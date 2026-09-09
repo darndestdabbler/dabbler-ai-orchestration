@@ -6948,7 +6948,7 @@ which are absent and why; every palette command named exists in the
 extension's `contributes.commands`; and no document instructs a manual commit
 after `bootstrap`.
 
-### Session 131 of 136: The three that stop a first-time operator
+### Session 131 of 137: The three that stop a first-time operator
 
 **Session 130 walked the UI path and fell into three holes in its first
 twenty minutes.** They are findings 1, 3 and 10 of `docs/uat/uat-walk-findings.md`,
@@ -7001,7 +7001,7 @@ names a command to run.
 **Not releasable.** These are what a first-time operator hits, so they will
 want shipping soon, but the whole block ships once at 136.
 
-### Session 132 of 136: The rest of the first-run path
+### Session 132 of 137: The rest of the first-run path
 
 **Findings 2, 4 and 5, owed as D259, D261 and D262.** None of them stops a
 person outright; each of them stops one operation with a message about
@@ -7038,7 +7038,7 @@ set-up given a remote records it and the branch tracks it.
 
 **Not releasable.**
 
-### Session 133 of 136: The four papercuts, and the walk's own record closed
+### Session 133 of 137: The four papercuts, and the walk's own record closed
 
 **Findings 6, 7, 8 and 9, owed as D263, D264, D265 and D266.** Each is small
 and each was hit by a walk that was not looking for it.
@@ -7072,7 +7072,7 @@ names the project directory's `.dabbler` in the discovery line.
 
 **Not releasable.**
 
-### Session 134 of 136: What the verifier is told, and what it can see
+### Session 134 of 137: What the verifier is told, and what it can see
 
 **Three sentences that stopped being true in session 100.** The managed
 body's *What comes back*, the scaffolded `dabbler.yaml`'s testing header and
@@ -7119,7 +7119,7 @@ every verifier reads. Holding it unreleased through 135 and 136 buys it two
 more sessions of real verification rounds in this repository before a seat
 ever sees it.
 
-### Session 135 of 136: The direct-API verifier can ask for a file, and .NET gets a root
+### Session 135 of 137: The direct-API verifier can ask for a file, and .NET gets a root
 
 **Parity with the seat, which has had this all along.** Across sessions
 100-109 the Copilot verifier read 312 files in 26 rounds, twelve to a round,
@@ -7199,7 +7199,78 @@ finding rate against the seat's 1.30 a session and the blind API path's 0.53.
 Turning it on by default is a separate decision that the measurement, not this
 session, settles.
 
-### Session 136 of 136: Codex undocumented, two labels the operator reads, and the block lands
+### Session 136 of 137: The suite the operator cannot work through
+
+**Three sessions have taken a swing at this and the machine is still
+unusable.** Session 76 put every test worker at below-normal OS priority;
+session 88 deleted that with `vitest.config.ts` and nothing noticed for
+twenty-five sessions; session 122 restored it and put a control on it so it
+cannot lapse silently again; session 126 put `--test-concurrency=4` back as
+D246 and measured it. Both protections are in place, both are audited, and
+the operator was crippled through session 135's run of record all the same.
+**So this session does not add a third protection of the same shape.** It
+measures what the operator actually experiences, and then it cuts the thing
+`docs/design/suite-cost.md` already names.
+
+**The note is unusually good ground, and it says where the load is.** Of the
+run's ~176 seconds, the eight walkthroughs hold about 416 seconds of work --
+`walk-session.test.ts` alone about 118, which is the floor no worker count
+goes below -- and the other 330 test files together cost about 30. Each
+walkthrough boots full CLI children under its worker. That is the load: not
+arithmetic, but process creation, on the operating system least able to
+afford it. The note also carries an open question in as many words -- the
+jump from 40 s to 102 s between sessions 98 and 99 is still unexplained --
+and a measurement that explains it is worth more than another guess.
+
+**Step one is a measurement, because the one that matters has never been
+taken.** Wall clock is recorded every session; what the operator feels is
+not. Through one run of record, sample the machine every few seconds -- CPU,
+disk queue length, free memory, process count -- and snapshot the process
+tree at each spike **with the priority class of every process in it**. That
+is the fact in question. `no-git.ts` calls `setPriority` in each test
+*worker*, and on Windows a child inherits its parent's class, so a
+walkthrough's CLI children are covered. But the runner process itself, the
+driver's `job-runner.cjs`, `dabbler.cjs`, and the extension suite's mocha --
+which loads no preload at all and is the run of record's other half -- are
+outside that call. A courtesy extended to the workers and not to the tree
+they hang from would explain precisely what 122 and 126 could not. The
+numbers, and what they say, go into `suite-cost.md` beside its table.
+
+**Step two is the lever, and session 96 already proved the pattern.** The
+walkthroughs spawn a whole CLI child per job where the test is not about
+spawning one; `journal.setGitSource` and `test/support/answers.ts` are how
+three hundred other files reach the framework without building anything, and
+session 96 cut the suite from 40 s to 17 s by using that seam rather than by
+throttling what it could not avoid. `walk-session.test.ts` is a third of the
+total and is where this starts. What genuinely tests the child boundary
+stays a child and says so where it stays.
+
+**Step three follows from step one, and only from it.** If the priority
+courtesy stops at the test worker, it moves to where the run of record is
+spawned, so every suite inherits it and the extension's mocha stops being
+the exception nobody declared. If step one says the tree is already
+below-normal, this step does not happen and the note records that the
+priority theory was tested and was wrong -- which is worth as much, and is
+what the last three attempts each failed to leave behind.
+
+**Steps.** (1) The measurement, through one real run of record, into
+`suite-cost.md`. (2) `walk-session.test.ts` off the CLI child where the test
+is not about the child. (3) The priority policy where step one says it
+belongs, or the finding recorded that it was already there.
+
+**Tests.** One, plus a measurement that is a recorded run and not a test:
+the priority policy is applied where step one puts it, proved by a spawned
+child's class and not by reading the source. The walkthrough's own
+assertions are its proof that step two changed nothing but how it reaches
+the framework.
+
+**Not releasable.** Nothing here ships; it changes how this repository's own
+suite runs. **The trap is that this session is measured by the thing it
+edits**: a change to `walk-session.test.ts` is a change to the run of record,
+so the run that judges this session is the first run of the new shape, and a
+green one that is also slower is a failure this plan is asking to see.
+
+### Session 137 of 137: Codex undocumented, two labels the operator reads, and the block lands
 
 **It cannot be tested here, so it is not claimed.** Codex comes out of the
 engine list in the managed body, the bootstrap templates, the registration
@@ -7257,14 +7328,14 @@ templates and the CLI help offer. (2) The registration's behaviour, and the
 decision recorded. (3) The session number on every terminal voice rule, the
 framework's and each job's. (4) The activity-bar and settings titles, and the
 tutorial re-rendered. (5) The version bump (`version.json`, then `npm run
-stamp:version`) and the release notes for sessions 131 to 136.
+stamp:version`) and the release notes for sessions 131 to 137.
 
 **Tests.** Two. A registration naming the undocumented engine behaves as the
 decision says, and a voice rule is headed with the session number where a
 job's rule is too. The labels get none: the manifest is the only copy, and the
 harness already reads it from there.
 
-**Releasable**, and it is the block's one release: sessions 131 to 135 reach
+**Releasable**, and it is the block's one release: sessions 131 to 136 reach
 a seat with it and not before.
 Releasability is declared at `start`, before the work, and the close refuses a
 releasable session with no packaging run on its record, so this is the session

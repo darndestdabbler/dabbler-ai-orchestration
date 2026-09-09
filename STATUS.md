@@ -1,4 +1,4 @@
-# STATUS — sessions 113–135 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, and session 135 letting the direct-API verifier ask for a file and giving .NET a root; session 136 is planned and carries the release; version 2.0.14
+# STATUS — sessions 113–135 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, and session 135 letting the direct-API verifier ask for a file and giving .NET a root; sessions 136 and 137 are planned, 136 for the suite that takes the machine and 137 for the release; version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
@@ -112,7 +112,40 @@
 > it on by default is a separate decision that the measurement settles, not
 > this session.
 
-> ## FOR SESSION 136, step 3 — why the operator never saw `S133:`
+> ## SESSION 136 INSERTED, 2026-09-09 — the suite the operator cannot work through
+>
+> **The operator was crippled through 135's run of record**, and said so while
+> it ran. The release session was renumbered 136 → 137 and a new 136 put ahead
+> of it, because a fourth attempt at this belongs before a release rather than
+> inside one.
+>
+> **What was looked at while 135 closed, and what it does and does not say.**
+> Sampling started after the run of record had finished — 135 was already at
+> `phase: close` — so **none of these numbers describe the burst**: CPU 31%,
+> disk 97% idle, Defender 0%, 29.8 GB free of 63.8 GB, `node --test
+> --test-concurrency=4` and its walk children winding down. The one useful
+> negative is that nothing was still saturated a minute after the suite ended,
+> so whatever the operator felt is inside the run and not a leak that outlives
+> it.
+>
+> **The fact nobody has recorded is the priority class of the process tree.**
+> `no-git.ts` calls `setPriority` in each test *worker* and a Windows child
+> inherits its parent's class, so a walkthrough's CLI children are covered —
+> but the runner process, the driver's `job-runner.cjs`, `dabbler.cjs`, and
+> the extension suite's mocha, which loads no preload at all, are all outside
+> that call. Sessions 122 and 126 both restored a protection without ever
+> measuring whether it reached the tree. **Step one of 136 is that
+> measurement**, and the entry says the finding is worth recording even if the
+> theory turns out to be wrong.
+>
+> **What is already known and needs no measuring** (`docs/design/suite-cost.md`):
+> the eight walkthroughs hold ~416 s of the ~176 s run, `walk-session.test.ts`
+> alone about 118 s — the floor no worker count goes below — and the other 330
+> test files together cost about 30 s. The load is process creation, not
+> arithmetic. Session 96 cut 40 s to 17 s with a seam rather than a throttle,
+> and that is the lever step two takes.
+
+> ## FOR SESSION 137, step 3 — why the operator never saw `S133:`
 >
 > Reported after installing the latest VSIX: no `S133:` appeared on any
 > *Dabbler* terminal voice rule. **The code is there and the bundle carries
@@ -133,7 +166,7 @@
 >   no change of voice at all, and the only rule on the scrollback is the
 >   plain `framework` one drawn before the session was known.
 >
-> **This is session 136's step 3, and it is bigger than a label.** Putting
+> **This is session 137's step 3, and it is bigger than a label.** Putting
 > the operator's `133 – framework` form on the rule and a session number on
 > a job's rule does not help if no rule is drawn. Step 3 should decide
 > whether the session's first framework rule is drawn *after* the banner
@@ -218,13 +251,14 @@
 > homeless once 133 took the last of D258–D267 — **is session 135's fourth
 > step**, deliberately not the release session's: 136 carries the release, and
 > a scaffold's behaviour change does not ride with it. It shares nothing with
-> 135's verifier work and says so in the entry. Session 136 takes the two
-> labels an operator reads: the session number on every *Dabbler* terminal
-> voice rule in the operator's own form (`134 – framework`, and a job's rule
-> headed at all, which it is not today), and the activity-bar container and
-> settings section renamed to *Dabbler AI Orchestration*, which the
-> extension's `displayName` has said all along. 135 goes to four tests and
-> 136 to two; both entries say which.
+> 135's verifier work and says so in the entry. **Session 137** — the release
+> session, renumbered from 136 when the suite session was inserted ahead of it
+> — takes the two labels an operator reads: the session number on every
+> *Dabbler* terminal voice rule in the operator's own form (`134 – framework`,
+> and a job's rule headed at all, which it is not today), and the activity-bar
+> container and settings section renamed to *Dabbler AI Orchestration*, which
+> the extension's `displayName` has said all along. 135 went to four tests and
+> 137 has two; both entries say which.
 
 > ## SESSION 133 CLOSED, 2026-09-08 — the four papercuts, and the walk's record closed
 >

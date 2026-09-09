@@ -277,8 +277,8 @@ async function runSuite(argv: readonly string[]): Promise<number> {
     writeErr(
       "dabbler test-evidence: refused -- the 'preverify-targeted' stage is " +
         "read-only history: the targeted pre-verification run was removed, " +
-        "and no new row may claim it. The verifier's authored tests run " +
-        "inside the round, and the complete suite is the run of record.\n",
+        "and no new row may claim it. The tests that run are each step's own " +
+        "checks, and the complete suite is the run of record.\n",
     );
     return EXIT_USAGE;
   }

@@ -185,9 +185,10 @@ Four kinds of instruction, and no fifth:
 
 Everything the framework now does for itself happens inside those calls:
 declaring the work, each step's own checks, cross-provider verification
-and its remediation rounds (the verifier runs its own tests inside the
-round), the complete suite as the run of record, the commit, the push,
-and the close. No other test run happens between a step and the round.
+and its remediation rounds, the complete suite as the run of record, the
+commit, the push, and the close. The tests that run are each step's own
+checks and that complete suite: the verifier reviews without writing or
+running one, and no other test run happens between a step and the round.
 None of them is yours to run, and none of them is yours to skip ahead to
 — the instruction in hand is the whole of what is asked. `dabbler
 version` says which router this is; report it when you report a problem.

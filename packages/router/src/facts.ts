@@ -69,6 +69,49 @@ export const DEFAULT_DIFF_EXCLUDES: readonly string[] = [
  */
 const IRREVERSIBLE_DELETE = "--irreversible-delete";
 
+/**
+ * How many lines of context the round's diff carries, widest first, with
+ * git's own default as the floor.
+ *
+ * The API verifier is blind: the bundle is everything it can see, so at
+ * three lines a modified file arrives as hunks with no surrounding function
+ * while a new file arrives whole. Measured over sessions 100-127, the seat
+ * verifier -- which reads what it likes -- raised 1.30 blocking findings a
+ * session against this path's 0.53 on a slightly higher total, so what
+ * blindness costs is not detection but the confidence to grade.
+ *
+ * The ladder is not a choice between a wider window and a narrower one: it
+ * is a choice between a wider window and a round that fails outright on a
+ * large session. A bundle that will not fit the cap at 24 is rendered again
+ * at 12, then 6, then 3, and only a bundle too large for git's own default
+ * still raises -- which is exactly what happens today, with the same message
+ * and the same escape hatch.
+ */
+const DIFF_CONTEXT_LADDER: readonly number[] = [24, 12, 6, 3];
+
+/** Code points, not UTF-16 units -- `checkEvidenceCap` measures the same. */
+function evidenceLength(rendered: string): number {
+  return [...rendered].length;
+}
+
+/**
+ * Render at the widest context that fits, and fall to the floor rather than
+ * fail. `renderAt` is given one ladder rung and returns the whole bundle at
+ * it; the last rung's render is returned unmeasured, so `checkEvidenceCap`
+ * is the single place an over-cap bundle is refused.
+ */
+function renderWidestThatFits(
+  renderAt: (context: number) => string,
+): string {
+  const cap = evidenceCharCap();
+  let rendered = "";
+  for (const context of DIFF_CONTEXT_LADDER) {
+    rendered = renderAt(context);
+    if (evidenceLength(rendered) <= cap) return rendered;
+  }
+  return rendered;
+}
+
 export const FACTS_FILENAME = "deterministic-facts.jsonl";
 
 // A control gets one word, and the four are not interchangeable. "pass" is
@@ -310,23 +353,36 @@ export function assembleEvidence(
   if (statusRun.code !== 0) {
     throw new FactsError(`git status failed: ${statusRun.stderr}`);
   }
-  const diffRun = runGit(repoRoot, [
-    "diff",
-    "--no-color",
-    IRREVERSIBLE_DELETE,
-    "HEAD",
-    "--",
-    ...pathspecs,
-  ]);
-  if (diffRun.code !== 0) {
-    throw new FactsError(`git diff failed: ${diffRun.stderr}`);
-  }
+  // Memoised, because the ladder may ask for a width the emptiness probe
+  // already paid for.
+  const diffs = new Map<number, string>();
+  const diffAt = (context: number): string => {
+    const seen = diffs.get(context);
+    if (seen !== undefined) return seen;
+    const diffRun = runGit(repoRoot, [
+      "diff",
+      "--no-color",
+      `-U${context}`,
+      IRREVERSIBLE_DELETE,
+      "HEAD",
+      "--",
+      ...pathspecs,
+    ]);
+    if (diffRun.code !== 0) {
+      throw new FactsError(`git diff failed: ${diffRun.stderr}`);
+    }
+    diffs.set(context, diffRun.stdout);
+    return diffRun.stdout;
+  };
   const { inlined, omitted, bookkeeping } = untrackedContents(
     repoRoot,
     pathspecs,
   );
   const allBookkeeping = [...bookkeeping, ...trackedBookkeeping(repoRoot)];
-  if (diffRun.stdout.trim() === "" && inlined.length === 0) {
+  // Emptiness is a property of the change, not of the context width: judged
+  // once, at the floor, where a diff that is empty is empty at every rung.
+  if (diffAt(DIFF_CONTEXT_LADDER[DIFF_CONTEXT_LADDER.length - 1]!).trim() ===
+      "" && inlined.length === 0) {
     throw new EvidenceEmptyError(
       "the evidence bundle is empty (no diff vs HEAD, no untracked " +
         "files). If the session's work is already committed, verify " +
@@ -337,13 +393,15 @@ export function assembleEvidence(
     "Complete diff (working tree vs `HEAD`; a deleted file is its header " +
     "alone, contents omitted; generated-bundle " +
     `exclusions: ${DEFAULT_DIFF_EXCLUDES.join(", ")})`;
-  const rendered = renderEvidence(
-    statusRun.stdout,
-    diffRun.stdout,
-    heading,
-    inlined,
-    omitted,
-    allBookkeeping,
+  const rendered = renderWidestThatFits((context) =>
+    renderEvidence(
+      statusRun.stdout,
+      diffAt(context),
+      heading,
+      inlined,
+      omitted,
+      allBookkeeping,
+    ),
   );
   checkEvidenceCap(rendered);
   return rendered;
@@ -368,30 +426,29 @@ export function assembleFixDeltaEvidence(
   }
   const pathspecs = buildDiffPathspecs();
   const statusRun = runGit(repoRoot, ["status", "--short"]);
-  const diffRun = runGit(repoRoot, [
-    "diff",
-    "--no-color",
-    IRREVERSIBLE_DELETE,
-    baselineTree,
-    currentTree,
-    "--",
-    ...pathspecs,
-  ]);
-  if (diffRun.code !== 0) {
-    throw new FactsError(`fix-delta diff failed: ${diffRun.stderr}`);
-  }
+  const diffAt = (context: number): string => {
+    const diffRun = runGit(repoRoot, [
+      "diff",
+      "--no-color",
+      `-U${context}`,
+      IRREVERSIBLE_DELETE,
+      baselineTree,
+      currentTree,
+      "--",
+      ...pathspecs,
+    ]);
+    if (diffRun.code !== 0) {
+      throw new FactsError(`fix-delta diff failed: ${diffRun.stderr}`);
+    }
+    return diffRun.stdout;
+  };
   const heading =
     `FIX DELTA ONLY (tree-to-tree: previous round ${baselineTree.slice(0, 12)}` +
     ` -> current working tree ${currentTree.slice(0, 12)}). This is NOT the ` +
     "full session diff — new defects are admissible only within these " +
     "hunks. A deleted file is its header alone, contents omitted.";
-  const rendered = renderEvidence(
-    statusRun.stdout,
-    diffRun.stdout,
-    heading,
-    [],
-    [],
-    [],
+  const rendered = renderWidestThatFits((context) =>
+    renderEvidence(statusRun.stdout, diffAt(context), heading, [], [], []),
   );
   checkEvidenceCap(rendered);
   return rendered;

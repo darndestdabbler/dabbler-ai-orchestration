@@ -2172,10 +2172,11 @@ ${this.stopArtifacts()}`,
   /**
    * No targeted suite runs here any more. Measured over sessions 70-77 the
    * selection cost 353-625 s per session and twice cost MORE than the full
-   * suite it approximates; the testing that remains is the verifier's
-   * authored tests inside the round and the complete suite as the run of
-   * record, which is unchanged. The phase name stays so an old record's
-   * `preverify` rows and stops still read as what they were.
+   * suite it approximates; the testing that remains is each step's own
+   * checks and the complete suite as the run of record, which is unchanged.
+   * The verifier reviews without writing or running one, and has not since
+   * `testphase.ts` went with the six-step workflow. The phase name stays so
+   * an old record's `preverify` rows and stops still read as what they were.
    */
   private async phasePreverify(): Promise<void> {
     this.setPhase("verify");

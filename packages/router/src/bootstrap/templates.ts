@@ -97,9 +97,10 @@ export const SHARED_BODY =
   "\n" +
   "Everything the framework now does for itself happens inside those calls:\n" +
   "declaring the work, each step's own checks, cross-provider verification\n" +
-  "and its remediation rounds (the verifier runs its own tests inside the\n" +
-  "round), the complete suite as the run of record, the commit, the push,\n" +
-  "and the close. No other test run happens between a step and the round.\n" +
+  "and its remediation rounds, the complete suite as the run of record, the\n" +
+  "commit, the push, and the close. The tests that run are each step's own\n" +
+  "checks and that complete suite: the verifier reviews without writing or\n" +
+  "running one, and no other test run happens between a step and the round.\n" +
   "None of them is yours to run, and none of them is yours to skip ahead to\n" +
   "— the instruction in hand is the whole of what is asked. `dabbler\n" +
   "version` says which router this is; report it when you report a problem.\n" +
@@ -403,10 +404,11 @@ export const PROJECT_CONFIG_HEADER =
 export const PROJECT_CONFIG_TESTING_HEADER =
   "\n" +
   "# Which tests answer for which path, and what proves the suite was green.\n" +
-  "# Nothing runs the selected tests before verification: the verifier runs\n" +
-  "# its own tests inside the round, and the complete suite is recorded once,\n" +
-  "# against the final verified tree. The selection is what the record NAMES\n" +
-  "# as affected by a change, and what `dabbler affected` prints.\n" +
+  "# Nothing runs the selected tests before verification: the tests that run\n" +
+  "# are each step's own checks, and the complete suite is recorded once,\n" +
+  "# against the final verified tree. The verifier reviews without writing\n" +
+  "# or running one. The selection is what the record NAMES as affected by a\n" +
+  "# change, and what `dabbler affected` prints.\n" +
   "#\n" +
   "# One suite per ecosystem whose root build file says how its tests run, so\n" +
   "# a repository that is Java and .NET at once hands each runner its own\n" +

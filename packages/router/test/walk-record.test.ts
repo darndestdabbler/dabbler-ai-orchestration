@@ -13,6 +13,7 @@ import { describe, it, type TestContext } from "node:test";
 import type { RouterConfig } from "../src/config.ts";
 import {
   EvidenceEmptyError,
+  EvidenceTooLargeError,
   assembleEvidence,
   assembleFixDeltaEvidence,
   collectControlFacts,
@@ -227,6 +228,43 @@ describe("a repository walked through the record one session leaves", () => {
     assert.ok(delta.includes("FIX DELTA ONLY (tree-to-tree: previous round") && delta.includes(baseline.slice(0, 12)));
     for (const name of ["new.txt", "big.txt", "raw.bin"]) unlinkSync(join(repo, name));
     git(repo, "checkout", "-q", "--", "src/widget.py");
+  });
+
+  milestone("the diff carries the code around the change, and narrows a rung rather than failing the round", () => {
+    const CAP = "AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS";
+    const before = process.env[CAP];
+    try {
+      delete process.env[CAP];
+      const lines = Array.from({ length: 400 }, (_, index) => `line ${index + 1}`);
+      writeFiles(repo, { "wide.txt": `${lines.join("\n")}\n` });
+      git(repo, "add", "-A");
+      git(repo, "commit", "-q", "-m", "a file long enough to tell the widths apart");
+      lines[199] = "line 200 CHANGED";
+      writeFiles(repo, { "wide.txt": `${lines.join("\n")}\n` });
+
+      // The widest rung: 24 lines each side of a one-line change is a
+      // 49-line hunk, where git's own default would have shown 7.
+      const wide = assembleEvidence(repo, sessionsDir, 1);
+      assert.match(wide, /@@ -\d+,49 \+\d+,49 @@/);
+
+      // A cap the widest render misses by a single character drops the
+      // bundle one rung: what comes back is UNDER the cap, at 12 lines of
+      // context, instead of an exception.
+      process.env[CAP] = String([...wide].length - 1);
+      const narrowed = assembleEvidence(repo, sessionsDir, 1);
+      assert.ok([...narrowed].length <= [...wide].length - 1, "the narrowed bundle is under the cap");
+      assert.match(narrowed, /@@ -\d+,25 \+\d+,25 @@/);
+
+      // The floor is still a refusal. The ladder removes a failure mode; it
+      // must not hide one, so a session too large for git's own three lines
+      // of context raises exactly as it did before the ladder existed.
+      process.env[CAP] = "200";
+      assert.throws(() => assembleEvidence(repo, sessionsDir, 1), EvidenceTooLargeError);
+    } finally {
+      if (before === undefined) delete process.env[CAP];
+      else process.env[CAP] = before;
+      git(repo, "checkout", "-q", "--", "wide.txt");
+    }
   });
 
   milestone("a quote is re-derived from the reviewed tree and an absence search is re-run over it", () => {

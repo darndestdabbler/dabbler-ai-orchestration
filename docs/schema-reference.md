@@ -59,7 +59,7 @@ are valid, `null` values are not):
 
 | Field | Type | Meaning |
 |---|---|---|
-| `engine` | string | e.g. `claude-code`, `codex`, `copilot`, `gemini` |
+| `engine` | string | e.g. `claude-code`, `copilot`, `gemini`; any name is recorded as given |
 | `provider` | string | seat descriptor; the *effective* provider is derived by registry lookup on `model` (`identity.ts`) |
 | `model` | string | registry alias or catalog id |
 | `effort` | string | |
@@ -346,8 +346,7 @@ The transcript is the same whether `driver.engine_output` (in
 `dabbler.yaml`; `--show-engine` overrides for one run) is `stream` or
 `quiet`: the mode decides what the terminal shows — Claude Code's
 stream-json as thinking / tool / text / result lines with only the `init`
-system event, Copilot's own progress lines, Codex's completed JSONL items —
-never what is recorded.
+system event, Copilot's own progress lines — never what is recorded.
 
 All three answers travel through the one engine verb. A step is answered
 with the flags (`--step --status --files --notes [--tests]`); a plan or a
@@ -423,7 +422,10 @@ otherwise `{kind, reason, at}` with `kind` one of `budget` \|
 clears it. `engine` names the adapter — `claude-code`, `copilot` or `codex`
 for the built-in command, `command:<program>` for `--engine-argv` — and a
 re-run through a different one is refused, because one engine's session
-store carries the run.
+store carries the run. The `codex` adapter is present and is **untested**:
+its argv shape was written from the published help and no session has been
+driven through it, so it is recorded like any other name and claimed
+nowhere.
 
 ## Metrics ledger — `router-metrics.jsonl`
 

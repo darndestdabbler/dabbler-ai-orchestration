@@ -57,7 +57,7 @@ const manifest = JSON.parse(
   };
 };
 
-/** The activity-bar icon's contributed title, e.g. "AI Orchestration". */
+/** The activity-bar icon's contributed title, e.g. "Dabbler AI Orchestration". */
 const CONTAINER_TITLE = manifest.contributes.viewsContainers.activitybar[0]!.title;
 
 /** One contributed view's own name, e.g. "Work Explorer", by its id. */

@@ -1,8 +1,8 @@
 {
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
-  "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
-  "version": "2.0.14",
+  "description": "Organize AI-led development like work: modules, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
+  "version": "2.0.15",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -18,7 +18,7 @@
     "agent workflow",
     "orchestration",
     "verification",
-    "session sets",
+    "modules",
     "planning",
     "dabbler"
   ],
@@ -43,7 +43,7 @@
       "activitybar": [
         {
           "id": "dabblerSessionSetsContainer",
-          "title": "AI Orchestration",
+          "title": "Dabbler AI Orchestration",
           "icon": "media/activity-bar-icon.svg"
         }
       ]
@@ -498,7 +498,7 @@
       }
     ],
     "configuration": {
-      "title": "AI Orchestration",
+      "title": "Dabbler AI Orchestration",
       "properties": {
         "dabbler.refreshSeconds": {
           "type": "number",
@@ -566,7 +566,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
-    "dabbler-ai-router": "2.0.14",
+    "dabbler-ai-router": "2.0.15",
     "yaml": "^2.7.0"
   }
 }

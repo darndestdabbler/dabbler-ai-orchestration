@@ -120,6 +120,20 @@ function lint(): number {
     process.stderr.write("workspace-check: suite-cost check failed\n");
     worst = Math.max(worst, suiteCost);
   }
+  // And the pages a stranger reads (`check-shipped-docs.mjs`). The
+  // Marketplace page required Python for a hundred sessions after the
+  // Python was deleted, because prose is the one surface the suite cannot
+  // see: a test asserts on behaviour, and a README that lies still
+  // compiles. It rides here so a stale page fails a session's own facts
+  // rather than waiting for a human to read it.
+  const shippedDocs = run(
+    [join(REPO_ROOT, "packages", "router", "scripts", "check-shipped-docs.mjs")],
+    REPO_ROOT,
+  );
+  if (shippedDocs !== 0) {
+    process.stderr.write("workspace-check: shipped-docs check failed\n");
+    worst = Math.max(worst, shippedDocs);
+  }
   return worst;
 }
 

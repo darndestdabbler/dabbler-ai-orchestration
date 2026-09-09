@@ -8608,3 +8608,76 @@ Walk finding 9 of session 130. packages.ts spawns the ecosystem build with shell
 ### D267 · 2026-09-08 · Orchestrator · Owed: no test suite is ever declared for a solution built by either walkthrough
 
 Walk finding 10 of session 130. Bootstrap must run before any project file exists, so it declares no suite and says so. Nothing revisits it; the lifecycle moment where the ecosystem becomes known is the first pack, where ensureRootFiles already writes that ecosystem root build files and knows what a maven or dotnet suite command would be. What makes it a defect rather than a nuance: with a selection rule and no suite, dabbler affected prints the configured-rule line the walkthroughs tell the reader to look for, and then says "no suite is declared, so there is no command to run" on the next line. The reader check reads as a pass over an empty run of record. This is the .NET reference run "two sessions closed green having run no tests at all", diagnosed one level deeper: the missing thing is the suite, not the rule. Bucket: framework.
+
+## Session 137 — The page a buyer reads, the heading an operator never saw, and the block lands
+
+### D268 · 2026-09-09 · Orchestrator (claude-opus-5/anthropic) · Codex is accepted and undocumented: the name still registers and records, and every list a reader is taught from names claude-code, gemini and copilot
+
+**What a `--engine codex` registration does.** It is accepted, recorded
+exactly as given, and claimed nowhere. `engines.ts` is untouched:
+`BUILT_IN_ENGINES` still carries `codex` with the argv shape written from
+its published help, and the identity machinery does not care which engine
+name it stores. Refusing the name would strand whoever is already mid-plan
+under it, and would buy nothing — a name the framework refuses is not the
+same as a path the framework tested.
+
+**Why it left the documents.** No session has ever been driven through
+Codex here, and its CLI's help was never read on the machine this was
+built on. Every place a reader is *taught* the engine list — the managed
+body the bootstrap templates write, the `--engine` help on `session start`
+and `session drive`, `docs/quick-start.md`, `docs/driving-a-session.md`,
+`docs/onboarding/README.md` and its deck, `docs/schema-reference.md`'s
+`engine` field — now names `claude-code`, `gemini` and `copilot`. Where
+the name survives it survives with the word **untested** beside it, which
+is the difference the decision turns on: undocumented, not unsupported.
+
+**Two places kept it deliberately, and both are facts rather than
+teaching.** `docs/schema-reference.md` still names `codex` among the
+adapters `stop.engine` can hold, because that is what the code holds and a
+schema reference that hid it would be wrong about the record; the sentence
+beside it now says the adapter is untested. And the extension's engine
+picker keeps its row, marked `openai — untested`. A picker is not a
+document: dropping the row would strand an operator at the one command
+that starts their session while the CLI still accepts the name they
+registered under. The two UAT walkthroughs transcribe that picker, so they
+carry the same marking rather than a shorter list that would no longer
+match what a person sees.
+
+**The one thing that must hold** is that the ledger says what it was told.
+`packages/router/test/session.test.ts` — *records an undocumented engine
+exactly as it was given* — registers under `codex` and asserts the
+orchestrator block comes back `codex` / `openai` / `direct`, with no
+substitution and no silent promotion to a documented name.
+
+### D269 · 2026-09-09 · Orchestrator (claude-opus-5/anthropic) · The engine picker offers only the CLIs that were measured, so Codex leaves it too: D268 holds everywhere else
+
+**What changed, and what did not.** [[D268]] stands in every other part:
+`--engine codex` is accepted, recorded exactly as given, `engines.ts` is
+untouched, and the documents say *untested* rather than *unsupported*.
+What changes is the one place D268 argued should keep it — the extension's
+engine picker — which now offers Claude Code and GitHub Copilot only.
+
+**Why D268's reasoning was the wrong shape.** It treated the picker as a
+list of engine *names*, and reasoned that removing a name the CLI still
+accepts would strand somebody. The picker is not a list of names. It is a
+list of CLIs **Start Session will launch**, and `ENGINE_CLI`'s own comment
+says which of them were measured: `claude` and `copilot` against their
+published `--help`, and `codex` against nothing, on a machine where it was
+never installed. Offering that row puts an unmeasured launch in front of a
+person at the one command that begins their work — and the two UAT
+walkthroughs, which transcribe the picker verbatim, would go on scripting
+a choice no walk has ever taken. A marking cannot fix that: `untested`
+tells a reader something about the engine, not about whether the button
+works.
+
+**Nobody is stranded.** `dabbler session next`, typed in a terminal, is
+the documented loop and takes the name as it always did; Start Session
+only opens a terminal with the opening sentence in it. `ENGINE_CLI` keeps
+its `codex` entry, so a session already registered under the name still
+resumes — which is the difference between resuming what exists and
+proposing it to someone new.
+
+**Raised by verification round 1 of session 137**, as a blocking finding
+against the plan's own instruction that Codex leave the walkthrough engine
+lists. The finding was right and the departure was not: the session took
+it as a fix rather than disputing it.

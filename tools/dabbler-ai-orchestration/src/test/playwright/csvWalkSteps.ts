@@ -69,7 +69,7 @@ export const WALK_STEPS: readonly WalkStep[] = [
     title: "Open the solution",
     operator: [
       "Open the CSV solution folder in VS Code.",
-      "Click the **AI Orchestration** icon in the activity bar.",
+      "Click the **Dabbler AI Orchestration** icon in the activity bar.",
     ],
     expect: [
       "Two panes appear: **Solution Explorer** and **Work Explorer**.",

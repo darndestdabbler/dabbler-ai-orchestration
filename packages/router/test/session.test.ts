@@ -276,6 +276,29 @@ describe("registering a session", () => {
     }
   });
 
+  it("records an undocumented engine exactly as it was given", async () => {
+    // Session 137 took `codex` out of every engine list a reader picks from
+    // and left the name working: the documents say untested, not
+    // unsupported. Refusing it would strand whoever is already mid-plan on
+    // it for no gain, and the identity machinery does not care which name it
+    // stores -- so the one thing that must hold is that the ledger says what
+    // it was told, with no substitution and no silent promotion.
+    const state = stateDir();
+    try {
+      const registered = await run(() =>
+        start(state.sessionsDir, { engine: "codex", provider: "openai" }),
+      );
+      assert.equal(registered.code, EXIT_OK);
+      assert.deepEqual(sessionOf(state.sessionsDir)["orchestrator"], {
+        engine: "codex",
+        provider: "openai",
+        identityProvenance: "direct",
+      });
+    } finally {
+      state.restore();
+    }
+  });
+
   it("says the next call is `session next`, and names neither the declaration nor the affected tests", async () => {
     // Both were the typed lifecycle's recipe, printed at the one moment an
     // engine had just read the managed body saying the framework does them.

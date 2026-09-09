@@ -45,7 +45,7 @@ This writes a fenced managed block into `AGENTS.md`, `CLAUDE.md` and
 `GEMINI.md`. `AGENTS.md` carries the body; the other two carry a
 one-line `@AGENTS.md` import plus their engine tail, so the instructions
 exist in exactly one place. All three are written because no single
-engine reads all three: Codex and Copilot read `AGENTS.md`, Claude Code
+engine reads all three: Copilot reads `AGENTS.md`, Claude Code
 reads only `CLAUDE.md`, and Gemini CLI reads only `GEMINI.md` unless its
 `context.fileName` setting is changed — while Copilot reads every one of
 them and de-duplicates nothing, which is why only one may hold the body.
@@ -86,6 +86,30 @@ dabbler bootstrap --print-plan-prompt
 dabbler bootstrap --print-decomposition-prompt
 ```
 
+### 1b. Modules, if the solution has more than one
+
+A solution is declared as modules in `docs/modules.yaml` — a slug, a kind,
+the code roots it owns, and the siblings it depends on. `dabbler modules
+create` writes one and `dabbler modules show` reads them back. The reason
+to bother is what it does to a session: a session whose plan section says
+`Module: <slug>` runs **focused**, in a git-enabled partial checkout of
+that module built for the session and discarded after — its own source,
+its siblings' contracts and packages, and not their code. The engine then
+reads a codebase the size of the work rather than the size of the
+repository.
+
+That wall is measured, not assumed: a focused session writes an exposure
+manifest and the close runs the `exposure_within_ceiling` gate over it. A
+session that cannot proceed without a sibling's source asks with `dabbler
+session next --request-grant <slug> --reason <why>` and waits for the
+answer; it never takes it. A session that must change two modules is
+declared **global** at the start and runs in the repository itself.
+
+The verbs for one module are `dabbler module contract | pack | open |
+preflight | grant | revoke`. A single-module repository needs none of
+this: with no manifest the repository is one implicit module and every
+session is global.
+
 ## 2. Start a session
 
 ```
@@ -94,10 +118,15 @@ dabbler session start --engine <engine>
 
 No command names a sessions root: there is one per repository and it is
 derived from the working directory.
-`--engine` is required (e.g. `claude-code`, `codex`, `copilot`,
-`gemini`); `--provider`, `--model`, and `--effort` record the seat
-identity (Copilot seats must pass `--model` — the seat label is not
-trusted). The start registers the session in `sessions.json` and
+`--engine` is required — `claude-code`, `gemini` or `copilot`;
+`--provider`, `--model`, and `--effort` record the seat identity
+(Copilot seats must pass `--model` — the seat label is not trusted).
+`codex` is accepted and recorded like any other name, and is left
+undocumented here because it is **untested**: no session has been driven
+through it. The lifecycle does not care which engine name it stores, so
+nothing refuses it and nothing claims it was tried. The start registers
+the session in
+`sessions.json` and
 seeds the spec's step list into `activity-log.json` once. It is
 idempotent — safe to re-run after a context reset. It refuses to start
 a session that is already in flight, re-open a completed one, or skip

@@ -1,8 +1,8 @@
 // The text bootstrap writes, and nothing that decides when to write it.
 //
 // One canonical instruction block carries the whole session workflow; it is
-// written into `AGENTS.md` (Codex, Copilot, Gemini -- every orchestrator that
-// reads that convention) and `CLAUDE.md` (Claude Code), differing only in a
+// written into `AGENTS.md` (Copilot, and every other orchestrator that reads
+// that convention) and `CLAUDE.md` (Claude Code), differing only in a
 // short engine tail. Copilot loads all three at once and de-duplicates
 // nothing, which is why exactly one of them may carry the body.
 //
@@ -70,7 +70,7 @@ export const SHARED_BODY =
   "separate verb, and it is the one that carries who is working:\n" +
   "\n" +
   "    dabbler session start --sessions-dir docs/sessions \\\n" +
-  "        --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>\n" +
+  "        --engine <claude-code|gemini|copilot> --provider <anthropic|openai|google>\n" +
   "\n" +
   "A Copilot seat adds `--model` (the seat label is not trusted; identity\n" +
   "resolves through the model registry). **Every `next` call carries none of\n" +
@@ -180,10 +180,11 @@ export const CLAUDE_TAIL =
   "read.\n";
 
 /**
- * Codex and Copilot read `AGENTS.md`, the one file with the body.
+ * Copilot reads `AGENTS.md`, the one file with the body, and so does any
+ * other engine that follows the convention.
  */
 export const AGENTS_TAIL =
-  "## Engine tail (Codex / GitHub Copilot)\n" +
+  "## Engine tail (GitHub Copilot)\n" +
   "\n" +
   "You read this `AGENTS.md` directly. `CLAUDE.md` and `GEMINI.md` import\n" +
   "it rather than repeating it, so this file is the one place the body\n" +

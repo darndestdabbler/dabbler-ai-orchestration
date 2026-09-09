@@ -158,7 +158,7 @@ framework holds the state.
 separate verb, and it is the one that carries who is working:
 
     dabbler session start --sessions-dir docs/sessions \
-        --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>
+        --engine <claude-code|gemini|copilot> --provider <anthropic|openai|google>
 
 A Copilot seat adds `--model` (the seat label is not trusted; identity
 resolves through the model registry). **Every `next` call carries none of
@@ -258,7 +258,7 @@ wait for the answer before starting the next one.
 
 ---
 
-## Engine tail (Codex / GitHub Copilot)
+## Engine tail (GitHub Copilot)
 
 You read this `AGENTS.md` directly. `CLAUDE.md` and `GEMINI.md` import
 it rather than repeating it, so this file is the one place the body

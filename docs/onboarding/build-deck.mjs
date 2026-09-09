@@ -135,13 +135,13 @@ export const SLIDES = [
     ],
   },
   {
-    id: "start-claude-codex",
-    title: "Getting started with Claude Code or Codex",
+    id: "start-claude-code",
+    title: "Getting started with Claude Code",
     media: [],
     layout: "text",
     subtitle: "Your own CLI, and direct provider accounts.",
     bullets: [
-      "You need VS Code 1.135+, Node.js 22.18+, and Claude Code or Codex installed and signed in.",
+      "You need VS Code 1.135+, Node.js 22.18+, and Claude Code installed and signed in.",
       "Two providers at minimum. Verification is cross-provider by design — the reviewer is never the provider that wrote the code — so one key is not enough.",
       "The keys live in environment variables and nowhere else: never in dabbler.yaml, never in local-overrides.yaml, never in a file you might commit. Configuration names a credential; it never holds one.",
       "Set them where new shells inherit them — on Windows with setx or System Properties, elsewhere in your shell profile.",

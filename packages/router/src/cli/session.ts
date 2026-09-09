@@ -75,7 +75,7 @@ const IMPLEMENTED = Object.keys(SUMMARY);
  */
 const OPTIONS: Record<string, readonly string[]> = {
   start: [
-    "  --engine ENGINE          required: claude-code | codex | gemini | copilot",
+    "  --engine ENGINE          required: claude-code | gemini | copilot",
     "  --provider PROVIDER      required: anthropic | openai | google",
     "  --model MODEL            required for a Copilot seat; identity resolves through",
     "                           the model registry rather than the seat label",
@@ -144,7 +144,7 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  to watcher-only -- the loop waits, and the clock readings say what is owed.",
   ],
   drive: [
-    "  --engine ENGINE          required: claude-code | codex | gemini | copilot -- who",
+    "  --engine ENGINE          required: claude-code | gemini | copilot -- who",
     "                           is registered as the session's orchestrator",
     "  --provider PROVIDER      anthropic | openai | google; required for a fresh registration",
     "  --model MODEL            required for a Copilot seat",

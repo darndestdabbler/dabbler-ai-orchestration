@@ -35,8 +35,8 @@ session by one step, and prints the next instruction on stdout. You do
 what the instruction says, run the command it names, and call `next`
 again — until it says `done`.
 
-**The engine stays in its own CLI.** Nothing spawns Claude Code or Codex
-or a Copilot seat; you are already talking to one, in the terminal you
+**The engine stays in its own CLI.** Nothing spawns Claude Code or Gemini
+CLI or a Copilot seat; you are already talking to one, in the terminal you
 like, with your own context, your own scrollback and your own interrupt
 key. The whole instruction an engine needs is one sentence: *call `dabbler
 session next` and do what it says until it says `done`.*
@@ -550,7 +550,8 @@ run the session for you, and it never stands between you and your engine.
 Code terminal at the repository root running *that engine's own CLI*,
 interactively. Where the CLI takes an opening prompt in its arguments the
 sentence is already there; where it does not, the sentence is typed at the
-prompt for you to press Enter on. From the walk, the three engines:
+prompt for you to press Enter on. From the walk, the two engines whose
+CLIs were measured:
 
 ```
 TERMINAL Claude Code
@@ -566,10 +567,10 @@ TERMINAL GitHub Copilot
 
 Claude Code takes a positional prompt and starts interactive by default.
 The Copilot CLI has no positional prompt — its `-p` is documented as
-non-interactive — so the sentence is typed and left for you. Codex is
-treated the same way, and for a plainer reason: its help was not read on
-the machine this was built on, and an argument a CLI does not take is a
-launch that fails in front of you.
+non-interactive — so the sentence is typed and left for you. Any engine
+whose CLI has not been measured here is launched the same way, for a
+plainer reason: an argument a CLI does not take is a launch that fails in
+front of you, and a typed sentence costs one keypress instead.
 
 **What Start does not do.** It spawns no driver. It copies nothing to the
 clipboard and pastes nothing into a chat. After it opens the terminal, the
@@ -759,7 +760,8 @@ Under the pull there is no such bound. The engine is your own CLI, and its
 bill is yours.
 
 An engine's conversation is resumed **by its id** — the `session_id`
-Claude Code reports, the `thread_id` Codex reports — never by asking for
+Claude Code reports, whatever its own protocol calls the same thing on
+another engine — never by asking for
 the most recent conversation in the directory. Session 60 asked for the
 most recent one and got an interactive session somebody had opened in the
 same working directory since.

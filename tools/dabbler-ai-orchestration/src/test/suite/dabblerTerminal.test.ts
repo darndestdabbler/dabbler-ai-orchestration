@@ -633,6 +633,55 @@ suite("the session from its registration, and each step as it starts", () => {
     terminal.dispose();
     rmrf(root);
   });
+
+  test("heads a job's rule with the session number too", () => {
+    // `verify-round-1` alone could head a group belonging to any session on
+    // a scrollback that has held several. The framework's rule has carried
+    // the number since session 126; a job's carried nothing at all.
+    const { root, written, terminal } = drivenRepo({ session_number: 62, phase: "verify", job: null, stop: null });
+    terminal.open({ columns: 80, rows: 20 });
+    terminal.poll();
+    written.length = 0;
+    const jobs = path.join(root, ".dabbler", "runs", "s62", "driver", "jobs");
+    fs.writeFileSync(path.join(jobs, "verify-round-1.log"), "reviewing\n", "utf8");
+    terminal.poll();
+    const said = plain(written.join(""));
+    assert.match(said, /─ S62: verify-round-1 ─/, said);
+    assert.ok(!/─ verify-round-1 ─/.test(said), said);
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("gives a session that puts no job output on the terminal a numbered heading anyway", () => {
+    // The operator's report: no `S133:` on any voice rule. The cause is not
+    // the label -- `voice()` returns it -- but the occasion: `emit` draws a
+    // rule only when the speaker changes, and a session driven from a chat
+    // never changes voice, so no numbered rule is ever drawn. The banner is
+    // the decided heading for that group, and this is the test that fails if
+    // it stops being drawn; a label-only test would pass with the operator's
+    // complaint still true.
+    const { root, written, terminal } = drivenRepo({ session_number: 133, phase: "steps", job: null, stop: null });
+    terminal.open({ columns: 80, rows: 20 });
+    terminal.poll();
+    const said = plain(written.join(""));
+    // No job ever spoke, so no voice rule was occasioned...
+    assert.ok(!/─ S133: framework ─/.test(said), said);
+    // ...and the session is headed by its number ONCE -- a second banner
+    // would be two headings for the group this one heads, which is the
+    // whole reason the rule is not drawn here either.
+    const rows = said.split("\r\n");
+    const headings = rows.flatMap((line, at) => (line.trim() === "SESSION 133" ? [at] : []));
+    assert.deepStrictEqual(headings.length, 1, said);
+    const heading = headings[0]!;
+    assert.strictEqual(rows[heading - 1], "═".repeat(79));
+    assert.strictEqual(rows[heading + 1], "═".repeat(79));
+    // And the framework's first line of the session follows that banner,
+    // rather than standing above it under the unnumbered opening rule.
+    const phase = rows.findIndex((line) => line.includes("now=steps"));
+    assert.ok(phase > heading + 1, said);
+    terminal.dispose();
+    rmrf(root);
+  });
 });
 
 suite("the outline", () => {
@@ -814,7 +863,7 @@ suite("the first look, and the rule between voices", () => {
     });
     terminal.poll();
     const after = plain(written.join(""));
-    assert.match(after, /─ close ─+\r\nclose: pushed 1 round ref\(s\)\r\n/, after);
+    assert.match(after, /─ S62: close ─+\r\nclose: pushed 1 round ref\(s\)\r\n/, after);
     // The framework's rule carries the session's number once one is known.
     assert.match(after, /─ S62: framework ─+\r\n14:30:05 paused/, after);
     // An empty line stands before each rule, so the groups have room
@@ -826,12 +875,12 @@ suite("the first look, and the rule between voices", () => {
     assert.ok(said.startsWith("─"), said.slice(0, 40));
     // The rule spans the terminal's width, one column short, and follows it
     // through a resize because it is drawn again with everything else.
-    const rule = after.split("\r\n").find((line) => line.includes("─ close ─")) ?? "";
+    const rule = after.split("\r\n").find((line) => line.includes("─ S62: close ─")) ?? "";
     assert.strictEqual(rule.length, 99, rule);
     written.length = 0;
     terminal.setDimensions({ columns: 40, rows: 20 });
     await new Promise((resolve) => setTimeout(resolve, 40));
-    const narrow = plain(written.join("")).split("\r\n").filter((line) => line.includes("─ close ─"));
+    const narrow = plain(written.join("")).split("\r\n").filter((line) => line.includes("─ S62: close ─"));
     assert.strictEqual(narrow.length, 1);
     assert.strictEqual(narrow[0]?.length, 39, narrow[0]);
 

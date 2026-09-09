@@ -76,7 +76,15 @@ export const ENGINES: readonly EngineChoice[] = [
     description: "anthropic",
     modelRequired: false,
   },
-  { label: "Codex", engine: "codex", provider: "openai", description: "openai", modelRequired: false },
+  // Codex is not here, and `--engine codex` still registers and records
+  // (D268, D269). The distinction is what this list IS: not a set of names
+  // the ledger accepts, but a set of CLIs Start Session will LAUNCH. Every
+  // row below was measured against its own `--help`; codex never was --
+  // ENGINE_CLI's comment says so in as many words -- so offering the row
+  // would put an unmeasured launch in front of a person at the one command
+  // that starts their work, and the two UAT walkthroughs would transcribe
+  // a choice no walk has ever taken. Typing `dabbler session next` in a
+  // terminal is the documented loop and takes the name as it always did.
   {
     label: "GitHub Copilot",
     engine: "copilot",
@@ -102,7 +110,10 @@ export const ENGINES: readonly EngineChoice[] = [
  * - `codex`: NOT installed on the machine this was written on, so its help
  *   was not read and nothing here claims to know it. It opens with no
  *   prompt: an argv a CLI does not take is a launch that fails in front of
- *   the person, and the sentence costs them one keypress instead.
+ *   the person, and the sentence costs them one keypress instead. The
+ *   entry stays because a session already registered under the name is
+ *   still resumable; ENGINES no longer offers it, which is the difference
+ *   between resuming what exists and proposing it to someone new.
  */
 const ENGINE_CLI: Readonly<Record<string, { program: string; carriesPrompt: boolean }>> = {
   "claude-code": { program: "claude", carriesPrompt: true },

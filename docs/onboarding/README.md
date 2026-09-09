@@ -2,7 +2,7 @@
 
 `dabbler-onboarding.pptx` introduces the framework to someone who has
 never seen it: what the extension is, why it is in the room, how to set a
-project up on a Copilot seat or on your own Claude Code / Codex, what the
+project up on a Copilot seat or on your own Claude Code, what the
 two Explorers say, what driving a session looks like, and what happens
 when the framework stops.
 

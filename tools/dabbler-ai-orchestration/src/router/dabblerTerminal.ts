@@ -598,6 +598,21 @@ function jobLabel(logPath: string): string {
   return path.basename(logPath).replace(/\.log$/, "");
 }
 
+/**
+ * A voice's name with the session's number set into it, for the heading of
+ * the group it leads: `S137: verify-round-1`.
+ *
+ * Both the framework's rule and a job's are headed this way, because a
+ * scrollback that has held several sessions is read back one group at a
+ * time and `verify-round-1` alone could head any of them. Before a session
+ * is known the bare name is the whole heading; a group written under a
+ * number keeps that number when the terminal replays it, because the group
+ * really did belong to that session.
+ */
+function numbered(name: string, session: number | undefined): string {
+  return session === undefined ? name : `S${session}: ${name}`;
+}
+
 /** A record's own timestamp as a Date, or null when it will not parse. */
 function recordedAt(value: unknown): Date | null {
   if (typeof value !== "string" || value === "") return null;
@@ -1039,6 +1054,21 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    * the framework speaking: the lines under it are the framework's until
    * a job's bytes arrive, and a voice rule directly beneath a banner would
    * be two headings for one group.
+   *
+   * **The banner IS the session's numbered heading, and that is the
+   * decision.** It was reported that no `S133:` ever appeared on a voice
+   * rule, and the cause is here rather than in `voice()`: `emit` draws a
+   * rule only when the speaker changes, this sets the speaker to the
+   * numbered voice without drawing one, and a session driven from a chat
+   * puts no job output on this terminal -- so its voice never changes and
+   * no numbered rule is ever occasioned. The alternative was to draw the
+   * session's first framework rule here, numbered. It is rejected: it
+   * restores exactly the two headings for one group this comment was
+   * written to prevent, and `SESSION 133` between double rules in the
+   * milestone tone is already a heading that names the session more
+   * plainly than `S133: framework` does. What the report is owed instead
+   * is the number on the headings that ARE drawn -- a job's rule as well
+   * as the framework's, which is what `numbered()` gives both.
    */
   private sayBanner(label: string): void {
     const voice = this.voice();
@@ -1678,7 +1708,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       return;
     }
     if (appended === "") return;
-    const label = jobLabel(logPath);
+    const label = numbered(jobLabel(logPath), this.bannered);
     this.remember({ kind: "raw", label, bytes: appended });
     this.say(forTerminal(appended), label);
   }
@@ -1706,7 +1736,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    * several sessions reads which one a group belongs to from its heading.
    */
   private voice(): string {
-    return this.bannered === undefined ? FRAMEWORK_VOICE : `S${this.bannered}: ${FRAMEWORK_VOICE}`;
+    return numbered(FRAMEWORK_VOICE, this.bannered);
   }
 
   /**

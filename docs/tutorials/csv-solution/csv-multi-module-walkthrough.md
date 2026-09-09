@@ -117,7 +117,7 @@ the sessions grouped **by module** under a **Not Started** bucket.
 ### Open the solution
 
 Open the CSV solution folder in VS Code.
-Click the **AI Orchestration** icon in the activity bar.
+Click the **Dabbler AI Orchestration** icon in the activity bar.
 
 **You should see:**
 

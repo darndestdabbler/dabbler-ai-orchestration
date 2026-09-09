@@ -3,20 +3,80 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-> **Unreleased entries live in [`changelog.d/`](changelog.d/), not in this
-> file (Set 122 S4).** This file is no longer an append target. Every
-> session writes its own fragment, so two developers running concurrent
-> session sets cannot collide here — that guaranteed merge conflict is
-> what the partition removes (verdict §7). Read the whole changelog,
-> pending entries included, with:
->
-> ```
-> python -m ai_router.changelog render --target extension
-> ```
->
-> The operator folds the fragments into a version section at release time
-> (`python -m ai_router.changelog fold --target extension`). Full contract:
-> [`docs/partitioned-append-files.md`](../../docs/partitioned-append-files.md).
+> **This file is the changelog.** An earlier framework partitioned
+> unreleased entries into `changelog.d/` fragments and rendered them with
+> a command that no longer exists; that directory is empty and the
+> renderer went with the implementation it belonged to. Entries are
+> written here, in a version section, by the session that carries the
+> release.
+
+## [2.0.15] — 2026-09-09
+
+The first version section since `0.51.0`: the `2.0.x` line was built and
+carried forward without one, so this entry covers the block that ends
+here rather than a single session's worth of change.
+
+### Fixed
+
+- **The first hour works now.** Ten defects found by walking the product
+  as a stranger — from an empty folder to a running multi-module solution
+  — are answered: the ones that stopped a first-time operator before they
+  reached their first session, the ones in the rest of the first-run
+  path, and four papercuts after them. A .NET solution now gets a root
+  `.slnx` written before the suite is detected, so `dotnet test` has a
+  root to resolve instead of failing with `MSB1003`.
+- **The Marketplace page stopped describing a product that was
+  deleted.** It required Python 3.11+ on PATH, told you to `pip install
+  dabbler-ai-router`, said setup creates a `.venv`, and described the
+  extension as a renderer of `python -m ai_router.progress` — none of
+  which has been true since the Python was removed. It also offered a
+  *waiver* the router refuses by name, and counted five close gates where
+  there are nine. All corrected, and a check in the lint control now
+  fails the build when a shipped page names a runtime or a unit of work
+  this product does not have, so it cannot go stale again unnoticed.
+
+### Added
+
+- **Modules are explained.** The feature that gives a session a
+  git-enabled partial checkout of one module — its own source, its
+  siblings' contracts and packages, built on the fly and discarded after
+  — is now described on the Marketplace page, the repository README and
+  the quick start, with the reason ahead of the configuration: the AI
+  reads a codebase the size of the work rather than the size of the
+  repository, and the close measures what it actually saw.
+- **Two real screenshots**, replacing one drawing of a tree two versions
+  old: this repository's panel with a session in flight and its steps,
+  and a four-module solution with each module holding its own session —
+  the second captured against a running VS Code by the same walk that
+  tests it.
+- **The verifier can see more of what it is reviewing.** What it is told
+  about the tests in a diff was corrected, the diff context ladder was
+  widened, and on the direct-API path a verifier may now ask for a file
+  by name and be given it, inside the session's own scope and a read
+  budget the framework enforces rather than counts. Behind a setting that
+  defaults off.
+
+### Changed
+
+- **The suite stopped taking the machine.** The run of record was
+  measured rather than guessed at: nothing is saturated, and the cost is
+  process creation — 363 distinct processes beneath one run. The
+  walkthrough that spawned a full CLI per job now runs those jobs in
+  process where the test is not about the child, and the courtesy that
+  kept test workers below normal priority moved to where the framework
+  spawns a job, so every suite it runs inherits it. Measured, controlled
+  and uninstrumented: 216 s to 190 s.
+- **The activity-bar and settings titles read `Dabbler AI
+  Orchestration`**, matching the listing. The container id and every
+  setting id are unchanged, so nothing moves in your activity bar and no
+  setting you have written is lost.
+- **A voice rule in the Dabbler terminal carries the session it belongs
+  to** — a job's rule as well as the framework's, so a scrollback holding
+  several sessions can be read back a group at a time.
+- **Codex is undocumented, not unsupported.** Nothing has ever driven a
+  session through it, so it comes out of the engine lists you are taught
+  from; the name is still accepted and recorded, and the picker still
+  offers it, marked `untested`.
 
 ## [0.51.0] — 2026-08-15
 

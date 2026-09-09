@@ -2679,6 +2679,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.14"
+    },
+    {
+      "number": 137,
+      "title": "The page a buyer reads, the heading an operator never saw, and the block lands",
+      "status": "in-progress",
+      "startedAt": "2026-09-09T04:57:14.756000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.14",
       "verification": {
         "rounds": 2,
@@ -2686,15 +2706,6 @@
         "verifierProvider": "openai",
         "transport": "api"
       }
-    },
-    {
-      "number": 137,
-      "title": "Codex undocumented, the heading an operator never saw, and the block lands",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     }
   ]
 }

@@ -542,8 +542,10 @@ start: refused -- the working tree carries N change(s) (...); the module's clone
 - **You —** in the Solution Explorer, **Dabbler: Start Focused Session** on
   the `model` row. Two prompts:
   *`Start session — which engine runs it?`* — pick `Claude Code`
-  (`anthropic`), `Codex` (`openai`), or `GitHub Copilot` (`openai — a seat
-  also needs a model`).
+  (`anthropic`) or `GitHub Copilot` (`openai — a seat also needs a
+  model`). Those two are what Start launches: an engine whose CLI has not
+  been measured is not offered here, and is started by typing `dabbler
+  session next` in a terminal of your own instead.
   *`Start session — model for <engine>`* — blank for the engine's default;
   on a seat, the model, e.g. `gpt-5.4`.
   The module's window opens with the AI's terminal running and the opening

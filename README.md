@@ -23,9 +23,9 @@ There is one implementation, in TypeScript, and it runs two ways:
 
 1. `dabbler session start` registers the session in `sessions.json` and
    seeds the plan's step list into `activity-log.json`, once.
-2. The orchestrating AI (Claude Code, Codex, Copilot, Gemini — any engine
-   that reads `AGENTS.md` or the `CLAUDE.md`/`GEMINI.md` that import it)
-   does the work.
+2. The orchestrating AI (Claude Code, Copilot, Gemini — any engine that
+   reads `AGENTS.md` or the `CLAUDE.md`/`GEMINI.md` that import it) does
+   the work.
 3. `dabbler verify` runs the verification loop **before commit**: round 1
    reviews the full working-tree diff; rounds ≥ 2 review only the fix
    delta. The verifier is always a different provider than the
@@ -39,10 +39,12 @@ There is one implementation, in TypeScript, and it runs two ways:
    cap left the fix unreviewed (the work lands, labelled unreviewed),
    **unresolved** when findings still stand (nothing lands but the
    record). There is no waiver and no verdict a person can type.
-4. `dabbler session close` runs five gates — verification clean, working
-   tree clean, pushed to remote, test run fresh, verdict vocabulary — then
-   flips the state. The verification gate reads the ledger; there is no
-   stamp, no override, no hand-writable record.
+4. `dabbler session close` runs the gates `GATE_CHECKS` declares —
+   verification clean, working tree clean, pushed to remote, test run
+   fresh, pins current, exposure within ceiling, owed decisions answered,
+   published when releasable, and verdict vocabulary — then flips the
+   state. The verification gate reads the ledger; there is no stamp, no
+   override, no hand-writable record.
 
 See [docs/quick-start.md](docs/quick-start.md) for the full walkthrough of
 the typed lifecycle, and [docs/driving-a-session.md](docs/driving-a-session.md)
@@ -55,6 +57,43 @@ empty folder to a running program, with every expected output captured from
 a real run: [docs/uat/uat-dotnet-json-solution.md](docs/uat/uat-dotnet-json-solution.md)
 (.NET) and [docs/uat/uat-java-json-solution.md](docs/uat/uat-java-json-solution.md)
 (Java, Maven and Spring).
+
+## Modules: a checkout the size of the work
+
+A solution is declared as **modules** in `docs/modules.yaml` — a slug, a
+kind, the code roots it owns, and the siblings it depends on. A session's
+section of the plan names the module it is for, and the framework then
+builds that module its own **git-enabled partial working tree** for the
+session: the module's own source, plus its siblings' *contracts* and
+*published packages* rather than their code. It is a real clone with a
+real branch, made on the fly and discarded when the session closes.
+
+**The point is not tidiness — it is what the engine reads.** A focused
+session sees a codebase the size of the work rather than the size of the
+repository, which is less context bought on every call, less for a model
+to wander into, and less room to change a module nobody asked it to
+touch. And it is measured rather than asserted: a focused session writes
+an **exposure manifest**, the close runs the `exposure_within_ceiling`
+gate over it, and a session that finds it cannot do the work without a
+sibling's source has to ask —
+
+```
+dabbler session next --request-grant <slug> --reason <why>
+```
+
+— which waits for a person's answer and records it. Taking it is not one
+of the options. A session that genuinely spans the solution is declared
+**global** instead, at the moment it starts, and runs in the repository
+with no wall and no exposure gate: the choice is made once, before the
+work, and never rediscovered afterwards.
+
+The verbs are `dabbler modules create` and `modules show` for the
+manifest, and `dabbler module contract | pack | open | grant | revoke`
+for one module — its designed seam, its committed package, its focused
+checkout, and the grants that widen it. Worked end to end in the two UAT
+walkthroughs above and, module by module across a four-module solution,
+in
+[docs/tutorials/csv-solution/csv-multi-module-walkthrough.md](docs/tutorials/csv-solution/csv-multi-module-walkthrough.md).
 
 ## Install
 
@@ -83,15 +122,20 @@ this repository.
 
 ## The repository's artifacts
 
-A repository's sessions live under `docs/sessions/`, and it carries
-exactly four artifacts:
+A repository's sessions live under `docs/sessions/`. One file is written
+by hand and reviewed by a person; every other one is the router's, and
+two of them are *rendered* — a rendered file is an output, so editing it
+loses the edit at the next render and rewinding it rewinds the counter
+that numbers what it holds:
 
 | Artifact | Written by | Purpose |
 |---|---|---|
-| `session-plan.md` | decomposition session (human-reviewed) | the plan: sessions and their steps |
+| `session-plan.md` | the decomposition session, human-reviewed | the plan: sessions and their steps |
 | `sessions.json` | the router only | the numbered session ledger, schema v5 |
-| `activity-log.json` | the router only | per-step progress log |
+| `activity-log.json` | the router only, append-only | per-step progress log, and the source of both rendered files |
 | `change-log.md` | the router (appends) | human-readable summary blocks per session |
+| `decisions-log.md` | the router, **rendered** from `activity-log.json` | the numbered decisions, in the order they were taken |
+| `project-work-plan.md` | the router, **rendered** | every numbered session beside what it declared |
 
 Verification round records live **outside the working tree** at
 `.dabbler/runs/s<N>/rounds.jsonl` (gitignored, machine-written only), and

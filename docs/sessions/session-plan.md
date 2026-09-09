@@ -7433,3 +7433,131 @@ a seat with it and not before.
 Releasability is declared at `start`, before the work, and the close refuses a
 releasable session with no packaging run on its record, so this is the session
 that must be started with it declared.
+
+### Session 138 of 139: The deadlocks that were not deadlocks, and the consent that was not asked for
+
+**Session 137 was told it was deadlocked nine times and was making progress
+almost every time.** Its publish refused for a sequence of different
+reasons -- no packaging block declared, then red gates, then a tag absent
+from origin, then a tag naming an earlier commit, then a published row the
+ledger's own schema refused -- and each was diagnosed and answered before
+the next arrived. `run.json` records `class: "deadlock"` from the second
+stop onward, and the owed decision said "running it again unchanged reaches
+this exact point again" while running it again was exactly what moved it.
+
+**The cause is that the classifier is fed a constant.** `drive.ts` compares
+kind, step and reason; for `publish` the reason is a string literal, so the
+comparison reduces to `constant === constant` and is true by construction.
+`close` throws the same shape. The comment above the throw reasons that the
+refusal is already in the packaging record and restating it would be a
+second copy that drifts -- sound, except that reading the last row's
+refusal at throw time quotes the one source rather than authoring a second.
+**The lesson is already learnt in this same file**: the verification phase
+carried the identical bug, was fixed, and its comment says why -- "the
+identical sentence two unlike refusals used to arrive in is what made the
+deadlock classifier call a red control and stale evidence the same
+impasse". Publish and close never got that treatment.
+
+**The second-order cost is worse than the label.** `climbLadder` runs only
+on a deadlock and only once per impasse, keyed on that same constant. So
+the first publish deadlock consumes the session's one triage and every
+later, genuinely different publish problem is logged `triage-skipped` and
+reaches no adviser at all.
+
+**Then the one that is not a label but an outward-facing act.** `dabbler
+release` tags, CI publishes, and a Marketplace version slot is never
+reusable. `raisePublicationDecision` says so in as many words -- "the one
+decision in this framework that cannot be taken back... the framework does
+not move until there is an answer" -- and `ID_PUBLICATION` is the bare
+string `publication`, so `raiseOwed` folds every future release onto the
+first one. The standing answer on this repository was given on 2026-09-02,
+for **2.8.0, to npm and the Marketplace**, and npm was retired that same
+day. It has since authorised `vsix-v2.0.15`, `2.0.16`, `2.0.17` and
+`2.0.18` without asking anyone anything. **A decision keyed to nothing is
+consent for everything**, and the fix is to key it to what it consents to:
+one answer authorises one version, and the next release asks again.
+
+**And the lifecycle stops owning the lifecycle at exactly the phase it
+matters.** When packaging refuses on `verification_clean`, the driver stays
+at `publish`: `rebaseline` moves the baseline and explicitly not the phase,
+and there is no verb that returns a stopped run to verification. Session
+137 was recovered by hand from there -- `verify`, both suites,
+`test-evidence record` twice, commit, push -- which is precisely the set of
+things the managed body tells an engine are not its to run. Either the
+driver rewinds when a later phase refuses on an earlier phase's evidence,
+or the guidance is wrong about who runs them; it cannot be both.
+
+**A smaller one, met four times in one recovery.** A `next` that finds a
+finished job collects its result and stops, and a second `next` is needed
+to start the fresh job the collection made possible. Each of those pauses
+is recorded as a stop, which is what turned one publish attempt into two
+deadlock rows.
+
+**What this session must not do is add a guard.** Every defect here is one
+rule stated twice and drifting -- the classifier and the refusals disagree
+about what counts as progress, the publication decision and the version
+disagree about what was consented to, the driver and the managed body
+disagree about whose the earlier phases are. Each is fixed by making the
+second statement read the first.
+
+**Steps.** (1) The publish and close stops carry the refusal they met, as
+the verification stop already does, and the triage key stops being a
+constant. (2) The publication decision is keyed to the version it
+authorises, so a standing answer cannot consent to a release nobody has
+seen. (3) A run stopped at a later phase on an earlier phase's evidence
+returns to that phase, so the framework runs the steps it says are its own.
+(4) Releasability can be withdrawn after step (a) by a recorded act
+carrying a reason and an approver, which the close reports rather than
+absorbs -- 137 could not have been abandoned if it had needed to be, and
+`close --force` cannot help because `published_when_releasable` is
+evidence.
+
+**Tests.** Four, one per step, each stated as the loop rather than as a
+single refusal: two unlike publish refusals in a row are not a deadlock and
+each reaches triage; an answered publication for one version does not
+authorise the next; a publish refused on stale verification puts the run
+back where the evidence is made; a withdrawn releasable session closes and
+its record says who withdrew it and why. Session 137's record is the
+fixture for the first two.
+
+**Not releasable.** Nothing ships until 139 carries it. **The trap is that
+this session edits the stop machinery it is itself driven by**, so a change
+that makes its own stops unreadable is not caught by a green suite -- step
+(1) is proved by its tests and by 139's driving, and by nothing in between.
+
+### Session 139 of 139: The release that carries the deadlock work
+
+**This is the block's release and the first driving of the repaired
+publish path.** Session 137 shipped `2.0.16`, `2.0.17` and `2.0.18` in one
+recovery, each fixing the thing the last one exposed, and none of them
+under a lifecycle that was still driving itself. 138's four repairs reach a
+seat here, and the session that carries them is the one that finds out
+whether they hold when the framework is the thing running them.
+
+**The version is bumped here and nowhere earlier.** `version.json` moves,
+`npm run stamp:version` writes it into every manifest, `npm run
+check:version` refuses a stale one. The bump belongs to the session that
+ships: a version bumped by a session that does not ship is a number nothing
+published, which is how 137 arrived at a tag naming a version already on
+origin.
+
+**The publication decision is asked and answered in this session**, which
+is the whole of step (2) of 138 observed rather than asserted. If `dabbler
+release` tags without asking, that is a finding against 138 and not a
+convenience.
+
+**Steps.** (1) Bump, stamp, and confirm every manifest agrees. (2) The
+release notes say what 138 changed in the operator's terms -- the stops
+that name their own refusal, consent that is asked per version, a run that
+goes back for the evidence it needs, a releasable session that can be
+withdrawn. (3) The publish, run in the framework's own order, and
+`dabbler release --verify-install` afterwards, which is the check that a
+green workflow and a served extension are the same fact.
+
+**Tests.** None new. The proof is a `published` packaging row and what the
+Marketplace answers; a test asserting the publish path here would assert
+the thing the session is for.
+
+**Releasable.** If it reaches the close with no packaging run on its
+record, the close refuses -- and after 138 there is an exit from that which
+is not `cancel`.

@@ -1,6 +1,77 @@
-# STATUS — sessions 113–135 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, and session 136 measuring what the run of record does to the operator's machine and cutting the load; session 137 is planned and carries the release; version 2.0.14
+# STATUS — sessions 113–138 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, and session 138 repairing all four; session 139 is planned and carries the release; version 2.0.18
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 138 CLOSED, 2026-09-09 — the deadlocks that were not deadlocks, and the consent that was not asked for
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 138 | the stops that name their refusal, the publication decision keyed to its version, the rewind, and the withdrawal | CLOSED VERIFIED (round 2; round 1 raised one blocking Major that was RIGHT and four disputes that were UPHELD as withdrawn — see below), landed `91e5ed40`, closed `7b7801b4` |
+>
+> **Four defects, each one rule stated twice and drifting, each fixed by
+> making the second statement read the first.** No gate was added.
+>
+> **(1) The publish and close stops now say WHICH refusal they met**, read
+> from the job's own log tail exactly as `phaseVerify` already did. They
+> threw string literals, so `previous.reason === entry.reason` reduced to
+> `constant === constant`: session 137's `stop_history` is eight rows whose
+> reasons are byte-identical, while its packaging record over the same eight
+> attempts carries seven refusals with six distinct causes. The classifier
+> was reading the first list. `judgeStopClass` and `alreadyTriaged` are now
+> pure and exported, and the triage key stops being a constant as a
+> consequence rather than by a separate edit — `climbLadder` was keyed on
+> the same reason, so the first refusal consumed the session's one triage
+> and every later one was logged `triage-skipped`.
+>
+> **(2) The publication decision is keyed to the version it authorises.**
+> `publicationDecisionId(version)` replaces the bare id `publication`;
+> `raiseDisposition` returns null for an answered id, so one answer given on
+> 2026-09-02 for 2.8.0 (to npm, retired that same day) had gone on to
+> authorise `vsix-v2.0.15`, `2.0.16`, `2.0.17` and `2.0.18` with nobody
+> asked. **A decision keyed to nothing is consent for everything.** The next
+> release raises its own brief and waits; `dabbler owed answer --id
+> publication:<version>` is what settles it now.
+>
+> **(3) A publish refused on an earlier phase's evidence rewinds.**
+> `GATE_EVIDENCE_PHASE` in `gates.ts` states once which phase makes each
+> gate's evidence — `verification_clean` → verify, `test_run_fresh` →
+> run-of-record, `working_tree_clean`/`pushed_to_remote` → land — and
+> `phasePublish` reads the refused packaging row's own gate rows and goes
+> back to the EARLIEST. Gates no phase can remake (an owed decision, a
+> verdict's vocabulary, the pins, the exposure) are unmapped, and a publish
+> refused on one of those still stops. Session 137 was recovered from this
+> state by hand, running the five verbs the managed body says are not an
+> engine's to run.
+>
+> **(4) Releasability can be withdrawn.** `dabbler session withdraw-release
+> --reason <why> --approver <who>` writes an immutable per-session row to
+> `.dabbler/runs/s<N>/releasability-withdrawals.jsonl`, in the shape of the
+> reopen grant. It does NOT rewrite the declaration: the publish phase
+> passes through and `published_when_releasable` PASSES while naming who
+> withdrew it and why, so the close's account of a session that was supposed
+> to ship and did not differs from its account of one that never was. It is
+> refused after a publication, and the gate reads the packaging record
+> first, so the close can never report the opposite of what shipped.
+>
+> **Round 1's Major was right, and my own comment was wrong.** A rewind
+> throws no `Stop`, so `stop_history` gains no row and `judgeStopClass`
+> never sees it — the deadlock classifier is no defence against a rewind
+> that fixes nothing, which would have gone round paying for a verification
+> round or a whole suite each time. The run now records its `rewinds` and
+> goes back **once per distinct refusal**; a refusal already in the list
+> stops instead, with that refusal in the stop where the triage ladder can
+> reach it. The four disputes (that session 137's record should be a test
+> fixture) were withdrawn on the evidence that `.gitignore` excludes
+> `.dabbler/` whole, so those files exist on one machine and in no clone.
+>
+> **Also landed:** the two selection rules that were owed — `src/jobs.ts`
+> selects `walk-jobs.test.ts` (owed since 136), `src/owedDecisions.ts`
+> selects its own test, `release`, `gates` and `walk-record`.
+>
+> **Owed:** eight non-blocking NITS from round 2, the substantive one being
+> that the withdrawal is asserted through `runGates` rather than by driving
+> the real `session close` and reading back the row it persists — a
+> walk-session case, not a unit one.
 
 > ## SESSION 136 CLOSED, 2026-09-09 — the suite, measured and then cut
 >

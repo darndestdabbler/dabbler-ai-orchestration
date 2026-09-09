@@ -23,7 +23,7 @@
 
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { tmpdir } from "node:os";
+import { constants, tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -72,6 +72,54 @@ export const JOB_RUNNER_FILENAME = "job-runner.cjs";
 export const DRIVEN_MARKER = "DABBLER_DRIVEN";
 
 /**
+ * The variable the runner reads its own OS priority out of. The parent
+ * decides and the runner applies, so the policy is stated once in
+ * TypeScript rather than a second time inside a generated CommonJS file.
+ */
+export const JOB_PRIORITY_VAR = "DABBLER_JOB_PRIORITY";
+
+/**
+ * The OS priority the framework's own long work runs at, or `null` to leave
+ * it where the platform put it.
+ *
+ * Measured in session 136 through a run of record: the test workers were
+ * below normal and everything above them was not -- the `node --test`
+ * runner in all 61 samples, and the extension suite's mocha end to end,
+ * which loads no preload at all. A courtesy extended to the workers and not
+ * to the tree they hang from is why two sessions of protections left the
+ * operator's machine unusable anyway. The job is where it belongs: every
+ * suite of the run of record is spawned beneath one, and on Windows a child
+ * inherits its parent's class.
+ *
+ * Under CI there is nobody to yield to and the runner owns the box, so
+ * nothing is changed there -- the same rule, and the same reason, as the
+ * test worker's own (`test/support/no-git.ts`).
+ */
+export function jobPriority(env: NodeJS.ProcessEnv): number | null {
+  const ci = env["CI"];
+  if (ci !== undefined && ci !== "" && ci !== "0" && ci !== "false") return null;
+  return constants.priority.PRIORITY_BELOW_NORMAL;
+}
+
+/**
+ * The environment a job runs in: the driver's mark, and the policy as the
+ * runner receives it.
+ *
+ * The variable is REMOVED where the policy says to leave the priority
+ * alone, never merely left unset: the child starts from a copy of this
+ * process's environment, so an inherited `DABBLER_JOB_PRIORITY` would
+ * otherwise carry a class straight past the CI exception that exists to
+ * stop it.
+ */
+function jobEnv(parent: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...parent, [DRIVEN_MARKER]: "1" };
+  const priority = jobPriority(parent);
+  if (priority === null) delete env[JOB_PRIORITY_VAR];
+  else env[JOB_PRIORITY_VAR] = String(priority);
+  return env;
+}
+
+/**
  * The runner, written beside the job it runs.
  *
  * CommonJS and dependency-free because it is spawned on a bare `node` with
@@ -111,6 +159,22 @@ const { createWriteStream, renameSync, writeFileSync } = require("node:fs");
 const [, , status, log, cwd, ...argv] = process.argv;
 const out = createWriteStream(log, { flags: "a" });
 const win = process.platform === "win32";
+
+// The long work yields to whoever is using the machine. WHAT class is the
+// parent's decision (\`jobPriority\`); this applies it before the command is
+// spawned, so the command and everything it forks inherit it -- which is the
+// half that was missing: session 76's courtesy reached each test worker and
+// stopped there, above them the runner of the run of record sat at normal.
+// Best-effort, as it is there: a platform that refuses has denied a
+// courtesy, not broken a job.
+const yielded = Number(process.env.DABBLER_JOB_PRIORITY);
+if (Number.isFinite(yielded)) {
+  try {
+    require("node:os").setPriority(yielded);
+  } catch {
+    /* whatever the platform gives it */
+  }
+}
 
 function finish(exit) {
   out.end(() => {
@@ -278,6 +342,16 @@ export function jobLogPath(repoRoot: string, sessionNumber: number, name: string
 }
 
 /**
+ * Where a job by that name records its exit code, whether or not one is
+ * running. Beside `jobLogPath` so that the runner, the poll and anything
+ * standing in for the runner take the path from one place: a job whose
+ * status is written where nobody looks polls as running forever.
+ */
+export function jobStatusPath(repoRoot: string, sessionNumber: number, name: string): string {
+  return join(jobsDir(repoRoot, sessionNumber), `${slug(name)}.status.json`);
+}
+
+/**
  * The last `lines` lines a job wrote, trimmed; empty when there is no log.
  *
  * A tail rather than the whole thing: a verb's refusal is the last thing it
@@ -300,30 +374,57 @@ export function jobLogTail(repoRoot: string, sessionNumber: number, name: string
 }
 
 /**
- * Start `argv` detached and return the record that finds it again.
+ * How the framework's long work is started: the one seam between the driver
+ * and a process of its own.
  *
- * The caller does not wait: the child is unrefd and its stdio ignored, so
- * this process may exit the moment it returns and the work carries on.
+ * The default is the detached spawn below and production code never swaps
+ * it. A walkthrough may: `selfArgv` re-enters this router, so every driver
+ * job costs a node boot and a full CLI module graph -- about 1.5 seconds and
+ * two processes each -- to reach code the test worker has already loaded.
+ * The seam is the same move `journal.setGitSource` made one layer down, and
+ * the same rule applies to it: what genuinely tests the child boundary
+ * (`test/walk-jobs.test.ts`) does not swap it.
  */
+export type JobStarter = (
+  repoRoot: string,
+  sessionNumber: number,
+  options: StartJobOptions,
+) => Job;
+
+let starter: JobStarter = spawnDetachedJob;
+
+/** Swap how a job is started; the returned function restores the previous one. */
+export function setJobStarter(source: JobStarter): () => void {
+  const previous = starter;
+  starter = source;
+  return () => {
+    starter = previous;
+  };
+}
+
+/** Start the framework's long work and return the record that finds it again. */
 export function startJob(
   repoRoot: string,
   sessionNumber: number,
   options: StartJobOptions,
 ): Job {
-  const directory = jobsDir(repoRoot, sessionNumber);
-  mkdirSync(directory, { recursive: true });
-  const runner = join(directory, JOB_RUNNER_FILENAME);
-  writeFileSync(runner, JOB_RUNNER, "utf8");
+  return starter(repoRoot, sessionNumber, options);
+}
 
-  const stem = slug(options.name);
-  const log = join(directory, `${stem}.log`);
-  const status = join(directory, `${stem}.status.json`);
-  // A re-run of the same job must not read the last round's answer, and
-  // its log is the log of THIS run.
-  for (const stale of [status, `${status}.writing`]) {
-    if (existsSync(stale)) unlinkSync(stale);
-  }
-  writeFileSync(log, "");
+/**
+ * Start `argv` detached and return the record that finds it again.
+ *
+ * The caller does not wait: the child is unrefd and its stdio ignored, so
+ * this process may exit the moment it returns and the work carries on.
+ */
+export function spawnDetachedJob(
+  repoRoot: string,
+  sessionNumber: number,
+  options: StartJobOptions,
+): Job {
+  const { log, status } = beginJobRecord(repoRoot, sessionNumber, options.name);
+  const runner = join(jobsDir(repoRoot, sessionNumber), JOB_RUNNER_FILENAME);
+  writeFileSync(runner, JOB_RUNNER, "utf8");
 
   // The work runs in the repository; the RUNNER deliberately does not. On
   // Windows a process's working directory cannot be removed, and the runner
@@ -338,18 +439,51 @@ export function startJob(
     // the mark. A verb that reads it knows the lifecycle around it is the
     // framework's -- `verify` under the mark prints no recipe for a run of
     // record and a push that the driver is about to do itself.
-    env: { ...process.env, [DRIVEN_MARKER]: "1" },
+    env: jobEnv(process.env),
   });
   child.unref();
   if (child.pid === undefined) {
     throw new Error(`the job '${options.name}' could not be started`);
   }
+  return jobRecord(repoRoot, sessionNumber, options, child.pid);
+}
+
+/**
+ * Clear the last run of this job away and return where this one writes.
+ *
+ * A re-run of the same job must not read the last round's answer, and its
+ * log is the log of THIS run. Whoever runs the work -- the detached runner
+ * or something standing in for it -- begins here, so a job's record has one
+ * shape and one set of paths.
+ */
+export function beginJobRecord(
+  repoRoot: string,
+  sessionNumber: number,
+  name: string,
+): { readonly log: string; readonly status: string } {
+  mkdirSync(jobsDir(repoRoot, sessionNumber), { recursive: true });
+  const log = jobLogPath(repoRoot, sessionNumber, name);
+  const status = jobStatusPath(repoRoot, sessionNumber, name);
+  for (const stale of [status, `${status}.writing`]) {
+    if (existsSync(stale)) unlinkSync(stale);
+  }
+  writeFileSync(log, "");
+  return { log, status };
+}
+
+/** The record `run.json` carries for a job now running under `pid`. */
+export function jobRecord(
+  repoRoot: string,
+  sessionNumber: number,
+  options: StartJobOptions,
+  pid: number,
+): Job {
   return {
     name: options.name,
     argv: [...options.argv],
-    pid: child.pid,
-    log: repoRelative(repoRoot, log),
-    status: repoRelative(repoRoot, status),
+    pid,
+    log: repoRelative(repoRoot, jobLogPath(repoRoot, sessionNumber, options.name)),
+    status: repoRelative(repoRoot, jobStatusPath(repoRoot, sessionNumber, options.name)),
     started_at: nowIso(),
     retry_after_seconds: options.retryAfterSeconds,
   };

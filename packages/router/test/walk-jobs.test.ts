@@ -5,15 +5,22 @@
 // behind -- a job ended from a process that never held it, and a command
 // that failed after starting a helper it never waited for.
 //
-// Real children on real detached processes. The whole point of the module
-// is what happens across process boundaries, and a stubbed spawn would test
-// the stub.
+// Real children on real detached processes, and the one walkthrough that
+// keeps them. `jobs.setJobStarter` lets a walk run the framework's long work
+// in this process instead (`test/support/inProcessJobs.ts`, installed by
+// `walk-session`), which is right where a test is about the ORDER of the
+// phases. It is wrong here: what this file is about is what happens across
+// a process boundary -- a detached runner, a pid that outlives the process
+// that started it, a tree that must still be killable, a priority class the
+// child inherits -- and none of that is true of a function call. A stubbed
+// spawn would test the stub.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { constants, getPriority, setPriority } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { endJob, pollJob, startJob } from "../src/jobs.ts";
+import { JOB_PRIORITY_VAR, endJob, pollJob, startJob } from "../src/jobs.ts";
 import { tempDir } from "./support/answers.ts";
 
 /** Poll until the job leaves `running`, or give up loudly. */
@@ -53,6 +60,84 @@ async function reportedPid(path: string): Promise<number> {
   }
   return Number(readFileSync(path, "utf8"));
 }
+
+/** The OS priority a job's own command reports for itself. */
+async function reportedPriority(repoRoot: string, sessionNumber: number): Promise<number> {
+  const job = startJob(repoRoot, sessionNumber, {
+    name: "run of record",
+    argv: [
+      process.execPath,
+      "-e",
+      "process.stdout.write(String(require('node:os').getPriority()))",
+    ],
+    retryAfterSeconds: 30,
+  });
+  const exited = await settle(repoRoot, job);
+  assert.equal(exited.state, "exited");
+  return Number(readFileSync(join(repoRoot, job.log), "utf8").trim());
+}
+
+describe("the machine a job runs on", () => {
+  it("runs the command below normal, and leaves it where it found it under CI", async (t) => {
+    // From the class a spawned child REPORTS, not from the source: the
+    // policy being right is worth nothing if the runner stops applying it,
+    // and that is the half that went missing for twenty-five sessions one
+    // layer down.
+    //
+    // This worker is already below normal (`no-git.ts`) and a child would
+    // inherit that, so a job that applied nothing would report the same
+    // number as one that applied the policy. The test therefore stands the
+    // worker back up at normal first -- which is what a driver run from a
+    // terminal is -- and where the platform will not allow that (POSIX does
+    // not let an unprivileged process raise its own priority) it SKIPS
+    // rather than assert something it cannot distinguish.
+    const repoRoot = tempDir("jobs-");
+    const worker = getPriority();
+    const ci = process.env["CI"];
+    try {
+      setPriority(constants.priority.PRIORITY_NORMAL);
+    } catch {
+      // Answered by the skip below, from what the priority actually is.
+    }
+    const parent = getPriority();
+    if (parent >= constants.priority.PRIORITY_BELOW_NORMAL) {
+      t.skip(
+        `this worker could not be raised out of below normal (it reports ${String(parent)}), so a ` +
+          "job that applied no policy would look exactly like one that did",
+      );
+      return;
+    }
+    try {
+      delete process.env["CI"];
+      const yielded = await reportedPriority(repoRoot, 64);
+      process.env["CI"] = "1";
+      // With the variable already in the environment the job inherits: the
+      // CI exception has to REMOVE it, not merely decline to set it.
+      process.env[JOB_PRIORITY_VAR] = String(constants.priority.PRIORITY_BELOW_NORMAL);
+      const onCi = await reportedPriority(repoRoot, 65);
+      delete process.env[JOB_PRIORITY_VAR];
+
+      // Higher is lower on Node's scale. The parent is at normal, so a job
+      // at below normal or lower is one the runner acted on -- and the CI
+      // arm is the control: the same call, the same parent, no policy.
+      assert.ok(
+        yielded >= constants.priority.PRIORITY_BELOW_NORMAL,
+        `a job's command reported ${String(yielded)} where a parent at ${String(parent)} ` +
+          "should have yielded it to below normal",
+      );
+      assert.equal(onCi, parent, "a job changed its priority under CI, where nobody is typing");
+    } finally {
+      delete process.env[JOB_PRIORITY_VAR];
+      if (ci === undefined) delete process.env["CI"];
+      else process.env["CI"] = ci;
+      try {
+        setPriority(worker);
+      } catch {
+        // The worker runs at whatever the platform gives it.
+      }
+    }
+  });
+});
 
 describe("one job, from start to collection", () => {
   it("polls as running, then as exited with its code, and keeps its output", async () => {

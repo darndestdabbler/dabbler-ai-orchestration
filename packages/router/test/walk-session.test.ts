@@ -29,6 +29,7 @@ import { EXIT_OK, planAmend, report, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
 import { readTaskDeclaration } from "../src/writers.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
+import { settleJobs, useInProcessJobs } from "./support/inProcessJobs.ts";
 import { gitOut, makeRepo } from "./support/repo.ts";
 
 const NODE = process.execPath;
@@ -169,7 +170,17 @@ async function answerStep(
   return { code: collected.value, err: collected.stderr };
 }
 
+// The framework's own long work runs here rather than in a child per job:
+// this file drives four whole sessions, and what it is about is the ORDER
+// the phases go through, not the process each one is spawned into. The
+// driver still starts a job, waits on it and collects an exit code from a
+// status file -- `settleJobs` is called where the loop below would have
+// slept, and runs the verb the driver asked for. `test/walk-jobs.test.ts`
+// keeps the real spawn, because that one IS about the child.
+const restoreJobs = useInProcessJobs();
+
 after(() => {
+  restoreJobs();
   delete process.env[CONFIG_ENV_VAR];
   resetRouter();
   resetRuntimeMode();
@@ -296,10 +307,11 @@ describe("one session, walked from next to done", () => {
     milestones.push("reported the step it did");
 
     // --- from here the framework works, and a call is a poll ----------------
-    // On a clock, not a count: sixty calls with no pause between them
-    // outran the framework's own jobs on a loaded machine and failed a walk
-    // whose every phase was fine. The framework owns the clock; the walk
-    // waits a moment and asks again, and gives up loudly on a deadline.
+    // Never two at once: the walk answers a wait by letting the job the
+    // driver started run to completion (`settleJobs`) and then asking again,
+    // and gives up loudly on a deadline. Sixty calls with no pause between
+    // them outran the framework's own jobs on a loaded machine and failed a
+    // walk whose every phase was fine; settling is that pause, made exact.
     let instruction: DriverInstruction | null = null;
     let last = { code: EXIT_OK, err: "" };
     const deadline = Date.now() + 180_000;
@@ -316,7 +328,7 @@ describe("one session, walked from next to done", () => {
           milestones.push("waited on the framework's own job");
         }
         if (Date.now() > deadline) assert.fail("the framework's own jobs never finished");
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await settleJobs();
         continue;
       }
       assert.fail(
@@ -467,7 +479,7 @@ describe("a red run of record, fixed, verified again, then run again", () => {
           assert.fail(`the framework asked for ${instruction.kind} ${String(instruction.step_id)}`);
         }
         if (Date.now() > deadline) assert.fail("the framework's own jobs never finished");
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await settleJobs();
       }
     };
 

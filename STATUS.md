@@ -1,6 +1,73 @@
-# STATUS — sessions 113–135 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, and session 135 letting the direct-API verifier ask for a file and giving .NET a root; sessions 136 and 137 are planned, 136 for the suite that takes the machine and 137 for the release; version 2.0.14
+# STATUS — sessions 113–135 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, and session 136 measuring what the run of record does to the operator's machine and cutting the load; session 137 is planned and carries the release; version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 136 CLOSED, 2026-09-09 — the suite, measured and then cut
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 136 | the measurement nobody had taken, `walk-session` off the CLI child per job, and the priority courtesy moved to the job | CLOSED VERIFIED (round 2; round 1 raised one blocking Major that was RIGHT — see below), landed `1082e6e7`, closed `f0927537` |
+>
+> **What the measurement says, and it is not what three sessions assumed.**
+> `packages/router/scripts/measure-suite-load.mjs` runs a command and every
+> three seconds records CPU, physical disk queue, free memory, the process
+> count and the tree beneath it **with every process's OS priority class**;
+> samples land under `.dabbler/scratch/suite-load/` (untracked) and what they
+> say is in `docs/design/suite-cost.md`. Through the typescript suite:
+> **nothing is saturated** — 29% CPU mean, a disk queue almost always zero,
+> 28 GB free — and the box is unusable anyway. The load is process creation:
+> 363 distinct processes seen beneath the run (146 `git`, 124 `conhost`, 66
+> node, 17 `sh` pre-commit hooks), and that is a floor, because a snapshot
+> every three seconds cannot see one that started and ended between two.
+>
+> **The courtesy stopped at the test worker.** The `node --test` runner was
+> at NORMAL in all 61 samples, and the extension suite's mocha tree is at
+> normal end to end — it loads no preload. So the policy moved to where the
+> driver spawns a job: `jobs.jobPriority` decides (below normal; nothing at
+> all under CI, the worker preload's own rule), `jobEnv` hands it to the
+> runner in `DABBLER_JOB_PRIORITY` and REMOVES the variable where the policy
+> declines, and the runner applies it to itself before spawning the command,
+> so the command and everything it forks inherit it. Every suite of the run
+> of record is spawned beneath a job, so that is all of them. The proof is a
+> spawned child's reported class from a parent stood back up at normal
+> (`walk-jobs.test.ts`), and it SKIPS where the platform will not allow the
+> raise rather than assert something it cannot distinguish.
+>
+> **`walk-session` stopped spawning a full CLI per job.**
+> `jobs.setJobStarter` is the seam, in the shape of `journal.setGitSource`;
+> `spawnDetachedJob` is the default and nothing in production swaps it.
+> `test/support/inProcessJobs.ts` runs the verb the driver asked for through
+> the CLI dispatcher — moved out of `cli/dabbler.ts` into `cli/run.ts`,
+> because loading the entry RUNS the process's argv — writing the same log
+> and the same status file at the same moments, so the driver still starts a
+> job, issues a `wait`, polls and collects an exit code. It runs from
+> `settleJobs`, which the walkthrough calls where it used to sleep, and never
+> on its own: `capture` and `standIn` both refuse to nest, so a job running
+> while the driver runs would interleave two verbs into one instruction.
+> `walk-jobs` keeps the real spawn and says so at the top of the file.
+>
+> **The numbers, controlled and uninstrumented, same host minutes apart:**
+> `walk-session` alone 105.9 s → 80.2 s; the whole typescript suite 215.6 s →
+> 189.9 s. The session's own run of record came in at 199.7 s for 1166 tests.
+> Both of today's numbers are far above session 126's 176 s on this same
+> host, ten sessions and 19 tests apart; that drift is recorded in the note's
+> *What is NOT explained* section rather than attributed.
+>
+> **Round 1's Major was right.** The first draft recorded only a sampled
+> 228 s run and called it non-comparable by subtracting the sampler's 40 s —
+> which is not subtractable, because the sampler runs alongside the suite and
+> not in front of it. With no uninstrumented pair, the session had not shown
+> the new shape was not slower, which is exactly the failure the plan asked
+> to be able to see. The fix is the controlled pair above. The three NITS
+> were taken too: the CI exception now removes an inherited priority
+> variable rather than declining to set one, the priority test skips instead
+> of passing vacuously, and the sampled process figures are described as
+> observed rather than created.
+>
+> **Owed:** `src/jobs.ts` still maps to no selection rule in `dabbler.yaml`,
+> so a change to it falls through to the smoke test; `walk-jobs.test.ts` is
+> its real coverage and the rule is a one-line addition for a session that is
+> already touching the selection map.
 
 > ## SESSION 135 CLOSED, 2026-09-09 — the direct-API verifier can ask for a file, and .NET gets a root
 >

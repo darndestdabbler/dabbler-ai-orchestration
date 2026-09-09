@@ -10,23 +10,31 @@
 // `process.env` when it spawns git.
 
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { canonicalPath } from "../../src/journal.ts";
+
 /**
- * The suite's temp root, in the name the OS will use for it.
+ * The suite's temp root, in the name the framework will use for it.
  *
- * `realpathSync` and not merely `tmpdir()`, because on Windows the two can
- * be different strings for one directory: a GitHub runner's `TEMP` is
- * `C:\Users\RUNNER~1\AppData\Local\Temp` -- the 8.3 short name, because
- * `runneradmin` is longer than eight characters -- while every path the
- * framework resolves comes back long. A test that compared a path it built
- * from this root against one the framework printed then failed on CI and
- * passed on any machine whose user name is short enough, which is the worst
- * shape a failure can have. Resolved once, here, so no test has to know.
+ * `canonicalPath` and not `tmpdir()`, and not plain `realpathSync` either.
+ * On Windows the two can be different strings for one directory: a GitHub
+ * runner's `TEMP` is `C:\Users\RUNNER~1\AppData\Local\Temp` -- the 8.3
+ * short name, because `runneradmin` is longer than eight characters --
+ * while every path the framework resolves comes back long. A test that
+ * compares a path it built from this root against one the framework
+ * printed then fails on CI and passes on any machine whose user name is
+ * short enough, which is the worst shape a failure can have.
+ *
+ * This is the SAME rule the framework applies, deliberately: `journal.ts`
+ * already carries it, its comment already names twelve consecutive red CI
+ * runs, and only `realpathSync.native` expands a short name -- the plain
+ * one leaves `RUNNER~1` exactly as it found it, which is a fix that looks
+ * like a fix and changes nothing.
  */
-const ROOT = join(realpathSync(tmpdir()), "dabbler-router-tests");
+const ROOT = join(canonicalPath(tmpdir()), "dabbler-router-tests");
 
 /**
  * The run this process belongs to: the `node --test` that started it as a

@@ -75,19 +75,18 @@
 > removed rather than adopted: introducing it would change how sessions are
 > scoped, which is nobody's side effect to make from a documentation step.
 >
-> **Still owed:** the .NET root solution file, the other half of D267 and
-> session 131's owed item. Session 135 is planned and unchanged; 136 carries
-> the release, which is when this session's work first reaches a seat.
->
-> **Session 136 took three more, after this close, at the operator's ask.**
-> Its plan entry now carries, beside the Codex documentation work and the
-> release: the session number on every *Dabbler* terminal voice rule in the
-> operator's own form (`134 – framework`, and a job's rule headed at all,
-> which it is not today); the activity-bar container and settings section
-> renamed to *Dabbler AI Orchestration*, which the extension's `displayName`
-> has said all along; and **the .NET root solution file above**, which needed
-> a home once 133 took the last of D258–D267 and is homeless no longer. Four
-> tests, and the entry says which.
+> **Three more were planned after this close, at the operator's ask.** The
+> .NET root solution file — the other half of D267, session 131's owed item,
+> homeless once 133 took the last of D258–D267 — **is session 135's fourth
+> step**, deliberately not the release session's: 136 carries the release, and
+> a scaffold's behaviour change does not ride with it. It shares nothing with
+> 135's verifier work and says so in the entry. Session 136 takes the two
+> labels an operator reads: the session number on every *Dabbler* terminal
+> voice rule in the operator's own form (`134 – framework`, and a job's rule
+> headed at all, which it is not today), and the activity-bar container and
+> settings section renamed to *Dabbler AI Orchestration*, which the
+> extension's `displayName` has said all along. 135 goes to four tests and
+> 136 to two; both entries say which.
 
 > ## SESSION 133 CLOSED, 2026-09-08 — the four papercuts, and the walk's record closed
 >

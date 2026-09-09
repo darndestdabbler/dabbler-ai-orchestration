@@ -7119,7 +7119,7 @@ every verifier reads. Holding it unreleased through 135 and 136 buys it two
 more sessions of real verification rounds in this repository before a seat
 ever sees it.
 
-### Session 135 of 136: The direct-API verifier can ask for a file
+### Session 135 of 136: The direct-API verifier can ask for a file, and .NET gets a root
 
 **Parity with the seat, which has had this all along.** Across sessions
 100-109 the Copilot verifier read 312 files in 26 rounds, twelve to a round,
@@ -7152,27 +7152,54 @@ for on the API path, what the record says it asked, and the setting that
 governs it. `docs/schema-reference.md` gains the agency record's shape where
 an API round now fills fields only a seat round filled before.
 
+**The other half of D267: a .NET solution has no root for `dotnet test` to
+resolve.** It shares nothing with the verifier work above and is here because
+it needs a home that is not the release. Session 131 measured it rather than
+guessing -- a multi-module .NET solution keeps its projects under `modules/`
+and writes nothing at the root, so `dotnet test` answers `MSB1003: Specify a
+project or solution file` -- and closed the honest half: `suiteForEcosystem`
+asks the root detector, and `whyNoSuite` says out loud why nothing was
+declared. The remaining half is the root solution file itself, the counterpart
+of the parent POM that makes Maven's side resolve, which `rootFilesDotnet`
+does not write. **It needs no new rule.** `ensureRootFilesWithSuite` writes
+the root files first and asks the detector second, so a solution file written
+by `rootFilesDotnet` is found by `detectDotnet` in the same call and the suite
+declares itself; a repository that reaches the note now stops reaching it.
+**Two things this session decides.** The format: `.slnx`, which is plain XML a
+scaffold can write and a person can read, against `.sln`, which carries GUIDs
+no generator should be inventing -- proposed `.slnx`, with its SDK floor
+(9.0.200+) stated in the note beside the file, where the operator meets it.
+And upkeep, which is Maven's exactly: the parent POM lists the modules holding
+a POM when it is written and notes *"add each as it gets one"*, so the root
+`.slnx` lists the project files under `modules/` on the same terms and gets
+the same note. A second aggregator that maintains itself while the first does
+not is two rules for one job.
+
 **Steps.** (1) The request block, its parse and its refusals. (2) The second
 turn on the OpenAI path, behind the setting. (3) The agency record for an API
-round that looked, and the two documents.
+round that looked, and the two documents. (4) The root solution file
+`rootFilesDotnet` writes, and the suite that now declares itself with it.
 
-**Tests.** Three: a request naming a path outside scope is refused and
+**Tests.** Four: a request naming a path outside scope is refused and
 recorded and the round still returns a verdict; with the setting on, a request
 block produces a second turn carrying the file's bytes; with it off, the block
-is recorded and ignored and the round is one turn.
+is recorded and ignored and the round is one turn; and a scaffolded .NET root
+writes the solution file, with the suite declared in the same call because the
+detector now finds one.
 
 **Not releasable.** The setting defaults off, so nothing changes for anyone
-until it is turned on. One real exposure to name: the proposal parser already
-runs on every round, including the ones granting no write, so a new label
-parsed there is code on the path of every verification. Its refusal case is
-one of the three tests for that reason.
+until it is turned on, and the scaffold's new root file reaches a seat with
+the rest of the block at 136. One real exposure to name: the proposal parser
+already runs on every round, including the ones granting no write, so a new
+label parsed there is code on the path of every verification. Its refusal case
+is one of the four tests for that reason.
 
 **After it lands**, run sessions with the setting on and compare the blocking
 finding rate against the seat's 1.30 a session and the blind API path's 0.53.
 Turning it on by default is a separate decision that the measurement, not this
 session, settles.
 
-### Session 136 of 136: Codex undocumented, three the operator asked for, and the block lands
+### Session 136 of 136: Codex undocumented, two labels the operator reads, and the block lands
 
 **It cannot be tested here, so it is not claimed.** Codex comes out of the
 engine list in the managed body, the bootstrap templates, the registration
@@ -7225,42 +7252,17 @@ records that name the old title are not touched** -- `docs/field-trial-50.md`,
 `docs/field-trial-70.md`, this plan's own history and the work plan -- for the
 same reason the Codex trap above exists.
 
-**The other half of D267: a .NET solution has no root for `dotnet test` to
-resolve.** Session 131 measured it rather than guessing -- a multi-module .NET
-solution keeps its projects under `modules/` and writes nothing at the root,
-so `dotnet test` answers `MSB1003: Specify a project or solution file` -- and
-closed the honest half: `suiteForEcosystem` asks the root detector, and
-`whyNoSuite` says out loud why nothing was declared. The remaining half is the
-root solution file itself, the counterpart of the parent POM that makes Maven's
-side resolve, which `rootFilesDotnet` does not write. **It needs no new rule.**
-`ensureRootFilesWithSuite` writes the root files first and asks the detector
-second, so a solution file written by `rootFilesDotnet` is found by
-`detectDotnet` in the same call and the suite declares itself; a repository
-that reaches the note now stops reaching it. **Two things this session
-decides.** The format: `.slnx`, which is plain XML a scaffold can write and a
-person can read, against `.sln`, which carries GUIDs no generator should be
-inventing -- proposed `.slnx`, with its SDK floor (9.0.200+) stated in the note
-beside the file, where the operator meets it. And upkeep, which is Maven's
-exactly: the parent POM lists the modules holding a POM when it is written and
-notes *"add each as it gets one"*, so the root `.slnx` lists the project files
-under `modules/` on the same terms and gets the same note. A second aggregator
-that maintains itself while the first does not is two rules for one job.
-
 **Steps.** (1) The live documented surface, and the engine list the bootstrap
 templates and the CLI help offer. (2) The registration's behaviour, and the
 decision recorded. (3) The session number on every terminal voice rule, the
 framework's and each job's. (4) The activity-bar and settings titles, and the
-tutorial re-rendered. (5) The root solution file `rootFilesDotnet` writes, and
-the suite that now declares itself with it. (6) The version bump
-(`version.json`, then `npm run stamp:version`) and the release notes for
-sessions 131 to 136.
+tutorial re-rendered. (5) The version bump (`version.json`, then `npm run
+stamp:version`) and the release notes for sessions 131 to 136.
 
-**Tests.** Four. A registration naming the undocumented engine behaves as the
-decision says. A voice rule is headed with the session number, and a job's rule
-is too. A scaffolded .NET root writes the solution file, and the suite is
-declared in the same call because the detector now finds one. The labels get
-none: the manifest is the only copy, and the harness already reads it from
-there.
+**Tests.** Two. A registration naming the undocumented engine behaves as the
+decision says, and a voice rule is headed with the session number where a
+job's rule is too. The labels get none: the manifest is the only copy, and the
+harness already reads it from there.
 
 **Releasable**, and it is the block's one release: sessions 131 to 135 reach
 a seat with it and not before.

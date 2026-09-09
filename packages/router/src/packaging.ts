@@ -22,7 +22,7 @@ import { childEnv } from "./checks.ts";
 import { type RouterConfig, loadConfig } from "./config.ts";
 import { GATE_PUBLISHED_WHEN_RELEASABLE, type GateResult, runGates } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
-import { repoRootFor, snapshotWorktreeTree } from "./journal.ts";
+import { repoRootFor, runGit, snapshotWorktreeTree } from "./journal.ts";
 import {
   OUTCOME_FAILED,
   OUTCOME_PUBLISHED,
@@ -33,6 +33,7 @@ import {
 } from "./ledger.ts";
 import { readSessionState } from "./progress.ts";
 import { resolveSecret } from "./secretResolver.ts";
+import { readText } from "./textfile.ts";
 import { sessionIsReleasable } from "./writers.ts";
 
 /**
@@ -122,6 +123,30 @@ export interface PushStep {
   readonly secretSource: string;
   readonly cwd: string;
   readonly timeoutSeconds: number;
+}
+
+/**
+ * A repository whose release is a TAG, not a pack and a push.
+ *
+ * Some repositories do not publish from the session's own machine, and
+ * saying so is a declaration rather than an absence. This one is the
+ * example: it releases the extension to the Marketplace from
+ * `.github/workflows/publish-vscode.yml`, which fires on a `vsix-v*` tag
+ * and authenticates with an environment secret that is not on any
+ * developer's box. A `pack`/`push` block here would have to name a
+ * credential this machine cannot hold and a feed this machine never
+ * reaches, and the record would say a session published when a workflow
+ * did.
+ *
+ * **The framework's act is the tag**, and `dabbler release` is the verb
+ * that makes it: it holds the version, refuses a dirty tree, and waits on
+ * the operator's own `publication` decision, because a tag is the one act
+ * here that cannot be taken back. The publish phase runs it and records
+ * what it did. Nothing about the `published_when_releasable` gate moves --
+ * it still asks for a `published` row and this still has to earn one.
+ */
+export interface TagRelease {
+  readonly kind: "tag";
 }
 
 export interface Declaration {
@@ -386,6 +411,48 @@ function requirePlaceholders(
  * `null` is an answer, not a gap: a repository publishes because it said how,
  * and there is no build to infer from a language nobody named.
  */
+/** The `release:` key of one already-parsed packaging block, validated. */
+function readTagRelease(packaging: Record<string, unknown>): TagRelease | null {
+  if (packaging["release"] === undefined) return null;
+  if (packaging["release"] !== "tag") {
+    throw new PackagingConfigError(
+      'packaging.release must be "tag" -- the only release this framework ' +
+        "makes without a feed of its own is an annotated tag that CI " +
+        `publishes from; got ${JSON.stringify(packaging["release"])}`,
+    );
+  }
+  // A repository releases ONE way. `release: tag` and a `pack`/`push` pair
+  // are two different accounts of what step (f) does, and a block carrying
+  // both would leave the record unable to say which one it describes.
+  if (packaging["pack"] !== undefined || packaging["push"] !== undefined) {
+    throw new PackagingConfigError(
+      "packaging declares `release: tag` and a pack/push pair: a repository " +
+        "releases one way, and a block that claims both leaves the record " +
+        "unable to say which one it describes.",
+    );
+  }
+  return { kind: "tag" };
+}
+
+/**
+ * The tag-release declaration, where the block carries one.
+ *
+ * Read with the same module-then-root rule as `loadDeclaration`, because a
+ * module publishes the way its own block says and the root answers
+ * otherwise; the two readers are never both non-null for one block.
+ */
+export function loadTagRelease(
+  config: RouterConfig | null,
+  module: string | null = null,
+): TagRelease | null {
+  const perModule = module === null ? null : moduleBlock(config, module);
+  const block = perModule ?? (config ?? {})["packaging"];
+  if (block === undefined || block === null) return null;
+  const packaging = asRecord(block);
+  if (packaging === null) return null;
+  return readTagRelease(packaging);
+}
+
 export function loadDeclaration(
   config: RouterConfig | null,
   module: string | null = null,
@@ -404,6 +471,12 @@ export function loadDeclaration(
       `${perModule === null ? "packaging" : `modules.${module}.packaging`} must be a mapping`,
     );
   }
+
+  // A tag release declares no pack and no push, so this reader has nothing
+  // to return for one. `loadTagRelease` is the reader that does, and it is
+  // called here so that a malformed `release:` is refused by whichever of
+  // the two a caller reaches first.
+  if (readTagRelease(packaging) !== null) return null;
 
   const packBlock = asRecord(packaging["pack"]);
   const pushBlock = asRecord(packaging["push"]);
@@ -672,6 +745,129 @@ export function artifactsIn(outputDir: string): string[] {
   return found.sort();
 }
 
+// --- The repository's one version, and the tag that releases it ------------
+//
+// These live here rather than beside `dabbler release` because they are
+// facts about what this repository RELEASES, and two callers need them: the
+// verb that tags, and the packaging run that records whether the tag
+// happened. A copy in each is how the tag shape and the stamping rule come
+// to disagree.
+
+/** The version a workspace package declares. */
+export function packageVersion(repoRoot: string, relPath: string): string | null {
+  try {
+    const doc = JSON.parse(readText(`${repoRoot}/${relPath}`)) as { version?: string };
+    return typeof doc.version === "string" ? doc.version : null;
+  } catch {
+    return null;
+  }
+}
+
+/** What the extension declares it takes from the router, or null. */
+export function declaredRouterDependency(repoRoot: string): string | null {
+  try {
+    const doc = JSON.parse(
+      readText(`${repoRoot}/tools/dabbler-ai-orchestration/package.json`),
+    ) as { dependencies?: Record<string, string> };
+    return doc.dependencies?.["dabbler-ai-router"] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** One version, or the sentence saying why this repository does not have one. */
+export interface ReleaseVersion {
+  readonly version: string | null;
+  readonly reason: string;
+}
+
+/** What `version.json` declares, or null when it declares nothing usable. */
+export function canonicalVersion(repoRoot: string): string | null {
+  try {
+    const doc = JSON.parse(readText(`${repoRoot}/version.json`)) as { version?: unknown };
+    const declared = doc.version;
+    return typeof declared === "string" && /^\d+\.\d+\.\d+(-[\w.]+)?$/.test(declared)
+      ? declared
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The repository's ONE version, and whether every manifest carries it.
+ *
+ * The router used to carry its own number and the extension another -- an
+ * install showed router 2.0.0 beside extension 2.7.0, which is two things
+ * where the operator has one. `version.json` is now the source and nothing
+ * else is authored: `npm run stamp:version` writes it into both manifests,
+ * the extension's dependency on the router, and the lock file.
+ *
+ * This asks whether that stamping is current, and `dabbler release` asks it
+ * before it tags -- because a stale manifest is exactly the thing that would
+ * otherwise become public as two artifacts nobody can say the version of.
+ * The remedy is named rather than left to be worked out: three literals
+ * hand-synchronised is the state this replaced.
+ */
+export function releaseVersion(repoRoot: string): ReleaseVersion {
+  const canonical = canonicalVersion(repoRoot);
+  if (canonical === null) {
+    return {
+      version: null,
+      reason:
+        "version.json does not declare a version, and it is the one file that " +
+        "does: every manifest is stamped from it by `npm run stamp:version`",
+    };
+  }
+  const stale: string[] = [];
+  const router = packageVersion(repoRoot, "packages/router/package.json");
+  const extension = packageVersion(
+    repoRoot,
+    "tools/dabbler-ai-orchestration/package.json",
+  );
+  if (router !== canonical) stale.push(`packages/router/package.json declares ${router}`);
+  if (extension !== canonical) {
+    stale.push(`tools/dabbler-ai-orchestration/package.json declares ${extension}`);
+  }
+  // Exactly, and it must be there. The extension BUNDLES the router, so a
+  // dependency naming any other version is a Marketplace build wrapping
+  // something else -- and a range that merely contains the number ("^2.0.0"
+  // for 2.8.0, or 12.8.0 for 2.8.0) is not this version being named.
+  const dependency = declaredRouterDependency(repoRoot);
+  if (dependency !== canonical) {
+    stale.push(
+      `the extension depends on dabbler-ai-router ${dependency ?? "nothing"}`,
+    );
+  }
+  if (stale.length > 0) {
+    return {
+      version: null,
+      reason:
+        `version.json declares ${canonical}, and ${stale.join("; ")}. ` +
+        "Run `npm run stamp:version` -- the manifests are stamped from that " +
+        "file, never edited beside it",
+    };
+  }
+  return { version: canonical, reason: "" };
+}
+
+/**
+ * The tag an answer means. One, because there is one artifact.
+ *
+ * There were two until 2026-09-02, and an ORDER between them: the router to
+ * npm first and the extension after, because the extension bundles the
+ * router and a Marketplace version whose npm half was missing would be the
+ * broken half-release. npm is retired -- the extension IS the distribution,
+ * and `dist/dabbler.cjs` ships inside it -- so there is no half that can be
+ * missing and nothing left to sequence.
+ */
+export function tagsFor(answer: string, version: string): string[] {
+  if (answer === "release-candidate") return [`vsix-v${version}-rc1`];
+  if (answer === "publish") return [`vsix-v${version}`];
+  return [];
+}
+
+
 // --- The run -----------------------------------------------------------------
 
 function currentSession(sessionsDir: string): number | null {
@@ -703,6 +899,122 @@ function refusal(
     recordedAt: nowIso(),
     ready: false,
     declared: false,
+  };
+}
+
+/**
+ * The commit a `ls-remote --tags` answer says the tag names, or null.
+ *
+ * An annotated tag answers on two lines -- the tag object, and the commit
+ * it peels to under `^{}` -- and the peeled line is the one that matters:
+ * the tag object's own SHA is not a commit and comparing it to HEAD would
+ * refuse every annotated tag ever made. A lightweight tag answers on one
+ * line, which already is the commit.
+ */
+export function taggedCommit(lsRemote: string, tag: string): string | null {
+  let plain: string | null = null;
+  for (const line of lsRemote.split(/\r?\n/)) {
+    const [sha, ref] = line.split("\t");
+    if (!sha || !ref) continue;
+    if (ref.trim() === `refs/tags/${tag}^{}`) return sha.trim();
+    if (ref.trim() === `refs/tags/${tag}`) plain = sha.trim();
+  }
+  return plain;
+}
+
+/**
+ * Step (f) where the release is a tag: the run RECORDS it, and never makes
+ * it.
+ *
+ * The division is the point, and it is not squeamishness. A tag push
+ * publishes to everyone the moment CI sees it, and `dabbler release` is
+ * where that act lives precisely so it waits on the operator's own
+ * `publication` decision rather than on a phase advancing. If this ran
+ * `git tag` itself, a session would publish by reaching step (f), which is
+ * the opposite of what the verb was built to prevent.
+ *
+ * So this asks one question -- is the tag for this repository's version on
+ * the remote? -- and answers it as `published` or `refused`. The refusal
+ * names the verb, because the operator reading it is one command away.
+ * `published_when_releasable` is untouched: it still wants a `published`
+ * row, and a session that was supposed to ship and did not still cannot
+ * close as one that did.
+ */
+function tagReleaseRun(
+  sessionsDir: string,
+  root: string,
+  sessionNumber: number,
+  gates: readonly GateResult[],
+  options: PackageOptions,
+): PackagingRun {
+  const agreed = releaseVersion(root);
+  if (agreed.version === null) {
+    return refusal(sessionNumber, true, `the release version is not settled: ${agreed.reason}`, gates);
+  }
+  const tag = tagsFor("publish", agreed.version)[0]!;
+  if (options.dryRun === true) {
+    return { ...refusal(sessionNumber, true, "", gates), ready: true, declared: true, feed: tag };
+  }
+  // On the REMOTE, not merely local. A tag that exists only here publishes
+  // nothing: the workflow fires on what origin received, so a local tag
+  // would let the record say published while the Marketplace served the
+  // version before it.
+  const onRemote = runGit(root, ["ls-remote", "--tags", "origin", tag]);
+  if (onRemote.code !== 0) {
+    return refusal(
+      sessionNumber,
+      true,
+      `could not ask origin whether ${tag} exists: ${onRemote.stderr.trim()}`,
+      gates,
+    );
+  }
+  const tagged = taggedCommit(onRemote.stdout, tag);
+  if (tagged === null) {
+    return refusal(
+      sessionNumber,
+      true,
+      `this repository releases by tag, and ${tag} is not on origin, so ` +
+        "nothing has been published. The tag is the one act here that " +
+        "cannot be taken back, so it is not made by a phase advancing: run " +
+        "`dabbler release`, which states what would ship and waits for the " +
+        "`publication` decision (`dabbler owed list`) before it tags. Then " +
+        "resume, and this records what the tag did.",
+      gates,
+    );
+  }
+  // The NAME is not the evidence; the commit under it is. A session whose
+  // version bump was missed still declares a version that was released
+  // before, from an older commit -- an ordinary release mistake, not an
+  // exotic one -- and matching on the name alone would file a `published`
+  // row for work CI never saw, which is precisely the claim
+  // `published_when_releasable` exists to make impossible. The land phase
+  // has already committed and pushed this session, so the tag has to name
+  // that commit.
+  const head = runGit(root, ["rev-parse", "HEAD"]);
+  if (head.code !== 0) {
+    return refusal(sessionNumber, true, `could not read HEAD: ${head.stderr.trim()}`, gates);
+  }
+  if (tagged !== head.stdout.trim()) {
+    return refusal(
+      sessionNumber,
+      true,
+      `${tag} is on origin but names commit ${tagged.slice(0, 12)}, and this ` +
+        `session landed ${head.stdout.trim().slice(0, 12)}. A tag that was ` +
+        "made for an earlier commit released that commit, not this one: the " +
+        "usual cause is a version that was not bumped, so the manifests " +
+        "still name a version already published. Bump `version.json`, run " +
+        "`npm run stamp:version`, and release the version this work is.",
+      gates,
+    );
+  }
+  return {
+    ...refusal(sessionNumber, true, "", gates),
+    outcome: OUTCOME_PUBLISHED,
+    // The tag IS the artifact here: it is what a person can look up, what
+    // CI consumed, and what the Marketplace version can be traced back to.
+    feed: "origin",
+    artifacts: [tag],
+    treeDigest: snapshotWorktreeTree(root),
   };
 }
 
@@ -766,8 +1078,10 @@ export function packageSession(
 
   // The session's module's own block answers for a module session, the root
   // block otherwise -- the same rule `module pack` reads by.
-  const declaration = loadDeclaration(config, moduleOfSession(sessionsDir, sessionNumber));
-  if (declaration === null) {
+  const module = moduleOfSession(sessionsDir, sessionNumber);
+  const tagRelease = loadTagRelease(config, module);
+  const declaration = tagRelease === null ? loadDeclaration(config, module) : null;
+  if (tagRelease === null && declaration === null) {
     return refusal(
       sessionNumber,
       true,
@@ -802,6 +1116,16 @@ export function packageSession(
       gates,
     );
   }
+
+  // A tag release runs no pack and no push: everything below this point is
+  // about a feed, a credential and an artifact on disk, and a tag has none
+  // of the three. It runs AFTER the gates above, for the same reason the
+  // pack does -- step (f) follows (e), and a tag naming a commit that never
+  // passed them would be the release this whole phase exists to prevent.
+  if (tagRelease !== null) {
+    return tagReleaseRun(sessionsDir, root, sessionNumber, gates, options);
+  }
+  if (declaration === null) throw new PackagingError("unreachable: no declaration");
 
   // An unauthenticated feed declares no credential, so there is none to
   // resolve and nothing to redact. The empty string travels on rather than

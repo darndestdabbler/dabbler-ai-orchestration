@@ -212,6 +212,27 @@ describe("loading a config", () => {
     assert.match(refusal(() => loadConfigFrom(sources({ base }))), /schema validation/);
   });
 
+  // Two accounts of what step (f) does, in one block. The runtime reader
+  // refuses it, and so must the schema: a consumer that validates and gets
+  // a pass is told the declaration is good when it is the one shape the
+  // record cannot describe.
+  it("refuses a packaging block that declares both a tag release and a pack/push pair", () => {
+    const base = makeConfig();
+    base["packaging"] = {
+      release: "tag",
+      pack: { argv: ["dotnet", "pack", "-o", "{output}"] },
+      push: { argv: ["dotnet", "nuget", "push", "{artifact}", "--source", "{feed}"], feed: "https://f/" },
+    };
+    assert.match(refusal(() => loadConfigFrom(sources({ base }))), /schema validation/);
+  });
+
+  it("accepts a packaging block that declares a tag release alone", () => {
+    const base = makeConfig();
+    base["packaging"] = { release: "tag" };
+    const config = loadConfigFrom(sources({ base }));
+    assert.deepEqual(config["packaging"], { release: "tag" });
+  });
+
   it("refuses a model referencing a provider that does not exist", () => {
     const base = makeConfig();
     (base["models"] as Record<string, Record<string, unknown>>)["flash"]["provider"] = "mystery";

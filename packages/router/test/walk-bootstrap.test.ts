@@ -25,7 +25,7 @@ import {
 import { bootstrapVerb } from "../src/cli/bootstrap.ts";
 import { sessionsDirFor } from "../src/evidence.ts";
 import { materialWorktreeChanges } from "../src/gates.ts";
-import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/cli/release.ts";
+import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/packaging.ts";
 import { capture } from "../src/output.ts";
 import { ID_GIT_REMOTE, openDecisions } from "../src/owedDecisions.ts";
 import { solutionShape } from "../src/modules.ts";

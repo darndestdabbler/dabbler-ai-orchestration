@@ -255,12 +255,8 @@
     },
     "packaging": {
       "type": "object",
-      "description": "Step (f) of the session lifecycle: pack, then push to the feed. A repository that declares no packaging block publishes nothing, which is a declaration rather than an omission -- there is no inferred build here, because guessing how a repository publishes is guessing an ecosystem. Placeholders are substituted per argv element and never through a shell: {output} is the run's own output directory, {artifact} is one file pack produced, {feed} is the declared feed, and {secret} is the resolved credential. Both commands are argv, not shell strings, so a credential cannot be re-split by a shell, and both are spawned with the child-environment allowlist, so the credential is in no environment at all.",
+      "description": "Step (f) of the session lifecycle: pack, then push to the feed. A repository that declares no packaging block publishes nothing, which is a declaration rather than an omission -- there is no inferred build here, because guessing how a repository publishes is guessing an ecosystem. Placeholders are substituted per argv element and never through a shell: {output} is the run's own output directory, {artifact} is one file pack produced, {feed} is the declared feed, and {secret} is the resolved credential. Both commands are argv, not shell strings, so a credential cannot be re-split by a shell, and both are spawned with the child-environment allowlist, so the credential is in no environment at all. A repository whose release is a tag declares release: tag instead of the pair, and the two are mutually exclusive.",
       "additionalProperties": false,
-      "required": [
-        "pack",
-        "push"
-      ],
       "properties": {
         "pack": {
           "type": "object",
@@ -327,8 +323,44 @@
               "exclusiveMinimum": 0
             }
           }
+        },
+        "release": {
+          "const": "tag",
+          "description": "This repository releases by TAG rather than from this machine: dabbler release pushes an annotated vsix-v* tag and a tag-driven CI workflow publishes from it with a credential no session ever sees. Declared instead of pack/push, never beside them -- a repository releases one way, and a block claiming both leaves the record unable to say which one it describes. The packaging run then RECORDS whether the tag reached origin; it never makes it, because a tag is the one act that waits on the operator publication decision rather than on a phase advancing."
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "release"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "pack"
+                ]
+              },
+              {
+                "required": [
+                  "push"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "pack",
+            "push"
+          ],
+          "not": {
+            "required": [
+              "release"
+            ]
+          }
+        }
+      ]
     },
     "verification": {
       "type": "object"
@@ -459,7 +491,10 @@
           "minimum": 1
         },
         "engine_output": {
-          "enum": ["stream", "quiet"]
+          "enum": [
+            "stream",
+            "quiet"
+          ]
         }
       }
     },

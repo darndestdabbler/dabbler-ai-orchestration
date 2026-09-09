@@ -463,7 +463,7 @@ carries what the repository owns and nothing else:
 |---|---|
 | `schema_version` | required, currently `1`; a repository written to a later shape is refused with its version named rather than read as unknown keys |
 | `testing` | `suites` (each with its own `test_roots` and `test_glob`), `controls`, and the `selection` rules that map a changed path to the tests that answer for it |
-| `packaging` | `pack` and `push` — step (f) of the lifecycle |
+| `packaging` | step (f) of the lifecycle: either `pack` and `push`, or `release: tag` for a repository CI publishes from — one or the other, never both |
 | `paths` | `sensitive_paths`: which of this repository's paths escalate a run |
 
 Tracked because CI reads these, the next machine reads them, and
@@ -542,6 +542,31 @@ packaging:
 Both commands are `argv`, never shell strings, so nothing can re-split
 the element the credential lands in; both are spawned with the child
 environment allowlist, so the credential is inherited by nothing.
+
+**Some repositories do not publish from the session's machine at all**, and
+that is a third answer rather than a missing block. This one is the example:
+it releases the extension from a tag-driven workflow whose credential lives
+in a GitHub environment, so there is no `push` it could honestly declare —
+and declaring nothing meant no session here could be releasable, because the
+publish phase and the `published_when_releasable` gate both look for a
+packaging run that an absent block never produces.
+
+```yaml
+# dabbler.yaml
+packaging:
+  release: tag
+```
+
+`release: tag` and a `pack`/`push` pair are **mutually exclusive**: a
+repository releases one way, and a block claiming both leaves the record
+unable to say which one it describes. The declared release is an annotated
+`vsix-v<version>` tag; `dabbler release` makes it, and the packaging run
+**records whether it reached origin** rather than making it — a tag is
+public to everyone the moment CI sees it, so it waits on the operator's own
+`publication` decision (`dabbler owed list`) instead of on a phase
+advancing. A run whose tag is not on origin is `refused` and names the verb.
+The gate is unchanged: it still asks for a `published` row, and only a tag
+that actually reached origin earns one.
 
 ## Seat catalog lockfile — `copilot-catalog.lock`
 

@@ -80,38 +80,9 @@ export type RouterConfig = {
     sensitive_paths?: string[];
   };
   /**
-   * Step (f) of the session lifecycle: pack, then push to the feed. A repository that declares no packaging block publishes nothing, which is a declaration rather than an omission -- there is no inferred build here, because guessing how a repository publishes is guessing an ecosystem. Placeholders are substituted per argv element and never through a shell: {output} is the run's own output directory, {artifact} is one file pack produced, {feed} is the declared feed, and {secret} is the resolved credential. Both commands are argv, not shell strings, so a credential cannot be re-split by a shell, and both are spawned with the child-environment allowlist, so the credential is in no environment at all.
+   * Step (f) of the session lifecycle: pack, then push to the feed. A repository that declares no packaging block publishes nothing, which is a declaration rather than an omission -- there is no inferred build here, because guessing how a repository publishes is guessing an ecosystem. Placeholders are substituted per argv element and never through a shell: {output} is the run's own output directory, {artifact} is one file pack produced, {feed} is the declared feed, and {secret} is the resolved credential. Both commands are argv, not shell strings, so a credential cannot be re-split by a shell, and both are spawned with the child-environment allowlist, so the credential is in no environment at all. A repository whose release is a tag declares release: tag instead of the pair, and the two are mutually exclusive.
    */
-  packaging?: {
-    pack: {
-      /**
-       * Must contain {output}. A pack that does not take its output directory from the framework writes into the repository, dirtying the tree that was just verified and leaving last week's build sitting where this week's push will find it.
-       */
-      argv: string[];
-      cwd?: string;
-      timeout_seconds?: number;
-    };
-    push: {
-      /**
-       * Must contain {artifact} and {feed}, and {secret} whenever the feed takes a credential. The first two are required rather than conventional: a command without {artifact} pushes nothing the framework can name, and a command without {feed} makes the recorded destination a label instead of a fact about what ran. {secret} is required for every feed that authenticates -- a command without it there is publishing on an ambient credential the framework cannot see, which makes 'the PAT is never in an environment' unprovable rather than true -- and is left out for a feed that is a folder on disk, which authenticates nothing. Which is which is decided by the loader from the feed, not declared here.
-       */
-      argv: string[];
-      /**
-       * A URL, or a folder on disk -- a drive path, a UNC path, a POSIX path or file://. A folder takes no credential.
-       */
-      feed: string;
-      /**
-       * The NAME of the credential, never its value. It resolves through the secret resolver at spawn time, exactly as a provider's api_key_env does. Required by the loader when the feed takes a credential; a folder feed declares none.
-       */
-      secret?: string;
-      /**
-       * Which secret_resolver backend holds it. Defaults to 'env'.
-       */
-      secret_source?: string;
-      cwd?: string;
-      timeout_seconds?: number;
-    };
-  };
+  packaging?: unknown;
   verification?: Record<string, unknown>;
   critique?: {
     /**

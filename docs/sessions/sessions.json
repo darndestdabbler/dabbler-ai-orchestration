@@ -2698,13 +2698,14 @@
         "provider": "anthropic",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": "VERIFIED",
+      "verificationVerdict": "REMEDIATED_AT_CAP",
       "frameworkVersion": "2.0.14",
       "verification": {
-        "rounds": 2,
+        "rounds": 3,
         "verifierModel": "gpt-5-6-terra",
         "verifierProvider": "openai",
-        "transport": "api"
+        "transport": "api",
+        "unreviewedFindings": 1
       }
     }
   ]

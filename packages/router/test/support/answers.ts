@@ -181,6 +181,10 @@ export function cleanRepoAnswers(repo: string): () => void {
 // --- A checkout that answers, without a repository ----------------------------
 
 const HEAD_COMMIT = "a1b2c3d4".repeat(5);
+/** An annotated tag's own object, which is never the commit it names. */
+const TAG_OBJECT = "f0f0f0f0".repeat(5);
+/** A commit that is not HEAD: a tag left over from an earlier release. */
+export const EARLIER_COMMIT = "9e9e9e9e".repeat(5);
 const ANCHOR_COMMIT = "c".repeat(40);
 
 /**
@@ -210,6 +214,8 @@ export interface AnsweredRepo {
   status(text: string): void;
   /** Commits ahead of the upstream; 0 is pushed. */
   ahead(count: number): void;
+  /** A tag origin answers `ls-remote --tags` with; at HEAD unless a commit is named. */
+  remoteTag(name: string, commit?: string): void;
 }
 
 /** The same, seeded with the sandbox and naming where its sessions live. */
@@ -261,7 +267,7 @@ export function makeAnsweredRepo(
   mkdirSync(join(repo, ".git"), { recursive: true });
   const posixRepo = repo.split("\\").join("/");
   const withOrigin = options.origin === true;
-  const state = { status: "", ahead: 0, headTree: diskTree(repo) };
+  const state = { status: "", ahead: 0, headTree: diskTree(repo), remoteTags: new Map<string, string>() };
   const config = new Map<string, string[]>(
     withOrigin
       ? [
@@ -307,6 +313,26 @@ export function makeAnsweredRepo(
     [
       ["rev-list", "--count", "@{u}..HEAD"],
       () => (withOrigin ? { stdout: String(state.ahead) } : { code: 128, stderr: "fatal: no upstream configured" }),
+    ],
+    // What origin has, which is not what the checkout has: a tag made
+    // locally and never pushed publishes nothing.
+    [
+      ["ls-remote", "--tags"],
+      (args) => {
+        const wanted = String(args[3] ?? "");
+        const commit = state.remoteTags.get(wanted);
+        if (commit === undefined) return { stdout: "" };
+        // An ANNOTATED tag, which is what `dabbler release` makes: two
+        // lines, and the commit is on the peeled one. A reader that took
+        // the first line would compare a tag object to a commit and
+        // refuse every real release.
+        return {
+          stdout: [
+            `${TAG_OBJECT}	refs/tags/${wanted}`,
+            `${commit}	refs/tags/${wanted}^{}`,
+          ].join("\n"),
+        };
+      },
     ],
     [["push"], { code: 0 }],
     // A pushed, clean checkout with an upstream pulls forward to itself.
@@ -361,6 +387,7 @@ export function makeAnsweredRepo(
     restore,
     status: (text) => { state.status = text; },
     ahead: (count) => { state.ahead = count; },
+    remoteTag: (name, commit) => { state.remoteTags.set(name, commit ?? HEAD_COMMIT); },
   };
 }
 

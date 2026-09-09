@@ -1046,3 +1046,9 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: none — this round's verifier could not look at the tree
 - Raw round output: `.dabbler/runs/s137/`
+
+## Session 137 verification — REMEDIATED AT THE CAP after 3 round(s)
+
+- Every blocking finding of round 3 was fixed; the cap left the fix unreviewed.
+- Fixed, unreviewed: [major] A remotely existing tag with the right name is treated as this session’s publication even when it points at an older commit.
+- This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.

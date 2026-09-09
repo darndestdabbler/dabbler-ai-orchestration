@@ -11,13 +11,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import {
-  canonicalVersion,
-  packageVersion,
-  releaseVersion,
-  servedVersions,
-  tagsFor,
-} from "../src/cli/release.ts";
+import { servedVersions } from "../src/cli/release.ts";
+import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/packaging.ts";
 import {
   ID_PUBLICATION,
   answerOwed,

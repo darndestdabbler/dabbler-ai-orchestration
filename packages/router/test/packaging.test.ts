@@ -19,13 +19,15 @@ import {
   PackagingConfigError,
   feedTakesCredential,
   loadDeclaration,
+  loadTagRelease,
   packageSession,
   record,
   redact,
   runAsRecord,
+  taggedCommit,
 } from "../src/packaging.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
-import { makeAnsweredSandbox, makeConfig } from "./support/answers.ts";
+import { EARLIER_COMMIT, makeAnsweredSandbox, makeConfig } from "./support/answers.ts";
 
 // Writes one file into whatever directory the framework hands it, named by
 // the arguments after it.
@@ -129,6 +131,31 @@ describe("the declaration", () => {
 
   it("loads nothing for a repository that declares nothing", () => {
     assert.equal(loadDeclaration(makeConfig()), null);
+    assert.equal(loadTagRelease(makeConfig()), null);
+  });
+
+  // The other kind of answer, and it is an answer rather than an absence: a
+  // repository that releases by tag has no pack and no push to declare,
+  // because the credential that publishes lives in CI and never here.
+  it("reads a tag release, which declares no pack and no push", () => {
+    const config = makeConfig({ packaging: { release: "tag" } });
+    assert.deepEqual(loadTagRelease(config), { kind: "tag" });
+    assert.equal(loadDeclaration(config), null);
+  });
+
+  // A block claiming both leaves the record unable to say which one it is
+  // describing, and the record is the whole point of step (f).
+  it("refuses a block that declares a tag release and a pack/push pair", () => {
+    const config = makeConfig({
+      packaging: { release: "tag", pack: { argv: ["true"] }, push: { argv: ["true"] } },
+    });
+    assert.throws(() => loadTagRelease(config), PackagingConfigError);
+    assert.throws(() => loadDeclaration(config), PackagingConfigError);
+  });
+
+  it("refuses a release this framework does not know how to make", () => {
+    const config = makeConfig({ packaging: { release: "npm" } });
+    assert.throws(() => loadTagRelease(config), PackagingConfigError);
   });
 
   // Each placeholder is the framework's only route for one fact. A command
@@ -323,6 +350,124 @@ describe("who may publish", () => {
 });
 
 // --- The publication ------------------------------------------------------------
+
+describe("a release that is a tag", () => {
+  // Session 137 landed its work, wrote its release notes, and then could not
+  // publish: this repository releases from a tag-driven workflow whose
+  // credential is not on any developer's machine, so it declares no pack and
+  // no push -- and the publish phase read that as "nothing to publish" while
+  // `published_when_releasable` demanded a run. A repository has to be able
+  // to SAY that its release is a tag.
+  const RELEASING = "3.1.4";
+
+  /** A publishable sandbox whose manifests all carry one stamped version. */
+  function taggable(routerVersion = RELEASING): ReturnType<typeof makeAnsweredSandbox> {
+    const sandbox = makeAnsweredSandbox({
+      "version.json": `{"version": "${RELEASING}"}\n`,
+      "packages/router/package.json": `{"version": "${routerVersion}"}\n`,
+      "tools/dabbler-ai-orchestration/package.json":
+        `{"version": "${RELEASING}", "dependencies": {"dabbler-ai-router": "${RELEASING}"}}\n`,
+    });
+    registerSessionStart(sandbox.sessionsDir, 1, {
+      engine: "claude-code",
+      provider: "anthropic",
+    });
+    declareSessionTask(sandbox.sessionsDir, {
+      sessionNumber: 1,
+      task: "ship it",
+      releasable: true,
+    });
+    appendRound(sandbox.repo, 1, {
+      round: 1,
+      verdict: "VERIFIED",
+      blocking: false,
+      verifier_model: "gpt-5-4",
+      verifier_provider: "openai",
+      findings: [],
+      completion_tree: snapshotWorktreeTree(sandbox.repo),
+      recorded_at: new Date().toISOString(),
+    });
+    return sandbox;
+  }
+
+  const TAG_CONFIG = () => makeConfig({ packaging: { release: "tag" } });
+
+  it("refuses, and names the verb, while the tag is not on origin", () => {
+    const { sessionsDir, restore } = taggable();
+    try {
+      const run = packageSession(sessionsDir, { config: TAG_CONFIG() });
+      assert.equal(run.outcome, OUTCOME_REFUSED);
+      assert.match(String(run.refusal), new RegExp(`vsix-v${RELEASING}`));
+      assert.match(String(run.refusal), /dabbler release/);
+    } finally {
+      restore();
+    }
+  });
+
+  it("records published once origin carries the tag at the commit this session landed", () => {
+    const { sessionsDir, remoteTag, restore } = taggable();
+    try {
+      remoteTag(`vsix-v${RELEASING}`);
+      const run = packageSession(sessionsDir, { config: TAG_CONFIG() });
+      assert.equal(run.outcome, OUTCOME_PUBLISHED);
+      // The tag IS the artifact: it is what CI consumed and what a served
+      // version can be traced back to.
+      assert.deepEqual(run.artifacts, [`vsix-v${RELEASING}`]);
+    } finally {
+      restore();
+    }
+  });
+
+  // The name is not the evidence. A session whose version bump was missed
+  // declares a version that was already released FROM AN EARLIER COMMIT --
+  // an ordinary release mistake -- and matching on the name alone would file
+  // a `published` row for work CI never saw, which is the one claim
+  // `published_when_releasable` exists to make impossible.
+  it("refuses a tag that names an earlier commit than the one this session landed", () => {
+    const { sessionsDir, remoteTag, restore } = taggable();
+    try {
+      remoteTag(`vsix-v${RELEASING}`, EARLIER_COMMIT);
+      const run = packageSession(sessionsDir, { config: TAG_CONFIG() });
+      assert.equal(run.outcome, OUTCOME_REFUSED);
+      assert.match(String(run.refusal), /released that commit, not this one/);
+      assert.match(String(run.refusal), /stamp:version/);
+    } finally {
+      restore();
+    }
+  });
+
+  // An annotated tag -- the kind `dabbler release` makes -- answers on two
+  // lines, and only the peeled one is a commit. A reader that took the first
+  // would compare a tag object to HEAD and refuse every real release.
+  it("reads the commit off an annotated tag's peeled ref", () => {
+    const answer = [
+      `${"f0f0f0f0".repeat(5)}\trefs/tags/vsix-v1.0.0`,
+      `${EARLIER_COMMIT}\trefs/tags/vsix-v1.0.0^{}`,
+    ].join("\n");
+    assert.equal(taggedCommit(answer, "vsix-v1.0.0"), EARLIER_COMMIT);
+    // A lightweight tag answers on one line, which already is the commit.
+    assert.equal(
+      taggedCommit(`${EARLIER_COMMIT}\trefs/tags/vsix-v1.0.0`, "vsix-v1.0.0"),
+      EARLIER_COMMIT,
+    );
+    assert.equal(taggedCommit("", "vsix-v1.0.0"), null);
+  });
+
+  // There is one version and a tag names it, so a repository whose manifests
+  // disagree has no version to tag. It is refused before origin is asked at
+  // all: the alternative is a tag that names one of two numbers.
+  it("refuses when the manifests do not agree on a version", () => {
+    const { sessionsDir, remoteTag, restore } = taggable("9.9.9");
+    try {
+      remoteTag(`vsix-v${RELEASING}`);
+      const run = packageSession(sessionsDir, { config: TAG_CONFIG() });
+      assert.equal(run.outcome, OUTCOME_REFUSED);
+      assert.match(String(run.refusal), /stamp:version/);
+    } finally {
+      restore();
+    }
+  });
+});
 
 describe("the publication", () => {
   it("packs once and pushes once per artifact, into the run directory", () => {

@@ -42,6 +42,24 @@ schema_version: 1
 #       feed: https://pkgs.dev.azure.com/<org>/_packaging/<feed>/nuget/v3/index.json
 #       secret: DABBLER_FEED_PAT
 
+# THIS repository's answer, and it is the other kind. Everything above is
+# still true -- there is no pack and no push here, and there cannot be: the
+# Marketplace credential lives in a GitHub environment and never on this
+# machine. What was missing was a way to SAY so. Declaring nothing meant a
+# session could not be releasable at all, because the publish phase and the
+# `published_when_releasable` gate both look for a packaging run and an
+# absent block produces none; session 137 walked into exactly that, with its
+# work landed and its release notes written.
+#
+# `release: tag` says: this repository's release is an annotated `vsix-v*`
+# tag, `dabbler release` makes it, and `.github/workflows/publish-vscode.yml`
+# publishes from it. The packaging run then RECORDS whether that tag reached
+# origin -- it never makes it, because a tag published to everyone the moment
+# CI sees it is the one act that waits on the operator's own `publication`
+# decision rather than on a phase advancing.
+packaging:
+  release: tag
+
 # Which tests a change makes necessary, and what proves the suite was green.
 #
 # Pre-verification runs the selected tests only. The full suite is recorded

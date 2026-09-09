@@ -31,7 +31,7 @@ import {
   currentDecisions,
   raisePublicationDecision,
 } from "../owedDecisions.ts";
-import { readText } from "../textfile.ts";
+import { releaseVersion, tagsFor } from "../packaging.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;
@@ -53,120 +53,6 @@ function usage(): string {
     "  -h, --help               show this message",
     "",
   ].join("\n");
-}
-
-/** The version a workspace package declares. */
-export function packageVersion(repoRoot: string, relPath: string): string | null {
-  try {
-    const doc = JSON.parse(readText(`${repoRoot}/${relPath}`)) as { version?: string };
-    return typeof doc.version === "string" ? doc.version : null;
-  } catch {
-    return null;
-  }
-}
-
-/** What the extension declares it takes from the router, or null. */
-export function declaredRouterDependency(repoRoot: string): string | null {
-  try {
-    const doc = JSON.parse(
-      readText(`${repoRoot}/tools/dabbler-ai-orchestration/package.json`),
-    ) as { dependencies?: Record<string, string> };
-    return doc.dependencies?.["dabbler-ai-router"] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** One version, or the sentence saying why this repository does not have one. */
-export interface ReleaseVersion {
-  readonly version: string | null;
-  readonly reason: string;
-}
-
-/** What `version.json` declares, or null when it declares nothing usable. */
-export function canonicalVersion(repoRoot: string): string | null {
-  try {
-    const doc = JSON.parse(readText(`${repoRoot}/version.json`)) as { version?: unknown };
-    const declared = doc.version;
-    return typeof declared === "string" && /^\d+\.\d+\.\d+(-[\w.]+)?$/.test(declared)
-      ? declared
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The repository's ONE version, and whether every manifest carries it.
- *
- * The router used to carry its own number and the extension another -- an
- * install showed router 2.0.0 beside extension 2.7.0, which is two things
- * where the operator has one. `version.json` is now the source and nothing
- * else is authored: `npm run stamp:version` writes it into both manifests,
- * the extension's dependency on the router, and the lock file.
- *
- * This asks whether that stamping is current, and `dabbler release` asks it
- * before it tags -- because a stale manifest is exactly the thing that would
- * otherwise become public as two artifacts nobody can say the version of.
- * The remedy is named rather than left to be worked out: three literals
- * hand-synchronised is the state this replaced.
- */
-export function releaseVersion(repoRoot: string): ReleaseVersion {
-  const canonical = canonicalVersion(repoRoot);
-  if (canonical === null) {
-    return {
-      version: null,
-      reason:
-        "version.json does not declare a version, and it is the one file that " +
-        "does: every manifest is stamped from it by `npm run stamp:version`",
-    };
-  }
-  const stale: string[] = [];
-  const router = packageVersion(repoRoot, "packages/router/package.json");
-  const extension = packageVersion(
-    repoRoot,
-    "tools/dabbler-ai-orchestration/package.json",
-  );
-  if (router !== canonical) stale.push(`packages/router/package.json declares ${router}`);
-  if (extension !== canonical) {
-    stale.push(`tools/dabbler-ai-orchestration/package.json declares ${extension}`);
-  }
-  // Exactly, and it must be there. The extension BUNDLES the router, so a
-  // dependency naming any other version is a Marketplace build wrapping
-  // something else -- and a range that merely contains the number ("^2.0.0"
-  // for 2.8.0, or 12.8.0 for 2.8.0) is not this version being named.
-  const dependency = declaredRouterDependency(repoRoot);
-  if (dependency !== canonical) {
-    stale.push(
-      `the extension depends on dabbler-ai-router ${dependency ?? "nothing"}`,
-    );
-  }
-  if (stale.length > 0) {
-    return {
-      version: null,
-      reason:
-        `version.json declares ${canonical}, and ${stale.join("; ")}. ` +
-        "Run `npm run stamp:version` -- the manifests are stamped from that " +
-        "file, never edited beside it",
-    };
-  }
-  return { version: canonical, reason: "" };
-}
-
-/**
- * The tag an answer means. One, because there is one artifact.
- *
- * There were two until 2026-09-02, and an ORDER between them: the router to
- * npm first and the extension after, because the extension bundles the
- * router and a Marketplace version whose npm half was missing would be the
- * broken half-release. npm is retired -- the extension IS the distribution,
- * and `dist/dabbler.cjs` ships inside it -- so there is no half that can be
- * missing and nothing left to sequence.
- */
-export function tagsFor(answer: string, version: string): string[] {
-  if (answer === "release-candidate") return [`vsix-v${version}-rc1`];
-  if (answer === "publish") return [`vsix-v${version}`];
-  return [];
 }
 
 export function releaseVerb(argv: string[]): Promise<number> {

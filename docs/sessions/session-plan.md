@@ -7270,7 +7270,7 @@ edits**: a change to `walk-session.test.ts` is a change to the run of record,
 so the run that judges this session is the first run of the new shape, and a
 green one that is also slower is a failure this plan is asking to see.
 
-### Session 137 of 137: Codex undocumented, the heading an operator never saw, and the block lands
+### Session 137 of 137: The page a buyer reads, the heading an operator never saw, and the block lands
 
 **It cannot be tested here, so it is not claimed.** Codex comes out of the
 engine list in the managed body, the bootstrap templates, the registration
@@ -7342,21 +7342,91 @@ records that name the old title are not touched** -- `docs/field-trial-50.md`,
 `docs/field-trial-70.md`, this plan's own history and the work plan -- for the
 same reason the Codex trap above exists.
 
+**The marketplace page describes a product that was deleted.** Asked by the
+operator, 2026-09-09, and it is the sharpest thing in this session: the page
+a buyer reads is `tools/dabbler-ai-orchestration/README.md`, and it still
+says the extension is "a pure renderer of `python -m ai_router.progress
+--json` -- TypeScript renders, Python decides", lists **Python 3.11+ on
+PATH** under *Requirements* with a `dabblerSessionSets.pythonPath` setting
+that no longer exists, tells a reader to `pip install dabbler-ai-router`,
+and says setup creates a workspace `.venv`. Session 36 deleted the Python
+and the extension has bundled the router since; the page has been telling
+operators to install a runtime the product does not use for a hundred
+sessions. It organises the work into "**session sets**" -- retired -- and
+promises an escape hatch that was retired with them: *"the operator's last
+resort -- **waiving** -- is typed at an interactive prompt an AI cannot
+reach"*, where `verify waive` is now refused **by name** in
+`packages/router/src/cli/verify.ts` and the root README says plainly that
+there is no waiver. A page that offers an operator a way out that does not
+exist is worse than a page that is merely old. Both pages also say the close
+runs **five gates**; `GATE_CHECKS` holds **nine**. The listing metadata is
+part of the page: `package.json`'s `description` and `keywords` both sell
+"session sets". **The `dabblerSessionSets.*` setting ids and the container
+id are not touched** -- same reason as the activity-bar rename above, and
+the same reason as the Codex trap: an id is not a label.
+
+**Modules are the product's second feature and neither page explains
+them.** Root `README.md` says the word twice, in passing; `docs/quick-start.md`
+never says it. What is undocumented is the thing a .NET or Java team is
+actually buying: a solution is declared as modules, a session's plan says
+which one it is for, and the framework checks that module out into its own
+git-enabled partial working tree for the session -- built on the fly,
+holding that module's source and its siblings' contracts and packages
+rather than their code, and thrown away after. **The reason is the reason to
+say it out loud:** the engine reads a codebase the size of the work instead
+of the size of the repository, which is less context, less spend, and less
+room to change something it was never asked to touch; the exposure gate at
+the close measures it. It goes on the marketplace page as a feature and on
+the GitHub page beside the lifecycle, in the operator's terms -- *what it is
+for* before *how it is configured*.
+
+**And the picture is from a product two versions back.** The marketplace
+page's one image is `media/ai-work-explorer.png`: a v1 tree reading
+"Default 131 sets", with no Solution Explorer and no modules, under alt text
+that describes a "Default module holding many sets" -- a caption written for
+a picture that does not show it. Two real screenshots replace it, and both
+are photographs rather than mock-ups: the repository's own panel with a
+session in flight and its steps, which the operator captured at
+`media/dabbler-ai-orchestration.png`, and the **four-module** CSV solution
+`csv-module-walk.spec.ts` already stages and shoots into
+`docs/tutorials/csv-solution/media/` -- the one place in this tree where the
+module tree can be photographed rather than drawn. `media/render-mockup.mjs`
+is not the tool for it and cannot be: both HTML mock-ups its own header
+names were deleted in session 110 with the webview renderer, so the script
+has been an orphan pointing at nothing since. It goes, or it earns its keep
+by cropping a real capture to the panel; it does not get new mock-ups drawn
+for it, because a drawing of the tree is exactly how the caption above came
+to disagree with the picture.
+
 **Steps.** (1) The live documented surface, and the engine list the bootstrap
 templates and the CLI help offer. (2) The registration's behaviour, and the
 decision recorded. (3) The occasion a numbered heading is drawn on, decided
 and taken; then the session number on every voice rule, the framework's and
 each job's. (4) The activity-bar and settings titles, and the tutorial
-re-rendered. (5) The version bump (`version.json`, then `npm run
-stamp:version`) and the release notes for sessions 131 to 137.
+re-rendered. (5) The marketplace page made true -- the extension README
+against the product that exists, and `package.json`'s `description` and
+`keywords` with it. (6) Modules explained, on both pages; and the two
+sentences the root README gets wrong on its own account -- the gate count
+and the artifact table. (7) The screenshots, both real and both current,
+and `render-mockup.mjs` settled either way. (8) The version bump
+(`version.json`, then `npm run stamp:version`) and the release notes for
+sessions 131 to 137.
 
-**Tests.** Three. A registration naming the undocumented engine behaves as
+**Tests.** Four. A registration naming the undocumented engine behaves as
 the decision says; a voice rule is headed with the session number where a
-job's rule is too; and **a session that puts no job output on the terminal
-still gets a numbered heading**, which is the one the operator's report is
-about and the one a label test would have passed without. The activity-bar
-and settings labels get none: the manifest is the only copy, and the harness
-already reads it from there.
+job's rule is too; **a session that puts no job output on the terminal still
+gets a numbered heading**, which is the one the operator's report is about
+and the one a label test would have passed without; and a control in the
+shape of `doc-paths.mjs` reads the **shipped** pages -- the two READMEs, the
+extension manifest's listing text and the three walkthrough documents -- and
+fails on a runtime or a vocabulary the product does not have. It cites its
+incident, which is this session's own finding and not a hypothetical: the
+page named Python for a hundred sessions after Python was deleted, and every
+one of those sessions had a human read something. It reads shipped pages
+only, so it can never reach the records, and the plan's own prose above --
+which quotes the false sentences in order to retire them -- is not one of
+them. The activity-bar and settings labels get no test: the manifest is the
+only copy, and the harness already reads it from there.
 
 **Releasable**, and it is the block's one release: sessions 131 to 136 reach
 a seat with it and not before.

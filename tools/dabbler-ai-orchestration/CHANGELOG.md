@@ -10,6 +10,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.0.18] — 2026-09-09
+
+Everything in `2.0.17` below, plus the record a tag release could not
+write. **Install this one:** `2.0.17` publishes correctly and cannot file
+the row that says it did.
+
+### Fixed
+
+- **A tag release can be recorded, not only made.** A `published` row must
+  say what ran, and the tag path runs nothing: `dabbler release` pushes the
+  tag, CI holds the credential, and no command executes in this process. The
+  row therefore omitted `steps` entirely and the ledger refused it against
+  its own schema — so `2.0.16` and `2.0.17` both reached the Marketplace and
+  neither could be recorded as published, which left the session that
+  shipped them unable to close. An empty list is now written for a
+  publication that ran no commands, because "nothing ran" is a claim the
+  record should carry and an absent key is the absence of one. The path had
+  never reached that line before: until `2.0.17` relaxed the tag check, a
+  tag release was always refused earlier.
+
 ## [2.0.17] — 2026-09-09
 
 Everything in `2.0.16` below, plus the one fix that lets a tag-released

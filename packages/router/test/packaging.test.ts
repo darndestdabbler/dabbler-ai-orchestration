@@ -11,7 +11,13 @@ import { join } from "node:path";
 import { beforeEach, describe, it } from "node:test";
 
 import { canonicalPath, snapshotWorktreeTree } from "../src/journal.ts";
-import { appendRound, packageOutputDir, packagingPath, readPackaging } from "../src/ledger.ts";
+import {
+  appendRound,
+  packageOutputDir,
+  packagingPath,
+  readPackaging,
+  validatePackaging,
+} from "../src/ledger.ts";
 import {
   OUTCOME_FAILED,
   OUTCOME_PUBLISHED,
@@ -458,6 +464,13 @@ describe("a release that is a tag", () => {
       const run = packageSession(sessionsDir, { config: TAG_CONFIG() });
       assert.equal(run.outcome, OUTCOME_PUBLISHED, String(run.refusal));
       assert.deepEqual(run.artifacts, [`vsix-v${RELEASING}`]);
+      // And the row it becomes is one the ledger will take. Asserting the
+      // outcome alone is what let 2.0.16 and 2.0.17 reach the Marketplace
+      // and be recorded as neither: `packageSession` answered `published`
+      // and the append then refused the row for want of `steps`, which a
+      // tag release has none of because no command runs in this process.
+      assert.doesNotThrow(() => validatePackaging(runAsRecord(run)));
+      assert.deepEqual(runAsRecord(run)["steps"], []);
     } finally {
       restore();
     }

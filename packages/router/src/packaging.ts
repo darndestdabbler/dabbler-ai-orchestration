@@ -251,7 +251,18 @@ export function runAsRecord(run: PackagingRun): Row {
       remediation: gate.remediation,
     }));
   }
-  if (run.steps.length > 0) record["steps"] = run.steps.map(stepAsRow);
+  // Keyed on the OUTCOME for the same reason `secret_name` is keyed on the
+  // feed: a published row always says what ran, and for a tag release the
+  // honest answer is nothing. `dabbler release` pushed the tag, CI holds the
+  // credential, and no command ran in this process -- an empty list is that
+  // claim, where an omitted key is the absence of one. The schema requires
+  // `steps` of every publication, so omitting it wrote a row nothing could
+  // read back: session 137 published 2.0.16 and 2.0.17 to the Marketplace
+  // and could record neither, because the tag path had never once reached
+  // this line until the tag check stopped demanding equality with HEAD.
+  if (run.steps.length > 0 || run.outcome === OUTCOME_PUBLISHED) {
+    record["steps"] = run.steps.map(stepAsRow);
+  }
   return record;
 }
 

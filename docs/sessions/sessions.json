@@ -2719,6 +2719,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.18"
+    },
+    {
+      "number": 139,
+      "title": "The release that carries the deadlock work",
+      "status": "in-progress",
+      "startedAt": "2026-09-09T12:03:06.281000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.18",
       "verification": {
         "rounds": 2,
@@ -2728,8 +2748,8 @@
       }
     },
     {
-      "number": 139,
-      "title": "The release that carries the deadlock work",
+      "number": 140,
+      "title": "The phase an operator can read, the step they can see, and the second release",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

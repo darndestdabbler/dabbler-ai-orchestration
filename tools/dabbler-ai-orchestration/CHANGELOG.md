@@ -10,6 +10,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.0.19] — 2026-09-09
+
+Four repairs to the driven session, each one a rule that was stated twice
+and had drifted, and each fixed by making the second statement read the
+first rather than by adding a gate. Nothing new to configure, and no
+change to how a session is started or driven.
+
+### Fixed
+
+- **A stop now says which refusal it actually met.** The publish and close
+  stops threw a fixed sentence, so the deadlock classifier — which decides
+  whether two stops are the same problem by comparing their reasons — was
+  comparing that one sentence with itself. Every publish refusal after the
+  first read as an impasse, and the session's one triage was spent on the
+  first of them while every later and genuinely different refusal was
+  skipped. The stop is now quoted from the job's own log, the way a
+  verification stop already was, so two unlike refusals are two problems
+  and each reaches its own advice.
+
+- **Consent to publish is asked once per version, and answered per
+  version.** The publication decision was filed under the bare id
+  `publication`, and an answered decision is not raised again — so a single
+  answer given for one release went on authorising every release after it
+  with nobody asked. The id now carries the version it authorises, so each
+  release raises its own brief and waits for it. Settle one with
+  `dabbler owed answer --id publication:<version>` — for this release,
+  `dabbler owed answer --id publication:2.0.19`. `dabbler owed list` shows
+  what is outstanding.
+
+- **A publish refused for missing evidence goes back and makes it.** When
+  the publish phase was refused because an earlier phase's evidence was
+  absent — the verification round, the full suite, a clean tree, a pushed
+  commit — it stopped and left a person to run the five commands the
+  framework says are not theirs to run. It now returns to the phase that
+  makes that evidence and carries on. A gate no phase can remake, such as
+  an unanswered decision, still stops, and the run goes back at most once
+  for any one refusal, so a rewind that changes nothing stops instead of
+  repeating.
+
+- **A session that was meant to ship can stop being one.** Releasability is
+  declared before the work and could not be taken back, so a release that
+  had to be abandoned left `cancel` as the only exit and threw the session
+  away with it. `dabbler session withdraw-release --reason <why>
+  --approver <who>` records the withdrawal, with its reason and its
+  approver, on the session's own record. It does not rewrite the
+  declaration: the close reports that this session was releasable, who
+  withdrew it and why, so a session that was supposed to ship and did not
+  reads differently from one that never was. It is refused once a
+  publication has been recorded.
+
 ## [2.0.18] — 2026-09-09
 
 Everything in `2.0.17` below, plus the record a tag release could not

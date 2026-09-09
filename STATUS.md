@@ -1,6 +1,80 @@
-# STATUS — sessions 113–139 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, and session 138 repairing all four, and session 139 preparing 2.0.19 and putting its publication to the operator, who held it for session 140; version 2.0.19, unpublished
+# STATUS — sessions 113–140 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it; **version 2.0.20, PUBLISHED — the Marketplace serves it**
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 140 CLOSED, 2026-09-09 — the phase an operator can read, the step they can see, and the release that went out
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 140 | the terminal's step line, the phase renamed `work`, one heading family, the packaging command that walked the whole repository, a signoff that outlived its session, and 2.0.20 shipped | CLOSED VERIFIED (round 3; round 1's blocking Major was well-founded and fixed, its two Minors disputed), landed `6ab120dd`, tagged `vsix-v2.0.20`, **published — `release --verify-install` says the Marketplace serves 2.0.20** |
+>
+> **The step line was never broken; no installed build had ever contained
+> it.** `version.json` moved to 2.0.14 at 08:45 on 2026-09-08 and its VSIX
+> was built three minutes earlier; session 126, which wrote the step line,
+> committed at 14:27 the same day and did not bump. One number named two
+> different extensions six hours apart, the installed one was the earlier,
+> and no VSIX was built here between then and this session. **A version
+> that does not move cannot signal that the build did** — the
+> same-version-republish trap from the other side. D270. The
+> read-once-drop-silently defect fixed alongside is real and was not the
+> cause: the seq was marked as said BEFORE the instruction was read, so a
+> first look that came back absent or half-written dropped the line
+> permanently. It is now marked only after a read that agreed.
+>
+> **`steps` is `work`, and the old name is kept forever.** The enum gains
+> `work`, `isWorkPhase` in `driver.ts` is the ONE place either name is
+> recognised, `drive.ts` dispatches on the canonical name, and no record is
+> rewritten — the retired-`ROW_WAIVE` shape. Session 140's own run says
+> `now=steps` to its end, because it entered that phase before the rename;
+> 141's will say `work`. Both open. `docs/terminal-walk-140.md` has that
+> watched rather than argued.
+>
+> **A plain `vsce package` was walking the whole repository, and the
+> declarations were not why.** With `dabbler-ai-router` and `yaml` moved to
+> `devDependencies` it still listed **10,158** files: `.git` whole, `.venv`
+> whole, and all of `.dabbler/` — where vsce's own secret scan found an
+> OpenAI token in `runs/s60/driver/engine-07.log` and refused, which is the
+> only thing that stopped a VSIX carrying it. The cause is the npm
+> **workspace self-link**: the root `node_modules` holds a symlink back to
+> the extension under its own name, and vsce follows it to the repository
+> root. `../../**` in `.vscodeignore` is the fix, and both forms of the
+> command now list the same 72 paths. D271. Keep the ignore line; it is not
+> redundant with `node_modules/**`, which filters only the local walk.
+>
+> **The manifest move broke `dabbler release`, and the run of record caught
+> it.** `declaredRouterDependency` read only `dependencies`, so the move
+> made it read "depends on nothing" and every release would have refused as
+> stale. It reads either field now. This is what the complete suite is for.
+>
+> **A held release burns its number.** `publication:2.0.19` was answered
+> `not yet`, answered is settled, and `dabbler release` reads that standing
+> answer and tags nothing — so 2.0.19 could never be consented to and this
+> session spent 2.0.20. That is what version-keyed consent MEANS and it is
+> strictly better than the bare id it replaced; what is worth knowing before
+> the next hold is that `not yet` retires the number. D272.
+>
+> **The publish still needs `dabbler release` typed by hand.** The publish
+> phase refused (correctly — the tag is not made by a phase advancing),
+> classified the second attempt as a deadlock, and named its own exit. The
+> answered decision does not cause the tag; `dabbler release` does. Session
+> 139 met the same thing. **138's rewind was again never reached**, because
+> every gate the publish reads passed.
+>
+> **A signoff about a session that has ended is asked again.** At the close,
+> every open `accountability-signoff` about a session no longer running is
+> superseded and re-raised with what answering NOW does — it settles the
+> record and performs nothing — and what the option undertook while its
+> session ran is quoted after that rather than still offered as an action.
+> Round 1 was right on both halves of its Major: the first draft reached
+> only the closing session, and appended the correction after the obsolete
+> promise instead of leading with it.
+>
+> **Owed:** nothing. `repair-outside-a-step-137` is answered (`It stands`,
+> session 139). One papercut recorded and not fixed: `npm install` on this
+> host writes `package-lock.json` with CRLF, and `check:version` compares
+> its own LF re-serialisation against the bytes — so it fails after every
+> install blaming the version for a line ending. `npm run stamp:version`
+> clears it.
 
 > ## SESSION 139 CLOSED, 2026-09-09 — the release that asked, and the operator who said not yet
 >

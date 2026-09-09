@@ -135,6 +135,10 @@ export const TONES: Readonly<Record<ThemeKind, Readonly<Record<PaintedTone, stri
  */
 const MILESTONE_PHASES = new Set([
   "plan",
+  // `work` is the phase's name; `steps` is what it was called before session
+  // 140, and a run recorded then must still light up in the tone it earned.
+  // No writer emits the old name and every reader accepts it.
+  "work",
   "steps",
   "verify",
   "run-of-record",
@@ -536,19 +540,25 @@ const DEFAULT_RULE_COLUMNS = 60;
 
 /**
  * The rule between two voices: a line across the terminal with the name of
- * the voice that follows set into the middle of it, the line muted and the
- * name in the terminal's own foreground, bold, so it reads as a heading
- * over the group beneath. One column short of the width, for the same
- * reason a framework line is.
+ * the voice that follows set into the middle of it, both drawn in the
+ * milestone tone, so it reads as a heading over the group beneath. One
+ * column short of the width, for the same reason a framework line is.
+ *
+ * **The headings of this terminal are one family.** A voice rule and a
+ * session banner do the same job at two scales, and the operator reads
+ * them as one thing; painting the rule quiet and the name in the plain
+ * foreground made them two. That is a presentation decision and the
+ * operator's to make -- there is nothing here to argue with, and nothing
+ * for a later session to rediscover and revert.
  */
 export function divider(label: string, columns: number | null, kind: ThemeKind): string {
   const width = Math.max(label.length + 6, (columns ?? DEFAULT_RULE_COLUMNS) - 1);
   const dashes = width - label.length - 2;
   const left = Math.floor(dashes / 2);
   return (
-    paint("─".repeat(left), "muted", kind) +
-    ` ${paint(label, "plain", kind, true)} ` +
-    paint("─".repeat(dashes - left), "muted", kind) +
+    paint("─".repeat(left), "milestone", kind) +
+    ` ${paint(label, "milestone", kind, true)} ` +
+    paint("─".repeat(dashes - left), "milestone", kind) +
     CRLF
   );
 }
@@ -1345,10 +1355,19 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     // starts, with the first sentence of its ask; an answer refused, with
     // the first reason. A wait and a done say nothing here -- the job and
     // the phase lines already do.
+    //
+    // **The seq is marked as said only after a read that agreed with it.**
+    // Marking it first makes the guard that would retry the read the very
+    // thing that swallows it: an instruction that is absent, half-written,
+    // or still carrying the previous seq drops its line PERMANENTLY, and
+    // no later poll can recover it because the seq already reads as said.
+    // A read that agreed is what marks it, whatever kind it turned out to
+    // be -- a wait and a done were read and are deliberately silent, which
+    // is not the same as never having been read at all.
     if (typeof run.seq === "number" && run.seq !== this.saidSeq) {
-      this.saidSeq = run.seq;
       const instruction = readInstruction(path.dirname(runPath));
       if (instruction !== null && instruction.seq === run.seq) {
+        this.saidSeq = run.seq;
         if (instruction.kind === "step") {
           this.line("step", {
             id: instruction.step_id ?? "?",

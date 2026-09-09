@@ -21,6 +21,14 @@ import { driveSession, sessionNext, type Engine } from "../src/drive.ts";
 import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
 import { readRounds } from "../src/ledger.ts";
+import {
+  AFTER_CLOSE_NOTE,
+  CLASS_ACCOUNTABILITY_SIGNOFF,
+  EVENT_RAISED,
+  foldOwed,
+  raiseOwed,
+  readOwed,
+} from "../src/owedDecisions.ts";
 import { capture } from "../src/output.ts";
 import { readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
@@ -225,11 +233,26 @@ describe("one session, walked from next to done", () => {
     // --- the plan is accepted, declared, and becomes the step ----------------
     const step = await next(sessionsDir);
     assert.equal(step.instruction?.step_id, "widget");
-    assert.equal(readRun(repo, 1)?.phase, "steps");
+    assert.equal(readRun(repo, 1)?.phase, "work");
     // Accepting a plan declares the session's task: the record says what this
     // session is for before any of it is done.
     assert.equal(readTaskDeclaration(sessionsDir, 1)?.["task"], PLAN.task);
     milestones.push("planned and declared");
+
+    // A signoff this session owes about itself, raised the way the framework
+    // raises one, and left open on purpose: what it offers must still be
+    // answerable once the close has landed the work it asks about.
+    raiseOwed(repo, {
+      id: "repair-outside-a-step-1",
+      decisionClass: CLASS_ACCOUNTABILITY_SIGNOFF,
+      question: "Session 1 had work put into its tree outside any step. Does that stand?",
+      determined: "It absorbed one path.",
+      options: [
+        { label: "It stands", consequence: "The repair is reviewed with this session's diff." },
+        { label: "It does not", consequence: "The repair is taken back out before the session continues." },
+      ],
+      sessionNumber: 1,
+    });
 
     // --- a report that names what the tree did not move is refused -----------
     const wrong = await answerStep(sessionsDir, step.instruction?.seq ?? 0, "widget", [
@@ -400,6 +423,20 @@ describe("one session, walked from next to done", () => {
     assert.equal(readInstruction(repo, 1)?.kind, "done");
     assert.equal(readInstruction(repo, 1)?.answer_command, undefined);
     assert.ok(existsSync(join(repo, ".dabbler", "runs", "s1", "driver", "run.json")));
+
+    // The signoff is still a person's to give -- it never held the close --
+    // but the close leaves no question offering to undo what it has landed.
+    const signoff = foldOwed(readOwed(repo)).get("repair-outside-a-step-1");
+    assert.equal(signoff?.["event"], EVENT_RAISED);
+    const offered = (signoff?.["options"] as Array<Record<string, string>>).map(
+      (option) => option["consequence"],
+    );
+    assert.deepEqual(
+      offered.filter((consequence) => !consequence.startsWith(AFTER_CLOSE_NOTE)),
+      [],
+      "an answer still leads with a promise to act on a session that has ended",
+    );
+    assert.match(String(signoff?.["determined"]), /session 1 has closed/);
 
     assert.deepEqual(milestones, [
       "registered and asked to plan",
@@ -585,7 +622,7 @@ describe("a session paused, then moving again", () => {
     // --- a plan accepted moves the phase, and THAT is progress resumed --------
     assert.equal(await answerPlan(sessionsDir, again.instruction?.seq ?? 0, PLAN), EXIT_OK);
     const moved = await next(sessionsDir);
-    assert.equal(readRun(repo, 1)?.phase, "steps");
+    assert.equal(readRun(repo, 1)?.phase, "work");
     const said = moved.err.match(/progress-resumed[^\n]*/g) ?? [];
     assert.equal(said.length, 1, moved.err);
     assert.match(said[0] ?? "", /past=rejected-thrice/);

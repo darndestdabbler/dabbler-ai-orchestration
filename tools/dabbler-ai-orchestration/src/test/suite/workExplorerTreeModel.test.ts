@@ -1,6 +1,12 @@
 import * as assert from "assert";
+import * as fs from "fs";
+import * as path from "path";
+import { createInProcessRouter } from "dabbler-ai-router";
+import type { Router } from "dabbler-ai-router";
+import { DabblerTerminal } from "../../router/dabblerTerminal";
 import {
   NODE_TOKEN,
+  WORK_STEP_PREFIX,
   actionToken,
   bucketNodes,
   childrenOf,
@@ -30,7 +36,9 @@ import {
   makeRepository,
   makeSession,
   makeTask,
+  makeTempDir,
   makeVerification,
+  rmrf,
 } from "./helpers";
 
 suite("workExplorerTreeModel: nodes", () => {
@@ -1099,5 +1107,133 @@ suite("workExplorerTreeModel: descriptorFor dispatch", () => {
       assert.ok(d.id.length > 0, node.kind);
       assert.ok(d.contextValue.startsWith(";"), node.kind);
     }
+  });
+});
+
+suite("workExplorerTreeModel: the two surfaces over one record", () => {
+  const ESC = "\u001b";
+
+  /** The bytes a pty received, with the SGR sequences taken back out. */
+  function plain(text: string): string {
+    return text
+      .split(ESC)
+      .map((piece, index) => (index === 0 ? piece : piece.slice(piece.indexOf("m") + 1)))
+      .join("");
+  }
+
+  /** The step the terminal last announced, from what it actually wrote. */
+  function announced(written: readonly string[]): string | null {
+    const said = [...plain(written.join("")).matchAll(/step id=(\S+)/g)];
+    return said.length === 0 ? null : (said[said.length - 1]?.[1] ?? null);
+  }
+
+  /** The step the Work Explorer shows as the open child of its Work row. */
+  async function shown(router: Router, root: string, sessionsDir: string): Promise<string | null> {
+    const projection = await router.progress({ repoRoot: root, sessionsDir });
+    assert.ok(projection.ok, JSON.stringify(projection));
+    const session = projection.value.sessions.find((row) => row.number === 1);
+    const open = (session?.tasks ?? []).find(
+      (row) => row.isOpen && (row.stepId ?? "").startsWith(WORK_STEP_PREFIX),
+    );
+    return open ? (open.stepId ?? "").slice(WORK_STEP_PREFIX.length) : null;
+  }
+
+  test("the terminal and the Work Explorer name the same step, from one instruction at one seq", async () => {
+    // The point is not that each surface renders something -- both did, and
+    // that is exactly why they were free to disagree. They are fed by one
+    // record, and when they disagree the operator cannot tell which is
+    // lying. So: one driver directory, and the same answer out of both, at
+    // two different seqs, so a fixed answer cannot pass twice.
+    const root = makeTempDir("dabbler-parity-");
+    const sessionsDir = path.join(root, "docs", "sessions");
+    fs.mkdirSync(sessionsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(sessionsDir, "session-plan.md"),
+      "### Session 1 of 1: Build the widget\n1. Register.\n",
+      "utf8",
+    );
+
+    const router = createInProcessRouter();
+    const started = await router.session.start({
+      engine: "claude-code",
+      provider: "anthropic",
+      repoRoot: root,
+      sessionsDir,
+    });
+    assert.ok(started.ok, JSON.stringify(started));
+
+    const driver = path.join(root, ".dabbler", "runs", "s1", "driver");
+    fs.mkdirSync(driver, { recursive: true });
+    const steps = ["widget", "polish", "ship"];
+    fs.writeFileSync(
+      path.join(driver, "plan.json"),
+      JSON.stringify({
+        schema_version: 1,
+        session_number: 1,
+        task: "Do it.",
+        releasable: false,
+        recorded_at: "2026-09-09T11:00:00-04:00",
+        steps: steps.map((id) => ({
+          id,
+          ask: `Do the ${id}. Then check it.`,
+          files: ["src/w.ts"],
+          checks: [{ argv: ["true"] }],
+        })),
+      }),
+      "utf8",
+    );
+
+    const written: string[] = [];
+    const terminal = new DabblerTerminal({ repoRoot: root, pollMs: 60_000 });
+    terminal.onDidWrite((text: string) => written.push(text));
+    terminal.open({ columns: 100, rows: 20 });
+
+    // Two moments of one run: the second step outstanding, then the third.
+    for (const [seq, accepted] of [
+      [5, ["widget"]],
+      [6, ["widget", "polish"]],
+    ] as ReadonlyArray<readonly [number, readonly string[]]>) {
+      const outstanding = steps[accepted.length];
+      fs.writeFileSync(
+        path.join(driver, "instruction.json"),
+        JSON.stringify({
+          schema_version: 1,
+          seq,
+          session_number: 1,
+          issued_at: "2026-09-09T11:30:00-04:00",
+          kind: "step",
+          step_id: outstanding,
+          ask: `Do the ${outstanding}. Then check it.`,
+        }),
+        "utf8",
+      );
+      fs.writeFileSync(
+        path.join(driver, "run.json"),
+        JSON.stringify({
+          schema_version: 1,
+          session_number: 1,
+          engine: "cli",
+          phase: "work",
+          seq,
+          invocations: 1,
+          max_invocations: 24,
+          accepted_steps: [...accepted],
+          baseline_tree: null,
+          stop: null,
+          started_at: "2026-09-09T11:00:00-04:00",
+          updated_at: "2026-09-09T11:30:00-04:00",
+        }),
+        "utf8",
+      );
+
+      terminal.poll();
+      const fromTerminal = announced(written);
+      const fromExplorer = await shown(router, root, sessionsDir);
+      assert.strictEqual(fromTerminal, fromExplorer, `seq ${seq}: ${plain(written.join(""))}`);
+      assert.strictEqual(fromTerminal, outstanding, `seq ${seq}`);
+    }
+
+    terminal.dispose();
+    rmrf(root);
   });
 });

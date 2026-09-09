@@ -58,6 +58,7 @@ import {
   DISPOSITION_SCHEMA,
   DRIVER_DIRNAME,
   DRIVER_SCHEMA_VERSION,
+  PHASE_WORK,
   REPORT_SCHEMA,
   WATCHER_OUTSTANDING,
   WORK_PLAN_SCHEMA,
@@ -69,6 +70,7 @@ import {
   readRun,
   readWatcher,
   readWorkPlan,
+  isWorkPhase,
   judgeWorkPlanModules,
   planPath,
   takeInterrupt,
@@ -2002,7 +2004,7 @@ ${this.stopArtifacts()}`,
         );
       }
     }
-    this.setPhase("steps");
+    this.setPhase(PHASE_WORK);
   }
 
   /**
@@ -3283,11 +3285,15 @@ ${this.stopArtifacts()}`,
           await this.runSynthesisedStep(pending.id, pending.ask, pending.then);
           continue;
         }
-        switch (this.run.phase) {
+        // Dispatched on the canonical name, so a run recorded under the old
+        // one resumes into the phase it stopped in without its record being
+        // rewritten to be readable. `isWorkPhase` is the only place either
+        // name is recognised.
+        switch (isWorkPhase(this.run.phase) ? PHASE_WORK : this.run.phase) {
           case "plan":
             await this.phasePlan();
             break;
-          case "steps":
+          case PHASE_WORK:
             await this.phaseSteps();
             break;
           case "preverify":

@@ -30,6 +30,7 @@ import {
   repoRootFromSessionsDir,
 } from "./evidence.ts";
 import {
+  isWorkPhase,
   readInstruction,
   readReport,
   readRun,
@@ -1081,7 +1082,7 @@ export function buildTaskRows(
   // showing Work forever open. A closed session's work ended when it did.
   const stepsDone =
     completedAt !== null ||
-    (driverRun !== null && driverRun.phase !== "plan" && driverRun.phase !== "steps");
+    (driverRun !== null && driverRun.phase !== "plan" && !isWorkPhase(driverRun.phase));
   const stepsDoneAt = stepsDone
     ? (rounds.length > 0 ? pyStr(rounds[0]["recorded_at"]) || null : null) ??
       driverRun?.updated_at ??
@@ -1269,9 +1270,9 @@ function workStepRows(
   const steps = plan?.steps ?? [];
   if (steps.length === 0) return [];
   const accepted = new Set(run?.accepted_steps ?? []);
-  // The steps phase is the only one in which a step can be the one being
+  // The work phase is the only one in which a step can be the one being
   // worked on; past it, an unaccepted step is one the run never reached.
-  const working = session.inFlight && (run?.phase === "plan" || run?.phase === "steps");
+  const working = session.inFlight && (run?.phase === "plan" || isWorkPhase(run?.phase));
   let seenOpen = false;
   return steps.map((step: { id: string; ask: string }) => {
     const done = accepted.has(step.id);

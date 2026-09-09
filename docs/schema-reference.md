@@ -478,12 +478,16 @@ one disappears.
 **`run.json`** (required: `schema_version`, `session_number`, `engine`,
 `phase`, `seq`, `invocations`, `max_invocations`, `accepted_steps`,
 `baseline_tree`, `stop`, `started_at`, `updated_at`): the loop's state,
-replaced whole after every transition. `phase` is `plan` \| `steps` \|
+replaced whole after every transition. `phase` is `plan` \| `work` \|
 `preverify` \| `verify` \| `dispositions` \| `fix` \| `run-of-record` \|
 `land` \| `close` \| `complete`, and a re-run of `session drive` enters
-there — skipping the `accepted_steps`, measuring the next report against
-`baseline_tree` (the tree after the last accepted step), continuing `seq`
-and counting `invocations` on from where they were. `invocations` is held
+there. The enum also accepts `steps`, which is what `work` was called
+before session 140: every run recorded until then carries it, no writer
+emits it and every reader takes it, so an older run still opens and is
+never rewritten to be readable. A re-run skips the `accepted_steps`,
+measures the next report against `baseline_tree` (the tree after the last
+accepted step), continues `seq` and counts `invocations` on from where they
+were. `invocations` is held
 under `max_invocations` (`driver.max_invocations` in `dabbler.yaml`, default
 24; `--max-invocations` overrides); reaching it stops the loop and closes
 nothing. `stop` is null while the loop runs and after it completed, and

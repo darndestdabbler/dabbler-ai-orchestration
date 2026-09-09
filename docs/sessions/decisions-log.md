@@ -8681,3 +8681,142 @@ proposing it to someone new.
 against the plan's own instruction that Codex leave the walkthrough engine
 lists. The finding was right and the departure was not: the session took
 it as a fix rather than disputing it.
+
+## Session 140 — The phase an operator can read, the step they can see, and the second release
+
+### D270 · 2026-09-09 · Orchestrator (claude-opus-5/anthropic) · The terminal's step line never reached an operator because the build never did: 2.0.14 named two extensions six hours apart, and the installed one predates the line
+
+The step line was measured before it was changed, and the measurement says
+the code was never the reason an operator did not see it.
+
+`saidSeq`, `firstSentence` and `bannered` are absent from the extension
+installed on this machine, and present in a build from this tree. The
+installed extension is 2.0.14. `version.json` was set to 2.0.14 at
+2026-09-08 08:45:40 after session 123, and the 2.0.14 VSIX was built three
+minutes earlier at 08:42. Session 126, which wrote the step line, committed
+at 14:27:41 the SAME DAY and did not bump: the number 2.0.14 named two
+different extensions six hours apart, and the installed one is the earlier.
+No VSIX has been built in this tree since -- 2.0.14 is the newest of the
+sixteen -- and sessions 126 through 136 were all declared not releasable
+while 137 to 139 either shipped nothing an operator here installed or were
+held. So the line has never been in a build that ran on this machine, and
+the terminal an operator has been reading is five weeks of work behind the
+tree the tests run against.
+
+Two things follow, and only one of them is a code change.
+
+**A version number that does not move cannot signal that the build did.**
+This is the same-version-republish trap from the other side: there, a
+republished 2.x left a seat with a stale install; here, a version that
+stayed put while the source moved left the operator's own machine stale
+with nothing to notice. The answer is not a rule about bumping -- a session
+that ships nothing should not spend a number -- it is that a session which
+changes what an operator SEES has to install what it built and look, which
+is why this session's plan ends in a walk rather than an assertion.
+
+**The read-once-drop-silently shape is a real defect and is fixed anyway.**
+`this.saidSeq = run.seq` was assigned before `readInstruction` returned, so
+the guard that would have retried the read was satisfied by the attempt
+rather than by the answer: an instruction absent, half-written, or still
+carrying the previous seq dropped its line permanently. The seq is now
+marked only after a read that agreed with it -- whatever kind it turned out
+to be, since a wait and a done were read and are deliberately silent, which
+is not the same as never having been read. The test writes each of those
+three bad first looks in turn and requires the line on a later poll; it
+fails against the old order and passes against the new one.
+
+### D271 · 2026-09-09 · Orchestrator (claude-opus-5/anthropic) · A plain 'vsce package' walked the whole repository -- .git, .venv and every run record -- because of the workspace self-link, not the two declarations; '../../**' in .vscodeignore is what makes the two commands agree
+
+The plan said the extension manifest's two runtime declarations were what
+made a plain `vsce package` walk 11,712 files where `--no-dependencies`
+walks 70. They were part of it and they were not the cause. Moved to
+`devDependencies`, the plain command still listed **10,158** files.
+
+What it was listing: `.git` whole (3,563), `.venv` whole (4,465), and
+`.dabbler/` whole (1,610) -- every run record this repository has ever
+written. The run that measured it never produced a VSIX, because vsce's own
+secret scan refused on an OpenAI API token inside
+`.dabbler/runs/s60/driver/engine-07.log`. That scan was the only thing
+standing between the obvious command and a published extension carrying
+the repository's history and a provider credential.
+
+The cause is the workspace self-link. This extension is an npm workspace
+member, so the root `node_modules` holds a symlink back to
+`tools/dabbler-ai-orchestration` under this package's own name. vsce
+follows it while resolving dependencies, arrives at the repository root by
+way of `../../`, and takes the repository for a dependency directory.
+Nothing about the two declarations creates that link and removing them
+cannot break it -- which is why the file count fell by fifteen per cent and
+stayed catastrophic.
+
+`../../**` in `.vscodeignore` stops it, and the note above the line says
+why so the next reader does not delete it as redundant with
+`node_modules/**` -- which does not reach it, because that filters this
+folder's own walk and dependency inclusion adds paths by name. With the
+line in place `vsce ls` and `vsce ls --no-dependencies` return the same
+72 paths, compared as sorted lists rather than as counts.
+
+Both halves are kept, for their own reasons. The declarations belong in
+`devDependencies` because they are true there: esbuild takes `yaml` and
+`dabbler-ai-router` into `dist/extension.js` and `dist/dabbler.cjs` at
+build time, nothing under `node_modules/` is loaded at runtime, and a
+manifest that says otherwise is a manifest that lies to every tool that
+reads it. The ignore line is what actually makes the two commands agree.
+`stampLock` now stamps the router's version wherever the lock records it,
+because the move would otherwise have left the lock's copy quietly stale
+the moment it happened.
+
+`npm run package` keeps `--no-dependencies`. It is correct, it is what CI
+runs, and dropping it is a separate decision with nothing to gain: the
+value here is that the command an operator reaches for without reading the
+scripts is now correct too.
+
+One thing this measurement found and did not fix: `npm install` on this
+host rewrites `package-lock.json` with CRLF, and `check:version` compares
+its own LF re-serialisation against the file's bytes -- so it fails after
+every install with "does not carry <version>", blaming the version for a
+line ending. `npm run stamp:version` rewrites it as LF and the check
+passes. Git normalises on commit, so nothing reaches the record wrong; the
+cost is one misleading failure per install.
+
+### D272 · 2026-09-09 · Orchestrator (claude-opus-5/anthropic) · A held release burns its version number: 'not yet' is answered, answered is settled, so 2.0.19 can never be consented to and this session ships 2.0.20
+
+Session 139 prepared 2.0.19, put its publication to the operator, and the
+operator answered `not yet` -- to hold it for one release today rather than
+two a day apart. The number is therefore spent, and this session ships
+2.0.20.
+
+Why the number cannot be reused. `raiseDisposition` returns null for an id
+whose current row is answered, because answered is settled: rewriting a
+brief under a decision somebody made would change what they are recorded as
+having agreed to. `dabbler release` reads `answerTo(publication:<version>)`
+and, for an answer that maps to no tag, prints "answered 'not yet', so
+nothing is tagged" and exits clean. Shipping 2.0.19 today would therefore
+have read yesterday's `not yet` as today's answer, tagged nothing, and left
+`published_when_releasable` to refuse a session that was supposed to ship.
+Nothing would have gone wrong loudly.
+
+This is not a defect in session 138's version-keyed consent -- it is what
+keying consent to a version MEANS, and it is strictly better than the bare
+`publication` id it replaced, which let one answer from 2026-09-02
+authorise four releases nobody was asked about. The property worth writing
+down is the one that follows from it: **`not yet` retires a version
+number.** A held release is not a paused release; the version it was
+prepared under can never be consented to afterwards, and the next session
+bumps past it.
+
+That is the right default. `not yet` is the answer that costs nothing and
+cannot be un-published, and the version number is the cheapest thing in the
+system to spend. But it should be said in the brief, which currently says
+only that the answer "settles <version> and nothing else" -- true, and it
+does not tell the operator that answering `not yet` means the next release
+carries a different number and its own separate question. Nothing in this
+session changes the brief; this records what the next reader should know
+before holding one.
+
+The mechanics here: `version.json` moves to 2.0.20 and `npm run
+stamp:version` writes it into both manifests, the extension's declaration
+of the router and the lock file's two workspace entries. 2.0.19's changelog
+section stays exactly as 139 wrote it -- those four repairs ship inside
+2.0.20, and rewriting that section to absorb this session's work would be
+editing the record of what 139 did.

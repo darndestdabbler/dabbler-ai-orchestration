@@ -92,6 +92,7 @@ import { PROJECT_CONFIG_FILENAME } from "./config.ts";
 import {
   CLASS_ACCOUNTABILITY_SIGNOFF,
   raiseOwed,
+  reaskSessionScopedSignoffs,
   refreshOwedDecisions,
 } from "./owedDecisions.ts";
 import { isSessionBookkeeping, loadSuitesChecked } from "./testEvidence.ts";
@@ -2361,6 +2362,24 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
         (verdict ? ` (${String(verdict)})` : "") +
         ".\n",
     );
+
+    // After the flip and not before it: what the re-ask says is that the
+    // session HAS closed, and saying so while it might still be refused
+    // would be the framework asserting an outcome it had not reached.
+    if (repoRoot) {
+      try {
+        const reasked = reaskSessionScopedSignoffs(repoRoot, current as number);
+        for (const row of reasked) {
+          writeOut(
+            `close: '${String(row["id"])}' is still open and is asked again for a ` +
+              "session that has ended; `dabbler owed list` has it.\n",
+          );
+        }
+      } catch {
+        // A close must not fail because a brief could not be rewritten. The
+        // standing question is still on the record either way.
+      }
+    }
 
     if (repoRoot) {
       const bookkeeping = SET_BOOKKEEPING_COMMIT_BASENAMES.map((name) =>

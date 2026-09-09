@@ -339,7 +339,7 @@ export function taskNodes(node: SessionNode): (TaskNode | RefusalNode)[] {
  * the record does not already carry: a row is a child because of what it is
  * called, not because this file decided where to put it.
  */
-const WORK_STEP_PREFIX = "work:";
+export const WORK_STEP_PREFIX = "work:";
 
 function isWorkStepRow(row: TaskRecord): boolean {
   return (row.stepId ?? "").startsWith(WORK_STEP_PREFIX);

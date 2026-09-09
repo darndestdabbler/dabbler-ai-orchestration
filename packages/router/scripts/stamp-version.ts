@@ -59,18 +59,28 @@ function stampDependency(text: string, version: string): string {
  * Parsed and re-serialised rather than patched by regex: npm writes it with
  * two-space indent and a trailing newline, and a lock file that disagrees
  * with the manifests is an `npm ci` that installs the wrong thing.
+ *
+ * The router is a DEV dependency of the extension -- esbuild takes it in at
+ * build time and nothing under `node_modules/` is loaded at runtime -- so
+ * npm records it under `devDependencies` here. Both fields are stamped
+ * because which one holds it is the manifest's business and not this
+ * script's: reading only one is how the lock's copy of the version went
+ * quietly stale the moment the declaration moved.
  */
 function stampLock(text: string, version: string): string {
   const lock = JSON.parse(text) as {
-    packages?: Record<string, { version?: string; dependencies?: Record<string, string> }>;
+    packages?: Record<
+      string,
+      { version?: string; dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
+    >;
   };
   const router = lock.packages?.["packages/router"];
   const extension = lock.packages?.["tools/dabbler-ai-orchestration"];
   if (router) router.version = version;
   if (extension) {
     extension.version = version;
-    if (extension.dependencies?.[ROUTER_PACKAGE] !== undefined) {
-      extension.dependencies[ROUTER_PACKAGE] = version;
+    for (const declared of [extension.dependencies, extension.devDependencies]) {
+      if (declared?.[ROUTER_PACKAGE] !== undefined) declared[ROUTER_PACKAGE] = version;
     }
   }
   return `${JSON.stringify(lock, null, 2)}\n`;

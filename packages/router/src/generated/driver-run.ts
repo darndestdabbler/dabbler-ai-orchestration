@@ -2,7 +2,10 @@
 // Do not edit: the schema is the source, and `npm run check:types` fails
 // when this file no longer matches it.
 
-export type DriverRunPhase = "plan" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "gate-wait" | "publish" | "close" | "complete";
+/**
+ * The phase names a run may carry. `work` is what the driver writes and what the Work Explorer has always called the row; `steps` is the name it was written under before session 140 and is kept because every run already on disk carries it. No writer emits `steps` and every reader accepts it -- the retired-`ROW_WAIVE` shape -- and nothing rewrites a record that exists.
+ */
+export type DriverRunPhase = "plan" | "work" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "gate-wait" | "publish" | "close" | "complete";
 
 export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engine" | "tests" | "verification" | "land" | "publish" | "close" | "interrupted";
 

@@ -473,6 +473,9 @@ suite("the Dabbler terminal", () => {
     // and the plan and the work beginning are two of the places it gets to.
     assert.strictEqual(lineTone("phase", { now: "close" }), "milestone");
     assert.strictEqual(lineTone("phase", { now: "plan" }), "milestone");
+    assert.strictEqual(lineTone("phase", { now: "work" }), "milestone");
+    // The name that phase was recorded under before session 140: a run from
+    // last week lights up in the tone it earned when it was written.
     assert.strictEqual(lineTone("phase", { now: "steps" }), "milestone");
     assert.strictEqual(lineTone("phase", { now: "preverify" }), "plain");
     // A pause is amber and a deadlock is red: the one word that says
@@ -579,6 +582,48 @@ suite("the session from its registration, and each step as it starts", () => {
     terminal.poll();
     assert.ok(!said().includes("seq=5"), said());
     assert.strictEqual(said().split("\r\n").filter((line) => / (step|rejected) /.test(line)).length, 2, said());
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("says the step line on a later poll when the instruction was not readable on the first look", () => {
+    // The read-once-drop-silently shape: the seq marked as said BEFORE the
+    // read means the guard that would retry it has already been satisfied,
+    // and the line is gone for good. Three ways one look can come back
+    // wrong -- absent, unparseable, and still carrying the previous seq --
+    // and after each of them the line still has to arrive.
+    const { root, driver, written, terminal } = drivenRepo({
+      session_number: 62,
+      phase: "steps",
+      seq: 7,
+      job: null,
+      stop: null,
+    });
+    const instructionPath = path.join(driver, "instruction.json");
+    terminal.open({ columns: 100, rows: 20 });
+    terminal.poll();
+
+    fs.writeFileSync(instructionPath, "{not json", "utf8");
+    terminal.poll();
+
+    fs.writeFileSync(
+      instructionPath,
+      JSON.stringify({ kind: "step", seq: 6, session_number: 62, step_id: "stale", ask: "An older seq." }),
+      "utf8",
+    );
+    terminal.poll();
+    assert.ok(!plain(written.join("")).includes("step id="), plain(written.join("")));
+
+    fs.writeFileSync(
+      instructionPath,
+      JSON.stringify({ kind: "step", seq: 7, session_number: 62, step_id: "widget", ask: "Build the widget. Then paint it." }),
+      "utf8",
+    );
+    terminal.poll();
+    terminal.poll();
+    const said = plain(written.join(""));
+    assert.strictEqual(said.split("step id=widget ask=Build the widget.").length - 1, 1, said);
+    assert.ok(!said.includes("step id=stale"), said);
     terminal.dispose();
     rmrf(root);
   });

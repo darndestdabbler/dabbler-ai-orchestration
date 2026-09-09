@@ -93,6 +93,32 @@ export const WORK_PLAN_SCHEMA = "driver-work-plan.schema.json";
 export const DISPOSITION_SCHEMA = "driver-disposition.schema.json";
 export const RUN_SCHEMA = "driver-run.schema.json";
 
+/**
+ * The phase in which the plan's own steps are walked.
+ *
+ * `work` is the name the record carries and the name the Work Explorer has
+ * always shown; the two were one string in the terminal, which printed the
+ * record's word straight, and they disagreed until session 140 made the
+ * record say what the reader reads.
+ */
+export const PHASE_WORK = "work";
+
+/**
+ * The name that phase was written under before session 140.
+ *
+ * Every run recorded until then carries it, so it stays readable forever:
+ * no writer emits it, every reader accepts it, and nothing rewrites a
+ * record that exists. That is exactly what was done with `ROW_WAIVE`, and
+ * `isWorkPhase` is the one place either name is recognised -- a second
+ * `=== "steps"` anywhere is the drift this shape exists to prevent.
+ */
+export const PHASE_WORK_LEGACY = "steps";
+
+/** Whether a phase names the walk of the plan's steps, under either name. */
+export function isWorkPhase(phase: string | null | undefined): boolean {
+  return phase === PHASE_WORK || phase === PHASE_WORK_LEGACY;
+}
+
 // --- Paths -------------------------------------------------------------------
 
 export function driverDir(repoRoot: string, sessionNumber: number): string {

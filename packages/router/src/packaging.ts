@@ -774,13 +774,29 @@ export function packageVersion(repoRoot: string, relPath: string): string | null
   }
 }
 
-/** What the extension declares it takes from the router, or null. */
+/**
+ * What the extension declares it takes from the router, or null.
+ *
+ * Read from either field, because which one holds it is the manifest's
+ * business and not this check's. It is a DEV dependency: esbuild takes the
+ * router into `dist/dabbler.cjs` at build time and nothing under
+ * `node_modules/` is loaded at runtime, so declaring it as a runtime
+ * dependency made a plain `vsce package` resolve a production tree the
+ * extension does not have. What this function is for is unchanged and is
+ * the reason it reads both -- the bundled router must be the version being
+ * released, and a manifest that names another is a build wrapping
+ * something else.
+ */
 export function declaredRouterDependency(repoRoot: string): string | null {
   try {
     const doc = JSON.parse(
       readText(`${repoRoot}/tools/dabbler-ai-orchestration/package.json`),
-    ) as { dependencies?: Record<string, string> };
-    return doc.dependencies?.["dabbler-ai-router"] ?? null;
+    ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    return (
+      doc.dependencies?.["dabbler-ai-router"] ??
+      doc.devDependencies?.["dabbler-ai-router"] ??
+      null
+    );
   } catch {
     return null;
   }

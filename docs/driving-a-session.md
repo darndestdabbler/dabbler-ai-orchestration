@@ -156,7 +156,7 @@ first step:
 ```
 dabbler [11:31:21] plan-accepted steps=["widget"] releasable=false
 declare: session 001 declared; releasable=no.
-dabbler [11:31:21] phase phase=steps
+dabbler [11:31:21] phase phase=work
 dabbler [11:31:22] instruction-issued seq=2 kind=step step=widget
 ```
 

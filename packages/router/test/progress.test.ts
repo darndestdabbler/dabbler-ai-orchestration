@@ -383,6 +383,36 @@ describe("the task rows", () => {
     assert.equal(stopped[4]["isOpen"], false);
   });
 
+  it("reads a run recorded as 'steps' exactly as one recorded as 'work'", () => {
+    // The phase the record carries was renamed in session 140, and every run
+    // written before then says `steps`. The reader takes both and nothing
+    // migrates a record, so the rows a hundred historical runs produce are
+    // the rows they always produced.
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    writeWorkPlan(repo, 1, {
+      schema_version: 1,
+      session_number: 1,
+      task: "Do it.",
+      releasable: false,
+      recorded_at: "2026-08-31T11:05:00-04:00",
+      steps: [
+        { id: "widget", ask: "Build the widget.", files: ["src/w.ts"], checks: [{ argv: ["true"] }] },
+        { id: "polish", ask: "Polish it.", files: ["src/w.ts"], checks: [{ argv: ["true"] }] },
+      ],
+    });
+
+    writeRun(repo, 1, { ...RUN, phase: "steps", accepted_steps: ["widget"] });
+    const legacy = buildTaskRows(sessionsDir, 1);
+    writeRun(repo, 1, { ...RUN, phase: "work", accepted_steps: ["widget"] });
+    const current = buildTaskRows(sessionsDir, 1);
+
+    assert.deepEqual(current, legacy);
+    assert.equal(current[4]["isOpen"], true);
+    assert.equal(current[4]["state"], "in flight");
+  });
+
   it("the open row says a finished job is waiting to be collected, in the router's words", () => {
     // Session 91: the status file held the exit code for three hours while
     // every surface read the record and said "working". The row stays open

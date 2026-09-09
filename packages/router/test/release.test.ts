@@ -88,9 +88,12 @@ describe("reading what would ship", () => {
     ): void => {
       write("version.json", { version: canonical });
       write("packages/router/package.json", { name: "dabbler-ai-router", version: router });
+      // Where the repository actually declares it: the extension BUNDLES the
+      // router, so it is a build-time dependency, and declaring it at runtime
+      // made a plain `vsce package` resolve a production tree.
       write("tools/dabbler-ai-orchestration/package.json", {
         version: extension,
-        dependencies: { "dabbler-ai-router": dependency },
+        devDependencies: { "dabbler-ai-router": dependency },
       });
     };
 
@@ -110,6 +113,16 @@ describe("reading what would ship", () => {
     assert.equal(releaseVersion(root).version, null);
     write("tools/dabbler-ai-orchestration/package.json", { version: "2.8.0" });
     assert.equal(releaseVersion(root).version, null);
+
+    // Which field holds it is the manifest's business: what this asks is
+    // that the bundled router IS the version being released. Reading only
+    // one field made the declaration's move silently mean "declares
+    // nothing", which refuses the release with a sentence about staleness.
+    write("tools/dabbler-ai-orchestration/package.json", {
+      version: "2.8.0",
+      dependencies: { "dabbler-ai-router": "2.8.0" },
+    });
+    assert.equal(releaseVersion(root).version, "2.8.0");
   });
 
   it("has one version in this repository, and every manifest carries it", () => {

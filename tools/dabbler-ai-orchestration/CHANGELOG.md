@@ -10,6 +10,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.0.20] — 2026-09-09
+
+What the Dabbler terminal tells you while a session runs, and what a
+packaging command does when you type the obvious one. Nothing to configure
+and nothing to change about how a session is started or driven; 2.0.19's
+four repairs ship inside this version, and their notes are below.
+
+### Fixed
+
+- **The terminal says which step the session is on.** It printed that the
+  phase had changed and then went quiet for the length of the work, so a
+  session doing its job and a session that had stopped looked the same.
+  Each instruction now announces itself — the step's id and the first
+  sentence of what it asks — and an answer refused says so with its first
+  reason. The line was written five weeks ago and no released build has
+  ever carried it, which is the actual reason nobody saw it; the defect
+  fixed alongside is that a first look at an instruction that was absent or
+  half-written used to drop the line permanently rather than retry.
+
+- **Every heading in that terminal is drawn in one tone.** A voice rule and
+  a session banner do the same job at two scales and now read as one
+  family, rather than the rule quiet and the banner bright.
+
+- **`vsce package` is correct without a flag.** Run in this repository
+  without `--no-dependencies`, it walked the workspace symlink up into the
+  repository root and listed ten thousand files — the git history, a Python
+  virtualenv, and every session run record. Two declarations that named
+  dependencies already inside the bundle are gone from the manifest, and
+  the packaging ignore list excludes everything above the extension, so
+  both forms of the command now produce the same 72 files.
+
+### Changed
+
+- **The phase is called `work`.** The record wrote `steps` while the Work
+  Explorer showed "Work", and the terminal prints the record's word
+  straight — so the two surfaces named one thing differently. They now
+  agree, and a run recorded before this version still opens and still reads
+  correctly: no record is rewritten and every reader takes the old name.
+
+- **A signoff about a session is asked again once that session ends.** An
+  accountability question raised during a session used to stand open
+  afterwards still offering an answer that undertook to change the tree
+  "before the session continues" — with no session to continue. At the
+  close it is re-asked with what answering now actually does: it settles
+  the record and performs nothing. It is still yours to answer and it still
+  never holds a close. `dabbler owed list` shows what is outstanding.
+
 ## [2.0.19] — 2026-09-09
 
 Four repairs to the driven session, each one a rule that was stated twice

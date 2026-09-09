@@ -7657,6 +7657,41 @@ decision, which is the operator's to make and not a defect to argue with,
 and it is recorded here so the session changes the tone rather than
 rediscovering the reasoning in the comment and leaving it alone.
 
+**The manifest says two shipped dependencies that the bundle already
+contains, and the packaging command hides it.** `npm run package` runs
+`vsce package --no-dependencies` and produces **70 files**; a plain `vsce
+package` produces **11,712**, because vsce resolves the declared production
+tree and pulls in `dabbler-ai-router`, `yaml` and everything beneath them.
+`.vscodeignore` does not stop it: `node_modules/**` filters the local file
+walk, and dependency inclusion is a separate path that adds those files by
+name. Nothing under `node_modules/` is loaded at runtime -- esbuild builds
+`dist/extension.js` and `dist/dabbler.cjs` is the router compiled in -- so
+the flag is suppressing a dependency set that should not be declared. CI is
+safe and always has been (the publish workflow runs `npm run package`, and
+its comment says why), which is exactly what let the manifest stay wrong:
+the correct command gives the right answer for the wrong reason, and an
+operator who types the obvious one gets an extension a hundred and sixty
+times too big. **The declaration moves to `devDependencies` so the plain
+command is correct too** -- and because `dabbler-ai-router` is a workspace
+dependency, whether esbuild still resolves it under `npm ci` is checked
+rather than assumed, and the move is abandoned rather than forced if it
+does not.
+
+**And an owed decision does not outlive the session it was asked about.**
+`repair-outside-a-step-137` stood open in the Work Explorer after 137 had
+closed, verified, published and shipped -- offering two answers, one of
+which had become impossible: "It does not" undertakes to take the repair
+back out of the tree "before the session continues", and there was no
+session to continue. `raiseOwed` supersedes only when the same id is
+re-raised with a changed brief, which is why every `driver-stop-s<N>` ends
+superseded and this one did not; nothing settles a session-scoped question
+when its session ends. That it does not BLOCK a close is right and
+deliberate -- an `accountability-signoff` is not a verification reduction
+-- but "does not block the close" and "survives the close forever, still
+offering to undo shipped work" are different decisions and only the first
+was taken. The signoff stays a person's to give; what changes is that it
+asks what is still askable.
+
 **And a VSIX built locally at the end, before anything is trusted.** This
 session changes what an operator sees and nothing an assertion can fully
 judge; the extension is installed from a locally built package and the
@@ -7671,20 +7706,37 @@ gains `work`; writers emit it, readers still accept `steps`, and no
 existing record is rewritten. (3) The terminal and the Work Explorer are
 proved to name the same step at the same seq from the same instruction.
 (4) `divider` takes the banner's milestone tone, so every heading in this
-terminal is one family. (5) Build the VSIX locally, install it, and drive
-one session's steps through the real terminal.
+terminal is one family. (5) The extension manifest stops declaring runtime
+dependencies its bundle already contains, so `vsce package` is correct
+without a flag -- or the move is abandoned on the record if esbuild cannot
+resolve the workspace dependency without it. (6) A session-scoped owed
+decision does not outlive its session as an open question: at the close,
+one still open is settled or re-asked in the form that is still answerable.
+(7) Build the VSIX locally, install it, and drive one session's steps
+through the real terminal.
 
-**Tests.** Three, plus a walk that is not a test. A run written with
+**Tests.** Four, plus a walk that is not a test. A run written with
 `steps` still opens under the new reader and one written today says `work`
 -- the historical record is the fixture, not a hand-built row. The step
 line survives an instruction that is not readable on the first look, which
-is the assertion whose absence let the line vanish silently. And the two
-surfaces answer with one step id for one seq. **The tone gets no test of
-its own**: the assertion would restate the constant, and Layer 3 is what
-catches a heading that reads wrong on a screen. Step (5) is a walk, and it
-produces a note rather than an assertion.
+is the assertion whose absence let the line vanish silently. The two
+surfaces answer with one step id for one seq. And a session that closes
+over an open `accountability-signoff` leaves no question offering to undo
+what the close has landed -- `repair-outside-a-step-137` is the fixture,
+and it is read from the record rather than built. **The tone gets no test
+of its own**: the assertion would restate the constant, and Layer 3 is what
+catches a heading that reads wrong on a screen. **Step (5) is proved by the
+manifest** -- a declaration that names no runtime dependency is what makes
+the two packaging commands agree, and counting files by running `vsce`
+twice in the suite would buy the same fact for a minute of every run. Step
+(7) is a walk, and it produces a note rather than an assertion.
 
-**Releasable.** This is the release after 139 and the second driving of
-the repaired publish path -- the first one that carries no change to the
-publish machinery at all, which is what makes it the honest test of it. If
-this session's publish is boring, the work of 138 and 139 is done.
+**Releasable, and one claim about it has to be narrowed.** This is the
+release after 139 and the second driving of the repaired publish path, but
+step (5) touches the manifest `vsce` reads -- so this session does not
+carry *nothing* that the publish path depends on, and saying otherwise
+would be the plan flattering itself. What is still true is the part worth
+having: nothing here changes the framework's own release machinery -- the
+tag rule, the packaging record, the publication consent, the phase order --
+so a publish that goes wrong here indicts step (5) and the manifest, and
+not the work 138 and 139 did. If the publish is boring, that work is done.

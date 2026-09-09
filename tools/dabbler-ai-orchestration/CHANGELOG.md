@@ -10,6 +10,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.0.17] — 2026-09-09
+
+Everything in `2.0.16` below, plus the one fix that lets a tag-released
+repository record what it published.
+
+### Fixed
+
+- **The release tag no longer has to be HEAD exactly.** The check that a
+  tag names the commit a session landed was right about the mistake it was
+  built for — a tag matched by name alone would file a publication for a
+  release CI made from an earlier commit — and too strict for the way a
+  release is actually made. `dabbler release` is deliberately a person's
+  act rather than a phase advancing, and the land writes the session's
+  verification bookkeeping *after* it, so HEAD moves past the tag by a
+  commit the framework itself made, carrying nothing that ships. `2.0.16`
+  reached the Marketplace and then could never be recorded: eight lines of
+  `change-log.md` and `sessions.json` stood between the tag and HEAD, and
+  the only remedy offered was a version bump that would have shipped a new
+  number for an artifact already built under the old one. A tag is now
+  current when it is an ancestor of HEAD and nothing **material** followed
+  it — by the same bookkeeping filter every close gate already uses, so the
+  tag check and the gates can no longer disagree about what a change is.
+  The refusal names the shipped paths that changed instead of prescribing a
+  version bump for every reason a tag might not be HEAD.
+
 ## [2.0.16] — 2026-09-09
 
 Everything in `2.0.15` below, plus the fix that supersedes it. **Install

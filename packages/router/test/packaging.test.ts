@@ -424,13 +424,55 @@ describe("a release that is a tag", () => {
   // a `published` row for work CI never saw, which is the one claim
   // `published_when_releasable` exists to make impossible.
   it("refuses a tag that names an earlier commit than the one this session landed", () => {
+    const { sessionsDir, remoteTag, landedSince, restore } = taggable();
+    try {
+      remoteTag(`vsix-v${RELEASING}`, EARLIER_COMMIT);
+      landedSince(EARLIER_COMMIT, ["packages/router/src/packaging.ts"]);
+      const run = packageSession(sessionsDir, { config: TAG_CONFIG() });
+      assert.equal(run.outcome, OUTCOME_REFUSED);
+      assert.match(String(run.refusal), /released that commit, not this one/);
+      assert.match(String(run.refusal), /stamp:version/);
+      // The refusal names what shipped-and-changed, rather than prescribing
+      // a bump for every reason a tag might not be HEAD.
+      assert.match(String(run.refusal), /packages\/router\/src\/packaging\.ts/);
+    } finally {
+      restore();
+    }
+  });
+
+  // `dabbler release` is a person's act placed by hand, and the land writes
+  // the session's verification bookkeeping AFTER it -- so HEAD moves past
+  // the tag by a commit the framework itself made, carrying nothing that
+  // ships. Session 137 published 2.0.16 to the Marketplace and could then
+  // never record it: eight lines of `change-log.md` and `sessions.json`
+  // stood in the way, and the only remedy offered was a version bump that
+  // would have shipped a new number for an artifact already built.
+  it("records published when only the lifecycle's own bookkeeping followed the tag", () => {
+    const { sessionsDir, remoteTag, landedSince, restore } = taggable();
+    try {
+      remoteTag(`vsix-v${RELEASING}`, EARLIER_COMMIT);
+      landedSince(EARLIER_COMMIT, [
+        "docs/sessions/change-log.md",
+        "docs/sessions/sessions.json",
+      ]);
+      const run = packageSession(sessionsDir, { config: TAG_CONFIG() });
+      assert.equal(run.outcome, OUTCOME_PUBLISHED, String(run.refusal));
+      assert.deepEqual(run.artifacts, [`vsix-v${RELEASING}`]);
+    } finally {
+      restore();
+    }
+  });
+
+  // Ancestry is what keeps round 3's finding answered once equality is
+  // relaxed: a tag off this history is not an earlier state of this work,
+  // however little appears to have changed since it.
+  it("refuses a tag on a commit this work never passed through", () => {
     const { sessionsDir, remoteTag, restore } = taggable();
     try {
       remoteTag(`vsix-v${RELEASING}`, EARLIER_COMMIT);
       const run = packageSession(sessionsDir, { config: TAG_CONFIG() });
       assert.equal(run.outcome, OUTCOME_REFUSED);
-      assert.match(String(run.refusal), /released that commit, not this one/);
-      assert.match(String(run.refusal), /stamp:version/);
+      assert.match(String(run.refusal), /not an ancestor of HEAD/);
     } finally {
       restore();
     }

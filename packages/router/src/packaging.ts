@@ -18,11 +18,11 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 
-import { childEnv } from "./checks.ts";
+import { childEnv, isSetBookkeeping } from "./checks.ts";
 import { type RouterConfig, loadConfig } from "./config.ts";
 import { GATE_PUBLISHED_WHEN_RELEASABLE, type GateResult, runGates } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
-import { repoRootFor, runGit, snapshotWorktreeTree } from "./journal.ts";
+import { repoRelativePath, repoRootFor, runGit, snapshotWorktreeTree } from "./journal.ts";
 import {
   OUTCOME_FAILED,
   OUTCOME_PUBLISHED,
@@ -1001,18 +1001,74 @@ function tagReleaseRun(
   if (head.code !== 0) {
     return refusal(sessionNumber, true, `could not read HEAD: ${head.stderr.trim()}`, gates);
   }
-  if (tagged !== head.stdout.trim()) {
-    return refusal(
-      sessionNumber,
-      true,
-      `${tag} is on origin but names commit ${tagged.slice(0, 12)}, and this ` +
-        `session landed ${head.stdout.trim().slice(0, 12)}. A tag that was ` +
-        "made for an earlier commit released that commit, not this one: the " +
-        "usual cause is a version that was not bumped, so the manifests " +
-        "still name a version already published. Bump `version.json`, run " +
-        "`npm run stamp:version`, and release the version this work is.",
-      gates,
-    );
+  const headSha = head.stdout.trim();
+  if (tagged !== headSha) {
+    // Not equality, and the difference is the framework's own commit.
+    //
+    // Equality was this check's first shape, and against round 3's finding
+    // it was right: a tag matched by NAME alone would file a `published`
+    // row for a release CI made from an earlier commit. But the land writes
+    // the session's verification bookkeeping AFTER `dabbler release` has
+    // tagged -- `release` is deliberately a person's act and not a phase
+    // advancing -- so HEAD moves past the tag by a commit the framework
+    // itself made, carrying nothing that ships. Session 137, 2026-09-09,
+    // published 2.0.16 to the Marketplace and could then never record it:
+    // eight lines of `change-log.md` and `sessions.json` stood between the
+    // tag and HEAD, and the only remedy the refusal named -- bump the
+    // version -- would have shipped a new number for an artifact already
+    // built under the old one, after a round that would end in another
+    // bookkeeping commit. A ratchet with no fixed point.
+    //
+    // So the question is the one the gates already ask: has anything
+    // MATERIAL moved? `isSetBookkeeping` is their filter and it is reused
+    // here rather than restated, because a tag check and a gate that
+    // disagree about what counts as a change is the defect itself. The
+    // ancestry test is what keeps round 3's finding answered: a tag off
+    // this history, or ahead of it, is not an earlier state of this work.
+    const ancestry = runGit(root, ["merge-base", "--is-ancestor", tagged, headSha]);
+    const drift =
+      ancestry.code === 0
+        ? runGit(root, ["diff", "--name-only", `${tagged}..${headSha}`])
+        : null;
+    if (drift !== null && drift.code !== 0) {
+      return refusal(
+        sessionNumber,
+        true,
+        `could not diff ${tag} against HEAD: ${drift.stderr.trim()}`,
+        gates,
+      );
+    }
+    const setRel = repoRelativePath(root, sessionsDir);
+    const material =
+      drift === null
+        ? null
+        : drift.stdout
+            .split("\n")
+            .map((line) => line.trim().replace(/\\/g, "/"))
+            .filter((line) => line !== "")
+            .filter((line) => !isSetBookkeeping(line, setRel));
+    if (material === null || material.length > 0) {
+      const shown = material ?? [];
+      const preview = shown.slice(0, 5).join(", ");
+      const suffix = shown.length > 5 ? ` (+${shown.length - 5} more)` : "";
+      return refusal(
+        sessionNumber,
+        true,
+        `${tag} is on origin but names commit ${tagged.slice(0, 12)}, and this ` +
+          `session landed ${headSha.slice(0, 12)}. ` +
+          (material === null
+            ? `${tag} is not an ancestor of HEAD, so it names a commit this ` +
+              "work never passed through rather than an earlier state of it."
+            : `${material.length} path(s) that ship changed after it: ` +
+              `${preview}${suffix}.`) +
+          " A tag that was made for an earlier commit released that commit, " +
+          "not this one: the usual cause is a version that was not bumped, " +
+          "so the manifests still name a version already published. Bump " +
+          "`version.json`, run `npm run stamp:version`, and release the " +
+          "version this work is.",
+        gates,
+      );
+    }
   }
   return {
     ...refusal(sessionNumber, true, "", gates),

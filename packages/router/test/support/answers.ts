@@ -216,6 +216,15 @@ export interface AnsweredRepo {
   ahead(count: number): void;
   /** A tag origin answers `ls-remote --tags` with; at HEAD unless a commit is named. */
   remoteTag(name: string, commit?: string): void;
+  /**
+   * What this checkout landed after `commit`: it becomes an ancestor of
+   * HEAD and `git diff --name-only commit..HEAD` answers with `paths`.
+   *
+   * A commit nothing declares is not an ancestor at all, which is the other
+   * answer a caller must handle -- a tag naming a commit off this history is
+   * not an earlier state of this work.
+   */
+  landedSince(commit: string, paths: readonly string[]): void;
 }
 
 /** The same, seeded with the sandbox and naming where its sessions live. */
@@ -267,7 +276,13 @@ export function makeAnsweredRepo(
   mkdirSync(join(repo, ".git"), { recursive: true });
   const posixRepo = repo.split("\\").join("/");
   const withOrigin = options.origin === true;
-  const state = { status: "", ahead: 0, headTree: diskTree(repo), remoteTags: new Map<string, string>() };
+  const state = {
+    status: "",
+    ahead: 0,
+    headTree: diskTree(repo),
+    remoteTags: new Map<string, string>(),
+    landed: new Map<string, readonly string[]>(),
+  };
   const config = new Map<string, string[]>(
     withOrigin
       ? [
@@ -335,6 +350,20 @@ export function makeAnsweredRepo(
         return { stdout: lines.join("\n") };
       },
     ],
+    // Is a commit an earlier state of this checkout? Only one a test said
+    // this repository landed work after. `--is-ancestor` answers by exit
+    // code and prints nothing, so this does too.
+    [
+      ["merge-base", "--is-ancestor"],
+      (args) => (state.landed.has(String(args[2])) ? { code: 0 } : { code: 1 }),
+    ],
+    [
+      ["diff", "--name-only"],
+      (args) => {
+        const from = String(args[args.length - 1]).split("..")[0] as string;
+        return { stdout: (state.landed.get(from) ?? []).join("\n") };
+      },
+    ],
     [["push"], { code: 0 }],
     // A pushed, clean checkout with an upstream pulls forward to itself.
     [["pull"], { code: 0 }],
@@ -389,6 +418,7 @@ export function makeAnsweredRepo(
     status: (text) => { state.status = text; },
     ahead: (count) => { state.ahead = count; },
     remoteTag: (name, commit) => { state.remoteTags.set(name, commit ?? HEAD_COMMIT); },
+    landedSince: (commit, paths) => { state.landed.set(commit, [...paths]); },
   };
 }
 

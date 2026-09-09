@@ -2730,9 +2730,9 @@
     {
       "number": 139,
       "title": "The release that carries the deadlock work",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-09T12:03:06.281000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-09T12:18:43.454000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

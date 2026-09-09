@@ -1,6 +1,84 @@
-# STATUS — sessions 113–133 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, and sessions 131–133 answering all ten of them; sessions 134–136 are planned; version 2.0.14
+# STATUS — sessions 113–134 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, and session 134 fixing what the verifier is told and widening what it can see; sessions 135–136 are planned; version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 134 CLOSED, 2026-09-09 — what the verifier is told, and what it can see
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 134 | the four false sentences, the prompt's test-assessment section, and the adaptive diff-context ladder | CLOSED VERIFIED (round 1, no blocking findings, two nits), landed `eda641ee`, closed `8e197897` |
+>
+> **What landed.** (1) **Four sentences that stopped being true in session
+> 100** now say what actually runs. `testphase.ts` went with the six-step
+> workflow and no verifier has written or run a test since, but the managed
+> body's *What comes back*, the scaffolded `dabbler.yaml`'s testing header
+> (both template strings in `bootstrap/templates.ts`), `drive.ts`'s
+> `phasePreverify` comment and — **the fourth site, not in the plan's list of
+> three** — the refusal `dabbler test-evidence --stage preverify-targeted`
+> prints from `cli/testEvidence.ts` all claimed one did. All four now carry
+> the same clause: *the tests that run are each step's own checks and the
+> complete suite as the run of record, and the verifier reviews without
+> writing or running one.* The fourth was corrected because it is the one of
+> the four an **operator** reads rather than a maintainer; fixing three and
+> leaving that one is the worse outcome. `AGENTS.md` was regenerated with
+> `bootstrap --no-transport-detect`.
+>
+> (2) **The verifier is asked about the tests, and proposes without writing.**
+> A new section in `prompt-templates/verification.md`, between *Your
+> Instructions* and *Materiality*, asks it to assess the tests in the diff —
+> is each claimed behaviour actually *pinned*, or would the test still pass
+> with the behaviour reversed — and to name a missing case as
+> **precondition / input / expectation** rather than as "needs more coverage".
+> Two boundaries stated in the section: scope is **only the tests in the
+> diff**, because on the API transport nothing else is visible; destination is
+> **NITS**, non-blocking, never another round. The line is drawn explicitly:
+> a test *this session's own task promised and did not deliver* stays an
+> **Issue** under Completeness, so an assessment cannot be laundered into a
+> blocker.
+>
+> (3) **The verifier sees the code around the change.** `DIFF_CONTEXT_LADDER`
+> is `[24, 12, 6, 3]`, widest first, with git's own default as the floor.
+> `renderWidestThatFits` returns the first render at or under
+> `evidenceCharCap()`; the floor's render is handed to `checkEvidenceCap`
+> unchanged, so **a session too large for three lines of context still raises
+> `EvidenceTooLargeError` with the same message and the same escape hatch** —
+> the ladder removes a failure mode and adds none. `assembleEvidence` and
+> `assembleFixDeltaEvidence` both go through the one ladder so they cannot
+> drift; per-width diffs are memoised, and emptiness is judged once on the
+> floor diff, because a diff that is empty is empty at every rung. Length is
+> measured in code points, as the cap measures it.
+>
+> **The one test** is a milestone in `walk-record.test.ts` (real git lives
+> only in `walk-*`): a 400-line tracked file with one line changed renders a
+> 49-line hunk at 24 context; with the cap set one character below that
+> render, the bundle comes back **under the cap** with a 25-line hunk instead
+> of an exception; with the cap at 200 it still raises. Run of record green
+> on both suites — 1161 TS tests, 0 failures.
+>
+> **The new prompt section worked on its first live round.** Round 1 came
+> back VERIFIED with two nits, and the second nit is exactly the shape the
+> section asks for: a concrete proposed case for `assembleFixDeltaEvidence`
+> stated as two tree IDs, a cap one character below the 24-context render,
+> and the 12-context hunk it should return. **Worth taking in a later
+> session** — the fix-delta path goes through the same ladder and is proven
+> only by construction, not by a test.
+>
+> **Nit 1 was wrong, and harmlessly so.** It said `CLAUDE.md` and `GEMINI.md`
+> were not regenerated because only `AGENTS.md` appears in the diff. Bootstrap
+> *did* rewrite all three; the other two carry the `@AGENTS.md` import line and
+> their engine tail and **not the body**, so regenerating them changes nothing.
+> The blind API verifier could not see that from the diff alone. Nothing to do.
+>
+> **A trap for the next session that runs bootstrap here.** `bootstrap`
+> scaffolds an untracked `docs/modules.yaml` on every run in this repository —
+> it has never been tracked, and 133 sessions have run without one. It was
+> removed rather than adopted: introducing it would change how sessions are
+> scoped, which is nobody's side effect to make from a documentation step.
+>
+> **Still owed:** the .NET root solution file, the other half of D267 and
+> session 131's owed item. Sessions 135 and 136 are planned and unchanged;
+> 136 carries the release, which is when this session's work first reaches a
+> seat.
 
 > ## SESSION 133 CLOSED, 2026-09-08 — the four papercuts, and the walk's record closed
 >

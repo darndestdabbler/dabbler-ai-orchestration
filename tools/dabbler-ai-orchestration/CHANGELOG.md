@@ -10,6 +10,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.0.16] — 2026-09-09
+
+Everything in `2.0.15` below, plus the fix that supersedes it. **Install
+this one:** `2.0.15` was tagged from the commit before the fix, so its
+publish machinery refuses every annotated tag — nothing else differs.
+
+### Fixed
+
+- **A repository can declare that its release is a tag.** Some repositories
+  do not publish from the session's own machine — this one releases from a
+  tag-driven CI workflow whose credential is not on any developer's box —
+  and until now there was no way to *say* so: declaring no packaging block
+  meant no session could be releasable at all. `packaging: { release: tag }`
+  is that declaration. The session records whether the release tag reached
+  origin and never makes it: a tag is public the moment CI sees it, so it
+  goes on waiting for a person. The record checks the *commit* the tag
+  names, not just its name, so a version that was not bumped cannot file a
+  publication for a release CI made from an earlier commit.
+
 ## [2.0.15] — 2026-09-09
 
 The first version section since `0.51.0`: the `2.0.x` line was built and

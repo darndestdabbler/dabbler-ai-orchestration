@@ -319,19 +319,20 @@ export function makeAnsweredRepo(
     [
       ["ls-remote", "--tags"],
       (args) => {
-        const wanted = String(args[3] ?? "");
-        const commit = state.remoteTags.get(wanted);
-        if (commit === undefined) return { stdout: "" };
-        // An ANNOTATED tag, which is what `dabbler release` makes: two
-        // lines, and the commit is on the peeled one. A reader that took
-        // the first line would compare a tag object to a commit and
-        // refuse every real release.
-        return {
-          stdout: [
-            `${TAG_OBJECT}	refs/tags/${wanted}`,
-            `${commit}	refs/tags/${wanted}^{}`,
-          ].join("\n"),
-        };
+        // Git answers the refs its PATTERNS name and nothing else, so a
+        // caller that asks for the tag alone gets the tag object's line and
+        // never the peeled one. This answered with both lines whatever was
+        // asked, and hid a real bug for one publish attempt: only a caller
+        // that asks for `<tag>^{}` too can see the commit.
+        const patterns = args.slice(3).map(String);
+        const lines: string[] = [];
+        for (const [name, commit] of state.remoteTags) {
+          // An ANNOTATED tag, which is what `dabbler release` makes: the
+          // ref names the tag object, and only the peeled ref is a commit.
+          if (patterns.includes(name)) lines.push(`${TAG_OBJECT}	refs/tags/${name}`);
+          if (patterns.includes(`${name}^{}`)) lines.push(`${commit}	refs/tags/${name}^{}`);
+        }
+        return { stdout: lines.join("\n") };
       },
     ],
     [["push"], { code: 0 }],

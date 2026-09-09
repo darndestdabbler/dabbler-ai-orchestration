@@ -959,7 +959,14 @@ function tagReleaseRun(
   // nothing: the workflow fires on what origin received, so a local tag
   // would let the record say published while the Marketplace served the
   // version before it.
-  const onRemote = runGit(root, ["ls-remote", "--tags", "origin", tag]);
+  // BOTH patterns, and the second is not decoration: `ls-remote` matches
+  // the refs its patterns name and nothing else, so asking for the tag
+  // alone returns the tag OBJECT's line and never the peeled `^{}` one.
+  // Session 137 shipped exactly that mistake for one publish attempt --
+  // the object SHA was compared to a commit and every annotated tag was
+  // refused -- and the test did not catch it, because the fake answered
+  // with both lines regardless of what was asked.
+  const onRemote = runGit(root, ["ls-remote", "--tags", "origin", tag, `${tag}^{}`]);
   if (onRemote.code !== 0) {
     return refusal(
       sessionNumber,

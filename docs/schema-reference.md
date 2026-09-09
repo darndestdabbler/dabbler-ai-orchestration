@@ -234,6 +234,45 @@ Row fields (all required):
 | `evidence_paths` | array, min 1 | repo-relative cites, optionally `path:START-END`; prose-only disputes are refused at the CLI |
 | `recorded_at` | string | timestamp |
 
+## Reopen ledger — `.dabbler/runs/s<N>/verification-reopens.jsonl`
+
+One row per operator grant of further verification rounds, written **only**
+by `dabbler verify reopen`; schema-validated on read
+(`packages/router/schemas/verification-reopen.schema.json`).
+
+The cap terminals are evidence of a spent **budget**, not of a judgment:
+`remediated_at_cap` says the last round's blocking findings were each fixed
+and the cap left the fix unreviewed, and the cap-clean end says the cap was
+reached with nothing outstanding. Neither is anyone's opinion that the work
+is right, so an operator may buy the review the budget refused. An
+adjudication is the opposite — a third provider's judgment of the disputes
+— and no grant reaches it; a cap reached with findings still **disputed**
+goes to `dabbler verify adjudicate` rather than to another round of the same
+two providers.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema_version` | integer ≥ 1 | |
+| `session_number` | integer ≥ 1 | |
+| `after_round` | integer ≥ 1 | the round this grant reopens past; terminals at or before it are neutralised and a later one stands again |
+| `terminal` | `remediated_at_cap` \| `cap-clean` | what stood when the grant was made |
+| `cap` | integer ≥ 2 | the absolute cap the grant sets; must exceed `after_round`, and wins over the configured cap and over `--max-rounds` |
+| `reason` | string | why the refused review is worth buying — permanent, read beside the rounds it authorised |
+| `approver` | string | who authorised it; **never** read as a verdict |
+| `tree_at_grant` | string | the worktree snapshot at the grant, when one could be taken |
+| `recorded_at` | string | timestamp |
+| `framework_version` | string | the router that recorded it |
+
+A grant buys **named rounds, never a mode**: reaching the new cap stops the
+session again and needs a new grant. It buys rounds and never a verdict —
+`verification_clean` refuses while a grant stands that no round has spent,
+so a session cannot close on the strength of the grant itself. One grant per
+terminal, ever; a second for the same `after_round` is refused.
+
+`dabbler session plan amend --max-rounds` moves the cap **before** it is
+reached and is refused once a terminal row stands, because the terminal is
+read ahead of the cap and a raised number there changes nothing.
+
 ## Step execution ledger — `.dabbler/runs/s<N>/step-execution.jsonl`
 
 Two rows per step of the session's approved plan — one `opened`, one

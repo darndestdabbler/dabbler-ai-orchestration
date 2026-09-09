@@ -508,6 +508,58 @@ someone who is not at the keyboard, stop calling `next`. Nothing expires.
 The session resumes from the phase it is in, and nothing already accepted
 is asked for again.
 
+### The one stop with no forward exit, and the verb that is one
+
+There is a stop the four steps above cannot answer, because it is not a
+wrong diagnosis — it is two correct refusals pointing at each other.
+
+A session reaches the verification round cap. The loop records a terminal:
+`remediated_at_cap` when the last round's blocking findings were each fixed
+at the site they cited, or a cap-clean end when nothing was outstanding. The
+tree then moves again — a repair to the repair, which is exactly what an
+unreviewed fix tends to need. Now:
+
+- the close's `verification_clean` gate refuses, correctly: this is not the
+  tree that was reviewed, so **re-run `dabbler verify`**;
+- `dabbler verify` refuses, correctly: a terminal row stands, so **close the
+  session**;
+- `session close --force` cannot help either, because `verification_clean`
+  is an *evidence* gate and force bypasses only bookkeeping.
+
+Session 137, 2026-09-09, sat in that loop. Raising the cap does not lift it:
+the terminal is read **before** the cap, so `session plan amend
+--max-rounds` was accepted, written to `amendments.jsonl` — and inert. It
+now refuses instead, and names the verb below.
+
+A cap terminal is a spent **budget**, not a judgment, so the operator may
+buy the review it refused:
+
+```
+dabbler verify reopen --rounds 1 --reason "<why>" --approver <who>
+```
+
+That records a grant in `.dabbler/runs/s<N>/verification-reopens.jsonl` and
+reopens the loop. Read what it is carefully, because it is easy to mistake
+for the waiver this framework does not have:
+
+- **It buys rounds, never a verdict.** Nothing is verified until a round
+  says so, and `verification_clean` refuses while a grant stands that no
+  round has spent — so a session cannot close on the grant itself.
+- **It buys named rounds, never a mode.** Reaching the new cap stops the
+  session again and needs a new grant. There is no state in which the cap
+  is off.
+- **It never reaches an adjudication.** That is a third provider's judgment
+  of the disputes, and no grant buys a different answer to a judged
+  question. A cap reached with findings still *disputed* goes to `dabbler
+  verify adjudicate` instead.
+- **It is refused where nothing is stuck**, so it cannot quietly become the
+  ordinary way a cap is raised. Before the cap is reached, the cap is what
+  moves: `session plan amend --max-rounds`.
+- **The reason and the approver are permanent**, and no gate reads the
+  approver — a gate that trusted an engine-written name would make the
+  authorisation forgeable, which is worse than absent. What the row buys is
+  that the claim exists, beside the rounds it authorised.
+
 ## The end
 
 ```

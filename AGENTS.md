@@ -83,6 +83,28 @@ past a single gate. If a gate is wrong, prove it is wrong, record the
 proof, and satisfy the gate anyway — a five-minute test run is cheaper
 than a damaged ledger, every time. See D157 and D158.
 
+### FIXED after 137: the cap terminal that `--max-rounds` could not lift
+
+A session reaches the verification cap, the loop writes `remediated_at_cap`,
+and then the tree moves again — which is what an unreviewed fix usually
+needs. From there `verification_clean` says re-run `dabbler verify`,
+`dabbler verify` says close the session, and `close --force` cannot help
+because that gate is evidence rather than bookkeeping. **No forward exit.**
+
+Raising the cap is not the answer, though it looks like one:
+`noRoundReason` reads the terminal row *before* the cap, so `session plan
+amend --max-rounds` was accepted, recorded in `amendments.jsonl` and did
+nothing. Session 137 raised 3 to 5 twenty seconds after the terminal was
+written and never opened round 5.
+
+**The exit is `dabbler verify reopen --rounds N --reason "<why>"
+--approver <who>`.** A cap terminal is a spent budget, not a judgment, so
+an operator may buy the review it refused. It buys rounds and never a
+verdict, buys named rounds and never a mode, and never reaches an
+adjudication. `plan amend --max-rounds` now refuses after a terminal and
+names it. See `docs/driving-a-session.md`, "The one stop with no forward
+exit".
+
 ### FIXED in session 26: the freshness gate and a deleted tracked file
 
 `testEvidence.surfaceDigest` used to hash every path `git ls-files`

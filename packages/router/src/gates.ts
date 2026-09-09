@@ -71,6 +71,7 @@ import {
   ROW_REMEDIATED_AT_CAP,
   readPackaging,
   readRounds,
+  standingReopen,
 } from "./ledger.ts";
 import { sessionIsReleasable } from "./writers.ts";
 import { readSessionState } from "./progress.ts";
@@ -232,6 +233,12 @@ export interface VerificationFacts {
   readonly currentTree: string | null;
   /** Paths changed since the latest round's tree; null when the diff failed. */
   readonly changedSinceLatest: readonly string[] | null;
+  /**
+   * An operator's grant of further rounds that no round has yet spent, or
+   * null. The grant reopened a cap terminal, so that terminal's own "this is
+   * as reviewed as it gets" no longer holds and the gate must not read it.
+   */
+  readonly unspentGrant: { readonly afterRound: number; readonly approver: string } | null;
   readonly setRel: string;
 }
 
@@ -247,6 +254,7 @@ export function readVerificationFacts(sessionsDir: string): VerificationFacts {
     ledgerError: null,
     currentTree: null,
     changedSinceLatest: null,
+    unspentGrant: null,
     setRel: sessionsDir,
   };
   const root = facts.root;
@@ -265,6 +273,16 @@ export function readVerificationFacts(sessionsDir: string): VerificationFacts {
     if (!(error instanceof LedgerError)) throw error;
     facts.ledgerError = error.message;
     return facts;
+  }
+  const grant = standingReopen(root, facts.current as number);
+  if (grant !== null && facts.rounds.length > 0) {
+    const latestRound = Number(
+      (facts.rounds[facts.rounds.length - 1] as Record<string, unknown>)["round"],
+    );
+    if (latestRound <= grant.afterRound) {
+      facts.unspentGrant = { afterRound: grant.afterRound, approver: grant.approver };
+      return facts;
+    }
   }
   if (judgeLatestRound(facts.rounds, facts.current, sessionsDir) !== null) return facts;
   const latest = facts.rounds[facts.rounds.length - 1];
@@ -310,6 +328,18 @@ export function judgeVerification(facts: VerificationFacts, sessionsDir: string)
       false,
       `the run ledger is unreadable or invalid (${facts.ledgerError ?? ""}); failing ` +
         "closed rather than trusting a tampered record",
+    ];
+  }
+  // Before the rounds are judged at all. The newest row is still the cap
+  // terminal a grant reopened, and reading it would answer with the very
+  // "remediated at the cap" line the operator spent a grant to get past.
+  if (facts.unspentGrant !== null) {
+    return [
+      false,
+      `${facts.unspentGrant.approver} reopened verification after round ` +
+        `${facts.unspentGrant.afterRound} and no round has run since. The ` +
+        "grant bought a review; it is not one. Run it: " +
+        verifyCommand(sessionsDir),
     ];
   }
   const standing = judgeLatestRound(facts.rounds, facts.current, sessionsDir);

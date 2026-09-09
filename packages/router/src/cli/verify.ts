@@ -1,7 +1,7 @@
 // `dabbler verify …` -- the cross-provider verification loop's command line.
 //
-// Six commands share one entry point: the bare round, `dispute`,
-// `adjudicate`, `prepare`, `reanchor` and `step`.
+// Seven commands share one entry point: the bare round, `dispute`,
+// `adjudicate`, `prepare`, `reanchor`, `reopen` and `step`.
 // A seventh, `waive`, exists only to be refused by name -- there is no
 // verdict a person can type, and argparse's "invalid choice" would read like
 // an oversight rather than a decision.
@@ -15,6 +15,7 @@ import {
 import { recordDispute, runAdjudication } from "../verify/disputes.ts";
 import { runPrepare } from "../verify/prepare.ts";
 import { runReanchor } from "../verify/reanchor.ts";
+import { runReopen } from "../verify/reopen.ts";
 import { runRound } from "../verify/rounds.ts";
 import {
   runStepAmend,
@@ -120,9 +121,14 @@ function usage(): string {
     "       dabbler verify adjudicate [--max-rounds N] [--transport T]",
     "       dabbler verify prepare [--claims FILE]",
     "       dabbler verify reanchor --commit COMMIT --reason TEXT",
+    "       dabbler verify reopen --rounds N --reason TEXT --approver WHO",
     "       dabbler verify step <open|close|status|amend|guard-commit>",
     "",
     "one cross-provider verification round; the loop continues on re-invocation",
+    "",
+    "reopen buys further rounds past a cap terminal that has already ended the",
+    "loop -- the operator's answer when the cap stopped a review the tree still",
+    "needs. It buys rounds, never a verdict, and never reaches an adjudication.",
     "",
   ].join("\n");
 }
@@ -259,6 +265,35 @@ async function reanchorMain(argv: readonly string[]): Promise<number> {
   return runReanchor(resolved.dir, commit, reason);
 }
 
+async function reopenMain(argv: readonly string[]): Promise<number> {
+  const parsed = parseArgs(argv, [SESSIONS_DIR, "--rounds", "--reason", "--approver"]);
+  if (typeof parsed === "string") {
+    writeErr(`dabbler verify reopen: ${parsed}\n`);
+    return EXIT_USAGE;
+  }
+  const reason = parsed.values.get("--reason");
+  const approver = parsed.values.get("--approver");
+  if (reason === undefined || approver === undefined) {
+    writeErr(
+      "dabbler verify reopen: the following arguments are required: " +
+        "--reason, --approver\n",
+    );
+    return EXIT_USAGE;
+  }
+  // Defaulted, and to one. A grant is for the review in front of the
+  // operator, and a number they did not type is the number that buys the
+  // least: reaching the new cap stops the session again, where an
+  // over-generous default would quietly spend rounds nobody asked for.
+  const rounds = integerFlag(parsed, "--rounds");
+  if (rounds === "invalid") {
+    writeErr("dabbler verify reopen: --rounds takes an integer\n");
+    return EXIT_USAGE;
+  }
+  const resolved = resolvedSessions("verify reopen", parsed);
+  if ("code" in resolved) return resolved.code;
+  return runReopen(resolved.dir, { rounds: rounds ?? 1, reason, approver });
+}
+
 const STEP_VERBS = ["open", "close", "status", "amend", "guard-commit"];
 
 async function stepMain(argv: readonly string[]): Promise<number> {
@@ -338,6 +373,7 @@ export async function verifyVerb(argv: string[]): Promise<number> {
   }
   if (first === "prepare") return prepareMain(rest);
   if (first === "reanchor") return reanchorMain(rest);
+  if (first === "reopen") return reopenMain(rest);
   if (first === "step") return stepMain(rest);
 
   const parsed = parseArgs(argv, [SESSIONS_DIR, "--max-rounds", "--transport"]);

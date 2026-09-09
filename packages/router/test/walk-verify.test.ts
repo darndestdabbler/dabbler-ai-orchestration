@@ -19,8 +19,9 @@ import { preverifyGate } from "../src/affected.ts";
 import { approvePlan, compareToEnvelope, needsAmendment, newPlan, writePlan } from "../src/approvedPlan.ts";
 import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { EXIT_BLOCKING } from "../src/contracts/exitCodes.ts";
+import { checkVerificationClean } from "../src/gates.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
-import { readDisputes, readRounds } from "../src/ledger.ts";
+import { readDisputes, readRounds, standingReopen } from "../src/ledger.ts";
 import { readSessionState } from "../src/progress.ts";
 import { resetForTests } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
@@ -29,6 +30,7 @@ import { recordRun, type SuiteSpec } from "../src/testEvidence.ts";
 import { recordDispute, runAdjudication } from "../src/verify/disputes.ts";
 import { splitDisputes } from "../src/verify/prompts.ts";
 import { legalAnchor } from "../src/verify/reanchor.ts";
+import { runReopen } from "../src/verify/reopen.ts";
 import { runRound } from "../src/verify/rounds.ts";
 import { setHttpSource } from "../src/transports/api.ts";
 import { flipStateToClosed, registerSessionStart } from "../src/writers.ts";
@@ -107,6 +109,21 @@ const seedHead = gitOut(repo, "rev-parse", "HEAD");
 
 function script(...bodies: string[]): void {
   bodies.forEach((body, index) => writeFileSync(join(responses, `${String(index + 1).padStart(2, "0")}.md`), body, "utf8"));
+}
+
+/**
+ * Further answers, placed where the cursor will next look.
+ *
+ * `script` writes from 01 and the cursor never rewinds, so a milestone that
+ * needs answers after earlier ones have been served appends rather than
+ * re-scripts -- otherwise it would overwrite responses already consumed and
+ * still be served nothing.
+ */
+function queue(...bodies: string[]): void {
+  const served = dispatches();
+  bodies.forEach((body, index) =>
+    writeFileSync(join(responses, `${String(served + index + 1).padStart(2, "0")}.md`), body, "utf8"),
+  );
 }
 
 /** How many scripted responses have been served: the honest count of dispatches. */
@@ -391,6 +408,83 @@ describe("a repository walked through the verification loop", () => {
       ["read", "src/widget.py", true, "verbatim"],
     );
     assert.equal(verdictOf(6), "VERIFIED");
+  });
+
+  milestone("session 7: the cap ends the loop, a further repair strands the session between two verbs, and an operator's grant is the way out", async () => {
+    // Session 137, 2026-09-09, walked for real. The shape that cost it:
+    // a blocking finding is fixed at the cap, the terminal is written, the
+    // fix itself then needs a repair -- and from there `verify` said close
+    // the session, the close said re-run `verify`, and `close --force`
+    // could not help because `verification_clean` is evidence rather than
+    // bookkeeping. Every assertion below is one half of that loop.
+    flipStateToClosed(sessionsDir, { verdict: "VERIFIED" });
+    registerSessionStart(sessionsDir, 7, { engine: "claude-code", provider: "anthropic" });
+    reconfigure({});
+    queue(ISSUE, "VERIFIED\n\nThe repair is right and the tree is the one I was shown.\n");
+    widget(9);
+    recordRun(sessionsDir, UNIT, "passed", { ...TARGETED, sessionNumber: 7 });
+    assert.equal((await captured(() => runRound(sessionsDir, { maxRounds: 1 }))).code, EXIT_BLOCKING);
+
+    // The fix at the cited site, at the cap: REMEDIATED_AT_CAP, and the
+    // work lands labelled unreviewed.
+    widget(2);
+    recordRun(sessionsDir, UNIT, "passed", { ...TARGETED, sessionNumber: 7 });
+    assert.equal((await captured(() => runRound(sessionsDir, { maxRounds: 1 }))).code, EXIT_OK);
+    const capped = readRounds(repo, 7)[1] as Record<string, unknown>;
+    assert.equal(capped["type"], "remediated_at_cap");
+    assert.ok(checkVerificationClean(sessionsDir)[0], "the tree it reviewed still closes");
+
+    // The repair to the repair -- 137's second bug in the same fix. From
+    // here neither verb moves, and each names the other.
+    widget(3);
+    recordRun(sessionsDir, UNIT, "passed", { ...TARGETED, sessionNumber: 7 });
+    const [clean, why] = checkVerificationClean(sessionsDir);
+    assert.equal(clean, false);
+    assert.match(why, /the working tree changed after verification round 2/);
+    assert.match(why, /dabbler verify/);
+    const stranded = await captured(() => runRound(sessionsDir, { maxRounds: 9 }));
+    assert.equal(stranded.code, EXIT_USAGE, "no cap reopens a terminal");
+    assert.match(stranded.err, /already carries its terminal 'remediated_at_cap' row/);
+    // The one sentence 137 did not have: the verb that breaks the tie.
+    assert.match(stranded.err, /dabbler verify reopen/);
+
+    // The grant, and what it does and does not buy.
+    const granted = await captured(() =>
+      runReopen(sessionsDir, {
+        rounds: 1,
+        reason: "the repair to the release path landed unreviewed",
+        approver: "operator",
+      }),
+    );
+    assert.equal(granted.code, EXIT_OK, granted.err);
+    assert.equal(standingReopen(repo, 7)?.cap, 3);
+    // A grant is not a verdict: the gate refuses until a round has run.
+    const [afterGrant, sinceGrant] = checkVerificationClean(sessionsDir);
+    assert.equal(afterGrant, false);
+    assert.match(sinceGrant, /operator reopened verification after round 2/);
+
+    // The bought round runs, over the flag that says one, and settles it.
+    const reviewed = await captured(() => runRound(sessionsDir, { maxRounds: 1 }));
+    assert.equal(reviewed.code, EXIT_OK, reviewed.err);
+    const rows = readRounds(repo, 7);
+    assert.equal(rows.length, 3);
+    assert.equal(rows[2]["round"], 3);
+    assert.equal(rows[2]["blocking"], false);
+    assert.ok(checkVerificationClean(sessionsDir)[0], "the reviewed tree closes");
+    assert.equal(verdictOf(7), "VERIFIED");
+
+    // And the cap is still a cap. The grant bought round 3 and nothing
+    // beyond it, so a fourth round is refused at the new cap exactly as the
+    // third was refused at the old one -- there is no state in which the
+    // budget has been switched off. The refusal names the same exit, which
+    // is what keeps the escape one an operator decides each time rather
+    // than a mode a session slips into.
+    widget(4);
+    recordRun(sessionsDir, UNIT, "passed", { ...TARGETED, sessionNumber: 7 });
+    const spent = await captured(() => runRound(sessionsDir, { maxRounds: 9 }));
+    assert.equal(spent.code, EXIT_USAGE);
+    assert.match(spent.err, /the cap \(3\) is reached/);
+    assert.match(spent.err, /dabbler verify reopen/);
   });
 
   milestone("the legal anchor is placed by topology and stops at the first post-round commit, so a backdated one can never win", () => {

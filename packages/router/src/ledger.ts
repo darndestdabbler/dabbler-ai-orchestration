@@ -65,6 +65,14 @@ export const LIFECYCLE_WRITTEN_FILES: readonly string[] = [
  * fixed and the cap left the fix unreviewed. `waive` is retired -- no
  * writer emits it -- but historical ledgers carry it, so readers still
  * recognize it as terminal.
+ *
+ * "Terminal" is the ledger's shape, not the last word: a `remediated_at_cap`
+ * row is evidence of a spent BUDGET, and an operator may buy further rounds
+ * past it with `dabbler verify reopen`, which records a grant in
+ * `verification-reopens.jsonl` and is read by `noRoundReason`. Adjudication
+ * is evidence of a JUDGMENT and no grant reaches it. Membership of this set
+ * is therefore about which rows end a loop by default; whether one still
+ * stands is `standingReopen`'s question, never a `has()` on this set.
  */
 export const ROW_ADJUDICATION = "adjudication";
 export const ROW_REMEDIATED_AT_CAP = "remediated_at_cap";
@@ -130,6 +138,10 @@ export function validateDispute(record: Row): Row {
 
 export function validateReanchor(record: Row): Row {
   return validateAgainst(record, "baseline-reanchor.schema.json", "baseline re-anchor");
+}
+
+export function validateReopen(record: Row): Row {
+  return validateAgainst(record, "verification-reopen.schema.json", "verification reopen");
 }
 
 export function validateStepEvent(record: Row): Row {
@@ -503,6 +515,81 @@ export function appendDispute(
   }
   appendJsonl(disputesPath(repoRoot, sessionNumber), record);
   return record;
+}
+
+// --- verification-reopens.jsonl ----------------------------------------------
+
+export function reopensPath(repoRoot: string, sessionNumber: number): string {
+  return join(sessionRunDir(repoRoot, sessionNumber), "verification-reopens.jsonl");
+}
+
+export function readReopens(repoRoot: string, sessionNumber: number): Row[] {
+  return readJsonl(reopensPath(repoRoot, sessionNumber), validateReopen);
+}
+
+/**
+ * Append one validated grant of further rounds. One per terminal, ever.
+ *
+ * A second grant for the same terminal would be an operator arguing with
+ * their own last answer, and the honest form of that is a grant naming the
+ * NEXT terminal -- which only exists once the rounds already bought have
+ * been spent. Immutable for the same reason a dispute is: the record has to
+ * say how many rounds were bought and by whom, and a row that can be
+ * rewritten says neither.
+ */
+export function appendReopen(
+  repoRoot: string,
+  sessionNumber: number,
+  record: Row,
+): Row {
+  validateReopen(record);
+  const existing = readReopens(repoRoot, sessionNumber);
+  if (existing.some((row) => row["after_round"] === record["after_round"])) {
+    throw new LedgerError(
+      `the terminal at round ${String(record["after_round"])} of session ` +
+        `${sessionNumber} has already been reopened once; a grant is immutable, ` +
+        "and further rounds are bought against the terminal the last grant's " +
+        "rounds reach, not against the same one twice",
+    );
+  }
+  appendJsonl(reopensPath(repoRoot, sessionNumber), record);
+  return record;
+}
+
+/** One operator grant of further rounds, as the verification rules read it. */
+export interface ReopenGrant {
+  readonly afterRound: number;
+  readonly cap: number;
+  readonly terminal: string;
+  readonly reason: string;
+  readonly approver: string;
+}
+
+/**
+ * The grant in force, or null.
+ *
+ * The newest by `after_round`, because grants are bought one terminal at a
+ * time and only the newest can still have rounds unspent. Reading the newest
+ * rather than folding them all is what stops a higher cap being assembled
+ * out of grants against terminals long since passed.
+ *
+ * It lives here, with the rows, and not beside the rule that consumes it:
+ * `gates.ts` and `verify/rounds.ts` both need the answer, and the record is
+ * the one layer they may both reach without either importing the other.
+ */
+export function standingReopen(repoRoot: string, sessionNumber: number): ReopenGrant | null {
+  const rows = readReopens(repoRoot, sessionNumber);
+  if (rows.length === 0) return null;
+  const newest = rows.reduce((best, row) =>
+    Number(row["after_round"]) > Number(best["after_round"]) ? row : best,
+  );
+  return {
+    afterRound: Number(newest["after_round"]),
+    cap: Number(newest["cap"]),
+    terminal: String(newest["terminal"]),
+    reason: String(newest["reason"]),
+    approver: String(newest["approver"]),
+  };
 }
 
 // --- packaging.jsonl ---------------------------------------------------------

@@ -70,12 +70,15 @@ import {
 import { DRIVEN_MARKER } from "../jobs.ts";
 import { nowIso } from "../journal.ts";
 import {
+  ROW_ADJUDICATION,
   ROW_REMEDIATED_AT_CAP,
   TERMINAL_ROW_TYPES,
   appendRound,
   effectiveBaseline,
   readDisputes,
   readRounds,
+  standingReopen,
+  type ReopenGrant,
   saveRawOutput,
   type Row,
 } from "../ledger.ts";
@@ -214,6 +217,44 @@ export type NoRoundReason =
   | null;
 
 /**
+ * The cap in force: a standing grant's, or the one the caller resolved.
+ *
+ * The grant wins outright rather than by `max`, and that is the whole of its
+ * authority: a number an operator signed for, which a config file edited
+ * afterwards must not quietly undo. It can only ever raise, because the verb
+ * refuses to record a grant that buys no round.
+ */
+export function effectiveCap(repoRoot: string, current: number, baseCap: number): number {
+  return standingReopen(repoRoot, current)?.cap ?? baseCap;
+}
+
+/**
+ * A terminal row that no grant has reopened, or null.
+ *
+ * A grant neutralises every terminal at or before the round it names, and
+ * nothing after it: a session that spends its bought rounds and reaches the
+ * cap again writes a new terminal beyond the grant, and stops again. There
+ * is no state in which the cap has been switched off.
+ *
+ * Adjudication is never in the neutralised set whatever a grant says. The
+ * verb refuses to write such a grant, and this refuses to honour one -- two
+ * statements of one rule, deliberately, because the ledger is append-only
+ * and a row written by an older or patched build must not become authority
+ * over a judgment.
+ */
+export function standingTerminal(
+  priorRounds: readonly Row[],
+  grant: ReopenGrant | null,
+): Row | undefined {
+  return priorRounds.find((row) => {
+    const type = String(row["type"]);
+    if (!TERMINAL_ROW_TYPES.has(type)) return false;
+    if (type === ROW_ADJUDICATION) return true;
+    return grant === null || Number(row["round"]) > grant.afterRound;
+  });
+}
+
+/**
  * Why no further verification round may open, or null when one may.
  *
  * Null covers both the ordinary case and the one terminal path that still
@@ -221,6 +262,13 @@ export type NoRoundReason =
  * `terminateAtCap` may still resolve into a `REMEDIATED_AT_CAP` row or an
  * UNRESOLVED refusal. That decision needs the tree, so it is not asked here
  * -- this answers only what the ledger alone can settle.
+ *
+ * `cap` is what the caller resolved; an operator's grant is read here rather
+ * than by the caller, so no call site can ask this question having missed
+ * one. Session 137, 2026-09-09: the terminal check ran BEFORE the cap and
+ * returned unconditionally, so `plan amend --max-rounds` was accepted,
+ * recorded, and could not reopen the loop it was raised to reopen -- and
+ * `verify` then named `close` while `close` named `verify`.
  */
 export function noRoundReason(
   repoRoot: string,
@@ -228,12 +276,11 @@ export function noRoundReason(
   priorRounds: readonly Row[],
   cap: number,
 ): NoRoundReason {
-  if (priorRounds.some((row) => TERMINAL_ROW_TYPES.has(String(row["type"])))) {
-    return NO_ROUND_TERMINAL;
-  }
+  const grant = standingReopen(repoRoot, current);
+  if (standingTerminal(priorRounds, grant) !== undefined) return NO_ROUND_TERMINAL;
   if (priorRounds.length === 0) return null;
   const latest = priorRounds[priorRounds.length - 1] as Row;
-  if (Number(latest["round"]) + 1 <= cap) return null;
+  if (Number(latest["round"]) + 1 <= (grant?.cap ?? cap)) return null;
   if (!latest["blocking"]) return NO_ROUND_CAP_CLEAN;
   const disputes = readDisputes(repoRoot, current);
   return undisputedBlockingIndices(latest, disputes).length < blockingFindings(latest).length
@@ -299,8 +346,12 @@ export async function terminateAtCap(
       `verify: refused -- round ${String(latest["round"])} left no blocking ` +
         `finding and the cap (${cap}) is reached; there is nothing ` +
         "left to verify. Close the session:\n" +
-        `  dabbler session close --sessions-dir ` +
-        `${sessionsDir}\n`,
+        `  dabbler session close --sessions-dir ${sessionsDir}\n` +
+        "\n\"Nothing left to verify\" is true of the tree that round saw. If " +
+        "the tree has moved since, the close refuses it and this is the verb " +
+        "that buys the round the cap will not:\n" +
+        `  dabbler verify reopen --rounds 1 --reason "<why>" ` +
+        `--approver <who> --sessions-dir ${sessionsDir}\n`,
     );
     return EXIT_USAGE;
   }
@@ -514,7 +565,7 @@ export async function runRound(
   }
 
   const config = loadConfig();
-  const cap = options.maxRounds || verificationRoundCap(config);
+  const cap = effectiveCap(repoRoot, current, options.maxRounds || verificationRoundCap(config));
   const priorRounds = readRounds(repoRoot, current);
   if (priorRounds.some((row) => row["type"] === "adjudication")) {
     writeErr(
@@ -526,16 +577,29 @@ export async function runRound(
   }
   const terminal =
     noRoundReason(repoRoot, current, priorRounds, cap) === NO_ROUND_TERMINAL
-      ? priorRounds.find((row) => TERMINAL_ROW_TYPES.has(String(row["type"])))
+      ? standingTerminal(priorRounds, standingReopen(repoRoot, current))
       : undefined;
   if (terminal !== undefined) {
+    // Two exits, and the message names both because naming only the close
+    // is what made session 137's deadlock: the close's own gate refuses a
+    // tree that moved since the round and says "re-run verify", and verify
+    // said "close the session", and neither sentence mentioned the verb
+    // that breaks the tie.
+    const reopenable = String(terminal["type"]) !== ROW_ADJUDICATION;
     writeErr(
       `verify: refused -- session ${current} already carries its ` +
         `terminal '${String(terminal["type"])}' row ` +
         `(${String(terminal["verdict"])}); no further verification round ` +
         "may open after it. Close the session:\n" +
-        `  dabbler session close --sessions-dir ` +
-        `${sessionsDir}\n`,
+        `  dabbler session close --sessions-dir ${sessionsDir}\n` +
+        (reopenable
+          ? "\nThat terminal is a spent round budget, not a judgment. If the " +
+            "tree has moved since it was written -- so the close refuses it " +
+            "too -- an operator may buy the review neither verb can give " +
+            "you:\n" +
+            `  dabbler verify reopen --rounds 1 --reason "<why>" ` +
+            `--approver <who> --sessions-dir ${sessionsDir}\n`
+          : ""),
     );
     return EXIT_USAGE;
   }

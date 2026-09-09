@@ -2320,13 +2320,20 @@ ${this.stopArtifacts()}`,
         this.setPhase("run-of-record");
         return;
       }
+      // The verb named here is `verify reopen`, not `plan amend
+      // --max-rounds`. The amendment moves the cap and is answered only
+      // BEFORE the cap is reached: once `terminateAtCap` has written its
+      // row, the terminal is read ahead of the cap and a raised number
+      // changes nothing. Session 137 was sent here, took that advice, had
+      // it accepted and recorded, and did not move.
       throw new Stop(
         "verification",
         `no further verification round may open (${noRound}), and this is not the ` +
-          `tree that was verified: ${why} Raising the round cap (\`dabbler session ` +
-          'plan amend --max-rounds <larger> --reason "<why>" --approver <who>`) buys ' +
-          "the review this change has not had, which is a decision to spend another " +
-          "round and is recorded as one; putting the tree back is the other answer.",
+          `tree that was verified: ${why} A cap terminal is a spent round budget ` +
+          "rather than a judgment, so an operator may buy the review this change " +
+          'has not had: `dabbler verify reopen --rounds 1 --reason "<why>" ' +
+          "--approver <who>`, which is recorded as the decision to spend another " +
+          "round that it is. Putting the tree back is the other answer.",
       );
     }
     const code = await this.longWork({

@@ -34,6 +34,7 @@ import type {
 import { MACHINE_DIRNAME, runGit } from "./journal.ts";
 import {
   LedgerError,
+  TERMINAL_ROW_TYPES,
   type Row,
   appendJsonl,
   atomicWriteJsonIndented,
@@ -773,6 +774,26 @@ export function amendRoundCap(
   if (run === null) {
     throw new LedgerError(
       `session ${sessionNumber} was never driven; there is no run whose cap this could move`,
+    );
+  }
+  // A cap the operator believes they set is worse than one they were told
+  // they cannot -- the rule this file already states about `--max-rounds` on
+  // a driving call, and this is the other place it applies. Once the loop
+  // has written a cap terminal, `noRoundReason` reads that row ahead of the
+  // cap, so a raised number here is accepted, recorded in `amendments.jsonl`
+  // and inert. Session 137, 2026-09-09, raised the cap from 3 to 5 twenty
+  // seconds after the terminal was written and never opened round 5.
+  const terminal = readRounds(repoRoot, sessionNumber).find((row) =>
+    TERMINAL_ROW_TYPES.has(String(row["type"])),
+  );
+  if (terminal !== undefined) {
+    throw new LedgerError(
+      `session ${sessionNumber} already carries its terminal ` +
+        `'${String(terminal["type"])}' row at round ${String(terminal["round"])}, and ` +
+        "a cap raised past a terminal changes nothing: the terminal is read " +
+        "before the cap is. Rounds past a terminal are BOUGHT, with the same " +
+        'reason and approver this amendment carries: `dabbler verify reopen ' +
+        '--rounds <N> --reason "<why>" --approver <who>`',
     );
   }
   const before = run.verification?.max_rounds ?? null;

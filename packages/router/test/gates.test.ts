@@ -163,6 +163,7 @@ describe("verification_clean: the rounds, then the tree", () => {
       ledgerError: null,
       currentTree: "u",
       changedSinceLatest: [],
+      unspentGrant: null,
       setRel: SESSIONS,
       ...overrides,
     });

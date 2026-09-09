@@ -27,6 +27,7 @@ export * from "./sessions.ts";
 export * from "./solution-dependencies.ts";
 export * from "./step-execution.ts";
 export * from "./triage.ts";
+export * from "./verification-reopen.ts";
 export * from "./verification-request.ts";
 export * from "./verification-result.ts";
 export * from "./worker-results.ts";

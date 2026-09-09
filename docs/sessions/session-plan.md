@@ -7270,7 +7270,7 @@ edits**: a change to `walk-session.test.ts` is a change to the run of record,
 so the run that judges this session is the first run of the new shape, and a
 green one that is also slower is a failure this plan is asking to see.
 
-### Session 137 of 137: Codex undocumented, two labels the operator reads, and the block lands
+### Session 137 of 137: Codex undocumented, the heading an operator never saw, and the block lands
 
 **It cannot be tested here, so it is not claimed.** Codex comes out of the
 engine list in the managed body, the bootstrap templates, the registration
@@ -7307,6 +7307,25 @@ could belong to any session on the scrollback. One function draws every rule,
 `divider(label, columns, kind)`, so what changes is the label both callers
 hand it and not the drawing.
 
+**And the occasion to draw one is missing, which makes this bigger than a
+label.** Reported against the installed VSIX: no `S133:` appeared on any
+voice rule, and the code is not the reason -- `voice()` returns it and the
+built bundle carries it. `emit` draws a rule **only when the speaker
+changes**, and `sayBanner` deliberately draws none while still setting the
+numbered voice, because "a voice rule directly beneath a banner would be two
+headings for one group". So a numbered framework rule is drawn only after a
+job has spoken and the framework speaks again, and **a chat-driven session,
+which puts no job output on that terminal, never changes voice at all**: the
+only rule on the scrollback is the plain `framework` one drawn before the
+session was known. Relabelling a rule that is never drawn changes nothing an
+operator sees. **This step therefore decides, and says which:** either the
+session's first framework rule is drawn after the banner -- numbered, one
+heading for the group, which is the reason the banner drew none -- or the
+banner becomes the numbered heading itself and the rule stays for changes of
+voice. Today it is neither, which is why the label looked absent when it was
+present. The finding is `STATUS.md`'s note under *FOR SESSION 137, step 3*
+(`dd75fea0`, written when this session was numbered 136).
+
 **The activity bar says what the marketplace says.** The extension's
 `displayName` is already *Dabbler AI Orchestration*; the activity-bar
 container and the settings section are contributed as *AI Orchestration*, and
@@ -7325,15 +7344,19 @@ same reason the Codex trap above exists.
 
 **Steps.** (1) The live documented surface, and the engine list the bootstrap
 templates and the CLI help offer. (2) The registration's behaviour, and the
-decision recorded. (3) The session number on every terminal voice rule, the
-framework's and each job's. (4) The activity-bar and settings titles, and the
-tutorial re-rendered. (5) The version bump (`version.json`, then `npm run
+decision recorded. (3) The occasion a numbered heading is drawn on, decided
+and taken; then the session number on every voice rule, the framework's and
+each job's. (4) The activity-bar and settings titles, and the tutorial
+re-rendered. (5) The version bump (`version.json`, then `npm run
 stamp:version`) and the release notes for sessions 131 to 137.
 
-**Tests.** Two. A registration naming the undocumented engine behaves as the
-decision says, and a voice rule is headed with the session number where a
-job's rule is too. The labels get none: the manifest is the only copy, and the
-harness already reads it from there.
+**Tests.** Three. A registration naming the undocumented engine behaves as
+the decision says; a voice rule is headed with the session number where a
+job's rule is too; and **a session that puts no job output on the terminal
+still gets a numbered heading**, which is the one the operator's report is
+about and the one a label test would have passed without. The activity-bar
+and settings labels get none: the manifest is the only copy, and the harness
+already reads it from there.
 
 **Releasable**, and it is the block's one release: sessions 131 to 136 reach
 a seat with it and not before.

@@ -253,12 +253,16 @@
 > a scaffold's behaviour change does not ride with it. It shares nothing with
 > 135's verifier work and says so in the entry. **Session 137** — the release
 > session, renumbered from 136 when the suite session was inserted ahead of it
-> — takes the two labels an operator reads: the session number on every
-> *Dabbler* terminal voice rule in the operator's own form (`134 – framework`,
-> and a job's rule headed at all, which it is not today), and the activity-bar
-> container and settings section renamed to *Dabbler AI Orchestration*, which
-> the extension's `displayName` has said all along. 135 went to four tests and
-> 137 has two; both entries say which.
+> — takes the terminal heading and the extension's label: the session number
+> on every *Dabbler* terminal voice rule in the operator's own form (`134 –
+> framework`, and a job's rule headed at all, which it is not today), and the
+> activity-bar container and settings section renamed to *Dabbler AI
+> Orchestration*, which the extension's `displayName` has said all along.
+> **The heading is not a label change**, per the note below: no rule is drawn
+> at all in a chat-driven session, so the step decides the occasion before it
+> decides the text, and carries a third test for the session that puts no job
+> output on the terminal. 135 went to four tests and 137 has three; both
+> entries say which.
 
 > ## SESSION 133 CLOSED, 2026-09-08 — the four papercuts, and the walk's record closed
 >

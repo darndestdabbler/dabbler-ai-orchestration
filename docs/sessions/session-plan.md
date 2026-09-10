@@ -7915,6 +7915,21 @@ went fine. Making the branch the remote's *default* is the one part no git
 command can do, so it is printed as an instruction to the human, naming the
 setting and the page.
 
+**And the two sites 141 left on the shorter reading take the whole one.**
+141's verifier raised it as a nit and was right: `localGateReceipt` and
+`candidateTrunk` call `headBranch` rather than `resolveTrunk`, so they take
+the branch HEAD is on without the clause that makes that rule safe -- *when
+origin has it*. For `candidateTrunk` that is the original bug in miniature:
+a local branch origin does not have sends `phaseGateWait` to poll a ref that
+will never move, for twenty-five minutes, which is exactly the failure
+`candidateTrunk` was fixed for once already. `candidateTrunk` takes
+`resolveTrunk`. `localGateReceipt` keeps `headBranch` and says why in a
+comment: a receipt names the branch that was actually tested, and resolving
+it to something else would make the receipt name a branch the test did not
+run on. **Two callers, two readings, one of them deliberate and now
+recorded as such** -- which is the difference between a rule with an
+exception and a rule with drift.
+
 **The two answers are not symmetrical, and the prompt has to say so.**
 Choosing the record-carrying branch deletes a README-only placeholder and
 costs nothing. Choosing the placeholder means the branch that carries the
@@ -7933,13 +7948,18 @@ record, and the refusal when the target is not a branch this repository has.
 raised where `defaultBranchMismatch` already sees the mismatch, and the
 force-push case is described as one. (5) The commands `retrunk` runs reach
 the Dabbler Terminal, and the remote-UI default change is printed as an
-instruction to the human. (6) The release: `version.json` to 2.0.21, stamped
+instruction to the human. (6) `candidateTrunk` takes `resolveTrunk`, and
+`localGateReceipt` keeps `headBranch` with the reason written down. (7) The
+release: `version.json` to 2.0.21, stamped
 through `npm run stamp:version`, with an extension changelog section that
 says what 141 and 142 changed in the terms an operator reads.
 
-**Tests.** Four. A heading composes to the session number, the rule
+**Tests.** Five. A heading composes to the session number, the rule
 character and the voice, for a framework line and for a job voice, from the
-one function. `retrunk` refuses a `--to` naming a branch the repository does
+one function. A candidate trunk on a local branch origin does not have
+resolves to the branch origin does, so the gate poll watches a ref that can
+move -- the assertion 141's nit named, and the one that keeps the exception
+at `localGateReceipt` from spreading back. `retrunk` refuses a `--to` naming a branch the repository does
 not have, and refuses without `--approve`. An approved `retrunk` over a real
 bare origin leaves the target carrying the work and the placeholder gone,
 with the approver on the record -- a walkthrough, for the same reason 141's

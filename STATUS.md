@@ -1,6 +1,72 @@
-# STATUS — sessions 113–140 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it; **version 2.0.20, PUBLISHED — the Marketplace serves it**
+# STATUS — sessions 113–141 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, and session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record; **version 2.0.20, PUBLISHED — the Marketplace serves it**
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 141 CLOSED, 2026-09-09 — the trunk a host answered for, and the clone that arrived holding one file
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 141 | `resolveTrunk` as the one reading of which branch is the trunk, a checkout that refuses when it carries no record, `bootstrap` saying the mismatch at the push, and a module's checkout listing only the sessions that run in it | CLOSED VERIFIED (round 1 of a cap of 3, one non-blocking nit, verifier `gpt-5-6-terra`/openai, transport `api`), landed `8b6f738a`, closed `4b8d446a`, not releasable |
+>
+> **This work was written once outside a session and was rewound before 141
+> ran.** It was committed to `master` on 2026-09-09 as `0ae5d4d3` with no
+> declaration, no verification, no run of record and no close, and a plan
+> for it was written afterwards. Both commits were force-pushed off
+> `master`; the diff was preserved outside the tree at
+> `D:\tmp\session-141-recovery\` and used as a REFERENCE by the session that
+> then did the work under the framework. **That is the shape to repeat if it
+> happens again**: the patch spares the session re-deriving what was already
+> worked out, and changes nothing about the review, because the verifier
+> reads the session's own diff either way. What it must never become is a
+> retrospective blessing — a session whose steps produce no diff cannot be
+> judged at all.
+>
+> **No branch name is spelled anywhere in the fix.** `main`, `master`,
+> `trunk` and `develop` are one question, and `resolveTrunk` in `journal.ts`
+> is the one reading of it: the branch HEAD is on **when origin has it**,
+> then origin's default, then origin's only branch, then a refusal that
+> names the candidates. `trunkOf` had been reading `refs/remotes/origin/HEAD`
+> — the host's default, a setting nobody revisits, which on a repository
+> initialised with a README on one branch and filled on another names the
+> placeholder for as long as it exists. Two sites had already answered the
+> question for themselves and each shipped a bug for it.
+>
+> **The refusal is the load-bearing change, not the ordering.** `openModule`
+> returned success on a clone holding no framework record at all, so a
+> placeholder default, a `--branch` typo and a cone that lost `docs/` failed
+> silently and identically. It now refuses, names the branches at origin that
+> DO carry the record, and says when the two share no history — the signature
+> of a host-created placeholder rather than an earlier state of the work. The
+> comparison is with the repository rather than a constant, so a project set
+> up and never started is not refused for being early. A note would not have
+> worked: `clonePathIn` reads `.path` out of `module open`'s JSON and both
+> call sites discard everything else, so the notes that verb has always
+> produced have never reached a human. **Only a refusal reaches the
+> operator.**
+>
+> **The one nit, and it is owed to 142.** `localGateReceipt` and
+> `candidateTrunk` take `headBranch` rather than `resolveTrunk`, so they read
+> the branch HEAD is on without the clause that makes the rule safe — *when
+> origin has it*. The verifier called that the original bug in miniature and
+> was right for `candidateTrunk`: a local branch origin does not have sends
+> `phaseGateWait` to poll a ref that will never move. **142 gives
+> `candidateTrunk` `resolveTrunk` and keeps `headBranch` at
+> `localGateReceipt` with the reason written down** — a receipt must name the
+> branch actually tested. It is step (6) of 142's plan and has an assertion
+> of its own.
+>
+> **The verifier saw the diff and nothing else.** `agency.mode` is `none` on
+> this round: the API transport sends no tools, so the round is not
+> equivalent to one that could read the tree. That is the `api_file_requests`
+> default from session 135, not a fault.
+>
+> **142 is planned and not started**, and it is the release: the terminal's
+> voice heading becomes the session number set into its rule, a
+> host-created placeholder default branch becomes a choice the framework puts
+> to the operator and a verb the framework executes with the approver on the
+> record, the nit above, and **2.0.21** carrying 141 and 142 to the
+> Marketplace. It runs on 141's `resolveTrunk` and would have to invent it
+> otherwise.
 
 > ## SESSION 140 CLOSED, 2026-09-09 — the phase an operator can read, the step they can see, and the release that went out
 >

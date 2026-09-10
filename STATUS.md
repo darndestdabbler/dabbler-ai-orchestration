@@ -1,6 +1,68 @@
-# STATUS — sessions 113–144 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped; **version 2.0.21 TAGGED (vsix-v2.0.21) — CI awaits a reviewer in the marketplace environment, so the Marketplace still serves 2.0.20**
+# STATUS — sessions 113–145 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, and session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list is still the direct-API registry on a Copilot seat; **2.1.0 is STAMPED AND HELD — the operator answered its publication decision with *not yet* until the pane is right on a seat; vsix-v2.0.21 is tagged and CI still awaits a reviewer, so the Marketplace serves 2.0.20**
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 145 CLOSED, 2026-09-10 — the configuration an operator sets once, and the seat gap it uncovered
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 145 | a Configuration section in the pane: engine and transport as two controls, the two models from the registry, each dated record with its age and its cost, and every model carrying what the record says about it | CLOSED VERIFIED at round 3 (rounds 1 and 2 each blocked on something real), landed `a42a42e1`, closed `5d67dff2`. **2.1.0 is stamped and NOT tagged**: the operator answered `publication:2.1.0` with *not yet*, and releasability was withdrawn on the record |
+>
+> **OWED, and it is the first thing session 146 does: the model list is wrong
+> on a Copilot seat.** Both role rows come from `explainRegistryCandidates`,
+> which enumerates the DIRECT-API registry and keeps only models whose
+> provider API key resolves. On the seat path the enumeration is the seat
+> catalog — `selection.ts` says so in its own header — so on a machine with a
+> seat and no `DABBLER_*_API_KEY` the pane reads "nothing resolves" for both
+> models while the catalog holds eighteen working ones. **That is the
+> operator's staff's machine**, and it is why 2.1.0 is held. `resolveRole`
+> already takes candidates from either transport and `confirmedModels`
+> is the seat's enumeration, so the fix is one function, not a redesign.
+>
+> **Owed beside it: nothing shows drift.** `dabbler discovery drift` already
+> answers "which models your roles name that the dated record does not have",
+> and no surface renders it — so a retired model sits in the list looking
+> perfectly selectable. One row's work, and it is the row that makes the list
+> trustworthy rather than merely honest.
+>
+> **What the pane does today.** The router decides and writes a
+> `configuration` block into the solution projection; the extension renders it
+> and derives nothing. Transport carries the LAYER that decided it and says
+> when something above the file is shadowing the operator's choice — the
+> failure this repository has already had. Engine is this extension's own
+> setting, because `session start` takes it as an argument, and Start Session
+> offers it first; the pane refuses to persist an engine Start Session cannot
+> launch (`codex`). Nothing probes on open: each record row shows its age and
+> what a refresh costs, and clicking one confirms and then runs the router's
+> own named command in a terminal.
+>
+> **Two constraints on a verifying model, both surfaced rather than
+> reinvented.** Same-provider is refused from the exclusion the dispatch
+> itself applies; below-tier is refused from `capability_tiers`, an ORDERED
+> list now declared in the registry, with an absent tier read as unknown and
+> never as unsupported.
+>
+> **Fidelity is on every model, per transport, and the three answers read as
+> three.** Observations come from the archived rounds filtered to the
+> transport in force plus the seat catalog's echoes, weighed as 144 requires:
+> only a provider's served id makes a model read `honoured`, an echo never
+> can, and `not-known` is most of the list. **Round 1 caught the pane's own
+> version of that promise being broken** — the row said it and the QuickPick
+> you actually choose from did not.
+>
+> **D273: 2.1.0, and the plan section that said 2.0.23 corrected rather than
+> obeyed.** Rounds 1 and 2 both blocked on the version. The dispute was
+> overruled on a fair point — a classification error in prose does not amend
+> a number stated twice, and the amendment lived in the accepted work plan,
+> which a verifier reading the session plan cannot see. So the plan section
+> was corrected with the reason inside it: 2.0.23 went stale when 142 released
+> 2.0.21, and from there the patch successor is 2.0.22 and the minor 2.1.0.
+> **The lesson: an amendment a verifier cannot see is not an amendment.**
+>
+> **The import-cycle control earned its keep.** The archived-rounds reader was
+> put in `verify/rounds.ts` and made `projection → verify` a cycle; it belongs
+> in `ledger.ts`, which owns `rounds.jsonl`. The deterministic controls
+> refused round 1 before a verifier was paid to notice.
 
 > ## SESSION 144 CLOSED, 2026-09-10 — the model that answered, and the three findings that were right
 >

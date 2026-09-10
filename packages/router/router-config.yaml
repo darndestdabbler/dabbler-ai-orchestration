@@ -68,14 +68,14 @@ transport:
 # one path is inert on the other rather than an error.
 roles:
   generator:
-    prefer: [claude-sonnet-4.6, gpt-5.5, gemini-3.1-pro-preview]
+    prefer: [claude-sonnet-5, gpt-5.5, gemini-3.1-pro-preview]
     require_provider_in: [anthropic, openai, google]
   verifier:
     # A verifier's job is to be right about whether work ships, which is the
     # wrong place to economise. Entries the registry marks
     # is_enabled_as_verifier: false are refused on both transports, so this
     # order never names one.
-    prefer: [gpt-5.6-terra, gpt-5.6-sol, gpt-5.4, claude-sonnet-4.6]
+    prefer: [gpt-5.6-terra, gpt-5.6-sol, gpt-5.4, claude-sonnet-5]
     require_provider_in: [anthropic, openai, google]
   plan-review:
     prefer: [gpt-5.4-mini, gemini-2.5-flash, claude-haiku-4.5]

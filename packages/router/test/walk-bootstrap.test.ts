@@ -248,6 +248,39 @@ describe("a project on its first day", () => {
     assert.equal(gitOut(bare, "rev-parse", `refs/heads/${branch}`), gitOut(folder, "rev-parse", "HEAD"));
   });
 
+  it("says so when the host's default branch is not the one it just pushed", async () => {
+    // The earliest this is visible: the host's answer and the operator's are
+    // both known for the first time. A repository initialised on one branch
+    // and filled on another leaves a default nobody re-points, and every
+    // later reader of it -- the close's push, a focused clone -- inherits it.
+    const folder = scratchDir("default-");
+    writeFiles(folder, { "README.md": PROJECT["README.md"]! });
+    const bare = join(scratchDir("bare-default-"), "origin.git");
+    git(folder, "--version");
+    git(folder, "init", "-q", "--bare", bare);
+    // The host holds a branch of its own and calls it the default.
+    const seed = scratchDir("seed-");
+    writeFiles(seed, { "README.md": "# placeholder\n" });
+    git(seed, "init", "-q", "-b", "placeholder");
+    git(seed, "add", "-A");
+    git(seed, "commit", "-q", "-m", "Added README.md");
+    git(seed, "push", "-q", bare, "placeholder");
+    git(bare, "symbolic-ref", "HEAD", "refs/heads/placeholder");
+
+    const setup = await capture(() =>
+      bootstrapVerb(["--project-dir", folder, "--no-transport-detect", "--remote", bare]),
+    );
+    assert.equal(setup.value, 0, setup.stderr);
+
+    const branch = gitOut(folder, "symbolic-ref", "--short", "HEAD");
+    assert.match(setup.stderr, /origin's default branch is 'placeholder'/);
+    assert.match(setup.stderr, new RegExp(`this project is on '${branch}'`));
+    // The two were never one history, and the advice is to re-point rather
+    // than to go and look at the placeholder.
+    assert.match(setup.stderr, /share no history/);
+    assert.match(setup.stderr, new RegExp(`Set the default branch to '${branch}'`));
+  });
+
   it("names the project directory's own .dabbler in the discovery line, not the working directory's", async () => {
     // Every other line of a `--project-dir` run names the project. This one
     // took the working directory instead, so it reported on a folder the

@@ -71,6 +71,38 @@ export function sessionsInOrder(
 }
 
 /**
+ * The module a session runs on, or null when it runs on the repository.
+ *
+ * `kind` and `module` are the projection's own answer, computed from the
+ * `checkout` the start wrote on the row and from the plan before that.
+ * `modules` is a different fact -- everything the session declared it
+ * touched -- and reading its first entry as "the module" filed a global
+ * planning session that named four of them under whichever came first.
+ */
+export function moduleOf(session: SessionRecord): string | null {
+  return session.kind === "focused" && typeof session.module === "string" && session.module !== ""
+    ? session.module
+    : null;
+}
+
+/**
+ * The sessions a root is allowed to show: in the repository, all of them;
+ * in a module's focused checkout, the ones that RUN there.
+ *
+ * A checkout exists to hold one module's work, and `session start` refuses
+ * every other session in it -- a global one belongs to the repository, and
+ * another module's belongs to another folder. The record stays whole, and
+ * only the reading narrows: `startableHere` still needs the next session's
+ * row to withhold the launcher for the right reason rather than because it
+ * could not find one.
+ */
+export function sessionsHere(repository: SessionsRepository): SessionRecord[] {
+  const slug = repository.checkoutModule;
+  if (slug === null) return [...repository.sessions];
+  return repository.sessions.filter((session) => moduleOf(session) === slug);
+}
+
+/**
  * The repository row's description. Always X/total: an "X/X" shape on a
  * finished repository would mask a count that ran ahead of the ledger.
  *
@@ -79,10 +111,20 @@ export function sessionsInOrder(
  * as two sessions that have not run YET, which is true of a repository
  * mid-sequence too; the distinction the operator needs is that nothing
  * has run here at all.
+ *
+ * A module's checkout counts its own work. The projection's totals are the
+ * repository's, and "2/6" in a folder that can run one of those six answers
+ * a question nobody standing in it asked.
  */
 export function progressText(repository: SessionsRepository): string {
+  const slug = repository.checkoutModule;
+  const mine = sessionsHere(repository);
   if (repository.sessionsSource === "plan") {
-    return `${repository.sessions.length} planned · nothing has run here yet`;
+    return `${mine.length} planned · nothing has run here yet`;
+  }
+  if (slug !== null) {
+    const done = mine.filter((session) => session.status === "complete").length;
+    return mine.length === 0 ? `no session runs on ${slug}` : `${done}/${mine.length} on ${slug}`;
   }
   const total = repository.totalSessions;
   const base =

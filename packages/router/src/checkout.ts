@@ -36,8 +36,15 @@ import {
   PACKAGES_DIR,
   ecosystemOf,
 } from "./ecosystem.ts";
-import { sessionsDirFor } from "./evidence.ts";
-import { nowIso, repoRelativePath, runGit } from "./journal.ts";
+import { sessionsDirFor, STATE_FILENAME } from "./evidence.ts";
+import {
+  haveCommonHistory,
+  nowIso,
+  remoteBranches,
+  repoRelativePath,
+  resolveTrunk,
+  runGit,
+} from "./journal.ts";
 import {
   type ModuleEntry,
   type SolutionShape,
@@ -280,18 +287,53 @@ function git(cwd: string, args: readonly string[], what: string): string {
   return result.stdout;
 }
 
-/** Origin's default branch as the clone knows it, or the one branch it has. */
-function trunkOf(clone: string): string {
-  const head = runGit(clone, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]);
-  if (head.code === 0 && head.stdout.startsWith("origin/")) return head.stdout.slice("origin/".length);
-  const refs = git(clone, ["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin"], "listing origin's branches")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line !== "" && line !== "origin/HEAD");
-  if (refs.length === 1) return (refs[0] as string).slice("origin/".length);
-  throw new CheckoutError(
-    "origin names no default branch and has more than one; say which with --branch",
+/** `docs/sessions/sessions.json` as a tree path, from the one pair of constants that spell it. */
+function recordPath(root: string): string {
+  return repoRelativePath(root, join(sessionsDirFor(root), STATE_FILENAME));
+}
+
+/**
+ * Why this clone is unusable, or null when it is fine.
+ *
+ * The record is what a session reads, writes and closes against, and `docs/`
+ * is in every cone, so a clone without it is not a narrow checkout -- it is
+ * the wrong tree. Checking it here turns every way of arriving at one (a
+ * placeholder default branch, a `--branch` typo, a cone that lost `docs/`)
+ * into the same sentence, at the moment it happens.
+ *
+ * The comparison is with the REPOSITORY rather than with a constant: a
+ * project set up and never started has no record anywhere, and refusing that
+ * would refuse a shape that is merely early.
+ */
+function unusableClone(root: string, clone: string, branch: string): string | null {
+  if (!existsSync(join(sessionsDirFor(root), STATE_FILENAME))) return null;
+  if (existsSync(join(sessionsDirFor(clone), STATE_FILENAME))) return null;
+  const rel = recordPath(root);
+  const carriers = remoteBranches(clone).filter(
+    (name) => runGit(clone, ["cat-file", "-e", `origin/${name}:${rel}`]).code === 0,
   );
+  const lines = [
+    `the clone of the repository is on '${branch}', which carries no ${rel} -- ` +
+      "the framework's own record, which every session reads",
+  ];
+  if (carriers.length === 0) {
+    lines.push(`no branch at origin carries it, so the record has never been pushed`);
+  } else {
+    lines.push(`${carriers.length === 1 ? "it is on" : "it is on these:"} ${carriers.join(", ")}`);
+    const unrelated = carriers.filter(
+      (name) => haveCommonHistory(clone, `origin/${branch}`, `origin/${name}`) === false,
+    );
+    if (unrelated.length === carriers.length) {
+      lines.push(
+        `'${branch}' shares no history with ${unrelated.join(", ")}, so it is a placeholder branch ` +
+          "the host created rather than an earlier state of the work",
+      );
+    }
+    lines.push(
+      `set origin's default branch to ${carriers[0] as string}, or pass --branch ${carriers[0] as string}`,
+    );
+  }
+  return lines.join("; ");
 }
 
 function hasRemoteBranch(clone: string, branch: string): boolean {
@@ -423,7 +465,9 @@ export function openModule(
   }
 
   git(clone, ["sparse-checkout", "set", "--cone", ...cone], "narrowing the cone");
-  const trunk = trunkOf(clone);
+  const reading = resolveTrunk(root, clone);
+  if (reading.trunk === null) throw new CheckoutError(reading.refusal ?? "origin names no trunk");
+  const trunk = reading.trunk;
   const branch = options.branch?.trim() || trunk;
   if (reset) {
     // Whatever the clone was on, it comes back to the trunk's tip -- or the
@@ -444,9 +488,14 @@ export function openModule(
     git(clone, ["checkout", "-q", "-b", branch, `origin/${trunk}`], "creating the session branch");
   }
 
+  // The record must have arrived. Checked after the checkout rather than
+  // before it, because what is on disk is the whole question: a branch that
+  // has it and a cone that keeps it are two ways to fail one requirement.
+  const unusable = unusableClone(root, clone, branch);
+  if (unusable !== null) throw new CheckoutError(unusable);
+
   const filtered = isFiltered(clone);
-  if (!filtered) {
-    notes.push(
+  if (!filtered) {    notes.push(
       "the clone is not blob-filtered: the origin did not honour --filter (uploadpack.allowFilter " +
         "is off), so every sibling's bytes are in the local object store even though they are " +
         "not on disk",

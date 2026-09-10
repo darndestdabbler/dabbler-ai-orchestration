@@ -50,25 +50,24 @@ const MANIFEST = [
   "",
 ].join("\n");
 
-const repo = makeRepo(
-  {
-    "docs/modules.yaml": MANIFEST,
-    "docs/sessions/session-plan.md":
-      "### Session 1 of 2: Persist things\nModule: persister\n1. Register.\n2. **Store a person.** Make it real.\n\n" +
-      "### Session 2 of 2: More things\n1. Register.\n2. Polish it.\n",
-    "dabbler.yaml": "schema_version: 1\n",
-    "global.json": "{}\n",
-    "Directory.Packages.props": "<Project />\n",
-    "nuget.config": "<configuration />\n",
-    "modules/model/src/CsvModel/CsvModel.csproj": "<Project />\n",
-    "modules/model/src/CsvModel/Person.cs": "public sealed class Person {}\n",
-    "modules/model/contract/README.md": "# CsvModel\n",
-    "modules/persister/src/CsvPersister/CsvPersister.csproj": "<Project />\n",
-    "modules/persister/tests/CsvPersister.Tests/CsvPersister.Tests.csproj": "<Project />\n",
-    "packages/CsvModel.0.1.0.nupkg": "stands in for the package\n",
-  },
-  { origin: true },
-);
+const SEED: Record<string, string> = {
+  "docs/modules.yaml": MANIFEST,
+  "docs/sessions/session-plan.md":
+    "### Session 1 of 2: Persist things\nModule: persister\n1. Register.\n2. **Store a person.** Make it real.\n\n" +
+    "### Session 2 of 2: More things\n1. Register.\n2. Polish it.\n",
+  "dabbler.yaml": "schema_version: 1\n",
+  "global.json": "{}\n",
+  "Directory.Packages.props": "<Project />\n",
+  "nuget.config": "<configuration />\n",
+  "modules/model/src/CsvModel/CsvModel.csproj": "<Project />\n",
+  "modules/model/src/CsvModel/Person.cs": "public sealed class Person {}\n",
+  "modules/model/contract/README.md": "# CsvModel\n",
+  "modules/persister/src/CsvPersister/CsvPersister.csproj": "<Project />\n",
+  "modules/persister/tests/CsvPersister.Tests/CsvPersister.Tests.csproj": "<Project />\n",
+  "packages/CsvModel.0.1.0.nupkg": "stands in for the package\n",
+};
+
+const repo = makeRepo(SEED, { origin: true });
 // The origin honours --filter, as GitHub and Azure DevOps do; a bare
 // repository does not until told to.
 git(join(dirname(repo), "remote.git"), "config", "uploadpack.allowFilter", "true");
@@ -180,6 +179,38 @@ describe("a module opened in its focused checkout", () => {
     assert.throws(
       () => openModule(repo, shape, "persister", { clonePath: clone }),
       /modules\/persister\/notes\.md/,
+    );
+  });
+
+  it("takes the branch the repository is on rather than the host's default, and refuses a branch carrying no record", () => {
+    // The shape a host leaves when it initialises a repository on one branch
+    // and then receives the work as another: origin's default still names
+    // the first, and reading it as the trunk cloned a tree with no record in
+    // it into a window that then had no repository at all.
+    const trap = makeRepo(SEED, { origin: true });
+    const remote = join(dirname(trap), "remote.git");
+    git(remote, "config", "uploadpack.allowFilter", "true");
+    git(trap, "branch", "-m", "main", "master");
+    const ledger = join(trap, "docs", "sessions", "sessions.json");
+    writeFileSync(ledger, '{ "schemaVersion": 5, "sessions": [] }\n', "utf8");
+    git(trap, "add", "-A");
+    git(trap, "commit", "-q", "-m", "the record");
+    git(trap, "push", "-q", "-u", "origin", "master");
+    git(remote, "symbolic-ref", "HEAD", "refs/heads/main");
+
+    const shape = solutionShape(trap);
+    const clone = join(scratchDir("trunk-"), "repo.persister");
+    const opened = openModule(trap, shape, "persister", { clonePath: clone });
+    assert.equal(opened.trunk, "master", "the trunk is the repository's branch, not origin's default");
+    assert.equal(opened.branch, "master");
+    assert.ok(existsSync(join(clone, "docs", "sessions", "sessions.json")), "the record arrived");
+
+    // Asked for the branch that has no record, it says so and names the one
+    // that does, rather than handing over a checkout nothing can run in.
+    const onto = join(scratchDir("placeholder-"), "repo.persister");
+    assert.throws(
+      () => openModule(trap, shape, "persister", { clonePath: onto, branch: "main" }),
+      /docs\/sessions\/sessions\.json[\s\S]*master/,
     );
   });
 });

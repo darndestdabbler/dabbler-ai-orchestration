@@ -136,8 +136,10 @@ it was restored from the later commit and re-rendered with
 ## Environment
 
 - Windows 11, PowerShell primary. Node 22.18+; nothing else to install.
-- Run the suite: `npx vitest run --root packages/router` (no live network
-  outside the tests marked live, which skip without keys).
+- Run the suite: `npm test` runs every workspace's; the router's alone is
+  `npm --prefix packages/router run test:unit`, which is `node --test` over
+  `packages/router/test` (no live network outside the tests marked live,
+  which skip without keys).
 - Run the router by hand: `node packages/router/dist/dabbler.cjs <verb>`
   after `npm run build -w dabbler-ai-router`, or `dabbler <verb>` from a VS
   Code terminal once the extension has installed its shim.

@@ -37,9 +37,11 @@ import {
 } from "./ActionRegistry";
 import {
   ICON_FILES,
+  moduleOf,
   progressText,
   sessionKindLabel,
   sessionRowLabel,
+  sessionsHere,
   sessionsInOrder,
   verdictIsUnclean,
 } from "./sessionsModel";
@@ -198,7 +200,7 @@ function bucketFor(session: SessionRecord): SessionStatus {
  * why RepositoryNode reports itself collapsible only when it has sessions.
  */
 export function bucketNodes(node: RepositoryNode): BucketNode[] {
-  const ordered = sessionsInOrder(node.repository.sessions);
+  const ordered = sessionsInOrder(sessionsHere(node.repository));
   const notes = informationNodes(node);
   const buckets: BucketNode[] = [];
   for (const spec of BUCKETS) {
@@ -241,16 +243,16 @@ export function sessionNodes(node: BucketNode): SessionNode[] {
  * A bucket's sessions grouped under their module, when the record names
  * one -- a multi-module solution, whose sessions are each on a module. The
  * groups read in order of first appearance within the bucket's own order,
- * and a session whose row names no module (one that predates the
- * manifest) sits under the bucket after the groups. A repository whose rows
- * name none -- a single-module solution -- is grouped by nothing and reads
- * exactly as it always has.
+ * and a session that runs on the repository rather than a module sits under
+ * the bucket after the groups. A repository whose rows name none -- a
+ * single-module solution -- is grouped by nothing and reads exactly as it
+ * always has.
+ *
+ * A module's own checkout shows only its own sessions, so the one group
+ * would restate the folder's name at every level: there, they read flat.
  */
 export function moduleGroupNodes(node: BucketNode): (ModuleGroupNode | SessionNode)[] {
-  const moduleOf = (session: SessionRecord): string | null => {
-    const first = session.modules?.[0];
-    return typeof first === "string" && first !== "" ? first : null;
-  };
+  if (node.repository.checkoutModule !== null) return sessionNodes(node);
   if (!node.sessions.some((session) => moduleOf(session) !== null)) return sessionNodes(node);
   const groups = new Map<string, SessionRecord[]>();
   const ungrouped: SessionRecord[] = [];
@@ -1252,7 +1254,24 @@ export function attentionNodes(node: RepositoryNode): AttentionNode[] {
 export function informationNodes(node: RepositoryNode): AttentionNode[] {
   const repository = node.repository;
   const rows: AttentionNode[] = [];
-  for (const session of sessionsInOrder(repository.sessions).reverse()) {
+  // What this folder does NOT show, said once. A checkout that has finished
+  // its module's work would otherwise render an empty tree, which reads as a
+  // broken view rather than as work that belongs somewhere else.
+  const slug = repository.checkoutModule;
+  if (slug !== null) {
+    const hidden = repository.sessions.length - sessionsHere(repository).length;
+    if (hidden > 0) {
+      rows.push({
+        kind: "attention",
+        repository,
+        subject: "unresolved",
+        label: `${hidden} session${hidden === 1 ? "" : "s"} run outside this checkout`,
+        detail: `This folder runs ${slug}'s sessions; open the repository for the rest.`,
+        urgent: false,
+      });
+    }
+  }
+  for (const session of sessionsInOrder(sessionsHere(repository)).reverse()) {
     const view = session.verification;
     if (!view || view.clean || !view.terminal) continue;
     if (session.status === "in-progress") continue;

@@ -178,6 +178,119 @@ export function repoRootFor(path: string): string | null {
   return result.code === 0 && result.stdout ? result.stdout : null;
 }
 
+// --- Which branch is the trunk ------------------------------------------------
+//
+// No branch name is ever spelled here. `main`, `master`, `trunk` and
+// `develop` are all one question -- which branch is this repository's -- and
+// git answers it three ways that can disagree. The rule below is the one
+// reading every caller makes, because the two sites that answered it for
+// themselves each shipped a bug: a receipt naming a branch that did not
+// exist, and a poll that watched a ref that was never going to move.
+
+/** The branch HEAD is on, or null when HEAD is detached or unreadable. */
+export function headBranch(repoRoot: string): string | null {
+  const branch = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (branch.code !== 0 || branch.stdout === "" || branch.stdout === "HEAD") return null;
+  return branch.stdout;
+}
+
+/** Origin's branches as short names, without the `origin/HEAD` alias. */
+export function remoteBranches(repoRoot: string): string[] {
+  const refs = runGit(repoRoot, ["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin"]);
+  if (refs.code !== 0) return [];
+  return refs.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && line !== "origin/HEAD")
+    .map((line) => line.slice("origin/".length));
+}
+
+/** What origin's own `HEAD` points at, as the local refs remember it. */
+function cachedRemoteDefault(repoRoot: string): string | null {
+  const head = runGit(repoRoot, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]);
+  if (head.code !== 0 || !head.stdout.startsWith("origin/")) return null;
+  return head.stdout.slice("origin/".length);
+}
+
+export interface TrunkReading {
+  readonly trunk: string | null;
+  /** Which of the three questions answered: the working branch, origin's default, or its only branch. */
+  readonly source: "head" | "origin-default" | "sole-branch" | null;
+  /** Origin's branches, for a refusal that names the choice rather than describing it. */
+  readonly candidates: readonly string[];
+  readonly refusal: string | null;
+}
+
+/**
+ * The trunk: the branch the repository's own HEAD is on when origin has it,
+ * then origin's default, then origin's only branch, then a refusal.
+ *
+ * HEAD comes first because it is the operator's answer rather than the
+ * server's, and the server's is a setting nobody revisits -- a repository
+ * created with a README on `main` and then filled on `master` reports `main`
+ * for as long as it exists. Origin's default is still consulted, because a
+ * fresh clone has no working branch to speak of.
+ *
+ * `remoteIn` is the working copy whose `refs/remotes/origin/*` are read; it
+ * differs from `repoRoot` for a focused checkout, where the branch belongs to
+ * the repository and the refs belong to the clone.
+ */
+export function resolveTrunk(repoRoot: string, remoteIn: string = repoRoot): TrunkReading {
+  const candidates = remoteBranches(remoteIn);
+  const working = headBranch(repoRoot);
+  if (working !== null && candidates.includes(working)) {
+    return { trunk: working, source: "head", candidates, refusal: null };
+  }
+  const fallback = cachedRemoteDefault(remoteIn);
+  if (fallback !== null && (candidates.length === 0 || candidates.includes(fallback))) {
+    return { trunk: fallback, source: "origin-default", candidates, refusal: null };
+  }
+  if (candidates.length === 1) {
+    return { trunk: candidates[0] as string, source: "sole-branch", candidates, refusal: null };
+  }
+  return {
+    trunk: null,
+    source: null,
+    candidates,
+    refusal:
+      candidates.length === 0
+        ? "origin has no branches, so there is no trunk to check out"
+        : `origin names no default branch and has ${candidates.length} (${candidates.join(", ")}); ` +
+          "say which with --branch",
+  };
+}
+
+/**
+ * The branch origin itself calls default, asked over the wire.
+ *
+ * `ls-remote` rather than the cached `refs/remotes/origin/HEAD`, because the
+ * caller is set-up: the point is to compare what the server says with what
+ * the operator just pushed, before a fetch has cached anything.
+ */
+export function remoteDefaultBranch(repoRoot: string): string | null {
+  const listed = runGit(repoRoot, ["ls-remote", "--symref", "origin", "HEAD"]);
+  if (listed.code !== 0) return null;
+  for (const line of listed.stdout.split("\n")) {
+    const match = /^ref:\s+refs\/heads\/(\S+)\s+HEAD$/.exec(line.trim());
+    if (match) return match[1] as string;
+  }
+  return null;
+}
+
+/**
+ * Whether two revisions share any ancestor, or null when it cannot be told.
+ *
+ * False is the signature of a repository holding two unrelated histories --
+ * initialised with a README on one branch, then filled from an existing tree
+ * pushed as another. Nothing about that is visible in either branch alone.
+ */
+export function haveCommonHistory(repoRoot: string, left: string, right: string): boolean | null {
+  const base = runGit(repoRoot, ["merge-base", left, right]);
+  if (base.code === 0) return base.stdout !== "";
+  // Exit 1 is the honest "no merge base"; anything else is a bad revision.
+  return base.code === 1 ? false : null;
+}
+
 /**
  * One path, spelled the way the operating system spells it.
  *

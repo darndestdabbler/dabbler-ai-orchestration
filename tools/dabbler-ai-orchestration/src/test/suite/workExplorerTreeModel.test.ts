@@ -76,13 +76,22 @@ suite("workExplorerTreeModel: nodes", () => {
     assert.ok(hasToken(done.contextValue, NODE_TOKEN.bucket));
   });
 
-  test("a bucket groups its sessions under their module when the record names one, and a single-module repository stays ungrouped", () => {
+  test("a bucket groups its sessions under the module they RUN on, and a session that runs on the repository stays ungrouped", () => {
     const multi = makeRepository({
       sessions: [
-        makeSession({ number: 1, status: "complete", completedAt: "2026-09-01T10:00:00Z", modules: ["model"] }),
-        makeSession({ number: 2, status: "in-progress", iconKey: "in-progress", modules: ["persister"] }),
-        makeSession({ number: 3, status: "not-started", iconKey: "not-started", modules: ["model"] }),
-        makeSession({ number: 4, status: "not-started", iconKey: "not-started" }),
+        makeSession({ number: 1, status: "complete", completedAt: "2026-09-01T10:00:00Z", kind: "focused", module: "model" }),
+        makeSession({ number: 2, status: "in-progress", iconKey: "in-progress", kind: "focused", module: "persister" }),
+        makeSession({ number: 3, status: "not-started", iconKey: "not-started", kind: "focused", module: "model" }),
+        // Global, and it names every module it touched. That list is not a
+        // module to file it under: reading its first entry put the planning
+        // session under whichever module happened to come first.
+        makeSession({
+          number: 4,
+          status: "not-started",
+          iconKey: "not-started",
+          kind: "global",
+          modules: ["model", "persister"],
+        }),
       ],
     });
     const [repository] = repositoryNodes([multi]);
@@ -116,6 +125,41 @@ suite("workExplorerTreeModel: nodes", () => {
     for (const bucket of bucketNodes(singleRepository)) {
       assert.deepStrictEqual(childrenOf(bucket).map((n) => n.kind), ["session"]);
     }
+  });
+
+  test("a module's checkout shows only the sessions that run in it, and names what runs elsewhere", () => {
+    // The folder is one module's. A global session belongs to the
+    // repository and another module's belongs to another folder, so
+    // `session start` refuses both here -- listing them offered a plan this
+    // window cannot act on.
+    const checkout = makeRepository({
+      checkoutModule: "persister",
+      sessions: [
+        makeSession({ number: 1, status: "complete", kind: "global", modules: ["model", "persister"] }),
+        makeSession({ number: 2, status: "complete", kind: "focused", module: "model" }),
+        makeSession({ number: 3, status: "not-started", iconKey: "not-started", kind: "focused", module: "persister" }),
+        makeSession({ number: 4, status: "not-started", iconKey: "not-started", kind: "focused", module: "app" }),
+      ],
+    });
+    const [repository] = repositoryNodes([checkout]);
+    const buckets = bucketNodes(repository);
+    assert.deepStrictEqual(
+      buckets.map((b) => b.bucket),
+      ["not-started", "information"],
+      "the two finished sessions run elsewhere, so Complete is not rendered",
+    );
+    // Flat: the one group would only restate the folder's own name.
+    const queued = buckets[0];
+    assert.deepStrictEqual(
+      childrenOf(queued).map((n) => (n.kind === "session" ? n.session.number : n.kind)),
+      [3],
+    );
+    // Said once, so a checkout whose module is finished is never a blank tree.
+    assert.deepStrictEqual(
+      childrenOf(buckets[1]).map((n) => (n.kind === "attention" ? n.label : n.kind)),
+      ["3 sessions run outside this checkout"],
+    );
+    assert.strictEqual(descriptorFor(repository).description, "0/1 on persister");
   });
 
   test("a grant request renders on the session that asked, as the decision it is, with grant and deny as the answers", () => {

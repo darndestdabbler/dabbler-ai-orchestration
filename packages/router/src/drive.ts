@@ -131,6 +131,7 @@ import {
 } from "./impact.ts";
 import {
   changedPathsBetween,
+  headBranch,
   nowIso,
   repoRelativePath,
   repoRootFor,
@@ -437,18 +438,15 @@ export function unchangedStepFiles(
 export function localGateReceipt(
   repoRoot: string,
 ): { receipt: Record<string, unknown>; refusal: null } | { receipt: null; refusal: string } {
-  const branch = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]);
-  if (branch.code !== 0 || branch.stdout === "") {
-    return { receipt: null, refusal: `the branch could not be read: ${tail(branch.stderr, 200)}` };
-  }
-  if (branch.stdout === "HEAD") {
+  const branch = headBranch(repoRoot);
+  if (branch === null) {
     return { receipt: null, refusal: "HEAD is detached, so there is no branch for the receipt to name" };
   }
   const tested = runGit(repoRoot, ["rev-parse", "HEAD"]).stdout;
   return {
     receipt: {
       mode: "local",
-      branch: branch.stdout,
+      branch,
       base_sha: tested,
       tested_sha: tested,
       executor: "local",
@@ -470,17 +468,14 @@ export function localGateReceipt(
 export function candidateTrunk(
   repoRoot: string,
 ): { trunk: string; refusal: null } | { trunk: null; refusal: string } {
-  const branch = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]);
-  if (branch.code !== 0 || branch.stdout === "") {
-    return { trunk: null, refusal: `the branch could not be read: ${tail(branch.stderr, 200)}` };
-  }
-  if (branch.stdout === "HEAD") {
+  const branch = headBranch(repoRoot);
+  if (branch === null) {
     return {
       trunk: null,
       refusal: "HEAD is detached, so there is no trunk for the candidate to be gated onto",
     };
   }
-  return { trunk: branch.stdout, refusal: null };
+  return { trunk: branch, refusal: null };
 }
 
 /** How often the push loop looks at a running job; a pull call never waits. */
@@ -3065,11 +3060,11 @@ ${this.stopArtifacts()}`,
   }
 
   /**
-   * Wait for the gate to move master to the tested SHA, then act on it.
+   * Wait for the gate to move the trunk to the tested SHA, then act on it.
    *
-   * The poll is git-only -- `merge-base --is-ancestor tested origin/master`
+   * The poll is git-only -- `merge-base --is-ancestor tested origin/<trunk>`
    * needs no CI vendor's API -- so the same wait works against any host the
-   * gate workflow runs on. Green pulls master forward and the lifecycle
+   * gate workflow runs on. Green pulls the trunk forward and the lifecycle
    * proceeds; a poll that runs out says where to look and stops, which
    * routes the red run's failures into remediation the way every stop does.
    */

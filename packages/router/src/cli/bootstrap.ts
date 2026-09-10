@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { TRANSPORT_ENV_VAR, VALID_TRANSPORTS, loadConfig } from "../config.ts";
 import { freshnessWarnings } from "../discovery.ts";
 import { SESSIONS_DIRNAME, ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
-import { repoRelativePath, runGit } from "../journal.ts";
+import { haveCommonHistory, remoteDefaultBranch, repoRelativePath, runGit } from "../journal.ts";
 import { raisePackagingDecisions, raiseRemoteDecision } from "../owedDecisions.ts";
 import { MANIFEST_RELPATH } from "../modules.ts";
 import { STATUS_IN_PROGRESS } from "../progress.ts";
@@ -447,6 +447,8 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
         `bootstrap: pushed ${pushed.branch} to origin and set it to track there, ` +
           "which is what the close's push and a focused checkout's clone both read.\n",
       );
+      const mismatch = defaultBranchMismatch(project, pushed.branch);
+      if (mismatch !== null) writeErr(mismatch);
     } else {
       writeErr(
         `bootstrap: origin is recorded, but the first push failed (${pushed.error}). ` +
@@ -567,6 +569,38 @@ function pushUpstream(projectDir: string): { readonly branch: string; readonly e
     branch,
     error: pushed.code === 0 ? "" : pushed.stderr.trim() || "git push failed",
   };
+}
+
+/**
+ * The warning for a repository whose host disagrees with its operator about
+ * which branch is the trunk, or null when they agree.
+ *
+ * This is the earliest the mismatch can be seen: the branch has just been
+ * pushed, so the host's answer and the operator's are both known for the
+ * first time, and every later reader of them -- the close's push, a focused
+ * checkout's clone -- inherits whichever is wrong. A host that initialised
+ * the repository with a README holds a branch that shares no history with
+ * anything here, and saying so is the difference between a fix now and a
+ * clone that silently arrives holding one file.
+ */
+function defaultBranchMismatch(projectDir: string, pushedBranch: string): string | null {
+  const root = repoRootFor(projectDir);
+  if (root === null || pushedBranch === "") return null;
+  const hosted = remoteDefaultBranch(root);
+  if (hosted === null || hosted === pushedBranch) return null;
+  const fetched = runGit(root, ["fetch", "-q", "origin", hosted]);
+  const unrelated =
+    fetched.code === 0 ? haveCommonHistory(root, "HEAD", "FETCH_HEAD") === false : null;
+  return (
+    `bootstrap: origin's default branch is '${hosted}', but this project is on '${pushedBranch}'` +
+    (unrelated === true
+      ? ` and the two share no history -- '${hosted}' is a placeholder the host created, not an earlier state of this work`
+      : "") +
+    `. A focused checkout clones origin's default, so it would arrive on '${hosted}'. ` +
+    `Set the default branch to '${pushedBranch}' on the host` +
+    (unrelated === true ? `, and delete '${hosted}'` : "") +
+    ".\n"
+  );
 }
 
 /**

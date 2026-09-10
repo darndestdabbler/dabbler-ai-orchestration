@@ -32,10 +32,10 @@ candidate_universe = [
     "gpt-6-astra",
     "grok-4.6",
 ]
-written_by = "dabbler.copilot 2.1.1"
-written_at = "2026-09-10T19:57:55Z"
-content_digest = "sha256:e476e327097465c30f7416da82fa66fc55a85b7c45c9036b18fc91ddd7723913"
-enumerated_at = "2026-09-10T19:57:55Z"
+written_by = "dabbler.copilot 2.1.2"
+written_at = "2026-09-10T22:17:18Z"
+content_digest = "sha256:56e3fc6e6694a2f3f8c9a3a813e778da6aa8e9a4dcc7ff1f628cc250a0ea57a7"
+enumerated_at = "2026-09-10T22:17:18Z"
 enumeration_source = "acp-session-new"
 
 [[models]]
@@ -70,7 +70,7 @@ confirmed_on_cli_version = "GitHub Copilot CLI 1.0.83."
 echoed_model = "claude-haiku-4.5"
 probe_premium_requests = 0.33
 seat_usage = "0.33x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "claude-fable-5"
@@ -95,7 +95,7 @@ confirmed_on_cli_version = "GitHub Copilot CLI 1.0.68."
 premium_request_weight = 15
 echoed_model = "claude-opus-4.8"
 seat_usage = "15x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "claude-opus-4.7"
@@ -108,7 +108,7 @@ echoed_model = "claude-opus-4.7"
 last_probe_error = "invalid-model"
 last_probe_at = "2026-08-19T11:59:01Z"
 seat_usage = "7.5x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "claude-opus-4.6"
@@ -149,7 +149,7 @@ confirmed_on_cli_version = "GitHub Copilot CLI 1.0.83."
 premium_request_weight = 7.5
 echoed_model = "gpt-5.5"
 seat_usage = "7.5x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "gpt-5.4"
@@ -161,7 +161,7 @@ confirmed_on_cli_version = "GitHub Copilot CLI 1.0.68."
 premium_request_weight = 0
 echoed_model = "gpt-5.4"
 seat_usage = "1x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "gpt-5.3-codex"
@@ -173,7 +173,7 @@ confirmed_on_cli_version = "GitHub Copilot CLI 1.0.68."
 premium_request_weight = 0
 echoed_model = "gpt-5.3-codex"
 seat_usage = "1x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "gpt-5.2-codex"
@@ -199,7 +199,7 @@ confirmed_on_cli_version = "GitHub Copilot CLI 1.0.68."
 premium_request_weight = 0
 echoed_model = "gpt-5.4-mini"
 seat_usage = "0.33x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "gpt-5-mini"
@@ -211,7 +211,7 @@ confirmed_on_cli_version = "GitHub Copilot CLI 1.0.83."
 premium_request_weight = 0
 echoed_model = "gpt-5-mini"
 seat_usage = "0x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "gemini-3.5-flash"
@@ -223,7 +223,7 @@ confirmed_on_cli_version = "GitHub Copilot CLI 1.0.68."
 premium_request_weight = 14
 echoed_model = "gemini-3.5-flash"
 seat_usage = "14x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "gemini-3.8-flash"
@@ -235,31 +235,31 @@ confirmed_on_cli_version = "GitHub Copilot CLI 1.0.83."
 probe_premium_requests = 14
 echoed_model = "gemini-3.8-flash"
 seat_usage = "14x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "gpt-5.6-sol"
 provider = "openai"
 provider_source = "name-prefix-heuristic"
-enablement = "unconfirmed"
+enablement = "listed"
 seat_usage = "1x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "gpt-5.6-terra"
 provider = "openai"
 provider_source = "name-prefix-heuristic"
-enablement = "unconfirmed"
+enablement = "listed"
 seat_usage = "1x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "gpt-5.6-luna"
 provider = "openai"
 provider_source = "name-prefix-heuristic"
-enablement = "unconfirmed"
+enablement = "listed"
 seat_usage = "1x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "claude-sonnet-5"
@@ -267,7 +267,7 @@ provider = "anthropic"
 provider_source = "name-prefix-heuristic"
 enablement = "confirmed"
 seat_usage = "1x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 confirmed_at = "2026-09-10T19:57:55Z"
 confirmed_on_cli_version = "GitHub Copilot CLI 1.0.83."
 probe_premium_requests = 1
@@ -288,7 +288,7 @@ provider = "anthropic"
 provider_source = "name-prefix-heuristic"
 enablement = "confirmed"
 seat_usage = "15x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 confirmed_at = "2026-09-10T19:57:55Z"
 confirmed_on_cli_version = "GitHub Copilot CLI 1.0.83."
 probe_premium_requests = 15
@@ -305,9 +305,9 @@ retired_at = "2026-09-10T19:57:55Z"
 
 [[models]]
 id = "mai-code-1.1-flash"
-enablement = "unconfirmed"
+enablement = "listed"
 seat_usage = "1x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "mai-code-1-flash-picker"
@@ -320,23 +320,23 @@ retired_at = "2026-09-10T19:57:55Z"
 id = "gemini-3.7-flash"
 provider = "google"
 provider_source = "name-prefix-heuristic"
-enablement = "unconfirmed"
+enablement = "listed"
 seat_usage = "14x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "gemini-3.6-flash"
 provider = "google"
 provider_source = "name-prefix-heuristic"
-enablement = "unconfirmed"
+enablement = "listed"
 seat_usage = "14x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "grok-4.5"
-enablement = "unconfirmed"
+enablement = "listed"
 seat_usage = "1x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "kimi-k3"
@@ -356,12 +356,12 @@ retired_at = "2026-09-10T19:57:55Z"
 id = "gpt-6-astra"
 provider = "openai"
 provider_source = "name-prefix-heuristic"
-enablement = "unconfirmed"
+enablement = "listed"
 seat_usage = "1x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"
 
 [[models]]
 id = "grok-4.6"
-enablement = "unconfirmed"
+enablement = "listed"
 seat_usage = "1x"
-listed_at = "2026-09-10T19:57:55Z"
+listed_at = "2026-09-10T22:17:18Z"

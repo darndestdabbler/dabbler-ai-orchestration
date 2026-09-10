@@ -2870,9 +2870,9 @@
     {
       "number": 146,
       "title": "The models there are, and what they cost, read from where they are stated",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-10T09:10:26.503000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-10T10:30:54.957000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -1,6 +1,89 @@
-# STATUS — sessions 113–141 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, and session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record; **version 2.0.20, PUBLISHED — the Marketplace serves it**
+# STATUS — sessions 113–142 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, and session 142 turning that refusal into a choice the operator is offered and a verb that carries it out; **version 2.0.21 TAGGED (vsix-v2.0.21) — CI awaits a reviewer in the marketplace environment, so the Marketplace still serves 2.0.20**
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 142 CLOSED, 2026-09-10 — the branch a host chose, now offered as a choice, and 2.0.21 tagged
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 142 | the terminal heading composed from the session number and the rule character, the count of how often that heading is drawn, `dabbler repo retrunk`, bootstrap raising the trunk as a choice, `candidateTrunk` on `resolveTrunk`, and the 2.0.21 release | CLOSED VERIFIED (round 2 of a cap of 3; round 1 found two real blocking defects, both fixed; verifier `gpt-5-6-terra`/openai, transport `api`), landed `e36204ef`, closed `52d7da80`, **releasable — `vsix-v2.0.21` PUSHED** |
+>
+> **2.0.21 is tagged and not yet serving.** `dabbler release --verify-install` says the
+> Marketplace still serves 2.0.20, which is correct and not a fault: CI builds from the
+> tag and its `marketplace` environment asks a person to approve the job before it
+> publishes. **That approval is outstanding and is the operator's** — until it is given,
+> anyone installing the extension gets 2.0.20. The `publication:2.0.21` decision was put
+> to the operator and answered `publish`; the tag followed.
+>
+> **The framework stopped twice at the publish, and both stops were right.** A releasable
+> session's phase advance does not tag, because a tag cannot be taken back: the first stop
+> said to run `dabbler release`, which stated what would ship and raised
+> `publication:2.0.21` rather than defaulting. The second stop was marked a DEADLOCK and
+> was also right — the decision was answered but nothing had tagged, because answering the
+> decision does not tag either; `dabbler release` run AGAIN is what tags, and the wording
+> "the framework acts on it from here; you are not asked to run anything" is what sent the
+> session back into the same stop. **That sentence is owed a correction**: after the answer
+> the operator (or the engine) still runs `release` a second time. Nothing is broken; the
+> guidance is simply wrong about who does the next thing.
+>
+> **The trunk a host answered for is now a choice, not a diagnosis.** 141 made the
+> framework survive a placeholder default; it refused and explained and stopped there.
+> `bootstrap`'s mismatch now states the situation, asks which branch is the trunk, and
+> gives the exact command for each answer — and says that the two answers are not the same
+> act. `dabbler repo retrunk --to <branch> --approve <who>` does the git, says every
+> command as it runs it, records the approver and the branches under
+> `.dabbler/runs/retrunk.jsonl`, and prints the one part no git command can do. No branch
+> name is spelled anywhere in any of it.
+>
+> **A remote refuses to delete the branch its own HEAD names, and so does every host.**
+> That is the shape of the whole trap and it is why the human instruction is load-bearing
+> rather than decorative: `retrunk` pushes the work, tells the operator where to move the
+> default on Azure DevOps or GitHub, and says the placeholder is still there until they do.
+> Run again afterwards, it removes it. The walkthrough proves both halves over a real bare
+> origin.
+>
+> **Round 1 found two real defects and both were mine.** (1) An unacknowledged
+> `retrunk --to <target>` force-pushed a target that SHARED history, discarding commits a
+> team had put there — while bootstrap's own text promised git would refuse a
+> non-fast-forward. It now pushes without `--force` and lets git refuse, and the refusal
+> names what forcing would cost. (2) A local branch already holding the target's name made
+> the rename fail AFTER the remote had been rewritten, reporting a refusal over a change
+> that stood, with no approval row. **Every refusal is now made before the first push, and
+> nothing after a push refuses**: the approval is recorded for what was actually done and
+> whatever could not be finished comes back as `outstanding`. That ordering rule is the
+> durable lesson — a check made after the irreversible act is not a check.
+>
+> **The new walkthrough caught a defect 2.0.20 shipped.** `remoteBranches` filtered
+> `origin/HEAD`, but `%(refname:short)` prints `refs/remotes/origin/HEAD` as **`origin`**,
+> not `origin/HEAD` — git shortens a remote's HEAD to the remote's own name. Slicing
+> `origin/` off `origin` left an EMPTY branch name in every candidate list, offered in
+> refusals and counted when deciding whether origin has exactly one branch. It is filtered
+> on the prefix now. This repository's own `for-each-ref` shows it; it was live.
+>
+> **Eight voice rules in one whole session, measured.** Session 141's record: four job logs
+> gained bytes, each in its own lease, so the framework spoke between every pair — two
+> rules per job, in fourteen minutes, plus one unnumbered opening rule. Recorded beside the
+> banner in `dabblerTerminal.ts`. A session driven from a chat puts no job bytes on that
+> terminal and sees none of them. **Making the rule draw more often is a change to WHEN a
+> heading appears rather than to what it says**, and it was deliberately not made here.
+>
+> **`candidateTrunk` takes `resolveTrunk`; `localGateReceipt` keeps `headBranch`.** 141's
+> nit was right about the first: HEAD on a local branch origin has never heard of sent
+> `phaseGateWait` to poll a ref that would never move. The second is a deliberate
+> exception and now says so in a comment — a receipt names the branch the check actually
+> ran on, and resolving it elsewhere would make the receipt name a branch the test did not
+> run on. The scripted `drive.test.ts` assertion that pinned the old reading is gone; the
+> real one lives in `walk-git-states.test.ts` over a bare origin, because the fact under
+> test is about a real remote and not about a script.
+>
+> **OWED to a later session.** (a) The publish guidance above — "you are not asked to run
+> anything" is wrong after the answer. (b) Round 1's third nit, undisposed and deliberately
+> so: the plan said the mismatch should become a `step` instruction, and it is bootstrap's
+> printed instruction instead. `bootstrap` runs outside the driver loop and issues no
+> instructions, and making the mismatch a driver step would put a gate in front of every
+> session in every repository. That is a design question, not a defect — but it is the
+> plan and the implementation disagreeing, and somebody should settle which is right.
+
 
 > ## SESSION 141 CLOSED, 2026-09-09 — the trunk a host answered for, and the clone that arrived holding one file
 >

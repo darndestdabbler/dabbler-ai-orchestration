@@ -29,6 +29,7 @@ import {
   getCliVersion,
 } from "../src/transports/copilot.ts";
 import { isOk } from "../src/transports/base.ts";
+import { EVIDENCE_SERVED, FIDELITY_HONOURED, modelFidelity } from "../src/selection.ts";
 
 const LIVE = process.env["DABBLER_E2E"] === "1";
 
@@ -153,4 +154,41 @@ describe("a live handoff through the seat", () => {
         `payload_bytes=${String(result.metadata["payload_bytes"])}\n`,
     );
   });
+});
+
+describe("whether the model asked for is the model that answered", () => {
+  // The measurement in `docs/model-fidelity.md`, as a test that can be re-run
+  // when a vendor's spelling might have moved. It found one already: OpenAI
+  // answers `gpt-5.4-mini` with `gpt-5.4-mini-2026-03-17`, and the reading
+  // recognised only `-20260317`, so every dashed pin would have been reported
+  // to an operator as a substituted model.
+  //
+  // Skipped without `DABBLER_E2E=1`, like every live test here: a developer
+  // with keys set must not discover that `npm test` spends money.
+  for (const provider of ["anthropic", "openai"]) {
+    it(`reads ${provider}'s own statement of what answered`, { skip: !LIVE }, async () => {
+      const requested = modelIdFor(provider);
+      const result = await callModel(
+        provider,
+        requested,
+        "",
+        "Reply with the single word: ok",
+        16,
+        providerBlock(provider),
+        provider === "openai" ? { reasoning_effort: "none" } : {},
+      );
+      assert.equal(isOk(result), true);
+      // The claim is that the provider SAYS what served, not that it matches:
+      // a dated pin is routine and is not a substitution.
+      assert.equal(typeof result.served_model_id, "string");
+      const served = String(result.served_model_id);
+      assert.equal(
+        modelFidelity(requested, [
+          { requested, served, evidence: EVIDENCE_SERVED },
+        ]),
+        FIDELITY_HONOURED,
+        `${provider} asked ${requested} and was answered ${served}`,
+      );
+    });
+  }
 });

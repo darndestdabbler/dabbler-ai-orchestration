@@ -40,6 +40,7 @@ import {
   workingTreeChanges,
 } from "../affected.ts";
 import { writeErr, writeOut } from "../output.ts";
+import { EVIDENCE_SERVED, FIDELITY_SUBSTITUTED, modelFidelity } from "../selection.ts";
 import {
   loadConfig,
   resolveTransport,
@@ -171,6 +172,39 @@ export function costNumber(value: unknown): number | null {
  */
 export function turnCount(value: unknown): number | null {
   return Array.isArray(value) ? value.length : costNumber(value);
+}
+
+/**
+ * What to say when the model that answered is not the model that was asked
+ * for, or null when there is nothing to say.
+ *
+ * The round has recorded both since the 364-request session and has said
+ * nothing about them ever since: the only place a substitution surfaced was
+ * a NOTE on stderr from inside one transport, which reaches whoever was
+ * watching that process and nobody else. The round is where both facts are
+ * already in hand, so it is where the operator hears it.
+ *
+ * **It is a note and never a refusal.** A provider substituting a model is a
+ * fact about what was bought, not a verification failure, and stopping the
+ * round would cost the operator the round they had already paid for while
+ * telling them nothing they could act on until it finished.
+ *
+ * The rule is `modelFidelity`'s and not a second one: a dated snapshot pin
+ * is the model that was asked for, and a round that warned about one would
+ * make the warning that matters routine.
+ */
+export function substitutionNote(requested: string, served: string | null): string | null {
+  if (served === null || served === "") return null;
+  // A round's served id is the provider's own statement, which is the strong
+  // kind; the note would be equally right on an echo, since an echo naming a
+  // DIFFERENT model is the only thing an echo can prove.
+  const seen = { requested, served, evidence: EVIDENCE_SERVED } as const;
+  if (modelFidelity(requested, [seen]) !== FIDELITY_SUBSTITUTED) return null;
+  return (
+    `verify: NOTE -- this round asked for '${requested}' and '${served}' answered. ` +
+    "Both are on the round; the verdict stands, and what it cost is what the " +
+    "model that answered costs.\n"
+  );
 }
 
 /**
@@ -904,6 +938,15 @@ export async function runRound(
     }
   }
   appendRound(repoRoot, current, row);
+
+  // Said whatever the verdict turned out to be: what was bought is a fact
+  // about this round either way, and a note that only appeared on a blocking
+  // round would be absent from every round an operator was happy with.
+  const substituted = substitutionNote(
+    String(row["requested_model"] ?? ""),
+    (row["served_model"] as string | null) ?? null,
+  );
+  if (substituted !== null) writeErr(substituted);
 
   if (classification.blocking) {
     writeOut(

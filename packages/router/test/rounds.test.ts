@@ -13,6 +13,7 @@ import {
   noRoundReason,
   reportedInputTokens,
   runOfRecordLines,
+  substitutionNote,
   turnCount,
 } from "../src/verify/rounds.ts";
 import { gitAnswers, tempDir } from "./support/answers.ts";
@@ -160,5 +161,28 @@ describe("what stands between a verified tree and a close", () => {
       if (before === undefined) delete process.env["DABBLER_DRIVEN"];
       else process.env["DABBLER_DRIVEN"] = before;
     }
+  });
+});
+
+describe("what a round says about the model that answered", () => {
+  it("says nothing when the provider did not name one, and nothing when it named the model asked for", () => {
+    // "The provider did not say" and "it served what was asked" are two
+    // facts, and the row's own comment says so. Neither is a substitution.
+    assert.equal(substitutionNote("gpt-5.4", null), null);
+    assert.equal(substitutionNote("gpt-5.4", ""), null);
+    assert.equal(substitutionNote("gpt-5.4", "gpt-5.4"), null);
+    // A dated snapshot pin is the model that was asked for. A round that
+    // warned about one would make the warning that matters routine.
+    assert.equal(substitutionNote("gpt-5.4", "gpt-5.4-20260901"), null);
+  });
+
+  it("names both models when a different one answered, and calls it a note rather than a failure", () => {
+    const note = substitutionNote("gpt-5.4", "gpt-5-mini");
+    assert.ok(note !== null);
+    assert.match(note, /gpt-5\.4/);
+    assert.match(note, /gpt-5-mini/);
+    // A provider substituting a model is a fact about what was bought, not a
+    // verification failure: the verdict stands and the round is not refused.
+    assert.match(note, /verdict stands/);
   });
 });

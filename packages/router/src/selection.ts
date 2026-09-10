@@ -315,3 +315,196 @@ export function explainRegistryCandidates(
 ): RoleResolution<readonly [string, string, string]> {
   return explainRole(config, role, registryEnumeration(config), excludeProviders);
 }
+
+// --- Whether the model asked for is the model that answered ---------------
+//
+// A surface that offers a person a list of models is offering something it
+// has to have evidence for: an operator who chooses, is shown their choice,
+// and pays for a different model has been told something untrue by a screen
+// this repository wrote. It has happened once, at fourteen times the price.
+//
+// The evidence already exists and is not gathered here. A verification round
+// records `requested_model` beside `served_model`; the Copilot seat catalog
+// records `echoed_model` beside each `id`. What was missing is the reading,
+// and `docs/model-fidelity.md` is what the reading currently says.
+
+/** The record shows this model answering as itself. */
+export const FIDELITY_HONOURED = "honoured";
+/** The record shows this model answering as a DIFFERENT model. */
+export const FIDELITY_SUBSTITUTED = "substituted";
+/** The record shows nothing either way. Never read as either of the above. */
+export const FIDELITY_UNKNOWN = "not-known";
+
+export type Fidelity =
+  | typeof FIDELITY_HONOURED
+  | typeof FIDELITY_SUBSTITUTED
+  | typeof FIDELITY_UNKNOWN;
+
+/**
+ * The provider's own statement of what answered, read out of its response
+ * body. A provider that served a different model said so itself.
+ */
+export const EVIDENCE_SERVED = "served";
+/**
+ * A CLI seat's echo of the model it was asked for. **It is a label**, and a
+ * seat label is the one thing this framework has always declined to trust --
+ * a seat that ignored `--model` and echoed the request back produces an echo
+ * indistinguishable from an honoured one.
+ */
+export const EVIDENCE_ECHO = "echo";
+
+export type EvidenceKind = typeof EVIDENCE_SERVED | typeof EVIDENCE_ECHO;
+
+/**
+ * One observation: what was asked for, what answered, and how that was
+ * learned.
+ *
+ * `served` is null when the source did not say, which is NOT the same fact
+ * as "it served what was asked" and never collapses into it.
+ *
+ * `evidence` is not decoration. The two kinds do not weigh the same and the
+ * asymmetry is the whole rule: see `modelFidelity`.
+ */
+export interface ModelObservation {
+  readonly requested: string;
+  readonly served: string | null;
+  readonly evidence: EvidenceKind;
+}
+
+/**
+ * Whether a served id is the requested model under a dated pin.
+ *
+ * A provider answering `<model>-20260901` for `<model>` served the model
+ * that was asked for; the transport's own note calls a dated-snapshot pin
+ * routine, and a reading that called it a substitution would make the one
+ * warning that matters routine too. The remainder has to LOOK like a date --
+ * anything else is another model, and `gpt-5.4` against `gpt-5.4-mini` is
+ * exactly the case a bare prefix test would get wrong.
+ */
+function datedPinOf(requested: string, served: string): boolean {
+  if (!served.startsWith(requested)) return false;
+  // Both spellings vendors actually use, which session 144's probe found out
+  // by asking: OpenAI answered `gpt-5.4-mini` with `gpt-5.4-mini-2026-03-17`,
+  // and a bare-digit rule would have called that a substitution and put a
+  // warning in front of an operator on the most routine thing a provider
+  // does. Anything that is not a date is another model.
+  const suffix = served.slice(requested.length);
+  const shaped = /^[-@](?:(\d{4})-(\d{2})-(\d{2})|(\d{4})(\d{2})(\d{2})|\d{6})$/.exec(suffix);
+  if (shaped === null) return false;
+  const month = shaped[2] ?? shaped[5];
+  const day = shaped[3] ?? shaped[6];
+  // Date-SHAPED is not a date. `-2026-99-99` is a suffix no vendor's release
+  // calendar can produce, so reading it as a pin would let a model id that
+  // merely looks like one pass as the model asked for.
+  if (month === undefined || day === undefined) return true;
+  const monthNumber = Number(month);
+  const dayNumber = Number(day);
+  return monthNumber >= 1 && monthNumber <= 12 && dayNumber >= 1 && dayNumber <= 31;
+}
+
+/**
+ * What the record says about one model on one transport: honoured,
+ * substituted, or not known.
+ *
+ * **Three answers, and the third is the reason this exists.** A model nobody
+ * has ever asked for and a model that answered as something else are
+ * different facts, and a reading that returned a boolean would have to call
+ * one of them the other -- which is how a list comes to be shown with a
+ * confidence nothing earned.
+ *
+ * One substitution outweighs any number of matches. A model that has once
+ * answered as another is a model that can, and the operator deciding what to
+ * spend on it is owed the exception rather than the average.
+ *
+ * **The two kinds of evidence are asymmetric, and this is the rule that
+ * matters.** An echo can establish a SUBSTITUTION and can never establish
+ * fidelity. A seat naming a different model than the one asked for is the
+ * seat testifying against its own interest, and is believed; a seat naming
+ * the model that was asked for is a seat that would print exactly that
+ * whether it honoured the flag or ignored it, and a reading that called it
+ * `honoured` would hand a later surface a confidence nothing earned. Only a
+ * served id -- the provider's own statement, read out of its response body
+ * -- establishes that the model asked for is the model that answered.
+ */
+export function modelFidelity(
+  model: string,
+  observations: readonly ModelObservation[],
+): Fidelity {
+  const mine = observations.filter((seen) => seen.requested === model);
+  const said = mine.filter((seen) => seen.served !== null && seen.served !== "");
+  if (said.length === 0) return FIDELITY_UNKNOWN;
+  const substituted = said.some(
+    (seen) => seen.served !== model && !datedPinOf(model, seen.served as string),
+  );
+  if (substituted) return FIDELITY_SUBSTITUTED;
+  // Matches only. They are worth something only if a provider said them.
+  return said.some((seen) => seen.evidence === EVIDENCE_SERVED)
+    ? FIDELITY_HONOURED
+    : FIDELITY_UNKNOWN;
+}
+
+/**
+ * A seat catalog's echoes as observations.
+ *
+ * Structural rather than imported: the catalog's own type lives with the
+ * transport that writes it, and selection has never depended on a transport.
+ * An entry with no echo becomes an observation that says nothing, which is
+ * what it is -- dropping it would leave a probed-and-silent model
+ * indistinguishable from one never probed at all.
+ */
+export function echoObservations(
+  entries: readonly { readonly id: string; readonly echoed_model?: unknown }[],
+): ModelObservation[] {
+  return entries.map((entry) => ({
+    requested: entry.id,
+    served: typeof entry.echoed_model === "string" && entry.echoed_model !== ""
+      ? entry.echoed_model
+      : null,
+    evidence: EVIDENCE_ECHO,
+  }));
+}
+
+/**
+ * The one transport whose `served_model` is the provider's own word. Named
+ * as the allowed case rather than as the excluded one: a transport added
+ * later is an echo until somebody shows it is not.
+ */
+const PROVIDER_STATED_TRANSPORT = "api";
+
+/**
+ * A round's requested/served pair as an observation, with the evidence kind
+ * its TRANSPORT makes it.
+ *
+ * **A round's `served_model` is not one kind of fact.** On the direct-API
+ * path it is read out of the provider's response body; on a Copilot seat it
+ * is the CLI's echo, carried into the same field by the same code path. A
+ * reading that called every round's pair a provider's statement would launder
+ * an echo into evidence simply by having a round wrapped around it -- which
+ * is the very substitution this whole reading exists to refuse, made one
+ * level up. Round 2 of session 144 found it doing exactly that.
+ *
+ * A round that does not say which transport it ran on is treated as a seat's:
+ * the weaker reading is the safe one, and an unlabelled round is old rather
+ * than trustworthy.
+ */
+export function roundObservations(
+  rounds: readonly {
+    readonly requested_model?: unknown;
+    readonly served_model?: unknown;
+    readonly transport?: unknown;
+  }[],
+): ModelObservation[] {
+  const seen: ModelObservation[] = [];
+  for (const round of rounds) {
+    if (typeof round.requested_model !== "string" || round.requested_model === "") continue;
+    seen.push({
+      requested: round.requested_model,
+      served: typeof round.served_model === "string" && round.served_model !== ""
+        ? round.served_model
+        : null,
+      evidence:
+        round.transport === PROVIDER_STATED_TRANSPORT ? EVIDENCE_SERVED : EVIDENCE_ECHO,
+    });
+  }
+  return seen;
+}

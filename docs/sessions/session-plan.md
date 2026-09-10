@@ -8177,8 +8177,27 @@ registry: data, revisable when a vendor ships something new, rather than a
 judgement about capability compiled into a function where it will quietly go
 stale.
 
-**And a model 144 found is not honoured on the selected transport is not
-offered as though it were.** That is the entire reason 144 runs first.
+**And a model the record does not vouch for is not offered as though it
+were.** That is the entire reason 144 runs first, and what 144 actually
+found changes what this session builds. **It does not need to make the
+framework notice which model answered: it already does.** `RouteResult`
+carries `served_model_id`, every verification round has recorded
+`requested_model` beside `served_model` since the 364-request session,
+the API transport compares them per call, and 144 added the note the round
+now writes when they differ. What 144 leaves for this session is a READING,
+`modelFidelity` in `selection.ts`, and this session consumes it rather than
+re-deriving it.
+
+**Its three answers are the constraint on what the pane may show.** Honoured,
+substituted, and NOT KNOWN -- and the third is the common case, not an edge
+one. 144 measured 98 verification rounds, all exact, across one provider and
+two models; the Copilot catalog holds fifteen echoes, all exact, and an echo
+is the seat's own account of itself, which this framework already holds to be
+untrusted. So most of the list an operator sees has no evidence either way,
+and **the pane must show that as what it is rather than as approval.** A
+surface that rendered "not known" the same as "honoured" would be making the
+promise 144 exists to stop it making. `docs/model-fidelity.md` is the
+measurement and states its own bounds; read it before designing the row.
 
 **Steps.** (1) The collapsible Configuration section, reading the dated
 registry and naming its age, with no probe on open. (2) Engine and transport
@@ -8187,8 +8206,9 @@ silently applied. (3) The authoring model and the verifying model, from the
 registry, with the cross-provider invariant surfaced from where it already
 lives. (4) The capability floor as an ordered tier in the registry, and the
 verifying choice held to it. (5) An explicit refresh that probes and re-dates
-the record. (6) A model the record says is not honoured on the selected
-transport is not offered as a plain choice. (7) The release: `version.json`
+the record. (6) Each model carries what `modelFidelity` says of it on the
+selected transport -- honoured, substituted, or not known -- and the three
+read as three rather than as two. (7) The release: `version.json`
 to 2.0.23, stamped through `npm run stamp:version`, with a changelog section
 covering 143, 144 and this session in the terms an operator reads.
 
@@ -8198,12 +8218,13 @@ refused, from the invariant's own reading rather than from a second copy of
 it. A verifying model below the authoring model's tier is refused, and the
 tier comes from the registry rather than from the assertion. A single
 installed CLI produces a chosen engine and a stated reason. And a model
-recorded as not honoured on the selected transport does not appear as an
-ordinary choice. **The pane's appearance gets no assertion**, for the reason
+`modelFidelity` reads as NOT KNOWN does not render as one it reads as
+honoured -- the assertion 144 exists for, and the one that fails if the
+pane's three answers ever collapse into two. **The pane's appearance gets no
+assertion**, for the reason
 every surface in this repository gets none: Layer 3 catches what a screen
 looks like.
 
-**Releasable.** 2.0.23, carrying 143's terminal, 144's guard and this
-session's pane. A patch if 144 changed nothing an operator can see and a
-minor otherwise; the session decides that from what 144 actually landed
-rather than from this sentence.
+**Releasable.** 2.0.23, carrying 143's terminal, 144's note and reading, and
+this session's pane. A minor rather than a patch: the pane is a surface an
+operator did not have, whatever 143 and 144 were on their own.

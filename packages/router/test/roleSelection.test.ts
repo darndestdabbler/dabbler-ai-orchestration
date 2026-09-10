@@ -11,11 +11,19 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 
 import { normalizeModelToken } from "../src/contracts/models.ts";
 import {
+  EVIDENCE_ECHO,
+  EVIDENCE_SERVED,
+  FIDELITY_HONOURED,
+  FIDELITY_SUBSTITUTED,
+  FIDELITY_UNKNOWN,
   REMOVED_EXCLUDED_PROVIDER,
   REMOVED_NOT_PERMITTED,
   REMOVED_UNTRUSTED_VERIFIER,
   ROLE_VERIFIER,
+  echoObservations,
   explainRole,
+  modelFidelity,
+  roundObservations,
   providerReachable,
   registryCandidates,
   resolveRole,
@@ -271,6 +279,132 @@ describe("enumerating the model registry", () => {
     assert.deepEqual(
       registryCandidates(registryConfig(), "generator", ["google", "openai", "anthropic"]),
       [],
+    );
+  });
+});
+
+describe("whether the model asked for is the model that answered", () => {
+  // The provider's own statement unless a test says otherwise: an echo is
+  // the weak kind and every test that uses one says so at the call.
+  const seen = (requested: string, served: string | null) =>
+    ({ requested, served, evidence: EVIDENCE_SERVED }) as const;
+  const echoed = (requested: string, served: string | null) =>
+    ({ requested, served, evidence: EVIDENCE_ECHO }) as const;
+
+  it("answers not-known for a model the record says nothing about", () => {
+    // The answer this reading exists for. A model nobody has asked for and a
+    // model that answered as something else are different facts, and a
+    // boolean would have to call one of them the other -- which is how a
+    // list gets shown with a confidence nothing earned.
+    assert.equal(modelFidelity("gpt-5.4", []), FIDELITY_UNKNOWN);
+    assert.equal(modelFidelity("gpt-5.4", [seen("gpt-5.6-terra", "gpt-5.6-terra")]), FIDELITY_UNKNOWN);
+    // Probed and silent is not a match: "the provider did not say" collapses
+    // into nothing, which is the one thing it must not collapse into.
+    assert.equal(modelFidelity("gpt-5.4", [seen("gpt-5.4", null)]), FIDELITY_UNKNOWN);
+  });
+
+  it("answers honoured when every observation names the model itself, dated pins included", () => {
+    assert.equal(modelFidelity("gpt-5.4", [seen("gpt-5.4", "gpt-5.4")]), FIDELITY_HONOURED);
+    // A dated snapshot IS the model that was asked for; the transport's own
+    // note calls the pin routine, and calling it a substitution would make
+    // the one warning that matters routine too. BOTH spellings vendors use:
+    // session 144's probe asked OpenAI for `gpt-5.4-mini` and was answered
+    // `gpt-5.4-mini-2026-03-17`, which a bare-digit rule called a
+    // substitution.
+    assert.equal(modelFidelity("gpt-5.4", [seen("gpt-5.4", "gpt-5.4-20260901")]), FIDELITY_HONOURED);
+    assert.equal(
+      modelFidelity("gpt-5.4-mini", [seen("gpt-5.4-mini", "gpt-5.4-mini-2026-03-17")]),
+      FIDELITY_HONOURED,
+    );
+    // Date-SHAPED is not a date: no release calendar produces -2026-99-99,
+    // and reading it as a pin would let an id that merely looks like one pass
+    // as the model asked for.
+    assert.equal(
+      modelFidelity("gpt-5.4", [seen("gpt-5.4", "gpt-5.4-2026-99-99")]),
+      FIDELITY_SUBSTITUTED,
+    );
+    // But a suffix that is not a date is another model. A bare prefix test
+    // would call this one honoured, and it is the case that costs money.
+    assert.equal(modelFidelity("gpt-5.4", [seen("gpt-5.4", "gpt-5.4-mini")]), FIDELITY_SUBSTITUTED);
+  });
+
+  it("lets one substitution outweigh any number of matches", () => {
+    // A model that has once answered as another is a model that can, and the
+    // operator deciding what to spend is owed the exception, not the average.
+    assert.equal(
+      modelFidelity("gpt-5.4", [
+        seen("gpt-5.4", "gpt-5.4"),
+        seen("gpt-5.4", "gpt-5.4"),
+        seen("gpt-5.4", "gpt-5-mini"),
+        seen("gpt-5.4", "gpt-5.4"),
+      ]),
+      FIDELITY_SUBSTITUTED,
+    );
+  });
+
+  it("never lets an echo establish fidelity, and always lets one establish a substitution", () => {
+    // Round 1's second finding, and the rule it bought. A seat that ignored
+    // `--model` and echoed the request back prints exactly what an honoured
+    // one prints, so a matching echo can only ever mean "not known" -- while
+    // an echo naming a DIFFERENT model is the seat testifying against its own
+    // interest, which is believed.
+    assert.equal(modelFidelity("gpt-5.4", [echoed("gpt-5.4", "gpt-5.4")]), FIDELITY_UNKNOWN);
+    assert.equal(modelFidelity("gpt-5.4", [echoed("gpt-5.4", "gpt-5-mini")]), FIDELITY_SUBSTITUTED);
+    // Any number of echoes is still no evidence of fidelity; one served id is.
+    const manyEchoes = Array.from({ length: 15 }, () => echoed("gpt-5.4", "gpt-5.4"));
+    assert.equal(modelFidelity("gpt-5.4", manyEchoes), FIDELITY_UNKNOWN);
+    assert.equal(
+      modelFidelity("gpt-5.4", [...manyEchoes, seen("gpt-5.4", "gpt-5.4")]),
+      FIDELITY_HONOURED,
+    );
+  });
+
+  it("reads a seat catalog's echoes as echoes, and a round's served ids as the provider's word", () => {
+    const observations = echoObservations([
+      { id: "claude-haiku-4.5", echoed_model: "claude-haiku-4.5" },
+      { id: "gemini-3.8-flash", echoed_model: null },
+      { id: "gpt-5.5" },
+    ]);
+    // An exact catalog echo is NOT approval -- the whole of the seat's
+    // evidence reads as not known, which is what session 145 must render.
+    assert.equal(modelFidelity("claude-haiku-4.5", observations), FIDELITY_UNKNOWN);
+    // Probed and silent, and never probed: both say nothing too.
+    assert.equal(modelFidelity("gemini-3.8-flash", observations), FIDELITY_UNKNOWN);
+    assert.equal(modelFidelity("gpt-5.5", observations), FIDELITY_UNKNOWN);
+    // A round on the direct-API path carries the provider's own statement.
+    const rounds = roundObservations([
+      { requested_model: "gpt-5.6-terra", served_model: "gpt-5.6-terra", transport: "api" },
+      { requested_model: "gpt-5.4", served_model: null, transport: "api" },
+      { served_model: "orphan", transport: "api" },
+    ]);
+    assert.equal(modelFidelity("gpt-5.6-terra", rounds), FIDELITY_HONOURED);
+    assert.equal(modelFidelity("gpt-5.4", rounds), FIDELITY_UNKNOWN);
+  });
+
+  it("does not launder a seat's echo into a provider's word by wrapping a round around it", () => {
+    // Round 2's finding. The two specimens are IDENTICAL but for where they
+    // came from: on the direct-API path `served_model` is read out of the
+    // provider's response body, and on a Copilot seat the very same field
+    // carries the CLI's echo. A reading that called both a provider's
+    // statement would make the substitution this whole rule refuses, one
+    // level up -- an echo becoming evidence by having a round around it.
+    const pair = { requested_model: "gpt-5.4", served_model: "gpt-5.4" };
+    const overApi = roundObservations([{ ...pair, transport: "api" }]);
+    const overSeat = roundObservations([{ ...pair, transport: "copilot-cli" }]);
+    assert.equal(modelFidelity("gpt-5.4", overApi), FIDELITY_HONOURED);
+    assert.equal(modelFidelity("gpt-5.4", overSeat), FIDELITY_UNKNOWN);
+    // A round that names no transport is read as the weaker kind: unlabelled
+    // is old rather than trustworthy.
+    assert.equal(modelFidelity("gpt-5.4", roundObservations([pair])), FIDELITY_UNKNOWN);
+    // The seat can still testify against itself, whatever the transport.
+    assert.equal(
+      modelFidelity(
+        "gpt-5.4",
+        roundObservations([
+          { requested_model: "gpt-5.4", served_model: "gpt-5-mini", transport: "copilot-cli" },
+        ]),
+      ),
+      FIDELITY_SUBSTITUTED,
     );
   });
 });

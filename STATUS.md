@@ -1,7 +1,71 @@
-# STATUS — sessions 113–146 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- and session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat; **2.1.0 is TAGGED AND PUBLISHED — the operator authorised it in session 146 and `vsix-v2.1.0` is on origin, so CI's marketplace environment is where it now waits for a reviewer**
+# STATUS — sessions 113–147 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.1 IS PUBLISHED to the Marketplace, carrying 143–147. 2.1.0 never shipped** — its publish job refused over a red Test on 146's commit (a walk-jobs timeout on the runner), so `vsix-v2.1.0` stands on origin unpublished and 2.1.1 supersedes it
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 147 CLOSED, 2026-09-10 — the stop a developer can act on, and 2.1.1 published
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 147 | a stop that says what refused, who acts, what each way on costs and the command for it; the reason on the terminal it points at; a standing dispute put to the operator as a question; and no button that runs the engine's command | CLOSED VERIFIED at round 3 (rounds 1 and 2 each blocked on something real), landed `79c1fb66`, closed after. **`vsix-v2.1.1` is TAGGED AND PUBLISHED**: the operator authorised it in-session and CI published `DarndestDabbler.dabbler-ai-orchestration v2.1.1` without waiting on a reviewer |
+>
+> **The fault this session exists to end: one sentence served ten unlike
+> stops.** `Next: you. Read the round's reason above and put it right, then
+> <resume>.` was `driver.ts`'s answer to every bound the loop can meet — over a
+> stop whose actor was the ENGINE, pointing at a reason no surface had shown,
+> naming nothing to put right, with a command that reads as starting something.
+> A stop now renders four things: `happened` (the record's own reason, after
+> the situation's sentence), `actor` (`engine` | `operator` | `either`, a field
+> and not a word inside prose), `choices` (label, cost, command — best first),
+> and `ways`, the one formatter every surface prints them with.
+>
+> **A stop's kind is the bound it met; `code` is which refusal it was.** New
+> closed vocabulary on `run.json`: `no-verdict`, `provider-unreachable`,
+> `dispute-refused`, `cap-unresolved`, `cap-disputed`,
+> `cap-terminal-tree-moved`. Absent is legal and means the kind is the whole
+> stop — every run written before this carries none. A new refusal is named in
+> `driver-run.schema.json` before it can be recorded, so no site can invent a
+> slug that reaches a surface unrendered.
+>
+> **`recordDispute` hands back the words it refused in.** It returns
+> `{exit, refusal}` now: the driver files the engine's disputes, and an exit
+> code alone put `refused (exit 2)` on the record while the sentence that
+> actually refused it — an evidence file over the 16 KB inline cap, which is
+> the stop that started all of this in 144 — went to a stream nothing kept.
+>
+> **A standing dispute is put to the operator before anything is spawned.**
+> `phaseVerify` reads `cap-disputed` off the record, and the stop carries a
+> BRIEF — each contested finding, the grounds filed against it, what that
+> argument cites — which rides to the stop's own owed decision and never to
+> `run.json`, because the reason there is what the deadlock classifier
+> compares. The refusal's words are `capDisputedRefusal`, read by both `verify`
+> and the driver, so the two readers of one state cannot disagree.
+>
+> **`Resume Session` is withheld while the stop is the engine's to clear.** The
+> projection names `stopActor` on the in-flight row (`standingStopActor`, the
+> same reading the blocked task row folds), and the Work Explorer keys on it.
+> `session run` calls `next`, and one instruction has exactly one caller: the
+> operator clicked that button at a stop that was the engine's and became a
+> second driver on a live loop. Every other state keeps the action it had.
+>
+> **What the rounds caught, and all of it was real.** Round 1: the terminal
+> dropped the stop's `code` on its way to `renderStop` (so a `cap-disputed`
+> stop read as the engine's and offered `session next`); the driver's own
+> stderr printed three of the four things it knew; and a provider that could
+> not be reached was still collapsed into `no-verdict`. Round 2: the terminal
+> line carried only the FIRST command and no costs at all. Both were fixed at
+> the source — `ways` is formatted once in `driver.ts` and printed by the
+> driver's stderr and the terminal alike.
+>
+> **Owed to 148, from round 2 (a nit, not dispositioned):** no test drives
+> `phaseVerify` through an actual `EXIT_CALL_FAILED` verification result to
+> prove the persisted stop code is `provider-unreachable` rather than
+> `no-verdict`; the mapping is asserted only at the rendering. `EXIT_UNAVAILABLE`
+> is deliberately NOT read as unreachability — three unlike causes share it —
+> and if that is to change, `verify` needs an exit of its own first.
+>
+> **Still owed from 146:** prove that refreshing the seat's LIST preserves an
+> existing confirmation, and give the seat-transport projection test a fixture
+> catalog so its retirement assertion cannot go vacuous.
 > ## SESSION 146 CLOSED, 2026-09-10 — every model list is free, and the code now says so
 >
 > | session | what | state |

@@ -1,7 +1,71 @@
-# STATUS — sessions 113–145 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, and session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list is still the direct-API registry on a Copilot seat; **2.1.0 is STAMPED AND HELD — the operator answered its publication decision with *not yet* until the pane is right on a seat; vsix-v2.0.21 is tagged and CI still awaits a reviewer, so the Marketplace serves 2.0.20**
+# STATUS — sessions 113–146 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- and session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat; **2.1.0 is TAGGED AND PUBLISHED — the operator authorised it in session 146 and `vsix-v2.1.0` is on origin, so CI's marketplace environment is where it now waits for a reviewer**
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 146 CLOSED, 2026-09-10 — every model list is free, and the code now says so
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 146 | the seat's own list read free over its protocol, the free records refreshing themselves at session start, a withdrawn model marked rather than dropped, every cost naming its billing platform, and the pane offering a seat's models on a seat | CLOSED VERIFIED at round 2 (rounds 2 and 3 nits only), landed `9ddb7434`, closed `89acf1a4`. **`vsix-v2.1.0` is TAGGED AND PUSHED**: the operator authorised the publication in-session, so the Marketplace waits only on CI's reviewer |
+>
+> **The finding this session exists to stop being re-derived: enumerating models
+> is free on every surface.** `session/new` over `copilot --acp` answers with
+> `models.availableModels` -- measured again here on 2026-09-10, CLI 1.0.83: 28
+> entries in 3 seconds, no token, no credit, 27 models plus the seat's own `auto`
+> alias. The maintained catalog had 18: sixteen models it had never heard of,
+> seven it carried that the seat no longer serves, and five sampled costs that
+> disagree with the seat's own statement. `enumerateSeatModels` is the reading,
+> `dabbler copilot refresh --list-only` is the free scope that records it, and
+> `docs/model-and-pricing-sources.md` carries the measurement with its date.
+>
+> **The probe is kept for entitlement and can no longer enumerate.** It neither
+> adds an entry nor removes one; `candidate_universe` is written from the free
+> reading and the file's own stale note -- the sentence three engines reasoned
+> from -- is rewritten by the writer, because hand-editing that file is what the
+> digest exists to catch.
+>
+> **Two records, two clocks, one of them free.** The seat catalog holds what the
+> seat lists (free, `enumerated_at`, 24h) and which models answered (a billed
+> turn each, `probed_at`, 720h), and they are dated separately because while
+> there was one row the free half inherited the priced half's month. Both free
+> records now refresh themselves before a session's work: `refreshStaleRecords`
+> re-reads the API record and the seat's list at `session start`, best-effort,
+> never blocking, and with no priced call in the path at any age.
+>
+> **Marked, never deleted.** A model an answering vendor stops returning keeps
+> its entry, its last-seen date and a `retired_at`; it stops being offered, shows
+> up in `dabbler discovery drift`, and is offered again if it comes back. One bad
+> enumeration cannot remove the only verifier a role had. `retiredModels` is the
+> one reading the drift diff and the pane's offer both go through.
+>
+> **145's defect is fixed where it belonged.** `roleReading` takes the enumeration
+> from the transport in force -- the seat's confirmed catalog on `copilot-cli`,
+> the registry on `api` -- and hands it to the same `resolveRole`. Walked live:
+> with no `DABBLER_*_API_KEY` set at all, the seat path offers 11 authoring
+> candidates and withholds 4 retired ones; every row says which record it read.
+>
+> **A held release had no forward path, and now it has one.** An answer is
+> settled, so 2.1.0's *not yet* could never be asked again and the release stayed
+> held after the defect was fixed. `dabbler release --reask --reason <why>`
+> supersedes the hold and re-raises the same brief; it authorises nothing, and it
+> refuses to re-ask an answer that already authorised a tag. The fold also stopped
+> carrying an old answer across a fresh `raised` row, which would have left a
+> re-asked release reading as settled.
+>
+> **What the rounds caught.** Round 1 found both blocking things above (the free
+> seat list not refreshing, and `--stale` able to spend a billed probe on a model
+> just marked retired) and one nit that was factually wrong -- disputed with the
+> lockfile's own lines, and WITHDRAWN by the verifier in round 2. The run of
+> record then caught two new tests shelling out to git through `loadConfig`'s
+> project-root lookup: **a suite may not read the machine it runs on**, and the
+> same lesson landed twice this session -- a step check refused two tests that
+> inherited `DABBLER_TRANSPORT` from the operator's environment.
+>
+> **Owed to 147, from rounds 2 and 3 (nits, no findings):** prove that refreshing
+> the seat's LIST preserves an existing confirmation (the test only shows
+> unconfirmed rows), and give the seat-transport projection test a fixture catalog
+> so its retirement assertion cannot go vacuous when the shipped one has no
+> retired entry.
 > ## SESSION 145 CLOSED, 2026-09-10 — the configuration an operator sets once, and the seat gap it uncovered
 >
 > | session | what | state |

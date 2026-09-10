@@ -322,6 +322,21 @@ export interface DepsVerbs {
   scaffold(options: DepsRepositoryOptions): Promise<RouterResult<RouterText>>;
 }
 
+/**
+ * One setting the operator chose, for the NEXT session.
+ *
+ * Absent means untouched, not cleared: a surface that sets one row must not
+ * silently reset the two beside it. The engine is deliberately not here --
+ * `session start` takes it as an argument, so its default belongs to the
+ * surface that offers to start one rather than to the router's config.
+ */
+export interface ConfigureOptions extends RepositoryTarget {
+  readonly transport?: string;
+  /** By registry alias or by model id; the router accepts either. */
+  readonly authoringModel?: string;
+  readonly verifyingModel?: string;
+}
+
 export interface VerifyReanchorOptions extends RepositoryTarget {
   /** Only a commit at or before the round is legal; the router enforces it. */
   readonly commit: string;
@@ -483,6 +498,15 @@ export interface Router {
    */
   workspace(options: RepositoryTarget): Promise<RouterResult<RouterText>>;
 
+  /**
+   * Set what the next session is run with, and re-derive the projection.
+   *
+   * It refuses rather than accepting a choice the dispatch would not honour:
+   * a verifying model on the authoring model's own provider, or one below
+   * its declared capability tier, comes back as a refusal in the selection
+   * rule's own words.
+   */
+  configure(options: ConfigureOptions): Promise<RouterResult<RouterText>>;
   bootstrap(options: BootstrapOptions): Promise<RouterResult<RouterText>>;
   /** The selected tests, why each was selected, and the command to run. */
   affected(options: AffectedOptions): Promise<RouterResult<RouterText>>;

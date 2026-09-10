@@ -34,10 +34,10 @@
 // config that means one thing to each router is the drift the port exists to
 // remove.
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
 
-import { parse as parseYaml } from "yaml";
+import { parseDocument, parse as parseYaml } from "yaml";
 
 import { ASSET_DIR, SCHEMA_DIR } from "./paths.ts";
 import { repoRootFor } from "./journal.ts";
@@ -443,6 +443,7 @@ export function loadConfigFrom(sources: ConfigSources): RouterConfig {
   }
 
   const providerNames = Object.keys(record(config["providers"]));
+  const tierNames = capabilityTiers(config);
   for (const [modelName, modelConfig] of Object.entries(
     record(config["models"]),
   )) {
@@ -451,6 +452,17 @@ export function loadConfigFrom(sources: ConfigSources): RouterConfig {
       throw new ConfigError(
         `Model '${modelName}' references unknown provider ` +
           `'${String(provider)}'. Available: ${renderList([...providerNames].sort())}`,
+      );
+    }
+    // The same rule one line above, for the other thing a model entry names
+    // that something else declares. A misspelt tier would otherwise read as
+    // an ABSENT one, and absent means unknown -- so the model would quietly
+    // stop being held to a floor instead of failing where it was written.
+    const tier = record(modelConfig)["capability_tier"];
+    if (tier !== undefined && tier !== null && !tierNames.includes(String(tier))) {
+      throw new ConfigError(
+        `Model '${modelName}' names capability_tier '${String(tier)}', ` +
+          `which capability_tiers does not declare. Declared: ${renderList(tierNames)}`,
       );
     }
   }
@@ -470,6 +482,20 @@ export function loadConfigFrom(sources: ConfigSources): RouterConfig {
 
 function renderList(items: readonly string[]): string {
   return `[${items.map((item) => `'${item}'`).join(", ")}]`;
+}
+
+/**
+ * The declared capability tiers, most capable first.
+ *
+ * The ORDER is the whole content: a tier name means its position in this
+ * list and nothing else, which is what lets a vendor's next release be
+ * absorbed by editing data instead of a comparison in code. Empty where none
+ * is declared, and an empty order holds nobody to anything -- a repository
+ * that has not ranked its models has not asked for a floor.
+ */
+export function capabilityTiers(config: RouterConfig): string[] {
+  const declared = config["capability_tiers"];
+  return (Array.isArray(declared) ? declared : []).map((tier) => String(tier));
 }
 
 /**
@@ -734,8 +760,38 @@ export function driverEngineOutput(config: RouterConfig): EngineOutput {
 
 // --- Transport and generation params -----------------------------------------
 
+/** The names of the three layers a transport can be set at, in precedence order. */
+export const TRANSPORT_SOURCE_FLAG = "--transport flag";
+export const TRANSPORT_SOURCE_ENV = `${TRANSPORT_ENV_VAR} env var`;
+export const TRANSPORT_SOURCE_CONFIG = "transport.profile";
+
+/** One layer that named a transport: where it was set, and to what. */
+export interface TransportLayer {
+  readonly source: string;
+  /** As it was written, before normalisation -- the operator has to recognise it. */
+  readonly value: string;
+}
+
 /**
- * The effective transport for routine dispatch.
+ * Which transport is effective, and which layer decided it.
+ *
+ * `layers` is every layer that named one, in precedence order, so the first
+ * of them is the one that decided; `decidedBy` is null when none did and the
+ * default stands. A surface that shows a person a transport control needs
+ * both halves: a value alone cannot say that the setting they are looking at
+ * is being shadowed by one above it, and that is the failure this repository
+ * has already had -- a persisted `DABBLER_TRANSPORT` deciding the cost of
+ * every session while the config said otherwise.
+ */
+export interface TransportReading {
+  readonly transport: string;
+  readonly decidedBy: string | null;
+  readonly layers: readonly TransportLayer[];
+}
+
+/**
+ * The effective transport for routine dispatch, with the layers that named
+ * one.
  *
  * Precedence: CLI flag > `DABBLER_TRANSPORT` env var (the operator's standing
  * preference) > `transport.profile` in the loaded config > default `api`. The
@@ -745,28 +801,141 @@ export function driverEngineOutput(config: RouterConfig): EngineOutput {
  * answer. An unknown value fails loud at whichever level supplied it. This
  * selects the transport for routine dispatch; verifier selection may still use
  * the other transport when provider independence requires it.
+ *
+ * Only the DECIDING layer is validated, which is what `resolveTransport` has
+ * always done: a layer nothing reads has never been able to fail a call, and
+ * a reading that started refusing over a shadowed value would refuse calls
+ * that work today.
  */
+export function explainTransport(
+  config: RouterConfig,
+  cliFlag?: string | null,
+): TransportReading {
+  const candidates: ReadonlyArray<readonly [string, unknown]> = [
+    [TRANSPORT_SOURCE_FLAG, cliFlag ?? null],
+    [TRANSPORT_SOURCE_ENV, process.env[TRANSPORT_ENV_VAR] || null],
+    [TRANSPORT_SOURCE_CONFIG, record(config["transport"])["profile"] ?? null],
+  ];
+  const layers: TransportLayer[] = candidates
+    .filter(([, value]) => value !== null && value !== undefined)
+    .map(([source, value]) => ({ source, value: String(value) }));
+  const decided = layers[0];
+  if (decided === undefined) {
+    return { transport: TRANSPORT_API, decidedBy: null, layers };
+  }
+  const normalized = decided.value.trim().toLowerCase();
+  if (!(VALID_TRANSPORTS as readonly string[]).includes(normalized)) {
+    throw new ConfigError(
+      `${decided.source} must be one of ${renderList(VALID_TRANSPORTS)}, ` +
+        `got '${decided.value}'`,
+    );
+  }
+  return { transport: normalized, decidedBy: decided.source, layers };
+}
+
+/** The effective transport, which is `explainTransport` with the reasons dropped. */
 export function resolveTransport(
   config: RouterConfig,
   cliFlag?: string | null,
 ): string {
-  const candidates: ReadonlyArray<readonly [string, unknown]> = [
-    ["--transport flag", cliFlag ?? null],
-    [`${TRANSPORT_ENV_VAR} env var`, process.env[TRANSPORT_ENV_VAR] || null],
-    ["transport.profile", record(config["transport"])["profile"] ?? null],
-  ];
-  for (const [source, value] of candidates) {
-    if (value === null || value === undefined) continue;
-    const normalized = String(value).trim().toLowerCase();
-    if (!(VALID_TRANSPORTS as readonly string[]).includes(normalized)) {
+  return explainTransport(config, cliFlag).transport;
+}
+
+// --- Writing the machine's own choice ---------------------------------------
+//
+// One writer, and it is here because this module is what decides what a
+// config MEANS -- a second writer somewhere else would eventually write a
+// key this loader refuses, or write it at a layer that something above
+// silently overrides.
+//
+// The overlay is the layer a machine's choice belongs at: gitignored, merged
+// last over the distribution, and refused the blocks the repository owns. A
+// choice written into the tracked `dabbler.yaml` would be one machine
+// deciding for every machine, and one written into the packaged
+// `router-config.yaml` would not survive an install.
+
+/** What the operator chose; an absent member is a thing they did not touch. */
+export interface ConfigurationChoice {
+  readonly transport?: string;
+  /** The `roles.generator` model, by the id the transport puts on the wire. */
+  readonly authoringModel?: string;
+  /** The `roles.verifier` model, likewise. */
+  readonly verifyingModel?: string;
+}
+
+/** What was written, and where. */
+export interface ConfigurationWrite {
+  readonly path: string;
+  /** One line per setting changed, in the words a person reads. */
+  readonly changed: readonly string[];
+}
+
+const OVERLAY_HEADER =
+  " Machine-local overrides for this checkout. Gitignored and never" +
+  " published: it states a fact about this machine, not about the project.";
+
+/**
+ * Put a model at the head of a role's preference order.
+ *
+ * The head and not the whole list: a preference order is an order rather
+ * than a permission, and replacing it with one entry would turn a choice of
+ * what to try FIRST into a declaration that nothing else may be tried --
+ * which is how a role comes to have no candidate at all the day that model
+ * is unreachable.
+ */
+function preferFirst(existing: unknown, modelId: string): string[] {
+  const order = (Array.isArray(existing) ? existing : []).map((entry) => String(entry));
+  return [modelId, ...order.filter((entry) => entry !== modelId)];
+}
+
+/**
+ * Write the operator's choice into the machine-local overlay, keeping
+ * whatever else the file says.
+ *
+ * The document is EDITED rather than re-serialised from a parse: the overlay
+ * in a working checkout carries the operator's own comments about why this
+ * machine is set up the way it is, and a writer that dropped them would be
+ * charging them their notes for using a control.
+ *
+ * This validates shape and nothing else. Whether a chosen verifier may
+ * review a chosen author is a question about selection, and it is asked
+ * before this is called -- config.ts knowing about roles' semantics would
+ * be an import cycle and, worse, a second home for a rule selection owns.
+ */
+export function writeConfigurationChoice(
+  root: string,
+  choice: ConfigurationChoice,
+): ConfigurationWrite {
+  const path = join(root, LOCAL_OVERRIDES_FILENAME);
+  const document = existsSync(path)
+    ? parseDocument(readText(path))
+    : parseDocument(`# ${OVERLAY_HEADER.trim()}\n`);
+  const changed: string[] = [];
+  if (choice.transport !== undefined) {
+    const transport = choice.transport.trim().toLowerCase();
+    if (!(VALID_TRANSPORTS as readonly string[]).includes(transport)) {
       throw new ConfigError(
-        `${source} must be one of ${renderList(VALID_TRANSPORTS)}, ` +
-          `got '${String(value)}'`,
+        `transport must be one of ${renderList(VALID_TRANSPORTS)}, ` +
+          `got '${choice.transport}'`,
       );
     }
-    return normalized;
+    document.setIn(["transport", "profile"], transport);
+    changed.push(`transport.profile is now '${transport}'`);
   }
-  return TRANSPORT_API;
+  // Read as plain data rather than as nodes: `getIn` hands back the YAML
+  // node for a sequence, and a node is not an array.
+  const current = record(document.toJS() as unknown);
+  for (const [role, model] of [
+    ["generator", choice.authoringModel],
+    ["verifier", choice.verifyingModel],
+  ] as const) {
+    if (model === undefined) continue;
+    const order = preferFirst(record(record(current["roles"])[role])["prefer"], model);
+    document.setIn(["roles", role, "prefer"], order);
+    changed.push(`roles.${role} tries '${model}' first`);
+  }
+  writeFileSync(path, document.toString(), "utf8");
+  return { path, changed };
 }
 
 /**

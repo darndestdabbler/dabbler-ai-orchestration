@@ -29,6 +29,12 @@ export {
 // restating it.
 export { spawnProgram, terminateTree } from "./checks.ts";
 
+// The transports there are, and the variable that outranks a config file's
+// answer about which one. The Configuration pane offers the choice and says
+// what would shadow it, and a surface with a list of its own would be the
+// second copy of a vocabulary -- which is the drift that has already been
+// paid for once here, in a phase list that was written down twice.
+export { VALID_TRANSPORTS, TRANSPORT_ENV_VAR } from "./config.ts";
 // The token a gate that judged nothing carries after its name. It is on the
 // contract because the terminal paints a gate row's mark as the bytes pass
 // and has to tell "passed" from "judged nothing", which wear the same mark.

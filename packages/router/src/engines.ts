@@ -36,7 +36,8 @@
 // shape is, not hidden.
 
 import type { ChildProcess } from "node:child_process";
-import { basename } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, delimiter, join } from "node:path";
 
 import { spawnProgram, terminateTree } from "./checks.ts";
 import type { DriverInstruction } from "./generated/index.ts";
@@ -101,6 +102,118 @@ export { DEFAULT_ENGINE_OUTPUT, ENGINE_OUTPUT_MODES, type EngineOutput } from ".
 
 /** The engines `session start` registers that have a built-in argv here. */
 export const BUILT_IN_ENGINES = ["claude-code", "copilot", "codex"] as const;
+
+/**
+ * The program each built-in engine is launched as.
+ *
+ * One statement, read by `engineShape` for the argv and by
+ * `installedEngines` for the lookup. Two copies of "which program is Claude
+ * Code" is how a vendor's rename comes to be made in one of them.
+ */
+const ENGINE_PROGRAM = {
+  "claude-code": "claude",
+  copilot: "copilot",
+  codex: "codex",
+} as const;
+
+/** The program that engine is launched as, or null for one with no built-in shape. */
+export function engineProgram(engine: string): string | null {
+  return (ENGINE_PROGRAM as Record<string, string | undefined>)[engine] ?? null;
+}
+
+/** One engine's CLI, and where this machine has it. */
+export interface EngineInstallation {
+  readonly engine: string;
+  readonly program: string;
+  /** Where it was found on PATH; null when it was not found at all. */
+  readonly path: string | null;
+}
+
+/**
+ * What this machine has, and what that decides.
+ *
+ * `chosen` is an engine only where the machine leaves no choice to make --
+ * exactly one CLI installed. `reason` is filled in every case, including
+ * that one: a default an operator cannot see the reason for is a thing that
+ * happened to them, and the sentence is the difference.
+ */
+export interface EngineReading {
+  readonly engines: readonly EngineInstallation[];
+  readonly chosen: string | null;
+  readonly reason: string;
+}
+
+/**
+ * The first `program` on PATH, or null.
+ *
+ * A LOOKUP and never a spawn: this answers a surface that repaints whenever
+ * a declaration moves, and running three CLIs to draw a row would put a
+ * process launch behind opening a pane. What it establishes is therefore
+ * narrower than "it runs", and that is the honest claim -- a name on PATH.
+ */
+function lookupOnPath(
+  program: string,
+  env: Readonly<Record<string, string | undefined>>,
+): string | null {
+  const search = (env["PATH"] ?? env["Path"] ?? "").split(delimiter).filter(Boolean);
+  // On Windows a bare name is not executable: what makes `claude` runnable
+  // is `claude.cmd` (or another PATHEXT member), and a lookup that ignored
+  // that would report every engine missing on the platform this framework
+  // is developed on.
+  const extensions =
+    process.platform === "win32"
+      ? (env["PATHEXT"] ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean)
+      : [""];
+  for (const directory of search) {
+    for (const extension of extensions) {
+      const candidate = join(directory, `${program}${extension}`);
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+/**
+ * Which engine CLIs this machine has, and the one that follows from it.
+ *
+ * `env` is a parameter rather than a read of `process.env` so that what the
+ * reading says is a function of the PATH it was handed, and not of whichever
+ * CLIs the machine running the suite happens to have installed.
+ */
+export function installedEngines(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): EngineReading {
+  const engines: EngineInstallation[] = BUILT_IN_ENGINES.map((engine) => {
+    const program = ENGINE_PROGRAM[engine];
+    return { engine, program, path: lookupOnPath(program, env) };
+  });
+  const present = engines.filter((entry) => entry.path !== null);
+  const quoted = present.map((entry) => `\`${entry.program}\``);
+  const names =
+    quoted.length < 2
+      ? quoted.join("")
+      : `${quoted.slice(0, -1).join(", ")} and ${quoted[quoted.length - 1]}`;
+  if (present.length === 1) {
+    const only = present[0] as EngineInstallation;
+    return {
+      engines,
+      chosen: only.engine,
+      reason:
+        `${names} is the only engine CLI on PATH, so it is the engine the ` +
+        "next session is offered. Install another and this becomes a choice.",
+    };
+  }
+  return {
+    engines,
+    chosen: null,
+    reason:
+      present.length === 0
+        ? "No engine CLI is on PATH, so nothing is chosen here. Install one, " +
+          "or name the engine yourself at `session start`."
+        : `${names} are on PATH, so which one runs a session is a choice ` +
+          "rather than a default, and nothing is chosen for you.",
+  };
+}
 
 /**
  * The one sentence on the command line; everything else is in the file.
@@ -178,7 +291,7 @@ export function engineShape(engine: string, model: string | null): EngineShape |
       // no id to name, this starts a fresh one rather than guessing: a lost
       // context costs a re-read, and the wrong context costs the session.
       return {
-        program: "claude",
+        program: ENGINE_PROGRAM["claude-code"],
         input: "stdin",
         argv: ({ resumeId }) => [
           "-p",
@@ -210,7 +323,7 @@ export function engineShape(engine: string, model: string | null): EngineShape |
       // price; the wrong conversation is not a price, it is a wrong answer.
       if (!model) return "a Copilot seat names its model: pass --model";
       return {
-        program: "copilot",
+        program: ENGINE_PROGRAM.copilot,
         input: "argv",
         argv: (_context, prompt) => [
           "-p", prompt,
@@ -229,7 +342,7 @@ export function engineShape(engine: string, model: string | null): EngineShape |
       // rather than `resume --last`, which picks whatever ran most recently
       // in this directory and carries the same hazard `--continue` did.
       return {
-        program: "codex",
+        program: ENGINE_PROGRAM.codex,
         input: "argv",
         argv: ({ resumeId }, prompt) => [
           "exec",

@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: modules, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
-  "version": "2.0.21",
+  "version": "2.1.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -178,6 +178,30 @@
         "icon": "$(lock)"
       },
       {
+        "command": "dabblerSolution.setEngine",
+        "title": "Set Engine for the Next Session",
+        "category": "Dabbler",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "dabblerSolution.setTransport",
+        "title": "Set Transport for the Next Session",
+        "category": "Dabbler",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "dabblerSolution.setRoleModel",
+        "title": "Set Model for the Next Session",
+        "category": "Dabbler",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "dabblerSolution.refreshRecord",
+        "title": "Refresh the Model Record",
+        "category": "Dabbler",
+        "icon": "$(sync)"
+      },
+      {
         "command": "dabblerSolution.showImpact",
         "title": "Show Impact",
         "category": "Dabbler",
@@ -273,6 +297,22 @@
         },
         {
           "command": "dabblerSolution.revokeModule",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.setEngine",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.setTransport",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.setRoleModel",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.refreshRecord",
           "when": "false"
         },
         {
@@ -377,6 +417,26 @@
           "command": "dabblerSolution.revokeModule",
           "when": "view == dabblerSolutionTree && viewItem =~ /;granted/",
           "group": "2_grant@2"
+        },
+        {
+          "command": "dabblerSolution.setEngine",
+          "when": "view == dabblerSolutionTree && viewItem == dabblerConfigEngine",
+          "group": "1_set@1"
+        },
+        {
+          "command": "dabblerSolution.setTransport",
+          "when": "view == dabblerSolutionTree && viewItem == dabblerConfigTransport",
+          "group": "1_set@1"
+        },
+        {
+          "command": "dabblerSolution.setRoleModel",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfigRole;/",
+          "group": "1_set@1"
+        },
+        {
+          "command": "dabblerSolution.refreshRecord",
+          "when": "view == dabblerSolutionTree && viewItem == dabblerConfigRecord",
+          "group": "1_set@1"
         },
         {
           "command": "dabblerSolution.openRepository",
@@ -524,6 +584,11 @@
           ],
           "default": "editor",
           "markdownDescription": "Where **Start Session** puts the AI CLI and the Dabbler terminal. A terminal cannot be moved after it is created, so this decides where each one opens; terminals already open keep the location they were opened at."
+        },
+        "dabbler.engine": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Which engine **Start Session** offers first. It is a default for the NEXT session and never changes one in flight: engine identity is recorded per session at `session start` and is on the record from that moment.\n\nSet it from the **Configuration** section of the Dabbler AI Orchestration pane, where the engines this machine actually has are listed beside it. Empty means nothing has been chosen, and the pick opens on whatever is installed."
         }
       }
     },
@@ -559,7 +624,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.9",
-    "dabbler-ai-router": "2.0.21",
+    "dabbler-ai-router": "2.1.0",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",

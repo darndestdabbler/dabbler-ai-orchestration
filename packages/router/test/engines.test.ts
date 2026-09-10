@@ -18,13 +18,14 @@ import {
   commandEngine,
   enginePrompt,
   engineShape,
+  installedEngines,
   renderClaudeCodeEvent,
   renderCodexEvent,
   type EngineInvocation,
 } from "../src/engines.ts";
 import { capture } from "../src/output.ts";
 import { EXIT_USAGE } from "../src/session.ts";
-import { tempDir } from "./support/answers.ts";
+import { seed, tempDir } from "./support/answers.ts";
 
 const NODE = process.execPath;
 
@@ -416,5 +417,30 @@ describe("what the command line refuses", () => {
     const loud = await usage("--engine", "claude-code", "--show-engine", "loud");
     assert.equal(loud.value, EXIT_USAGE);
     assert.match(loud.stderr, /invalid choice: 'loud'/);
+  });
+});
+
+describe("which engine this machine leaves to choose", () => {
+  it("chooses the only CLI on PATH and says why, and chooses nothing when there are two", () => {
+    // Both spellings, so the lookup finds one on either platform: the bare
+    // name on POSIX, the PATHEXT member on Windows. Nothing is executed --
+    // the reading is a lookup, which is what keeps opening a pane free.
+    const bin = tempDir("engines-path-");
+    seed(bin, { claude: "#!/bin/sh\n", "claude.cmd": "@echo off\n" });
+    const env = { PATH: bin, PATHEXT: ".COM;.EXE;.BAT;.CMD" };
+
+    const alone = installedEngines(env);
+    assert.equal(alone.chosen, "claude-code");
+    assert.match(alone.reason, /only engine CLI on PATH/);
+    assert.equal(alone.engines.find((entry) => entry.engine === "codex")?.path, null);
+
+    seed(bin, { copilot: "#!/bin/sh\n", "copilot.cmd": "@echo off\n" });
+    const two = installedEngines(env);
+    assert.equal(two.chosen, null);
+    // Nothing is chosen, and the sentence still says why -- a default an
+    // operator cannot see the reason for is a thing that happened to them.
+    assert.match(two.reason, /choice rather than a default/);
+
+    assert.equal(installedEngines({ PATH: tempDir("engines-empty-") }).chosen, null);
   });
 });

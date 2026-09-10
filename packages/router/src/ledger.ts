@@ -232,6 +232,40 @@ export function readRounds(repoRoot: string, sessionNumber: number): Row[] {
   return rounds;
 }
 
+/**
+ * Every round this repository has ever recorded, across every session.
+ *
+ * The evidence for "is the model we asked for the model that answered" is
+ * already here and has been since the 364-request session: each row carries
+ * `requested_model`, `served_model` and the transport that decides which
+ * kind of statement the pair is. Nothing new is stored to answer the
+ * question -- this is the reading of what was written anyway.
+ *
+ * An unreadable or absent session is skipped rather than refused. A reading
+ * that offers a surface what the record says must not be the thing that
+ * empties the surface when one old ledger will not parse.
+ */
+export function archivedRounds(repoRoot: string): Row[] {
+  const runs = join(repoRoot, ...RUNS_DIRNAME.split("/"));
+  let entries: string[];
+  try {
+    entries = readdirSync(runs);
+  } catch {
+    return [];
+  }
+  const rounds: Row[] = [];
+  for (const entry of entries) {
+    const match = /^s(\d+)$/.exec(entry);
+    if (match === null) continue;
+    try {
+      rounds.push(...readRounds(repoRoot, Number(match[1])));
+    } catch {
+      // One damaged ledger is not every ledger.
+    }
+  }
+  return rounds;
+}
+
 export function latestRound(repoRoot: string, sessionNumber: number): Row | null {
   const rounds = readRounds(repoRoot, sessionNumber);
   return rounds.length > 0 ? rounds[rounds.length - 1] : null;

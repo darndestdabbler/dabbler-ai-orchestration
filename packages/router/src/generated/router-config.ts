@@ -22,8 +22,16 @@ export type RouterConfig = {
       backoff_base_seconds: number;
     };
   }>;
+  /**
+   * How capable a model is, as an ORDER: most capable first, and a tier name means only its position here. A verifying model may not sit below the authoring model's tier, because a review is worth what the reviewer is. Data rather than a judgement compiled into a function, because capability is a thing vendors change. This list is the one home for the names -- a model whose capability_tier is not one of these is refused at load, and the shape is checked here while the membership is checked there.
+   */
+  capability_tiers?: string[];
   models: Record<string, {
     provider: string;
+    /**
+     * Which tier of capability_tiers this model sits in. Absent is UNKNOWN and never unsupported: a model the record says nothing about stays eligible, because a hard filter on missing metadata would end cross-vendor verification by accident.
+     */
+    capability_tier?: string;
     model_id?: string;
     is_enabled?: boolean;
     is_enabled_as_verifier?: boolean;

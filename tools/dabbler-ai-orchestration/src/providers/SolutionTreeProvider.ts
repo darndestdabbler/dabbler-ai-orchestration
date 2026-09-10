@@ -23,6 +23,7 @@ import {
   rootNodes,
 } from "./solutionTreeModel";
 import { reprojectSolution } from "../router/host";
+import { chosenEngine } from "../commands/configurationCommands";
 
 const PROJECTION_RELPATH = path.join(".dabbler", "solution", "projection.json");
 
@@ -170,7 +171,13 @@ export class SolutionTreeProvider
   public getTreeItem(element: SolutionNode): vscode.TreeItem {
     const p = this.projection();
     if (!p) return new vscode.TreeItem("");
-    const d = descriptorFor(element, p, { nextSessionModule: this.nextSessionModule });
+    const d = descriptorFor(element, p, {
+      nextSessionModule: this.nextSessionModule,
+      // Read at paint time rather than cached: it is a setting, and a
+      // setting changed in the settings editor must not need a window
+      // reload to reach the row that reports it.
+      chosenEngine: chosenEngine(),
+    });
 
     const item = new vscode.TreeItem(
       d.label,
@@ -187,6 +194,11 @@ export class SolutionTreeProvider
         d.icon.id,
         d.icon.tone ? new vscode.ThemeColor(TONE[d.icon.tone]) : undefined,
       );
+    }
+    // A row whose whole purpose is one action runs it when it is clicked,
+    // and takes the node so the handler knows which row it was.
+    if (d.command) {
+      item.command = { command: d.command, title: d.label, arguments: [element] };
     }
     if (element.kind === "contract" && d.contextValue === "dabblerContract") {
       const target = contractTarget(

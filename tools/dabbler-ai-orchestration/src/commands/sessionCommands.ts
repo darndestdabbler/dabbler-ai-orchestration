@@ -28,6 +28,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
+import { chosenEngine } from "./configurationCommands";
 import type { Router } from "dabbler-ai-router";
 import { SESSIONS_REL, type SessionsRepository } from "../utils/fileSystem";
 import { productionRouter } from "../router/host";
@@ -93,6 +94,19 @@ export const ENGINES: readonly EngineChoice[] = [
     modelRequired: true,
   },
 ];
+
+/**
+ * The engines to offer, with the operator's default first.
+ *
+ * First and not only: the pane sets what the NEXT session is offered, and a
+ * list that hid the others would turn a default into a decision nobody can
+ * revisit at the moment they are being asked to make it.
+ */
+export function engineOrder(preferred: string | null): readonly EngineChoice[] {
+  if (preferred === null) return ENGINES;
+  const chosen = ENGINES.filter((entry) => entry.engine === preferred);
+  return [...chosen, ...ENGINES.filter((entry) => entry.engine !== preferred)];
+}
 
 /**
  * How each engine's own CLI is launched interactively, and whether it has
@@ -292,9 +306,17 @@ export function defaultSessionRunUi(): SessionRunUi {
     pickEngine: () =>
       vscode.window
         .showQuickPick(
-          ENGINES.map((entry) => ({
+          // The default the Configuration section set, first in the list and
+          // saying that it is the default. It is offered rather than
+          // applied: identity is recorded per session at `session start`,
+          // and a start that skipped the question would be choosing on the
+          // operator's behalf at the one moment they are being asked.
+          engineOrder(chosenEngine()).map((entry) => ({
             label: entry.label,
-            description: entry.description,
+            description:
+              entry.engine === chosenEngine()
+                ? `${entry.description} — your default`
+                : entry.description,
             entry,
           })),
           {

@@ -24,6 +24,7 @@ import {
   explainRole,
   modelFidelity,
   roundObservations,
+  verifierRefusal,
   providerReachable,
   registryCandidates,
   resolveRole,
@@ -280,6 +281,46 @@ describe("enumerating the model registry", () => {
       registryCandidates(registryConfig(), "generator", ["google", "openai", "anthropic"]),
       [],
     );
+  });
+});
+
+describe("what a verifying model may be", () => {
+  it("refuses the authoring model's own provider, from the invariant's own reading", () => {
+    // Not a comparison written here: the verifying role is resolved with the
+    // authoring model's provider excluded -- the same exclusion the dispatch
+    // asserts immediately before the wire -- and the refusal names the rule
+    // that removed the candidate.
+    const config = registryConfig();
+    assert.equal(verifierRefusal(config, "opus", "gpt"), null);
+    const refused = verifierRefusal(config, "opus", "sonnet");
+    assert.match(String(refused), /authoring model's own provider/);
+    // And the OTHER reason the same reading removes a candidate still reads
+    // as its own reason rather than as this one.
+    assert.match(String(verifierRefusal(config, "opus", "gpt-mini")), /is_enabled_as_verifier/);
+  });
+
+  it("refuses a verifier below the authoring model's tier, ranked by the registry", () => {
+    // The order is data. Nothing here asserts that 'frontier' beats 'fast':
+    // it asserts that the list's own order decides, which is why reversing
+    // the list reverses the refusal.
+    const tiers = { capability_tiers: ["high", "low"] };
+    const config = registryConfig();
+    Object.assign(config, tiers);
+    const models = config["models"] as Record<string, Record<string, unknown>>;
+    models["opus"]["capability_tier"] = "high";
+    models["gpt"]["capability_tier"] = "low";
+    assert.match(String(verifierRefusal(config, "opus", "gpt")), /a review is worth what/);
+    // Upwards is fine, and so is a model the registry has not ranked: an
+    // absent tier is unknown, never unsupported.
+    assert.equal(verifierRefusal(config, "gpt", "opus"), null);
+    delete models["gpt"]["capability_tier"];
+    assert.equal(verifierRefusal(config, "opus", "gpt"), null);
+    // The registry ranks; nothing here does. With the order reversed, the
+    // same pair is refused the other way round.
+    models["gpt"]["capability_tier"] = "low";
+    config["capability_tiers"] = ["low", "high"];
+    assert.equal(verifierRefusal(config, "opus", "gpt"), null);
+    assert.match(String(verifierRefusal(config, "gpt", "opus")), /a review is worth what/);
   });
 });
 

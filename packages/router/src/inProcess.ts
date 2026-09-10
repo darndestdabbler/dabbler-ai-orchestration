@@ -41,6 +41,7 @@ import {
   type DepsRepositoryOptions,
   type DepsVerbs,
   type BootstrapOptions,
+  type ConfigureOptions,
   type LedgerVerbs,
   type ModuleCreateOptions,
   type ModuleGrantOptions,
@@ -581,6 +582,17 @@ export class InProcessRouter implements Router {
    */
   public workspace(o: RepositoryTarget): Promise<RouterResult<RouterText>> {
     return this.text("workspace", targetArgs(o), o.repoRoot);
+  }
+
+  public configure(o: ConfigureOptions): Promise<RouterResult<RouterText>> {
+    // `--repo-root` and not the cwd: the extension host stands wherever the
+    // window was opened, and the repository the operator clicked in is the
+    // one being configured.
+    const args = ["--repo-root", o.repoRoot];
+    optional(args, "--transport", o.transport);
+    optional(args, "--authoring-model", o.authoringModel);
+    optional(args, "--verifying-model", o.verifyingModel);
+    return this.text("configure", args, o.repoRoot);
   }
 
   public bootstrap(o: BootstrapOptions): Promise<RouterResult<RouterText>> {

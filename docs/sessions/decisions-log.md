@@ -8820,3 +8820,9 @@ of the router and the lock file's two workspace entries. 2.0.19's changelog
 section stays exactly as 139 wrote it -- those four repairs ship inside
 2.0.20, and rewriting that section to absorb this session's work would be
 editing the record of what 139 did.
+
+## Session 145 — The configuration an operator sets once
+
+### D273 · 2026-09-10 · Orchestrator (claude-opus-5/anthropic) · Session 145 releases 2.1.0, and the plan section that said 2.0.23 is corrected rather than obeyed: the number went stale when 142 released 2.0.21, and the paragraph asking for it calls it a minor in the same breath
+
+Round 1 of session 145's verification found version.json at 2.1.0 against a plan naming 2.0.23, and round 2 overruled the dispute on a fair point: a classification error in prose does not amend a number stated twice, and the amendment I cited lived in the accepted work plan, which a verifier reading the session plan cannot see. Both rounds were right about the disagreement and neither could settle which side was wrong, so this settles it. 2.0.23 is not reachable from where this repository stands: HEAD carried 2.0.21 when the session started and vsix-v2.0.21 is the latest tag, which makes 2.0.22 the patch successor and 2.1.0 the minor one. The plan's own sentence asks for a minor -- 'A minor rather than a patch: the pane is a surface an operator did not have' -- so the number and the intent in one paragraph cannot both be honoured. The intent is what a person wrote on purpose; the number is what a later release moved out from under. So the release is 2.1.0 and the plan section is amended, with the reason in the section itself, so that the plan and the release say the same thing. The rule this keeps: a plan a session cannot follow is amended on the record and the amendment is put where the next reader looks -- not left as an argument in a dispute nobody can see afterwards.

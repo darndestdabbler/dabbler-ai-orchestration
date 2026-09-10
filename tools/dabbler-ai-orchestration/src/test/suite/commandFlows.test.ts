@@ -45,6 +45,8 @@ import {
 import * as fs from "fs";
 import { ROUTER_VERSION } from "dabbler-ai-router";
 import { prerequisiteReport, type ToolProbe } from "../../commands/troubleshoot";
+import { setRoleModel, type ConfigurationUi } from "../../commands/configurationCommands";
+import type { ConfigurationModel } from "../../providers/solutionTreeModel";
 import type { DriveHandle } from "../../router/driveProcess";
 import { openDabblerTerminal } from "../../router/dabblerTerminal";
 import { cancellableSessionOf } from "../../commands/cancelLifecycleCommands";
@@ -1225,5 +1227,68 @@ suite("Troubleshoot's prerequisite report", () => {
     assert.ok(text.includes("DABBLER_ANTHROPIC_API_KEY is set"));
     assert.ok(text.includes("DABBLER_OPENAI_API_KEY is not set"));
     assert.ok(!text.includes("sk-ant-shouldneverbeprinted"));
+  });
+});
+
+suite("the Configuration section's model pick", () => {
+  /** A pick that records what it was offered and takes the first item. */
+  function capturingUi(): { ui: ConfigurationUi; offered: vscode.QuickPickItem[] } {
+    const offered: vscode.QuickPickItem[] = [];
+    return {
+      offered,
+      ui: {
+        confirm: () => Promise.resolve(false),
+        runVerb: () => undefined,
+        pick: (items) => {
+          offered.push(...items);
+          return Promise.resolve(undefined);
+        },
+        showInformationMessage: () => undefined,
+        showWarningMessage: () => undefined,
+        workspaceRoot: () => "D:/ws",
+        setEngine: () => Promise.resolve(),
+      },
+    };
+  }
+
+  const model = (over: Partial<ConfigurationModel>): ConfigurationModel => ({
+    alias: "a", model: "a-model", provider: "anthropic", ...over,
+  });
+
+  test("offers each model with what the record says about it, so the choice is not made blind", async () => {
+    // The row already said it; the LIST is where the choice is actually
+    // made, and a model nothing vouches for sitting beside one a provider
+    // has vouched for, with nothing to tell them apart, is the promise
+    // session 144 exists to stop this surface making.
+    const projection = {
+      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+      modules: [],
+      configuration: {
+        fidelityTransport: "api",
+        verifying: {
+          role: "verifier",
+          chosen: null,
+          candidates: [
+            model({ alias: "vouched", model: "o-vouched", provider: "openai", fidelity: "honoured" }),
+            model({ alias: "silent", model: "o-silent", provider: "openai", fidelity: "not-known" }),
+          ],
+          excludes: ["anthropic"],
+          fellThrough: false,
+        },
+      },
+    } as unknown as Projection;
+    const { ui, offered } = capturingUi();
+    const { router } = fakeRouter(0, "");
+    await setRoleModel(
+      router,
+      { node: { kind: "configRole", role: "verifying" }, projection },
+      () => undefined,
+      ui,
+    );
+    assert.strictEqual(offered.length, 2);
+    assert.ok(offered[0].description?.includes("answers as itself"), offered[0].description);
+    assert.ok(offered[1].description?.includes("not known"), offered[1].description);
+    // And what the answer is an answer ABOUT travels with it.
+    assert.ok(offered[0].description?.includes("api"));
   });
 });

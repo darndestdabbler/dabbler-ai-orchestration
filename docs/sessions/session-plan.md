@@ -8209,7 +8209,7 @@ verifying choice held to it. (5) An explicit refresh that probes and re-dates
 the record. (6) Each model carries what `modelFidelity` says of it on the
 selected transport -- honoured, substituted, or not known -- and the three
 read as three rather than as two. (7) The release: `version.json`
-to 2.0.23, stamped through `npm run stamp:version`, with a changelog section
+to 2.1.0, stamped through `npm run stamp:version`, with a changelog section
 covering 143, 144 and this session in the terms an operator reads.
 
 **Tests.** Five. The pane renders from a dated registry and issues no probe
@@ -8225,9 +8225,21 @@ assertion**, for the reason
 every surface in this repository gets none: Layer 3 catches what a screen
 looks like.
 
-**Releasable.** 2.0.23, carrying 143's terminal, 144's note and reading, and
+**Releasable.** 2.1.0, carrying 143's terminal, 144's note and reading, and
 this session's pane. A minor rather than a patch: the pane is a surface an
 operator did not have, whatever 143 and 144 were on their own.
+
+> **Amended in session 145: the number was 2.0.23 and is 2.1.0.** It was
+> written before 142 released 2.0.21, and it went stale in a way the sentence
+> beside it makes plain: 2.0.23 is a patch, and this paragraph asks for a
+> minor. From 2.0.21 -- the version at HEAD when this session started, and
+> the latest tag -- the patch successor is 2.0.22 and the minor successor is
+> 2.1.0. 2.0.23 is neither, so it was not a version this repository could
+> release under either reading. The paragraph's stated INTENT is what
+> survives; its number is corrected here rather than obeyed, and the plan and
+> the release now say the same thing. Round 2 of this session's verification
+> was right to refuse a release that disagreed with its own plan -- the fix
+> is that they agree, not that one of them is ignored.
 
 ### Session 146 of 146: The stop a developer can act on
 

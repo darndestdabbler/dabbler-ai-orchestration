@@ -133,6 +133,87 @@ export interface ProjectionBundle {
   dependencies: { module: string; package: string; version: string; digest?: string | null }[];
 }
 
+/** Which transport is effective, and which layer decided it. */
+export interface ConfigurationTransport {
+  effective: string;
+  decidedBy: string | null;
+  /** Every layer that named one, in precedence order; the first decided. */
+  layers: { source: string; value: string }[];
+}
+
+/** The engine CLIs this machine has, and what that decides on its own. */
+export interface ConfigurationEngines {
+  chosen: string | null;
+  reason: string;
+  installed: { engine: string; program: string; path: string | null }[];
+}
+
+/**
+ * What the record says about whether a model answers as itself.
+ *
+ * THREE answers and never two, which is the whole reason this field exists.
+ * A model nobody has ever asked for and a model that once answered as
+ * something else are different facts, and a surface that rendered them alike
+ * would be claiming a confidence nothing earned. `not-known` is the common
+ * case: only a provider's own statement of what answered can make a model
+ * read `honoured`, and a seat's echo can never.
+ */
+export type ModelFidelity = "honoured" | "substituted" | "not-known";
+
+/** One model, as the registry declares it and the record reads it. */
+export interface ConfigurationModel {
+  alias: string;
+  model: string;
+  provider: string;
+  /** Absent in a projection written before the record was read. */
+  fidelity?: ModelFidelity;
+}
+
+/** How a role resolves: what it would pick, and what it was resolved against. */
+export interface ConfigurationRole {
+  role: string;
+  chosen: ConfigurationModel | null;
+  candidates: ConfigurationModel[];
+  /** The providers the role was resolved AGAINST -- the invariant, made visible. */
+  excludes: string[];
+  fellThrough: boolean;
+}
+
+/** One dated record, in the words the router's own freshness reading uses. */
+export interface ConfigurationRecord {
+  record: string;
+  path: string;
+  present: boolean;
+  datedAt: string | null;
+  ageHours: number | null;
+  thresholdHours: number;
+  command: string;
+  /** What asking for a refresh buys, in the router's own words. */
+  cost?: string;
+  stale: boolean;
+  notes: string[];
+}
+
+/**
+ * What a session is run with, as the router read it.
+ *
+ * Every field is READ from a file by the router and rendered here. Nothing in
+ * this module decides any of it, and nothing in this module may go and find
+ * out: the registry is a dated record, and a pane that enumerated a vendor
+ * when it opened would charge a window for being open.
+ */
+export interface ProjectionConfiguration {
+  transport?: ConfigurationTransport;
+  /** Which transport every `fidelity` below was read for. */
+  fidelityTransport?: string;
+  engines?: ConfigurationEngines;
+  authoring?: ConfigurationRole;
+  verifying?: ConfigurationRole;
+  records?: ConfigurationRecord[];
+  /** Why there is nothing to show: a config this router could not load. */
+  unavailable?: string;
+}
+
 export interface Projection {
   solution: ProjectionSolution;
   /** In dependency order, as the router projects them. */
@@ -141,6 +222,8 @@ export interface Projection {
   members?: ProjectionMember[];
   /** The bundle records, as the router read them; recorded, never executed. */
   bundles?: ProjectionBundle[];
+  /** What a session is run with; absent in a projection written before it existed. */
+  configuration?: ProjectionConfiguration;
 }
 
 /**
@@ -171,7 +254,12 @@ export type SolutionNode =
   | { kind: "externalUsedBy"; id: string }
   | { kind: "externalConsumer"; id: string; repository: string }
   | { kind: "memberGroup" }
-  | { kind: "member"; id: string };
+  | { kind: "member"; id: string }
+  | { kind: "configuration" }
+  | { kind: "configEngine" }
+  | { kind: "configTransport" }
+  | { kind: "configRole"; role: "authoring" | "verifying" }
+  | { kind: "configRecord"; record: string };
 
 export interface RowDescriptor {
   id: string;
@@ -182,6 +270,16 @@ export interface RowDescriptor {
   /** Collapsed, never Expanded: the tree stays lazy. */
   expandable: boolean;
   contextValue?: string;
+  /**
+   * What a CLICK on the row does, by command id.
+   *
+   * Only a row whose whole purpose is one action has one, and the
+   * Configuration rows are that: a setting is a thing you click to change.
+   * It is deliberately not an inline icon -- the menu registry holds this
+   * pane to two of those, and a control that has to be discovered by
+   * right-clicking is a control most people never find.
+   */
+  command?: string;
 }
 
 function find(p: Projection, slug: string): ProjectionModule | undefined {
@@ -189,7 +287,59 @@ function find(p: Projection, slug: string): ProjectionModule | undefined {
 }
 
 export function rootNodes(): SolutionNode[] {
-  return [{ kind: "solution" }];
+  // Two roots, and the second is collapsed like everything else here: what a
+  // session is run with is a thing an operator looks at when they are
+  // deciding, not a thing that should be in the way while they are working.
+  return [{ kind: "solution" }, { kind: "configuration" }];
+}
+
+function configuration(p: Projection): ProjectionConfiguration {
+  return p.configuration ?? {};
+}
+
+function configRole(
+  p: Projection,
+  which: "authoring" | "verifying",
+): ConfigurationRole | undefined {
+  return which === "authoring" ? configuration(p).authoring : configuration(p).verifying;
+}
+
+/** How old a record is, in the units a person reads it in. */
+function agePhrase(hours: number | null): string {
+  if (hours === null) return "no readable date";
+  if (hours < 1) return "under an hour old";
+  if (hours < 48) return `${Math.round(hours)}h old`;
+  return `${Math.round(hours / 24)} days old`;
+}
+
+/**
+ * What each answer READS as, and the three are three.
+ *
+ * `not known` is not an absence of a problem and it is not approval: it is
+ * the common case, and the day it renders like `honoured` is the day this
+ * pane starts making a promise the record cannot keep.
+ */
+export const FIDELITY_WORDS: Record<ModelFidelity, string> = {
+  honoured: "answers as itself",
+  substituted: "has answered as another model",
+  "not-known": "not known",
+};
+
+const FIDELITY_TOLD: Record<ModelFidelity, string> = {
+  honoured:
+    "The provider's own statement of what answered, from a round on this transport, names this model.",
+  substituted:
+    "A record of this model answering as a DIFFERENT one. One substitution outweighs any number of matches: a model that has once answered as another is a model that can.",
+  "not-known":
+    "Nothing on this transport establishes it either way, which is the ordinary case. A seat's echo can never establish fidelity — a CLI that ignored the flag and echoed the request back would print exactly what an honoured one prints — so only a provider's own served id can.",
+};
+
+/** One model as a row reads it: the id that is dispatched, and whose it is. */
+function modelText(model: ConfigurationModel | null | undefined): string {
+  if (!model) return "nothing resolves";
+  const fidelity = model.fidelity;
+  const said = fidelity === undefined ? "" : ` · ${FIDELITY_WORDS[fidelity]}`;
+  return `${model.model} (${model.provider})${said}`;
 }
 
 function externals(p: Projection): ProjectionExternal[] {
@@ -313,6 +463,21 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
       if ((p.bundles ?? []).length > 0) own.push({ kind: "bundleGroup" });
       return own;
     }
+    case "configuration": {
+      const config = configuration(p);
+      // A row per thing a person chooses, then a row per dated record. Only
+      // what the projection carries: a section that invented a row for an
+      // absent field would be saying something the router never read.
+      const own: SolutionNode[] = [];
+      if (config.engines) own.push({ kind: "configEngine" });
+      if (config.transport) own.push({ kind: "configTransport" });
+      if (config.authoring) own.push({ kind: "configRole", role: "authoring" });
+      if (config.verifying) own.push({ kind: "configRole", role: "verifying" });
+      for (const row of config.records ?? []) {
+        own.push({ kind: "configRecord", record: row.record });
+      }
+      return own;
+    }
     case "externalGroup":
       return externals(p).map((e) => ({ kind: "external" as const, id: e.id }));
     case "bundleGroup":
@@ -398,6 +563,13 @@ const KIND_ICONS: Record<string, string> = {
  */
 export interface SolutionContext {
   readonly nextSessionModule?: string | null;
+  /**
+   * The engine the operator chose for the next session, which is a setting
+   * of this extension rather than of the router: `session start` takes the
+   * engine as an argument, so the default belongs to whoever offers to start
+   * one. Null when nobody has chosen and the machine's own reading stands.
+   */
+  readonly chosenEngine?: string | null;
 }
 
 export function descriptorFor(
@@ -697,6 +869,166 @@ export function descriptorFor(
         tooltip: pin?.drift ?? undefined,
         icon: { id: "arrow-small-right", tone: behind ? "attention" : "muted" },
         expandable: false,
+      };
+    }
+    case "configuration": {
+      const config = configuration(p);
+      const bits: string[] = [];
+      if (config.engines?.chosen) bits.push(config.engines.chosen);
+      if (config.transport) bits.push(config.transport.effective);
+      const stale = (config.records ?? []).filter((row) => row.stale).length;
+      return {
+        id: "configuration",
+        label: "Configuration",
+        description: config.unavailable
+          ? "cannot be read"
+          : bits.length > 0
+            ? bits.join(" · ")
+            : "what the next session runs with",
+        tooltip:
+          config.unavailable ??
+          "What a session is run with, read from files. Nothing here is " +
+            "probed: the model registry is a dated record, and refreshing it " +
+            "is something you ask for.",
+        icon: {
+          id: "settings-gear",
+          ...(config.unavailable || stale > 0 ? { tone: "attention" as const } : {}),
+        },
+        expandable: childrenOf(node, p).length > 0,
+        contextValue: "dabblerConfiguration",
+      };
+    }
+    case "configEngine": {
+      const engines = configuration(p).engines;
+      const installed = (engines?.installed ?? []).filter((entry) => entry.path !== null);
+      // What the OPERATOR chose outranks what the machine leaves to choose:
+      // one installed CLI is a default, and a person picking one is a
+      // decision, and a row that showed the first while the second stood
+      // would be reporting something that is not what happens.
+      const chosen = context.chosenEngine ?? engines?.chosen ?? null;
+      const theirs = (context.chosenEngine ?? null) !== null;
+      return {
+        id: "config:engine",
+        label: "Engine",
+        // What is set, and what is only a candidate, are different facts: a
+        // chosen engine reads as one, and an unchosen one says how many
+        // there are to choose from rather than naming one of them.
+        description: chosen ?? (installed.length === 0 ? "none installed" : "not chosen"),
+        tooltip: [
+          theirs
+            ? `You chose ${chosen}. Start Session offers it first.`
+            : (engines?.reason ?? "Nothing was read."),
+          "What this sets is the default for the NEXT session: the engine is recorded per session at `session start` and never changes one in flight.",
+        ].join("\n\n"),
+        icon: { id: "person", ...(chosen ? {} : { tone: "muted" as const }) },
+        expandable: false,
+        contextValue: "dabblerConfigEngine",
+        command: "dabblerSolution.setEngine",
+      };
+    }
+    case "configTransport": {
+      const transport = configuration(p).transport;
+      const shadowed = (transport?.layers ?? []).slice(1);
+      return {
+        id: "config:transport",
+        label: "Transport",
+        description: transport
+          ? `${transport.effective}${shadowed.length > 0 ? " ⚠" : ""}`
+          : "not read",
+        // The shadowing is the whole point of the row. A setting that is
+        // being overridden by one above it looks exactly like one that is
+        // in force, which is how a persisted environment variable came to
+        // decide what every session here cost.
+        tooltip: [
+          transport?.decidedBy
+            ? `Decided by ${transport.decidedBy}.`
+            : "Nothing sets one, so the default `api` stands.",
+          ...shadowed.map(
+            (layer) => `${layer.source} says '${layer.value}' and is overridden.`,
+          ),
+        ].join("\n"),
+        icon: {
+          id: "plug",
+          ...(shadowed.length > 0 ? { tone: "attention" as const } : {}),
+        },
+        expandable: false,
+        contextValue: "dabblerConfigTransport",
+        command: "dabblerSolution.setTransport",
+      };
+    }
+    case "configRole": {
+      const role = configRole(p, node.role);
+      const authoring = node.role === "authoring";
+      const excluded = role?.excludes ?? [];
+      const chosenFidelity = role?.chosen?.fidelity;
+      return {
+        id: `config:role:${node.role}`,
+        label: authoring ? "Authoring model" : "Verifying model",
+        description: `${modelText(role?.chosen)}${role?.fellThrough ? " ⚠" : ""}`,
+        tooltip: [
+          authoring
+            ? "What the framework's own calls are authored by, from the registry."
+            : excluded.length > 0
+              ? `From another provider than the authoring model's (${excluded.join(", ")}): cross-provider review is an invariant of this framework, not a preference, and this list is what enforcing it leaves.`
+              : "The model that reviews the work.",
+          role?.fellThrough
+            ? "It fell past its own preference order, so what answers is a model nobody named. That is what billed one session 364 premium requests."
+            : "",
+          // What the record says about this model answering as itself, on
+          // the transport it was read for. Said in full, because "not
+          // known" is the answer that needs the sentence.
+          chosenFidelity === undefined
+            ? ""
+            : `Is it the model that answers? ${FIDELITY_WORDS[chosenFidelity]}${
+                configuration(p).fidelityTransport
+                  ? ` on \`${configuration(p).fidelityTransport}\``
+                  : ""
+              }. ${FIDELITY_TOLD[chosenFidelity]}`,
+          `${role?.candidates.length ?? 0} model(s) qualify.`,
+        ]
+          .filter((line) => line !== "")
+          .join("\n\n"),
+        icon: {
+          id: authoring ? "edit" : "verified",
+          // A model that has answered as another is the one thing here worth
+          // a colour. Not-known is not a fault -- it is most of the list.
+          ...(role?.fellThrough || chosenFidelity === "substituted"
+            ? { tone: "attention" as const }
+            : {}),
+        },
+        expandable: false,
+        contextValue: `dabblerConfigRole;${node.role}`,
+        command: "dabblerSolution.setRoleModel",
+      };
+    }
+    case "configRecord": {
+      const row = (configuration(p).records ?? []).find(
+        (record) => record.record === node.record,
+      );
+      return {
+        id: `config:record:${node.record}`,
+        label: node.record,
+        description: row?.present ? agePhrase(row.ageHours) : "no record yet",
+        // The age is here BEFORE anyone asks for a refresh, and so is the
+        // command that would buy one: a probe costs something, and asking
+        // for one should be a decision rather than a surprise.
+        tooltip: [
+          row?.present
+            ? `Dated ${row.datedAt}; it is read as stale past ${Math.round(row.thresholdHours)}h.`
+            : `Nothing has been recorded at ${row?.path ?? "this path"} yet.`,
+          ...(row?.notes ?? []),
+          // The cost BEFORE the click, so asking for a refresh is a
+          // decision rather than a surprise. It is the only thing in this
+          // section that reaches a vendor at all.
+          `Click to run \`${row?.command ?? ""}\`. ${row?.cost ?? ""}`.trim(),
+        ].join("\n"),
+        icon: {
+          id: "database",
+          ...(row?.stale ? { tone: "attention" as const } : { tone: "done" as const }),
+        },
+        expandable: false,
+        contextValue: "dabblerConfigRecord",
+        command: "dabblerSolution.refreshRecord",
       };
     }
     case "memberGroup": {

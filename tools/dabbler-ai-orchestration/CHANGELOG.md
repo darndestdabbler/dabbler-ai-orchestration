@@ -10,6 +10,81 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.1.0] — 2026-09-10
+
+A place to see what a session will actually be run with, and to change it
+before the next one starts. Until now the engine, the transport, the model
+that authors and the model that verifies were each decided by a file you had
+to know existed, while the pane open in front of you all day said nothing
+about any of them. Nothing is configured for you and nothing about starting a
+session changes; the new section is collapsed until you open it, and opening
+it costs a disk read.
+
+A minor rather than a patch because the section is a surface you did not have
+before. 143's terminal work and 144's model-fidelity note ship inside it, and
+their notes are below.
+
+### Added
+
+- **A Configuration section in the Dabbler AI Orchestration pane.** It holds
+  what a person chooses and nothing the framework can work out for itself:
+  the engine, the transport, the authoring model and the verifying model,
+  with each dated model record and how old it is. Click a row to change it.
+  Every row says the same thing about when it applies — what you set is the
+  default for the NEXT session, because which engine ran a session is
+  recorded when that session starts and never changes underneath it.
+
+- **Engine and transport are two controls, not one.** They are two settings
+  and they can override each other, which has happened here before: a
+  `DABBLER_TRANSPORT` left in the environment quietly decided what every
+  session cost while a config file said otherwise. So the transport row
+  names the layer that decided it, and says when something above the file
+  you just wrote is overriding your choice rather than letting you believe
+  it took. Where exactly one engine CLI is installed, the pane picks it and
+  tells you it picked it and why.
+
+- **The two constraints on a verifying model are shown rather than
+  reinvented.** A verifier on the authoring model's own provider is refused,
+  in the words of the rule that already refuses it before every call —
+  cross-provider review is an invariant here, not a preference. And the
+  registry now ranks models in ordered capability tiers, so a verifier below
+  the authoring model's tier is refused too: a review is worth what the
+  reviewer is. The tiers are data in the registry, revisable when a vendor
+  ships something new.
+
+- **Every model says whether the record shows it answering as itself.**
+  Honoured, substituted, or not known — three answers, and *not known* is
+  the common one. It is read from the verification rounds this repository
+  has already recorded and from the Copilot seat's own catalog, weighed
+  differently on purpose: a provider's statement of what answered is
+  evidence, and a seat echoing back the model you asked for is not, because
+  a CLI that ignored the flag would print exactly the same thing. Nothing
+  new is probed to answer it, and *not known* is never rendered as approval.
+
+- **Refreshing a model record is something you ask for.** The section never
+  probes when it opens — the registry is a dated record and the row tells
+  you its age. Clicking one asks first, says what the refresh costs (three
+  metadata requests for the API record; a priced premium request per model
+  for the seat), and then runs it in a terminal where you can watch it.
+
+### Changed
+
+- **The Dabbler Terminal reads as one thing.** Every phase of a session is
+  announced in the same tone, whichever phase it is; the gate rows the close
+  prints and the ones a packaging run prints are drawn by one renderer
+  instead of two that had drifted apart; and a gate's mark is painted as the
+  job's own bytes arrive rather than after it finishes, so a long gate looks
+  like one that is working.
+
+- **A verification round says when the model that answered is not the model
+  it asked for.** Both were already on the record and nothing read them out:
+  the only place a substitution surfaced was a note on one transport's error
+  stream, which reached whoever happened to be watching that process. The
+  round says it now, on the round, whatever the verdict — it is a fact about
+  what you bought, so it is not a failure and does not stop anything. A
+  provider pinning a dated snapshot of the model you asked for is the model
+  you asked for and is not reported as a substitution.
+
 ## [2.0.21] — 2026-09-10
 
 For anyone whose repository was created by the host before the work went

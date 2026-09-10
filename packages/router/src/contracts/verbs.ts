@@ -181,6 +181,15 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "this repository at its remote: set which branch is the trunk",
   },
   {
+    // The pane's Configuration section is what calls it, which is why it is
+    // extension-facing: an operator choosing a model clicks a row, and the
+    // row's command is this verb. It stays typeable because the same choice
+    // has to be makeable on a machine with no editor open.
+    verb: "configure",
+    extensionFacing: true,
+    summary: "what the next session is run with: the transport, and the two models",
+  },
+  {
     verb: "contractdoc",
     extensionFacing: false,
     summary: "render a module's contract from its declaration",

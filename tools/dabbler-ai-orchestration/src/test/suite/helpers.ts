@@ -8,6 +8,7 @@ import * as path from "path";
 import { outcomeForExitCode } from "dabbler-ai-router";
 import type {
   BootstrapOptions,
+  ConfigureOptions,
   AffectedOptions,
   DepsRepositoryOptions,
   OwedAnswerOptions,
@@ -206,6 +207,8 @@ export function fakeRouter(
   router: Router;
   asked: string[];
   bootstrapOptions: BootstrapOptions[];
+  /** What the Configuration section asked the router to set. */
+  configureOptions: ConfigureOptions[];
   interruptOptions: SessionInterruptOptions[];
   owedAnswers: OwedAnswerOptions[];
   /** Which repository each writing `deps` verb was asked about. */
@@ -218,6 +221,7 @@ export function fakeRouter(
   // callers care about: setting up one project must not carry a machine-wide
   // side effect, and only the options say whether it does. The same for an
   // interrupt: Stop and Send are one verb apart by an option.
+  const configureOptions: ConfigureOptions[] = [];
   const bootstrapOptions: BootstrapOptions[] = [];
   const interruptOptions: SessionInterruptOptions[] = [];
   // And the same for an answered decision: which option the operator chose
@@ -237,6 +241,7 @@ export function fakeRouter(
   const text = (verb: string) => () => answer(verb, { stdout: message });
   return {
     bootstrapOptions,
+    configureOptions,
     interruptOptions,
     owedAnswers,
     depsCalls,
@@ -301,6 +306,10 @@ export function fakeRouter(
       bootstrap: (options: BootstrapOptions) => {
         bootstrapOptions.push(options);
         return answer("bootstrap", { stdout: message });
+      },
+      configure: (options: ConfigureOptions) => {
+        configureOptions.push(options);
+        return answer("configure", { stdout: message });
       },
       affected: (options: AffectedOptions) => {
         affectedOptions.push(options);

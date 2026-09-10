@@ -5,6 +5,7 @@ import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import { registerNewModuleCommand } from "./commands/newModule";
 import {
+  ENGINES,
   defaultDriveLauncher,
   defaultSessionRunUi,
   nextFocusedModule,
@@ -49,6 +50,12 @@ import {
 } from "./commands/openRepository";
 import { openModule } from "./commands/openModule";
 import { endGrant } from "./commands/moduleGrant";
+import {
+  refreshRecord,
+  setEngine,
+  setRoleModel,
+  setTransport,
+} from "./commands/configurationCommands";
 import { showImpact } from "./commands/showImpact";
 import { packModule } from "./commands/packModule";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
@@ -349,6 +356,44 @@ export function activate(context: vscode.ExtensionContext): void {
       await endGrant(productionRouter(), { node, projection: solutionProvider.currentProjection() });
       solutionProvider.refresh();
     }),
+    // The Configuration section's three controls. Two settings, two
+    // controls, and a third for whichever model row was clicked: the engine
+    // is this extension's own setting because `session start` takes it as an
+    // argument, and the transport and the models are the router's because
+    // they are its configuration. Each refreshes the tree, because the row
+    // the operator just set is the one they are looking at.
+    vscode.commands.registerCommand("dabblerSolution.setEngine", async (node?: SolutionNode) => {
+      // What Start Session can open is passed IN rather than imported by the
+      // command: the pick reads this extension's setting and Start Session
+      // reads it back, and a module that imported the other's list would
+      // close the loop between the two.
+      await setEngine(
+        { node, projection: solutionProvider.currentProjection() },
+        ENGINES.map((entry) => entry.engine),
+      );
+      solutionProvider.refresh();
+    }),
+    vscode.commands.registerCommand("dabblerSolution.setTransport", (node?: SolutionNode) =>
+      setTransport(
+        productionRouter(),
+        { node, projection: solutionProvider.currentProjection() },
+        () => solutionProvider.refresh(),
+      ),
+    ),
+    // The one thing in the Configuration section that reaches a vendor. It
+    // asks first, with the cost in the question, and runs in a terminal
+    // rather than in-process: the operator is paying for it, so they watch
+    // it happen.
+    vscode.commands.registerCommand("dabblerSolution.refreshRecord", (node?: SolutionNode) =>
+      refreshRecord({ node, projection: solutionProvider.currentProjection() }),
+    ),
+    vscode.commands.registerCommand("dabblerSolution.setRoleModel", (node?: SolutionNode) =>
+      setRoleModel(
+        productionRouter(),
+        { node, projection: solutionProvider.currentProjection() },
+        () => solutionProvider.refresh(),
+      ),
+    ),
     // What a change under the module would reach: the router's impact plan
     // for a hypothetical change, shown rather than computed here.
     vscode.commands.registerCommand("dabblerSolution.showImpact", (node?: SolutionNode) =>

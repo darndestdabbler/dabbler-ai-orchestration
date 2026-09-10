@@ -119,16 +119,30 @@ discovery:
   max_age_hours: 24
   seat_max_age_hours: 720
 
+# How capable a model is, as an ORDER rather than a judgement in code. Most
+# capable first, and the names mean only their position in this list: a
+# verifying model may not sit below the authoring model's tier, because a
+# review is worth what the reviewer is. It is data because capability is a
+# thing vendors change — a tier compiled into a function goes stale the week
+# after a release and nobody can see that it has. The list is the one home
+# for the names; a model naming a tier that is not here is refused at load.
+capability_tiers: [frontier, workhorse, fast]
+
 # --- Model Registry ---
 # is_enabled: in the routed pool at all (identity-only entries set false —
 #   they exist so orchestrator identity can resolve).
 # is_enabled_as_verifier: trusted to review another model's output. It is a
 #   property of the record rather than of a role, because it says what a model
 #   may be asked to do and not which order the candidates are tried in.
+# capability_tier: which tier of capability_tiers this model sits in. Absent
+#   is UNKNOWN, never unsupported: a model the record says nothing about
+#   stays eligible, because a hard filter on missing metadata would end
+#   cross-vendor verification by accident the first time a vendor ships one.
 models:
   gemini-flash:
     provider: google
     model_id: gemini-2.5-flash
+    capability_tier: fast
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 1048576
@@ -141,6 +155,7 @@ models:
   gemini-pro:
     provider: google
     model_id: gemini-2.5-pro
+    capability_tier: workhorse
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 1048576
@@ -153,6 +168,7 @@ models:
   gemini-3-1-pro:
     provider: google
     model_id: gemini-3.1-pro-preview
+    capability_tier: frontier
     is_enabled: true
     # New model: generator + explicit-call only until calibrated.
     is_enabled_as_verifier: false
@@ -166,6 +182,7 @@ models:
   sonnet:
     provider: anthropic
     model_id: claude-sonnet-5
+    capability_tier: workhorse
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 200000
@@ -181,6 +198,7 @@ models:
   opus:
     provider: anthropic
     model_id: claude-opus-5
+    capability_tier: frontier
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 200000
@@ -198,6 +216,7 @@ models:
     model_id: claude-fable-5
     # Registered, not routed: enabling it is an operator decision, not a
     # default.
+    capability_tier: frontier
     is_enabled: false
     is_enabled_as_verifier: false
     max_context_tokens: 200000
@@ -208,6 +227,7 @@ models:
   gpt-5-4:
     provider: openai
     model_id: gpt-5.4
+    capability_tier: frontier
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 272000
@@ -220,6 +240,7 @@ models:
   gpt-5-5:
     provider: openai
     model_id: gpt-5.5
+    capability_tier: frontier
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 272000
@@ -232,6 +253,7 @@ models:
   gpt-5-6-sol:
     provider: openai
     model_id: gpt-5.6-sol
+    capability_tier: frontier
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 272000
@@ -244,6 +266,7 @@ models:
   gpt-5-6-terra:
     provider: openai
     model_id: gpt-5.6-terra
+    capability_tier: frontier
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 272000
@@ -259,6 +282,7 @@ models:
   gpt-5-6-luna:
     provider: openai
     model_id: gpt-5.6-luna
+    capability_tier: workhorse
     is_enabled: true
     # Enabled so a discovery fan-out can prefer it by name, kept out of the
     # verifier pool so it can never review work it is not strong enough to
@@ -274,6 +298,7 @@ models:
   haiku:
     provider: anthropic
     model_id: claude-haiku-4-5-20251001
+    capability_tier: fast
     is_enabled: true
     # Enabled so a follow-through study can prefer it by name, kept out of the
     # verifier pool for the same reason as Luna.
@@ -286,6 +311,7 @@ models:
   gpt-5-4-mini:
     provider: openai
     model_id: gpt-5.4-mini
+    capability_tier: fast
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 400000
@@ -303,6 +329,7 @@ models:
   gemini-3-pro:
     provider: google
     model_id: gemini-3-pro-preview
+    capability_tier: frontier
     is_enabled: false
     is_enabled_as_verifier: false
     notes: "Identity registry only: Gemini Code Assist orchestrator sessions."

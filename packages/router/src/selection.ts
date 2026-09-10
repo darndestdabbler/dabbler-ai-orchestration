@@ -15,7 +15,7 @@
 // A provider whose key does not resolve is not a candidate anywhere:
 // selection can never land on a model the process could not call.
 
-import { truthy, type RouterConfig } from "./config.ts";
+import { capabilityTiers, truthy, type RouterConfig } from "./config.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
 import { resolveSecret } from "./secretResolver.ts";
 
@@ -315,6 +315,95 @@ export function explainRegistryCandidates(
 ): RoleResolution<readonly [string, string, string]> {
   return explainRole(config, role, registryEnumeration(config), excludeProviders);
 }
+
+// --- What a verifying model may be -----------------------------------------
+//
+// Two constraints, and a surface that offers a person a verifier has to hold
+// its offer to both. Neither is invented here: the first is an invariant of
+// dispatch already, and this reads it rather than restating it; the second is
+// an ORDER declared in the registry, so what "not much weaker" means is data
+// a vendor's next release can revise rather than a comparison compiled into a
+// function where it would quietly go stale.
+
+/**
+ * Where a model sits in the declared order, or null when nothing says.
+ *
+ * Null is the common answer and it is not a failure: a registry that has
+ * ranked nothing, or a model added before anybody ranked it, both land here,
+ * and both mean the same thing -- there is no floor to apply.
+ */
+export function tierRank(config: RouterConfig, alias: string): number | null {
+  const entry = record(record(config["models"])[alias]);
+  const tier = entry["capability_tier"];
+  if (typeof tier !== "string" || tier === "") return null;
+  const rank = capabilityTiers(config).indexOf(tier);
+  return rank < 0 ? null : rank;
+}
+
+/**
+ * Why this model may not verify that one, or null when it may.
+ *
+ * **The cross-provider half is not decided here.** The verifying role is
+ * resolved with the authoring model's provider excluded -- the same call the
+ * dispatch makes, applying the same exclusion it asserts again immediately
+ * before the wire -- and a model that is not among the survivors is refused
+ * with the rule that removed it. A second copy of "not the same provider"
+ * written in this function is exactly the drift the invariant cannot afford:
+ * it is load-bearing, and a copy of it would be the one that goes stale.
+ *
+ * The tier half is applied only where BOTH models declare one. An absent
+ * record is unknown and never unsupported, and a floor that refused over
+ * missing metadata would end cross-vendor verification the first week a
+ * vendor shipped a model nobody had ranked.
+ */
+export function verifierRefusal(
+  config: RouterConfig,
+  authorAlias: string,
+  verifierAlias: string,
+): string | null {
+  const models = record(config["models"]);
+  const authorProvider = String(record(models[authorAlias])["provider"] ?? "");
+  const resolution = explainRegistryCandidates(
+    config,
+    ROLE_VERIFIER,
+    authorProvider === "" ? null : [authorProvider],
+  );
+  if (!resolution.candidates.some(([, , alias]) => alias === verifierAlias)) {
+    const verifierId = String(record(models[verifierAlias])["model_id"] ?? verifierAlias);
+    const removed = resolution.removed.find((row) => row.model === verifierId);
+    return (
+      `'${verifierAlias}' cannot verify '${authorAlias}': ` +
+      (removed === undefined
+        ? "it is not a model this configuration can dispatch to -- it is " +
+          "absent from the registry, disabled, or its provider has no key."
+        : REMOVAL_REASONS[removed.rule] ??
+          `the '${ROLE_VERIFIER}' role removed it (${removed.rule}).`)
+    );
+  }
+  const authorRank = tierRank(config, authorAlias);
+  const verifierRank = tierRank(config, verifierAlias);
+  if (authorRank === null || verifierRank === null) return null;
+  if (verifierRank <= authorRank) return null;
+  const tiers = capabilityTiers(config);
+  return (
+    `'${verifierAlias}' cannot verify '${authorAlias}': the registry ranks ` +
+    `it '${tiers[verifierRank]}' and the authoring model '${tiers[authorRank]}', ` +
+    "and a review is worth what the reviewer is."
+  );
+}
+
+/** What each removal rule means to the person who chose the model. */
+const REMOVAL_REASONS: Record<string, string> = {
+  [REMOVED_EXCLUDED_PROVIDER]:
+    "it is on the authoring model's own provider, and cross-provider review " +
+    "is an invariant of this framework rather than a preference.",
+  [REMOVED_UNTRUSTED_VERIFIER]:
+    "the registry marks it is_enabled_as_verifier: false, so it is not " +
+    "trusted to review another model's output.",
+  [REMOVED_NOT_PERMITTED]:
+    "its provider is outside the set the verifier role may draw from.",
+  [REMOVED_NO_PROVIDER]: "it names no provider.",
+};
 
 // --- Whether the model asked for is the model that answered ---------------
 //

@@ -86,6 +86,23 @@ export const DEFAULT_SEAT_MAX_AGE_HOURS = 720.0;
 export const RECORD_API = "api-enumeration";
 export const RECORD_SEAT = "seat-catalog";
 
+/**
+ * What re-dating each record costs, said before anybody asks for one.
+ *
+ * It is here, beside the thresholds the same fact already decides, because
+ * the cost IS the reason the two records are on different clocks. A surface
+ * that offers a refresh has to be able to say what the operator is buying,
+ * and a sentence written into a pane would be a second statement of
+ * something this module already knows.
+ */
+export const REFRESH_COST: Readonly<Record<string, string>> = {
+  [RECORD_API]:
+    "Three metadata requests, one per enabled vendor. They bill no tokens.",
+  [RECORD_SEAT]:
+    "A probe per model through the Copilot CLI. Seat calls are priced in " +
+    "premium requests, which is why this record is allowed to be a month old.",
+};
+
 // --- What a failed enumeration is called -------------------------------------
 //
 // One vocabulary, written by both routers. The name of the exception is the

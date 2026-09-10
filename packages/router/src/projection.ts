@@ -16,7 +16,19 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
 import { readModuleSessionMarker } from "./checkout.ts";
-import { loadConfig } from "./config.ts";
+import {
+  TRANSPORT_COPILOT_CLI,
+  explainTransport,
+  loadConfig,
+  type RouterConfig,
+} from "./config.ts";
+import {
+  REFRESH_COST,
+  checkFreshness,
+  isStale,
+  type FreshnessRow,
+} from "./discovery.ts";
+import { installedEngines } from "./engines.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { readExposure } from "./exposure.ts";
 import { platformNewlines } from "./journal.ts";
@@ -44,6 +56,18 @@ import {
   publishedVersions,
   reconcileResolution,
 } from "./resolution.ts";
+import {
+  ROLE_GENERATOR,
+  ROLE_VERIFIER,
+  echoObservations,
+  explainRegistryCandidates,
+  modelFidelity,
+  roundObservations,
+  type Fidelity,
+  type ModelObservation,
+} from "./selection.ts";
+import { archivedRounds } from "./ledger.ts";
+import { loadCatalog, resolveLockfilePath } from "./transports/copilot.ts";
 
 type Node = Record<string, unknown>;
 
@@ -158,6 +182,176 @@ function runsOfRecord(
   return out;
 }
 
+// --- What a session is run with ---------------------------------------------
+//
+// Every decision below is already made somewhere in this router; not one of
+// them is reachable from the window an operator has open all day. So the
+// reading is assembled here and rendered there, exactly as the module rows
+// are: the extension re-derives none of it, because two implementations of
+// one rule disagree eventually and the disagreement arrives as a row nobody
+// can explain.
+//
+// **Nothing here reaches a network or spawns a process.** The registry is a
+// dated record; freshness is read from it and refreshing it is something the
+// operator asks for. A pane that enumerated a vendor when it opened would
+// charge a window for being open, and would do it on a sparse clone that
+// only wants to draw a tree.
+
+/**
+ * What the record says about each model on ONE transport: honoured,
+ * substituted, or not known.
+ *
+ * Per transport, because the two kinds of evidence are not interchangeable
+ * and neither are the paths that produce them. A round on the direct-API
+ * path carries the provider's own statement of what answered; the seat's
+ * catalog carries the CLI's echo of what it was asked for, which is a label,
+ * and this framework has never trusted a seat label. `modelFidelity` weighs
+ * them; this only hands it the observations that belong to the transport the
+ * operator is actually on, so evidence about the seat never reads as
+ * evidence about the API.
+ *
+ * Nothing is gathered that was not already recorded. `docs/model-fidelity.md`
+ * is the measurement and states its own bounds.
+ */
+function fidelityOn(root: string, config: RouterConfig, transport: string): (model: string) => Fidelity {
+  const observations: ModelObservation[] = [];
+  try {
+    observations.push(
+      ...roundObservations(
+        archivedRounds(root).filter((row) => row["transport"] === transport),
+      ),
+    );
+  } catch {
+    // No run record here yet, which is most repositories. Not knowing is an
+    // answer this reading is built to give.
+  }
+  if (transport === TRANSPORT_COPILOT_CLI) {
+    try {
+      observations.push(...echoObservations(loadCatalog(resolveLockfilePath(config)).models));
+    } catch {
+      // No seat configured, or no catalog probed. Again: not known.
+    }
+  }
+  return (model) => modelFidelity(model, observations);
+}
+
+/** One model a role could resolve to, as the registry declares it. */
+function candidateNode(
+  candidate: readonly [string, string, string],
+  fidelity: (model: string) => Fidelity,
+): Node {
+  const [modelId, provider, alias] = candidate;
+  // Three answers and never two. A model nobody has asked for and one that
+  // answered as something else are different facts, and a surface that
+  // rendered them alike would be making the promise session 144 exists to
+  // stop it making.
+  return { alias, model: modelId, provider, fidelity: fidelity(modelId) };
+}
+
+/**
+ * A role's resolution: what it would pick, and what else it could.
+ *
+ * `excludes` carries the providers the role was resolved AGAINST, which is
+ * where the cross-provider invariant becomes visible rather than restated --
+ * the verifying role is resolved with the authoring model's provider
+ * excluded, by the same rule that excludes it immediately before the wire.
+ */
+function roleNode(
+  config: RouterConfig,
+  role: string,
+  exclude: readonly string[] | null,
+  fidelity: (model: string) => Fidelity,
+): Node {
+  const resolution = explainRegistryCandidates(config, role, exclude);
+  const chosen = resolution.candidates[0];
+  return {
+    role,
+    chosen: chosen === undefined ? null : candidateNode(chosen, fidelity),
+    candidates: resolution.candidates.map((candidate) => candidateNode(candidate, fidelity)),
+    excludes: [...(exclude ?? [])],
+    // A role that fell past its own preference order picked a model nobody
+    // named. The 364-request session is why that is worth a row.
+    fellThrough: resolution.fellThrough,
+  };
+}
+
+/** One dated record, in the words the freshness reading already uses. */
+function recordNode(row: FreshnessRow): Node {
+  return {
+    record: row.record,
+    path: row.path,
+    present: row.present,
+    datedAt: row.dated_at,
+    ageHours: row.age_hours,
+    thresholdHours: row.threshold_hours,
+    command: row.command,
+    // What asking for a refresh buys, from where the thresholds are decided.
+    cost: REFRESH_COST[row.record] ?? "",
+    stale: isStale(row),
+    notes: [...row.notes],
+  };
+}
+
+/**
+ * What this session would be run with, and what decided each part of it.
+ *
+ * Never throws. A configuration this router cannot load is a real state --
+ * an unknown key in an overlay, a transport spelled wrong -- and a pane that
+ * went blank over it would hide the one sentence that says how to fix it.
+ */
+export function configurationNode(root: string): Node {
+  let config: RouterConfig;
+  try {
+    config = loadConfig(undefined, root);
+  } catch (error) {
+    return { unavailable: error instanceof Error ? error.message : String(error) };
+  }
+  const engines = installedEngines();
+  try {
+    const transport = explainTransport(config);
+    // Read for the transport in force. A model's fidelity is not one fact:
+    // the same model on the seat and on the direct-API path is two different
+    // questions with two different kinds of answer.
+    const fidelity = fidelityOn(root, config, transport.transport);
+    const authoring = roleNode(config, ROLE_GENERATOR, null, fidelity);
+    const author = authoring["chosen"] as Node | null;
+    return {
+      transport: {
+        effective: transport.transport,
+        decidedBy: transport.decidedBy,
+        layers: transport.layers.map((layer) => ({ ...layer })),
+      },
+      // Which transport the fidelity below was read for, said rather than
+      // implied: a row that carried an answer without saying what it was an
+      // answer about is how the seat's evidence would come to be read as the
+      // API's.
+      fidelityTransport: transport.transport,
+      engines: {
+        chosen: engines.chosen,
+        reason: engines.reason,
+        installed: engines.engines.map((entry) => ({ ...entry })),
+      },
+      authoring,
+      verifying: roleNode(
+        config,
+        ROLE_VERIFIER,
+        author === null ? null : [String(author["provider"])],
+        fidelity,
+      ),
+      records: checkFreshness(config, Date.now(), root).map(recordNode),
+    };
+  } catch (error) {
+    return {
+      engines: {
+        chosen: engines.chosen,
+        reason: engines.reason,
+        installed: engines.engines.map((entry) => ({ ...entry })),
+      },
+      unavailable: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export function project(root: string): Record<string, unknown> {
   const shape = solutionShape(root);
   const name = basename(resolve(root)) || "solution";
@@ -247,6 +441,8 @@ export function project(root: string): Record<string, unknown> {
   const members = assembleSolution(root);
   doc.external = externalComponents(root, members);
   doc.members = solutionMembers(members);
+  // What a session is run with: read from files, never probed.
+  doc.configuration = configurationNode(root);
   return doc;
 }
 

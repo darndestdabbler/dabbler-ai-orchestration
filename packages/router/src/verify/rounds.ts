@@ -19,7 +19,6 @@
 // still run first -- `facts` settles compile, typecheck, lint and analyzer
 // before dispatch, and a red required one returns to the author instead of
 // being bought a verifier's opinion.
-
 import {
   applyWrites,
   deliverFileRequests,

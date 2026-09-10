@@ -1,9 +1,14 @@
 import * as assert from "assert";
+import * as fs from "fs";
+import * as path from "path";
+import { createRequire } from "module";
+import { spawnProgram, tryWriteProjection } from "dabbler-ai-router";
 import {
   NO_MODULES_YET,
   PROJECTION_RELPATH,
   PROJECTION_SOURCE_GLOBS,
   Projection,
+  ProjectionConfiguration,
   ProjectionModule,
   childrenOf,
   contractTarget,
@@ -16,6 +21,7 @@ import {
   repositoryTarget,
   workspaceFileIn,
 } from "../../commands/openRepository";
+import { makeTempDir, rmrf, writeFileTree } from "./helpers";
 
 /** The CSV pipeline's four modules, as the router projects them: dependency order, usedBy derived. */
 function modules(): ProjectionModule[] {
@@ -69,7 +75,8 @@ suite("solutionTreeModel: modules", () => {
   test("renders the modules in the router's dependency order, with depends-on and used-by derived", () => {
     const p = projection();
     const roots = rootNodes();
-    assert.strictEqual(roots.length, 1);
+    // The solution, and beside it what a session is run with.
+    assert.deepStrictEqual(roots.map((n) => n.kind), ["solution", "configuration"]);
     const rows = childrenOf(roots[0], p);
     assert.deepStrictEqual(
       rows.map((n) => (n as { slug: string }).slug),
@@ -597,5 +604,344 @@ suite("openSolutionWorkspace: one window over the solution", () => {
       workspaceFileIn("it would go to C:/repos/x/.dabbler/solution.code-workspace"),
       null,
     );
+  });
+});
+
+suite("solutionTreeModel: what a session is run with", () => {
+  /** The document, made unwritable: a renderer may read it and nothing else. */
+  function deepFreeze<T>(value: T): T {
+    if (value !== null && typeof value === "object") {
+      for (const nested of Object.values(value)) deepFreeze(nested);
+      Object.freeze(value);
+    }
+    return value;
+  }
+
+  /** A projection whose configuration block is what the router read from files. */
+  function configured(over: Partial<ProjectionConfiguration> = {}): Projection {
+    return {
+      ...single(),
+      configuration: {
+        engines: {
+          chosen: "claude-code",
+          reason: "`claude` is the only engine CLI on PATH, so it is the engine the next session is offered.",
+          installed: [
+            { engine: "claude-code", program: "claude", path: "C:/bin/claude.cmd" },
+            { engine: "copilot", program: "copilot", path: null },
+          ],
+        },
+        transport: {
+          effective: "api",
+          decidedBy: "DABBLER_TRANSPORT env var",
+          layers: [
+            { source: "DABBLER_TRANSPORT env var", value: "api" },
+            { source: "transport.profile", value: "copilot-cli" },
+          ],
+        },
+        authoring: {
+          role: "generator",
+          chosen: { alias: "opus", model: "claude-opus-5", provider: "anthropic" },
+          candidates: [{ alias: "opus", model: "claude-opus-5", provider: "anthropic" }],
+          excludes: [],
+          fellThrough: false,
+        },
+        verifying: {
+          role: "verifier",
+          chosen: { alias: "gpt-5-6-terra", model: "gpt-5.6-terra", provider: "openai" },
+          candidates: [{ alias: "gpt-5-6-terra", model: "gpt-5.6-terra", provider: "openai" }],
+          excludes: ["anthropic"],
+          fellThrough: false,
+        },
+        records: [
+          {
+            record: "seat-catalog", path: "C:/router/copilot-catalog.lock", present: true,
+            datedAt: "2026-09-01T10:00:00Z", ageHours: 30, thresholdHours: 720,
+            command: "dabbler copilot refresh", stale: false, notes: [],
+          },
+          {
+            record: "api-enumeration", path: "C:/repo/.dabbler/api-models.lock", present: false,
+            datedAt: null, ageHours: null, thresholdHours: 24,
+            command: "dabbler discovery enumerate", stale: true, notes: [],
+          },
+        ],
+        ...over,
+      },
+    };
+  }
+
+  test("renders every row from the dated record, and derives nothing while it does", () => {
+    // The claim is not only that the rows are right: it is that drawing them
+    // costs a disk read the router already did. Two halves prove it. The
+    // network is trapped for the duration, so a row that enumerated a vendor
+    // fails here; and the projection is FROZEN, so a row that wanted
+    // something the document does not carry has nowhere to put it and no way
+    // to fetch it. The other half of the same claim is the last assertion:
+    // with no configuration in the document there are no rows at all, which
+    // is what "it reads the record" means and what "it goes and finds out"
+    // would contradict.
+    const fetched = (globalThis as { fetch?: unknown }).fetch;
+    (globalThis as { fetch?: unknown }).fetch = () => {
+      throw new Error("the Configuration section reached for the network");
+    };
+    try {
+      const p = deepFreeze(configured());
+      const root = rootNodes().find((n) => n.kind === "configuration");
+      assert.ok(root);
+      const section = descriptorFor(root, p);
+      assert.strictEqual(section.expandable, true);
+      assert.ok(section.description?.includes("claude-code"));
+
+      const rows = childrenOf(root, p);
+      assert.deepStrictEqual(
+        rows.map((n) => n.kind),
+        ["configEngine", "configTransport", "configRole", "configRole", "configRecord", "configRecord"],
+      );
+      const rendered = rows.map((n) => descriptorFor(n, p));
+
+      // The record's own age and the command that re-dates it, before
+      // anybody asks for a refresh.
+      const seat = rendered.find((row) => row.label === "seat-catalog");
+      assert.strictEqual(seat?.description, "30h old");
+      assert.ok(seat?.tooltip?.includes("dabbler copilot refresh"));
+      const api = rendered.find((row) => row.label === "api-enumeration");
+      assert.strictEqual(api?.description, "no record yet");
+      assert.strictEqual(api?.icon?.tone, "attention");
+
+      // A transport a layer above is overriding says so; the value alone
+      // would look exactly like one that is in force.
+      const transport = rendered.find((row) => row.label === "Transport");
+      assert.ok(transport?.description?.includes("api"));
+      assert.ok(transport?.tooltip?.includes("transport.profile says 'copilot-cli' and is overridden"));
+
+      // The cross-provider invariant is shown, not restated: the row says
+      // what excluding the authoring model's provider left.
+      const verifying = rendered.find((row) => row.label === "Verifying model");
+      assert.ok(verifying?.description?.includes("gpt-5.6-terra"));
+      assert.ok(verifying?.tooltip?.includes("anthropic"));
+
+      // And the engine's default carries the sentence that says why.
+      const engine = rendered.find((row) => row.label === "Engine");
+      assert.strictEqual(engine?.description, "claude-code");
+      assert.ok(engine?.tooltip?.includes("only engine CLI on PATH"));
+
+      // The other half: a document that carries no configuration produces no
+      // rows. Nothing is derived here and nothing is asked for.
+      assert.deepStrictEqual(childrenOf(root, deepFreeze(single())), []);
+    } finally {
+      (globalThis as { fetch?: unknown }).fetch = fetched;
+    }
+  });
+
+  test("says a configuration it could not read is unreadable, rather than showing an empty one", () => {
+    const p: Projection = { ...single(), configuration: { unavailable: "local-overrides.yaml: bad key" } };
+    const root = { kind: "configuration" as const };
+    assert.deepStrictEqual(childrenOf(root, p), []);
+    const row = descriptorFor(root, p);
+    assert.strictEqual(row.expandable, false);
+    assert.strictEqual(row.tooltip, "local-overrides.yaml: bad key");
+  });
+});
+
+suite("solutionTreeModel: is the model we asked for the model that answered", () => {
+  // The whole path, from the rows on disk to the row on the screen. Session
+  // 144 measured this and left the reading; what fails here is the day the
+  // three answers become two.
+  const ROUND = {
+    round: 1,
+    verdict: "VERIFIED",
+    blocking: false,
+    findings: [],
+    completion_tree: "0".repeat(40),
+    recorded_at: "2026-09-01T10:00:00.000000-04:00",
+    verifier_model: "reviewer",
+    verifier_provider: "openai",
+  };
+
+  /** A registry of two models, so what is asserted is the reading and not the shipped list. */
+  const CONFIG = [
+    "providers:",
+    "  anthropic:",
+    "    api_key_env: TEST_ANTHROPIC_KEY",
+    "    rate_limit: { requests_per_minute: 10, tokens_per_minute: 100 }",
+    "    timeout_seconds: 30",
+    "    retry: { max_retries: 1, backoff_base_seconds: 0 }",
+    "  openai:",
+    "    api_key_env: TEST_OPENAI_KEY",
+    "    rate_limit: { requests_per_minute: 10, tokens_per_minute: 100 }",
+    "    timeout_seconds: 30",
+    "    retry: { max_retries: 1, backoff_base_seconds: 0 }",
+    "models:",
+    "  author:",
+    "    provider: anthropic",
+    "    model_id: a-author",
+    "  reviewer:",
+    "    provider: openai",
+    "    model_id: o-reviewer",
+    "roles:",
+    "  generator:",
+    "    prefer: [a-author]",
+    "  verifier:",
+    "    prefer: [o-reviewer]",
+    "transports:",
+    "  copilot-cli:",
+    "    lockfile: copilot-catalog.lock",
+    "escalation:",
+    "  enabled: false",
+    "  max_escalations: 0",
+    "  triggers: { empty_response: true, max_tokens_hit: true, min_output_tokens: 30, refusal_detection: true }",
+    "",
+  ].join("\n");
+
+  let root = "";
+  const saved = new Map<string, string | undefined>();
+
+  setup(() => {
+    root = makeTempDir("fidelity-");
+    // The environment is set rather than read: a suite that took the
+    // operator's own DABBLER_TRANSPORT would assert a different thing on
+    // their machine than on anyone else's.
+    for (const name of [
+      "AI_ROUTER_CONFIG",
+      "DABBLER_TRANSPORT",
+      "TEST_ANTHROPIC_KEY",
+      "TEST_OPENAI_KEY",
+    ]) {
+      saved.set(name, process.env[name]);
+    }
+    writeFileTree(root, {
+      "router-config.yaml": CONFIG,
+      // Two dated records, each with a date NO probe could produce: a
+      // refresh would stamp them with now. They are how the next test tells
+      // a record that was read from one that was fetched.
+      ".dabbler/api-models.lock": [
+        "[meta]",
+        'key_set_id = "test"',
+        'enumerated_at = "2026-08-01T09:00:00Z"',
+        "[[providers]]",
+        'name = "anthropic"',
+        'enumerated_at = "2026-08-01T09:00:00Z"',
+        "[[providers]]",
+        'name = "openai"',
+        'enumerated_at = "2026-08-01T09:00:00Z"',
+        "",
+      ].join("\n"),
+      "copilot-catalog.lock": [
+        "[meta]",
+        'cli_version = "test"',
+        'seat_id = "test-seat"',
+        'probed_at = "2026-08-02T09:00:00Z"',
+        "[[models]]",
+        'id = "o-reviewer"',
+        'echoed_model = "o-reviewer"',
+        "",
+      ].join("\n"),
+      // Two rounds, and they are the two KINDS of evidence. The first is on
+      // the direct-API path, where the served id is the provider's own
+      // statement of what answered. The second is a seat round, where the
+      // same field carries the CLI's echo of what it was asked for -- a
+      // label, and this framework has never trusted a seat label.
+      ".dabbler/runs/s1/rounds.jsonl":
+        [
+          JSON.stringify({ ...ROUND, transport: "api", requested_model: "a-author", served_model: "a-author" }),
+          JSON.stringify({
+            ...ROUND,
+            round: 2,
+            previous_tree: "0".repeat(40),
+            transport: "copilot-cli",
+            requested_model: "o-reviewer",
+            served_model: "o-reviewer",
+          }),
+        ].join("\n") + "\n",
+    });
+    process.env.AI_ROUTER_CONFIG = path.join(root, "router-config.yaml");
+    process.env.DABBLER_TRANSPORT = "api";
+    process.env.TEST_ANTHROPIC_KEY = "k";
+    process.env.TEST_OPENAI_KEY = "k";
+  });
+
+  teardown(() => {
+    for (const [name, value] of saved) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    rmrf(root);
+  });
+
+  test("an exact seat echo reads not known, and does not render as one a round records as honoured", () => {
+    // The router's own reading runs here, over records on disk, with the
+    // network trapped: if assembling the projection enumerated a vendor
+    // this throws, and if it probed the seat the dates below would be
+    // today's rather than the fixture's.
+    const fetched = (globalThis as { fetch?: unknown }).fetch;
+    const reached = (what: string) => () => {
+      throw new Error(`the projection reached ${what} while it was being assembled`);
+    };
+    (globalThis as { fetch?: unknown }).fetch = reached("a vendor");
+    // The other way a probe happens is a CLI: `dabbler copilot refresh`
+    // spawns the seat's binary once per model. So every process creation is
+    // trapped too -- except `git`, which the router runs to find a
+    // repository root and which is not a probe of anything. The trap is
+    // PROVEN ARMED before it is relied on, by calling the router's own spawn
+    // and requiring the trap's error back: a trap that silently failed to
+    // install would otherwise make this test pass by doing nothing.
+    const childProcess = createRequire(path.join(root, "index.js"))("child_process") as Record<
+      string,
+      unknown
+    >;
+    const spawners = ["spawn", "spawnSync", "execFile", "execFileSync", "exec", "execSync"];
+    const original = spawners.map((name) => [name, childProcess[name]] as const);
+    for (const [name, real] of original) {
+      childProcess[name] = (...args: unknown[]) => {
+        const program = String(args[0] ?? "");
+        if (/(^|[\\/])git(\.exe)?$/i.test(program)) {
+          return (real as (...rest: unknown[]) => unknown)(...args);
+        }
+        reached(`a CLI (${program})`)();
+      };
+    }
+    try {
+      assert.throws(
+        () => spawnProgram(["definitely-not-a-real-program"], { stdio: "ignore" }),
+        /reached a CLI/,
+        "the process trap did not install, so this test proves nothing about spawning",
+      );
+      tryWriteProjection(root);
+    } finally {
+      for (const [name, value] of original) childProcess[name] = value;
+      (globalThis as { fetch?: unknown }).fetch = fetched;
+    }
+    const p = JSON.parse(
+      fs.readFileSync(path.join(root, ".dabbler", "solution", "projection.json"), "utf8"),
+    ) as Projection;
+
+    // Both records are present and carry the dates the fixture wrote.
+    const records = p.configuration?.records ?? [];
+    assert.strictEqual(
+      records.find((row) => row.record === "api-enumeration")?.datedAt,
+      "2026-08-01T09:00:00Z",
+    );
+    assert.strictEqual(
+      records.find((row) => row.record === "seat-catalog")?.datedAt,
+      "2026-08-02T09:00:00Z",
+    );
+
+    // Both models answered as themselves. Only one of them was said so by a
+    // provider; the other was said so by the seat, about itself.
+    assert.strictEqual(p.configuration?.fidelityTransport, "api");
+    assert.strictEqual(p.configuration?.authoring?.chosen?.fidelity, "honoured");
+    assert.strictEqual(p.configuration?.verifying?.chosen?.fidelity, "not-known");
+
+    const authoring = descriptorFor({ kind: "configRole", role: "authoring" }, p);
+    const verifying = descriptorFor({ kind: "configRole", role: "verifying" }, p);
+    // Three answers read as three: what the rows SAY differs, and the one
+    // with no evidence does not read as the one with a provider's word.
+    assert.notStrictEqual(authoring.description, verifying.description);
+    assert.ok(authoring.description?.includes("answers as itself"));
+    assert.ok(verifying.description?.includes("not known"));
+    assert.ok(!verifying.description?.includes("answers as itself"));
+    // And the row says what the answer is an answer ABOUT, so the seat's
+    // evidence can never be read as the API's.
+    assert.ok(verifying.tooltip?.includes("api"));
+    assert.ok(verifying.tooltip?.includes("echo"));
   });
 });

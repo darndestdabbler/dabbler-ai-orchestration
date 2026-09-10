@@ -1,7 +1,73 @@
-# STATUS — sessions 113–147 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.1 IS PUBLISHED to the Marketplace, carrying 143–147. 2.1.0 never shipped** — its publish job refused over a red Test on 146's commit (a walk-jobs timeout on the runner), so `vsix-v2.1.0` stands on origin unpublished and 2.1.1 supersedes it
+# STATUS — sessions 113–149 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.3 IS PUBLISHED to the Marketplace, carrying 148 and 149. 2.1.0 and 2.1.2 never shipped** — 2.1.0 refused over a walk-jobs timeout on the runner and 2.1.2 died on a Marketplace request timeout, so both tags stand on origin unpublished and 2.1.3 supersedes them
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 149 CLOSED, 2026-09-10 — the flake that refused a release, the gate that could not pass, and 2.1.3 published
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 149 | the walk-jobs flake diagnosed and its cause removed, the candidate gate given a runner that exists, and the publish taught the difference between a refusal and the weather | CLOSED VERIFIED at round 2 (round 1 blocked on two real things, both fixed), landed `ccbf9fee`, closed `253f8352`. **`vsix-v2.1.3` is TAGGED AND PUBLISHED** — the Marketplace serves 2.1.3, confirmed by `dabbler release --verify-install` |
+>
+> **A pid is a number, not an identity, and that is the whole of the flake.**
+> `walk-jobs`'s "ends a running job and everything under it" watched a process
+> id to decide whether a job's fork had been taken down. Measured under this
+> suite's own load: **14 of 150 freed pids (9.3%) read as alive again within
+> forty seconds**, held by unrelated processes, so `process.kill(pid, 0)`
+> answers "is there a process with this number" and a recycled number reads as
+> the job's fork forever. No deadline rescues that, which is why raising the
+> ten seconds to the twenty beside it would have bought nothing — the
+> `vsix-v2.1.0` publish would have refused ten seconds later. A fork now
+> appends to a heartbeat while it lives and *gone* is the heartbeat stopping,
+> which the OS cannot hand to somebody else. `docs/design/job-tree-kill.md`
+> carries the measurement.
+>
+> **The product-side theory was ruled out by measurement, and the blind spot
+> was fixed anyway — the verifier was right about that.** Fourteen loaded tree
+> kills all returned `SUCCESS` and none left a survivor, so `terminateTree`
+> did not cause this. But a kill that failed and a kill that worked were
+> reported identically, and a job is ended from a router process that never
+> held it, so nothing else would ever notice. `terminateTree` returns
+> `TreeKill` now; `endJob` retries once, then ends the runner directly and
+> says what it could not reach. `setTreeKiller` is the seam, because a machine
+> that cannot spawn a process cannot be asked for one.
+>
+> **A gate is proved by running and by nothing else.** The candidate gate ran
+> `node node_modules/vitest/vitest.mjs` from session 88's retirement of vitest
+> until now — a package in no manifest and no lockfile entry, so the gate that
+> fast-forwards the trunk could never have gone green, and `drive.ts` waits
+> twenty-five minutes on it. `check-ci-suites.mjs` rides in the lint control
+> and refuses any workflow naming a runner or an npm script this repository
+> does not have; it caught the live defect on its first run.
+>
+> **The publish now knows a refusal from the weather — and it was needed the
+> same hour.** `publish-marketplace.mjs` asks the gallery (free, no
+> credential) what it holds before uploading and after any failure, retries a
+> timeout or an unreachable gallery, and stops at once on a refusal. Round 1
+> caught the real hole: an unreadable gallery after an upload is **`unknown`,
+> not `absent`**, and treating it as absent is how a correlated outage turns
+> one upload into two. It fails closed and says re-run me.
+>
+> **The Marketplace was genuinely down for about fifteen minutes.** 2.1.3's
+> publish job hit `Request timeout: /_apis/gallery` on all four attempts, each
+> at exactly 180 s, confirming 2.1.3 absent between every one — so nothing was
+> double-sent. A re-run of that same job published in **11 seconds**, which is
+> the recovery path the design intends: no tag re-push, the script asks first.
+> vsce was unchanged since 2.1.1 shipped successfully at 16:45, so this was
+> the far end. **2.1.0 and 2.1.2 remain tagged and unpublished**; 2.1.3
+> supersedes both and the changelog says so for anyone comparing tags against
+> the Marketplace.
+>
+> **Owed to 150, from round 2 (a nit, not dispositioned):** `treeKillCommand`
+> sets `stdio: "ignore"`, so a real `spawnSync` returns no `stderr` and
+> `terminateTree`'s "already gone" branch (`/not found|no running
+> instance/`) is unreachable in production — a process that exits between
+> `endJob`'s `alive()` check and the `taskkill` is reported as a failed tree
+> kill rather than an ended one. The test passes only because the seam
+> supplies output production discards. Pipe the tree kill's output and assert
+> the options carry it. Not fixed here: the session was at the publish gate,
+> and editing the tree there is the deadlock family this repository has
+> already paid for twice.
+>
 > ## SESSION 147 CLOSED, 2026-09-10 — the stop a developer can act on, and 2.1.1 published
 >
 > | session | what | state |

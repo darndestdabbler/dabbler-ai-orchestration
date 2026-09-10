@@ -2830,22 +2830,21 @@
     {
       "number": 144,
       "title": "Whether the model we asked for is the model that answered",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-10T06:09:25.814000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-10T06:58:44.956000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": "REMEDIATED_AT_CAP",
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.21",
       "verification": {
-        "rounds": 3,
+        "rounds": 5,
         "verifierModel": "gpt-5-6-terra",
         "verifierProvider": "openai",
-        "transport": "api",
-        "unreviewedFindings": 1
+        "transport": "api"
       }
     },
     {

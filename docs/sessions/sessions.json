@@ -2910,9 +2910,9 @@
     {
       "number": 148,
       "title": "Session 148",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-10T16:17:00.970000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-10T18:15:46.993000-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

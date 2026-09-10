@@ -8408,3 +8408,97 @@ walk is what says whether it is clear.
 
 **Not releasable on its own.** It ships with 145 if 145 has not gone yet, and
 carries its own release if it has.
+
+
+### Session 149 of 149: The flake that refused a release, and the gate that cannot pass
+
+**Three things were left standing at the end of session 148, and two of them
+have already cost a release each.** They are not related in the code and they
+are related in the only way that matters here: each one turns a green session
+into a red or absent publication, and none of them is a fault in the work
+being published.
+
+**The flake has no record, and it refused 2.1.0.** `walk-jobs`'s "ends a
+running job and everything under it" hits `waitGone`'s ten-second deadline
+under parallel load. It surfaced once in four full-suite runs at the end of
+148, and once before that on a GitHub runner, where it turned the Test check
+red on 146's commit and the `vsix-v2.1.0` publish job refused over it -- so
+2.1.0 stands tagged and unpublished to this day and 2.1.1 superseded it. The
+session before this one diagnosed it as "test-side timing, not product code",
+fixed a different flake (`snapshotWorktreeTree`), and left this one open with
+**no formal record at all**, which is how a fault that has already cost one
+release stays available to cost the next.
+
+**It is diagnosed before it is fixed, and the diagnosis decides which half
+moves.** The test's own numbers say the deadline is not obviously the fault:
+alone on an idle machine the whole case takes 803 ms against a ten-second
+bound, and the two other waits in the same file are given twenty seconds --
+so the asymmetry is real but a twelvefold headroom is not what a slow machine
+eats. The candidate the evidence has to rule in or out is on the product
+side: `terminateTree` on Windows is `spawnSync("taskkill", "/F", "/T", ...)`
+and **it reads neither the result nor the error**. A spawn that fails --
+which is what a process-creation storm produces, and session 136 established
+that process creation *is* this suite's load -- returns silently, and
+`endJob` then reports having ended a tree it never touched. That is the exact
+failure the children registry exists to prevent (the 38-hour-old tree found
+squatting on the operator's machine on 2026-09-02), reachable through the
+one path that registry does not cover: a job started by one router process
+and ended by another. Whichever way the evidence falls, **the flake gets a
+written record** -- what it is, what it costs, and what was done -- because
+an intermittent failure nobody wrote down is re-diagnosed from scratch every
+time it appears.
+
+**The candidate gate runs a test runner this repository does not have.**
+`.github/workflows/candidate-gate.yml` runs `node
+node_modules/vitest/vitest.mjs run --root packages/router` as its
+"step-level proof" that the suite ran. Session 88 retired vitest; it is in no
+`package.json` and in no lockfile entry, so that step cannot resolve its
+module and **the gate can never go green**. It is not decoration: `drive.ts`
+pushes `candidate/s<N>` and waits up to twenty-five minutes for the gate to
+fast-forward the trunk, so the first session to land through the candidate
+path deadlocks on a step that was already impossible when it was written. The
+report that opened this session named `AGENTS.md` as the file still carrying
+that command; it does not -- session 141 removed it, for this reason, in
+these words -- and the surviving instance is worse than the one that was
+reported, because a stale command in a document costs a session a detour
+while a stale command in a gate costs it the trunk. The gate runs what
+`test.yml` runs and what `dabbler.yaml` declares: `npm run test:unit -w
+dabbler-ai-router`. **One command, named once**, is what the third ground
+rule asks for and what neither of these two files was doing.
+
+**And 2.1.2 was never published either.** Its job did not refuse and it was
+not held: `npx vsce publish` uploaded and the Marketplace answered `Request
+timeout: /_apis/gallery` three minutes later, the step exited 1, and the tag
+stands. The Marketplace serves 2.1.1. A gallery timeout is not a verdict on
+the artifact -- it is the far end being slow -- and a publish step that
+treats it as final is a release lost to weather. The publish retries a
+transient upload failure, and it does so **without ever republishing over a
+version that already landed**: the query the gallery answers about what it
+holds is free and is the thing to ask before a second attempt.
+
+**Steps.** (1) Reproduce the `walk-jobs` timeout under the load the run of
+record actually creates, and record what the evidence says the cause is. (2)
+Fix what the diagnosis names -- if `terminateTree` can fail silently, it
+stops being able to, and the tree-kill's failure becomes something a caller
+can see; if the deadline is genuinely the whole of it, the deadline moves and
+the plan says so plainly. (3) The candidate gate runs the suite the rest of
+the repository runs. (4) The publish survives a transient gallery timeout,
+and asks the gallery what it already holds rather than republishing blind.
+(5) The flake's own record: what it was, what it cost, and what was done.
+
+**Tests.** Four. A `terminateTree` whose tree-kill cannot be spawned reports
+that it failed rather than returning as though it had worked. A job ended
+through that path ends the grandchild its command forked -- the behaviour
+`walk-jobs` asserts, held to the same bound as the two waits beside it. The
+publish's retry decision: a transient upload failure is retried and a refusal
+is not. And the version already in the gallery is not published over. **The
+workflow files get no test** -- a YAML gate is proved by running, and the
+lint control that already reads `dabbler.yaml`'s suite declarations is where
+a divergence between the declared command and the gate's would be caught if
+it is cheap to add there, not in a test that asserts on file text.
+
+**Releasable.** It carries **2.1.3**, a patch: every change in it is a fix to
+behaviour an operator already has, and one of them is the reason the last two
+version numbers did not reach them. 2.1.2 is superseded rather than re-run --
+it does not carry these fixes, and a second attempt at it would ship the
+release that the publish defect is being fixed for.

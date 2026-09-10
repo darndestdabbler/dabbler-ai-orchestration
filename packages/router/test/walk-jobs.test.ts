@@ -15,7 +15,7 @@
 // child inherits -- and none of that is true of a function call. A stubbed
 // spawn would test the stub.
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { constants, getPriority, setPriority } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -37,28 +37,67 @@ async function settle(
   }
 }
 
-/** Wait for a process to be gone, or say which one outlived what. */
-async function waitGone(pid: number, what: string): Promise<void> {
-  const deadline = Date.now() + 10_000;
-  for (;;) {
-    try {
-      process.kill(pid, 0);
-    } catch {
-      return;
-    }
-    if (Date.now() > deadline) throw new Error(`${pid} outlived ${what}`);
+/**
+ * What a fork this test starts does to say it is alive: append a byte every
+ * `HEARTBEAT_MS`, and be identified by that rather than by a pid.
+ *
+ * **A pid is a number, not an identity.** Windows recycles process ids, and
+ * it recycles them quickly on a machine that is busy making processes --
+ * measured under this suite's own load, 9.3% of freed pids read as alive
+ * again within forty seconds, held by unrelated processes. What
+ * `process.kill(pid, 0)` answers is "is there a process with this number",
+ * so a recycled number reads as the job's own fork forever and no deadline
+ * rescues the wait: this is the flake that turned the Test check red on a
+ * runner and refused the `vsix-v2.1.0` publish. The measurement, and what it
+ * ruled out on the product side, are in `docs/design/job-tree-kill.md`. The
+ * file a process appends to while it runs is the one thing here the
+ * operating system cannot hand to somebody else.
+ */
+const HEARTBEAT = (path: string) =>
+  `const fs=require('node:fs');fs.appendFileSync(${path},'.');` +
+  `setInterval(()=>fs.appendFileSync(${path},'.'),50);`;
+
+const HEARTBEAT_STILL_MS = 2_000;
+
+/** Wait until a fork has started and said so. */
+async function beating(path: string): Promise<void> {
+  const deadline = Date.now() + 20_000;
+  while (beats(path) <= 0) {
+    if (Date.now() > deadline) throw new Error(`nothing ever reported to ${path}`);
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
 }
 
-/** Wait for a child to report a pid it forked. */
-async function reportedPid(path: string): Promise<number> {
+/**
+ * Wait for a fork's heartbeat to stop, or say what outlived what.
+ *
+ * Stopped is a beat that has not moved for `HEARTBEAT_STILL_MS` -- forty
+ * missed beats, so a live process starved of CPU under a loaded suite is not
+ * read as a dead one. The deadline holds that window plus the time the tree
+ * kill itself takes, which is 2.2 s at the worst load measured.
+ */
+async function waitStopped(path: string, what: string): Promise<void> {
   const deadline = Date.now() + 20_000;
-  while (!existsSync(path)) {
-    if (Date.now() > deadline) throw new Error(`nothing ever reported to ${path}`);
+  let seen = beats(path);
+  let moved = Date.now();
+  for (;;) {
     await new Promise((resolve) => setTimeout(resolve, 25));
+    const now = beats(path);
+    if (now !== seen) {
+      seen = now;
+      moved = Date.now();
+    } else if (Date.now() - moved >= HEARTBEAT_STILL_MS) return;
+    if (Date.now() > deadline) throw new Error(`${what} was still beating at ${path}`);
   }
-  return Number(readFileSync(path, "utf8"));
+}
+
+/** How much a heartbeat has written; -1 while it has written nothing. */
+function beats(path: string): number {
+  try {
+    return statSync(path).size;
+  } catch {
+    return -1;
+  }
 }
 
 /** The OS priority a job's own command reports for itself. */
@@ -188,31 +227,31 @@ describe("what a job leaves behind", () => {
   it("ends a running job and everything under it, from a process that never held it", async () => {
     // A job is started by one router process and collected by another, so
     // the record's pid is all the ending process has. The verb the job runs
-    // forks -- here a grandchild that reports its pid -- and a job that is
-    // abandoned must take that fork with it: the trees found squatting on
+    // forks -- here a grandchild that beats while it lives -- and a job that
+    // is abandoned must take that fork with it: the trees found squatting on
     // the operator's machine were never the runner, they were what it ran.
     const repoRoot = tempDir("jobs-");
-    const pidFile = join(repoRoot, "grandchild.pid");
+    const beat = join(repoRoot, "grandchild.beat");
     const job = startJob(repoRoot, 62, {
       name: "the complete suite",
       argv: [
         process.execPath,
         "-e",
         "const { spawn } = require('node:child_process');" +
-          "const g = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });" +
-          "require('node:fs').writeFileSync(process.argv[1], String(g.pid));" +
+          `spawn(process.execPath, ['-e', ${JSON.stringify(HEARTBEAT("process.argv[1]"))}, ` +
+          "process.argv[1]], { stdio: 'ignore' });" +
           "setInterval(() => {}, 1000);",
-        pidFile,
+        beat,
       ],
       retryAfterSeconds: 30,
     });
-    const grandchild = await reportedPid(pidFile);
+    await beating(beat);
     assert.deepEqual(pollJob(repoRoot, job), { state: "running" });
 
     endJob(job);
 
     assert.notEqual((await settle(repoRoot, job)).state, "running");
-    await waitGone(grandchild, "the job that was ended");
+    await waitStopped(beat, "the job that was ended");
   });
 
   it("reaps what a failed command left running before it records the result", async () => {
@@ -228,26 +267,25 @@ describe("what a job leaves behind", () => {
     // child in a job object that dies with the parent unless it is
     // detached, and a POSIX child stays in the runner's group unless it is.
     const repoRoot = tempDir("jobs-");
-    const pidFile = join(repoRoot, "helper.pid");
+    const beat = join(repoRoot, "helper.beat");
     const job = startJob(repoRoot, 63, {
       name: "verification round 2",
       argv: [
         process.execPath,
         "-e",
         "const { spawn } = require('node:child_process');" +
-          "const h = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], " +
-          "{ stdio: 'ignore', detached: process.platform === 'win32' });" +
+          `const h = spawn(process.execPath, ['-e', ${JSON.stringify(HEARTBEAT("process.argv[1]"))}, ` +
+          "process.argv[1]], { stdio: 'ignore', detached: process.platform === 'win32' });" +
           "h.unref();" +
-          "require('node:fs').writeFileSync(process.argv[1], String(h.pid));" +
           "process.exit(2);",
-        pidFile,
+        beat,
       ],
       retryAfterSeconds: 30,
     });
     const exited = await settle(repoRoot, job);
     assert.equal(exited.state, "exited");
     assert.equal(exited.state === "exited" ? exited.exitCode : null, 2);
-    await waitGone(Number(readFileSync(pidFile, "utf8")), "its collected job");
+    await waitStopped(beat, "its collected job");
     assert.match(readFileSync(join(repoRoot, job.log), "utf8"), /ended 1 process\(es\)/);
   });
 });

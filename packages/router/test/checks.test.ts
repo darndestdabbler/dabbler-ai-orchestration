@@ -28,7 +28,9 @@ import {
   resolveProgram,
   shlexSplit,
   spawnOptionsFor,
+  setTreeKiller,
   spawnProgram,
+  terminateTree,
   treeKillCommand,
   unquotePorcelainPath,
 } from "../src/checks.ts";
@@ -447,6 +449,47 @@ describe("what a session started, a session ends", () => {
     const kill = treeKillCommand(4242);
     assert.deepEqual(kill.argv, ["taskkill", "/F", "/T", "/PID", "4242"]);
     assert.equal(kill.options.windowsHide, true);
+  });
+
+  it("says when the tree kill could not be run, instead of answering as though it had", { skip: process.platform !== "win32" ? "the tree kill is taskkill" : false }, () => {
+    // A job is ended from a router process that never held it, so the pid on
+    // the record is the only handle there is: a kill that silently did
+    // nothing is indistinguishable from one that worked, and the caller goes
+    // on to report the job ended. The failure cannot be produced on demand
+    // -- a machine that cannot spawn a process cannot be asked for one -- so
+    // the spawn is the seam.
+    const restore = setTreeKiller(() => ({
+      error: Object.assign(new Error("spawn taskkill EAGAIN"), { code: "EAGAIN" }),
+      status: null,
+    }));
+    try {
+      const failed = terminateTree(4242);
+      assert.equal(failed.ended, false);
+      assert.match(String(failed.reason), /could not be started/);
+    } finally {
+      restore();
+    }
+
+    // taskkill that ran and refused is the other half, and it is not the
+    // same as taskkill reporting a pid that had already gone.
+    const refused = setTreeKiller(() => ({ status: 1, stderr: "ERROR: Access is denied." }));
+    try {
+      const failed = terminateTree(4242);
+      assert.equal(failed.ended, false);
+      assert.match(String(failed.reason), /Access is denied/);
+    } finally {
+      refused();
+    }
+
+    const already = setTreeKiller(() => ({
+      status: 128,
+      stderr: 'ERROR: The process "4242" not found.',
+    }));
+    try {
+      assert.equal(terminateTree(4242).ended, true);
+    } finally {
+      already();
+    }
   });
 
   it("hides the console window on every path a check is reached by", () => {

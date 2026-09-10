@@ -10,6 +10,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.1.3] — 2026-09-10
+
+**Two versions in a row did not reach you, and neither had anything wrong
+with it.** 2.1.0 was built, tagged and refused at the last gate because an
+unrelated test went red on the build machine; 2.1.2 was uploaded to the
+Marketplace, which then stopped answering for three minutes, and the job read
+the far end being slow as a refusal and gave up. Both tags stand and were
+never published — the Marketplace has been serving 2.1.1 since — and 2.1.3
+supersedes them both. This release is the repair of the two paths that lost
+them.
+
+### Fixed
+
+- **A release is no longer lost to a slow Marketplace.** The publish now asks
+  the Marketplace what it already holds before it uploads and again after any
+  failure, waits out a timeout or an unreachable gallery and tries again, and
+  stops at once on a real refusal — a rejected credential or a version that
+  genuinely already exists — instead of retrying something that will never
+  succeed. An upload that landed just before the far end went quiet is
+  recognised as the success it was, rather than reported as a failure and
+  then attempted a second time.
+- **A false test failure no longer blocks a release.** The test that went red
+  and cost 2.1.0 was asking the wrong question. It watched a process id to
+  decide whether a job's work had really been shut down, and an operating
+  system is free to give a finished process's id to something else — measured
+  on a busy machine, about one id in ten is handed on within forty seconds.
+  When that happened the test saw an unrelated program wearing the number it
+  was watching and declared that the job had survived. It now watches for the
+  work itself to stop, which nothing else can imitate.
+- **Ending a job now says so when it could not end everything.** The
+  suspicion was that shutting down a job might quietly fail to take down what
+  it had started, leaving processes behind on your machine. Measured under
+  heavy load, it does not — fourteen shutdowns, all successful, nothing left
+  running — but a shutdown that *did* fail and one that worked were reported
+  the same way, and a job is shut down by a part of the framework that holds
+  nothing but the job's id, so there was nothing else to notice. It reports
+  the difference now, tries again once, and if it still cannot walk the whole
+  tree it ends what it can reach and tells you what it could not.
+- **The gate that moves the trunk can run.** One continuous-integration gate
+  had been calling a test runner this project stopped using a hundred
+  sessions ago, so it could never have gone green. It runs the real suite
+  now, and a new check reads every workflow against what the project actually
+  has, so a gate cannot again sit broken for months without anyone noticing.
+
 ## [2.1.2] — 2026-09-10
 
 Models your Copilot seat lists are now offered. Until now the Configuration

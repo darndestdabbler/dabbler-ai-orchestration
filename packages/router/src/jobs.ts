@@ -28,6 +28,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { terminateTree } from "./checks.ts";
+import type { TreeKill } from "./checks.ts";
 import {
   type UncollectedJob,
   driverDir,
@@ -499,11 +500,28 @@ export function jobRecord(
  * which is the truth, and the caller that ends a job is a caller that is
  * abandoning the run it belonged to and clears the record itself.
  */
-export function endJob(job: Job): void {
+export function endJob(job: Job): TreeKill {
   // Only a runner that is still there: the OS reuses pids, and a job whose
   // runner has already exited names a number that may be somebody else's.
-  if (!alive(job.pid)) return;
-  terminateTree(job.pid);
+  if (!alive(job.pid)) return { ended: true };
+  let killed = terminateTree(job.pid);
+  // A tree kill that did not happen is worth one more try -- the reason it
+  // fails is a machine momentarily out of process slots, which is a
+  // condition that passes. What must not happen is reporting success.
+  if (!killed.ended) killed = terminateTree(job.pid);
+  if (killed.ended) return killed;
+  // The tree walk is what could not be run; the runner itself can still be
+  // ended with no child process at all. It leaves the runner's own children
+  // behind, which is worse than a clean end and far better than a job that
+  // keeps working after the framework was told to stop it.
+  try {
+    process.kill(job.pid, "SIGKILL");
+  } catch {
+    /* it went in the meantime, which is the outcome asked for */
+  }
+  return alive(job.pid)
+    ? killed
+    : { ended: false, reason: `${killed.reason}; the runner was ended directly, its children were not` };
 }
 
 /** Where the job is: running, exited with its code, or vanished. */

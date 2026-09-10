@@ -1517,23 +1517,77 @@ export function isArgvTooLarge(error: unknown): boolean {
  * gave the child, and a bare kill of the pid is the fallback for a child
  * that was never a group leader.
  */
-export function terminateTree(target: ChildProcess | number): void {
+export function terminateTree(target: ChildProcess | number): TreeKill {
   const pid = typeof target === "number" ? target : target.pid;
-  if (pid === undefined) return;
+  if (pid === undefined) return { ended: true };
   if (process.platform === "win32") {
     const kill = treeKillCommand(pid);
-    spawnSync(kill.argv[0] as string, kill.argv.slice(1), kill.options);
-    return;
+    const result = treeKiller(kill.argv, kill.options);
+    if (result.error) {
+      // The spawn itself did not happen, which is what a machine out of
+      // process slots answers. Nothing was killed and nothing said so.
+      return { ended: false, reason: `the tree kill could not be started: ${result.error.message}` };
+    }
+    if (result.status !== 0 && result.status !== null) {
+      // taskkill exits non-zero for a pid that is already gone as well as
+      // for one it could not touch, and only its own words separate them.
+      const said = String(result.stderr ?? result.stdout ?? "").trim().split("\n")[0] ?? "";
+      if (/not found|no running instance|nicht gefunden/i.test(said)) return { ended: true };
+      return { ended: false, reason: `taskkill exited ${result.status}${said ? `: ${said}` : ""}` };
+    }
+    return { ended: true };
   }
   try {
     process.kill(-pid, "SIGKILL");
+    return { ended: true };
   } catch {
     try {
       process.kill(pid, "SIGKILL");
-    } catch {
-      /* already gone */
+      return { ended: true };
+    } catch (error) {
+      // ESRCH is the process already being gone, which is the outcome asked
+      // for; anything else is a kill that did not happen.
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") return { ended: true };
+      return { ended: false, reason: `the kill was refused: ${(error as Error).message}` };
     }
   }
+}
+
+/**
+ * What a tree kill did. `ended` false means the tree may still be running
+ * and NOBODY ELSE WILL NOTICE: a job is ended from a process that never held
+ * it, so the pid on the record is the only handle there is and a kill that
+ * silently did nothing used to be indistinguishable from one that worked.
+ * The trees found squatting on the operator's machine on 2026-09-02 are what
+ * that costs.
+ */
+export interface TreeKill {
+  readonly ended: boolean;
+  readonly reason?: string;
+}
+
+type TreeKiller = (
+  argv: readonly string[],
+  options: SpawnSyncOptions,
+) => { error?: Error; status: number | null; stdout?: unknown; stderr?: unknown };
+
+const spawnTreeKill: TreeKiller = (argv, options) =>
+  spawnSync(argv[0] as string, argv.slice(1), options);
+
+let treeKiller: TreeKiller = spawnTreeKill;
+
+/**
+ * Swap how the Windows tree kill is spawned; the returned function restores
+ * the previous one. The failure this exists to cover cannot be produced on
+ * demand -- a machine that cannot spawn a process cannot be asked for one --
+ * and it is the failure whose whole danger is that it is silent.
+ */
+export function setTreeKiller(killer: TreeKiller): () => void {
+  const previous = treeKiller;
+  treeKiller = killer;
+  return () => {
+    treeKiller = previous;
+  };
 }
 
 /**

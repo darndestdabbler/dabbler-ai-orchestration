@@ -256,6 +256,17 @@ jobs:
         with:
           node-version: '20'
 
+      # The publish needs the repository for its own script, which is where
+      # the decision lives now. It comes BEFORE the artifact download, and
+      # must stay there: `actions/checkout` cleans the workspace, so a
+      # checkout after the download would delete the VSIX it is about to
+      # publish. The bytes still come from the build job's artifact and
+      # never from the tree.
+      - name: Checkout tag (for the publish script)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
       - name: Download VSIX artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
@@ -266,19 +277,28 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
           EXPECTED_VERSION: ${{ needs.classify.outputs.semver_version }}
+        # The script decides three things this step used to get wrong, all
+        # of them learned from a release that did not ship. It asks the
+        # gallery -- free, unauthenticated -- what it already holds, so a
+        # re-run after an upload that actually landed succeeds instead of
+        # failing on "version already exists". It retries a transient fault
+        # and never a refusal: `Request timeout: /_apis/gallery` three
+        # minutes into the vsix-v2.1.2 upload was the far end being slow,
+        # and reading it as a verdict cost that release, while retrying a
+        # rejected credential would only turn one clear failure into four.
+        # And it re-asks the gallery after each transient failure, because
+        # an upload that timed out may well have landed.
+        #
+        # The version-pinned path is unchanged and stays that way: an
+        # `ls ... | head -n1` once silently mis-published v0.12.1 from the
+        # vsix-v0.13.0 run when a stale committed VSIX rode along.
         run: |
-          # Version-pinned path: pick the exact VSIX matching the tag, not
-          # whatever lexicographically-first file the download artifact
-          # happens to contain. The pre-fix `ls ... | head -n1` shape
-          # silently mis-published v0.12.1 from the vsix-v0.13.0 run when
-          # a stale committed VSIX was bundled alongside the just-built
-          # one.
           vsix_file="vsix/dabbler-ai-orchestration-${EXPECTED_VERSION}.vsix"
           if [[ ! -f "$vsix_file" ]]; then
             echo "::error::expected VSIX '$vsix_file' not found in downloaded artifact. Files present:"
             ls -la vsix/ || true
             exit 1
           fi
-          echo "Publishing $vsix_file to VS Code Marketplace..."
-          npx --yes @vscode/vsce publish --packagePath "$vsix_file" -p "$VSCE_PAT"
+          node tools/dabbler-ai-orchestration/scripts/publish-marketplace.mjs \
+            "$EXPECTED_VERSION" "$vsix_file"
 

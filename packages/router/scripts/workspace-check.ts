@@ -134,6 +134,20 @@ function lint(): number {
     process.stderr.write("workspace-check: shipped-docs check failed\n");
     worst = Math.max(worst, shippedDocs);
   }
+  // And the gates themselves (`check-ci-suites.mjs`). A workflow step is
+  // proved by running and by nothing else, so a gate that never fires
+  // carries whatever it was written with: the candidate gate ran a vitest
+  // retired in session 88 until session 149, and it is the gate that
+  // fast-forwards the trunk. No runner or script a workflow names may be
+  // one this repository does not have.
+  const ciSuites = run(
+    [join(REPO_ROOT, "packages", "router", "scripts", "check-ci-suites.mjs")],
+    REPO_ROOT,
+  );
+  if (ciSuites !== 0) {
+    process.stderr.write("workspace-check: ci-suites check failed\n");
+    worst = Math.max(worst, ciSuites);
+  }
   return worst;
 }
 

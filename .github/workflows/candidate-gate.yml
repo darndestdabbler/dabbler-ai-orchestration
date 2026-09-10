@@ -47,8 +47,18 @@ jobs:
       - name: Lint and boundary
         run: node packages/router/scripts/run-ts.mjs packages/router/scripts/workspace-check.ts lint
 
+      # The runner here is the package's own `test:unit` door, which is what
+      # `test.yml` runs and what the router declares. It is deliberately not
+      # a copy of `dabbler.yaml`'s suite command: that one carries the
+      # concurrency cap and the no-git preload the operator's own machine
+      # needs, and the two are allowed to differ. What is not allowed is
+      # naming a runner this repository does not have -- this step ran
+      # `node node_modules/vitest/vitest.mjs` from session 88's retirement of
+      # vitest until session 149, against a package in no manifest and no
+      # lockfile entry, so the gate that fast-forwards master could never go
+      # green and nothing could see it. `check-ci-suites.mjs` sees it now.
       - name: Router suite (the full check, step-level proof)
-        run: node node_modules/vitest/vitest.mjs run --root packages/router
+        run: npm run test:unit -w dabbler-ai-router
 
       - name: Extension suite
         run: npm run test:unit -w dabbler-ai-orchestration

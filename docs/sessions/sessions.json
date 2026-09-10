@@ -2790,9 +2790,9 @@
     {
       "number": 142,
       "title": "The heading an operator can read, the placeholder branch the framework offers to fix, and the release that carries both",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-09T23:36:54.770000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-10T04:06:38.744000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

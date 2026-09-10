@@ -8133,7 +8133,7 @@ and produces a record rather than an assertion.**
 **Not releasable.** Nothing here changes what an operator does; it changes
 what the record knows. 145 carries it.
 
-### Session 145 of 145: The configuration an operator sets once
+### Session 145 of 146: The configuration an operator sets once
 
 **Most of this already exists and is simply not reachable.** `selection.ts`
 resolves a role against registry candidates; `route.ts` holds cross-provider
@@ -8228,3 +8228,87 @@ looks like.
 **Releasable.** 2.0.23, carrying 143's terminal, 144's note and reading, and
 this session's pane. A minor rather than a patch: the pane is a surface an
 operator did not have, whatever 143 and 144 were on their own.
+
+### Session 146 of 146: The stop a developer can act on
+
+**A session stopped, and the framework told the operator to read a reason
+that was not on their screen, "put it right" without saying what, and run a
+command that reads as starting something.** They ran it. It was not theirs to
+run: the stop was a dispute of mine refused because an evidence path exceeded
+a 16 KB cap, and the actor was the engine. The operator's words for the
+result were "clear as mud", and the sentence they read was
+`driver.ts:1365`:
+
+> `Next: you. Read the round's reason above and put it right, then ${resumes}.`
+
+**One sentence serves four unrelated stops.** A verification round that ended
+without a verdict, a dispute the framework refused to write, a provider that
+could not be reached, and a cap terminal are four different situations with
+four different actors and four different next moves. `renderStop` switches on
+a stop's KIND and the kinds are too coarse: within `verification` alone those
+four all print the same words. Every fault the operator named follows from
+that, and so does the one they could not see -- **the sentence says "Next:
+you" when the actor is frequently the engine.**
+
+**A stop says four things or it says nothing.** What happened, in the words
+of the thing that refused. Who acts next -- the engine, the operator, or
+either. What the choices are, each with what it costs. And the exact command
+that carries each choice out, which a person may run or an engine may. The
+framework already knows all four at the moment it stops; it currently
+renders one of them.
+
+**The reason is not on the terminal, and that is a record problem rather than
+a wording one.** `stop.reason` is written to `run.json` and the Dabbler
+Terminal renders a stop line without it, so "read the reason above" points at
+something the surface never showed. The terminal reads the record for
+verdicts and test outcomes already; a stop's own reason is the same kind of
+fact and reaches the operator the same way.
+
+**And a toast with a button made a person the second caller of `next`.** The
+operator clicked one. Nothing was damaged -- the lease held -- but the
+one-caller rule is not a convention, it is what keeps two drivers from
+answering one instruction, and a surface that invites a click while an engine
+is mid-loop is a race with a person in it. **A stop that only the engine can
+clear must not offer the operator a button that runs the engine's command**;
+what it offers instead is the thing that IS theirs, and where a stop is
+genuinely theirs the button stays.
+
+**An adjudication is the case worth designing for, because it is the one a
+person cannot avoid.** When a dispute stands, the operator is the tie-break,
+and today they are told to "put it right". `dabbler owed list` already shows
+what a well-put question looks like -- the brief, the options, what a wrong
+answer costs, the recommendation, and the default -- and it is the shape to
+copy rather than invent. An adjudication that reached the operator as an owed
+decision would arrive on a surface they already read, with a verb they
+already use to answer one.
+
+**What this session does not do is decide the adjudication.** The verdict
+stays the verifier's and the tie-break stays the operator's; this is about
+how the question is put, not who answers it.
+
+**Steps.** (1) A stop carries what happened, who acts, the choices and the
+command for each, from what the framework already knows at the moment it
+stops -- `renderStop`'s single sentence becomes those four, and the four
+verification stops stop sharing one. (2) Who acts is a field rather than a
+word in a sentence: engine, operator, or either, decided from the stop's own
+kind and class. (3) The stop's reason reaches the Dabbler Terminal from the
+record, so what the sentence points at is on the screen it points from. (4) A
+standing dispute reaches the operator as an owed decision, with the finding,
+the grounds, the evidence and the options, answered with the verb they
+already use. (5) No surface offers a person a button that runs the engine's
+command: a stop the engine must clear says so and offers nothing to click,
+and one that is genuinely the operator's keeps its action.
+
+**Tests.** Five. Each of the four verification stops renders a different
+`what happened` and a different next command, asserted over the stop kinds
+the record can carry rather than over a list. A stop whose actor is the
+engine says so, and one whose actor is the operator says so. A stop line on
+the terminal carries the reason the record holds, so the sentence and the
+screen agree. A standing dispute appears in `dabbler owed list` with its
+options and its cost. And a stop the engine must clear offers no action to a
+person -- the assertion that keeps the second caller out. **How any of it
+reads gets no assertion**: Layer 3 catches a screen, and the operator's own
+walk is what says whether it is clear.
+
+**Not releasable on its own.** It ships with 145 if 145 has not gone yet, and
+carries its own release if it has.

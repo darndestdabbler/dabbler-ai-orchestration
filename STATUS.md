@@ -1,6 +1,74 @@
-# STATUS — sessions 113–143 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, and session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes; **version 2.0.21 TAGGED (vsix-v2.0.21) — CI awaits a reviewer in the marketplace environment, so the Marketplace still serves 2.0.20**
+# STATUS — sessions 113–144 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped; **version 2.0.21 TAGGED (vsix-v2.0.21) — CI awaits a reviewer in the marketplace environment, so the Marketplace still serves 2.0.20**
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 144 CLOSED, 2026-09-10 — the model that answered, and the three findings that were right
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 144 | the fidelity measurement, `modelFidelity`'s three answers, the round's substitution note, and 145's premise corrected | CLOSED VERIFIED at round 5 of a reopened cap (rounds 1–3 each found something real; the cap terminal was bought out with `verify reopen --rounds 3`, approved by the operator), landed `d13f8c4c`, closed `5b350e19`, not releasable |
+>
+> **The plan's premise was false and the session amended rather than built.**
+> It said what was asked for and what answered are two facts of which only one
+> is recorded. In fact `RouteResult` has carried `served_model_id` for some
+> time, every round has written `requested_model` beside `served_model` since
+> the 364-request session, `metrics.ts` keys a summary on the pair, and the API
+> transport already compares them per call. **What had never happened was the
+> reading.**
+>
+> **Three verification rounds, three real findings, two of them defects that
+> would have shipped.** This is the session to point at when anyone asks what
+> cross-provider verification is for.
+>
+> 1. **An exact seat echo was classified `honoured`** while the document
+>    beside it said an echo is not evidence. The code was the half that was
+>    wrong.
+> 2. **`roundObservations` marked every round's `served_model` as the
+>    provider's word** — including rounds run on a Copilot seat, where that
+>    same field carries the CLI's echo. That laundered an echo into evidence
+>    by wrapping a round around it: the very substitution the rule refuses,
+>    one level up.
+> 3. **The four probe calls I argued were unnecessary found a bug nothing else
+>    could.** OpenAI answers `gpt-5.4-mini` with `gpt-5.4-mini-2026-03-17` — a
+>    DASHED dated pin — and `datedPinOf` recognised only `-20260317`. **Every
+>    dashed pin would have been reported to an operator as a substituted
+>    model.** The 98 archived rounds cover two models, neither pinned that way,
+>    so no amount of reading them would have found it. **The dispute was
+>    well-argued and wrong**; that is worth more than the code.
+>
+> **The rule, and it is asymmetric.** An echo can never establish fidelity —
+> a seat that ignored `--model` and echoed the request prints exactly what an
+> honoured one prints. An echo CAN establish a substitution: a seat naming a
+> different model is testifying against its own interest. Only a served id,
+> the provider's own statement from its response body, makes a model read
+> `honoured`. **So the seat's fifteen models read `not-known`**, and that is
+> what 145's pane must render — not an absence of a problem, and not approval.
+>
+> **Three answers, never two.** `honoured`, `substituted`, `not-known`. A
+> model nobody has asked for and one that answered as something else are
+> different facts, and a boolean would have to call one of them the other.
+> `not-known` is the COMMON case.
+>
+> **`verify reopen` works, and the close proves it did.** The cap terminal at
+> round 3 landed the fix unreviewed; the operator authorised three more rounds;
+> the reopen recorded the grant and the loop went on to land and close anyway,
+> because the driver had already left the verify phase. **The close caught
+> it** — `verification_clean` refused with "the grant bought a review; it is
+> not one. Run it" — and one `dabbler verify` later, round 5 was VERIFIED. The
+> gate did exactly what it exists for; nothing was papered over.
+>
+> **OWED, and it is session 146.** The operator reported the stop message as
+> "clear as mud", on TWO surfaces: the Dabbler Terminal and a VS Code toast
+> with an action button they clicked. `driver.ts:1365` renders one sentence —
+> *"Next: you. Read the round's reason above and put it right"* — for an
+> adjudication, a refused dispute, a provider outage and a cap terminal alike.
+> The reason it points at is not on the terminal; "put it right" names no
+> action; `dabbler session next` reads as starting something; and **it says
+> "Next: you" when the actor is often the engine** — the refused dispute in
+> this very session was mine to fix, caused by an evidence path over the 16 KB
+> inline cap. A clickable toast also makes a person a SECOND caller of `next`,
+> which the one-caller rule forbids.
+
 
 > ## SESSION 143 CLOSED, 2026-09-10 — the terminal held to one rule
 >

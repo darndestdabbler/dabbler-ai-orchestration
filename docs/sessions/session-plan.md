@@ -7740,3 +7740,218 @@ having: nothing here changes the framework's own release machinery -- the
 tag rule, the packaging record, the publication consent, the phase order --
 so a publish that goes wrong here indicts step (5) and the manifest, and
 not the work 138 and 139 did. If the publish is boring, that work is done.
+
+### Session 141 of 142: The clone that arrived holding one file, and the window that listed six sessions it could not run
+
+**This work was written once already, outside any session, and was
+rewound.** On 2026-09-09 it was committed to `master` as `0ae5d4d3` with no
+declaration, no cross-provider verification, no run of record and no close.
+It was typechecked, linted, built and covered by the suite, and none of that
+is the gate this repository relies on -- work that has not faced a verifier
+has not been reviewed, and session 140's round 1 raised a well-founded
+blocking Major on work that looked just as finished. The commit was
+force-pushed off `master` and its diff is preserved outside the tree at
+`D:\tmp\session-141-recovery\0ae5d4d3.code.diff`, where it applies cleanly
+to this session's base. **The patch is a reference and not a shortcut.** It
+spares this session re-deriving what was already worked out; it changes
+nothing about the review, because the verifier reads this session's own diff
+either way. Where the patch and this plan disagree the plan wins -- step (5)
+is in the plan and not in the patch.
+
+**A focused checkout arrived holding one file.** Start Focused Session on
+`csv-parser`'s `person-model` cloned the origin, wrote its choices into
+`.dabbler/start-request.json`, opened the window -- and landed on `main`,
+one commit, `README.md` and nothing else. The work was on `master`. The
+window therefore had no `docs/sessions/sessions.json`, so the extension
+found no repository in it, rendered the Set Up New Project empty state, and
+never consumed the start request: no session, no engine, and no sentence
+anywhere saying why. The operator was left with a button.
+
+**`trunkOf` asked the wrong party, and this repository had already answered
+that question twice.** It read `refs/remotes/origin/HEAD` -- the host's
+default, a setting nobody revisits, which on a repository created with a
+README on one branch and filled on another names the placeholder for as
+long as it exists. `drive.ts` had been here before: `localGateReceipt` wrote
+the literal `master` and named a branch that did not exist in a `main`
+repository, and `candidateTrunk` polled `origin/master` for twenty-five
+minutes against a ref that was never going to move. Both were fixed the same
+way -- read the branch HEAD is on, refuse rather than guess -- and `trunkOf`
+never got the rule. That is ground rule 3 with the drift visible: one rule,
+stated three times, and the third one wrong. **No branch name is spelled
+anywhere in the fix.** `main`, `master`, `trunk` and `develop` are one
+question, and the answer is a resolution order rather than a list of names.
+
+**The branch was not the expensive part.** `openModule` returned success on
+a clone that contained no framework record at all, and said nothing -- it
+notes a missing convenience file and an unfiltered clone, but not a missing
+ledger. So every way of arriving at an unusable checkout -- a placeholder
+default, a `--branch` typo, a cone that lost `docs/` -- failed silently and
+identically, and the fifteen minutes went on the silence rather than the
+branch. The refusal is the load-bearing change; the trunk order only stops
+the commonest way in. **The check compares against the repository rather
+than a constant**, so a project set up and never started is not refused for
+being early.
+
+**The extension cannot show a note, so a note is not the fix.**
+`clonePathIn` reads `.path` out of `module open`'s JSON and both call sites
+discard everything else, which means the notes that verb has always produced
+have never reached a human. Only a refusal reaches the operator, and that is
+why this is one.
+
+**Then the same window listed six sessions, four of which it would refuse to
+start.** `moduleGroupNodes` read `modules[0]` -- the list of everything a
+session declared it touched -- and called it the session's module, so the
+global planning session that named four was filed under whichever came
+first. `kind` and `module` are what `sessionKindMembers` already computes for
+exactly this, from the `checkout` the start wrote on the row and from the
+plan before that; the tree ignored them. **A module's checkout shows the
+sessions that RUN in it and nothing else** -- a global session belongs to the
+repository, another module's belongs to another folder, and `startableHere`
+refuses both there already. The record stays whole and only the reading
+narrows: filtering `repository.sessions` itself would leave `startableHere`
+unable to find the next session's row, and the launcher would then disappear
+for want of a row rather than because the session does not run here -- the
+same pixels, the wrong reason, and a worse thing to build on.
+
+**Steps.** (1) `resolveTrunk` in `journal.ts` as the one reading of which
+branch is the trunk -- the branch HEAD is on when origin has it, then
+origin's default, then origin's only branch, then a refusal naming the
+candidates -- with `localGateReceipt` and `candidateTrunk` calling it, and
+the stale comment in the candidate poll that still names `master` as the
+rule corrected. (2) `openModule` refuses a clone whose branch carries no
+`docs/sessions/sessions.json`, names the branches that do, and says when the
+two share no history, which is the signature of a host-initialised
+placeholder rather than an earlier state of the work. (3) `bootstrap` says
+it at the push, the earliest moment the host's answer and the operator's
+both exist. (4) The Work Explorer groups by `kind`/`module` and scopes a
+checkout to the sessions that run in it, flat, with its own count and one
+Information row naming how many run elsewhere -- a folder whose module is
+finished must say so rather than render a blank tree. (5) `AGENTS.md`'s
+environment section says `npx vitest run --root packages/router`; the suite
+runs on `node --test` and has for as long as the TypeScript one has existed.
+A stale command in the one file every engine reads is a trap of the same
+family as the one this session is fixing, and it is the one step the
+preserved patch does not carry.
+
+**Tests.** Four. A repository whose host default names a placeholder opens
+its module on the branch the repository is on, and the same open asked for
+the branch without the record is refused naming the one that has it -- a
+walkthrough over a real bare origin, because the thing under test is git's
+own answer and a scripted git would test the script. `bootstrap` says so
+when the default it just pushed against is not the default the host names,
+including that the two share no history. A bucket groups by the module a
+session runs on, and a global session naming several modules groups under
+none. And a module's checkout renders only its own sessions, its own count,
+and the row that names what it is not showing. **The trunk order gets no
+unit test of its own beyond the walkthrough**: the walkthrough is the
+assertion, and a second one over a scripted git would prove the script.
+
+**Not releasable.** Nothing here is shipped by this session. Session 142
+carries it to the Marketplace along with its own two changes, so the fix
+reaches an operator through the next release rather than through one driven
+for it.
+
+**One thing this session does not do.** The `.git/hooks/pre-commit` in this
+working copy invoked `python -m ai_router.verify` -- a v1 leftover naming a
+package deleted in session 36, failing open on every commit, so the
+step-execution commit guard had been dead here for as long as the Python has
+been gone. It was repointed at `dabbler verify step guard-commit` on
+2026-09-09. Hooks are untracked machine state and the shipped template in
+`bootstrap/templates.ts` was already correct, so there is nothing here to
+change and nothing to verify. It is recorded because the next machine to
+clone this repository will have the same dead hook, and a guard that fails
+open is one nobody notices is gone.
+
+### Session 142 of 142: The heading an operator can read, the placeholder branch the framework offers to fix, and the release that carries both
+
+**Three things, and the third ships the first two.** This session runs on
+141's work and would have to invent it otherwise: `resolveTrunk`,
+`unusableClone` and `defaultBranchMismatch` are what its second change is
+built on. It is small on purpose, and it says so rather than being padded.
+
+**The terminal's headings say `S140: framework` and should say the session
+number set into the rule.** `divider` already draws a box-drawing rule with
+its label centred and spaced; what it is handed comes from `numbered`, which
+composes `S${session}: ${name}`. The heading becomes the session number, a
+single U+2500 light horizontal, and the voice -- `─────── 140 ─ framework
+───────` -- so the separator inside the label is the same character the rule
+is made of and the whole line reads as one object rather than a label
+dropped into a line. `numbered` also names job voices, so `S140: verify`
+becomes `140 ─ verify` by the same change: one function, one rule, every
+heading. **This is presentation and the operator's call**, recorded here so
+it is made rather than re-argued from the constant that states the old one.
+
+**What this step does not change is when the rule is drawn.** A voice rule
+is drawn on a change of voice, and a session banner sets the voice without
+drawing one, which is why an operator sees these headings rarely and why
+reformatting them makes them no more frequent. This session measures how
+often the rule actually draws in one real run and records the number; if the
+answer is that the heading is essentially never seen, that is a finding for a
+later session and not a second change smuggled into this one.
+
+**A host that creates the repository answers "which branch is the trunk"
+before the operator ever does.** Azure DevOps initialises with `main` and a
+README and makes it the default; the work then arrives as `master`, and the
+default still names the placeholder. Session 141 made the framework survive
+that -- it resolves the trunk by reading rather than guessing, and refuses a
+checkout whose branch carries no record, naming the branch that does. **It
+refuses and explains, and there it stops.** Nothing offers to fix it, and the
+operator is left holding a correct diagnosis and a manual git problem.
+
+**So the framework offers the fix, and a person chooses it.** Immediately
+after a remote is declared -- `bootstrap`'s push, the first moment the host's
+answer and the operator's both exist -- a detected mismatch becomes a `step`
+instruction whose `ask` is to put the situation in front of the operator and
+present the choice: which branch is this repository's trunk. Both answers are
+offered, because the framework does not know which one the operator wants and
+141's rule is that no branch name is spelled. The operator's answer is
+executed by a framework verb, `dabbler repo retrunk --to <branch>
+--approve`, which does the git and records the approver -- **the engine never
+types the git itself**, because deleting a branch at a remote is exactly the
+kind of act this repository keeps on the record with a name against it. The
+commands the verb runs are written to the Dabbler Terminal as it runs them,
+so the operator sees what was done to their remote rather than being told it
+went fine. Making the branch the remote's *default* is the one part no git
+command can do, so it is printed as an instruction to the human, naming the
+setting and the page.
+
+**The two answers are not symmetrical, and the prompt has to say so.**
+Choosing the record-carrying branch deletes a README-only placeholder and
+costs nothing. Choosing the placeholder means the branch that carries the
+work must become it, and the two share no history -- so that answer is a
+force-push, and an operator approving it is approving a rewrite. A prompt
+that offered both as though they were the same act would be collecting
+consent for something it had not described.
+
+**Steps.** (1) `numbered` composes the session number, a U+2500 light
+horizontal and the voice; every heading and every job voice follows from the
+one function. (2) Measure how often a voice rule is drawn across one real
+session and record the number, changing nothing. (3) `repo retrunk`: the
+verb, its `--to` and `--approve`, the git it runs, the approver on the
+record, and the refusal when the target is not a branch this repository has.
+(4) The detected mismatch becomes an instruction with the choice in it,
+raised where `defaultBranchMismatch` already sees the mismatch, and the
+force-push case is described as one. (5) The commands `retrunk` runs reach
+the Dabbler Terminal, and the remote-UI default change is printed as an
+instruction to the human. (6) The release: `version.json` to 2.0.21, stamped
+through `npm run stamp:version`, with an extension changelog section that
+says what 141 and 142 changed in the terms an operator reads.
+
+**Tests.** Four. A heading composes to the session number, the rule
+character and the voice, for a framework line and for a job voice, from the
+one function. `retrunk` refuses a `--to` naming a branch the repository does
+not have, and refuses without `--approve`. An approved `retrunk` over a real
+bare origin leaves the target carrying the work and the placeholder gone,
+with the approver on the record -- a walkthrough, for the same reason 141's
+was one. And the instruction raised for a mismatch offers both branches and
+names the force-push when the target shares no history with the record.
+**The terminal's rendering of the commands gets no assertion**: an assertion
+there would restate the format, and Layer 3 is what catches a line that reads
+wrong on a screen. **Step (2) is a measurement and produces a note rather
+than an assertion.**
+
+**Releasable.** This is the release that carries 141's trunk and checkout
+fixes as well as this session's own two changes -- 2.0.21, a patch, because
+every change in it is a fix to behaviour an operator already had. The staff
+who hit the placeholder-branch trap get it from the Marketplace rather than
+from a checkout.

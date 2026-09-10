@@ -2890,9 +2890,9 @@
     {
       "number": 147,
       "title": "The stop a developer can act on",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-10T11:27:19.410000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-10T12:45:40.536000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

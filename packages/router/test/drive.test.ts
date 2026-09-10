@@ -26,7 +26,6 @@ import {
   rewindFromPackaging,
   judgeReportFiles,
   judgeReportShape,
-  candidateTrunk,
   localGateReceipt,
   suiteRetrySeconds,
   staleJobDisposition,
@@ -396,24 +395,12 @@ describe("what the local gate receipt names", () => {
     );
   });
 
-  it("gates a candidate onto the branch HEAD is on, never onto a literal master", () => {
-    // Both candidate-mode sites read `origin/master` as a literal; a `main`
-    // repository would have polled a ref that does not exist and stopped.
-    const onMain = gitAnswers([[["rev-parse", "--abbrev-ref", "HEAD"], { stdout: "main" }]]);
-    try {
-      assert.deepEqual(candidateTrunk("/repo"), { trunk: "main", refusal: null });
-    } finally {
-      onMain();
-    }
-    const detached = gitAnswers([[["rev-parse", "--abbrev-ref", "HEAD"], { stdout: "HEAD" }]]);
-    try {
-      const read = candidateTrunk("/repo");
-      assert.equal(read.trunk, null);
-      assert.match(String(read.refusal), /detached/);
-    } finally {
-      detached();
-    }
-  });
+  // `candidateTrunk` was asserted here against a scripted git, on the
+  // reading it no longer makes: HEAD alone. It reads `resolveTrunk` now --
+  // HEAD *when origin has it* -- and the ref it hands the poll has to be one
+  // that can actually move, which is a fact about a real remote and not
+  // about a script. The assertion lives in walk-git-states.test.ts, over a
+  // real origin, beside the receipt's deliberate exception.
 });
 
 describe("a reached suite whose tests are not in this folder", () => {

@@ -591,15 +591,38 @@ function defaultBranchMismatch(projectDir: string, pushedBranch: string): string
   const fetched = runGit(root, ["fetch", "-q", "origin", hosted]);
   const unrelated =
     fetched.code === 0 ? haveCommonHistory(root, "HEAD", "FETCH_HEAD") === false : null;
+  // The situation, then the choice, then the command for each answer. It
+  // used to stop after the situation, which left a correct diagnosis and a
+  // manual git problem in the same breath -- and the operator holding both.
+  //
+  // Both answers are offered because the framework does not know which one
+  // is wanted: which branch a repository's trunk is, is the operator's to
+  // say, and a framework that picked would be spelling a branch name for
+  // them. They are NOT the same act, and the text has to say so -- one
+  // deletes a branch a host created, the other rewrites the branch the work
+  // is on over a history it does not share, and a prompt that offered them
+  // as equals would be collecting consent for something it had not
+  // described.
   return (
     `bootstrap: origin's default branch is '${hosted}', but this project is on '${pushedBranch}'` +
     (unrelated === true
       ? ` and the two share no history -- '${hosted}' is a placeholder the host created, not an earlier state of this work`
       : "") +
-    `. A focused checkout clones origin's default, so it would arrive on '${hosted}'. ` +
-    `Set the default branch to '${pushedBranch}' on the host` +
-    (unrelated === true ? `, and delete '${hosted}'` : "") +
-    ".\n"
+    `. A focused checkout clones origin's default, so it would arrive on '${hosted}'.\n` +
+    "bootstrap: which branch is this repository's trunk? Both answers are yours to make, " +
+    "and they are not the same act:\n" +
+    `  '${pushedBranch}' -- the branch your work is on. It stays, and '${hosted}' is deleted ` +
+    "at origin; nothing of yours moves.\n" +
+    `    dabbler repo retrunk --to ${pushedBranch} --approve "<your name>"\n` +
+    `  '${hosted}' -- the branch the host named. '${pushedBranch}' has to become it, ` +
+    (unrelated === true
+      ? `and because the two share no history that is a FORCE-PUSH: everything now on '${hosted}' is gone.\n` +
+        `    dabbler repo retrunk --to ${hosted} --approve "<your name>" --rewrite-history\n`
+      : `which git will refuse unless it fast-forwards -- if '${hosted}' has moved since, ` +
+        "nothing is pushed until you have merged it or approved discarding it.\n" +
+        `    dabbler repo retrunk --to ${hosted} --approve "<your name>"\n`) +
+    "bootstrap: either way, which branch is default is a setting on the host and no git " +
+    "command changes it; the verb prints where to move it.\n"
   );
 }
 

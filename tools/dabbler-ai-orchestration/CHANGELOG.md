@@ -10,6 +10,57 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.0.21] — 2026-09-10
+
+For anyone whose repository was created by the host before the work went
+into it. Azure DevOps starts a repository with a README on one branch and
+makes that branch the default; the work then arrives on another, and the
+default still names the placeholder — a setting nobody revisits, which
+until now quietly decided what every later step of the framework read.
+Nothing to configure, and nothing changes for a repository that never met
+this.
+
+### Fixed
+
+- **A module checkout that arrived holding one file now says so.** It
+  cloned whatever branch the host called default, landed on the
+  placeholder, found no session record there and reported success — so the
+  window showed "Set Up New Project" for a project that was fully set up,
+  with no sentence saying why. It refuses instead, names the branches at
+  origin that *do* carry the record, and says when the two share no
+  history, which is what tells a host-created placeholder from an earlier
+  state of your work.
+
+- **Which branch is the trunk is read from the repository, not from a
+  setting.** `main`, `master`, `trunk` and `develop` were four answers in
+  four places; there is one reading now — the branch you are on when origin
+  has it, then origin's default, then origin's only branch, then a refusal
+  naming the candidates. A session branch that exists only on your machine
+  no longer sends the candidate gate to watch a remote ref that will never
+  move.
+
+### Added
+
+- **Setup offers to fix a placeholder default, and does the git for you.**
+  When the branch you just pushed is not the one the host calls default,
+  setup now puts the choice in front of you rather than only diagnosing it:
+  both branches, and the command for each. `dabbler repo retrunk --to
+  <branch> --approve "<your name>"` carries out the answer, prints every
+  git command as it runs it, and records who approved it. The two answers
+  are not the same act and the prompt says so — keeping the host's branch
+  means force-pushing your work over a history it does not share, and that
+  one needs `--rewrite-history` on top of the approval. Which branch is
+  *default* is a setting on the host that no git command can change, so
+  the verb tells you where to move it on Azure DevOps and on GitHub, and
+  says why the placeholder is still there until you do.
+
+### Changed
+
+- **The Dabbler Terminal's headings read as part of the line they sit in.**
+  `S140: framework` becomes `140 ─ framework`, the separator being the same
+  character the rule is drawn with. Framework headings and job headings both,
+  from the one place that composes them.
+
 ## [2.0.20] — 2026-09-09
 
 What the Dabbler terminal tells you while a session runs, and what a

@@ -135,6 +135,7 @@ import {
   nowIso,
   repoRelativePath,
   repoRootFor,
+  resolveTrunk,
   runGit,
   snapshotWorktreeTree,
 } from "./journal.ts";
@@ -434,6 +435,14 @@ export function unchangedStepFiles(
  * literal `master`, and three receipts in a repository whose trunk is `main`
  * named a branch that did not exist. A detached HEAD names no branch, and
  * the answer then is a refusal rather than a guess.
+ *
+ * **`headBranch` here and `resolveTrunk` in `candidateTrunk`, deliberately.**
+ * A receipt names the branch the check actually ran on, and resolving that
+ * to the trunk would make it name a branch the test did not run on -- which
+ * is the one thing a receipt exists not to do. The rule is `resolveTrunk`
+ * everywhere it answers "which branch is this repository's"; this asks a
+ * different question, and the exception is written down so it is a rule with
+ * an exception rather than a rule with drift.
  */
 export function localGateReceipt(
   repoRoot: string,
@@ -457,25 +466,30 @@ export function localGateReceipt(
 }
 
 /**
- * The trunk a candidate is gated onto: the branch HEAD is on, at `origin`.
+ * The trunk a candidate is gated onto, at `origin`: `resolveTrunk`'s reading
+ * and no other.
  *
- * It was the literal `origin/master` at both sites -- the receipt's base
- * and the poll's ancestor check -- so a `main` repository in candidate mode
- * would have polled a ref that does not exist for twenty-five minutes and
- * stopped. The same reading the local receipt makes, with the same refusal
- * for a detached HEAD.
+ * It was the literal `origin/master` once, so a repository whose trunk was
+ * named anything else polled a ref that does not exist for twenty-five
+ * minutes and stopped. Reading HEAD fixed the constant and kept the shape of
+ * the bug: HEAD on a local branch origin has never heard of resolves to a
+ * remote ref that will never move, and `phaseGateWait` waits out its whole
+ * budget on it. The clause that makes the rule safe is *when origin has it*,
+ * and `resolveTrunk` is where that clause lives.
  */
 export function candidateTrunk(
   repoRoot: string,
 ): { trunk: string; refusal: null } | { trunk: null; refusal: string } {
-  const branch = headBranch(repoRoot);
-  if (branch === null) {
+  const reading = resolveTrunk(repoRoot);
+  if (reading.trunk === null) {
     return {
       trunk: null,
-      refusal: "HEAD is detached, so there is no trunk for the candidate to be gated onto",
+      refusal:
+        reading.refusal ??
+        "there is no branch at origin for the candidate to be gated onto",
     };
   }
-  return { trunk: branch, refusal: null };
+  return { trunk: reading.trunk, refusal: null };
 }
 
 /** How often the push loop looks at a running job; a pull call never waits. */

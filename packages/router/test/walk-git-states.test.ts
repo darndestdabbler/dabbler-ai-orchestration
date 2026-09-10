@@ -22,6 +22,8 @@ import {
 import {
   changedPathsBetween,
   objectExists,
+  remoteBranches,
+  remoteDefaultBranch,
   roundRef,
   runGit,
   runGitBinary,
@@ -32,6 +34,8 @@ import { POLICY_TARGETED, loadSuitesChecked, recordRun, type SuiteSpec } from ".
 import { ensureRootFiles } from "../src/ecosystem.ts";
 import { solutionShape } from "../src/modules.ts";
 import { packModule } from "../src/packages.ts";
+import { candidateTrunk, localGateReceipt } from "../src/drive.ts";
+import { retrunk } from "../src/cli/repo.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { git, gitOut, makeRepo, writeFiles } from "./support/repo.ts";
 
@@ -347,5 +351,195 @@ describe("a module's source digest over a real repository", () => {
       "modules/model/src/CsvModel/obj/project.assets.json": "{}\n",
     });
     assert.equal(pack(), before);
+  });
+});
+
+/**
+ * The trap, built for real: a repository whose work is on one branch and
+ * whose origin calls another its default -- created by the host with a
+ * README, sharing no history with anything here.
+ *
+ * A walkthrough rather than a scripted git, for the same reason the focused
+ * checkout's is one: what is under test IS git's own refusal to delete the
+ * branch a remote's HEAD points at, which is the constraint the whole verb
+ * is shaped around.
+ */
+function repoWithPlaceholderDefault(): { repo: string; remote: string; work: string; placeholder: string } {
+  const repo = makeRepo({ "a.txt": "one\n" }, { origin: true });
+  const remote = join(repo, "..", "remote.git");
+  const work = gitOut(repo, "rev-parse", "--abbrev-ref", "HEAD");
+  const placeholder = "host-placeholder";
+  git(repo, "checkout", "-q", "--orphan", placeholder);
+  git(repo, "rm", "-rqf", ".");
+  writeFiles(repo, { "README.md": "created by the host\n" });
+  git(repo, "add", "-A");
+  git(repo, "commit", "-q", "-m", "Add README.md");
+  git(repo, "push", "-q", "origin", placeholder);
+  git(repo, "checkout", "-q", work);
+  git(repo, "branch", "-qD", placeholder);
+  // What the host does when it creates the repository and nobody revisits it.
+  git(remote, "symbolic-ref", "HEAD", `refs/heads/${placeholder}`);
+  git(repo, "fetch", "-q", "--prune", "origin");
+  return { repo, remote, work, placeholder };
+}
+
+describe("the trunk a candidate is gated onto", () => {
+  it("resolves a local branch origin has never heard of to the branch origin does have", () => {
+    // 141's nit, and the original bug in miniature: `headBranch` alone
+    // answers with whatever HEAD is on, so a session branch that exists only
+    // here sent `phaseGateWait` to poll `origin/<that>` -- a ref that will
+    // never move -- for its whole budget. The clause that makes the rule
+    // safe is *when origin has it*.
+    const project = makeRepo({ "a.txt": "one\n" }, { origin: true });
+    const trunk = gitOut(project, "rev-parse", "--abbrev-ref", "HEAD");
+    git(project, "checkout", "-q", "-b", "session/9");
+    assert.equal(gitOut(project, "rev-parse", "--abbrev-ref", "HEAD"), "session/9");
+    const reading = candidateTrunk(project);
+    assert.equal(reading.refusal, null);
+    assert.equal(reading.trunk, trunk);
+    // Which is the point: the ref the poll watches is one that can move.
+    assert.ok(remoteBranches(project).includes(reading.trunk as string));
+  });
+
+  it("keeps the receipt on the branch the check actually ran on", () => {
+    // The deliberate exception. A receipt that resolved its branch to the
+    // trunk would name a branch the test did not run on, which is the one
+    // thing a receipt exists not to do.
+    const project = makeRepo({ "a.txt": "one\n" }, { origin: true });
+    git(project, "checkout", "-q", "-b", "session/9");
+    const { receipt, refusal } = localGateReceipt(project);
+    assert.equal(refusal, null);
+    assert.equal(receipt?.["branch"], "session/9");
+  });
+});
+
+describe("the trunk a host answered for, set by the verb that owns the git", () => {
+  it("refuses a branch this repository does not have, and refuses without an approver", () => {
+    const { repo, work } = repoWithPlaceholderDefault();
+    const unknown = retrunk(repo, { to: "no-such-branch", approver: "the operator" });
+    assert.match(unknown.refusal ?? "", /no branch 'no-such-branch'/);
+    assert.deepEqual(unknown.commands, [], "nothing is run before the target is known");
+    const unapproved = retrunk(repo, { to: work, approver: "" });
+    assert.match(unapproved.refusal ?? "", /--approve is required/);
+    assert.deepEqual(unapproved.commands, [], "nothing is run without a name against it");
+  });
+
+  it("refuses to hand the trunk to a branch the work would have to be force-pushed over", () => {
+    // The two answers are not the same act, and a prompt that offered them as
+    // though they were would be collecting consent for something it had not
+    // described. This is the second answer, unacknowledged.
+    const { repo, placeholder, work } = repoWithPlaceholderDefault();
+    const out = retrunk(repo, { to: placeholder, approver: "the operator" });
+    assert.match(out.refusal ?? "", /share no history/);
+    assert.match(out.refusal ?? "", /--rewrite-history/);
+    assert.deepEqual(out.commands, [], "a refusal moves nothing");
+    assert.equal(gitOut(repo, "rev-parse", "--abbrev-ref", "HEAD"), work);
+  });
+
+  it("refuses to force over a target that has moved, and refuses a local branch already holding the name", () => {
+    // Round 1's two findings. Shared history is not safety: a target a team
+    // has moved on since has commits the work does not, and an
+    // unacknowledged run must let git refuse rather than discard them.
+    const { repo, remote, work } = repoWithPlaceholderDefault();
+    git(repo, "checkout", "-q", "-b", "shared-target");
+    writeFiles(repo, { "theirs.txt": "someone else's commit\n" });
+    git(repo, "add", "-A");
+    git(repo, "commit", "-q", "-m", "theirs");
+    git(repo, "push", "-q", "origin", "shared-target");
+    git(repo, "checkout", "-q", work);
+    git(repo, "branch", "-qD", "shared-target");
+    git(repo, "fetch", "-q", "--prune", "origin");
+
+    const moved = retrunk(repo, { to: "shared-target", approver: "the operator" });
+    assert.match(moved.refusal ?? "", /not a fast-forward/);
+    assert.match(moved.refusal ?? "", /--rewrite-history/);
+    // git refused, so the target still carries what was on it.
+    assert.equal(
+      gitOut(remote, "rev-parse", "refs/heads/shared-target"),
+      gitOut(repo, "rev-parse", "origin/shared-target"),
+    );
+
+    // And a local branch already holding the target's name is refused
+    // BEFORE anything reaches the remote -- a refusal after the push would
+    // report failure over a change that stands.
+    git(repo, "branch", "-q", "shared-target", "origin/shared-target");
+    const taken = retrunk(repo, {
+      to: "shared-target",
+      approver: "the operator",
+      rewriteHistory: true,
+    });
+    assert.match(taken.refusal ?? "", /already has a local branch 'shared-target'/);
+    assert.deepEqual(taken.commands, [], "nothing reaches the remote");
+  });
+
+  it("rewrites the target when the operator has approved a rewrite, and records that it did", () => {
+    // The other answer, taken: the host's branch is kept and the work
+    // becomes it, over a history they do not share.
+    const { repo, remote, work, placeholder } = repoWithPlaceholderDefault();
+    const carried = gitOut(repo, "rev-parse", "HEAD");
+    const out = retrunk(repo, {
+      to: placeholder,
+      approver: "the operator",
+      rewriteHistory: true,
+    });
+    assert.equal(out.refusal, null);
+    assert.equal(out.rewrote, true);
+    assert.deepEqual(out.outstanding, []);
+    // The target carries the work, the branch that carried it is gone at
+    // origin, and the local branch went with it.
+    assert.equal(gitOut(remote, "rev-parse", `refs/heads/${placeholder}`), carried);
+    assert.deepEqual(remoteBranches(repo), [placeholder]);
+    assert.equal(out.deleted, work);
+    assert.equal(gitOut(repo, "rev-parse", "--abbrev-ref", "HEAD"), placeholder);
+    // Origin already called the target its default, so nothing is left for a
+    // person to do on the host.
+    assert.equal(out.pending, null);
+    const rows = readFileSync(join(repo, ".dabbler", "runs", "retrunk.jsonl"), "utf8")
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]?.["rewrote_history"], true);
+    assert.equal(rows[0]?.["approver"], "the operator");
+  });
+
+  it("makes the branch carrying the work the trunk, and clears the placeholder once a person has moved the default", () => {
+    const { repo, remote, work, placeholder } = repoWithPlaceholderDefault();
+    const first = retrunk(repo, { to: work, approver: "the operator" });
+    assert.equal(first.refusal, null);
+    // git will not delete the branch the remote's HEAD names, and neither
+    // will a host -- so the placeholder stays and the operator is told what
+    // is theirs to do rather than told it went fine.
+    assert.equal(first.deleted, null);
+    assert.equal(first.pending, placeholder);
+    assert.equal(remoteDefaultBranch(repo), placeholder);
+    assert.ok(remoteBranches(repo).includes(work));
+
+    // The person does the one part no git command can: the host's setting.
+    git(remote, "symbolic-ref", "HEAD", `refs/heads/${work}`);
+    const second = retrunk(repo, { to: work, approver: "the operator" });
+    assert.equal(second.refusal, null);
+    assert.equal(second.deleted, placeholder);
+    assert.equal(second.pending, null);
+    assert.deepEqual(remoteBranches(repo), [work]);
+    assert.equal(second.rewrote, false);
+
+    // Both runs are on the record, with the approver and what was run.
+    const rows = readFileSync(join(repo, ".dabbler", "runs", "retrunk.jsonl"), "utf8")
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    assert.equal(rows.length, 2);
+    for (const row of rows) {
+      assert.equal(row["approver"], "the operator");
+      assert.equal(row["to"], work);
+      assert.equal(row["carried_record"], work);
+    }
+    assert.deepEqual(rows[0]?.["deleted_at_origin"], []);
+    assert.deepEqual(rows[1]?.["deleted_at_origin"], [placeholder]);
+    assert.ok(
+      (rows[1]?.["commands"] as string[]).some((command) => command.includes("--delete")),
+      "the record names the git that deleted it",
+    );
   });
 });

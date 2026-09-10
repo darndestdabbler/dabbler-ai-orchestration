@@ -169,6 +169,18 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "classify a stopped session on a provider that is not the engine's",
   },
   {
+    // The git an operator would otherwise type by hand, after the framework
+    // has told them their host answered "which branch is the trunk" for
+    // them. The choice is a person's; the typing is not, and this is what
+    // the engine runs once the person has answered. Not extension-facing:
+    // nothing in the extension calls it, and a verb listed as one the
+    // extension calls when it does not is the drift this table exists to
+    // stop.
+    verb: "repo",
+    extensionFacing: false,
+    summary: "this repository at its remote: set which branch is the trunk",
+  },
+  {
     verb: "contractdoc",
     extensionFacing: false,
     summary: "render a module's contract from its declaration",

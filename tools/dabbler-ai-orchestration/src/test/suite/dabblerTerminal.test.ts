@@ -25,6 +25,7 @@ import {
   revealOnSessionStart,
   lineTone,
   paint,
+  RULE_CHAR,
   terminalLocation,
   watcherLookMs,
   watcherThreshold,
@@ -656,13 +657,18 @@ suite("the session from its registration, and each step as it starts", () => {
     rmrf(root);
   });
 
+  // The two tests below are the plan's "a heading composes to the session
+  // number, the rule character and the voice, for a framework line and for
+  // a job voice, from the one function": one case each, strengthened to
+  // assert the composition rather than joined by a third test of the same
+  // behaviour.
   test("rules the framework's voice with the session number once a session is known, and without one before", () => {
     const { root, written, terminal } = drivenRepo({ session_number: 62, phase: "plan", job: null, stop: null });
     terminal.open({ columns: 80, rows: 20 });
     // Before the first look nothing is known: the opening line is ruled `framework`.
     const opened = plain(written.join(""));
-    assert.ok(opened.includes("─ framework ─"), opened);
-    assert.ok(!opened.includes("S62"), opened);
+    assert.ok(opened.includes(`${RULE_CHAR} framework ${RULE_CHAR}`), opened);
+    assert.ok(!new RegExp(`62 ${RULE_CHAR} framework`).test(opened), opened);
     written.length = 0;
     terminal.poll();
     // A job's bytes change the voice, and the framework's next line comes
@@ -673,8 +679,11 @@ suite("the session from its registration, and each step as it starts", () => {
     writeRun(driver, { session_number: 62, phase: "verify", job: null, stop: null });
     terminal.poll();
     const after = plain(written.join(""));
-    assert.match(after, /─ S62: framework ─/, after);
-    assert.ok(!/─ framework ─/.test(after), after);
+    // The number, the character the rule itself is drawn with, the voice --
+    // set into a rule of that same character on both sides.
+    assert.match(after, new RegExp(`${RULE_CHAR}{2} 62 ${RULE_CHAR} framework ${RULE_CHAR}{2}`), after);
+    // ...and never the bare voice, which would head any session's group.
+    assert.ok(!new RegExp(`${RULE_CHAR}{2} framework`).test(after), after);
     terminal.dispose();
     rmrf(root);
   });
@@ -691,14 +700,14 @@ suite("the session from its registration, and each step as it starts", () => {
     fs.writeFileSync(path.join(jobs, "verify-round-1.log"), "reviewing\n", "utf8");
     terminal.poll();
     const said = plain(written.join(""));
-    assert.match(said, /─ S62: verify-round-1 ─/, said);
-    assert.ok(!/─ verify-round-1 ─/.test(said), said);
+    assert.match(said, new RegExp(`${RULE_CHAR}{2} 62 ${RULE_CHAR} verify-round-1 ${RULE_CHAR}{2}`), said);
+    assert.ok(!new RegExp(`${RULE_CHAR}{2} verify-round-1`).test(said), said);
     terminal.dispose();
     rmrf(root);
   });
 
   test("gives a session that puts no job output on the terminal a numbered heading anyway", () => {
-    // The operator's report: no `S133:` on any voice rule. The cause is not
+    // The operator's report: no numbered voice rule at all. The cause is not
     // the label -- `voice()` returns it -- but the occasion: `emit` draws a
     // rule only when the speaker changes, and a session driven from a chat
     // never changes voice, so no numbered rule is ever drawn. The banner is
@@ -710,7 +719,7 @@ suite("the session from its registration, and each step as it starts", () => {
     terminal.poll();
     const said = plain(written.join(""));
     // No job ever spoke, so no voice rule was occasioned...
-    assert.ok(!/─ S133: framework ─/.test(said), said);
+    assert.ok(!new RegExp(`${RULE_CHAR} 133 ${RULE_CHAR} framework ${RULE_CHAR}`).test(said), said);
     // ...and the session is headed by its number ONCE -- a second banner
     // would be two headings for the group this one heads, which is the
     // whole reason the rule is not drawn here either.
@@ -908,24 +917,24 @@ suite("the first look, and the rule between voices", () => {
     });
     terminal.poll();
     const after = plain(written.join(""));
-    assert.match(after, /─ S62: close ─+\r\nclose: pushed 1 round ref\(s\)\r\n/, after);
+    assert.match(after, /─ 62 ─ close ─+\r\nclose: pushed 1 round ref\(s\)\r\n/, after);
     // The framework's rule carries the session's number once one is known.
-    assert.match(after, /─ S62: framework ─+\r\n14:30:05 paused/, after);
+    assert.match(after, /─ 62 ─ framework ─+\r\n14:30:05 paused/, after);
     // An empty line stands before each rule, so the groups have room
     // between them; the one at the very top has nothing above it. The
     // framework's last line had ended its own line, so one CRLF is the
     // empty line before the close rule; the job's bytes had too.
     assert.ok(after.startsWith("\r\n─"), after.slice(0, 40));
-    assert.match(after, /ref\(s\)\r\n\r\n─+ S62: framework ─/, after);
+    assert.match(after, /ref\(s\)\r\n\r\n─+ 62 ─ framework ─/, after);
     assert.ok(said.startsWith("─"), said.slice(0, 40));
     // The rule spans the terminal's width, one column short, and follows it
     // through a resize because it is drawn again with everything else.
-    const rule = after.split("\r\n").find((line) => line.includes("─ S62: close ─")) ?? "";
+    const rule = after.split("\r\n").find((line) => line.includes("─ 62 ─ close ─")) ?? "";
     assert.strictEqual(rule.length, 99, rule);
     written.length = 0;
     terminal.setDimensions({ columns: 40, rows: 20 });
     await new Promise((resolve) => setTimeout(resolve, 40));
-    const narrow = plain(written.join("")).split("\r\n").filter((line) => line.includes("─ S62: close ─"));
+    const narrow = plain(written.join("")).split("\r\n").filter((line) => line.includes("─ 62 ─ close ─"));
     assert.strictEqual(narrow.length, 1);
     assert.strictEqual(narrow[0]?.length, 39, narrow[0]);
 

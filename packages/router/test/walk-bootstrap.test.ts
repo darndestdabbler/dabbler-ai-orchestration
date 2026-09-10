@@ -248,7 +248,7 @@ describe("a project on its first day", () => {
     assert.equal(gitOut(bare, "rev-parse", `refs/heads/${branch}`), gitOut(folder, "rev-parse", "HEAD"));
   });
 
-  it("says so when the host's default branch is not the one it just pushed", async () => {
+  it("puts the choice of trunk to the operator when the host's default is not the branch it just pushed", async () => {
     // The earliest this is visible: the host's answer and the operator's are
     // both known for the first time. A repository initialised on one branch
     // and filled on another leaves a default nobody re-points, and every
@@ -275,10 +275,18 @@ describe("a project on its first day", () => {
     const branch = gitOut(folder, "symbolic-ref", "--short", "HEAD");
     assert.match(setup.stderr, /origin's default branch is 'placeholder'/);
     assert.match(setup.stderr, new RegExp(`this project is on '${branch}'`));
-    // The two were never one history, and the advice is to re-point rather
-    // than to go and look at the placeholder.
+    // The two were never one history.
     assert.match(setup.stderr, /share no history/);
-    assert.match(setup.stderr, new RegExp(`Set the default branch to '${branch}'`));
+    // BOTH answers are offered, each with the command that carries it out:
+    // which branch is the trunk is the operator's to say, and a framework
+    // that picked would be spelling a branch name on their behalf.
+    assert.match(setup.stderr, new RegExp(`retrunk --to ${branch} --approve`));
+    assert.match(setup.stderr, /retrunk --to placeholder --approve/);
+    // And they are not the same act: keeping the host's branch means the
+    // work is force-pushed over it, which the prompt names rather than
+    // leaving the operator to discover once approved.
+    assert.match(setup.stderr, /FORCE-PUSH/);
+    assert.match(setup.stderr, /--rewrite-history/);
   });
 
   it("names the project directory's own .dabbler in the discovery line, not the working directory's", async () => {

@@ -194,15 +194,26 @@ export function headBranch(repoRoot: string): string | null {
   return branch.stdout;
 }
 
-/** Origin's branches as short names, without the `origin/HEAD` alias. */
+/**
+ * Origin's branches as short names, without the `origin/HEAD` alias.
+ *
+ * `%(refname:short)` prints `refs/remotes/origin/HEAD` as `origin`, not as
+ * `origin/HEAD`: git shortens a remote's HEAD to the remote's own name. A
+ * filter that only knew the long spelling let it through, and slicing
+ * `origin/` off `origin` left an EMPTY branch name in the candidate list --
+ * offered in a refusal, and counted when deciding whether origin has exactly
+ * one branch. The prefix is what identifies a branch here, so anything not
+ * carrying it is not one.
+ */
 export function remoteBranches(repoRoot: string): string[] {
   const refs = runGit(repoRoot, ["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin"]);
   if (refs.code !== 0) return [];
+  const prefix = "origin/";
   return refs.stdout
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line !== "" && line !== "origin/HEAD")
-    .map((line) => line.slice("origin/".length));
+    .filter((line) => line.startsWith(prefix) && line !== `${prefix}HEAD`)
+    .map((line) => line.slice(prefix.length));
 }
 
 /** What origin's own `HEAD` points at, as the local refs remember it. */

@@ -11,7 +11,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { servedVersions } from "../src/cli/release.ts";
+import { reaskPublication, servedVersions } from "../src/cli/release.ts";
+import { capture } from "../src/output.ts";
 import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/packaging.ts";
 import {
   answerOwed,
@@ -19,6 +20,7 @@ import {
   currentDecisions,
   publicationDecisionId,
   raisePublicationDecision,
+  readOwed,
 } from "../src/owedDecisions.ts";
 import { makeAnsweredSandbox, tempDir } from "./support/answers.ts";
 
@@ -263,5 +265,68 @@ describe("the brief the operator answers", () => {
     assert.equal(decided().find((r) => String(r["id"]) === publicationDecisionId("2.0.0"))?.["answer"], "publish");
     // Still asked once per version, however often the verb runs.
     assert.equal(raisePublicationDecision(repo, { version: "2.0.1" }), null);
+  });
+});
+
+describe("a version that was held until something was true", () => {
+  const HELD = "2.1.0";
+
+  /** The current row for the held version, off disk. */
+  function row(repo: string): Record<string, unknown> | undefined {
+    return currentDecisions(repo).find(
+      (candidate) => String(candidate["id"]) === publicationDecisionId(HELD),
+    );
+  }
+
+  async function reask(repo: string, reason: string | undefined): Promise<number> {
+    return (
+      await capture(() =>
+        Promise.resolve(
+          reaskPublication(repo, HELD, publicationDecisionId(HELD), reason),
+        ),
+      )
+    ).value;
+  }
+
+  it("is put back to the operator when it becomes true, and authorises nothing by being asked", async () => {
+    // The stop this closes: an answer is settled, so a release held for a
+    // defect stayed held after the defect was fixed with nothing but a
+    // person remembering it. 2.1.0 was held at the close of 145 because the
+    // pane was wrong on a seat.
+    const { repo } = makeAnsweredSandbox();
+    raisePublicationDecision(repo, { version: HELD });
+    answerOwed(repo, publicationDecisionId(HELD), "not yet", null, "the pane is wrong on a seat");
+
+    // A re-ask with no reason is refused: the operator is being asked again
+    // because something happened, and the record has to say what.
+    assert.equal(await reask(repo, undefined), 2);
+    assert.equal(row(repo)?.["answer"], "not yet");
+
+    assert.equal(await reask(repo, "the pane now reads the seat's own catalog"), 0);
+    const asked = row(repo);
+    assert.equal(asked?.["state"], "open");
+    assert.equal(asked?.["answer"], undefined);
+    // Both halves are on the record: what was held, and what changed.
+    const superseded = readOwed(repo).filter(
+      (candidate) =>
+        String(candidate["id"]) === publicationDecisionId(HELD) &&
+        candidate["event"] === "superseded",
+    );
+    assert.match(String(superseded.at(-1)?.["note"]), /answered 'not yet'/);
+    assert.match(String(superseded.at(-1)?.["note"]), /reads the seat's own catalog/);
+    // An open question is not an authorisation, and it still does not block
+    // a close: an unpublished product is not an unverified one.
+    assert.deepEqual(blockingDecisions(repo), []);
+  });
+
+  it("never re-asks an answer that already authorised a tag", async () => {
+    // Asking a person to consent twice to the same publication is pressure,
+    // not process -- and the answer that carries it out is already on the
+    // record for `dabbler release` to act on.
+    const { repo } = makeAnsweredSandbox();
+    raisePublicationDecision(repo, { version: HELD });
+    answerOwed(repo, publicationDecisionId(HELD), "publish");
+    assert.equal(await reask(repo, "I would like to be asked again"), 1);
+    assert.equal(row(repo)?.["answer"], "publish");
   });
 });

@@ -23,7 +23,7 @@ import { VALID_TRANSPORTS, type Router } from "dabbler-ai-router";
 
 import { resolveRouterCli } from "../router/terminalShim";
 
-import { FIDELITY_WORDS } from "../providers/solutionTreeModel";
+import { ENUMERATION_WORDS, FIDELITY_WORDS } from "../providers/solutionTreeModel";
 import type {
   ConfigurationModel,
   Projection,
@@ -304,8 +304,18 @@ export async function setRoleModel(
     target.projection?.configuration?.fidelityTransport,
   );
   if (items.length === 0) {
+    // Which record was read, and why it offered nothing. "No model
+    // qualifies" on its own is what a Copilot seat with eighteen working
+    // models was told while the pane read the direct-API registry.
+    const read = role?.enumeration
+      ? `The list was read from the ${ENUMERATION_WORDS[role.enumeration] ?? role.enumeration}. `
+      : "";
     ui.showWarningMessage(
-      "No model qualifies for that role here. A provider with no key resolves to no candidate at all.",
+      `No model qualifies for that role here. ${read}${
+        role?.unavailable
+          ? `${role.unavailable}.`
+          : "A provider with no key resolves to no candidate at all."
+      }`,
     );
     return;
   }

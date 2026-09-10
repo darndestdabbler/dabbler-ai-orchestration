@@ -61,13 +61,57 @@ their notes are below.
   a CLI that ignored the flag would print exactly the same thing. Nothing
   new is probed to answer it, and *not known* is never rendered as approval.
 
-- **Refreshing a model record is something you ask for.** The section never
-  probes when it opens — the registry is a dated record and the row tells
-  you its age. Clicking one asks first, says what the refresh costs (three
-  metadata requests for the API record; a priced premium request per model
-  for the seat), and then runs it in a terminal where you can watch it.
+- **Refreshing a model record is something you ask for — and what the seat
+  lists is free.** The section never probes when it opens: the record is
+  dated and the row tells you its age. Clicking one asks first and says what
+  it costs, which is nothing for the API record's three metadata requests
+  and nothing for reading the seat's own list. Only *confirming* that a
+  model answers on your seat is a billed turn, and that is the one a person
+  asks for by name.
+
+- **The models a Copilot seat can dispatch come from the seat.** The Copilot
+  CLI states its whole model list over its own protocol — no prompt, no
+  token, no credit — so `dabbler copilot refresh` reads it instead of
+  working from a list maintained by hand, and `--list-only` records it
+  without spending anything. On this seat the list was 27 models where the
+  maintained one had 18: sixteen it had never heard of, seven it carried
+  that the seat no longer serves. A probe now establishes only that a named
+  model answers.
+
+- **A model that stopped being served is marked, not dropped.** It keeps its
+  entry, says when it was last seen, stops being offered, and shows up in
+  `dabbler discovery drift`. One bad enumeration cannot remove the only
+  verifier you had, and a model that comes back is simply offered again.
 
 ### Changed
+
+- **The Configuration section shows a Copilot seat's own models.** Both
+  model rows read the direct-API registry whichever transport was in force,
+  so a machine with a seat and no provider API keys was told "nothing
+  qualifies" while its seat catalog held every working model it has. The
+  enumeration belongs to the transport: on a seat the list is the seat's
+  catalog, on the API path it is the registry, and each row says which
+  record it was read from.
+
+- **A stale model record brings itself up to date when a session starts.**
+  Both the free ones do: enumerating a vendor's models is a metadata request
+  and reading what a Copilot seat lists is a protocol reply, so neither bills
+  anything and a record older than its declared 24 hours is re-read before
+  the work rather than reported and left. The seat catalog's two halves are
+  now dated separately, because only one of them costs money — what the seat
+  lists is free and on the free clock, and confirming that a model answers is
+  a billed turn each and stays on its own month-long one. A source that
+  cannot be reached leaves its record exactly as it was and says which; a
+  probe is never in that path; and a repository that has never run discovery
+  is still left to `dabbler bootstrap`.
+
+- **Every cost says which billing platform it is counted in.** GitHub bills
+  a Copilot seat in AI credits per token, and premium requests are the
+  legacy platform — so a premium-request figure now prints as one, beside
+  the sentence that it is not a price and that `dabbler seat-cost` reads
+  what was actually spent. The seat catalog also carries the seat's own
+  statement of each model's multiplier beside this repository's sampled
+  guess, which on five of eighteen entries disagreed with it.
 
 - **The Dabbler Terminal reads as one thing.** Every phase of a session is
   announced in the same tone, whichever phase it is; the gate rows the close

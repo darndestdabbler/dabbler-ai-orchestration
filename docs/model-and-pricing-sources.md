@@ -77,6 +77,41 @@ dispatch — each with a `_meta.copilotUsage` multiplier, plus
 It listed models the maintained catalog has never heard of: `gpt-6-astra`,
 `grok-4.5`, `grok-4.6`, `kimi-k3`, `kimi-k2.7-code`, `mai-code-1.1-flash`.
 
+### Re-measured from the router, 2026-09-10, CLI 1.0.83
+
+`enumerateSeatModels` in `packages/router/src/transports/copilot.ts` is the
+reading: it opens an ACP conversation, takes `models.availableModels` from the
+`session/new` reply, and closes without ever calling `session/prompt`. Run
+against this seat on **2026-09-10**, on **GitHub Copilot CLI 1.0.83**, it
+returned **28 entries in 3 seconds and billed nothing**.
+
+- **27 models plus `auto`**, the seat's own router alias, which carries no
+  `_meta` and no provider — named because the seat names it, and never
+  dispatched to by this framework, because "let Copilot pick" is the one
+  answer a framework that has to know which model answered cannot use.
+- **The same 27 ids as 2026-09-05**, with the same multipliers. Five days on,
+  the free list needed no correction.
+- **Two `_meta` fields the earlier transcript does not record**:
+  `copilotEnablement` (`enabled` on all 27 — the seat's own statement of what
+  it may dispatch) and `copilotPriceCategory` (`low` … `very_high`).
+- `currentModelId` was **`gpt-5.6-sol`** with nothing on the argv, so the
+  reply also says what the seat would have used if asked for no model.
+- `modes`: agent, plan, autopilot. `configOptions`: mode, model,
+  `reasoning_effort` (none, low, medium, high, xhigh, max), `allow_all`.
+
+**What the maintained catalog knew, measured the same day.**
+`copilot-catalog.lock` held **18 entries, 15 confirmed** — and:
+
+| | |
+| --- | --- |
+| models the seat lists that the catalog has never heard of | **16** |
+| models the catalog carries that the seat no longer lists | **7** (`claude-sonnet-4.6`, `claude-sonnet-4.5`, `claude-opus-4.6`, `claude-opus-4.6-fast`, `claude-opus-4.5`, `gpt-5.2-codex`, `gpt-5.2`) |
+| entries whose sampled cost disagrees with the seat's own statement | **5** — `gpt-5.4` 0 vs 1x, `gpt-5.3-codex` 0 vs 1x, `gpt-5.4-mini` 0 vs 0.33x, `claude-fable-5` 1 vs 15x, `claude-opus-4.7` unknown vs 7.5x |
+
+A maintained array cannot keep up with a list the vendor publishes for free,
+and the probe that samples cost is both expensive and wrong. That is the whole
+case for reading the list instead of maintaining one.
+
 **Newer route, not yet exercised here.** The Copilot SDK shipped inside the
 VS Code install (`@github/copilot-*/copilot-sdk/`) declares
 `client.listModels(): Promise<ModelInfo[]>` and the RPC
@@ -120,8 +155,9 @@ and never in an automatic path.
 ## Re-measuring
 
 - Direct API: `dabbler discovery enumerate` (free, seconds)
-- Seat list and multipliers: `dabbler agent prompt --engine copilot` and read
-  the `open` line's `session` payload, or the SDK's `models.list`
+- Seat list and multipliers: `enumerateSeatModels` (free — it opens a
+  conversation and sends no prompt), or the SDK's `models.list`. **Not
+  `dabbler agent prompt`**, which takes a real turn and bills for it
 - Seat spend: `dabbler seat-cost`
 - Billing model: `copilot help billing`
 

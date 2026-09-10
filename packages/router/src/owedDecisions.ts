@@ -115,6 +115,9 @@ export interface OwedDecision extends Row {
   readonly event: string;
 }
 
+/** What an answer put on a row, and what a re-asked question drops. */
+const ANSWER_KEYS: ReadonlySet<string> = new Set(["answer", "answeredBy", "value"]);
+
 /**
  * The current state of each decision, keyed by id, in the order first raised.
  *
@@ -127,9 +130,20 @@ export function foldOwed(rows: readonly Row[]): Map<string, Row> {
   for (const row of rows) {
     const id = String(row["id"]);
     if (!merged.has(id)) first.push(id);
-    // The brief is carried forward: an `answered` row states the choice, and a
-    // reader still needs the question it answers.
-    merged.set(id, { ...(merged.get(id) ?? {}), ...row });
+    const prior = merged.get(id) ?? {};
+    // **A question asked again has no answer.** The brief is carried forward
+    // -- an `answered` row states the choice and a reader still needs the
+    // question it answers -- but the choice is not carried across a fresh
+    // `raised` row, because the merge would otherwise leave a re-asked
+    // decision reading as settled: open, with last time's answer still on
+    // it, which is an answer nobody gave to the question now being asked.
+    const base =
+      row["event"] === EVENT_RAISED
+        ? Object.fromEntries(
+            Object.entries(prior).filter(([key]) => !ANSWER_KEYS.has(key)),
+          )
+        : prior;
+    merged.set(id, { ...base, ...row });
   }
   const ordered = new Map<string, Row>();
   // No derivation here any more: every row carries the state it produced, so

@@ -37,6 +37,61 @@ import { isAbsolute, join, resolve } from "node:path";
 export const NANO_AIU_PER_CREDIT = 1_000_000_000;
 export const CREDITS_PER_USD = 100.0;
 
+// --- Which billing platform a number belongs to ------------------------------
+//
+// **Two platforms, and only one of them is current.** GitHub bills this seat
+// in AI CREDITS, per token, and has since 2026-06-01; premium requests are the
+// legacy platform, in the CLI's own words (`copilot help billing`). A number
+// in one unit is not comparable with a number in the other, and neither is a
+// price -- which is why every cost this framework reports carries the platform
+// its unit belongs to, and why the only answer to "what did this cost" is the
+// measurement below.
+//
+// This vocabulary lives here rather than beside the samples in the seat
+// catalog because it is a fact about billing and not about a lockfile, and a
+// second copy of it next to the samples is exactly how the samples came to
+// read as prices.
+
+export const PLATFORM_AI_CREDITS = "ai-credits";
+export const PLATFORM_LEGACY_PREMIUM_REQUESTS = "legacy-premium-requests";
+
+/** The verb that answers what was actually spent. Named in every caveat. */
+export const SEAT_COST_COMMAND = "dabbler seat-cost";
+
+const PLATFORM_UNITS: Readonly<Record<string, string>> = {
+  [PLATFORM_AI_CREDITS]: "AI credit(s)",
+  [PLATFORM_LEGACY_PREMIUM_REQUESTS]: "legacy premium request(s)",
+};
+
+/** The unit a platform is counted in, for a reader. */
+export function costUnit(platform: string): string {
+  return PLATFORM_UNITS[platform] ?? platform;
+}
+
+/**
+ * A number with the platform it is counted in, or `unknown`.
+ *
+ * Unknown, never zero: a cost nobody measured is not a free one, and the
+ * seat's cheapest models are precisely where a zero would be believed.
+ */
+export function renderCost(amount: number | null, platform: string): string {
+  if (amount === null || !Number.isFinite(amount)) return "unknown";
+  return `${String(amount)} ${costUnit(platform)}`;
+}
+
+/**
+ * The sentence that goes with a legacy number, once per message.
+ *
+ * Every place this framework prints a premium-request figure prints this
+ * beside it, because the figure is neither current nor a price: the samples in
+ * the seat catalog were bought one billed call at a time and disagree with the
+ * seat's own statement of its multipliers.
+ */
+export const LEGACY_PLATFORM_CAVEAT =
+  "premium requests are the LEGACY billing platform and this figure is not a " +
+  `price; \`${SEAT_COST_COMMAND}\` reads what was really spent, in ` +
+  `${costUnit(PLATFORM_AI_CREDITS)}`;
+
 export const STATUS_MEASURED = "measured";
 export const STATUS_FLOOR = "floor";
 export const STATUS_UNMEASURED = "unmeasured";

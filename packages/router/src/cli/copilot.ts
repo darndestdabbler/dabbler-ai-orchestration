@@ -19,6 +19,7 @@ import {
   SCOPE_MODELS,
   SCOPE_QUORUM,
   SCOPE_STALE,
+  enumerateSeatModels,
   getCliVersion,
   resolveLockfilePath,
   resolveTransportTimeouts,
@@ -50,13 +51,15 @@ function refreshUsage(): string {
   return [
     "usage: dabbler copilot refresh [-h]",
     "                               [--quorum | --stale | --all | --models a,b,c]",
-    "                               [--dry-run] [--yes]",
+    "                               [--list-only] [--dry-run] [--yes]",
     "                               [--confirm-threshold CONFIRM_THRESHOLD]",
     "                               [--lockfile LOCKFILE] [--binary BINARY]",
     "",
-    "Probe a named scope of models and fold the answers into the lockfile. Merge,",
-    "never clobber: an entry this run did not probe survives byte for byte,",
-    "provenance included.",
+    "Read the seat's own model list -- free, no prompt, no credit -- then probe a",
+    "named scope of it for entitlement and fold the answers into the lockfile.",
+    "Merge, never clobber: an entry this run did not probe survives byte for byte,",
+    "provenance included, and a model the seat has stopped listing is marked",
+    "retired rather than deleted.",
     "",
     "options:",
     "  -h, --help            show this help message and exit",
@@ -65,9 +68,12 @@ function refreshUsage(): string {
     "                        invariant and re-date the CLI version",
     "  --stale               entries confirmed on a CLI version other than the live",
     "                        one, cheapest first",
-    "  --all                 the whole declared candidate universe; costs what it",
-    "                        costs, which is why it must be asked for by name",
+    "  --all                 every model the seat lists; costs what it costs, which",
+    "                        is why it must be asked for by name",
     "  --models a,b,c        probe these ids only, comma-separated",
+    "  --list-only           read the seat's own model list, record it, and probe",
+    "                        nothing -- free, and the only scope that spends no",
+    "                        turn at all",
     "  --dry-run             print the plan and its projected cost; probe nothing",
     "  --yes                 authorize a plan that would otherwise ask first",
     "  --confirm-threshold CONFIRM_THRESHOLD",
@@ -83,6 +89,7 @@ function refreshUsage(): string {
 
 interface RefreshArgs {
   scope: string;
+  enumerateOnly: boolean;
   models: string[] | null;
   dryRun: boolean;
   assumeYes: boolean;
@@ -115,6 +122,7 @@ export async function copilotVerb(argv: string[]): Promise<number> {
 
   const args: RefreshArgs = {
     scope: SCOPE_QUORUM,
+    enumerateOnly: false,
     models: null,
     dryRun: false,
     assumeYes: false,
@@ -131,6 +139,7 @@ export async function copilotVerb(argv: string[]): Promise<number> {
     } else if (argument === "--quorum") args.scope = SCOPE_QUORUM;
     else if (argument === "--stale") args.scope = SCOPE_STALE;
     else if (argument === "--all") args.scope = SCOPE_ALL;
+    else if (argument === "--list-only") args.enumerateOnly = true;
     else if (argument === "--dry-run") args.dryRun = true;
     else if (argument === "--yes") args.assumeYes = true;
     else if (argument === "--models") {
@@ -180,7 +189,11 @@ export async function copilotVerb(argv: string[]): Promise<number> {
         timeouts: resolveTransportTimeouts(cliConfig),
         maxInvocations: typeof maxInvocations === "number" ? maxInvocations : null,
       }),
+      // Free, and first: what the seat has is read from the seat before any
+      // probe is priced, let alone spent.
+      enumerate: () => enumerateSeatModels({ binary }),
       liveCliVersion: getCliVersion({ binary }),
+      enumerateOnly: args.enumerateOnly,
       scope: args.scope,
       models: args.models,
       dryRun: args.dryRun,

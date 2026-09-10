@@ -1,14 +1,26 @@
 // Copilot CLI transport: seat-billed dispatch through the GitHub Copilot
 // CLI's headless mode, plus the seat-local catalog lockfile it selects from.
 //
-// The CLI has no list-models command and no first-party provider field: a
-// model's provider is inferable only from its name prefix, and whether a
-// model is enabled on a seat is discoverable only by invoking it. The
-// lockfile is therefore seat-scoped, empirically-probed truth -- the
-// load-bearing record of what this seat can dispatch -- and this module is
-// its only writer. A reader without a writer leaves hand-editing as the only
-// remedy for a stale file, which destroys exactly the empirical signal the
-// file exists to carry.
+// **The seat lists its own models, for free, and this file was written as
+// though it could not.** There is no `copilot models` subcommand -- true, and
+// irrelevant: the list arrives in the reply to `session/new` over `copilot
+// --acp`, which sends no prompt and bills nothing (`enumerateSeatModels`,
+// below). The maintained `candidate_universe` array that used to be the only
+// answer to "what models exist on this seat" is now written from that
+// reading, and survives only as the fallback for a seat that could not be
+// read. Three AI engines reasoned from the old note and its premium-request
+// vocabulary and each concluded that finding out what exists is expensive;
+// `docs/model-and-pricing-sources.md` is the measured answer.
+//
+// What the seat still does not state is a first-party provider -- inferable
+// only from a name prefix, and stamped as a heuristic wherever it is used --
+// or whether a model will actually answer, which one trivial turn is the only
+// way to learn. So the probe is kept for ENTITLEMENT and is never an
+// enumeration: it neither adds an entry nor removes one. The lockfile is
+// seat-scoped truth of both kinds -- what the seat lists, and what answered
+// when asked -- and this module is its only writer. A reader without a writer
+// leaves hand-editing as the only remedy for a stale file, which destroys
+// exactly the empirical signal the file exists to carry.
 //
 // Dispatch is an invocation state machine: three-tier timeouts
 // (spawn < first_byte < total), JSONL event parsing, stderr-substring error
@@ -66,6 +78,13 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { parse as parseToml } from "smol-toml";
 
+import {
+  COPILOT_ACP,
+  acpAgent,
+  type AgentClient,
+  type AgentConnection,
+  type StandIn,
+} from "../acp.ts";
 import { HANDOFF_FILE_PREFIX } from "../agency.ts";
 import { isArgvTooLarge, quoteForCmd, resolveProgram, spawnProgram, terminateTree } from "../checks.ts";
 import { hiddenSpawn } from "../journal.ts";
@@ -84,6 +103,12 @@ import {
 } from "../lockfile.ts";
 import { ASSET_DIR } from "../paths.ts";
 import { pythonFloatRepr } from "../pythonJson.ts";
+import {
+  LEGACY_PLATFORM_CAVEAT,
+  PLATFORM_LEGACY_PREMIUM_REQUESTS,
+  costUnit,
+  renderCost,
+} from "../seatCost.ts";
 import { explainRole, type RoleResolution } from "../selection.ts";
 import { truthy, type RouterConfig } from "../config.ts";
 import { isOk, type APIResult, type DispatchRequest, type Transport } from "./base.ts";
@@ -1313,6 +1338,191 @@ export async function preflight(
   return [true, version];
 }
 
+// --- The seat's own model list, free ----------------------------------------
+//
+// **The seat states its own models, and reading them costs nothing.** There
+// is no `copilot models` subcommand, which is true and was read for years as
+// "the seat cannot be enumerated"; the list is not on a subcommand. It is in
+// the reply to `session/new` over `copilot --acp`, and opening a conversation
+// sends no prompt, spends no token and bills no credit. Every engine that
+// concluded otherwise did so from the probe's premium-request vocabulary
+// further down this file.
+//
+// So this is the enumeration, and the prompting probe below is not. What the
+// probe establishes -- that a named model ANSWERS on this seat -- is
+// entitlement, and only a real turn can establish it. What it cannot
+// establish is existence, and it must never be run to find out.
+//
+// The one invariant worth a test of its own: **this path never calls
+// `session/prompt`.** A later convenience that "just asks the model to list
+// itself" would undo the whole finding and would look, from the outside,
+// exactly like this function.
+
+/** How a seat enumeration was obtained. Never inferred by a reader. */
+export const SEAT_ENUMERATION_SOURCE = "acp-session-new";
+
+/** One model as the SEAT states it, in the seat's own words. */
+export interface SeatModel {
+  readonly id: string;
+  readonly name: string;
+  /** The prefix heuristic's answer, or `""` when the name says nothing. */
+  readonly provider: string;
+  readonly provider_source: string;
+  /**
+   * The seat's own cost statement, verbatim -- `"1x"`, `"0.33x"`. A LEGACY
+   * request multiplier and not a price: this seat is billed in AI credits
+   * per token, and what a session really cost is read by `../seatCost.ts`.
+   */
+  readonly usage: string | null;
+  /** The seat's own word for whether this model is available to it. */
+  readonly enablement: string | null;
+  readonly price_category: string | null;
+  /** The entry as it arrived, so a field this version does not model is kept. */
+  readonly raw: Record<string, unknown>;
+}
+
+/**
+ * What the seat answered when a conversation was opened.
+ *
+ * `known: false` is a real answer and the reason says which kind it is -- no
+ * CLI on PATH, a seat that could not be reached, a reply that carried no
+ * model list. An empty list would read as "this seat has no models", which
+ * is a thing this framework must never conclude from a failure.
+ */
+export interface SeatEnumeration {
+  readonly known: boolean;
+  readonly models: readonly SeatModel[];
+  /** The model the seat would use with nothing on the argv. */
+  readonly current_model_id: string | null;
+  readonly modes: readonly string[];
+  readonly reasoning_efforts: readonly string[];
+  readonly cli_version: string | null;
+  readonly read_at: string;
+  readonly source: string;
+  readonly reason: string | null;
+}
+
+function seatUnknown(reason: string, cliVersion: string | null): SeatEnumeration {
+  return {
+    known: false,
+    models: [],
+    current_model_id: null,
+    modes: [],
+    reasoning_efforts: [],
+    cli_version: cliVersion,
+    read_at: utcNow(),
+    source: SEAT_ENUMERATION_SOURCE,
+    reason,
+  };
+}
+
+/** A mode id is a protocol URL whose fragment is the name a person uses. */
+function modeName(id: unknown): string {
+  const text = String(id ?? "");
+  const hash = text.lastIndexOf("#");
+  return hash < 0 ? text : text.slice(hash + 1);
+}
+
+/** One `availableModels` entry, as the seat put it on the wire. */
+export function seatModel(entry: Record<string, unknown>): SeatModel {
+  const meta = isRecord(entry["_meta"]) ? entry["_meta"] : {};
+  const id = String(entry["modelId"] ?? "");
+  return {
+    id,
+    name: typeof entry["name"] === "string" ? entry["name"] : id,
+    provider: inferProvider(id),
+    provider_source: PROVIDER_SOURCE_HEURISTIC,
+    usage: typeof meta["copilotUsage"] === "string" ? meta["copilotUsage"] : null,
+    enablement:
+      typeof meta["copilotEnablement"] === "string" ? meta["copilotEnablement"] : null,
+    price_category:
+      typeof meta["copilotPriceCategory"] === "string" ? meta["copilotPriceCategory"] : null,
+    raw: { ...entry },
+  };
+}
+
+/**
+ * The seat's model list, read from the protocol and never from a prompt.
+ *
+ * `client` and `standIn` are the seams a test speaks through; by default this
+ * opens the real CLI in `--acp` mode. The conversation is opened in the
+ * system temp directory rather than in the caller's tree: the ACP mode has no
+ * `--no-custom-instructions`, so a repository cwd would load that repository's
+ * `AGENTS.md` into a session opened only to read a list.
+ *
+ * Permissions are declared `deny` for the same reason a prompt is never sent:
+ * there is no turn, so nothing can ask, and a policy that could say yes to
+ * something is not one an enumeration should carry.
+ */
+export async function enumerateSeatModels(
+  options: {
+    readonly binary?: string;
+    readonly cwd?: string;
+    readonly client?: AgentClient;
+    readonly standIn?: StandIn;
+  } = {},
+): Promise<SeatEnumeration> {
+  const binary = options.binary ?? "copilot";
+  const standIn = options.standIn;
+  const cliVersion = standIn === undefined ? getCliVersion({ binary }) : null;
+  if (standIn === undefined && options.client === undefined && cliVersion === null) {
+    return seatUnknown(`'${binary}' is not on PATH or failed --version`, null);
+  }
+  const client =
+    options.client ??
+    acpAgent(standIn === undefined ? { ...COPILOT_ACP, program: binary } : COPILOT_ACP, standIn);
+  let connection: AgentConnection;
+  try {
+    connection = await client.open({ cwd: options.cwd ?? tmpdir(), permissions: "deny" });
+  } catch (error) {
+    return seatUnknown(
+      `the seat could not be opened over ${SEAT_ENUMERATION_SOURCE}: ` +
+        (error instanceof Error ? error.message : String(error)),
+      cliVersion,
+    );
+  }
+  try {
+    const models = isRecord(connection.session["models"]) ? connection.session["models"] : null;
+    const available = models === null ? null : models["availableModels"];
+    if (!Array.isArray(available)) {
+      return seatUnknown(
+        "the reply to session/new carried no models.availableModels, so what " +
+          "this seat can dispatch is unknown rather than empty",
+        cliVersion,
+      );
+    }
+    const modes = isRecord(connection.session["modes"])
+      ? connection.session["modes"]["availableModes"]
+      : null;
+    const configOptions = Array.isArray(connection.session["configOptions"])
+      ? connection.session["configOptions"].map((option) =>
+          isRecord(option) ? option : {},
+        )
+      : [];
+    const effort = configOptions.find((option) => option["id"] === "reasoning_effort");
+    const efforts = Array.isArray(effort?.["options"]) ? effort["options"] : [];
+    return {
+      known: true,
+      models: available.filter(isRecord).map(seatModel),
+      current_model_id:
+        models !== null && typeof models["currentModelId"] === "string"
+          ? models["currentModelId"]
+          : null,
+      modes: (Array.isArray(modes) ? modes : []).filter(isRecord).map((mode) => modeName(mode["id"])),
+      reasoning_efforts: efforts
+        .filter(isRecord)
+        .map((option) => String(option["value"] ?? ""))
+        .filter((value) => value !== ""),
+      cli_version: cliVersion,
+      read_at: utcNow(),
+      source: SEAT_ENUMERATION_SOURCE,
+      reason: null,
+    };
+  } finally {
+    await connection.close().catch(() => undefined);
+  }
+}
+
 // --- Seat catalog lockfile ---------------------------------------------------
 
 /** The providers a seat may front. A name outside this set is not trusted. */
@@ -1436,6 +1646,23 @@ export interface ModelEntry {
    * price, never fed to selection; `null` is unknown and never free.
    */
   readonly probe_premium_requests: number | null;
+  /**
+   * What the SEAT says this model costs, verbatim -- `"1x"`, `"0.33x"`, read
+   * free from its own enumeration. A legacy request multiplier and not a
+   * price, and not comparable with the sample above it: where the two
+   * disagree the seat's statement is the vendor's and the sample is this
+   * repository's guess, bought with a billed call.
+   */
+  readonly seat_usage: string | null;
+  /** When the seat's own enumeration last listed this model. */
+  readonly listed_at: string | null;
+  /**
+   * When an enumeration that SUCCEEDED stopped listing this model, or null
+   * while it is still listed. Marked and never deleted: one bad read must not
+   * be able to remove a verifier, and a model that comes back has this
+   * cleared rather than a new entry written.
+   */
+  readonly retired_at: string | null;
   readonly echoed_model: unknown;
   readonly provider_source: string;
   readonly confirmed_at: string | null;
@@ -1455,6 +1682,67 @@ export interface ModelEntry {
   readonly raw: Record<string, unknown>;
 }
 
+/**
+ * What the catalog says a model costs, with the platform of every figure.
+ *
+ * Two figures and neither is a price: the seat's own statement of its legacy
+ * multiplier, read free, and this repository's one-call sample, bought with a
+ * billed turn. They have been measured disagreeing on five of eighteen
+ * entries, and where they do the seat's is the vendor's. No reader gets a
+ * number out of this file without the unit it is counted in.
+ */
+export interface CatalogCost {
+  readonly amount: number | null;
+  readonly platform: string;
+  readonly source: string;
+  /** The vendor's own words, where it stated them: `"15x"`. */
+  readonly stated: string | null;
+}
+
+export const COST_SOURCE_SEAT_STATEMENT = "seat-statement";
+export const COST_SOURCE_PROBE_SAMPLE = "probe-sample";
+
+/**
+ * Both cost readings for one entry, the vendor's first.
+ *
+ * Empty is possible and honest: an entry nobody probed, on a seat that has
+ * not been enumerated since it was added, costs an unknown amount.
+ */
+export function catalogCosts(entry: ModelEntry): CatalogCost[] {
+  const costs: CatalogCost[] = [];
+  if (entry.seat_usage !== null) {
+    const parsed = Number(entry.seat_usage.replace(/x$/i, ""));
+    costs.push({
+      amount: Number.isFinite(parsed) ? parsed : null,
+      platform: PLATFORM_LEGACY_PREMIUM_REQUESTS,
+      source: COST_SOURCE_SEAT_STATEMENT,
+      stated: entry.seat_usage,
+    });
+  }
+  if (entry.probe_premium_requests !== null) {
+    costs.push({
+      amount: entry.probe_premium_requests,
+      platform: PLATFORM_LEGACY_PREMIUM_REQUESTS,
+      source: COST_SOURCE_PROBE_SAMPLE,
+      stated: null,
+    });
+  }
+  return costs;
+}
+
+/** One line naming every cost figure, its unit and where it came from. */
+export function renderCatalogCosts(entry: ModelEntry): string {
+  const costs = catalogCosts(entry);
+  if (costs.length === 0) return `${entry.id}: cost unknown`;
+  return (
+    `${entry.id}: ` +
+    costs
+      .map((cost) => `${cost.source} ${renderCost(cost.amount, cost.platform)}`)
+      .join(", ") +
+    ` -- ${LEGACY_PLATFORM_CAVEAT}`
+  );
+}
+
 /** A `ModelEntry` with the dataclass defaults filled in. */
 export function modelEntry(
   fields: Partial<ModelEntry> & { readonly id: string },
@@ -1463,6 +1751,9 @@ export function modelEntry(
     provider: "",
     enablement: ENABLEMENT_UNCONFIRMED,
     probe_premium_requests: null,
+    seat_usage: null,
+    listed_at: null,
+    retired_at: null,
     echoed_model: null,
     provider_source: "",
     confirmed_at: null,
@@ -1481,9 +1772,23 @@ export interface CatalogMeta {
   readonly seat_label: string;
   readonly probed_at: string | null;
   /**
-   * The candidate universe lives in the file, not in code: the CLI cannot
-   * enumerate its models, so this is a maintained list and adding a model
-   * must be a data edit that leaves the file the whole truth about the seat.
+   * What the seat said it can dispatch, when it was last asked, and how.
+   *
+   * The reading is free (`enumerateSeatModels`), so this is a measurement
+   * rather than a maintained fact, and it is dated for the same reason every
+   * other record here is: a list nobody can date is a list nobody can trust.
+   */
+  readonly enumerated_at: string | null;
+  readonly enumeration_source: string | null;
+  /**
+   * Every model the seat listed, as of `enumerated_at` -- the set a probe may
+   * be spent on.
+   *
+   * It was a MAINTAINED array, because the CLI has no `models` subcommand and
+   * that was read as "the seat cannot be enumerated". The seat enumerates
+   * itself over the protocol for nothing, so this is written from that
+   * reading; the hand-maintained value survives only as the fallback for a
+   * seat that could not be read.
    */
   readonly candidate_universe: readonly string[];
   /**
@@ -1506,6 +1811,8 @@ export function catalogMeta(
     cli_version_pin_required: false,
     seat_label: "",
     probed_at: null,
+    enumerated_at: null,
+    enumeration_source: null,
     candidate_universe: [],
     written_by: null,
     written_at: null,
@@ -1604,6 +1911,8 @@ export function loadCatalog(path: string): Catalog {
     seat_id: String(metaRaw["seat_id"]),
     seat_label: String(metaRaw["seat_label"] ?? ""),
     probed_at: optionalString(metaRaw["probed_at"]),
+    enumerated_at: optionalString(metaRaw["enumerated_at"]),
+    enumeration_source: optionalString(metaRaw["enumeration_source"]),
     candidate_universe: readCandidateUniverse(metaRaw, path),
     written_by: optionalString(metaRaw["written_by"]),
     written_at: optionalString(metaRaw["written_at"]),
@@ -1625,6 +1934,9 @@ export function loadCatalog(path: string): Catalog {
       provider: String(row["provider"] ?? ""),
       enablement: String(row["enablement"] ?? ENABLEMENT_UNCONFIRMED),
       probe_premium_requests: coerceProbePremiumRequests(rawProbe),
+      seat_usage: optionalString(row["seat_usage"]),
+      listed_at: optionalString(row["listed_at"]),
+      retired_at: optionalString(row["retired_at"]),
       echoed_model: row["echoed_model"] ?? null,
       provider_source: String(row["provider_source"] ?? ""),
       confirmed_at: optionalString(row["confirmed_at"]),
@@ -1781,6 +2093,8 @@ function metaMapping(meta: CatalogMeta): LockTable {
   out["seat_id"] = meta.seat_id;
   setOrDrop(out, "seat_label", meta.seat_label || null);
   setOrDrop(out, "probed_at", meta.probed_at);
+  setOrDrop(out, "enumerated_at", meta.enumerated_at);
+  setOrDrop(out, "enumeration_source", meta.enumeration_source);
   setOrDrop(
     out,
     "candidate_universe",
@@ -1813,6 +2127,9 @@ function entryMapping(entry: ModelEntry): LockTable {
     probeKey === LEGACY_PROBE_PREMIUM_KEY ? PROBE_PREMIUM_KEY : LEGACY_PROBE_PREMIUM_KEY
   ];
   setOrDrop(out, probeKey, entry.probe_premium_requests);
+  setOrDrop(out, "seat_usage", entry.seat_usage);
+  setOrDrop(out, "listed_at", entry.listed_at);
+  setOrDrop(out, "retired_at", entry.retired_at);
   setOrDrop(out, "echoed_model", asLockValue("echoed_model", entry.echoed_model));
   setOrDrop(out, "last_probe_error", entry.last_probe_error);
   setOrDrop(out, "last_probe_at", entry.last_probe_at);
@@ -2021,6 +2338,142 @@ export function mergeCatalog(
 }
 
 /**
+ * The note the file carries about its own universe, rewritten by the writer.
+ *
+ * The old one said the CLI cannot enumerate its models, which is the sentence
+ * three engines reasoned from into concluding that finding out what exists is
+ * expensive. It is an unmodelled key, so it can only be corrected by the
+ * writer -- hand-editing this file is what the digest exists to catch.
+ */
+export const SEAT_UNIVERSE_NOTE =
+  "Every model the seat listed when it was last enumerated, which is free: " +
+  "the reply to session/new over `copilot --acp` carries them all, so this " +
+  "is a measurement rather than a maintained list. A probe establishes " +
+  "ENTITLEMENT -- that a model answers on this seat -- and never existence, " +
+  "so it neither adds an entry nor removes one. An id absent here is a model " +
+  "this seat does not list; an entry with retired_at is one it stopped " +
+  "listing, kept because one bad read must not be able to remove a verifier.";
+
+/**
+ * A row the seat lists that is not a model: its own router alias.
+ *
+ * `auto` -- "let Copilot pick the best model" -- arrives in
+ * `availableModels` with no `_meta` at all, and it is the one answer a
+ * framework that has to record WHICH model answered cannot use. Named
+ * because the seat names it, never probed, never a candidate.
+ */
+export function isSeatAlias(model: SeatModel): boolean {
+  return model.usage === null && model.enablement === null;
+}
+
+/**
+ * Fold the seat's own enumeration into `catalog`: what it lists, what it
+ * costs by the seat's own statement, and what it no longer names.
+ *
+ * **This is where the candidate universe comes from.** A probe establishes
+ * entitlement and nothing else, so it neither adds nor removes an entry: a
+ * model the seat lists and the lockfile has never heard of arrives here as
+ * `unconfirmed`, waiting for a probe to say whether it answers, and a model
+ * the seat has stopped listing is MARKED with the date rather than dropped.
+ * One bad read must not be able to remove a verifier, and a model that comes
+ * back has its mark cleared rather than a second entry written.
+ *
+ * An enumeration that failed changes nothing at all -- `known: false` leaves
+ * the maintained universe standing, which is the only thing it is still for.
+ */
+export function adoptSeatEnumeration(
+  catalog: Catalog,
+  enumeration: SeatEnumeration,
+): Catalog {
+  if (!enumeration.known) return catalog;
+  const listed = enumeration.models.filter((model) => !isSeatAlias(model));
+  const listedById = new Map(listed.map((model) => [model.id, model]));
+  const at = enumeration.read_at;
+
+  const models = catalog.models.map((entry): ModelEntry => {
+    const model = listedById.get(entry.id);
+    if (model === undefined) {
+      // Still here, still saying what it was and when it was last seen.
+      return entry.retired_at === null ? { ...entry, retired_at: at } : entry;
+    }
+    // An entry that already names a provider keeps it and keeps how it was
+    // reached; one that names none takes the heuristic's answer, stamped as
+    // the heuristic's, and takes nothing when the name says nothing.
+    const inferred = entry.provider === "" && model.provider !== "";
+    return {
+      ...entry,
+      provider: inferred ? model.provider : entry.provider,
+      provider_source: inferred ? model.provider_source : entry.provider_source,
+      seat_usage: model.usage,
+      listed_at: at,
+      retired_at: null,
+    };
+  });
+  const known = new Set(catalog.models.map((entry) => entry.id));
+  for (const model of listed) {
+    if (known.has(model.id)) continue;
+    models.push(
+      modelEntry({
+        id: model.id,
+        provider: model.provider,
+        provider_source: model.provider === "" ? "" : model.provider_source,
+        enablement: ENABLEMENT_UNCONFIRMED,
+        seat_usage: model.usage,
+        listed_at: at,
+      }),
+    );
+  }
+  return {
+    meta: {
+      ...catalog.meta,
+      cli_version: enumeration.cli_version || catalog.meta.cli_version,
+      enumerated_at: at,
+      enumeration_source: enumeration.source,
+      candidate_universe: listed.map((model) => model.id),
+      raw: { ...catalog.meta.raw, candidate_universe_note: SEAT_UNIVERSE_NOTE },
+    },
+    models,
+  };
+}
+
+/** What adopting an enumeration did, for the operator reading the run. */
+export function diffEnumeration(before: Catalog, after: Catalog): string[] {
+  if (after.meta.enumerated_at === before.meta.enumerated_at) {
+    return [
+      "the seat's own model list could not be read, so the lockfile's " +
+        "maintained candidate universe stands; nothing was enumerated",
+    ];
+  }
+  const priorIds = new Set(before.models.map((entry) => entry.id));
+  const added = after.models.filter((entry) => !priorIds.has(entry.id)).map((entry) => entry.id);
+  const priorRetired = new Set(
+    before.models.filter((entry) => entry.retired_at !== null).map((entry) => entry.id),
+  );
+  const retired = after.models
+    .filter((entry) => entry.retired_at !== null && !priorRetired.has(entry.id))
+    .map((entry) => entry.id);
+  const returned = before.models
+    .filter(
+      (entry) =>
+        entry.retired_at !== null &&
+        after.models.some((row) => row.id === entry.id && row.retired_at === null),
+    )
+    .map((entry) => entry.id);
+  const lines = [
+    `the seat lists ${after.meta.candidate_universe.length} model(s), ` +
+      `read free over ${after.meta.enumeration_source} at ${after.meta.enumerated_at}`,
+  ];
+  if (added.length > 0) lines.push(`new to the lockfile: ${added.join(", ")}`);
+  if (retired.length > 0) {
+    lines.push(
+      `no longer listed, marked retired and kept: ${retired.join(", ")}`,
+    );
+  }
+  if (returned.length > 0) lines.push(`listed again: ${returned.join(", ")}`);
+  return lines;
+}
+
+/**
  * The lockfile `transports.copilot-cli.lockfile` names, resolved relative to
  * the config that named it.
  *
@@ -2152,8 +2605,18 @@ function compareCost(left: ModelEntry, right: ModelEntry): number {
   return leftUnknown - rightUnknown || leftSample - rightSample;
 }
 
+/**
+ * A sample with the platform its unit belongs to, always.
+ *
+ * There is no rendering of a sample that omits the unit, because a bare
+ * number beside the word "cost" is read as money -- and this number is a
+ * one-call observation in a legacy unit that has already been measured
+ * disagreeing with the seat's own statement.
+ */
 function sampleText(sample: number | null): string {
-  return sample === null ? "unknown" : pythonNumber(sample);
+  return sample === null
+    ? "unknown"
+    : `${pythonNumber(sample)} ${costUnit(PLATFORM_LEGACY_PREMIUM_REQUESTS)}`;
 }
 
 /**
@@ -2207,9 +2670,21 @@ export function needsConfirmation(plan: RefreshPlan): boolean {
  * re-establishes the >=2-distinct-provider invariant and re-dates the CLI
  * version, which is what "did my seat survive the auto-update?" actually asks.
  */
+/**
+ * The entries a probe may be spent on: confirmed, and still served.
+ *
+ * A retired entry is kept for its history and is never probed. Confirmation
+ * is a billed turn, and buying one against a model the seat has just said it
+ * no longer serves spends real money to learn what the free reading already
+ * established -- which is this session's whole finding, one layer down.
+ */
+function probeable(catalog: Catalog): ModelEntry[] {
+  return confirmedModels(catalog).filter((entry) => entry.retired_at === null);
+}
+
 function quorumIds(catalog: Catalog): string[] {
   const cheapest = new Map<string, ModelEntry>();
-  for (const entry of confirmedModels(catalog)) {
+  for (const entry of probeable(catalog)) {
     if (!KNOWN_PROVIDERS.has(entry.provider)) continue;
     const held = cheapest.get(entry.provider);
     if (held === undefined || compareCost(entry, held) < 0) {
@@ -2225,6 +2700,11 @@ function quorumIds(catalog: Catalog): string[] {
  * An entry with no confirmation at all is not stale, it is unprobed, and
  * sweeping it in here would quietly turn a targeted re-confirmation into a
  * universe probe -- the cost blowout this whole command exists to avoid.
+ *
+ * A RETIRED entry is not stale either: its confirmation was earned on an
+ * older CLI and will never be earned again, because the seat has stopped
+ * serving the model. Re-confirming it is a billed turn bought to learn what
+ * the free enumeration at the top of this run already said.
  */
 function staleIds(catalog: Catalog, liveCliVersion: string | null): string[] {
   if (!liveCliVersion) {
@@ -2237,6 +2717,7 @@ function staleIds(catalog: Catalog, liveCliVersion: string | null): string[] {
   return catalog.models
     .filter(
       (entry) =>
+        entry.retired_at === null &&
         entry.confirmed_on_cli_version &&
         entry.confirmed_on_cli_version !== liveCliVersion,
     )
@@ -2248,10 +2729,12 @@ function staleIds(catalog: Catalog, liveCliVersion: string | null): string[] {
 function universeIds(catalog: Catalog): string[] {
   if (catalog.meta.candidate_universe.length === 0) {
     throw new CatalogError(
-      "the lockfile declares no [meta].candidate_universe and the CLI " +
-        "has no list-models command to stand in for one. Add the ids to " +
-        "that array: it is a maintained list, and that data edit is how " +
-        "a model becomes probeable.",
+      "the lockfile carries no [meta].candidate_universe and the seat's own " +
+        "list could not be read, so there is nothing this scope could " +
+        `probe. The list is free (${SEAT_ENUMERATION_SOURCE}): fix what ` +
+        "stopped the seat being reached -- `copilot --version` and " +
+        "`copilot login` are where that starts -- rather than typing the " +
+        "ids in by hand.",
     );
   }
   return [...catalog.meta.candidate_universe];
@@ -2273,10 +2756,12 @@ function namedIds(catalog: Catalog, models: readonly string[]): string[] {
     universe.size > 0 ? requested.filter((id) => !universe.has(id)) : [];
   if (unknown.length > 0) {
     throw new CatalogError(
-      "not in the lockfile's declared candidate universe: " +
+      "not in the model list this seat states it can dispatch: " +
         unknown.join(", ") +
-        ". Every probe costs a premium request, so a typo must not buy " +
-        "one -- add the id to [meta].candidate_universe first.",
+        ". A probe is a billed turn, so a typo must not buy one -- and the " +
+        "list is read free at the start of every refresh, so an id missing " +
+        "from it is a model this seat does not have rather than a gap in " +
+        "the file.",
     );
   }
   return requested;
@@ -2325,8 +2810,9 @@ export function formatPlan(plan: RefreshPlan): string {
     lines.push(`  ${modelId}  (sample: ${sampleText(sample)})`);
   }
   lines.push(
-    `projected cost: ${pythonNumber(knownPremiumRequests(plan))} premium ` +
-      "request(s) from recorded samples",
+    `projected cost: ${pythonNumber(knownPremiumRequests(plan))} ` +
+      `${costUnit(PLATFORM_LEGACY_PREMIUM_REQUESTS)} from recorded samples ` +
+      `-- ${LEGACY_PLATFORM_CAVEAT}`,
   );
   const unknown = unknownCostIds(plan);
   if (unknown.length > 0) {
@@ -2402,6 +2888,13 @@ export type Sink = (text: string) => void;
 export async function runRefresh(options: {
   catalogPath: string;
   transport: Transport;
+  /**
+   * The seat's own list, read free. Absent is the same fact as a seat that
+   * could not be read: the maintained universe stands and the run says so.
+   */
+  enumerate?: () => Promise<SeatEnumeration>;
+  /** Record what the seat lists and probe nothing: the whole free half. */
+  enumerateOnly?: boolean;
   liveCliVersion?: string | null;
   scope?: string;
   models?: readonly string[] | null;
@@ -2414,7 +2907,28 @@ export async function runRefresh(options: {
 }): Promise<number> {
   const out = options.out ?? ((text: string) => process.stdout.write(text + "\n"));
   const clock = options.clock ?? utcNow;
-  const before = loadCatalog(options.catalogPath);
+  const onDisk = loadCatalog(options.catalogPath);
+  // Enumeration first, and free: what exists is established before a plan
+  // prices a probe, so a probe is only ever spent on a model the seat has
+  // just said it has.
+  const seat =
+    options.enumerate === undefined
+      ? seatUnknown("no enumeration was offered to this run", null)
+      : await options.enumerate();
+  const before = adoptSeatEnumeration(onDisk, seat);
+  for (const line of diffEnumeration(onDisk, before)) out(`seat: ${line}`);
+  if (options.enumerateOnly) {
+    // The free half on its own: what the seat lists, recorded, with no turn
+    // taken. The reason it is a scope of its own is that it is the only one
+    // an operator can run without deciding to spend anything.
+    if (options.dryRun || before === onDisk) {
+      out("nothing was written.");
+      return before === onDisk ? 1 : 0;
+    }
+    writeCatalog(options.catalogPath, before, { writtenAt: clock() });
+    out("the seat's list was recorded; no probe was spent.");
+    return 0;
+  }
   const plan = planRefresh(before, {
     scope: options.scope ?? SCOPE_QUORUM,
     models: options.models ?? null,
@@ -2424,6 +2938,13 @@ export async function runRefresh(options: {
   out(formatPlan(plan));
   if (plan.samples.length === 0) {
     out("nothing to probe: this scope selects no entry.");
+    // The enumeration was free and is a measurement; a run that probed
+    // nothing still learned what the seat lists, and dropping that would
+    // make the next run buy the same knowledge with a billed call.
+    if (!options.dryRun && before !== onDisk) {
+      writeCatalog(options.catalogPath, before, { writtenAt: clock() });
+      out("the seat's list was recorded; no probe was spent.");
+    }
     return 0;
   }
   if (options.dryRun) {
@@ -2483,8 +3004,8 @@ function promptToConfirm(plan: RefreshPlan, out: Sink): boolean {
   }
   const unknown = unknownCostIds(plan).length > 0 ? " plus entries of unknown cost" : "";
   process.stdout.write(
-    `spend ${pythonNumber(knownPremiumRequests(plan))} premium request(s)` +
-      `${unknown}? [y/N] `,
+    `spend ${pythonNumber(knownPremiumRequests(plan))} ` +
+      `${costUnit(PLATFORM_LEGACY_PREMIUM_REQUESTS)}${unknown}? [y/N] `,
   );
   return ["y", "yes"].includes(readLineFromStdin().trim().toLowerCase());
 }

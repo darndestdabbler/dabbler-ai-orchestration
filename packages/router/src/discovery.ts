@@ -1,16 +1,16 @@
 // Model discovery on the direct-API path: enumeration, freshness, drift.
 //
 // **A role never depends on the model names it happens to list**, so
-// something has to say what currently exists. On the seat that is an
-// empirical probe, because the Copilot CLI has no list-models command; on
-// the direct-API path each vendor publishes a models endpoint, so the
-// framework reads it.
+// something has to say what currently exists. Each vendor publishes a models
+// endpoint and the framework reads it; the seat states its own list over its
+// protocol, which `transports/copilot.ts` reads.
 //
-// **Enumeration is a metadata request and bills no tokens on any of the
-// three vendors.** That is the whole reason the default cadence is 24 hours:
-// freshness is free here, so the knob is a preference rather than a budget
-// control. The seat keeps its probe-based refresh precisely because a probe
-// is not free.
+// **Enumeration is free on every surface** -- a metadata request here, a
+// protocol reply on the seat, and neither bills a token. That is the whole
+// reason the default cadence is 24 hours: freshness costs nothing, so the
+// knob is a preference rather than a budget control. What the seat keeps a
+// month-long clock for is the other half of its record, CONFIRMING that a
+// model answers, which is a real turn and is billed like one.
 //
 // Three rules shape everything below.
 //
@@ -61,7 +61,20 @@ import {
 } from "./transports/api.ts";
 import { resolveSecret } from "./secretResolver.ts";
 import { workingDirectory } from "./workdir.ts";
-import { confirmedModels, loadCatalog, resolveLockfilePath } from "./transports/copilot.ts";
+import {
+  PLATFORM_AI_CREDITS,
+  SEAT_COST_COMMAND,
+  costUnit,
+} from "./seatCost.ts";
+import {
+  adoptSeatEnumeration,
+  confirmedModels,
+  enumerateSeatModels,
+  loadCatalog,
+  resolveLockfilePath,
+  writeCatalog,
+  type SeatEnumeration,
+} from "./transports/copilot.ts";
 
 export const RECORD_SOURCE = "vendor-enumeration";
 
@@ -77,14 +90,26 @@ export const SEAT_REFRESH_COMMAND = "dabbler copilot refresh";
 
 export const DEFAULT_RECORD_FILENAME = ".dabbler/api-models.lock";
 export const DEFAULT_MAX_AGE_HOURS = 24.0;
-// The seat is not on the same clock and must not be: a probe costs premium
-// requests, so a 24-hour warning on the seat catalog would fire every day of
-// a month for a refresh nobody should run daily -- and a warning that is
-// always on is a warning that is always ignored.
+// The seat's CONFIRMATIONS are not on the same clock and must not be: each
+// one is a real turn, so a 24-hour warning about them would fire every day
+// of a month for a refresh nobody should run daily -- and a warning that is
+// always on is a warning that is always ignored. What the seat LISTS is free
+// and is on the free clock; see `RECORD_SEAT_LIST`.
 export const DEFAULT_SEAT_MAX_AGE_HOURS = 720.0;
 
 export const RECORD_API = "api-enumeration";
 export const RECORD_SEAT = "seat-catalog";
+/**
+ * The seat catalog holds TWO facts on two clocks, and only one of them costs
+ * anything: what the seat lists, read free over its own protocol, and which
+ * of those models answered when asked, which is a billed turn each. They are
+ * dated separately because a month-old list is stale and a month-old set of
+ * confirmations is not -- and while there was one row, the free half
+ * inherited the priced half's clock and went unrefreshed for as long as it
+ * liked.
+ */
+export const RECORD_SEAT_LIST = "seat-list";
+export const SEAT_LIST_COMMAND = "dabbler copilot refresh --list-only";
 
 /**
  * What re-dating each record costs, said before anybody asks for one.
@@ -98,9 +123,16 @@ export const RECORD_SEAT = "seat-catalog";
 export const REFRESH_COST: Readonly<Record<string, string>> = {
   [RECORD_API]:
     "Three metadata requests, one per enabled vendor. They bill no tokens.",
+  [RECORD_SEAT_LIST]:
+    "Nothing: the seat states its own models in the reply to opening a " +
+    "conversation, and no prompt is sent. It is on the same clock as the " +
+    "API record for exactly that reason, and a session refreshes it itself.",
   [RECORD_SEAT]:
-    "A probe per model through the Copilot CLI. Seat calls are priced in " +
-    "premium requests, which is why this record is allowed to be a month old.",
+    "Reading what the seat lists is free -- it is a protocol reply, not a " +
+    "prompt. What costs is CONFIRMING that a model answers: one real turn " +
+    `per model, billed in ${costUnit(PLATFORM_AI_CREDITS)} per token, ` +
+    `which \`${SEAT_COST_COMMAND}\` measures. That is why the confirmations ` +
+    "in this record are allowed to be a month old.",
 };
 
 // --- What a failed enumeration is called -------------------------------------
@@ -199,7 +231,18 @@ export interface ApiModelEntry {
   readonly max_context_tokens: number | null;
   readonly max_output_tokens: number | null;
   readonly capabilities: readonly string[];
+  /** When a vendor last returned this model: its last-seen date. */
   readonly enumerated_at: string | null;
+  /**
+   * When an enumeration the vendor ANSWERED stopped returning this model, or
+   * null while it is still served.
+   *
+   * Marked, never deleted. A vendor's answer used to replace what the record
+   * held for it, so one bad enumeration could remove the only verifier a
+   * role had and leave nothing able to say the model was ever there. The
+   * entry stays, keeps its last-seen date, and stops being offered.
+   */
+  readonly retired_at: string | null;
   /**
    * Keys this version does not model, in file order, so a writer never
    * silently drops what a future version wrote.
@@ -353,6 +396,7 @@ export function loadRecord(path: string): ModelRecord {
       max_output_tokens: optionalInt(row["max_output_tokens"]),
       capabilities: stringList(row["capabilities"]),
       enumerated_at: optionalString(row["enumerated_at"]),
+      retired_at: optionalString(row["retired_at"]),
       raw: { ...row },
     });
   }
@@ -399,6 +443,7 @@ function entryMapping(entry: ApiModelEntry): LockTable {
   setOrDrop(out, "max_output_tokens", entry.max_output_tokens);
   setOrDrop(out, "capabilities", entry.capabilities.length > 0 ? [...entry.capabilities] : null);
   setOrDrop(out, "enumerated_at", entry.enumerated_at);
+  setOrDrop(out, "retired_at", entry.retired_at);
   return out;
 }
 
@@ -534,6 +579,9 @@ function freshEntry(fields: Partial<ApiModelEntry> & { id: string; provider: str
     provider_source: PROVIDER_SOURCE_ENUMERATION,
     display_name: null,
     created_at: null,
+    // A model the vendor just returned is served, whatever the record said
+    // before: an entry that comes back has its mark cleared by the merge.
+    retired_at: null,
     max_context_tokens: null,
     max_output_tokens: null,
     capabilities: [],
@@ -761,11 +809,21 @@ function mergeEntry(prior: ApiModelEntry, fresh: ApiModelEntry): ApiModelEntry {
 /**
  * Fold enumeration `results` into `recordValue`, touching nothing else.
  *
- * A vendor that answered is authoritative about which of its models exist,
- * so its list is replaced -- a model the endpoint no longer returns leaves
- * the record and shows up in the drift diff, which is where a role naming a
- * withdrawn model is supposed to become visible. A vendor that failed keeps
- * everything it had and gains the failure beside it.
+ * A vendor that answered is authoritative about which of its models it
+ * currently serves, so a model it no longer returns is MARKED with the date
+ * it went and keeps everything else it had -- its provider, its last-seen
+ * date, its metadata. It stops being offered and it shows up in the drift
+ * diff, which is where a role naming a withdrawn model becomes visible.
+ *
+ * Marked rather than deleted, because the two are not the same risk. A
+ * deletion is indistinguishable from a model that was never there, and one
+ * bad enumeration -- a proxy answering with an empty list, a vendor's beta
+ * endpoint -- could take the only verifier a role had with nothing left to
+ * say what happened. A model that comes back has the mark cleared rather
+ * than a second entry written.
+ *
+ * A vendor that failed keeps everything it had and gains the failure beside
+ * it.
  */
 export function mergeRecord(
   recordValue: ModelRecord,
@@ -775,9 +833,6 @@ export function mergeRecord(
   const stamp = enumeratedAt ?? utcNow();
   const answered = new Set(results.filter(resultOk).map((result) => result.provider));
 
-  const models: ApiModelEntry[] = recordValue.models.filter(
-    (entry) => !answered.has(entry.provider),
-  );
   // Python keys this map on the `(provider, id)` TUPLE; a Map keys on
   // identity, so the pair has to become one string -- and the separator has
   // to be a character neither field can hold, or `("a b", "c")` and
@@ -786,6 +841,20 @@ export function mergeRecord(
   // that reads it call the file binary.
   const pairKey = (provider: string, id: string): string =>
     `${provider}\u0000${id}`;
+  const returned = new Set<string>();
+  for (const result of results) {
+    if (!resultOk(result)) continue;
+    for (const entry of result.entries) returned.add(pairKey(entry.provider, entry.id));
+  }
+  const models: ApiModelEntry[] = recordValue.models
+    .filter((entry) => !answered.has(entry.provider) || !returned.has(pairKey(entry.provider, entry.id)))
+    .map((entry) =>
+      // Only a vendor that ANSWERED can retire its own model; a failed
+      // attempt is not a withdrawal, and neither is another vendor's answer.
+      answered.has(entry.provider) && entry.retired_at === null
+        ? { ...entry, retired_at: stamp }
+        : entry,
+    );
   const priorByKey = new Map<string, ApiModelEntry>();
   for (const entry of recordValue.models) {
     priorByKey.set(pairKey(entry.provider, entry.id), entry);
@@ -1144,11 +1213,16 @@ export function checkFreshness(
   let seatPath = "(no transports.copilot-cli.lockfile configured)";
   let seatPresent = false;
   let seatDated: string | null = null;
+  let seatListed: string | null = null;
   try {
     const resolved = resolveLockfilePath(config);
     seatPath = resolved;
     seatPresent = existsSync(resolved);
-    if (seatPresent) seatDated = loadCatalog(resolved).meta.probed_at;
+    if (seatPresent) {
+      const catalog = loadCatalog(resolved);
+      seatDated = catalog.meta.probed_at;
+      seatListed = catalog.meta.enumerated_at;
+    }
   } catch {
     // An unconfigured or unreadable seat catalog is reported as a stale
     // record, which is what it is. It is never an error: this check has to
@@ -1158,6 +1232,12 @@ export function checkFreshness(
     makeRow(
       RECORD_SEAT, seatPath, settings.seat_max_age_hours, SEAT_REFRESH_COMMAND,
       seatDated, seatPresent, now,
+    ),
+    // The free half, on the free clock. One file, two dates: what the seat
+    // said it has, and what answered when asked.
+    makeRow(
+      RECORD_SEAT_LIST, seatPath, settings.max_age_hours, SEAT_LIST_COMMAND,
+      seatListed, seatPresent, now,
     ),
   );
   return rows;
@@ -1194,12 +1274,189 @@ export function freshnessWarnings(
     .map((row) => `discovery: ${freshnessMessage(row)}`);
 }
 
+/**
+ * Bring the API record up to date before a session starts, because it is
+ * free.
+ *
+ * **This is the knob finally being acted on.** `discovery.max_age_hours` has
+ * declared 24 since it was written and nothing has ever read it as an
+ * instruction: staleness was reported and left, and a session ran against
+ * whatever the record last happened to say. A vendor's models endpoint is a
+ * metadata request -- three vendors, 195 models, 2.4 seconds, no tokens
+ * billed -- so there is nothing to weigh: an out-of-date record and a current
+ * one cost the same.
+ *
+ * **What is never in this path is a priced call.** The seat's other half is
+ * a real turn per model, so the seat catalog is not refreshed here at any
+ * age; its own row keeps saying what a refresh of it would buy, and a person
+ * asks for that one. Nothing here dispatches to a model.
+ *
+ * Never blocks and never throws. A vendor that could not be reached leaves
+ * the record exactly as it was and says so in a line -- a registration that
+ * failed because a provider was down would be a maintenance signal capable of
+ * causing an outage, which is how maintenance signals come to be suppressed.
+ *
+ * A record that was never made is left alone, and that is deliberate: a first
+ * enumeration is part of setting a project up, `bootstrap` says so once, and
+ * a session start that silently created the record would hide the one moment
+ * where an operator finds out the record exists.
+ */
+export async function refreshStaleRecords(
+  config: RouterConfig,
+  options: {
+    readonly now?: number;
+    readonly projectDir?: string;
+    readonly get?: HttpGet;
+    /** The seat's own list, as a seam a test speaks through. */
+    readonly enumerateSeat?: () => Promise<SeatEnumeration>;
+  } = {},
+): Promise<string[]> {
+  const now = options.now ?? Date.now();
+  const rows = checkFreshness(config, now, options.projectDir);
+  const seatRow = rows.find((candidate) => candidate.record === RECORD_SEAT_LIST);
+  const lines: string[] = [];
+  if (seatRow !== undefined && seatRow.present && isStale(seatRow)) {
+    lines.push(...(await refreshSeatList(config, seatRow, options.enumerateSeat)));
+  }
+  const row = rows.find((candidate) => candidate.record === RECORD_API);
+  if (row === undefined || !row.present || !isStale(row)) return lines;
+  const path = resolveRecordPath(config, options.projectDir);
+  try {
+    const current = loadRecord(path);
+    const results = options.get === undefined
+      ? await enumerateAll(config)
+      : await enumerateAll(config, null, options.get);
+    const merged = mergeRecord(current, results);
+    writeRecord(path, merged);
+    const failed = results.filter((result) => !resultOk(result));
+    lines.push(
+      `discovery: ${RECORD_API} was ${freshnessAge(row)} and has been ` +
+        `re-read before this session's work -- ${merged.models.length} ` +
+        "model(s) recorded, no tokens billed",
+    );
+    for (const result of failed) {
+      lines.push(
+        `discovery: ${result.provider} could not be read ` +
+          `(${String(result.error)}); what the record already held stands`,
+      );
+    }
+    return lines;
+  } catch (error) {
+    lines.push(
+      `discovery: ${RECORD_API} is stale and could not be re-read ` +
+        `(${error instanceof Error ? error.message : String(error)}); ` +
+        `the record stands as it was -- \`${ENUMERATE_COMMAND}\` when the ` +
+        "vendor is reachable again",
+    );
+    return lines;
+  }
+}
+
+/**
+ * Re-read what the seat lists, which costs nothing.
+ *
+ * The free half of the seat catalog, brought up to date on the same terms as
+ * the API record: it opens a conversation, takes the list from the reply and
+ * closes -- no prompt, no token, no credit. **The priced half is untouched.**
+ * Confirming that a model answers is a real turn per model, and no automatic
+ * path in this framework may buy one; what this writes is what the seat said
+ * it has, with a model it has stopped listing marked rather than dropped.
+ *
+ * A seat that could not be read leaves the catalog exactly as it was and
+ * says so, like every other reading here.
+ */
+async function refreshSeatList(
+  config: RouterConfig,
+  row: FreshnessRow,
+  enumerateSeat?: () => Promise<SeatEnumeration>,
+): Promise<string[]> {
+  try {
+    const path = resolveLockfilePath(config);
+    const before = loadCatalog(path);
+    const seat = enumerateSeat === undefined
+      ? await enumerateSeatModels()
+      : await enumerateSeat();
+    if (!seat.known) {
+      return [
+        `discovery: ${RECORD_SEAT_LIST} was ${freshnessAge(row)} and the ` +
+          `seat could not be read (${seat.reason ?? "no reason given"}); the ` +
+          "catalog stands as it was, and nothing was probed",
+      ];
+    }
+    const after = adoptSeatEnumeration(before, seat);
+    writeCatalog(path, after);
+    return [
+      `discovery: ${RECORD_SEAT_LIST} was ${freshnessAge(row)} and has been ` +
+        `re-read before this session's work -- ${after.meta.candidate_universe.length} ` +
+        "model(s) the seat lists, free, no prompt sent",
+    ];
+  } catch (error) {
+    return [
+      `discovery: ${RECORD_SEAT_LIST} is stale and could not be re-read ` +
+        `(${error instanceof Error ? error.message : String(error)}); the ` +
+        `catalog stands as it was -- \`${SEAT_LIST_COMMAND}\` when the seat ` +
+        "is reachable again",
+    ];
+  }
+}
+
+/** How old a row is, in the words the freshness line already uses. */
+function freshnessAge(row: FreshnessRow): string {
+  return row.age_hours === null
+    ? "undated"
+    : `${fixed0(row.age_hours)}h old against a ${fixed0(row.threshold_hours)}h threshold`;
+}
+
 // --- Drift ------------------------------------------------------------------
 
 export interface Drift {
   readonly unnamed: ReadonlyArray<readonly [string, string]>;
   readonly unavailable: ReadonlyArray<readonly [string, string]>;
   readonly freshness: readonly FreshnessRow[];
+}
+
+/** A model the record still carries and the vendor has stopped serving. */
+export interface RetiredModel {
+  readonly id: string;
+  readonly provider: string;
+  /** When the vendor last returned it. */
+  readonly lastSeenAt: string | null;
+  readonly retiredAt: string;
+}
+
+/**
+ * What the dated record says is no longer served, by model id.
+ *
+ * **One reading, two consumers.** The drift diff reports a role naming a
+ * model the record cannot vouch for, and a surface offering a model has to
+ * withhold the same one -- and two predicates for that would disagree the
+ * first time either moved. A retired entry is therefore not "known" to
+ * drift and not offered by the pane, from here.
+ *
+ * Best-effort by design: a repository with no record, or an unreadable one,
+ * retires nothing. Absent evidence is not evidence of withdrawal.
+ */
+export function retiredModels(
+  config: RouterConfig,
+  projectDir?: string,
+): Map<string, RetiredModel> {
+  const out = new Map<string, RetiredModel>();
+  try {
+    const path = resolveRecordPath(config, projectDir);
+    if (!existsSync(path)) return out;
+    for (const entry of loadRecord(path).models) {
+      if (entry.retired_at === null) continue;
+      out.set(entry.id, {
+        id: entry.id,
+        provider: entry.provider,
+        lastSeenAt: entry.enumerated_at,
+        retiredAt: entry.retired_at,
+      });
+    }
+  } catch {
+    /* an unreadable record retires nothing, and says so in freshness */
+  }
+  return out;
 }
 
 /** `model id -> the roles that name it`, over every role's preference order. */
@@ -1237,7 +1494,12 @@ function knownModels(config: RouterConfig): Map<string, string[]> {
   const recordPath = resolveRecordPath(config);
   if (existsSync(recordPath)) {
     try {
-      for (const entry of loadRecord(recordPath).models) add(entry.id, RECORD_API);
+      for (const entry of loadRecord(recordPath).models) {
+        // A retired entry is kept in the file and is not knowledge that the
+        // model exists: it is the record saying the vendor stopped serving
+        // it, which is exactly what a role still naming it needs to hear.
+        if (entry.retired_at === null) add(entry.id, RECORD_API);
+      }
     } catch {
       /* an unreadable record contributes nothing, and says so in freshness */
     }
@@ -1246,7 +1508,9 @@ function knownModels(config: RouterConfig): Map<string, string[]> {
   try {
     const seatPath = resolveLockfilePath(config);
     if (existsSync(seatPath)) {
-      for (const entry of confirmedModels(loadCatalog(seatPath))) add(entry.id, RECORD_SEAT);
+      for (const entry of confirmedModels(loadCatalog(seatPath))) {
+        if (entry.retired_at === null) add(entry.id, RECORD_SEAT);
+      }
     }
   } catch {
     /* no seat here, which is a legitimate machine */

@@ -26,7 +26,9 @@ import {
   REFRESH_COST,
   checkFreshness,
   isStale,
+  retiredModels,
   type FreshnessRow,
+  type RetiredModel,
 } from "./discovery.ts";
 import { installedEngines } from "./engines.ts";
 import { sessionsDirFor } from "./evidence.ts";
@@ -63,11 +65,17 @@ import {
   explainRegistryCandidates,
   modelFidelity,
   roundObservations,
+  type RoleResolution,
   type Fidelity,
   type ModelObservation,
 } from "./selection.ts";
 import { archivedRounds } from "./ledger.ts";
-import { loadCatalog, resolveLockfilePath } from "./transports/copilot.ts";
+import {
+  explainRoleCandidates,
+  loadCatalog,
+  resolveLockfilePath,
+  type Catalog,
+} from "./transports/copilot.ts";
 
 type Node = Record<string, unknown>;
 
@@ -235,17 +243,120 @@ function fidelityOn(root: string, config: RouterConfig, transport: string): (mod
   return (model) => modelFidelity(model, observations);
 }
 
+// --- Which enumeration a role resolves over --------------------------------
+//
+// **The enumeration belongs to the transport.** `selection.ts` has said so in
+// its own header since the day it was written -- the model registry on the
+// direct-API path, the confirmed seat catalog on the Copilot path, both handed
+// to the same `resolveRole` so the rule has one implementation. This pane
+// asked the registry on every transport, so a machine with a seat and no
+// `DABBLER_*_API_KEY` read "nothing resolves" while its catalog held eighteen
+// working models. It shipped in 2.1.0's held build, and it is what held it.
+//
+// Nothing here enumerates anything: the seat catalog is a dated file, exactly
+// as the registry is, and reading a file is all a pane may do.
+
+export const ENUMERATION_API_REGISTRY = "api-registry";
+export const ENUMERATION_SEAT_CATALOG = "seat-catalog";
+
+/** Nothing resolved, said as a resolution rather than as an absence. */
+const NOTHING_RESOLVES: RoleResolution<readonly [string, string, string]> = {
+  candidates: [],
+  preferenceDeclared: false,
+  rank: null,
+  fellThrough: false,
+  removed: [],
+};
+
+/** How a role is resolved on the transport in force, and over what. */
+interface RoleReading {
+  readonly enumeration: string;
+  readonly resolve: (
+    role: string,
+    exclude: readonly string[] | null,
+  ) => RoleResolution<readonly [string, string, string]>;
+  readonly retired: ReadonlyMap<string, RetiredModel>;
+  /** Why this transport can offer nothing, or null when it can. */
+  readonly unavailable: string | null;
+}
+
+function roleReading(root: string, config: RouterConfig, transport: string): RoleReading {
+  if (transport !== TRANSPORT_COPILOT_CLI) {
+    return {
+      enumeration: ENUMERATION_API_REGISTRY,
+      resolve: (role, exclude) => explainRegistryCandidates(config, role, exclude),
+      retired: retiredModels(config, root),
+      unavailable: null,
+    };
+  }
+  let catalog: Catalog;
+  try {
+    catalog = loadCatalog(resolveLockfilePath(config));
+  } catch (error) {
+    return {
+      enumeration: ENUMERATION_SEAT_CATALOG,
+      resolve: () => NOTHING_RESOLVES,
+      retired: new Map(),
+      // The reason, not a blank list: "no models" and "your seat catalog
+      // could not be read" are different problems with different remedies.
+      unavailable: `the seat catalog could not be read (${
+        error instanceof Error ? error.message : String(error)
+      })`,
+    };
+  }
+  const retired = new Map<string, RetiredModel>();
+  for (const entry of catalog.models) {
+    if (entry.retired_at === null) continue;
+    retired.set(entry.id, {
+      id: entry.id,
+      provider: entry.provider,
+      lastSeenAt: entry.listed_at,
+      retiredAt: entry.retired_at,
+    });
+  }
+  return {
+    enumeration: ENUMERATION_SEAT_CATALOG,
+    resolve: (role, exclude) => {
+      const resolution = explainRoleCandidates(config, catalog, role, exclude);
+      // The seat has no aliases: an id is both what the registry would call
+      // the model and what goes on the wire.
+      return {
+        ...resolution,
+        candidates: resolution.candidates.map(
+          ([modelId, provider]) => [modelId, provider, modelId] as const,
+        ),
+      };
+    },
+    retired,
+    unavailable: null,
+  };
+}
+
 /** One model a role could resolve to, as the registry declares it. */
 function candidateNode(
   candidate: readonly [string, string, string],
   fidelity: (model: string) => Fidelity,
+  retired: ReadonlyMap<string, RetiredModel>,
 ): Node {
   const [modelId, provider, alias] = candidate;
+  const withdrawn = retired.get(modelId);
   // Three answers and never two. A model nobody has asked for and one that
   // answered as something else are different facts, and a surface that
   // rendered them alike would be making the promise session 144 exists to
   // stop it making.
-  return { alias, model: modelId, provider, fidelity: fidelity(modelId) };
+  return {
+    alias,
+    model: modelId,
+    provider,
+    fidelity: fidelity(modelId),
+    // Present only on a model the dated record says stopped being served,
+    // and it carries when the vendor last had it -- a row that withheld a
+    // model without saying since when would read as a bug in the pane.
+    retired:
+      withdrawn === undefined
+        ? null
+        : { since: withdrawn.retiredAt, lastSeenAt: withdrawn.lastSeenAt },
+  };
 }
 
 /**
@@ -257,21 +368,34 @@ function candidateNode(
  * excluded, by the same rule that excludes it immediately before the wire.
  */
 function roleNode(
-  config: RouterConfig,
+  reading: RoleReading,
   role: string,
   exclude: readonly string[] | null,
   fidelity: (model: string) => Fidelity,
 ): Node {
-  const resolution = explainRegistryCandidates(config, role, exclude);
-  const chosen = resolution.candidates[0];
+  const retired = reading.retired;
+  const resolution = reading.resolve(role, exclude);
+  // A model the record says is no longer served is not offered. Withheld
+  // rather than dropped: the row says which model and since when, because an
+  // operator whose usual verifier vanished from a list needs to know it was
+  // withdrawn rather than wonder what they broke.
+  const served = resolution.candidates.filter(([modelId]) => !retired.has(modelId));
+  const withheld = resolution.candidates.filter(([modelId]) => retired.has(modelId));
+  const chosen = served[0];
   return {
     role,
-    chosen: chosen === undefined ? null : candidateNode(chosen, fidelity),
-    candidates: resolution.candidates.map((candidate) => candidateNode(candidate, fidelity)),
+    chosen: chosen === undefined ? null : candidateNode(chosen, fidelity, retired),
+    candidates: served.map((candidate) => candidateNode(candidate, fidelity, retired)),
+    withheld: withheld.map((candidate) => candidateNode(candidate, fidelity, retired)),
     excludes: [...(exclude ?? [])],
     // A role that fell past its own preference order picked a model nobody
     // named. The 364-request session is why that is worth a row.
     fellThrough: resolution.fellThrough,
+    // Which record this list came from, and why it is empty when it is. A
+    // pane that said "nothing resolves" without saying what it had read is
+    // the defect this carries the answer to.
+    enumeration: reading.enumeration,
+    unavailable: reading.unavailable,
   };
 }
 
@@ -313,7 +437,12 @@ export function configurationNode(root: string): Node {
     // the same model on the seat and on the direct-API path is two different
     // questions with two different kinds of answer.
     const fidelity = fidelityOn(root, config, transport.transport);
-    const authoring = roleNode(config, ROLE_GENERATOR, null, fidelity);
+    // The enumeration the transport in force owns, with what that record
+    // says is no longer served -- read once, for both roles. A withdrawn
+    // model is withheld from what is offered rather than deleted from the
+    // record that still carries it.
+    const reading = roleReading(root, config, transport.transport);
+    const authoring = roleNode(reading, ROLE_GENERATOR, null, fidelity);
     const author = authoring["chosen"] as Node | null;
     return {
       transport: {
@@ -333,7 +462,7 @@ export function configurationNode(root: string): Node {
       },
       authoring,
       verifying: roleNode(
-        config,
+        reading,
         ROLE_VERIFIER,
         author === null ? null : [String(author["provider"])],
         fidelity,

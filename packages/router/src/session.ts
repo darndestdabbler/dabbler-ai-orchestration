@@ -38,7 +38,7 @@ import {
   resolveOrchestratorIdentity,
 } from "./identity.ts";
 import { loadConfig } from "./config.ts";
-import { freshnessWarnings } from "./discovery.ts";
+import { freshnessWarnings, refreshStaleRecords } from "./discovery.ts";
 import {
   ROUND_REF_NAMESPACE,
   SESSION_PLAN_FILENAME,
@@ -150,16 +150,37 @@ import {
 import { writeErr, writeOut } from "./output.ts";
 
 /**
- * Stale-record warnings for the session about to start.
+ * Bring a stale record up to date before the session is registered.
  *
  * Registration is the last moment before the work at which a refresh may
- * legitimately happen, and the first at which it may not: discovery runs
- * between sessions, so the signal belongs here and the refresh does not. It
- * warns and names the invocation; it never blocks and it never refreshes. A
- * staleness check that could fail a registration would be a maintenance
- * signal capable of causing an outage, which is how maintenance signals get
- * suppressed -- so any failure reading it leaves the session unblocked and
- * silent.
+ * legitimately happen, and this is that moment: discovery runs between
+ * sessions, and the free half of it belongs on this side of the line rather
+ * than being reported and left. What may NOT happen here is a priced call --
+ * the seat's probe is a real turn per model and is never in this path, at any
+ * age -- and what may not happen is a failure: a vendor that could not be
+ * reached leaves the record as it was and says so.
+ *
+ * The refusal in `dabbler discovery enumerate` still holds and is not
+ * contradicted: this runs BEFORE the session exists, so no session is
+ * changing its own verifier pool while running.
+ */
+async function refreshDiscovery(): Promise<string[]> {
+  try {
+    return await refreshStaleRecords(loadConfig());
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Stale-record warnings for the session about to start.
+ *
+ * What the refresh above did not fix: the seat catalog, whose other half
+ * costs a turn per model, and anything a vendor outage left standing. It
+ * warns and names the invocation; it never blocks. A staleness check that
+ * could fail a registration would be a maintenance signal capable of causing
+ * an outage, which is how maintenance signals get suppressed -- so any
+ * failure reading it leaves the session unblocked and silent.
  *
  * Python imports both names inside the function to keep `ai_router.session`
  * out of `discovery`'s import path at module load; here the graph runs the
@@ -1020,7 +1041,7 @@ export function judgeStartBoundary(
   return { requested, refusal: null, exitCode: EXIT_OK };
 }
 
-export function start(sessionsDir: string, options: StartOptions): number {
+export async function start(sessionsDir: string, options: StartOptions): Promise<number> {
   if (!isDirectory(sessionsDir)) {
     writeErr(`start: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
@@ -1159,6 +1180,9 @@ export function start(sessionsDir: string, options: StartOptions): number {
         throw error;
       }
     }
+    // Free, and before the session exists: what the roles may resolve to is
+    // established while there is still nothing whose review it could change.
+    for (const line of await refreshDiscovery()) writeOut(`${line}\n`);
     const registerIn = moduleStart === null ? sessionsDir : moduleStart.sessionsDir;
     registerSessionStart(registerIn, requested, {
       engine: identity.engine,

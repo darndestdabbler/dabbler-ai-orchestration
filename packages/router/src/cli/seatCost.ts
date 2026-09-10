@@ -7,7 +7,9 @@
 // tell" has put a false number in the record.
 
 import {
+  PLATFORM_AI_CREDITS,
   STATUS_UNMEASURED,
+  costUnit,
   measureConversations,
   usd,
 } from "../seatCost.ts";
@@ -76,7 +78,9 @@ export async function seatCostVerb(argv: string[]): Promise<number> {
     const qualifier = result.reason ? ` (${result.reason})` : "";
     writeOut(
       `status: ${result.status}${qualifier}\n` +
-        `credits: ${result.credits.toFixed(3)}\n` +
+        // The unit, named: this is the platform the seat is actually billed
+        // on, and it is the only number here that is money.
+        `credits: ${result.credits.toFixed(3)} ${costUnit(PLATFORM_AI_CREDITS)}\n` +
         `usd: $${(usd(result) ?? 0).toFixed(4)}\n` +
         `events: ${result.event_count}\n`,
     );

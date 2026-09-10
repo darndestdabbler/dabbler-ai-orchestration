@@ -521,7 +521,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(`${kind}\n`);
       return EXIT_USAGE;
     }
-    return start(sessionsDir, {
+    return await start(sessionsDir, {
       engine,
       provider: values.get("--provider") ?? null,
       model: values.get("--model") ?? null,

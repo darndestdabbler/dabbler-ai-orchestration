@@ -11,6 +11,8 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { describe, it } from "node:test";
 
+import { type StandIn } from "../src/acp.ts";
+import { PLATFORM_LEGACY_PREMIUM_REQUESTS } from "../src/seatCost.ts";
 import {
   PROVENANCE_HAND_EDITED,
   PROVENANCE_MACHINE_WRITTEN,
@@ -26,6 +28,15 @@ import {
   PREMIUM_SOURCE_USAGE_FILE,
   PROVIDER_SOURCE_HEURISTIC,
   REFRESH_COMMAND,
+  COST_SOURCE_PROBE_SAMPLE,
+  COST_SOURCE_SEAT_STATEMENT,
+  SEAT_ENUMERATION_SOURCE,
+  adoptSeatEnumeration,
+  catalogCosts,
+  renderCatalogCosts,
+  diffEnumeration,
+  enumerateSeatModels,
+  seatModel,
   readVendorUsage,
   SCOPE_ALL,
   SCOPE_MODELS,
@@ -54,6 +65,7 @@ import {
   writeCatalog,
   type Catalog,
   type ModelEntry,
+  type SeatEnumeration,
   type ProcessHandle,
   type RefreshPlan,
 } from "../src/transports/copilot.ts";
@@ -567,14 +579,22 @@ describe("the seat catalog as a record", () => {
     }
   });
 
-  it("declares every id it carries in the shipped lockfile's universe", () => {
-    // The CLI cannot enumerate models, so the universe is data in the file
-    // rather than a list in code.
+  it("carries the shipped lockfile's universe as what the seat last listed", () => {
+    // The universe is the seat's own enumeration, so it is exactly the
+    // entries the seat still lists -- and every entry it stopped listing is
+    // still in the file, marked with the date it went.
     const shipped = loadCatalog(SHIPPED_LOCK);
+    // Compared as sets: the universe is in the seat's own order and the
+    // entries are in the file's, and neither order means anything.
     assert.deepEqual(
-      [...shipped.meta.candidate_universe],
-      shipped.models.map((model) => model.id),
+      [...shipped.meta.candidate_universe].sort(),
+      shipped.models
+        .filter((model) => model.retired_at === null)
+        .map((model) => model.id)
+        .sort(),
     );
+    assert.ok(shipped.models.some((model) => model.retired_at !== null));
+    assert.equal(shipped.meta.enumeration_source, SEAT_ENUMERATION_SOURCE);
   });
 
   it("refuses a malformed candidate universe at load", () => {
@@ -938,16 +958,59 @@ describe("what a refresh selects", () => {
     assert.equal(unknownCostIds(plan).length, 5);
   });
 
-  it("bounds what may be probed by the declared universe", () => {
-    // The CLI has no list-models command, so the universe in the file is the
-    // only list there is: a probe costs a premium request a typo must not buy.
+  it("bounds what may be probed by what the seat says it has", () => {
+    // The seat's own list is the only list there is, and a probe is a billed
+    // turn a typo must not buy.
     assert.throws(
       () => planRefresh(loadCatalog(V1_LOCK), { scope: SCOPE_MODELS, models: ["claude-opus-9"] }),
-      /candidate universe/,
+      /this seat states it can dispatch/,
     );
+    // Nothing enumerated and nothing maintained: the scope has no members,
+    // and the message points at the free reading rather than at typing ids in.
     assert.throws(
       () => planRefresh(catalog([entry("a", "anthropic")]), { scope: SCOPE_ALL }),
-      /candidate_universe/,
+      /the seat's own list could not be read/,
+    );
+  });
+
+  it("never spends a probe on a model the seat has stopped listing", () => {
+    // The free reading has already said the seat no longer serves it, so a
+    // confirmation is a billed turn bought to learn that again. Neither the
+    // cheap scope nor the stale one may select it.
+    const retired = modelEntry({
+      id: "gone",
+      provider: "anthropic",
+      enablement: "confirmed",
+      confirmed_on_cli_version: "v1",
+      probe_premium_requests: 0,
+      retired_at: "2026-09-10T00:00:00Z",
+    });
+    const served = modelEntry({
+      id: "here",
+      provider: "openai",
+      enablement: "confirmed",
+      confirmed_on_cli_version: "v1",
+      probe_premium_requests: 1,
+    });
+    const catalog = {
+      meta: catalogMeta({
+        cli_version: "v2",
+        seat_id: "s",
+        candidate_universe: ["here"],
+      }),
+      models: [retired, served],
+    };
+
+    assert.deepEqual(planModelIds(planRefresh(catalog, { scope: SCOPE_QUORUM })), ["here"]);
+    assert.deepEqual(
+      planModelIds(planRefresh(catalog, { scope: SCOPE_STALE, liveCliVersion: "v2" })),
+      ["here"],
+    );
+    // And it cannot be asked for by name either: the universe is what the
+    // seat listed, and a retired id is not in it.
+    assert.throws(
+      () => planRefresh(catalog, { scope: SCOPE_MODELS, models: ["gone"] }),
+      /this seat states it can dispatch/,
     );
   });
 
@@ -957,7 +1020,7 @@ describe("what a refresh selects", () => {
         scope: SCOPE_QUORUM,
       }),
     );
-    assert.match(text, /projected cost: 1 premium request\(s\)/);
+    assert.match(text, /projected cost: 1 legacy premium request\(s\)/);
     assert.match(text, /unknown is not zero/);
     assert.match(text, /floor/);
   });
@@ -1269,6 +1332,230 @@ function dispatchBig(spawner: HandoffSpawner): Promise<APIResult> {
     user_message: BIG_PROMPT,
   });
 }
+
+// A stand-in seat that speaks ACP: it answers `initialize`, `session/new`
+// (with the model list the real seat carries), and `session/close`. A
+// `session/prompt` would be a billed turn, so it writes its arrival to
+// FAKE_PROMPTED and the test fails on the file existing. With FAKE_NO_MODELS
+// the reply carries an id and nothing else, which is the seat this framework
+// must call unknown rather than empty.
+const FAKE_SEAT = `
+const fs = require("node:fs");
+const out = (o) => process.stdout.write(JSON.stringify(o) + "\\n");
+const model = (id, name, usage) => usage === null
+  ? { modelId: id, name }
+  : { modelId: id, name, _meta: { copilotUsage: usage, copilotEnablement: "enabled", copilotPriceCategory: "low" } };
+let buf = "";
+process.stdin.on("data", (chunk) => {
+  buf += chunk.toString("utf8");
+  let i;
+  while ((i = buf.indexOf("\\n")) >= 0) {
+    const line = buf.slice(0, i);
+    buf = buf.slice(i + 1);
+    if (!line.trim()) continue;
+    const m = JSON.parse(line);
+    if (m.method === "initialize") {
+      out({ jsonrpc: "2.0", id: m.id, result: { protocolVersion: 1, agentCapabilities: {}, agentInfo: { name: "fake-seat", version: "0" } } });
+    } else if (m.method === "session/new") {
+      const result = { sessionId: "conv-list" };
+      if (!process.env.FAKE_NO_MODELS) {
+        result.models = {
+          currentModelId: "gpt-5.6-sol",
+          availableModels: [
+            model("auto", "Auto", null),
+            model("gpt-5.6-sol", "GPT-5.6 Sol", "1x"),
+            model("claude-haiku-4.5", "Claude Haiku 4.5", "0.33x"),
+          ],
+        };
+        result.modes = { currentModeId: "x#agent", availableModes: [{ id: "x#agent" }, { id: "x#plan" }] };
+        result.configOptions = [
+          { type: "select", id: "model", currentValue: "gpt-5.6-sol" },
+          { type: "select", id: "reasoning_effort", currentValue: "medium", options: [{ value: "low" }, { value: "high" }] },
+        ];
+      }
+      out({ jsonrpc: "2.0", id: m.id, result });
+    } else if (m.method === "session/prompt") {
+      fs.writeFileSync(process.env.FAKE_PROMPTED, JSON.stringify(m.params));
+      out({ jsonrpc: "2.0", id: m.id, result: { stopReason: "end_turn" } });
+    } else if (m.method === "session/close") {
+      out({ jsonrpc: "2.0", id: m.id, result: {} });
+    } else if (m.id !== undefined) {
+      out({ jsonrpc: "2.0", id: m.id, error: { code: -32601, message: "no" } });
+    }
+  }
+});
+process.stdin.on("end", () => process.exit(0));
+`;
+
+/** The stand-in, and the path it would write if a prompt were ever sent. */
+function fakeSeat(noModels = false): { standIn: StandIn; prompted: string } {
+  const dir = tempDir("seat-acp-");
+  const script = join(dir, "seat.cjs");
+  writeFileSync(script, FAKE_SEAT, "utf8");
+  const prompted = join(dir, "prompted.json");
+  process.env["FAKE_PROMPTED"] = prompted;
+  if (noModels) process.env["FAKE_NO_MODELS"] = "1";
+  else delete process.env["FAKE_NO_MODELS"];
+  return { standIn: { program: process.execPath, leadingArgs: [script] }, prompted };
+}
+
+describe("the seat's own model list", () => {
+  it("comes from the session/new reply, and sends no prompt to get it", async () => {
+    const seat = fakeSeat();
+    const enumeration = await enumerateSeatModels({ standIn: seat.standIn });
+
+    assert.equal(enumeration.known, true);
+    assert.equal(enumeration.source, SEAT_ENUMERATION_SOURCE);
+    assert.deepEqual(
+      enumeration.models.map((entry) => [entry.id, entry.provider, entry.usage]),
+      [
+        // The seat's router alias carries no cost and no provider: named
+        // because the seat names it, and a guess about it would be a guess
+        // about which model answers.
+        ["auto", "", null],
+        ["gpt-5.6-sol", "openai", "1x"],
+        ["claude-haiku-4.5", "anthropic", "0.33x"],
+      ],
+    );
+    assert.equal(enumeration.models[1]?.provider_source, PROVIDER_SOURCE_HEURISTIC);
+    assert.equal(enumeration.current_model_id, "gpt-5.6-sol");
+    assert.deepEqual(enumeration.modes, ["agent", "plan"]);
+    assert.deepEqual(enumeration.reasoning_efforts, ["low", "high"]);
+    // The assertion this session exists to keep: enumerating is free, and it
+    // is free because no turn is ever taken.
+    assert.equal(existsSync(seat.prompted), false);
+  });
+
+  it("calls a seat that lists nothing unknown, not empty", async () => {
+    const seat = fakeSeat(true);
+    const enumeration = await enumerateSeatModels({ standIn: seat.standIn });
+
+    assert.equal(enumeration.known, false);
+    assert.deepEqual(enumeration.models, []);
+    assert.match(String(enumeration.reason), /availableModels/);
+    assert.equal(existsSync(seat.prompted), false);
+  });
+});
+
+/** A seat reading, as `enumerateSeatModels` would return one. */
+function seatList(
+  rows: ReadonlyArray<readonly [string, string | null]>,
+  options: { known?: boolean; at?: string } = {},
+): SeatEnumeration {
+  return {
+    known: options.known ?? true,
+    models: rows.map(([id, usage]) =>
+      seatModel(
+        usage === null
+          ? { modelId: id, name: id }
+          : { modelId: id, name: id, _meta: { copilotUsage: usage, copilotEnablement: "enabled" } },
+      ),
+    ),
+    current_model_id: rows[0]?.[0] ?? null,
+    modes: ["agent"],
+    reasoning_efforts: [],
+    cli_version: "v1",
+    read_at: options.at ?? "2026-09-10T00:00:00Z",
+    source: SEAT_ENUMERATION_SOURCE,
+    reason: null,
+  };
+}
+
+describe("adopting the seat's list into the catalog", () => {
+  it("writes the universe from the seat, adds what it has never heard of, and keeps what the seat dropped", () => {
+    const before = catalog([entry("kept", "anthropic"), entry("gone", "openai")]);
+    const after = adoptSeatEnumeration(
+      before,
+      seatList([
+        ["auto", null],
+        ["kept", "1x"],
+        ["claude-haiku-4.5", "0.33x"],
+      ]),
+    );
+
+    // The alias is not a model: named by the seat, never probeable, never a
+    // candidate, so it is not in the universe a probe may be spent on.
+    assert.deepEqual([...after.meta.candidate_universe], ["kept", "claude-haiku-4.5"]);
+    assert.equal(after.meta.enumeration_source, SEAT_ENUMERATION_SOURCE);
+    assert.equal(after.meta.enumerated_at, "2026-09-10T00:00:00Z");
+
+    const added = after.models.find((model) => model.id === "claude-haiku-4.5")!;
+    // Listed is not entitled: only a turn can say whether it answers.
+    assert.equal(added.enablement, "unconfirmed");
+    assert.equal(added.provider, "anthropic");
+    assert.equal(added.provider_source, PROVIDER_SOURCE_HEURISTIC);
+    assert.equal(added.seat_usage, "0.33x");
+    assert.equal(added.probe_premium_requests, null);
+
+    // Marked, never deleted: one bad read must not be able to remove a
+    // verifier, and the entry still says what it was.
+    const dropped = after.models.find((model) => model.id === "gone")!;
+    assert.equal(dropped.retired_at, "2026-09-10T00:00:00Z");
+    assert.equal(dropped.provider, "openai");
+    assert.equal(dropped.enablement, "confirmed");
+    assert.equal(after.models.find((model) => model.id === "kept")?.retired_at, null);
+  });
+
+  it("clears the mark when a model is listed again", () => {
+    const retired = adoptSeatEnumeration(catalog([entry("m", "openai")]), seatList([["x", "1x"]]));
+    assert.equal(retired.models[0]?.retired_at, "2026-09-10T00:00:00Z");
+    const back = adoptSeatEnumeration(retired, seatList([["m", "1x"]], { at: "2026-09-11T00:00:00Z" }));
+    assert.equal(back.models.filter((model) => model.id === "m").length, 1);
+    assert.equal(back.models[0]?.retired_at, null);
+    assert.equal(back.models[0]?.listed_at, "2026-09-11T00:00:00Z");
+  });
+
+  it("changes nothing when the seat could not be read", () => {
+    const before = catalog([entry("m", "openai")]);
+    const after = adoptSeatEnumeration(before, seatList([], { known: false }));
+    assert.equal(after, before);
+    assert.match(diffEnumeration(before, after).join(" "), /maintained candidate universe stands/);
+  });
+
+  it("round-trips the seat's statement, its date and its mark through the file", () => {
+    const path = join(tempDir("catalog-"), "seat.lock");
+    const adopted = adoptSeatEnumeration(
+      catalog([entry("m", "openai"), entry("gone", "anthropic")]),
+      seatList([["m", "0.33x"]]),
+    );
+    writeCatalog(path, adopted);
+    const read = loadCatalog(path);
+    assert.equal(read.models.find((model) => model.id === "m")?.seat_usage, "0.33x");
+    assert.equal(read.models.find((model) => model.id === "m")?.listed_at, "2026-09-10T00:00:00Z");
+    assert.equal(read.models.find((model) => model.id === "gone")?.retired_at, "2026-09-10T00:00:00Z");
+    assert.equal(read.meta.enumerated_at, "2026-09-10T00:00:00Z");
+  });
+});
+
+describe("what the catalog says a model costs", () => {
+  it("names the platform of every figure, so a weight can never read as a price", () => {
+    const [seat, sample] = catalogCosts(
+      modelEntry({ id: "m", seat_usage: "15x", probe_premium_requests: 1 }),
+    );
+    // The vendor's own statement first, this repository's billed sample
+    // second, and both in the legacy unit -- which is the finding: they
+    // disagree, and neither is money.
+    assert.deepEqual(
+      [seat?.source, seat?.amount, seat?.stated, seat?.platform],
+      [COST_SOURCE_SEAT_STATEMENT, 15, "15x", PLATFORM_LEGACY_PREMIUM_REQUESTS],
+    );
+    assert.deepEqual(
+      [sample?.source, sample?.amount, sample?.platform],
+      [COST_SOURCE_PROBE_SAMPLE, 1, PLATFORM_LEGACY_PREMIUM_REQUESTS],
+    );
+
+    const rendered = renderCatalogCosts(
+      modelEntry({ id: "m", seat_usage: "15x", probe_premium_requests: 1 }),
+    );
+    assert.match(rendered, /legacy premium request\(s\)/);
+    assert.match(rendered, /not a price/);
+    assert.match(rendered, /dabbler seat-cost/);
+
+    // Nothing measured is unknown, and unknown is never zero.
+    assert.deepEqual(catalogCosts(modelEntry({ id: "m" })), []);
+    assert.match(renderCatalogCosts(modelEntry({ id: "m" })), /cost unknown/);
+  });
+});
 
 describe("measuring the rendered command line", () => {
   for (const [argv, expected] of [

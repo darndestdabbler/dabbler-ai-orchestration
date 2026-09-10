@@ -60,7 +60,9 @@ import { readTaskDeclaration, registerSessionStart, sessionIsReleasable } from "
 import { cleanRepoAnswers, seed, tempDir } from "./support/answers.ts";
 
 /** One verb's exit code and everything it wrote, so a refusal can be read. */
-async function run(verb: () => number): Promise<{ code: number; out: string; err: string }> {
+async function run(
+  verb: () => number | Promise<number>,
+): Promise<{ code: number; out: string; err: string }> {
   const collected = await capture(() => Promise.resolve(verb()));
   return { code: collected.value, out: collected.stdout, err: collected.stderr };
 }

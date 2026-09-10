@@ -1121,7 +1121,7 @@ class Driver {
   }
 
   /** Register (or re-register) and load or open the run's state. */
-  register(): number {
+  async register(): Promise<number> {
     // A pull call that names no engine is a person continuing a session
     // already in flight: its identity is on the record, and re-registering
     // would only ask them to repeat it.
@@ -1161,7 +1161,7 @@ class Driver {
       (outcome === REGISTER_START || outcome === REGISTER_CONTINUE) &&
       this.options.engine !== null
     ) {
-      const code = start(this.sessionsDir, {
+      const code = await start(this.sessionsDir, {
         engine: this.options.engine,
         provider: this.options.provider ?? null,
         model: this.options.model ?? null,
@@ -3486,7 +3486,7 @@ async function withDriver(
   }
   const driver = new Driver(sessionsDir, options, repoRoot, config);
   try {
-    const registered = driver.register();
+    const registered = await driver.register();
     if (registered !== EXIT_OK) return registered;
     return await run(driver);
   } catch (error) {

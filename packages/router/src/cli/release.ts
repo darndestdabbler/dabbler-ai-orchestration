@@ -30,6 +30,7 @@ import {
   currentDecisions,
   publicationDecisionId,
   raisePublicationDecision,
+  supersedeOwed,
 } from "../owedDecisions.ts";
 import { releaseVersion, tagsFor } from "../packaging.ts";
 import { writeErr, writeOut } from "./output.ts";
@@ -42,6 +43,7 @@ function usage(): string {
   return [
     "usage: dabbler release [-h] [--sessions-dir SESSIONS_DIR]",
     "                       [--dry-run] [--verify-install]",
+    "                       [--reask --reason WHY]",
     "",
     "  Tags the release the operator authorised: one tag, one artifact.",
     "  CI publishes from the tag; no credential is read or written here.",
@@ -49,6 +51,12 @@ function usage(): string {
     "options:",
     "  --dry-run                print what it would tag and stop",
     "  --verify-install         ask the Marketplace what it actually serves",
+    "  --reask                  put a HELD version's publication decision back to",
+    "                           the operator, because what it was held for has",
+    "                           happened. Needs --reason, supersedes nothing but",
+    "                           the question, and authorises nothing; an answer",
+    "                           that already authorised a tag is never re-asked",
+    "  --reason WHY             required with --reask: what changed since the hold",
     "  --sessions-dir PATH      the sessions root; derived from the cwd when absent",
     "  -h, --help               show this message",
     "",
@@ -69,6 +77,8 @@ async function run(argv: string[]): Promise<number> {
   let sessionsDirArg: string | undefined;
   let dryRun = false;
   let verifyInstall = false;
+  let reask = false;
+  let reason: string | undefined;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--sessions-dir") {
@@ -82,6 +92,15 @@ async function run(argv: string[]): Promise<number> {
     }
     if (token === "--verify-install") {
       verifyInstall = true;
+      continue;
+    }
+    if (token === "--reask") {
+      reask = true;
+      continue;
+    }
+    if (token === "--reason") {
+      reason = argv[index + 1];
+      index += 1;
       continue;
     }
     writeErr(`${usage()}dabbler release: unrecognized arguments: ${token}\n`);
@@ -124,6 +143,7 @@ async function run(argv: string[]): Promise<number> {
   // The id names the version, so what is read here is the answer given for
   // THIS release and never one carried over from an earlier one.
   const decisionId = publicationDecisionId(version);
+  if (reask) return reaskPublication(root, version, decisionId, reason);
   const answer = answerTo(root, decisionId);
   if (answer === null) {
     writeOut(
@@ -204,6 +224,75 @@ async function run(argv: string[]): Promise<number> {
 }
 
 /** The operator's answer to a decision, when they have given one. */
+/**
+ * Put a HELD version's publication decision back to the operator.
+ *
+ * **A version held until something was true has no forward path when it
+ * becomes true.** An answer is settled -- rightly, since rewriting a brief
+ * under a decision already taken would change what the operator is recorded
+ * as having agreed to -- so the framework asks nothing again, and a release
+ * held for a defect stays held after the defect is fixed, with nothing but
+ * a person remembering it.
+ *
+ * So the hold is re-asked, and re-asking is all it is: the held answer stays
+ * on the record, superseded rather than replaced, with the claim that made
+ * the question live again beside it. Nothing here authorises a tag, and the
+ * one answer that is never re-asked is one that already did -- asking a
+ * person to consent twice to the same publication is pressure, not process.
+ */
+export function reaskPublication(
+  root: string,
+  version: string,
+  decisionId: string,
+  reason: string | undefined,
+): number {
+  if (reason === undefined || reason.trim() === "") {
+    writeErr(
+      "release: --reask needs --reason: the operator is being asked again " +
+        "because something they were waiting for has happened, and the " +
+        "record has to say what.\n",
+    );
+    return EXIT_USAGE;
+  }
+  const answer = answerTo(root, decisionId);
+  if (answer === null) {
+    writeOut(
+      `release: ${version}'s publication decision is already open and ` +
+        "waiting for an answer; nothing was re-asked. `dabbler owed list` " +
+        "has the brief.\n",
+    );
+    return EXIT_OK;
+  }
+  if (tagsFor(answer, version).length > 0) {
+    writeErr(
+      `release: refused -- ${version} was answered '${answer}', which ` +
+        "authorises a tag. An authorisation is not re-asked: run `dabbler " +
+        "release` to carry it out, or `dabbler session withdraw-release` if " +
+        "it should not ship after all.\n",
+    );
+    return EXIT_REFUSED;
+  }
+  supersedeOwed(
+    root,
+    decisionId,
+    `re-asked: the hold was answered '${answer}', and ${reason.trim()}`,
+  );
+  try {
+    raisePublicationDecision(root, { version });
+  } catch (error) {
+    if (!(error instanceof OwedDecisionError)) throw error;
+    writeErr(`release: ${error.message}\n`);
+    return EXIT_REFUSED;
+  }
+  writeOut(
+    `release: ${version} was held ('${answer}') and its publication ` +
+      "decision is open again, with what changed on the record: " +
+      `${reason.trim()}\nNothing is authorised by asking. \`dabbler owed ` +
+      "list` has the brief, and `dabbler owed answer` settles it.\n",
+  );
+  return EXIT_OK;
+}
+
 function answerTo(repoRoot: string, id: string): string | null {
   for (const row of currentDecisions(repoRoot)) {
     if (String(row["id"]) !== id) continue;

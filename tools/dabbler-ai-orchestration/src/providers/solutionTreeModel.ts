@@ -167,6 +167,12 @@ export interface ConfigurationModel {
   provider: string;
   /** Absent in a projection written before the record was read. */
   fidelity?: ModelFidelity;
+  /**
+   * Present only on a model the dated record says stopped being served,
+   * with when it went and when it was last seen. Such a model is in
+   * `withheld` and never in `candidates`.
+   */
+  retired?: { since: string; lastSeenAt: string | null } | null;
 }
 
 /** How a role resolves: what it would pick, and what it was resolved against. */
@@ -174,9 +180,20 @@ export interface ConfigurationRole {
   role: string;
   chosen: ConfigurationModel | null;
   candidates: ConfigurationModel[];
+  /** Models the record says are no longer served: offered to nobody. */
+  withheld?: ConfigurationModel[];
   /** The providers the role was resolved AGAINST -- the invariant, made visible. */
   excludes: string[];
   fellThrough: boolean;
+  /**
+   * Which record the list came from -- the direct-API registry, or the seat's
+   * own catalog. The transport owns the enumeration, and a pane that showed a
+   * list without saying which record it read is how a seat came to read
+   * "nothing resolves" while its catalog held eighteen models.
+   */
+  enumeration?: string;
+  /** Why this transport can offer nothing, when it cannot. */
+  unavailable?: string | null;
 }
 
 /** One dated record, in the words the router's own freshness reading uses. */
@@ -319,6 +336,18 @@ function agePhrase(hours: number | null): string {
  * the common case, and the day it renders like `honoured` is the day this
  * pane starts making a promise the record cannot keep.
  */
+/**
+ * Which record a role's list was read from, in words.
+ *
+ * The router names the enumeration; this only spells it. A name it does not
+ * know is printed as it came, because an unknown record is still worth
+ * saying and a pane that swallowed it would be back to a list from nowhere.
+ */
+export const ENUMERATION_WORDS: Record<string, string> = {
+  "api-registry": "direct-API model registry",
+  "seat-catalog": "seat's own catalog",
+};
+
 export const FIDELITY_WORDS: Record<ModelFidelity, string> = {
   honoured: "answers as itself",
   substituted: "has answered as another model",
@@ -984,7 +1013,20 @@ export function descriptorFor(
                   ? ` on \`${configuration(p).fidelityTransport}\``
                   : ""
               }. ${FIDELITY_TOLD[chosenFidelity]}`,
-          `${role?.candidates.length ?? 0} model(s) qualify.`,
+          // Which record was read, said plainly: the seat's catalog is the
+          // enumeration on a seat, and the registry is on the API path.
+          `${role?.candidates.length ?? 0} model(s) qualify${
+            role?.enumeration ? `, from the ${ENUMERATION_WORDS[role.enumeration] ?? role.enumeration}` : ""
+          }.`,
+          (role?.withheld ?? []).length > 0
+            ? `Withheld, because the record says the vendor stopped serving them: ${(role?.withheld ?? [])
+                .map(
+                  (model) =>
+                    `${model.model} (last seen ${model.retired?.lastSeenAt ?? "unknown"}, gone since ${model.retired?.since ?? "unknown"})`,
+                )
+                .join(", ")}. The entry is kept, so a model that comes back is offered again.`
+            : "",
+          role?.unavailable ? `Nothing can be offered here: ${role.unavailable}.` : "",
         ]
           .filter((line) => line !== "")
           .join("\n\n"),

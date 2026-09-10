@@ -2810,9 +2810,9 @@
     {
       "number": 143,
       "title": "The terminal an operator actually reads",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-10T05:30:09.581000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-10T05:58:49.663000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

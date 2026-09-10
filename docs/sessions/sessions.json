@@ -2770,9 +2770,9 @@
     {
       "number": 141,
       "title": "The clone that arrived holding one file, and the window that listed six sessions it could not run",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-09T23:12:18.002000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-09T23:28:34.402000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

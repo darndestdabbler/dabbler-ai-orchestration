@@ -7975,3 +7975,235 @@ fixes as well as this session's own two changes -- 2.0.21, a patch, because
 every change in it is a fix to behaviour an operator already had. The staff
 who hit the placeholder-branch trap get it from the Marketplace rather than
 from a checkout.
+
+### Session 143 of 145: The terminal an operator actually reads
+
+**The operator watches this terminal through every session, and it is the
+one surface that has never been held to a single rule.** Three complaints,
+and they are one complaint: what the framework says about itself is
+formatted three different ways depending on which part of the framework is
+saying it. A phase is blue or plain depending on which phase it is; a gate
+row reads one way from the close and another from the packaging run; and the
+suite's output arrives with no colour at all, so a green run and a red one
+look the same until you read them.
+
+**The step line is reported missing, and the first thing this session does
+is reproduce it.** Session 140 made the terminal announce each instruction
+from `instruction.json`, its unit test passes, `run.json` carries the `seq`
+the reader matches on, and the operator still does not see it. That is
+either an environment the test does not cover or a claim the test does not
+actually make, and **there is no third possibility worth guessing between**.
+So the session starts by reproducing it in a real window against a real
+session, and only then decides what to change. If it does not reproduce, the
+step records what was actually observed and changes nothing -- a fix written
+against a symptom nobody could produce is a fix nobody can judge.
+
+**Every phase is a milestone, because every phase is a phase.**
+`MILESTONE_PHASES` lists eight of them and `lineTone` paints the rest plain,
+so one session reads blue, blue, plain, blue, plain, plain, blue, blue,
+plain, blue as it moves -- and `preverify`, `dispositions`, `fix` and
+`publish` are exactly the phases an operator most wants to catch, because
+they are where a session stops being routine. The set goes. A phase line is
+the framework saying where the session is, and where the session is, is
+always worth the same weight.
+
+**One gate renderer, because a gate reads the same wherever it is shown or
+the two screens disagree about the same fact.** `session.ts` writes
+`- <name>  PASS` and `packaging.ts` writes `[<mark>] <name>`, and the comment
+above the second one already claims they are "the same three marks the close
+prints". They are not. One function renders a gate row and both call it, in
+the form the operator asked for: a check mark at the front of the line, the
+name, and `(N/A)` after the name for a gate that did not apply. **The skip
+explanation is dropped.** It is the longest text on the busiest screen and it
+explains something that did not happen; a gate that could not see its own
+precondition is saying "not applicable", and the sentence saying why it was
+not applicable belongs to whoever is debugging the gate rather than to the
+operator watching a close.
+
+**The colour goes into the bytes at the terminal, not into the log.** Gate
+rows and suite output both reach this terminal as a JOB's bytes, passed
+through as the runner wrote them, and there are only three ways to colour
+them. The router could emit ANSI when it knows it is being driven -- and then
+every `close.log` and `run-of-record-*.log` on disk carries escape sequences
+for anyone who opens one. The terminal could read the gates from a
+machine-owned record and render them itself, as it already does for a
+verdict and a test outcome -- and then the rows would be said twice, once
+from the record and once from the bytes the job wrote anyway. Or the terminal
+paints marks in the bytes as they pass. **The third, and it is not a
+compromise**: the suite's output leaves this repository no choice about it,
+because `node --test` writes its own marks and there is no record to read
+them from, so the mechanism has to exist regardless -- and once it exists,
+the gate rows are one more shape it recognises. One mechanism, no escapes on
+disk, and nothing said twice.
+
+**What that mechanism may touch is bounded, and the bound is the point.** It
+paints a MARK, anchored at the start of a line, and never the prose after it:
+a bright bold green check for a pass, an unbolded white one for a gate that
+did not apply, red for a failure mark. A renderer that recognised phrases in
+another component's sentences would be a contract nobody declared and the
+first reworded message would break it; a renderer that recognises a glyph in
+the first column of a line is reading punctuation, which is what punctuation
+is for.
+
+**Steps.** (1) Reproduce the missing step line against a real session in a
+real window; fix it in this step if it reproduces, and record what was
+observed if it does not. (2) `MILESTONE_PHASES` goes and every phase line
+reads in the milestone tone. (3) One gate renderer, called by both the close
+and the packaging run: the mark at the front, the name, `(N/A)` for a gate
+that did not apply, and no skip explanation. (4) The terminal paints marks
+at the start of passed-through job lines -- bold green for a pass, plain
+white for not-applicable, red for a failure -- and leaves every character
+after the mark alone.
+
+**Tests.** Four. Every phase this framework writes reads as a milestone,
+asserted over the phase vocabulary rather than over a list a later phase
+would have to be added to by hand. A gate row renders identically for the
+close and for the packaging run, from the one function, for a pass, a
+failure and a gate that did not apply -- and carries no explanation for the
+last. A mark at the start of a passed-through line is painted and the prose
+after it is not, including a line whose prose happens to contain the same
+glyph. Step (1)'s assertion is whatever reproducing it turns out to
+license: a regression test if the cause is found, and a recorded observation
+and no assertion if it is not. **How any of it LOOKS gets no assertion** --
+an assertion on appearance restates the format, and Layer 3 is what catches a
+line that reads wrong on a screen.
+
+**Not releasable.** `vsix-v2.0.21` is tagged and waiting on a reviewer in the
+`marketplace` environment, so the Marketplace still serves 2.0.20. Stacking a
+second unpublished version on top of one that has not yet served is how a
+number gets burned for nothing. Session 145 carries this work, 144's, and its
+own.
+
+### Session 144 of 145: Whether the model we asked for is the model that answered
+
+**This session exists to make session 145 honest, and it is a measurement
+before it is a change.** 145 offers the operator a list of models to choose
+between. That offer is worth nothing -- worse than nothing -- if the
+transport underneath quietly answers with something else, because the
+operator would have chosen a model, been shown their choice, and paid for a
+different one. This repository has already paid that bill once: a verifier
+picked a model at fourteen times the cost and one session spent 364 premium
+requests.
+
+**The framework already distrusts the seat's own account of itself.** The
+managed body says a Copilot seat declares `--model` because "the seat label
+is not trusted; identity resolves through the model registry" -- so the
+question this session answers is not new, it has simply never been measured.
+`acp.ts` sends `--model`. What comes back is the open question, and it has a
+different answer per transport: the direct API names the model that answered
+in its own response, and a CLI seat names whatever it chooses to name.
+
+**Two models per transport, or the measurement proves nothing.** A probe that
+asks for one model and gets that model back has not distinguished a transport
+that honours the flag from a transport that always answers with the same
+model, which happens to be the one asked for. So each transport is asked for
+two models that differ in a way the answer can show, and the pair is what is
+read.
+
+**This costs real calls and the plan says how many.** Two transports, two
+models each, one call per pair: four calls, and the number is written here so
+a session that finds itself making a fifth knows it has left the plan. Seat
+calls are priced.
+
+**The guard is the durable half.** What the framework ASKED FOR and what
+ANSWERED are two facts, and today only one of them is recorded. A round
+records both, and when they disagree the framework says so rather than
+swallowing it -- on the round, where the cost of the round is already
+recorded. **It does not refuse.** A provider substituting a model is not a
+verification failure and pretending it is would stop sessions for a reason
+the operator cannot act on mid-round; it is a fact about what was bought,
+and the operator is the one who decides what to do about it.
+
+**Steps.** (1) A probe that asks one transport for one named model and
+records what answered, with the pair of models per transport that makes a
+constant answer distinguishable from an honoured one. (2) Run it against
+each transport and record the result where session 145 reads it -- four
+calls, no more. (3) A round records the model asked for beside the model that
+answered, and says it when they differ; it does not refuse. (4) Write what
+was measured into the record 145 will read, in the terms 145 needs: per
+transport, whether the flag is honoured.
+
+**Tests.** Three. The comparison of asked-for against answered is asserted
+over recorded specimens rather than live, so the assertion runs on a machine
+with no keys. A round carrying a mismatch says so and does not refuse. And
+the probe itself is marked live and skips without keys, which is the rule
+every live test in this suite already follows. **Step (2) is a measurement
+and produces a record rather than an assertion.**
+
+**Not releasable.** Nothing here changes what an operator does; it changes
+what the record knows. 145 carries it.
+
+### Session 145 of 145: The configuration an operator sets once
+
+**Most of this already exists and is simply not reachable.** `selection.ts`
+resolves a role against registry candidates; `route.ts` holds cross-provider
+verification as an invariant and says in its own comments that it is "never
+a silent same-provider pick"; `discovery` enumerates a vendor and dates what
+it found. What is missing is not machinery. It is that every one of those
+decisions is made by a file an operator has to know exists, and the pane that
+is open in front of them all day says nothing about any of it.
+
+**A collapsible Configuration section in the Dabbler AI Orchestration pane**,
+holding what a person chooses and nothing the framework can work out for
+itself.
+
+**Engine and transport are two controls, not one.** They are two settings
+today -- `--engine` names who orchestrates, `DABBLER_TRANSPORT` names how the
+provider is reached -- and one control over two settings is how a chosen
+value gets silently overridden by the other. That has already happened here
+once, at the level of an environment variable, and building a single
+"Copilot or Claude" switch would reproduce it one level up where it is harder
+to see. Where only one CLI is installed, the pane chooses it and **says that
+it chose it and why**, which is the difference between a default and a thing
+that happened to you.
+
+**What the pane sets is the default for the NEXT session, and it says so.**
+Engine identity is recorded per session at `session start` and is on the
+record from that moment; a control that appeared to change a session in
+flight would be offering something the ledger will not honour.
+
+**No probe on open, ever.** The registry is a dated record, so the pane reads
+it and shows how old it is; refreshing it is something the operator asks for.
+A window opened on a sparse clone reads the same record as every other and
+pays nothing for it -- which is the whole reason the record is dated rather
+than fetched.
+
+**The two constraints are surfaced, not invented.** That the verifier comes
+from another provider is already an invariant, and the pane's job is to show
+it rather than to re-implement it -- a second copy of a rule is a rule that
+drifts, and this one is load-bearing. That the verifier is not much weaker
+than the author has no home yet, and it gets one as an ORDERED TIER in the
+registry: data, revisable when a vendor ships something new, rather than a
+judgement about capability compiled into a function where it will quietly go
+stale.
+
+**And a model 144 found is not honoured on the selected transport is not
+offered as though it were.** That is the entire reason 144 runs first.
+
+**Steps.** (1) The collapsible Configuration section, reading the dated
+registry and naming its age, with no probe on open. (2) Engine and transport
+as two controls, with the single-CLI case chosen and explained rather than
+silently applied. (3) The authoring model and the verifying model, from the
+registry, with the cross-provider invariant surfaced from where it already
+lives. (4) The capability floor as an ordered tier in the registry, and the
+verifying choice held to it. (5) An explicit refresh that probes and re-dates
+the record. (6) A model the record says is not honoured on the selected
+transport is not offered as a plain choice. (7) The release: `version.json`
+to 2.0.23, stamped through `npm run stamp:version`, with a changelog section
+covering 143, 144 and this session in the terms an operator reads.
+
+**Tests.** Five. The pane renders from a dated registry and issues no probe
+when it opens. A verifying choice on the authoring model's provider is
+refused, from the invariant's own reading rather than from a second copy of
+it. A verifying model below the authoring model's tier is refused, and the
+tier comes from the registry rather than from the assertion. A single
+installed CLI produces a chosen engine and a stated reason. And a model
+recorded as not honoured on the selected transport does not appear as an
+ordinary choice. **The pane's appearance gets no assertion**, for the reason
+every surface in this repository gets none: Layer 3 catches what a screen
+looks like.
+
+**Releasable.** 2.0.23, carrying 143's terminal, 144's guard and this
+session's pane. A patch if 144 changed nothing an operator can see and a
+minor otherwise; the session decides that from what 144 actually landed
+rather than from this sentence.

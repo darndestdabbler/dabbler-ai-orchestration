@@ -2850,9 +2850,9 @@
     {
       "number": 145,
       "title": "The configuration an operator sets once",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-10T07:05:26.137000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-10T08:24:19.548000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

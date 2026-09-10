@@ -685,11 +685,13 @@ describe("the record a session start brings up to date", () => {
     assert.match(lines.join("\n"), /no prompt sent/);
     const catalog = loadCatalog(seatPath);
     assert.deepEqual([...catalog.meta.candidate_universe], ["gpt-seat", "claude-seat"]);
-    // And the priced half is untouched: not one confirmation was bought.
+    // And the priced half is untouched: not one confirmation was bought. The
+    // free half now carries the seat's own word for what it will dispatch,
+    // which is `listed` -- a reading, never a confirmation.
     assert.equal(catalog.meta.probed_at, stamp(10_000));
     assert.deepEqual(catalog.models.map((model) => model.enablement), [
-      "unconfirmed",
-      "unconfirmed",
+      "listed",
+      "listed",
     ]);
   });
 

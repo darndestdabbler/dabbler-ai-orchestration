@@ -398,7 +398,39 @@ export function runDir(root: string, runId: string): string {
  * ledger cannot appear in a snapshot even in a repository that never got
  * the ignore rule (or that committed the ledger before it did).
  */
-export function snapshotWorktreeTree(repoRoot: string): string | null {
+/**
+ * How many times a snapshot is attempted before the failure is believed.
+ *
+ * Every git call below reads a tree nobody is writing, so repeating one
+ * cannot change what it observes -- which is what makes a retry safe here
+ * and would not make it safe on a command that writes. On Windows a
+ * plumbing call fails transiently for reasons that have nothing to do with
+ * the repository: a scanner or a sibling process holding a file for a
+ * moment is enough, and several sessions running at once is enough to make
+ * that routine. A snapshot that gave up on the first refusal turned a busy
+ * machine into `verify: could not snapshot the working tree` -- a stop that
+ * named nothing an operator could act on and that a re-run cleared.
+ *
+ * Bounded, because a repository that genuinely cannot be read must still
+ * fail rather than be retried until someone notices.
+ */
+const SNAPSHOT_ATTEMPTS = 3;
+
+export function snapshotWorktreeTree(
+  repoRoot: string,
+  options: { attempts?: number; snapshot?: (repoRoot: string) => string | null } = {},
+): string | null {
+  const attempts = Math.max(1, options.attempts ?? SNAPSHOT_ATTEMPTS);
+  const once = options.snapshot ?? snapshotWorktreeTreeOnce;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const tree = once(repoRoot);
+    if (tree !== null) return tree;
+  }
+  return null;
+}
+
+/** One attempt at the snapshot above; `null` is "git refused", not "empty". */
+function snapshotWorktreeTreeOnce(repoRoot: string): string | null {
   const tempIndex = join(tmpdir(), `dabbler-verify-index-${uniqueSuffix()}`);
   const env = { GIT_INDEX_FILE: tempIndex };
   try {

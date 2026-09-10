@@ -1177,3 +1177,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: none — this round's verifier could not look at the tree
 - Raw round output: `.dabbler/runs/s147/`
+
+## Session 148 verification — VERIFIED after 2 round(s)
+
+- Verifier: gpt-5.4 (openai) over copilot-cli
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: 16 read(s), 0 search(es), 0 listing(s); 1 read(s) of the transport's own handoff file, not counted
+- Raw round output: `.dabbler/runs/s148/`

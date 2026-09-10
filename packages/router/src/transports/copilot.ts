@@ -1532,8 +1532,27 @@ export const KNOWN_PROVIDERS: ReadonlySet<string> = new Set([
   "google",
 ]);
 
+/** A real turn was taken and this model answered on this seat. */
 export const ENABLEMENT_CONFIRMED = "confirmed";
+/**
+ * The seat states it can dispatch this model, and no probe has answered for
+ * it.
+ *
+ * Its own state rather than `confirmed`, because the two are different
+ * evidence and this framework does not trust a seat label as far as it
+ * trusts a turn that happened: promoting the seat's word would make what a
+ * billed call established indistinguishable from what the seat claims.
+ * Selection accepts it -- a model the seat lists is a model the seat says it
+ * will dispatch, and the enumeration that says so is free and on a 24-hour
+ * clock -- while the probe scopes do not, because re-probing is for what a
+ * probe has already answered for.
+ */
+export const ENABLEMENT_LISTED = "listed";
+/** Neither a probe nor an enumeration has said anything about this model. */
 export const ENABLEMENT_UNCONFIRMED = "unconfirmed";
+
+/** The seat's own word, in `_meta.copilotEnablement`, for a model it serves. */
+export const SEAT_ENABLEMENT_ENABLED = "enabled";
 
 /**
  * The verb whose absence is the whole incident: with no refresh command, the
@@ -2372,15 +2391,36 @@ export function isSeatAlias(model: SeatModel): boolean {
  *
  * **This is where the candidate universe comes from.** A probe establishes
  * entitlement and nothing else, so it neither adds nor removes an entry: a
- * model the seat lists and the lockfile has never heard of arrives here as
- * `unconfirmed`, waiting for a probe to say whether it answers, and a model
- * the seat has stopped listing is MARKED with the date rather than dropped.
- * One bad read must not be able to remove a verifier, and a model that comes
- * back has its mark cleared rather than a second entry written.
+ * model the seat lists and the lockfile has never heard of arrives here
+ * carrying the seat's own word for whether it is dispatchable -- `listed`
+ * where the seat says enabled -- and a model the seat has stopped listing is
+ * MARKED with the date rather than dropped. One bad read must not be able to
+ * remove a verifier, and a model that comes back has its mark cleared rather
+ * than a second entry written.
+ *
+ * What the seat says is taken and never promoted: `confirmed` is a turn that
+ * happened and this free reading cannot write it, nor lower it.
  *
  * An enumeration that failed changes nothing at all -- `known: false` leaves
  * the maintained universe standing, which is the only thing it is still for.
  */
+/**
+ * What an enumeration may say about a model's enablement.
+ *
+ * A probe is a turn that happened and a reading is free, so a reading never
+ * undoes one: `confirmed` is never lowered here, whatever the seat says.
+ * Any other entry takes the seat's own word, which is what makes a model the
+ * seat began serving this morning selectable this morning rather than after
+ * a billed turn per model re-establishes what the seat already stated.
+ */
+function enablementFromSeat(current: string, model: SeatModel): string {
+  if (current === ENABLEMENT_CONFIRMED) return ENABLEMENT_CONFIRMED;
+  if (model.enablement === SEAT_ENABLEMENT_ENABLED) return ENABLEMENT_LISTED;
+  // Listed, and the seat declined to call it enabled. Its word is taken as
+  // readily when it withholds a model as when it offers one.
+  return model.enablement === null ? current : ENABLEMENT_UNCONFIRMED;
+}
+
 export function adoptSeatEnumeration(
   catalog: Catalog,
   enumeration: SeatEnumeration,
@@ -2404,6 +2444,7 @@ export function adoptSeatEnumeration(
       ...entry,
       provider: inferred ? model.provider : entry.provider,
       provider_source: inferred ? model.provider_source : entry.provider_source,
+      enablement: enablementFromSeat(entry.enablement, model),
       seat_usage: model.usage,
       listed_at: at,
       retired_at: null,
@@ -2417,7 +2458,7 @@ export function adoptSeatEnumeration(
         id: model.id,
         provider: model.provider,
         provider_source: model.provider === "" ? "" : model.provider_source,
-        enablement: ENABLEMENT_UNCONFIRMED,
+        enablement: enablementFromSeat(ENABLEMENT_UNCONFIRMED, model),
         seat_usage: model.usage,
         listed_at: at,
       }),
@@ -2522,6 +2563,27 @@ export function resolveRoleCandidates(
  * wants to warn about the resolution reads the same list the caller that
  * dispatches reads.
  */
+/**
+ * Whether a role may draw on this entry.
+ *
+ * Three conditions, and each is a different question. The seat has an
+ * answer for it -- a probe took a turn and it answered, or the seat itself
+ * states it will dispatch the model. The seat still LISTS it: a retired
+ * entry is one the seat has stopped offering, kept on the record so one bad
+ * read cannot remove a verifier, and keeping it is not offering it. And its
+ * provider is one this framework routes to, so cross-provider selection
+ * cannot land on a name it could not place.
+ */
+function selectableEntry(entry: ModelEntry): boolean {
+  return (
+    (entry.enablement === ENABLEMENT_CONFIRMED ||
+      entry.enablement === ENABLEMENT_LISTED) &&
+    entry.retired_at === null &&
+    entry.provider !== "" &&
+    KNOWN_PROVIDERS.has(entry.provider)
+  );
+}
+
 export function explainRoleCandidates(
   config: RouterConfig,
   catalog: Catalog,
@@ -2532,12 +2594,7 @@ export function explainRoleCandidates(
     config,
     role,
     catalog.models
-      .filter(
-        (entry) =>
-          entry.enablement === ENABLEMENT_CONFIRMED &&
-          entry.provider !== "" &&
-          KNOWN_PROVIDERS.has(entry.provider),
-      )
+      .filter(selectableEntry)
       .map((entry) => [entry.id, entry.provider] as const),
     excludeProviders,
   );
@@ -2591,12 +2648,44 @@ export const SCOPE_ALL = "all";
 export const CONFIRM_THRESHOLD_PREMIUM_REQUESTS = 5;
 
 /**
- * Sort key for "cheapest first". An unknown sample sorts after every known
- * one: unknown means never measured, and never measured is never free.
+ * The seat's own multiplier as a number, or null when it says nothing.
+ *
+ * `"15x"`, `"0.33x"`, `"1x"` -- `copilotUsage`, kept in the catalog verbatim.
+ * Anything not of that shape is not a multiplier and is read as no statement
+ * rather than guessed at: a figure invented here would be indistinguishable
+ * from one the seat gave.
+ */
+export function seatMultiplier(usage: string | null): number | null {
+  if (usage === null) return null;
+  const shaped = /^(\d+(?:\.\d+)?)x$/.exec(usage.trim());
+  if (shaped === null) return null;
+  const value = Number(shaped[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * What one call on this model is projected to cost, in legacy premium
+ * requests.
+ *
+ * **The seat's own statement outranks the sample.** They disagree, measured
+ * and recorded in `docs/model-and-pricing-sources.md` -- `gpt-5.4` sampled 0
+ * while the seat says 1x -- and the seat states its multiplier for free on
+ * every enumeration while a sample costs a real turn and is one observation.
+ * The sample stays on disk as provenance and is read only where the seat has
+ * said nothing, so a projection is never a figure that was bought when a
+ * free one was available.
+ */
+function entryCost(entry: ModelEntry): number | null {
+  return seatMultiplier(entry.seat_usage) ?? entry.probe_premium_requests;
+}
+
+/**
+ * Sort key for "cheapest first". An unknown cost sorts after every known
+ * one: unknown means nothing has said, and nothing has said is never free.
  */
 function costOrder(entry: ModelEntry): [number, number] {
-  const sample = entry.probe_premium_requests;
-  return sample === null ? [1, 0] : [0, sample];
+  const cost = entryCost(entry);
+  return cost === null ? [1, 0] : [0, cost];
 }
 
 function compareCost(left: ModelEntry, right: ModelEntry): number {
@@ -2606,12 +2695,11 @@ function compareCost(left: ModelEntry, right: ModelEntry): number {
 }
 
 /**
- * A sample with the platform its unit belongs to, always.
+ * A projected cost with the platform its unit belongs to, always.
  *
- * There is no rendering of a sample that omits the unit, because a bare
- * number beside the word "cost" is read as money -- and this number is a
- * one-call observation in a legacy unit that has already been measured
- * disagreeing with the seat's own statement.
+ * There is no rendering that omits the unit, because a bare number beside
+ * the word "cost" is read as money -- and this number is a legacy request
+ * multiplier, not a price. What was really spent is read by `../seatCost.ts`.
  */
 function sampleText(sample: number | null): string {
   return sample === null
@@ -2794,10 +2882,10 @@ export function planRefresh(
   const byId = new Map(catalog.models.map((entry) => [entry.id, entry]));
   return {
     scope,
-    samples: ids.map(
-      (modelId) =>
-        [modelId, byId.get(modelId)?.probe_premium_requests ?? null] as const,
-    ),
+    samples: ids.map((modelId) => {
+      const entry = byId.get(modelId);
+      return [modelId, entry === undefined ? null : entryCost(entry)] as const;
+    }),
     threshold: options.threshold ?? CONFIRM_THRESHOLD_PREMIUM_REQUESTS,
   };
 }
@@ -2807,11 +2895,12 @@ export function formatPlan(plan: RefreshPlan): string {
     `refresh plan: scope=${plan.scope}, ${plan.samples.length} model(s) to probe`,
   ];
   for (const [modelId, sample] of plan.samples) {
-    lines.push(`  ${modelId}  (sample: ${sampleText(sample)})`);
+    lines.push(`  ${modelId}  (cost: ${sampleText(sample)})`);
   }
   lines.push(
     `projected cost: ${pythonNumber(knownPremiumRequests(plan))} ` +
-      `${costUnit(PLATFORM_LEGACY_PREMIUM_REQUESTS)} from recorded samples ` +
+      `${costUnit(PLATFORM_LEGACY_PREMIUM_REQUESTS)} -- the seat's own stated ` +
+      "multiplier where it has one, a recorded sample only where it has not " +
       `-- ${LEGACY_PLATFORM_CAVEAT}`,
   );
   const unknown = unknownCostIds(plan);

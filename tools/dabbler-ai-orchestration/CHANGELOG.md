@@ -10,7 +10,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.1.2] — 2026-09-10
+
+Models your Copilot seat lists are now offered. Until now the Configuration
+section would only offer a model that a *probe* had confirmed — a real,
+billed turn, one per model. Your seat already states, for free and on every
+refresh, which models it will dispatch; the framework read that answer and
+then threw it away. So a model your seat began serving this morning stayed
+invisible until somebody spent a turn per model to re-establish what the
+seat had already said, and a verifier quietly fell past its first two
+choices to whatever had last been probed.
+
+### Changed
+
+- **A model the seat lists can be selected the day the seat lists it.** The
+  catalog now records the seat's own word — `listed` — beside `confirmed`,
+  which stays what a real turn established, and selection accepts either. No
+  probe is needed for a new model to appear in Configuration or to be chosen
+  for a role; the free refresh that already runs every 24 hours is enough.
+- **The seat's word is taken, never promoted.** `listed` and `confirmed` are
+  different evidence and stay different: an enumeration never rewrites a
+  `confirmed` entry, and `dabbler copilot refresh --quorum` and `--stale`
+  still re-probe only what a probe has answered for. What the probe remains
+  for is fidelity — whether the model that answered is the model asked for.
+- **Cost is projected from what the seat states, not from what a probe
+  sampled.** The two disagree, and the free statement is the correct one, so
+  `dabbler copilot refresh --dry-run` now prices a plan from the seat's own
+  multiplier and falls back to a recorded sample only where the seat has said
+  nothing. A sampled figure stays on disk as provenance.
+
+### Fixed
+
+- **A session no longer stops because a snapshot was refused for a moment.**
+  Reading the working tree runs several git commands that only read; on a
+  busy machine one can fail transiently, and the session stopped with `could
+  not snapshot the working tree` — a refusal naming nothing to act on, which
+  a re-run cleared. The read is now retried, a bounded number of times, while
+  a tree that genuinely cannot be read still fails.
+
 ## [2.1.1] — 2026-09-10
+
 
 A stop you can act on. When a session stops, the framework hands it back to
 a person, and until now it handed them one sentence written for ten unlike

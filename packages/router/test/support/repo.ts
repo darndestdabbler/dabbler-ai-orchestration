@@ -122,12 +122,36 @@ const GIT_CONFIG =
 
 let pinned = false;
 
+/**
+ * Take git's third configuration channel away from the caller.
+ *
+ * `GIT_CONFIG_GLOBAL` and `GIT_CONFIG_NOSYSTEM` cover the files; they do not
+ * cover `GIT_CONFIG_COUNT` with its `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n`
+ * pairs, nor `GIT_CONFIG_PARAMETERS`, which git reports as coming from the
+ * command line and which outrank every file. A parent process that sets one
+ * -- an IDE or an agent harness injecting `safe.bareRepository=explicit` is
+ * the measured case -- reaches straight past the pin, and eight tests that
+ * write through a bare remote fail on a machine whose own git config is
+ * empty. A suite that pins configuration at all has to pin this too, or its
+ * result is a fact about whoever invoked it.
+ */
+function unpinInheritedGitConfig(): void {
+  const count = Number.parseInt(process.env["GIT_CONFIG_COUNT"] ?? "", 10);
+  for (let index = 0; index < (Number.isNaN(count) ? 0 : count); index += 1) {
+    delete process.env[`GIT_CONFIG_KEY_${index}`];
+    delete process.env[`GIT_CONFIG_VALUE_${index}`];
+  }
+  delete process.env["GIT_CONFIG_COUNT"];
+  delete process.env["GIT_CONFIG_PARAMETERS"];
+}
+
 function pinGit(): void {
   if (pinned) return;
   const config = join(scratchDir("git-env-"), "gitconfig");
   writeFileSync(config, GIT_CONFIG, "utf8");
   process.env["GIT_CONFIG_GLOBAL"] = config;
   process.env["GIT_CONFIG_NOSYSTEM"] = "1";
+  unpinInheritedGitConfig();
   pinned = true;
 }
 

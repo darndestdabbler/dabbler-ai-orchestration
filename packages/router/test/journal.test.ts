@@ -11,8 +11,36 @@ import {
   nowIso,
   platformNewlines,
   repoRelativePath,
+  snapshotWorktreeTree,
 } from "../src/journal.ts";
 import { tempDir } from "./support/answers.ts";
+
+describe("snapshotting a tree git refused to read", () => {
+  it("repeats a refusal that did not last, and stops repeating a refusal that did", () => {
+    // The git calls behind a snapshot only READ, so repeating one cannot
+    // change what it sees -- and on a machine running several sessions at
+    // once a plumbing call fails for a moment for reasons outside the
+    // repository. Giving up on the first refusal stopped a session with
+    // `could not snapshot the working tree`, which a re-run then cleared.
+    let refusals = 0;
+    const settles = (): string | null => {
+      refusals += 1;
+      return refusals < 3 ? null : "tree-sha";
+    };
+    assert.equal(snapshotWorktreeTree("nowhere", { snapshot: settles }), "tree-sha");
+    assert.equal(refusals, 3);
+
+    // Bounded: a repository that genuinely cannot be read still fails, and
+    // fails after a countable number of attempts rather than eventually.
+    let always = 0;
+    const never = (): string | null => {
+      always += 1;
+      return null;
+    };
+    assert.equal(snapshotWorktreeTree("nowhere", { attempts: 2, snapshot: never }), null);
+    assert.equal(always, 2);
+  });
+});
 
 describe("what the router hands the OS", () => {
   it("adds the hidden window without disturbing what the caller asked for", () => {

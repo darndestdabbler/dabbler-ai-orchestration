@@ -63,6 +63,50 @@ second time with a billed call that established nothing new.
 **Never quote a cost from the catalog's samples.** Read the seat's own
 statement, or read what was actually spent from `seatCost.ts`.
 
+**Session 148 made the code read it that way too.** `dabbler copilot refresh`
+projects and orders from the seat's stated multiplier wherever the catalog
+has one, and falls back to a recorded sample only where the seat has said
+nothing; `probe_premium_requests` stays on disk as provenance and is no
+longer what a projection reads. The dry run states the rule it applied; it
+does not annotate each model with which of the two that figure came from.
+
+## A model the seat lists is selectable without a probe
+
+**Measured 2026-09-10, GitHub Copilot CLI 1.0.83.** The seat's free
+enumeration carries `_meta.copilotEnablement` for every model it lists — 21
+of the 22 entries answered `"enabled"`, the exception being `auto`, the
+seat's own router alias, which states neither an enablement nor a usage and
+is not a model.
+
+Until session 148 that answer was parsed and then discarded:
+`adoptSeatEnumeration` wrote `unconfirmed` over it, and selection offered a
+role nothing but `confirmed` entries, so a model the seat began serving this
+morning stayed invisible until somebody spent a billed turn per model to
+re-establish what the seat had already said. That is how `claude-opus-5` and
+`claude-sonnet-5` came to be missing from an operator's Configuration pane on
+the day their seat began listing them.
+
+The catalog now carries three enablement states, and they are not the same
+evidence:
+
+| state | what it means | what it cost |
+| --- | --- | --- |
+| `confirmed` | a real turn was taken and the model answered | one billed turn |
+| `listed` | the seat states it can dispatch this model | free |
+| `unconfirmed` | neither a probe nor an enumeration has said | — |
+
+Selection accepts `confirmed` and `listed`. The probe scopes (`--quorum`,
+`--stale`) still read `confirmed` alone, because re-probing is for what a
+probe has already answered for, and an enumeration never lowers a
+`confirmed` entry: a free reading must not be able to undo a turn that
+happened.
+
+**What the probe is still for is fidelity** — whether the model that answered
+is the model that was asked for, which is `echoed_model` and is the subject
+of `docs/model-fidelity.md`. That question is a property of the vendor's
+routing and the CLI version rather than of one seat, so it is answered once
+and shared through the committed lockfile, not re-bought per developer.
+
 ## The Copilot seat's model list, free
 
 **Measured route, 2026-09-05, CLI 1.0.83** — `docs/acp-walkthrough.md` §1 has

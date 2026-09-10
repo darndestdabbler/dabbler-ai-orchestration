@@ -921,6 +921,40 @@ describe("what a refresh selects", () => {
     assert.equal(knownPremiumRequests(plan), 2);
   });
 
+  it("never spends a probe on a model only the seat's list vouches for", () => {
+    // Re-probing is for what a probe has already answered for. A `listed`
+    // entry has no confirmation to re-date, so buying a turn for it would be
+    // spending on the one thing the free reading already covers.
+    const plan = planRefresh(
+      catalog([
+        sampled("a-listed", "anthropic", { enablement: "listed" }),
+        sampled("o-1", "openai", { sample: 0 }),
+      ]),
+      { scope: SCOPE_QUORUM },
+    );
+    assert.deepEqual(planModelIds(plan), ["o-1"]);
+  });
+
+  it("projects from the seat's own multiplier over a sample that disagrees", () => {
+    // The measured disagreement: gpt-5.4 sampled 0 while the seat states 1x.
+    // The seat says it free on every enumeration and the sample cost a turn
+    // to get wrong, so the free statement is the one a projection reads.
+    const plan = planRefresh(
+      catalog([
+        modelEntry({
+          id: "gpt-5.4",
+          provider: "openai",
+          enablement: "confirmed",
+          probe_premium_requests: 0,
+          seat_usage: "1x",
+        }),
+      ]),
+      { scope: SCOPE_MODELS, models: ["gpt-5.4"] },
+    );
+    assert.equal(knownPremiumRequests(plan), 1);
+    assert.deepEqual(unknownCostIds(plan), []);
+  });
+
   it("prefers a measured sample to an unmeasured one", () => {
     // Unknown is never free, so an unmeasured entry is not the cheap one --
     // picking it would make the projection meaningless.
@@ -1244,6 +1278,62 @@ describe("resolving a role against the seat", () => {
     assert.deepEqual(candidates[candidates.length - 1], ["gemini-x", "google"]);
   });
 
+  it("offers a model the seat lists without waiting for a turn to be spent on it", () => {
+    // The whole point of the third state: a model the seat began serving
+    // this morning is selectable this morning. Withholding it until a billed
+    // probe restated what the seat already said is what kept an operator's
+    // own models out of their own pane.
+    const candidates = resolveRoleCandidates(
+      CONFIG,
+      catalog([entry("claude-x", "anthropic", "listed"), entry("gpt-x", "openai")]),
+      "generator",
+    );
+    assert.deepEqual(candidates, [
+      ["claude-x", "anthropic"],
+      ["gpt-x", "openai"],
+    ]);
+  });
+
+  it("keeps the provider-trust boundary over a listed entry that names no provider", () => {
+    // `listed` widens which ANSWER counts, and nothing else. An entry whose
+    // provider the name heuristic could not place is still unplaceable, and
+    // a role that drew on it could not honour a cross-provider exclusion.
+    const candidates = resolveRoleCandidates(
+      CONFIG,
+      catalog([
+        modelEntry({ id: "grok-x", provider: "", enablement: "listed" }),
+        entry("gpt-x", "openai"),
+      ]),
+      "generator",
+    );
+    assert.deepEqual(candidates, [["gpt-x", "openai"]]);
+  });
+
+  it("stops offering a model the seat has stopped listing, whatever established it", () => {
+    // Retiring an entry keeps it on the record so one bad read cannot remove
+    // a verifier -- and keeping it is not offering it. Both states the seat
+    // has an answer for go the same way, or a model the seat withdrew stays
+    // dispatchable because a probe once answered for it.
+    const withdrawn = catalog([
+      modelEntry({
+        id: "claude-gone",
+        provider: "anthropic",
+        enablement: "confirmed",
+        retired_at: "2026-09-10T00:00:00Z",
+      }),
+      modelEntry({
+        id: "gemini-gone",
+        provider: "google",
+        enablement: "listed",
+        retired_at: "2026-09-10T00:00:00Z",
+      }),
+      entry("gpt-x", "openai"),
+    ]);
+    assert.deepEqual(resolveRoleCandidates(CONFIG, withdrawn, "generator"), [
+      ["gpt-x", "openai"],
+    ]);
+  });
+
   it("leaves the rest of the confirmed catalog after an exclusion", () => {
     assert.deepEqual(
       resolveRoleCandidates(CONFIG, seatCatalog(), "generator", ["anthropic", "openai"]),
@@ -1480,8 +1570,9 @@ describe("adopting the seat's list into the catalog", () => {
     assert.equal(after.meta.enumerated_at, "2026-09-10T00:00:00Z");
 
     const added = after.models.find((model) => model.id === "claude-haiku-4.5")!;
-    // Listed is not entitled: only a turn can say whether it answers.
-    assert.equal(added.enablement, "unconfirmed");
+    // The seat's own word, taken and not promoted. `listed` says the seat
+    // states it will dispatch this model; only a turn writes `confirmed`.
+    assert.equal(added.enablement, "listed");
     assert.equal(added.provider, "anthropic");
     assert.equal(added.provider_source, PROVIDER_SOURCE_HEURISTIC);
     assert.equal(added.seat_usage, "0.33x");
@@ -1494,6 +1585,21 @@ describe("adopting the seat's list into the catalog", () => {
     assert.equal(dropped.provider, "openai");
     assert.equal(dropped.enablement, "confirmed");
     assert.equal(after.models.find((model) => model.id === "kept")?.retired_at, null);
+  });
+
+  it("takes the seat's word for a model it has never heard of, and never over a turn", () => {
+    const before = catalog([
+      entry("probed", "anthropic"),
+      entry("silent", "openai", "unconfirmed"),
+    ]);
+    const after = adoptSeatEnumeration(before, seatList([["probed", "1x"], ["silent", "1x"], ["new", "1x"]]));
+
+    // A reading is free and a probe is a turn that happened, so the reading
+    // never lowers what the turn established.
+    assert.equal(after.models.find((model) => model.id === "probed")?.enablement, "confirmed");
+    // An entry nothing had said anything about takes the seat's statement.
+    assert.equal(after.models.find((model) => model.id === "silent")?.enablement, "listed");
+    assert.equal(after.models.find((model) => model.id === "new")?.enablement, "listed");
   });
 
   it("clears the mark when a model is listed again", () => {

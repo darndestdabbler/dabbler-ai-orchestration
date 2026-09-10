@@ -1,6 +1,71 @@
-# STATUS — sessions 113–142 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, and session 142 turning that refusal into a choice the operator is offered and a verb that carries it out; **version 2.0.21 TAGGED (vsix-v2.0.21) — CI awaits a reviewer in the marketplace environment, so the Marketplace still serves 2.0.20**
+# STATUS — sessions 113–143 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, and session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes; **version 2.0.21 TAGGED (vsix-v2.0.21) — CI awaits a reviewer in the marketplace environment, so the Marketplace still serves 2.0.20**
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 143 CLOSED, 2026-09-10 — the terminal held to one rule
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 143 | every phase in the milestone tone, one gate renderer for the close and the packaging run, marks painted in a job's bytes, and the missing step line driven rather than guessed at | CLOSED VERIFIED (rounds 1 and 2, no findings either time; verifier `gpt-5-6-terra`/openai, transport `api`), landed `7e5861f1`, not releasable |
+>
+> **The step line does not reproduce, and three things were driven before
+> that was said.** The built `dist/extension.js` carries the emission;
+> `vsix-v2.0.20`'s own tree carries it, so the released build an operator
+> installs has it; and a new test replays session 142's whole succession --
+> seqs 1 to 24, nine step instructions among waits, a rejection and a done,
+> each overwriting the pair of files the one before wrote -- and every step
+> line appears. **That succession was what no test covered**: every existing
+> test wrote ONE instruction at ONE seq. Nothing in the terminal's source
+> changed. **The remaining unknown is which build is INSTALLED in the
+> operator's VS Code**, which is where the next look belongs -- and
+> `same-version-republish-stale-install` is the trap that fits the symptom.
+>
+> **`MILESTONE_PHASES` is gone.** It listed eight phases and `lineTone`
+> painted every other one plain, so one session read blue, blue, plain, blue,
+> plain, plain, blue, blue, plain, blue as it moved -- and `preverify`,
+> `dispositions`, `fix` and `publish` were among the plain ones, which are
+> exactly the phases where a session stops being routine. The assertion reads
+> the phase enum out of `packages/router/schemas/driver-run.schema.json`
+> rather than listing phases: **a second copy of the vocabulary is how those
+> four fell out of the tone they should have had without anything failing.**
+>
+> **One gate row, from `renderGateRow` beside `runGates`.** `session.ts`
+> wrote `- <name>  PASS` and `packaging.ts` wrote `[PASS] <name>` under a
+> comment claiming they were already the same three marks. Neither spells a
+> mark now. A gate that judged nothing renders as `✓ <name> (N/A)` with its
+> explanation dropped -- it is the longest text on the busiest screen and it
+> explains something that did not happen. **A remediation on a gate that DID
+> judge is kept**: on a failure it is the operator's next action, and on a
+> pass it appears only under `--force`, where dropping it would have lost the
+> record of a force.
+>
+> **The colour goes in at the terminal, not into the log.** `forTerminal`
+> paints the mark opening a line -- `✓`/`✔` bold green, `✗`/`✖` bold red,
+> and a `(N/A)` row left plain -- and not one character after it. The router
+> emitting ANSI would put escapes in every `close.log` on disk; the terminal
+> rendering gates from a record would say them twice, once from the record
+> and once from the bytes the job wrote anyway. Neither option exists for
+> `node --test`, which writes its own marks and keeps no record of them, **so
+> the mechanism had to exist regardless** -- and once it does the gate rows
+> are one more shape it recognises. `▶`, `ℹ` and `﹣` pass through untouched.
+>
+> **`GATE_NOT_APPLICABLE` is now on the router's contract**, exported from
+> `index.ts` rather than copied into the renderer: a gate that judged nothing
+> wears the pass mark, so the terminal has to tell the two apart, and a second
+> copy of that token is how they would come to disagree about one fact.
+>
+> **The run of record caught what the targeted checks could not.** A
+> `cli.test.ts` assertion pinned the old close row -- four spaces, a dash, the
+> name, `PASS|FAIL|SKIP` -- which is the format this session was asked to
+> change. It exercises the close VERB rather than the gates, so no step's own
+> checks reached it. It now reads the marks from `gates.ts` instead of
+> spelling them, so the assertion cannot drift from the renderer again.
+>
+> **Next: 144, then 145.** 144 measures whether the model asked for is the
+> model that answered, per transport, and is the precondition for 145's
+> Configuration pane offering a list of models honestly. 145 carries 143,
+> 144 and itself to the Marketplace as 2.0.23.
+
 
 > ## SESSION 142 CLOSED, 2026-09-10 — the branch a host chose, now offered as a choice, and 2.0.21 tagged
 >

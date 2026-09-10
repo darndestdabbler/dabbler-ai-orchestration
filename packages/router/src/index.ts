@@ -28,6 +28,13 @@ export {
 // shell, a `.cmd` shim quoted, its own process group on POSIX) rather than
 // restating it.
 export { spawnProgram, terminateTree } from "./checks.ts";
+
+// The token a gate that judged nothing carries after its name. It is on the
+// contract because the terminal paints a gate row's mark as the bytes pass
+// and has to tell "passed" from "judged nothing", which wear the same mark.
+// A second copy of the token in the renderer is how the two would come to
+// disagree about the same fact.
+export { GATE_NOT_APPLICABLE } from "./gates.ts";
 // Which router this is, for a host that has to say so. The extension bundles
 // the router rather than finding it on PATH, so "run `dabbler version`" is a
 // question about a terminal's PATH and not about the router this window is

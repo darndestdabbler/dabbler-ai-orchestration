@@ -83,6 +83,7 @@ import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
   governingConfig,
   readWorktreeStatus,
+  renderGateRow,
   runGates,
 } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
@@ -2321,16 +2322,13 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
     const results = runGates(sessionsDir, { forced });
     const width = Math.max(...results.map((row) => row.name.length));
     for (const row of results) {
-      // Three marks, not two. A gate that could not see its own precondition
-      // reports SKIP: it does not block, and it does not claim to have proved
-      // anything either.
-      const mark = row.inapplicable ? "SKIP" : row.passed ? "PASS" : "FAIL";
       // One bullet per gate, a level in from the close's own sentences: the
       // rows are the detail under the close, and in the framework's terminal
-      // they sit under the line that announced the close job.
-      let line = `    - ${row.name.padEnd(width)}  ${mark}`;
-      if (row.remediation) line += `  ${row.remediation}`;
-      writeOut(`${line}\n`);
+      // they sit under the line that announced the close job. What the row
+      // SAYS is `renderGateRow`'s, shared with the packaging run, because a
+      // gate reads the same wherever it is shown or the two screens disagree
+      // about the same fact.
+      writeOut(`    ${renderGateRow(row, width)}\n`);
     }
     const failed = results.filter((row) => !row.passed);
     if (dryRun) {

@@ -149,6 +149,44 @@ export type Check = readonly [
   inapplicable?: boolean,
 ];
 
+/** The mark a gate that judged and passed carries. */
+export const GATE_PASS_MARK = "✓";
+/** The mark a gate that judged and failed carries. */
+export const GATE_FAIL_MARK = "✗";
+/** What a gate that judged nothing says of itself, after its name. */
+export const GATE_NOT_APPLICABLE = "(N/A)";
+
+/**
+ * One gate as a line, for whoever is showing it.
+ *
+ * **One renderer, because a gate reads the same wherever it is shown or the
+ * two screens disagree about the same fact.** The close and the packaging
+ * run each spelled their own marks -- `- <name>  PASS` against
+ * `[PASS] <name>` -- under a comment in the second one claiming they were
+ * already the same three marks. They were not, and the operator read two
+ * formats for one fact.
+ *
+ * **A gate that judged nothing says `(N/A)` and stops there.** The sentence
+ * explaining why its precondition was invisible is the longest text on the
+ * busiest screen and it explains something that did not happen; it belongs
+ * to whoever is debugging the gate. **A remediation on a gate that DID judge
+ * is kept**: on a failure it is the operator's next action, and on a pass it
+ * appears only under `--force`, where it is the forensic note saying a
+ * bookkeeping gate was stepped over. Neither is an explanation of a
+ * non-event.
+ *
+ * The caller supplies its own indent and may pad the name to a column; what
+ * a gate row SAYS is settled here.
+ */
+export function renderGateRow(gate: GateResult, nameWidth = 0): string {
+  const mark = gate.inapplicable || gate.passed ? GATE_PASS_MARK : GATE_FAIL_MARK;
+  const name = gate.name.padEnd(nameWidth);
+  if (gate.inapplicable) return `${mark} ${name} ${GATE_NOT_APPLICABLE}`;
+  return gate.remediation
+    ? `${mark} ${name}  ${gate.remediation}`
+    : `${mark} ${name}`.trimEnd();
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

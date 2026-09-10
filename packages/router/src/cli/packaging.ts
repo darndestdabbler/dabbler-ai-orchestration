@@ -8,6 +8,7 @@
 import { detectPackaging } from "../bootstrap/detect.ts";
 import { loadConfig } from "../config.ts";
 import { repoRootFor, resolveSessionsDir } from "../evidence.ts";
+import { renderGateRow } from "../gates.ts";
 import { packagingPath, readPackaging } from "../ledger.ts";
 import {
   type PackagingRun,
@@ -155,13 +156,10 @@ function explain(sessionsDir: string, run: PackagingRun): string {
 
 function render(run: PackagingRun): string {
   const lines = [`packaging: ${run.ready ? "ready (dry run)" : run.outcome}`];
-  for (const gate of run.gates) {
-    // The same three marks the close prints. A gate reads the same wherever
-    // it is shown, or the two screens disagree about the same fact.
-    const mark = gate.inapplicable ? "SKIP" : gate.passed ? "PASS" : "FAIL";
-    const note = gate.remediation ? ` — ${gate.remediation}` : "";
-    lines.push(`  [${mark}] ${gate.name}${note}`);
-  }
+  // The same row the close prints, from the same function -- which is what
+  // this comment used to claim while spelling its own marks a line below.
+  const width = Math.max(0, ...run.gates.map((gate) => gate.name.length));
+  for (const gate of run.gates) lines.push(`  ${renderGateRow(gate, width)}`);
   if (run.refusal) lines.push(`  ${run.refusal}`);
   for (const step of run.steps) {
     const code = step.timedOut ? "timed out" : `exit ${step.exitCode}`;

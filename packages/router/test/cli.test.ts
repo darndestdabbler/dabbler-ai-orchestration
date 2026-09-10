@@ -22,6 +22,7 @@ import { sessionVerb } from "../src/cli/session.ts";
 import { statusVerb } from "../src/cli/status.ts";
 import { extensionAbove, versionVerb } from "../src/cli/version.ts";
 import { VERBS } from "../src/contracts/verbs.ts";
+import { GATE_FAIL_MARK, GATE_PASS_MARK } from "../src/gates.ts";
 import { VERSION } from "../src/version.ts";
 import { readCandidateRecord } from "../src/impact.ts";
 import { readBundleRecord } from "../src/land.ts";
@@ -232,8 +233,9 @@ describe("dabbler session, the whole surface", () => {
     const result = await run(() => sessionVerb(["close", "--dry-run", "--sessions-dir", sessionsDir]));
     assert.equal(result.code, 1);
     assert.match(result.out, /gates pass; nothing written\./);
-    // One bullet per gate, indented under the close's own sentences.
-    assert.match(result.out, /^ {4}- verification_clean +(PASS|FAIL|SKIP)/m);
+    // One bullet per gate, indented under the close's own sentences, in the
+    // row `renderGateRow` gives every screen: the mark first, then the name.
+    assert.match(result.out, new RegExp(`^ {4}[${GATE_PASS_MARK}${GATE_FAIL_MARK}] verification_clean`, "m"));
     const record = (readRawSessionState(sessionsDir)?.["sessions"] as Record<string, unknown>[])[0];
     assert.equal(record?.["status"], "in-progress");
   });

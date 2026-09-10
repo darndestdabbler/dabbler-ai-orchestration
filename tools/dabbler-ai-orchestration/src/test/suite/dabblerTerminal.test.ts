@@ -7,6 +7,7 @@ import * as assert from "assert";
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
+import { GATE_NOT_APPLICABLE } from "dabbler-ai-router";
 
 import {
   DabblerTerminal,
@@ -17,6 +18,8 @@ import {
   disposeDabblerTerminals,
   ensureDabblerTerminal,
   forgetClosedTerminal,
+  fieldTone,
+  forTerminal,
   frameworkTerminalLocation,
   isSessionStart,
   layout,
@@ -54,6 +57,27 @@ function drivenRepo(run: Record<string, unknown>): {
   });
   terminal.onDidWrite((text: string) => written.push(text));
   return { root, driver, written, terminal };
+}
+
+/**
+ * Every phase this framework writes, from the schema that declares them.
+ *
+ * Read rather than listed: a list here is a second copy of the vocabulary,
+ * and the last one let four phases fall out of the tone they should have
+ * had without anything failing.
+ */
+function phaseVocabulary(): string[] {
+  const schema = path.join(
+    __dirname,
+    "..", "..", "..", "..", "..",
+    "packages", "router", "schemas", "driver-run.schema.json",
+  );
+  const parsed = JSON.parse(fs.readFileSync(schema, "utf8")) as {
+    $defs?: { phase?: { enum?: string[] } };
+  };
+  const phases = parsed.$defs?.phase?.enum;
+  if (phases === undefined) throw new Error(`no phase enum in ${schema}`);
+  return phases;
 }
 
 function writeRun(driver: string, run: Record<string, unknown>): void {
@@ -469,16 +493,18 @@ suite("the Dabbler terminal", () => {
     }
     // `plain` is the terminal's own foreground and paints nothing.
     assert.strictEqual(paint("text", "plain", "dark"), "text");
-    // And a milestone phase is a milestone while an ordinary one is not:
-    // the operator reads this terminal to know where the session got to,
-    // and the plan and the work beginning are two of the places it gets to.
-    assert.strictEqual(lineTone("phase", { now: "close" }), "milestone");
-    assert.strictEqual(lineTone("phase", { now: "plan" }), "milestone");
-    assert.strictEqual(lineTone("phase", { now: "work" }), "milestone");
-    // The name that phase was recorded under before session 140: a run from
-    // last week lights up in the tone it earned when it was written.
-    assert.strictEqual(lineTone("phase", { now: "steps" }), "milestone");
-    assert.strictEqual(lineTone("phase", { now: "preverify" }), "plain");
+    // EVERY phase, read from the schema that declares them rather than from
+    // a list here that a later phase would have to be added to by hand --
+    // which is how `preverify`, `dispositions`, `fix` and `publish` came to
+    // be the plain ones, the very phases where a session stops being
+    // routine. The vocabulary includes `steps`, the name `work` was recorded
+    // under before session 140, so a run from last week lights up too.
+    const phases = phaseVocabulary();
+    assert.ok(phases.includes("preverify") && phases.includes("steps"), phases.join(","));
+    for (const phase of phases) {
+      assert.strictEqual(lineTone("phase", { now: phase }), "milestone", phase);
+      assert.strictEqual(fieldTone("phase", "now", phase), "milestone", phase);
+    }
     // A pause is amber and a deadlock is red: the one word that says
     // "running this again reaches this exact point" keeps its colour.
     assert.strictEqual(lineTone("paused", {}), "warn");
@@ -653,6 +679,72 @@ suite("the session from its registration, and each step as it starts", () => {
     const said = plain(written.join(""));
     assert.strictEqual(said.split("step id=widget").length - 1, 1, said);
     assert.strictEqual(said.split("step id=gadget").length - 1, 1, said);
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("says a step line for every step of a whole session, replayed as one really ran", () => {
+    // The tests above write ONE instruction at ONE seq. A session issues two
+    // dozen, and the operator's report is that the line is not on the screen
+    // -- so the thing that was never driven is the SUCCESSION: nine step
+    // instructions among waits, a rejection and a done, each overwriting the
+    // pair of files the one before it wrote.
+    //
+    // The shape is session 142's own, from its record: seqs 1 to 24, the
+    // plan, seven accepted steps, the round-1 rejection and the fix step it
+    // issued, with waits between and a done at the end.
+    const steps = [
+      "plan",
+      "heading-is-the-number-and-the-rule",
+      "measure-how-often-the-rule-draws",
+      "repo-retrunk",
+      "retrunk-narrates-and-instructs",
+      "bootstrap-offers-the-choice",
+      "candidate-trunk-takes-the-whole-reading",
+      "release-2-0-21",
+    ];
+    const issued: { kind: string; step?: string }[] = [
+      ...steps.map((step) => ({ kind: "step", step })),
+      { kind: "wait" },
+      { kind: "wait" },
+      { kind: "rejection", step: "release-2-0-21" },
+      { kind: "step", step: "fix-round-1" },
+      ...Array.from({ length: 11 }, () => ({ kind: "wait" })),
+      { kind: "done" },
+    ];
+    const { root, driver, written, terminal } = drivenRepo({
+      session_number: 142,
+      phase: "plan",
+      seq: 0,
+      job: null,
+      stop: null,
+    });
+    terminal.open({ columns: 100, rows: 20 });
+    issued.forEach((entry, at) => {
+      const seq = at + 1;
+      // The order the driver writes them in: the instruction first, then the
+      // run record that points at it. A poll landing between the two sees a
+      // seq the instruction does not yet carry, which is the case the reader
+      // is built to retry rather than swallow.
+      fs.writeFileSync(
+        path.join(driver, "instruction.json"),
+        JSON.stringify({
+          kind: entry.kind,
+          seq,
+          session_number: 142,
+          ...(entry.step === undefined ? {} : { step_id: entry.step }),
+          ask: `Do ${entry.step ?? "nothing"}.`,
+          ...(entry.kind === "rejection" ? { reasons: ["Something was found."] } : {}),
+        }),
+        "utf8",
+      );
+      writeRun(driver, { session_number: 142, phase: "work", seq, job: null, stop: null });
+      terminal.poll();
+    });
+    const said = plain(written.join(""));
+    for (const step of [...steps, "fix-round-1"]) {
+      assert.strictEqual(said.split(`step id=${step} `).length - 1, 1, `${step}\n${said}`);
+    }
     terminal.dispose();
     rmrf(root);
   });
@@ -1507,5 +1599,66 @@ suite("the watcher's second rule", () => {
     terminal.dispose();
     clearConfig();
     rmrf(root);
+  });
+});
+
+suite("the marks in a job's bytes", () => {
+  const paintedMark = (line: string): string => {
+    const out = forTerminal(line, "dark");
+    // What was painted: everything between the first SGR and its reset.
+    const start = out.indexOf(ESC);
+    if (start === -1) return "";
+    const body = out.slice(start).split(ESC);
+    return body
+      .slice(1)
+      .map((piece) => piece.slice(piece.indexOf("m") + 1))
+      .join("")
+      .slice(0, 1);
+  };
+
+  test("paints the mark opening a line and leaves every character after it alone", () => {
+    for (const mark of ["\u2713", "\u2714", "\u2717", "\u2716"]) {
+      const line = `  ${mark} working_tree_clean`;
+      const out = forTerminal(line, "dark");
+      assert.strictEqual(paintedMark(line), mark, out);
+      // The prose is byte for byte what the runner wrote.
+      assert.strictEqual(plain(out), line, out);
+    }
+  });
+
+  test("leaves a line whose mark is not in the first column exactly as it arrived", () => {
+    // A glyph further along a line is that line's own text -- a renderer
+    // that painted it would be reading another component's prose.
+    const line = "  a test named \u2714 in its title";
+    assert.strictEqual(forTerminal(line, "dark"), line);
+    // And a mark opening a WORD is part of the word, not a bullet.
+    assert.strictEqual(forTerminal("\u2714ok", "dark"), "\u2714ok");
+    // Marks this terminal does not claim pass through: the suite header, the
+    // summary rows, a skip.
+    for (const other of ["\u25b6", "\u2139", "\ufe63"]) {
+      assert.strictEqual(forTerminal(`${other} something`, "dark"), `${other} something`);
+    }
+  });
+
+  test("leaves a gate that judged nothing unpainted, though it wears the pass mark", () => {
+    // `(N/A)` is not a pass, and the two carry the same mark by design: the
+    // operator reads a column of check marks and the green ones are the
+    // gates that actually judged.
+    const judged = "  \u2713 working_tree_clean";
+    const judgedNothing = `  \u2713 exposure_within_ceiling ${GATE_NOT_APPLICABLE}`;
+    assert.notStrictEqual(forTerminal(judged, "dark"), judged);
+    assert.strictEqual(forTerminal(judgedNothing, "dark"), judgedNothing.replace(/\r?\n/g, "\r\n"));
+  });
+
+  test("does not paint the first glyph of a chunk that continues a line", () => {
+    // A drain reads whatever has arrived, and what has arrived is not always
+    // whole lines: told the chunk does not open one, the same bytes pass
+    // through untouched.
+    const chunk = "\u2714 a pass";
+    assert.notStrictEqual(forTerminal(chunk, "dark", true), chunk);
+    assert.strictEqual(forTerminal(chunk, "dark", false), chunk);
+    // The lines AFTER a newline in that chunk are line starts either way.
+    const two = `tail of a line\n\u2714 a pass`;
+    assert.ok(forTerminal(two, "dark", false).includes(ESC), "the second line is still painted");
   });
 });

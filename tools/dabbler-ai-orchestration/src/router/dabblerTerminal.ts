@@ -73,6 +73,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 
 import {
+  GATE_NOT_APPLICABLE,
   WATCHER_QUIET,
   progressResumed,
   readUncollectedJob,
@@ -123,29 +124,6 @@ export const TONES: Readonly<Record<ThemeKind, Readonly<Record<PaintedTone, stri
     muted: "#6b6b6b",
   },
 };
-
-/**
- * The phases that are a lifecycle milestone rather than a step of one.
- *
- * The operator reads this terminal to know where the session has GOT to,
- * and these are the answers worth looking up for: the plan being asked
- * for, the work beginning, the verification, the suite that is the run of
- * record, the commit and push, the close, and the end. `preverify`,
- * `dispositions` and `fix` are the ordinary traffic between them.
- */
-const MILESTONE_PHASES = new Set([
-  "plan",
-  // `work` is the phase's name; `steps` is what it was called before session
-  // 140, and a run recorded then must still light up in the tone it earned.
-  // No writer emits the old name and every reader accepts it.
-  "work",
-  "steps",
-  "verify",
-  "run-of-record",
-  "land",
-  "close",
-  "complete",
-]);
 
 /** Where `jobs.ts` writes a background job's log, under the run's driver dir. */
 const JOBS_DIRNAME = "jobs";
@@ -221,9 +199,15 @@ export function lineTone(event: string, fields: Record<string, string> = {}): To
   if (event === "watcher") return "warn";
   if (event === "verify") return verdictTone(fields["verdict"] ?? "");
   if (event === "tests") return (fields["outcome"] ?? "") === "passed" ? "good" : "bad";
-  if (event === "phase") {
-    return MILESTONE_PHASES.has(fields["now"] ?? "") ? "milestone" : "plain";
-  }
+  // Every phase, and not a chosen eight. A list of the interesting ones put
+  // `preverify`, `dispositions`, `fix` and `publish` in the plain tone --
+  // which are precisely the phases where a session stops being routine and
+  // an operator most wants to catch it -- so one session read blue, blue,
+  // plain, blue, plain, plain, blue, blue, plain, blue as it moved, and the
+  // reader had to know the list to know what the change of colour meant. A
+  // phase line is the framework saying where the session is, and where the
+  // session is is always worth the same weight.
+  if (event === "phase") return "milestone";
   if (event === "session-closed") return "milestone";
   // A step beginning is the session's own progress, in the milestone blue;
   // an answer refused is the amber of a nudge, not the red of a failure --
@@ -253,8 +237,9 @@ export function fieldTone(event: string, key: string, value: string): Tone {
   if (key === "outcome") return value === "passed" ? "good" : "bad";
   if (key === "exit") return exitTone(value);
   // `now` is the phase line's own word for where the run is; `phase` is the
-  // same value wherever another line carries it.
-  if (key === "now" || key === "phase") return MILESTONE_PHASES.has(value) ? "milestone" : "plain";
+  // same value wherever another line carries it. Every one of them, for the
+  // reason `lineTone` gives above.
+  if (key === "now" || key === "phase") return "milestone";
   // On a pause the kind is amber and a deadlock class is red; the words
   // themselves stay plain, because prose painted whole is a wall.
   if (event === "paused" && key === "kind") return "warn";
@@ -667,9 +652,77 @@ function startedAfter(startedAt: string | undefined, since: number): boolean {
   return !Number.isNaN(at) && at >= since;
 }
 
-/** A pseudoterminal only accepts CRLF; nothing else about the bytes changes. */
-export function forTerminal(bytes: string): string {
-  return bytes.replace(/\r?\n/g, "\r\n");
+/**
+ * The mark at the start of a line, and the tone it is worth.
+ *
+ * Two writers, one shape. `✓` and `✗` are the gate row's, from the router's
+ * one `renderGateRow`; `✔` and `✖` are `node --test`'s own. Everything else
+ * a runner writes at the start of a line -- `▶` over a suite, `ℹ` on a
+ * summary, `﹣` on a skip -- is left exactly as it arrived.
+ */
+const MARK_TONES: Readonly<Record<string, Tone>> = {
+  "✓": "good",
+  "✔": "good",
+  "✗": "bad",
+  "✖": "bad",
+};
+
+/**
+ * One line of a job's bytes with its mark painted, and not one character
+ * more.
+ *
+ * **The bound is the point.** A renderer that recognised PHRASES in another
+ * component's sentences would be a contract nobody declared, and the first
+ * reworded message would break it silently. This recognises a glyph in the
+ * first column, which is punctuation doing what punctuation is for -- and
+ * the prose after it reaches the screen exactly as the runner wrote it.
+ *
+ * A gate that judged nothing wears the pass mark and is not a pass, so the
+ * token the router writes after such a gate's name selects the plain tone.
+ * That token is imported rather than spelled here: a second copy is how the
+ * two would come to disagree about the same fact.
+ */
+function paintMark(line: string, kind: ThemeKind): string {
+  const at = line.search(/\S/);
+  if (at === -1) return line;
+  const mark = line[at] as string;
+  const tone = MARK_TONES[mark];
+  if (tone === undefined) return line;
+  // A mark is a bullet, so something follows it. A glyph opening a word is
+  // part of the word.
+  const after = line[at + 1];
+  if (after !== undefined && after !== " ") return line;
+  const judgedNothing = tone === "good" && line.trimEnd().endsWith(GATE_NOT_APPLICABLE);
+  return (
+    line.slice(0, at) +
+    (judgedNothing ? mark : paint(mark, tone, kind, true)) +
+    line.slice(at + 1)
+  );
+}
+
+/**
+ * A pseudoterminal only accepts CRLF; beyond that the only thing that
+ * changes is the MARK opening a line, which is painted.
+ *
+ * The colour goes in here rather than into the bytes on disk. The router
+ * could have written the escapes itself, and then every `close.log` and
+ * run-of-record log would carry them for whoever opens one; the terminal
+ * could have read the gate rows from a record and drawn them, and then they
+ * would be said twice, once from the record and once from the bytes the job
+ * wrote anyway. Neither is available for `node --test`, which writes its own
+ * marks and keeps no record of them -- so this has to exist regardless, and
+ * once it does the gate rows are one more shape it recognises.
+ *
+ * `atLineStart` is false when this chunk continues a line an earlier drain
+ * ended in the middle of: its first glyph is then not in the first column,
+ * whatever it looks like here.
+ */
+export function forTerminal(bytes: string, kind: ThemeKind, atLineStart = true): string {
+  return bytes
+    .replace(/\r?\n/g, "\r\n")
+    .split("\r\n")
+    .map((line, at) => (at === 0 && !atLineStart ? line : paintMark(line, kind)))
+    .join("\r\n");
 }
 
 /**
@@ -991,6 +1044,13 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    */
   private readonly logOffsets = new Map<string, number>();
 
+  /**
+   * Whether each log's next chunk will open a line, which is the only thing
+   * that decides whether its first glyph can be a mark. A drain reads
+   * whatever has arrived, and what has arrived is not always whole lines.
+   */
+  private readonly logAtLineStart = new Map<string, boolean>();
+
   /** Log paths the record already announced, so nothing is announced twice. */
   private readonly announced = new Set<string>();
 
@@ -1211,7 +1271,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       if (entry.kind === "line") {
         this.emit(this.render(entry.at, entry.event, entry.fields), entry.voice);
       } else if (entry.kind === "raw") {
-        this.emit(forTerminal(entry.bytes), entry.label);
+        this.emit(forTerminal(entry.bytes, this.theme), entry.label);
       } else {
         this.emitBanner(entry.label, entry.voice);
       }
@@ -1755,7 +1815,12 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     if (appended === "") return;
     const label = numbered(jobLabel(logPath), this.bannered);
     this.remember({ kind: "raw", label, bytes: appended });
-    this.say(forTerminal(appended), label);
+    // Whether this chunk opens a line, so a mark is only painted where it
+    // really is in the first column: a drain that ended mid-line leaves the
+    // next one continuing it, whatever its first glyph looks like.
+    const opensLine = this.logAtLineStart.get(logPath) ?? true;
+    this.logAtLineStart.set(logPath, appended.endsWith("\n"));
+    this.say(forTerminal(appended, this.theme, opensLine), label);
   }
 
   private sessionLabel(run: RunRecord): string {

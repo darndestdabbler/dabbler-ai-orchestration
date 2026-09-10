@@ -5,6 +5,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  GATE_FAIL_MARK,
+  GATE_NOT_APPLICABLE,
+  GATE_PASS_MARK,
+  type GateResult,
+  renderGateRow,
   EVIDENCE_GATES,
   GATE_CHECKS,
   GATE_EVIDENCE_PHASE,
@@ -359,5 +364,47 @@ describe("which phase makes a gate's evidence", () => {
       "published_when_releasable",
       "verdict_vocabulary",
     ]);
+  });
+});
+
+describe("the gate row every screen shows", () => {
+  const row = (over: Partial<GateResult> = {}): GateResult => ({
+    name: "working_tree_clean",
+    passed: true,
+    remediation: "",
+    inapplicable: false,
+    ...over,
+  });
+
+  it("marks a pass, marks a failure, and says (N/A) for a gate that judged nothing", () => {
+    // The close and the packaging run each spelled their own marks -- `-
+    // <name>  PASS` against `[PASS] <name>` -- under a comment in the second
+    // one claiming they were already the same three marks. That they now
+    // agree is not asserted by rendering the same row twice, which would
+    // prove nothing; it is true because there is one function and neither
+    // caller spells a mark. What IS asserted is what that function says.
+    assert.equal(renderGateRow(row()), `${GATE_PASS_MARK} working_tree_clean`);
+    assert.equal(
+      renderGateRow(row({ passed: false, remediation: "run: git push" })),
+      `${GATE_FAIL_MARK} working_tree_clean  run: git push`,
+    );
+    assert.equal(
+      renderGateRow(row({ inapplicable: true, remediation: "no manifest" })),
+      `${GATE_PASS_MARK} working_tree_clean ${GATE_NOT_APPLICABLE}`,
+    );
+  });
+
+  it("drops the explanation for a non-event and keeps the one for an act", () => {
+    // A gate that could not see its own precondition is saying "not
+    // applicable"; WHY it could not is the longest text on the busiest
+    // screen and it explains something that did not happen.
+    assert.ok(!renderGateRow(row({ inapplicable: true, remediation: "no exposure manifest" })).includes("manifest"));
+    // A remediation on a gate that DID judge is kept. On a failure it is the
+    // operator's next action; on a pass it appears only under `--force`,
+    // where it is the forensic note saying a bookkeeping gate was stepped
+    // over -- and losing that would be losing the record of a force.
+    assert.ok(
+      renderGateRow(row({ remediation: "skipped by --force (bookkeeping gate)" })).includes("--force"),
+    );
   });
 });

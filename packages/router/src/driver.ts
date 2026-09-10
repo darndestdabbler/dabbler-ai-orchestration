@@ -1240,6 +1240,19 @@ function lastAnsweredAt(repoRoot: string, sessionNumber: number): string | null 
 /** The parts of a stop the rendering reads. Every one is on `run.json`. */
 export interface StopRecord {
   readonly kind: string;
+  /**
+   * Which refusal this was, where the kind is too coarse to act on.
+   *
+   * A kind is the bound the loop met, and four unlike things meet the
+   * `verification` bound: a round that ended without a verdict, a dispute
+   * the framework refused to write, a cap reached over findings that
+   * cannot be shown remediated, and a cap terminal met by a tree that has
+   * moved. They have four actors and four next moves, and keying the
+   * words on the kind alone is what printed one sentence for all of them.
+   * Absent is not a fifth situation: it means the kind is the whole of
+   * what this stop is, which is true of every run written before this.
+   */
+  readonly code?: string | null;
   readonly reason: string;
   readonly class?: "first" | "deadlock" | null;
   readonly step_id?: string | null;
@@ -1254,6 +1267,26 @@ export interface StopContext {
   readonly engine?: string;
 }
 
+/**
+ * Who the framework expects to make the next move.
+ *
+ * `either` is the pull's honest answer and not a hedge: the framework
+ * cannot see the engine, so the next call comes from the engine if its loop
+ * is still going and from the person if it is not. Under the push nothing
+ * calls back but a person, and `either` is a person.
+ */
+export type StopActor = "engine" | "operator" | "either";
+
+/** One way on from a stop: what it is, what it costs, and the command that makes it. */
+export interface StopChoice {
+  /** The move, imperative and short: "Buy another verification round". */
+  readonly label: string;
+  /** What choosing it costs or gives up -- a provider call, a repair, the session. */
+  readonly cost: string;
+  /** The exact command that carries it out. A person may run it, or an engine may. */
+  readonly command: string;
+}
+
 export interface StopRendering {
   /** "Session 094 paused (verification, deadlock)". */
   readonly headline: string;
@@ -1261,9 +1294,22 @@ export interface StopRendering {
   readonly happened: string;
   /** That the command which met the stop has ended, and the session has not. */
   readonly ended: string;
-  /** Who is expected to act next, and the command that resumes it. */
+  /** Who acts next, as a sentence. The field beside it is the fact. */
   readonly next: string;
-  /** The four joined, for a surface that renders one string. */
+  readonly actor: StopActor;
+  /**
+   * The ways on, best first -- the first is what the framework would
+   * choose, and what its owed decision recommends. Never fewer than two: a
+   * question with one answer is a notification.
+   */
+  readonly choices: readonly StopChoice[];
+  /**
+   * The choices as lines under the sentence that named them, formatted
+   * once. Every surface that prints a stop prints these; a second
+   * spelling beside them is a second thing to keep in step.
+   */
+  readonly ways: string;
+  /** All of it, for a surface that renders one string. */
   readonly text: string;
   readonly deadlock: boolean;
 }
@@ -1271,18 +1317,326 @@ export interface StopRendering {
 /** The engine name a pulled run records: nothing invokes the engine. */
 export const PULL_ENGINE = "cli";
 
-/** One plain sentence per bound the loop can meet, keyed by the stop's kind. */
-const HAPPENED: Readonly<Record<string, string>> = {
-  budget: "The loop reached its invocation bound.",
-  "rejected-thrice": "An answer was refused three times running.",
-  blocked: "The engine reported its step blocked.",
-  engine: "The engine could not be run, or what it gave back could not be used.",
-  tests: "A test run could not be handed back.",
-  verification: "A verification round ended without a verdict the framework could act on.",
-  land: "The commit or the push did not go through.",
-  publish: "Packaging did not publish.",
-  close: "The close's gates refused.",
-  interrupted: "Somebody asked it to stop.",
+/**
+ * What a stop IS, per situation: the sentence that opens it, who acts, and
+ * the ways on.
+ *
+ * Keyed on the stop's `code` where it has one and its `kind` where it does
+ * not, because a kind is the bound the loop met and not the situation a
+ * person is in. Four unlike things meet the `verification` bound -- a round
+ * that ended without a verdict, a dispute the framework refused to write, a
+ * cap reached over findings that cannot be shown remediated, and a cap
+ * terminal met by a tree that has moved -- and one sentence for all four is
+ * what the operator called clear as mud.
+ *
+ * `moves` is handed the parts a command is spelled out of rather than
+ * building them itself: the resume verb is the mode's, and a sentence
+ * written here that named the other one would be wrong for every session
+ * run the other way.
+ */
+interface StopSituation {
+  /** What happened, before the record's own reason is added to it. */
+  readonly what: string;
+  /** Who the framework expects to act, before the mode collapses `either`. */
+  readonly actor: StopActor;
+  readonly moves: (parts: MoveParts) => readonly StopChoice[];
+}
+
+/** The pieces every situation's commands are spelled out of. */
+interface MoveParts {
+  /** `dabbler session next` under the pull, `dabbler session drive` under the push. */
+  readonly resume: string;
+  /** The phase a resume re-enters. */
+  readonly phase: string;
+  /** " 'widget'" when the stop was on a step, empty when it was not. */
+  readonly step: string;
+}
+
+/** Ending it, which is a way on from every stop and never the first one. */
+function cancelChoice(): StopChoice {
+  return {
+    label: "Cancel the session",
+    cost:
+      "The session ends with your reason on the record. What the working " +
+      "tree already carries stays where it is; nothing is unwound.",
+    command: "dabbler session cancel --reason \"<why>\"",
+  };
+}
+
+/** Carrying on from where it stopped, which most situations spell their own way. */
+function carryOn(parts: MoveParts, label: string, cost: string): StopChoice {
+  return { label, cost, command: `${parts.resume}` };
+}
+
+/** The verb that buys a verification round a cap refused, with what it costs. */
+const REOPEN_COMMAND = 'dabbler verify reopen --rounds 1 --reason "<why>" --approver <who>';
+const REOPEN_COST =
+  "One more verification round -- a provider call for the verifier and the " +
+  "round's own clock -- recorded as your decision to spend it. It buys " +
+  "rounds and never a verdict.";
+
+const SITUATIONS: Readonly<Record<string, StopSituation>> = {
+  budget: {
+    what: "The loop reached its invocation bound.",
+    actor: "operator",
+    moves: (parts) => [
+      {
+        label: "Raise the bound and carry on",
+        cost:
+          "A decision to spend more: the invocations you name, and the " +
+          "provider calls the phases still to run make. Nothing already " +
+          "accepted is asked for again.",
+        command: `${parts.resume} --max-invocations <larger>`,
+      },
+      cancelChoice(),
+    ],
+  },
+  "rejected-thrice": {
+    what: "An answer was refused three times running.",
+    actor: "either",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        `Read the last rejection's reasons and answer step${parts.step} again`,
+        "The step is asked afresh. Nothing already accepted is re-asked, and " +
+          "no provider call is made by asking.",
+      ),
+      cancelChoice(),
+    ],
+  },
+  blocked: {
+    what: "The engine reported its step blocked.",
+    actor: "operator",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        `Clear what step${parts.step} is blocked on, then carry on`,
+        "Whatever the blocker itself costs; an owed item may already carry " +
+          "it, and `dabbler owed list` says whether one does.",
+      ),
+      cancelChoice(),
+    ],
+  },
+  engine: {
+    what: "The engine could not be run, or what it gave back could not be used.",
+    actor: "either",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        `Run it again from '${parts.phase}'`,
+        "One more invocation of the engine, and whatever the phase it " +
+          "re-enters spends.",
+      ),
+      cancelChoice(),
+    ],
+  },
+  tests: {
+    what: "A test run could not be handed back.",
+    actor: "either",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        "Put right what stopped the run, then carry on",
+        "The suite runs again -- your machine's time, and no provider call.",
+      ),
+      cancelChoice(),
+    ],
+  },
+  land: {
+    what: "The commit or the push did not go through.",
+    actor: "either",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        "Put right what git refused, then carry on",
+        "The commit and the push are made again. No provider call, and " +
+          "nothing already verified is re-verified.",
+      ),
+      cancelChoice(),
+    ],
+  },
+  publish: {
+    what: "Packaging did not publish.",
+    actor: "operator",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        "Read the publish job's log, put it right, then carry on",
+        "The packaging run is made again. What it pushes is outward-facing; " +
+          "nothing else moves.",
+      ),
+      cancelChoice(),
+    ],
+  },
+  close: {
+    what: "The close's gates refused.",
+    actor: "operator",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        "Satisfy the gate the close named, then carry on",
+        "Whatever the gate demands. An owed decision is answered with " +
+          "`dabbler owed answer`, and the close is run again.",
+      ),
+      cancelChoice(),
+    ],
+  },
+  interrupted: {
+    what: "Somebody asked it to stop.",
+    actor: "either",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        `Carry on from '${parts.phase}'`,
+        "The session resumes where it stopped. Nothing accepted is re-asked.",
+      ),
+      cancelChoice(),
+    ],
+  },
+  // The `verification` bound, which is four situations rather than one.
+  verification: {
+    what: "A verification round ended without a verdict the framework could act on.",
+    actor: "either",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        "Put right what `verify` refused over, then run the round again",
+        "One more verification round: a provider call for the verifier, and " +
+          "the round's own clock.",
+      ),
+      cancelChoice(),
+    ],
+  },
+  "no-verdict": {
+    what: "A verification round ended without a verdict the framework could act on.",
+    actor: "either",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        "Put right what `verify` refused over, then run the round again",
+        "One more verification round: a provider call for the verifier, and " +
+          "the round's own clock. Nothing already verified is re-verified.",
+      ),
+      cancelChoice(),
+    ],
+  },
+  "provider-unreachable": {
+    what:
+      "The verification call could not be completed: the provider was not " +
+      "reached, so no round was asked for and none was written.",
+    actor: "either",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        "Ask for the round again",
+        "One more attempt at the same round -- a provider call if it " +
+          "connects, and nothing at all if it does not. The tree is not the " +
+          "problem and nothing about it needs changing first.",
+      ),
+      {
+        label: "Route the round somewhere else",
+        cost:
+          "Verification stays cross-provider either way. What changes is " +
+          "which provider answers, and the next round is charged to that " +
+          "one; a key that is missing rather than unreachable is set in the " +
+          "environment, never in a file.",
+        command: "dabbler configure --verifying-model <alias or id>",
+      },
+      cancelChoice(),
+    ],
+  },
+  "dispute-refused": {
+    what: "The framework refused to write a dispute of the round's finding.",
+    actor: "engine",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        "File the dispute again, as the refusal asks",
+        "No provider call: the round is unchanged and its dispositions are " +
+          "answered again.",
+      ),
+      carryOn(
+        parts,
+        "Dispose the finding `fix` instead of disputing it",
+        "The fix becomes a step, and the next round reviews it -- one more " +
+          "verification round when that step is done.",
+      ),
+      cancelChoice(),
+    ],
+  },
+  "cap-unresolved": {
+    what:
+      "The verification cap is reached and blocking findings cannot be shown " +
+      "remediated, so nothing lands but the record.",
+    actor: "operator",
+    moves: () => [
+      {
+        label: "Buy the review this change has not had",
+        cost: REOPEN_COST,
+        command: REOPEN_COMMAND,
+      },
+      cancelChoice(),
+    ],
+  },
+  "cap-disputed": {
+    what:
+      "The verification cap is reached with blocking findings still disputed. " +
+      "A dispute says a finding is wrong rather than fixed, so it is judged " +
+      "rather than terminated -- and the judgment is not the engine's to make.",
+    actor: "operator",
+    moves: () => [
+      {
+        label: "Route the disputes to a third provider",
+        cost:
+          "One adjudication call to a provider that has neither orchestrated " +
+          "nor verified this session. It judges the disputes it is given and " +
+          "may raise no new finding; its outcome is terminal.",
+        command: "dabbler verify adjudicate",
+      },
+      {
+        label: "Withdraw the dispute and fix the finding instead",
+        cost:
+          "The repair is a step, and the review it then needs is a round the " +
+          "cap will not open: buying one is the other decision.",
+        command: REOPEN_COMMAND,
+      },
+      cancelChoice(),
+    ],
+  },
+  "cap-terminal-tree-moved": {
+    what:
+      "A terminal verification row stands, and this is not the tree that was " +
+      "verified. A cap terminal is a spent round budget rather than a judgment.",
+    actor: "operator",
+    moves: (parts) => [
+      {
+        label: "Buy the review this change has not had",
+        cost: REOPEN_COST,
+        command: REOPEN_COMMAND,
+      },
+      carryOn(
+        parts,
+        "Put the tree back to the one that was verified, then carry on",
+        "The repair is given up. Nothing is spent, and the session closes on " +
+          "the tree the round actually saw.",
+      ),
+      cancelChoice(),
+    ],
+  },
+};
+
+/** Every bound with no situation of its own, which is a bug in this table rather than a state. */
+const UNNAMED: StopSituation = {
+  what: "The loop met a bound it could not pass.",
+  actor: "operator",
+  moves: (parts) => [
+    carryOn(
+      parts,
+      `Read the reason, put it right, then carry on from '${parts.phase}'`,
+      "Whatever the phase it re-enters spends.",
+    ),
+    cancelChoice(),
+  ],
 };
 
 /** A reason as a sentence of its own: a capital to start, a stop to end. */
@@ -1294,85 +1648,55 @@ function asSentence(text: string): string {
 }
 
 /**
- * What a person is told to do about a stop, per kind.
+ * Which mode the run is in, and the verb that carries it on.
  *
- * The actor is a person for every kind but two. A budget, a blocked step,
- * an engine that would not run, a red suite, a round without a verdict, a
- * refused push, a failed publish or a refused close each need something
- * put right before running again reaches anywhere else. An interruption and
- * a thrice-refused answer are the two a plain re-run answers -- and under
- * the pull the re-run is whoever calls `next`, which the framework cannot
- * see: the engine if its loop is still going, otherwise the person.
+ * Under the pull the framework invokes nobody: the next move is made by
+ * whoever calls `next`, and which of them that is the framework cannot see.
+ * Under the push it drives the engine itself, so the only caller left is a
+ * person.
  */
-/**
- * Who makes the next call, per mode. Under the pull the re-run is whoever
- * calls `next`, which the framework cannot see: the engine if its loop is
- * still going, otherwise the person. Under the push it is the person.
- */
-function nextActor(run: StopContext): {
-  readonly pull: boolean;
-  readonly resume: string;
-  readonly whoever: string;
-} {
+function nextActor(run: StopContext): { readonly pull: boolean; readonly resume: string } {
   const pull = (run.engine ?? PULL_ENGINE) === PULL_ENGINE;
-  const resume = pull ? "`dabbler session next`" : "`dabbler session drive`";
-  const whoever = pull
-    ? "whoever calls " + resume + " -- the engine if its loop is still running, otherwise you"
-    : "you";
-  return { pull, resume, whoever };
+  return { pull, resume: pull ? "dabbler session next" : "dabbler session drive" };
 }
 
-function nextMove(stop: StopRecord, run: StopContext): string {
-  const { resume, whoever } = nextActor(run);
-  const resumes = `${resume} resumes it from '${run.phase}'`;
-  const cancel = "`dabbler session cancel` ends it instead";
-  const step = stop.step_id ? ` '${stop.step_id}'` : "";
-  let advice: string;
-  switch (stop.kind) {
-    case "budget":
-      advice =
-        "Next: you. Continuing is a decision to spend more: " +
-        `${resume} with --max-invocations <larger> resumes it from '${run.phase}', and ${cancel}.`;
-      break;
-    case "rejected-thrice":
-      advice =
-        `Next: ${whoever}. Read the last rejection's reasons first; ` +
-        `${resume} asks the step${step} afresh, and ${cancel}.`;
-      break;
-    case "blocked":
-      advice =
-        `Next: you. Clear what the engine said step${step} is blocked on ` +
-        `(an owed item may carry it), then ${resumes}; ${cancel}.`;
-      break;
-    case "interrupted":
-      advice = `Next: ${whoever}. ${resumes}; ${cancel}.`;
-      break;
-    case "close":
-      advice =
-        "Next: you. Satisfy the gate the close named -- an owed decision is " +
-        `answered with \`dabbler owed answer\` -- then ${resumes}.`;
-      break;
-    case "land":
-      advice = `Next: you. Put right what git refused, then ${resumes}.`;
-      break;
-    case "publish":
-      advice = `Next: you. Read the publish job's log and put it right, then ${resumes}.`;
-      break;
-    case "tests":
-      advice = `Next: you. Read the run's log and put right what stopped it, then ${resumes}.`;
-      break;
-    case "verification":
-      advice = `Next: you. Read the round's reason above and put it right, then ${resumes}.`;
-      break;
-    default:
-      advice = `Next: you. Read the reason above and put it right, then ${resumes}.`;
+/** The situation this stop is, by its code where it has one and its kind where it does not. */
+function situationFor(stop: StopRecord): StopSituation {
+  return SITUATIONS[stop.code ?? ""] ?? SITUATIONS[stop.kind] ?? UNNAMED;
+}
+
+/**
+ * Who acts, once the mode has had its say.
+ *
+ * `either` is only ever true of the pull. Under the push nothing calls back
+ * but a person, and telling them the engine might is how a person comes to
+ * wait on a loop that is not running.
+ */
+function actorFor(stop: StopRecord, run: StopContext): StopActor {
+  const declared = situationFor(stop).actor;
+  if (declared === "either" && !nextActor(run).pull) return "operator";
+  return declared;
+}
+
+/** Who acts, as the sentence a person reads. */
+function actorSentence(actor: StopActor, resume: string): string {
+  if (actor === "operator") return "Next: you.";
+  if (actor === "engine") {
+    return (
+      "Next: the engine -- this is its to clear, and it clears it by calling " +
+      `\`${resume}\` with the answer put right. If its loop has stopped, that ` +
+      "call is yours to make."
+    );
   }
-  if (stop.class === "deadlock") {
-    advice +=
-      " It is a deadlock: running it again unchanged reaches this exact point again, " +
-      "so change something first.";
-  }
-  return advice;
+  return (
+    `Next: whoever calls \`${resume}\` -- the engine if its loop is still ` +
+    "running, otherwise you."
+  );
+}
+
+/** The choices as lines a person reads, under the sentence that named them. */
+function choiceLines(choices: readonly StopChoice[]): string {
+  return choices.map((choice) => `\n  - ${choice.label}: ${choice.command}\n    ${choice.cost}`).join("");
 }
 
 /**
@@ -1383,17 +1707,32 @@ export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
   const session = `Session ${String(run.session_number).padStart(3, "0")}`;
   const deadlock = stop.class === "deadlock";
   const headline = `${session} paused (${stop.kind}${deadlock ? ", deadlock" : ""})`;
-  const what = HAPPENED[stop.kind] ?? "The loop met a bound it could not pass.";
+  const situation = situationFor(stop);
   const reason = asSentence(stop.reason);
-  const happened = reason === "" ? what : `${what} ${reason}`;
+  const happened = reason === "" ? situation.what : `${situation.what} ${reason}`;
   const ended = `The dabbler command that met it has ended; ${session.toLowerCase()} remains in flight.`;
-  const next = nextMove(stop, run);
+  const { resume } = nextActor(run);
+  const actor = actorFor(stop, run);
+  const choices = situation.moves({
+    resume,
+    phase: run.phase,
+    step: stop.step_id ? ` '${stop.step_id}'` : "",
+  });
+  const next =
+    actorSentence(actor, resume) +
+    (deadlock
+      ? " It is a deadlock: running it again unchanged reaches this exact point again, " +
+        "so change something first."
+      : "");
   return {
     headline,
     happened,
     ended,
     next,
-    text: `${headline}. ${happened} ${ended} ${next}`,
+    actor,
+    choices,
+    ways: choiceLines(choices),
+    text: `${headline}. ${happened} ${ended} ${next}${choiceLines(choices)}`,
     deadlock,
   };
 }
@@ -1460,13 +1799,17 @@ export function uncollectedJob(
  */
 export function renderUncollected(job: UncollectedJob, run: StopContext): string {
   const session = `Session ${String(run.session_number).padStart(3, "0")}`;
-  const { pull, resume, whoever } = nextActor(run);
+  const { pull, resume } = nextActor(run);
   const finished =
     `finished${job.ended_at ? ` at ${job.ended_at}` : ""}` +
     `${job.exit === null ? "" : ` (exit ${job.exit})`}`;
+  // Whose call it is comes from the same rule a stop's does: an uncollected
+  // job is nobody's fault and everybody's to collect, and under the pull
+  // the framework cannot see which of them will.
   const next = pull
-    ? `Next: ${whoever}; ${resume} collects the result and carries on from '${run.phase}'.`
-    : `Next: you. ${resume} collects the result first and carries on from '${run.phase}'.`;
+    ? `${actorSentence("either", resume)} That call collects the result and ` +
+      `carries on from '${run.phase}'.`
+    : `Next: you. \`${resume}\` collects the result first and carries on from '${run.phase}'.`;
   return (
     `${session}: the framework's job '${job.name}' ${finished} and its result has ` +
     `not been collected. Nothing is running, and collecting it takes a moment. ${next}`

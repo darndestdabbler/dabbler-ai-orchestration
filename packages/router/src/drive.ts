@@ -181,12 +181,15 @@ import {
 import { recordDispute, resolveRepoRelative } from "./verify/disputes.ts";
 import {
   EXIT_BLOCKING,
+  EXIT_CALL_FAILED,
   EXIT_OK as VERIFY_OK,
   EXIT_UNRESOLVED,
 } from "./verify/errors.ts";
 import {
   NO_ROUND_CAP_CLEAN,
+  NO_ROUND_CAP_DISPUTED,
   NO_ROUND_TERMINAL,
+  capDisputedRefusal,
   noRoundReason,
 } from "./verify/rounds.ts";
 import { readTaskDeclaration, sessionIsReleasable } from "./writers.ts";
@@ -721,10 +724,7 @@ const DEADLOCK_NOTE =
   "Running it again unchanged reaches this exact point again.";
 
 type StopKind = NonNullable<DriverRun["stop"]>["kind"];
-
-/** The two answers a stopped loop has, in the words the operator is offered. */
-const RESUME_CHOICE = "Run `next` again";
-const CANCEL_CHOICE = "Cancel the session";
+type StopCode = NonNullable<NonNullable<DriverRun["stop"]>["code"]>;
 
 /**
  * The one decision a stop raises, per session.
@@ -748,10 +748,35 @@ function stopDecisionId(sessionNumber: number): string {
  */
 class Stop extends Error {
   readonly kind: StopKind;
+  /**
+   * Which refusal this was, where the kind is too coarse for a person to
+   * act on. Named at the sites that need distinguishing and nowhere else:
+   * a stop with no code is its kind, and adding one to a site whose kind
+   * already says everything would only give the rendering a second key to
+   * disagree with itself on.
+   */
+  readonly code: StopCode | null;
+  /**
+   * The substance a person needs to answer this stop, where the reason
+   * cannot carry it: the findings, the grounds, the evidence.
+   *
+   * It rides to the stop's own owed decision and nowhere else. The reason
+   * on `run.json` stays what the deadlock classifier compares -- short, and
+   * identical when the same impasse is met twice -- and a brief that grew
+   * a timestamp or a path would make every stop look like a first.
+   */
+  readonly brief: string | null;
 
-  constructor(kind: StopKind, reason: string) {
+  constructor(
+    kind: StopKind,
+    reason: string,
+    code: StopCode | null = null,
+    brief: string | null = null,
+  ) {
     super(reason);
     this.kind = kind;
+    this.code = code;
+    this.brief = brief;
     this.name = "Stop";
   }
 }
@@ -803,6 +828,37 @@ function describeFinding(index: number, finding: Row): string {
     `${finding["blocking"] === true ? ", blocking" : ""}: ` +
     String(finding["description"] ?? "").trim() +
     (cited.length > 0 ? ` -- cited: ${cited.join(", ")}` : "")
+  );
+}
+
+/**
+ * What a person needs to judge a standing dispute: each contested finding,
+ * the grounds the engine filed against it, and what that argument cites.
+ *
+ * Read from the record, said in the record's own words, and decided by
+ * nothing here. An adjudication is the operator's tie-break between a
+ * verifier and an engine, and a summary that leaned either way would be the
+ * framework voting in a question it raised.
+ */
+export function disputedFindingsBrief(latest: Row, disputes: readonly Row[]): string {
+  const findings = Array.isArray(latest["findings"]) ? (latest["findings"] as Row[]) : [];
+  const round = Number(latest["round"]);
+  const standing = disputes.filter((row) => Number(row["round"]) === round);
+  if (standing.length === 0) return "";
+  const blocks = standing.map((dispute) => {
+    const index = Number(dispute["finding_index"]);
+    const cited = Array.isArray(dispute["evidence_paths"])
+      ? (dispute["evidence_paths"] as unknown[]).map(String)
+      : [];
+    return (
+      `${describeFinding(index, findings[index] ?? {})}\n` +
+      `  Disputed on: ${String(dispute["grounds"] ?? "").trim()}\n` +
+      `  Citing: ${cited.length > 0 ? cited.join(", ") : "(nothing)"}`
+    );
+  });
+  return (
+    `The ${standing.length} dispute(s) standing over round ${round}, as the ` +
+    `record holds them:\n\n${blocks.join("\n\n")}`
   );
 }
 
@@ -1316,25 +1372,32 @@ class Driver {
    * The reason is on `run.json` and on stderr either way, and a stop
    * reported as a crash would cost more than the row it failed to write.
    */
-  private raiseStopDecision(words: StopRendering, ladder: Ladder | null = null): void {
+  private raiseStopDecision(
+    words: StopRendering,
+    ladder: Ladder | null = null,
+    substance: string | null = null,
+  ): void {
     const advice = ladder?.advice ?? null;
     // The brief's first paragraph is the rendering, whole: what happened,
     // that the command ended and the session did not, and who acts next.
-    const reason = `${words.happened} ${words.ended} ${words.next}`;
-    const options = [
-      {
-        label: RESUME_CHOICE,
-        consequence:
-          `The session resumes from '${this.run.phase}'. The steps it has ` +
-          "already accepted are not asked for again.",
-      },
-      {
-        label: CANCEL_CHOICE,
-        consequence:
-          "`dabbler session cancel` ends it with a reason on the record. " +
-          "What the working tree already carries stays where it is.",
-      },
-    ];
+    // A stop that carries its own substance -- the findings a dispute
+    // stands over, their grounds, what they cite -- says it here, where
+    // the person answering has it in front of them. It is not on
+    // `run.json`: the record's reason is what the deadlock classifier
+    // compares, and a brief is what a person reads.
+    const reason =
+      `${words.happened} ${words.ended} ${words.next}` +
+      (substance ? `\n\n${substance}` : "");
+    // The ways on are the stop's own, not a second list beside them: one
+    // pair of words per stop, offered here and printed there, so what the
+    // brief offers and what the stop says cannot disagree. Each option
+    // carries the command that carries it out, because a choice a person
+    // cannot act on is a description.
+    const options = words.choices.map((choice) => ({
+      label: choice.label,
+      consequence: `${choice.cost}\n\n  ${choice.command}`,
+    }));
+    const recommended = options[0]?.label ?? null;
     // An amendment is an OPTION and never an act. The framework applies
     // nothing an adviser proposed; choosing it is what records it, and where
     // it relaxes a gate that is the first thing the chooser is told.
@@ -1374,14 +1437,17 @@ ${advice.brief}`
 No adviser could classify this. The raw artifacts:
 ${this.stopArtifacts()}`,
         options,
+        // The stop's own first choice is what the framework would do, so it
+        // is what it recommends -- and where an adviser proposed an
+        // amendment, that is the thing it actually has an opinion about.
         recommendation:
           ladder === null
-            ? RESUME_CHOICE
+            ? recommended
             : advice === null
               ? null
               : amendment
                 ? `${AMEND_CHOICE} '${amendment.step_id}'`
-                : RESUME_CHOICE,
+                : recommended,
         onNoAnswer:
           "Nothing happens. The session stays in flight and its record stops " +
           "moving until someone resumes it or cancels it.",
@@ -2418,10 +2484,12 @@ ${this.stopArtifacts()}`,
     // verification could never close at all: the fix cycles back through
     // preverify to here, and the refusal is the same one forever.
     //
-    // The third, disputes at the cap, is not the driver's to answer:
-    // adjudication is a person routing findings to a third provider. It
-    // falls through to the job, which refuses, and the stop carries
-    // `verify`'s own words -- which say exactly that.
+    // The third, disputes at the cap, is still not the driver's to ANSWER
+    // -- adjudication is a person routing findings to a third provider, and
+    // the tie-break between a verifier and an engine is theirs. What the
+    // driver does is put the question, in the place they answer questions,
+    // and stop. It used to fall through to the job, which spawned a verb to
+    // print a refusal the record already implied.
     const noRound = noRoundReason(
       this.repoRoot,
       this.sessionNumber,
@@ -2456,6 +2524,26 @@ ${this.stopArtifacts()}`,
           'has not had: `dabbler verify reopen --rounds 1 --reason "<why>" ' +
           "--approver <who>`, which is recorded as the decision to spend another " +
           "round that it is. Putting the tree back is the other answer.",
+        "cap-terminal-tree-moved",
+      );
+    }
+    if (noRound === NO_ROUND_CAP_DISPUTED) {
+      // Asked before anything is spawned, because the answer is on the
+      // record already and the job would only re-read it to print a
+      // refusal. The question goes where the operator answers questions,
+      // carrying what they need to answer it, and the stop that follows
+      // offers the same ways on. Nothing here judges the dispute.
+      const rounds = readRounds(this.repoRoot, this.sessionNumber);
+      const latest = rounds[rounds.length - 1] as Row;
+      throw new Stop(
+        "verification",
+        capDisputedRefusal(
+          this.sessionsDir,
+          this.run.verification?.max_rounds || verificationRoundCap(this.config),
+          latest["round"],
+        ),
+        "cap-disputed",
+        disputedFindingsBrief(latest, readDisputes(this.repoRoot, this.sessionNumber)),
       );
     }
     const code = await this.longWork({
@@ -2513,6 +2601,27 @@ ${this.stopArtifacts()}`,
         "verification",
         "the round cap is reached and blocking findings cannot be shown " +
           `remediated; nothing lands but the record. ${reason}`,
+        "cap-unresolved",
+      );
+    }
+
+    // The provider could not be reached, which is not a round that failed
+    // to produce a verdict: nothing was asked and nothing was written, the
+    // tree is not the problem, and the move is to try again or to change
+    // what is routed to -- neither of which is "put the round right".
+    // `verify` says so with its own exit: EXIT_CALL_FAILED is the routed
+    // call failing, and it is the one exit here that means exactly that.
+    // EXIT_UNAVAILABLE is deliberately NOT read as reachability: three
+    // unlike causes share it -- no candidate provider, evidence the round
+    // could not use, and a truncated reply -- and naming it after one of
+    // them would be the coarse-kind fault this session exists to fix, one
+    // level down.
+    if (code === EXIT_CALL_FAILED) {
+      throw new Stop(
+        "verification",
+        `the verification call could not be completed (exit ${code}): ` +
+          (reason || "it wrote no reason; its log is under the run's jobs directory"),
+        "provider-unreachable",
       );
     }
 
@@ -2525,6 +2634,7 @@ ${this.stopArtifacts()}`,
       "verification",
       `dabbler verify refused (exit ${code}): ` +
         (reason || "it wrote no reason; its log is under the run's jobs directory"),
+      "no-verdict",
     );
   }
 
@@ -2612,14 +2722,23 @@ ${this.stopArtifacts()}`,
         (row) => Number(row["round"]) === roundNumber && Number(row["finding_index"]) === entry.finding_index,
       );
       if (already) continue;
-      const code = recordDispute(this.sessionsDir, {
+      const outcome = recordDispute(this.sessionsDir, {
         roundNumber,
         findingIndex: entry.finding_index,
         grounds: String(entry.reason),
         evidence: [...(entry.evidence_paths ?? [])],
       });
-      if (code !== EXIT_OK) {
-        throw new Stop("verification", `the dispute of finding ${entry.finding_index} was refused (exit ${code})`);
+      if (outcome.exit !== EXIT_OK) {
+        // In the refusing verb's own words. An exit code alone sent
+        // session 144's operator to look for a reason that was on a
+        // stream nothing kept, and the reason -- an evidence file over
+        // the inline cap -- is exactly what says how to answer it.
+        throw new Stop(
+          "verification",
+          `the dispute of finding ${entry.finding_index} was refused ` +
+            `(exit ${outcome.exit}): ${outcome.refusal}`,
+          "dispute-refused",
+        );
       }
       this.log("dispute-recorded", { round: roundNumber, finding: entry.finding_index });
     }
@@ -3373,6 +3492,7 @@ ${this.stopArtifacts()}`,
       }
       const entry = {
         kind: error.kind,
+        code: error.code,
         reason: error.message,
         at: nowIso(),
         step_id: this.currentStep,
@@ -3385,6 +3505,7 @@ ${this.stopArtifacts()}`,
         ...this.run,
         stop: {
           kind: entry.kind,
+          code: entry.code,
           reason,
           at: entry.at,
           step_id: entry.step_id,
@@ -3422,10 +3543,15 @@ ${this.stopArtifacts()}`,
       // The words are the router's one rendering of a stop, shared with the
       // status row and the terminal; what is on disk is the record above.
       const words = renderStop(this.run.stop as NonNullable<DriverRun["stop"]>, this.run);
-      this.raiseStopDecision(words, ladder);
+      this.raiseStopDecision(words, ladder, error.brief);
+      // The whole rendering, ways on included. The command that met the
+      // stop is the surface a person is already looking at, and printing
+      // three of the four things it knows sent one operator to look for
+      // the fourth in a record they had no reason to know existed.
       writeErr(
         `dabbler: ${words.headline} in phase '${this.run.phase}' after ` +
-          `${this.run.invocations} invocation(s).\n${words.happened}\n${words.ended} ${words.next}\n`,
+          `${this.run.invocations} invocation(s).\n${words.happened}\n` +
+          `${words.ended} ${words.next}${words.ways}\n`,
       );
       return EXIT_GATE_FAILED;
     }

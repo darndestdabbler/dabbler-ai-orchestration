@@ -321,6 +321,30 @@ export function noRoundReason(
     : null;
 }
 
+/**
+ * Why no further round opens over a standing dispute, said once.
+ *
+ * `verify` refuses in these words when a person runs it, and the driver
+ * stops in them when it reads the same state off the record before spawning
+ * anything. Written twice they would drift, and the two readers of a state
+ * disagreeing about what it is is exactly what sent one session between two
+ * verbs that each named the other.
+ */
+export function capDisputedRefusal(
+  sessionsDir: string,
+  cap: number,
+  round: unknown,
+): string {
+  return (
+    `verify: refused -- the cap (${cap}) is reached and round ` +
+    `${String(round)} carries disputed blocking finding(s). A ` +
+    "dispute says a finding is wrong, not that it was fixed, so it " +
+    "is judged rather than terminated. Route the disputes to a " +
+    "third provider:\n" +
+    `  dabbler verify adjudicate --sessions-dir ${sessionsDir}`
+  );
+}
+
 /** What a verdict is followed by when the driver spawned this verb. */
 export const DRIVER_RUNS_THE_REST = "The driver runs the rest.";
 
@@ -390,15 +414,7 @@ export async function terminateAtCap(
   }
 
   if (noRound === NO_ROUND_CAP_DISPUTED) {
-    writeErr(
-      `verify: refused -- the cap (${cap}) is reached and round ` +
-        `${String(latest["round"])} carries disputed blocking finding(s). A ` +
-        "dispute says a finding is wrong, not that it was fixed, so it " +
-        "is judged rather than terminated. Route the disputes to a " +
-        "third provider:\n" +
-        `  dabbler verify adjudicate --sessions-dir ` +
-        `${sessionsDir}\n`,
-    );
+    writeErr(`${capDisputedRefusal(sessionsDir, cap, latest["round"])}\n`);
     return EXIT_USAGE;
   }
 

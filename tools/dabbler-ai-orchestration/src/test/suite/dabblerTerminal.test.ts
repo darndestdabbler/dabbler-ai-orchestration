@@ -305,14 +305,82 @@ suite("the Dabbler terminal", () => {
     terminal.poll();
     const spoken = plain(written.join(""));
     // The router's words, not this terminal's: paused rather than stopped,
-    // the command ended and the session not, and who acts next.
+    // and the record's own four facts as four fields. The reason is the
+    // one that matters here -- the sentence a person read told them to go
+    // and read a reason that no surface had ever shown them.
     assert.ok(spoken.includes("paused session=062 kind=budget"));
     assert.ok(spoken.includes("driver.max_invocations (24)"));
-    assert.ok(spoken.includes("remains in flight"));
-    assert.ok(spoken.includes("Next: "));
+    // Who acts, off the record rather than asserted in prose, and the
+    // command that carries the first way on.
+    assert.ok(spoken.includes("who=you"));
+    assert.ok(spoken.includes("dabbler session next --max-invocations"));
     assert.ok(!spoken.includes("stopped kind"));
     assert.ok(!spoken.includes("rewritten"));
     assert.ok(!spoken.includes("engine:"));
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("carries the stop's code to the rendering, so the coded stops keep their own actor and command", () => {
+    // The record goes to `renderStop` whole. Dropped, the code takes the
+    // generic `verification` situation with it: a cap reached over standing
+    // disputes would read as the engine's to clear and offer `session
+    // next`, which re-enters the same cap and stops again.
+    const { root, driver, terminal, written } = drivenRepo(RUNNING);
+    writeRun(driver, {
+      session_number: 62,
+      phase: "verify",
+      job: null,
+      engine: "cli",
+      stop: {
+        kind: "verification",
+        code: "cap-disputed",
+        reason: "the cap is reached and one blocking finding is disputed",
+      },
+    });
+
+    terminal.poll();
+    const spoken = plain(written.join(""));
+    assert.ok(spoken.includes("who=you"));
+    assert.ok(spoken.includes("dabbler verify adjudicate"));
+    assert.ok(!spoken.includes("dabbler session next"));
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("says every way on with its cost, not only the first command", () => {
+    // One command on the row says the others do not exist. A provider that
+    // could not be reached has three real moves and they cost different
+    // things: another attempt, a different verifier, or ending the session.
+    const { root, driver, terminal, written } = drivenRepo(RUNNING);
+    writeRun(driver, {
+      session_number: 62,
+      phase: "verify",
+      job: null,
+      engine: "cli",
+      stop: {
+        kind: "verification",
+        code: "provider-unreachable",
+        reason: "routed verification call failed: connect ETIMEDOUT",
+      },
+    });
+
+    terminal.poll();
+    const spoken = plain(written.join(""));
+    for (const command of [
+      "dabbler session next",
+      "dabbler configure --verifying-model",
+      "dabbler session cancel",
+    ]) {
+      assert.ok(spoken.includes(command), command);
+    }
+    // And what each one costs, which is what makes them choices rather
+    // than a list of commands.
+    assert.ok(spoken.includes("One more attempt at the same round"));
+    assert.ok(spoken.includes("Verification stays cross-provider either way"));
+    assert.ok(spoken.includes("ends with your reason on the record"));
 
     terminal.dispose();
     rmrf(root);
@@ -340,10 +408,12 @@ suite("the Dabbler terminal", () => {
     assert.ok(stop !== undefined);
     // Not one bare LF anywhere in it: every newline is a full CRLF.
     assert.strictEqual(stop.split("\n").length - 1, stop.split("\r\n").length - 1);
-    // Three physical lines: the clock at the edge of the first, and the
-    // other two under the text, where a continuation belongs.
+    // The clock at the edge of the first, and every line after it under the
+    // text, where a continuation belongs. The stop's ways on are lines of
+    // their own below these, for the same reason and with the same indent.
     const lines = plain(stop).split("\r\n").filter((line) => line !== "");
-    assert.strictEqual(lines.length, 3);
+    assert.ok(lines.length >= 3, String(lines.length));
+    assert.ok(lines.slice(1).every((line) => line.startsWith(" ".repeat(HANGING_INDENT))));
     assert.ok(lines[0]?.startsWith("14:30:05 paused"));
     assert.ok(lines[1]?.startsWith(`${" ".repeat(HANGING_INDENT)}remote: permission denied`));
     assert.ok(lines[2]?.startsWith(`${" ".repeat(HANGING_INDENT)}remote: contact an owner`));
@@ -920,7 +990,14 @@ suite("the outline", () => {
     assert.ok(stream.includes(clear));
     const wide = physical(stream);
     assert.ok(wide.length < narrow.length, `${wide.length} vs ${narrow.length}`);
-    assert.ok(wide.every((line) => line.startsWith("14:30:05 ")), wide.join("|"));
+    // Nothing is left wrapped: at this width every line break is one the
+    // words themselves carry -- a stop's ways on are a list, and a list is
+    // still a list on a wide terminal -- and each of those begins under the
+    // text, exactly where a wrapped tail would have.
+    assert.ok(
+      wide.every((line) => line.startsWith("14:30:05 ") || line.startsWith(indent)),
+      wide.join("|"),
+    );
     assert.strictEqual(
       wide.join(" ").replace(/\s+/g, " "),
       narrow.join(" ").replace(/\s+/g, " "),

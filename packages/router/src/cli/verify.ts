@@ -194,12 +194,15 @@ async function disputeMain(argv: readonly string[]): Promise<number> {
   }
   const resolved = resolvedSessions("verify dispute", parsed);
   if ("code" in resolved) return resolved.code;
+  // A person at a terminal has already read the refusal; the exit is all
+  // the shell wants. The words it carries beside the exit are for the
+  // driver, which has a record to put them on.
   return recordDispute(resolved.dir, {
     roundNumber: round,
     findingIndex: finding,
     grounds,
     evidence: parsed.repeated.get("--evidence") ?? [],
-  });
+  }).exit;
 }
 
 async function adjudicateMain(argv: readonly string[]): Promise<number> {

@@ -97,6 +97,28 @@ export function resolveRepoRelative(
 }
 
 /**
+ * What `recordDispute` did, and -- when it refused -- the words it refused in.
+ *
+ * The words travel because the caller is not always a person at a terminal.
+ * The driver files the engine's disputes, and an exit code alone put `the
+ * dispute of finding 2 was refused (exit 2)` on the record while the
+ * sentence that actually refused it -- an evidence file over the inline cap
+ * -- went to a stream nothing kept. A stop says what refused in the words of
+ * the thing that refused, and this is where those words come from.
+ */
+export interface DisputeOutcome {
+  readonly exit: number;
+  /** Empty when it was recorded; otherwise the refusal, as it was written. */
+  readonly refusal: string;
+}
+
+/** Refused, said once: written where a person reads it and handed back for the record. */
+function refusedDispute(exit: number, text: string): DisputeOutcome {
+  writeErr(text);
+  return { exit, refusal: text.trim() };
+}
+
+/**
  * Record the orchestrator's rebuttal of one recorded finding. The dispute is
  * immutable and rides into the next round's prompt beside the finding it
  * contests, where the verifier must engage it -- UPHOLD or WITHDRAW --
@@ -110,33 +132,34 @@ export function recordDispute(
     grounds: string;
     evidence: readonly string[];
   },
-): number {
+): DisputeOutcome {
   const repoRoot = repoRootFor(sessionsDir);
   if (repoRoot === null) {
-    writeErr(`verify dispute: not inside a git repository: ${sessionsDir}\n`);
-    return EXIT_STATE;
+    return refusedDispute(
+      EXIT_STATE,
+      `verify dispute: not inside a git repository: ${sessionsDir}\n`,
+    );
   }
   const state = readSessionState(sessionsDir);
   const current = (state ?? {})["currentSession"] as number | null | undefined;
   if (current === null || current === undefined) {
-    writeErr(
+    return refusedDispute(
+      EXIT_STATE,
       `verify dispute: no session is in flight under ${sessionsDir}; a ` +
         "dispute belongs to the session whose round it contests.\n",
     );
-    return EXIT_STATE;
   }
 
   if ((options.grounds || "").trim() === "") {
-    writeErr("verify dispute: --grounds must be non-empty\n");
-    return EXIT_USAGE;
+    return refusedDispute(EXIT_USAGE, "verify dispute: --grounds must be non-empty\n");
   }
   if (options.evidence.length === 0) {
-    writeErr(
+    return refusedDispute(
+      EXIT_USAGE,
       "verify dispute: refused -- a dispute is an argument from the " +
         "record, not a complaint; prose-only disputes are refused. Cite " +
         "at least one existing repo path with --evidence.\n",
     );
-    return EXIT_USAGE;
   }
 
   const cited: string[] = [];
@@ -162,25 +185,25 @@ export function recordDispute(
         why === "outside"
           ? "is outside the repository"
           : "does not name a file in the repository";
-      writeErr(
+      return refusedDispute(
+        EXIT_USAGE,
         `verify dispute: refused -- evidence path ${pythonRepr(raw)} ` +
           `${reason}; a dispute cites the repo's own record.\n`,
       );
-      return EXIT_USAGE;
     }
     if (!suffix) {
       // A bare cite of an oversized file would silently drop its tail at
       // render time; refuse it now, naming the exit.
       const size = statSync(resolve(repoRoot, rel)).size;
       if (size > DISPUTE_EVIDENCE_INLINE_CAP) {
-        writeErr(
+        return refusedDispute(
+          EXIT_USAGE,
           `verify dispute: refused -- ${rel} is ${size} bytes, ` +
             "over the inline cap " +
             `(${DISPUTE_EVIDENCE_INLINE_CAP}); cite the relevant ` +
             `passage as ${rel}:START-END so it rides the prompt ` +
             "whole instead of being truncated.\n",
         );
-        return EXIT_USAGE;
       }
     }
     cited.push(rel + suffix);
@@ -190,12 +213,12 @@ export function recordDispute(
   const target = rounds.find((row) => row["round"] === options.roundNumber);
   if (target === undefined) {
     const recorded = rounds.map((row) => row["round"]);
-    writeErr(
+    return refusedDispute(
+      EXIT_STATE,
       `verify dispute: round ${options.roundNumber} is not recorded for ` +
         `session ${current} (recorded rounds: ` +
         `${recorded.length > 0 ? `[${recorded.join(", ")}]` : "none"}).\n`,
     );
-    return EXIT_STATE;
   }
   const findings = Array.isArray(target["findings"])
     ? (target["findings"] as Row[])
@@ -208,12 +231,12 @@ export function recordDispute(
           `${sliceCodePoints(String(finding["description"] ?? ""), 120)}`,
       )
       .join("\n");
-    writeErr(
+    return refusedDispute(
+      EXIT_STATE,
       `verify dispute: finding ${options.findingIndex} does not exist in ` +
         `round ${options.roundNumber}. Its findings, by 0-based index:\n` +
         `${listing || "  (none)"}\n`,
     );
-    return EXIT_STATE;
   }
 
   const row: Row = {
@@ -231,15 +254,14 @@ export function recordDispute(
     appendDispute(repoRoot, current, row);
   } catch (error) {
     if (!(error instanceof LedgerError)) throw error;
-    writeErr(`verify dispute: ${error.message}\n`);
-    return EXIT_STATE;
+    return refusedDispute(EXIT_STATE, `verify dispute: ${error.message}\n`);
   }
   writeOut(
     `verify dispute: recorded against round ${options.roundNumber} finding ` +
       `${options.findingIndex}. The next verification round presents the ` +
       "rebuttal beside the finding for UPHOLD-or-WITHDRAW.\n",
   );
-  return EXIT_OK;
+  return { exit: EXIT_OK, refusal: "" };
 }
 
 

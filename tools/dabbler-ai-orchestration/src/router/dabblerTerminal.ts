@@ -247,6 +247,20 @@ export function fieldTone(event: string, key: string, value: string): Tone {
   return "plain";
 }
 
+/**
+ * Who acts, in the second person a terminal line is read in.
+ *
+ * The router's word is the field name -- `engine`, `operator`, `either` --
+ * and a person reading their own screen is `you`. Nothing is decided here:
+ * which of the three it is comes off the record, and this only says it in
+ * the voice the rest of the line is written in.
+ */
+export function whoActs(actor: "engine" | "operator" | "either"): string {
+  if (actor === "operator") return "you";
+  if (actor === "engine") return "the engine";
+  return "the engine or you";
+}
+
 /** A path as the record spells them: repository-relative, forward slashes. */
 function relativeToRoot(repoRoot: string, full: string): string {
   return path.relative(repoRoot, full).replace(/\\/g, "/");
@@ -272,6 +286,14 @@ interface RunRecord {
   readonly started_at?: string;
   readonly stop?: {
     kind?: string;
+    /**
+     * Which refusal it was, where the kind is too coarse. Carried through
+     * rather than dropped: the rendering keys on it, and a stop read
+     * without it renders another situation's actor and another
+     * situation's command -- which is the coarse-kind fault this line
+     * exists to have fixed.
+     */
+    code?: string | null;
     reason?: string;
     class?: "first" | "deadlock";
     at?: string;
@@ -1505,20 +1527,44 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     if (stop) {
       // A stop is its kind, its moment and its reason: a replacement of the
       // same kind is a new pause, spoken as one. The words are the router's
-      // one rendering, shared with the driver's stderr and the status row.
+      // one rendering, shared with the driver's stderr and the status row --
+      // and the record goes to it WHOLE, code included: rendering a
+      // cap-disputed stop without its code renders the generic
+      // verification situation, which names the wrong actor and offers
+      // `session next` where the move is `verify adjudicate`.
       const identity = `${stop.kind ?? ""}\0${stop.at ?? ""}\0${stop.reason ?? ""}`;
       if (this.paused === null || this.paused.identity !== identity) {
         const kind = stop.kind ?? "?";
         this.paused = { identity, stop: { kind }, phase };
         const words = renderStop(
-          { kind, reason: stop.reason ?? "", class: stop.class ?? null, step_id: stop.step_id ?? null },
+          {
+            kind,
+            code: stop.code ?? null,
+            reason: stop.reason ?? "",
+            class: stop.class ?? null,
+            step_id: stop.step_id ?? null,
+          },
           { session_number: run.session_number ?? 0, phase, engine: run.engine },
         );
+        // Four separable facts, as four fields. Folded into one they were a
+        // wall of prose whose middle sentence told the operator to read a
+        // reason -- and the reason was the one thing the wall left out,
+        // because `happened` opens with the kind's own sentence and the
+        // record's words were buried behind it. `who` is off the record
+        // now rather than asserted in prose, and `next` is the command
+        // that carries the first way on.
         this.line("paused", {
           session: this.sessionLabel(run),
           kind,
           class: stop.class ?? "",
-          reason: `${words.happened} ${words.ended} ${words.next}`,
+          who: whoActs(words.actor),
+          reason: stop.reason ?? "",
+          // Every way on, with its cost and its command, as the router
+          // formats them once -- the same bulleted second level the close's
+          // gate rows print in. One command on the row would say the others
+          // do not exist, and the whole point of the four things is that a
+          // person can see what their options cost before they pick one.
+          ways: words.ways,
         });
       }
     } else if (this.paused !== null && progressResumed(this.paused, { stop: null, phase })) {

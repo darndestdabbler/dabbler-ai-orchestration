@@ -219,18 +219,28 @@ describe("a repository walked through the verification loop", () => {
   });
 
   milestone("a dispute argues from the record: prose alone is refused, a bad index lists the findings, a cited one is filed once", async () => {
-    const prose = await captured(() => recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 0, grounds: "I disagree", evidence: [] }));
+    let handedBack = "";
+    const prose = await captured(() => {
+      const outcome = recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 0, grounds: "I disagree", evidence: [] });
+      handedBack = outcome.refusal;
+      return outcome.exit;
+    });
     assert.equal(prose.code, EXIT_USAGE);
     assert.match(prose.err, /prose-only disputes are refused/);
-    const wrong = await captured(() => recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 7, grounds: "g", evidence: ["src/widget.py"] }));
+    // The refusal travels beside the exit, and it is the same refusal: the
+    // driver files the engine's disputes, and an exit code on its own put
+    // `refused (exit 2)` on the record while the sentence that refused it
+    // went to a stream nothing kept.
+    assert.equal(handedBack, prose.err.replace(/\r\n/g, "\n").trim());
+    const wrong = await captured(() => recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 7, grounds: "g", evidence: ["src/widget.py"] }).exit);
     assert.match(wrong.err, /Its findings, by 0-based index:/);
-    const filed = await captured(() => recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 0, grounds: "the test covers it", evidence: ["src/widget.py"] }));
+    const filed = await captured(() => recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 0, grounds: "the test covers it", evidence: ["src/widget.py"] }).exit);
     assert.equal(filed.code, EXIT_OK, filed.err);
     assert.equal(readDisputes(repo, 1).length, 1);
     assert.equal(readDisputes(repo, 1)[0]["filed_after_round"], 1);
     let refusedTwice = false;
     try {
-      const again = await captured(() => recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 0, grounds: "again", evidence: ["src/widget.py"] }));
+      const again = await captured(() => recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 0, grounds: "again", evidence: ["src/widget.py"] }).exit);
       refusedTwice = again.code !== EXIT_OK;
     } catch {
       refusedTwice = true;
@@ -262,7 +272,7 @@ describe("a repository walked through the verification loop", () => {
     widget(4);
     recordRun(sessionsDir, UNIT, "passed", { ...TARGETED, sessionNumber: 2 });
     assert.equal((await captured(() => runRound(sessionsDir, { maxRounds: 1 }))).code, EXIT_BLOCKING);
-    assert.equal((await captured(() => recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 0, grounds: "the test proves it", evidence: ["tests/test_widget.py"] }))).code, EXIT_OK);
+    assert.equal((await captured(() => recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 0, grounds: "the test proves it", evidence: ["tests/test_widget.py"] }).exit)).code, EXIT_OK);
     const refused = await captured(() => runRound(sessionsDir, { maxRounds: 1 }));
     assert.equal(refused.code, EXIT_USAGE);
     assert.match(refused.err, /carries disputed blocking finding\(s\)/);
@@ -284,7 +294,7 @@ describe("a repository walked through the verification loop", () => {
     widget(5);
     recordRun(sessionsDir, UNIT, "passed", { ...TARGETED, sessionNumber: 3 });
     assert.equal((await captured(() => runRound(sessionsDir, { maxRounds: 1 }))).code, EXIT_BLOCKING);
-    assert.equal((await captured(() => recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 0, grounds: "the test proves it", evidence: ["tests/test_widget.py"] }))).code, EXIT_OK);
+    assert.equal((await captured(() => recordDispute(sessionsDir, { roundNumber: 1, findingIndex: 0, grounds: "the test proves it", evidence: ["tests/test_widget.py"] }).exit)).code, EXIT_OK);
     const judged = await adjudicate("Dispute 1: OVERRULE — the cited test proves the widget right\n");
     assert.equal(judged.code, EXIT_OK, judged.out + judged.err);
     const rows = readRounds(repo, 3);

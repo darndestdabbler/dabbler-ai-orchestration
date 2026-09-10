@@ -38,6 +38,7 @@ import {
   renderStop,
   renderUncollected,
   uncollectedJob,
+  type StopActor,
 } from "./driver.ts";
 import { pollJob } from "./jobs.ts";
 import { nowIso } from "./journal.ts";
@@ -968,6 +969,31 @@ function epoch(value: unknown): number | null {
 }
 
 /**
+ * Who the stop standing over a session is for, or null when none stands.
+ *
+ * The same reading the blocked task row is folded from, named so a surface
+ * can key on it: the Work Explorer withholds the engine's own command while
+ * the stop is the engine's to clear, because a person clicking it is a
+ * second caller on one live instruction. It is the router's rule and not
+ * the extension's, for the reason every stop's words are.
+ *
+ * An unreadable run record answers null rather than throwing: what a
+ * surface does about damage is say so -- `tasksRefused` carries that -- and
+ * a missing actor withholds nothing.
+ */
+export function standingStopActor(repoRoot: string, sessionNumber: number): StopActor | null {
+  let run: ReturnType<typeof readRun> = null;
+  try {
+    run = readRun(repoRoot, sessionNumber);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    return null;
+  }
+  if (run === null || !run.stop) return null;
+  return renderStop(run.stop, run).actor;
+}
+
+/**
  * The session's task rows, derived from the records the lifecycle writes.
  *
  * Every row is a phase whose end is a record some verb wrote: `session
@@ -1061,7 +1087,8 @@ export function buildTaskRows(
   // A driven session that stopped short of the close is an attention row:
   // the first phase not done is blocked, and its intent says which bound
   // the loop met. Read from the driver's own state rather than inferred,
-  // and refused like the rounds ledger when that file does not parse.
+  // and refused like the rounds ledger when that file does not parse. Who
+  // the stop is FOR is the same reading, named: see `standingStopActor`.
   let driverRun: ReturnType<typeof readRun> = null;
   let driverStop: NonNullable<ReturnType<typeof readRun>>["stop"] = null;
   try {
@@ -1653,6 +1680,11 @@ export function buildProjection(
         if (!(error instanceof TaskRowsRefused)) throw error;
         sessionOut["tasksRefused"] = error.message;
       }
+      // Present only while a stop stands, so a row that projects nothing
+      // here is a session with nothing stopped -- which is what a surface
+      // needs to know before it offers anybody a command.
+      const actor = standingStopActor(repoRoot, number as number);
+      if (actor !== null) sessionOut["stopActor"] = actor;
     }
     if (Number.isInteger(number)) {
       try {

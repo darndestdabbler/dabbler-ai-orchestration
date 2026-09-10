@@ -212,6 +212,35 @@ describe("the source of a projection's sessions", () => {
     assert.equal(rows[1]["iconKey"], "not-started");
   });
 
+  it("names who the standing stop is for, so no surface offers a person the engine's own command", () => {
+    // `Resume Session` calls `next`, and one instruction has exactly one
+    // caller. Which of them a stop belongs to is the router's reading, not
+    // the extension's, and it reaches the surface as a fact rather than as
+    // a sentence to be parsed.
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    const at = "2026-08-31T12:30:00-04:00";
+    const stopped = (stop: Record<string, unknown> | null) => {
+      writeRun(repo, 1, { ...RUN, engine: "cli", stop });
+      return sessions(sessionsDir)[0]!["stopActor"];
+    };
+    // Nothing has stopped: no member at all, which is the state a surface
+    // reads before it offers anybody anything.
+    assert.equal(stopped(null), undefined);
+    // A dispute the framework refused to write is the engine's to clear...
+    assert.equal(
+      stopped({ kind: "verification", code: "dispute-refused", reason: "over the inline cap", at }),
+      "engine",
+    );
+    // ...and the tie-break over one that stands is the operator's.
+    assert.equal(
+      stopped({ kind: "verification", code: "cap-disputed", reason: "one dispute stands", at }),
+      "operator",
+    );
+    // A bound either of them may clear says so, and the button stays.
+    assert.equal(stopped({ kind: "interrupted", reason: "you asked it to stop", at }), "either");
+  });
+
   it("carries an open decision's whole brief, options and consequences included", () => {
     // A surface with the labels but not their consequences would be a menu
     // with no prices.
@@ -449,7 +478,7 @@ describe("the task rows", () => {
     assert.equal(finished?.["state"], "in flight");
     assert.match(String(finished?.["intent"]), /'run of record: unit' finished at 2026-08-31T12:05:00.000Z \(exit 0\)/);
     assert.match(String(finished?.["intent"]), /not been collected/);
-    assert.match(String(finished?.["intent"]), /`dabbler session next` collects the result/);
+    assert.match(String(finished?.["intent"]), /`dabbler session next`.*collects the result/s);
     assert.doesNotMatch(String(finished?.["intent"]), /working/);
   });
 

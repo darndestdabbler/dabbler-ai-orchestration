@@ -122,8 +122,19 @@ export const SESSION_ACTIONS: SessionAction[] = [
     // the proof of 2026-09-08 lost the engine's editor tab and had no way
     // to bring it back. Only on the in-flight row, because `session run`
     // drives the session the record says is in flight and no other.
+    //
+    // And not while the standing stop is the ENGINE's to clear. `session
+    // run` calls `next`, and one instruction has exactly one caller: the
+    // operator clicked this at a stop that was the engine's -- a dispute
+    // the framework had refused to write -- and became a second driver on
+    // a live loop. The lease held, so nothing was damaged; a surface that
+    // invites the click is still a race with a person in it. Where the
+    // stop is theirs, or nothing has stopped, the action is exactly where
+    // it was, and the blocked row's own words say who acts and why.
     when: (repository, session) =>
-      repository.currentSession === session.number && session.status === "in-progress",
+      repository.currentSession === session.number &&
+      session.status === "in-progress" &&
+      session.stopActor !== "engine",
   },
   {
     id: "dabblerSessionSets.cancel",

@@ -10,6 +10,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.1.1] — 2026-09-10
+
+A stop you can act on. When a session stops, the framework hands it back to
+a person, and until now it handed them one sentence written for ten unlike
+situations: read a reason that was not on the screen, put something right
+that was not named, and run a command that reads as starting something —
+over a stop that was frequently the engine's to clear and not yours at all.
+A stop now says four things: what refused, in the words of the thing that
+refused; who acts next; what the ways on are and what each costs; and the
+exact command for each.
+
+Nothing about the lifecycle changes. No gate moved, no verdict changed
+hands, and the tie-break over a contested finding is still the operator's.
+
+### Changed
+
+- **Four things, not one sentence.** A stop carries what happened, who acts
+  — the engine, you, or whoever calls `next` next — the choices with their
+  costs, and the command that carries each one out. The stop's own owed
+  decision is built from those same choices, so the question and the pause
+  cannot offer you different things.
+
+- **The verification stops stopped sharing a sentence.** A round that ended
+  without a verdict, a provider that could not be reached, a dispute the
+  framework refused to write, a cap reached over findings that cannot be
+  shown remediated and a cap terminal met by a moved tree are five
+  situations with different actors and different next moves. Each says its
+  own, and a refused dispute now carries the refusal's own words — the
+  evidence file over the inline cap, and not `(exit 2)`.
+
+- **The Dabbler terminal's `paused` line carries the record's own reason**,
+  who acts, and the command for the first way on, instead of folding the
+  whole rendering into one wall of prose whose middle sentence told you to
+  go and read a reason no surface had shown you.
+
+- **A standing dispute reaches you as a question.** When the verification
+  cap is reached with blocking findings still disputed, the tie-break is
+  yours, and it now arrives in `dabbler owed list` — with each contested
+  finding, the grounds filed against it, what that argument cites, and what
+  each answer costs. It is asked before the verification round that would
+  only refuse, so putting the question spends no provider call.
+
+### Fixed
+
+- **`Resume Session` is withheld while the stop is the engine's to clear.**
+  It runs `dabbler session run`, which calls `next`, and one instruction has
+  exactly one caller: clicking it while an engine is mid-loop makes you a
+  second driver on a live instruction. Where the stop is genuinely yours, or
+  nothing has stopped, the action is exactly where it was.
+
 ## [2.1.0] — 2026-09-10
 
 A place to see what a session will actually be run with, and to change it

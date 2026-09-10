@@ -145,6 +145,32 @@ suite("ActionRegistry: session actions", () => {
     assert.ok(ids.includes("dabblerSessionSets.restore"));
     assert.ok(!ids.includes("dabblerSessionSets.cancel"));
   });
+
+  test("Resume Session is withheld while the stop is the engine's to clear", () => {
+    // `session run` calls `next`, and one instruction has exactly one
+    // caller. The operator clicked this at a stop that was the engine's --
+    // a dispute the framework had refused to write -- and became a second
+    // driver on a live loop.
+    const offered = (stopActor?: "engine" | "operator" | "either") =>
+      applicableSessionActions(
+        makeRepository({
+          currentSession: 2,
+          sessions: [makeSession({ number: 2, status: "in-progress", ...(stopActor ? { stopActor } : {}) })],
+        }),
+        makeSession({ number: 2, status: "in-progress", ...(stopActor ? { stopActor } : {}) }),
+      ).map((a) => a.id);
+
+    assert.ok(!offered("engine").includes("dabblerSessionSets.resumeSession"));
+    // Where the stop is genuinely theirs, or nothing has stopped at all,
+    // the action is exactly where it was: this withholds a button in one
+    // state rather than removing an affordance.
+    assert.ok(offered("operator").includes("dabblerSessionSets.resumeSession"));
+    assert.ok(offered("either").includes("dabblerSessionSets.resumeSession"));
+    assert.ok(offered().includes("dabblerSessionSets.resumeSession"));
+    // And nothing else moves: cancelling a session is the person's verb
+    // whatever the loop is doing.
+    assert.ok(offered("engine").includes("dabblerSessionSets.cancel"));
+  });
 });
 
 suite("ActionRegistry: package.json menu registry", () => {

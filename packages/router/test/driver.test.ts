@@ -26,6 +26,7 @@ import {
   uncollectedJob,
   validateDispositions,
   validateInstruction,
+  validateRun,
   validateReport,
   validateWorkPlan,
   judgeWorkPlanModules,
@@ -580,12 +581,11 @@ describe("a stop, as a person reads it", () => {
     "interrupted",
   ];
 
-  it("says paused, says the command ended and the session did not, and names who acts next", () => {
-    // Every kind, both classes, both modes: the words are the same shape
-    // whatever the record says, because the four things a person needs are
-    // the same four things every time. What the words never say is that the
-    // engine is working on it -- under the pull the framework cannot see the
-    // engine, and a sentence that claimed otherwise would have a person
+  it("says what happened, that the command ended and the session did not, who acts, and every way on with its cost and its command", () => {
+    // Every kind, both classes, both modes: the four things a person needs
+    // are the same four things every time. What the words never say is that
+    // the engine is working on it -- under the pull the framework cannot see
+    // the engine, and a sentence that claimed otherwise would have a person
     // waiting on a process that is gone.
     for (const kind of KINDS) {
       for (const klass of ["first", "deadlock"] as const) {
@@ -602,8 +602,24 @@ describe("a stop, as a person reads it", () => {
           assert.match(words.ended, /has ended/, label);
           assert.match(words.ended, /remains in flight/, label);
           assert.match(words.next, /^Next: /, label);
-          // The command that resumes it is the mode's, never the other one's.
-          assert.match(words.next, engine === "cli" ? /session next/ : /session drive/, label);
+          // A question with one answer is a notification, and every choice
+          // is a real move: something to do, what it costs, and the command.
+          assert.ok(words.choices.length >= 2, label);
+          for (const choice of words.choices) {
+            for (const part of [choice.label, choice.cost, choice.command]) {
+              assert.ok(part.trim().length > 0, `${label}: ${JSON.stringify(choice)}`);
+            }
+            assert.ok(words.text.includes(choice.command), label);
+          }
+          // Whatever the choices are, the mode's own resume verb is the only
+          // one offered: a session run one way must never be told the other
+          // way's command.
+          const commands = words.choices.map((choice) => choice.command).join(" ");
+          const otherMode = engine === "cli" ? /session drive/ : /session next/;
+          assert.doesNotMatch(commands, otherMode, label);
+          // Ending it is always on the table, and never the recommendation.
+          assert.match(commands, /session cancel/, label);
+          assert.doesNotMatch(words.choices[0]!.command, /session cancel/, label);
           assert.doesNotMatch(words.text, /working on|is working|fixing it|STOPPED/, label);
           assert.equal(words.deadlock, klass === "deadlock", label);
           assert.equal(/deadlock/.test(words.next), klass === "deadlock", label);
@@ -613,6 +629,121 @@ describe("a stop, as a person reads it", () => {
         }
       }
     }
+  });
+
+  it("says who acts as a field, and never says the engine might under the push", () => {
+    // The sentence said "Next: you" over a stop whose actor was the engine,
+    // and a person ran the engine's command on a live loop. Who acts is a
+    // fact off the record now, and the sentence follows the fact.
+    const pull = { session_number: 7, phase: "verify", engine: "cli" };
+    const push = { session_number: 7, phase: "verify", engine: "claude-code" };
+    const engineStop = { kind: "verification", code: "dispute-refused", reason: "over the inline cap" };
+    const operatorStop = { kind: "verification", code: "cap-disputed", reason: "two disputes stand" };
+    const eitherStop = { kind: "interrupted", reason: "you asked it to stop" };
+
+    assert.equal(renderStop(engineStop, pull).actor, "engine");
+    assert.match(renderStop(engineStop, pull).next, /^Next: the engine/);
+    assert.equal(renderStop(operatorStop, pull).actor, "operator");
+    assert.equal(renderStop(operatorStop, pull).next, "Next: you.");
+    // Under the pull the framework cannot see the engine, so "either" is
+    // the honest answer; under the push nothing calls back but a person,
+    // and saying otherwise leaves them waiting on a loop that is not running.
+    assert.equal(renderStop(eitherStop, pull).actor, "either");
+    assert.match(renderStop(eitherStop, pull).next, /whoever calls/);
+    assert.equal(renderStop(eitherStop, push).actor, "operator");
+    assert.equal(renderStop(eitherStop, push).next, "Next: you.");
+    // An engine's stop stays the engine's whichever way the session runs:
+    // the mode decides who else might call, not whose refusal it was.
+    assert.equal(renderStop(engineStop, push).actor, "engine");
+  });
+
+  it("tells the four verification stops apart: four accounts, four sets of moves", () => {
+    // One sentence served all four, and the operator read it as clear as
+    // mud. They are four situations: a round with no verdict, a dispute the
+    // framework would not write, a cap over findings that cannot be shown
+    // remediated, and a cap terminal met by a tree that has moved.
+    const run = { session_number: 7, phase: "verify", engine: "cli" };
+    const codes = [
+      "no-verdict",
+      "provider-unreachable",
+      "dispute-refused",
+      "cap-unresolved",
+      "cap-disputed",
+      "cap-terminal-tree-moved",
+    ];
+    const accounts = new Set<string>();
+    const firstMoves = new Set<string>();
+    for (const code of codes) {
+      const words = renderStop({ kind: "verification", code, reason: "the round said so" }, run);
+      accounts.add(words.happened);
+      firstMoves.add(words.choices[0]!.command);
+    }
+    assert.equal(accounts.size, codes.length);
+    // Not five distinct commands -- two of them are answered by the same
+    // verb -- but no longer one command for all of them, which is what
+    // sent a person to run the engine's `next`.
+    assert.ok(firstMoves.size >= 3, [...firstMoves].join(" | "));
+    // The stop with no code renders its kind, which is what every run
+    // written before the code carries.
+    const uncoded = renderStop({ kind: "verification", reason: "the round said so" }, run);
+    assert.match(uncoded.happened, /without a verdict/);
+    // A cap terminal names the verb that buys the round, and never `plan
+    // amend --max-rounds`, which is read after the terminal and does nothing.
+    const capped = renderStop({ kind: "verification", code: "cap-terminal-tree-moved", reason: "the tree moved" }, run);
+    assert.match(capped.choices.map((choice) => choice.command).join(" "), /verify reopen/);
+    assert.doesNotMatch(capped.text, /--max-rounds/);
+    // A standing dispute is judged, not terminated: the adjudication is
+    // the first move offered and it is the operator's.
+    const disputed = renderStop({ kind: "verification", code: "cap-disputed", reason: "one dispute stands" }, run);
+    assert.equal(disputed.actor, "operator");
+    assert.match(disputed.choices[0]!.command, /verify adjudicate/);
+    // A provider that could not be reached is not a round that produced no
+    // verdict: nothing was asked, the tree is not the problem, and the
+    // moves are to try again or to route the round elsewhere.
+    const unreachable = renderStop({ kind: "verification", code: "provider-unreachable", reason: "the call failed" }, run);
+    assert.match(unreachable.happened, /not reached/);
+    assert.doesNotMatch(unreachable.happened, /without a verdict/);
+    assert.match(unreachable.choices.map((choice) => choice.command).join(" "), /dabbler configure/);
+  });
+
+  it("prints its ways on once, in the same words wherever a stop is printed", () => {
+    // The command that met the stop is the surface the person is already
+    // looking at, and it printed three of the four things the framework
+    // knew -- sending them to look for the fourth in a record they had no
+    // reason to know existed. One formatter, so the stderr line, the status
+    // row and the terminal cannot spell the choices differently.
+    const words = renderStop(
+      { kind: "verification", code: "cap-unresolved", reason: "two findings cannot be shown remediated" },
+      { session_number: 7, phase: "verify", engine: "cli" },
+    );
+    assert.ok(words.ways.length > 0);
+    for (const choice of words.choices) {
+      assert.ok(words.ways.includes(choice.label));
+      assert.ok(words.ways.includes(choice.command));
+      assert.ok(words.ways.includes(choice.cost));
+    }
+    assert.ok(words.text.endsWith(words.ways));
+  });
+
+  it("names its refusal from a closed vocabulary, or names none at all", () => {
+    // The kind is the bound the loop met and four unlike things meet the
+    // `verification` bound. The code is which of them it was, and it is
+    // closed on purpose: a site that invented one would reach every
+    // surface as an unrendered slug, which is the coarse-kind problem
+    // again one level down. Absent stays legal -- it is what every run
+    // written before this member carries, and what a stop whose kind says
+    // everything still carries.
+    const stopped = (code: unknown): unknown => ({
+      ...RUN,
+      stop: { kind: "verification", code, reason: "the dispute was refused", at: RUN.updated_at },
+    });
+    for (const code of ["no-verdict", "provider-unreachable", "dispute-refused", "cap-unresolved", "cap-disputed", "cap-terminal-tree-moved", null]) {
+      assert.equal(validateRun(stopped(code)).stop?.code ?? null, code);
+    }
+    assert.throws(() => validateRun(stopped("verification-went-wrong")), LedgerError);
+    // And the kind alone is still a whole stop.
+    const uncoded = { ...RUN, stop: { kind: "tests", reason: "red", at: RUN.updated_at } };
+    assert.equal(validateRun(uncoded).stop?.code ?? null, null);
   });
 
   it("says progress resumed only once the phase has moved past the pause, with nothing in its place", () => {

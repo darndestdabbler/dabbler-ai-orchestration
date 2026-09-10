@@ -19,6 +19,7 @@ import {
   REGISTER_START,
   alreadyRewoundFor,
   alreadyTriaged,
+  disputedFindingsBrief,
   idleInstruction,
   judgeRegistration,
   judgeStopClass,
@@ -37,6 +38,7 @@ import {
   type StopKey,
 } from "../src/drive.ts";
 import { judgeFreshness, rewindPhaseFor } from "../src/gates.ts";
+import { capDisputedRefusal } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
 import { type ImpactPlan, demandedByPlan } from "../src/impact.ts";
 import { dependencyOrder, impliedDeployables, parseEntries } from "../src/modules.ts";
@@ -658,5 +660,53 @@ describe("a publish refused on an earlier phase's evidence", () => {
       alreadyRewoundFor([...rewinds, { to: "land", reason: tag, at: "later" }], tag),
       true,
     );
+  });
+});
+
+describe("the question a standing dispute puts to the operator", () => {
+  const ROUND = {
+    round: 2,
+    findings: [
+      { severity: "major", blocking: true, description: "the widget is unreachable", evidencePaths: ["src/widget.ts"] },
+      { severity: "minor", blocking: false, description: "a stale comment" },
+    ],
+  };
+  const DISPUTES = [
+    {
+      round: 2,
+      finding_index: 0,
+      grounds: "the call site is the extension's, and the test covers it",
+      evidence_paths: ["packages/router/test/widget.test.ts:12-40"],
+    },
+  ];
+
+  it("carries the finding, the grounds and what the argument cites, and judges none of it", () => {
+    // The operator is the tie-break between a verifier and an engine, and
+    // until now they were told to "put it right" over a stop whose reason
+    // named neither the finding nor the argument against it.
+    const brief = disputedFindingsBrief(ROUND, DISPUTES);
+    assert.match(brief, /1 dispute\(s\) standing over round 2/);
+    assert.match(brief, /\[0\] major, blocking: the widget is unreachable/);
+    assert.match(brief, /Disputed on: the call site is the extension's/);
+    assert.match(brief, /Citing: packages\/router\/test\/widget\.test\.ts:12-40/);
+    // The finding nobody disputed is not the question, and no word here
+    // says which way the tie-break should go.
+    assert.doesNotMatch(brief, /stale comment/);
+    assert.doesNotMatch(brief, /UPHOLD|OVERRULE|should be|recommend/);
+  });
+
+  it("says nothing where nothing is disputed, or where the disputes belong to another round", () => {
+    assert.equal(disputedFindingsBrief(ROUND, []), "");
+    assert.equal(disputedFindingsBrief(ROUND, [{ ...DISPUTES[0]!, round: 1 }]), "");
+  });
+
+  it("is put in the words `verify` itself refuses in, from one sentence rather than two", () => {
+    // The driver reads this state off the record before it spawns anything,
+    // and `verify` run by hand reads it too. Two spellings of one refusal
+    // is how a session ends up between two verbs that each name the other.
+    const refusal = capDisputedRefusal("docs/sessions", 3, 2);
+    assert.match(refusal, /the cap \(3\) is reached and round 2 carries disputed blocking finding\(s\)/);
+    assert.match(refusal, /judged rather than terminated/);
+    assert.match(refusal, /dabbler verify adjudicate --sessions-dir docs\/sessions/);
   });
 });

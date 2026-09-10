@@ -10,6 +10,11 @@ export type DriverRunPhase = "plan" | "work" | "steps" | "preverify" | "verify" 
 export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engine" | "tests" | "verification" | "land" | "publish" | "close" | "interrupted";
 
 /**
+ * Which refusal this was, where the kind is too coarse to act on. A kind says which bound the loop met; four unlike things meet the `verification` bound, with four actors and four next moves, and a surface keyed on the kind alone renders one sentence for all of them. Optional and closed: a stop with no code is its kind, which is what every run written before this member is, and a new refusal is named here before it can be recorded.
+ */
+export type DriverRunStopCode = null | "no-verdict" | "provider-unreachable" | "dispute-refused" | "cap-unresolved" | "cap-disputed" | "cap-terminal-tree-moved";
+
+/**
  * The work-plan step the loop was on when it halted, or null when it was not on one -- a verification round, the suite, the close. Two stops on different steps are not the same stop however alike their reasons read.
  */
 export type DriverRunStopStepId = string | null;
@@ -70,6 +75,7 @@ export type DriverRun = {
      * Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; packaging refusing or failing to reach the feed; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason).
      */
     kind: DriverRunStopKind;
+    code?: DriverRunStopCode;
     reason: string;
     at: string;
     step_id?: DriverRunStopStepId;
@@ -83,6 +89,7 @@ export type DriverRun = {
    */
   stop_history?: {
     kind: DriverRunStopKind;
+    code?: DriverRunStopCode;
     /**
      * The stop's own reason as the loop raised it, undecorated. What `stop.reason` shows a person may say more; this is what the next stop is compared against, and a comparison against a decorated reason would never match twice running.
      */

@@ -8241,7 +8241,91 @@ operator did not have, whatever 143 and 144 were on their own.
 > was right to refuse a release that disagreed with its own plan -- the fix
 > is that they agree, not that one of them is ignored.
 
-### Session 146 of 146: The stop a developer can act on
+### Session 146 of 147: The models there are, and what they cost, read from where they are stated
+
+**This has been got wrong three times, and the third time was in one
+conversation.** An engine reads `copilot-catalog.lock`, sees
+`premium_request_weight`, reasons in premium requests, and concludes that
+finding out what models exist is expensive. It is not: **every model list
+this framework needs is free to obtain on all three surfaces**, and the
+research proving it has been sitting in `docs/acp-walkthrough.md` since
+2026-09-05, unadopted, while the same conclusion was re-derived badly.
+
+**The facts, measured, with the commands that re-measure them, are in
+`docs/model-and-pricing-sources.md`**, and the managed body's traps section
+points every engine at it. That page and that pointer already exist. This
+session makes the code agree with them.
+
+**Copilot bills AI credits, per token.** Premium requests are the legacy
+platform -- `copilot help billing` says so, and this seat has been billed per
+token since 2026-06-01. `seatCost.ts` already reads credits from the CLI's
+own session store, and D29 measured a session at roughly $22. What is stale
+is the CATALOG's vocabulary, and it is stale in a way that misleads: its
+sampled costs disagree with the seat's own statement (`gpt-5.4` sampled 0
+where the seat says 1x), and a probe on 2026-09-10 bought that finding a
+second time with a billed call.
+
+**The seat states its own models for nothing.** `session/new` over `copilot
+--acp` answers with `models.availableModels` -- every model the seat can
+dispatch, with its cost, its modes and its options -- and named six the
+maintained catalog has never heard of. The newer SDK route
+(`client.listModels()`, RPC `models.list`) carries per-token prices rather
+than a legacy multiplier and is worth preferring once measured. **The
+prompting probe is kept for what only it can establish**: that a model
+ANSWERS on this seat. Entitlement, not existence, and never in an automatic
+path.
+
+**So the refresh can be automatic, because it is free.** The direct-API
+enumeration read three vendors and 195 models in 2.4 seconds and billed
+nothing; `discovery.max_age_hours` already declares 24 and nothing acts on
+it. A session that starts against a record older than that refreshes it
+first. No priced call is ever made without a person asking for one.
+
+**A model that stopped being served is MARKED, never deleted.** One bad
+enumeration must not be able to remove a verifier. The record is dated, so a
+model the fresh record no longer carries stops being offered and says when it
+was last seen.
+
+**And the defect 145 shipped with is fixed here**, because it is the same
+mistake one layer up: the pane's model rows enumerate the direct-API registry
+on every transport, so a machine with a seat and no provider keys reads
+"nothing resolves" while the seat has eighteen working models. The
+enumeration belongs to the transport, as `selection.ts` has said in its own
+header all along.
+
+**Steps.** (1) Measure the seat's list from the router -- the ACP
+`session/new` reply, or `models.list` if it proves the better route -- and
+write what was measured, with the date and the CLI version, into
+`docs/model-and-pricing-sources.md`. (2) The seat catalog's enumeration comes
+from that reading rather than from a maintained array, and the prompting
+probe is kept for entitlement alone. (3) The catalog's cost fields say which
+billing platform their unit belongs to, and nothing quotes a premium-request
+number as though it were a price; the owed seat-cost re-base from session 96
+is settled here. (4) A stale dated record is refreshed at session start,
+free, before any work -- and a priced probe is never in that path. (5) What
+the fresh record adds and what it no longer serves: a retired model is marked
+and stops being offered, and no registry entry is deleted by a probe's say-so.
+(6) On the seat transport the pane offers the seat's models, which is 145's
+defect. (7) The release: 2.1.0, held by the operator at the end of 145
+precisely until this is true, ships here.
+
+**Tests.** Five. A session starting against a stale record enumerates before
+its work, and one starting against a fresh record does not -- and neither
+path makes a priced call, asserted by trapping the one that would. A model
+the fresh record no longer serves is marked retired and is not offered, and
+its registry entry is still there. On the `copilot-cli` transport the offered
+models come from the seat catalog rather than the API registry. A cost read
+from the catalog names the platform its unit belongs to, so a
+premium-request weight can never be rendered as a price. And the seat's
+enumeration is taken from a protocol reply that sends no prompt -- the
+assertion that keeps this session's whole finding from being undone by a
+later convenience.
+
+**Releasable.** 2.1.0, carrying 143's terminal, 144's reading, 145's pane and
+this session's correction. The operator held 2.1.0 at the close of 145 because
+the pane was wrong for a seat; this is what makes it right.
+
+### Session 147 of 147: The stop a developer can act on
 
 **A session stopped, and the framework told the operator to read a reason
 that was not on their screen, "put it right" without saying what, and run a

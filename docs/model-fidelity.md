@@ -5,6 +5,10 @@
 > something it has evidence for. Session 144 wrote this. Re-measure it rather
 > than trusting the numbers below once a vendor or a CLI version has moved.
 
+> **Which models exist, and what they cost, is a different question with a
+> different answer**: see `docs/model-and-pricing-sources.md`. This page is
+> only about whether the model asked for is the model that answered.
+
 ## Why it is asked at all
 
 A configuration surface that lets a person choose a model, and a transport

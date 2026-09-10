@@ -65,6 +65,38 @@ one as the trunk strands work where nothing else can see it.
 Read these before reaching for the tool they name. Each is here because a
 session hit it, not because anyone imagined it.
 
+### EVERY model list is FREE. Read `docs/model-and-pricing-sources.md` first
+
+**Three engines have now got this wrong, twice in one conversation.** Before
+you say anything about which models are available, what they cost, or what a
+refresh would spend:
+
+- **Copilot bills AI CREDITS, per token.** Premium requests are the LEGACY
+  platform — `copilot help billing` says so itself, and this seat has been
+  billed per token since 2026-06-01. What was actually spent is read by
+  `seatCost.ts` / `dabbler seat-cost`, in credits.
+- **The seat's model list costs nothing.** `session/new` over `copilot --acp`
+  returns `models.availableModels` — every model the seat can dispatch, with
+  its cost — measured on 2026-09-05 and transcribed in
+  `docs/acp-walkthrough.md` §1. The newer SDK route (`client.listModels()`,
+  RPC `models.list`) carries per-token prices instead of a legacy multiplier.
+- **The direct-API list costs nothing**: `dabbler discovery enumerate` read
+  three vendors and 195 models in 2.4 seconds, billing no tokens.
+- **The Claude CLI cannot be enumerated** — no list command. Its reachable
+  set IS the Anthropic key's API enumeration. Do not maintain a third list.
+
+**The trap is `copilot-catalog.lock`.** Its `premium_request_weight` and
+`probe_premium_requests` are the legacy unit, and `copilot refresh
+--dry-run` prints costs in premium requests. An engine that reasons from
+those numbers concludes that finding out what models exist is expensive. It
+is not, and the samples are wrong besides: the catalog sampled `gpt-5.4` at
+0 where the seat states 1x, and re-probing it on 2026-09-10 moved the sample
+to 1 — the same finding bought twice with a billed call.
+
+`dabbler copilot refresh` sends a real prompt per model. It establishes that
+a model ANSWERS on this seat — entitlement, not existence. Never use it to
+enumerate.
+
 ### `session close --force` closes the WHOLE PLAN, not one session
 
 Its help says "bypass bookkeeping gates, never evidence; stamps

@@ -72,6 +72,11 @@ not agree everywhere — the catalog's probe sampled `gpt-5.4` at 0 and
 finding to weigh in the owed seat-cost re-base, not a value to copy.
 Nothing here acts on it.
 
+> **This section is the measured route to the seat's model list, and it went
+> unadopted for five days while the same conclusion was re-derived badly.
+> `docs/model-and-pricing-sources.md` is where every surface's answer now
+> lives; keep the two in step.
+
 ## 2. A tool call arrives as events, not as screen paint
 
 Prompt: *Create a file named hello.txt in the current directory containing

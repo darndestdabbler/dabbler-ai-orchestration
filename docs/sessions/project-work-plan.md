@@ -183,7 +183,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 143 | The terminal an operator actually reads | no | 2026-09-10 |
 | 144 | Whether the model we asked for is the model that answered | no | 2026-09-10 |
 | 145 | The configuration an operator sets once | yes | 2026-09-10 |
-| 146 | The stop a developer can act on | — | not declared |
+| 146 | The models there are, and what they cost, read from where they are stated | — | not declared |
+| 147 | The stop a developer can act on | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 

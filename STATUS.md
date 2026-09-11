@@ -68,6 +68,49 @@
 > and editing the tree there is the deadlock family this repository has
 > already paid for twice.
 >
+> ## OPEN FOR 150 — the Configuration pane's model records
+>
+> **Read `docs/design/model-catalog.md` before touching the Configuration
+> section.** Raised by the operator on 2026-09-11 against 2.1.3, measured on
+> a seat-only machine, and deliberately NOT fixed here — it is to be
+> implemented on the machine that has both direct-API keys and a Copilot
+> seat, which is the only place the multi-transport refresh can be walked.
+>
+> Three things, one root:
+>
+> 1. **The pane offers models `dabbler configure` then refuses.** 146 moved
+>    the pane's enumeration to the transport that is in force;
+>    `cli/configure.ts` never got that fix and still validates every choice
+>    against the direct-API registry. Measured: **10 of 18** offered
+>    authoring models and **7 of 12** offered verifying models are refused,
+>    with a message listing registry aliases the operator has never seen.
+>    Whether a seat model passes turns on whether the registry's `model_id`
+>    happens to be spelled the same way — `claude-sonnet-5` passes,
+>    `claude-haiku-4.5` does not, because `haiku` carries a dated pin.
+> 2. **"Entitlement, not existence" is stale.** Session 148 established that
+>    the seat states `copilotEnablement` for free and made `listed` a
+>    selectable state; the probe's unique payload is **fidelity**, not
+>    entitlement. Three places still say otherwise — `AGENTS.md`,
+>    `docs/model-and-pricing-sources.md`, and `REFRESH_COST[RECORD_SEAT]` —
+>    and reading any of them makes an engine reason wrongly about cost. It
+>    has now caught a fourth.
+> 3. **Three record rows named for their implementation.** `seat-catalog`
+>    and `seat-list` are two dates on one file; `api-enumeration` is a file
+>    that never exists without provider keys and so reads stale forever.
+>
+> **The operator's direction:** one `ai-model-catalog.json` keyed by
+> transport, replacing all three rows with a single Solution Explorer entry
+> carrying one "last updated", a right-click to refresh or view, refreshed
+> automatically on the first session of a day, and only for the transports
+> active on the machine doing the refresh. The proposal is quoted in full in
+> the design page, with a recommendation to adopt it and seven notes on the
+> details — the load-bearing ones being that the refresh must MERGE rather
+> than replace (or the first seat-only laptop strips the API models for
+> everyone on the next VSIX), that the declared registry stays separate from
+> the observed catalog (or a daily refresh rewrites the operator's judgement
+> about who may verify), and that `costFactor` must name its billing
+> platform in the file.
+>
 > ## SESSION 147 CLOSED, 2026-09-10 — the stop a developer can act on, and 2.1.1 published
 >
 > | session | what | state |

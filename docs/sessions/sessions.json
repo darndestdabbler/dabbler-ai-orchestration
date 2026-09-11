@@ -3071,9 +3071,9 @@
     {
       "number": 156,
       "title": "The walk on both transports, and the release that carries the block",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-11T17:59:48.507000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-11T19:00:54.166000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

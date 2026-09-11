@@ -120,14 +120,97 @@ testing:
     # the extension's suite alone. The refusal that makes it unrepeatable --
     # a surface covered only by a non-expensive suite -- is session 95's,
     # and it is the loader's: `loadSuitesChecked` names the suite.
-    - name: typescript
-      command: node --test --test-concurrency=4 --import ./packages/router/test/support/no-git.ts packages/router/test/**/*.test.ts
+    #
+    # The command is a runner rather than `node --test` directly, from session
+    # 153, and the flags did not change: `scripts/suite.mjs` spawns the same
+    # `--test-concurrency=4` run with the same `no-git.ts` preload inside a
+    # CPU-bounded Podman container. Measured on this machine on 2026-09-11:
+    # 324 seconds on the host and 24.6 seconds there, whole door to whole
+    # door, with the host's other 50 tests costing 1.8 s. The mechanism is
+    # process creation, which session 136 already measured as this suite's
+    # load -- a bare `node -e 0` spawn costs 158.8ms on this Windows host and
+    # 18.9ms inside the WSL2 machine, and the walkthroughs boot a full CLI
+    # child per job. Nothing was saturated on either side: twenty cores,
+    # sixty-four gigabytes, four concurrent files.
+    #
+    # What that buys is the keyboard rather than the clock. Six minutes of
+    # relentless spawning on the scheduler the editor shares leaves the
+    # operator typing about one character every two or three seconds; four
+    # cores inside a virtual machine takes the load off the host entirely.
+    #
+    # The image is built on demand from the `Containerfile` beside this file,
+    # and three named volumes hold the Linux `node_modules` so the operator's
+    # Windows ones are never read or written. Only this repository declares
+    # any of it: nothing in the shipped framework changes, because the next
+    # repository to adopt this framework is .NET or Java and would want none
+    # of it. CI is not moved either -- both workflow jobs stay on
+    # `windows-latest`, which is what proves the platform. The measurement,
+    # that divergence and the tests that cannot run in the container are in
+    # `docs/design/suite-runners.md`.
+    # The other door, and it exists because of how the container fails rather
+    # than how it succeeds. Measured on 2026-09-11 against the image beside
+    # this file: run the whole 1,179 there and 32 come back
+    # `cancelledByParent` while the file they are in still reports
+    # `# fail 0`. A runner reading the failure count would call that green,
+    # having silently stopped proving the transport this repository is
+    # actually operated on. So the container door runs 1,129 and this one
+    # runs the other 50.
+    #
+    # It is ONE file, and the measurement is what made it one. Three other
+    # files failed in the container on the first pass and would have been
+    # declared Windows-only on the strength of it: two because an orphaned
+    # grandchild with no PID 1 to reap it stays a zombie, which
+    # `process.kill(pid, 0)` answers for exactly as it answers for a live
+    # process, and one because `node:22-slim` carries no `ps`, so the POSIX
+    # branch of `survivors()` finds no process table and reaps nothing while
+    # saying nothing. `--init` and `procps` fix all three. Writing them down
+    # as proofs about Windows would have been three false sentences and a
+    # container that had quietly stopped proving the job runner's reaping.
+    #
+    # It is declared FIRST, and the order is load-bearing rather than
+    # cosmetic. Both doors draw from the same directory, so both name the same
+    # `test_roots`, and `scopeForTest` attributes a test file to the FIRST
+    # declared suite whose root and glob match it -- one owner per file, so
+    # that naming every selected test to every runner cannot put a Java test
+    # in a `dotnet test` command. Declared the other way round, `typescript`
+    # would claim `copilot.test.ts`, the container runner would decline it as
+    # not its own, and no targeted command would run it at all: the one test
+    # this whole split exists to keep proving would be the one test that
+    # stopped being proved.
+    #
+    # So this suite's glob names the file instead of a pattern. That is two
+    # statements of one fact -- the glob here and
+    # `scripts/suite-membership.json`, which carries the reason -- and
+    # `scripts/check-suite-membership.mjs` holds them to each other and
+    # refuses a manifest this glob cannot express, rather than letting the two
+    # drift. `docs/design/suite-runners.md` carries the measurement, the
+    # reason the one file is here, and why CI is not moved.
+    - name: typescript-windows
+      command: node scripts/suite.mjs host
       expensive: true
       covers:
         - packages/router/
         - package.json
         - package-lock.json
         - dabbler.yaml
+        - Containerfile
+        - scripts/suite.mjs
+        - scripts/suite-membership.json
+      test_roots:
+        - packages/router/test
+      test_glob: "copilot.test.ts"
+
+    - name: typescript
+      command: node scripts/suite.mjs container
+      expensive: true
+      covers:
+        - packages/router/
+        - package.json
+        - package-lock.json
+        - dabbler.yaml
+        - Containerfile
+        - scripts/suite.mjs
+        - scripts/suite-membership.json
       test_roots:
         - packages/router/test
       test_glob: "*.test.ts"
@@ -210,6 +293,13 @@ testing:
       # `selection_unknown: dabbler.yaml` while the operator was editing the
       # declaration the selector reads.
       - dabbler.yaml
+      # The runner, the image it runs in and the list of which tests run
+      # where. Each of these changes what EVERY test does -- which machine it
+      # runs on, which tools it can see, and which door it goes through -- so
+      # they belong here for the same reason `dabbler.yaml` does.
+      - scripts/suite.mjs
+      - scripts/suite-membership.json
+      - Containerfile
 
     # Run when a changed path maps to nothing. Cheap, broad, and enough to
     # notice a structural break -- not a substitute for a real mapping.

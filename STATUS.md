@@ -1,7 +1,80 @@
-# STATUS — sessions 113–151 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.3 IS PUBLISHED to the Marketplace, carrying 148 and 149. 2.1.0 and 2.1.2 never shipped** — 2.1.0 refused over a walk-jobs timeout on the runner and 2.1.2 died on a Marketplace request timeout, so both tags stand on origin unpublished and 2.1.3 supersedes them
+# STATUS — sessions 113–153 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.3 IS PUBLISHED to the Marketplace, carrying 148 and 149. 2.1.0 and 2.1.2 never shipped** — 2.1.0 refused over a walk-jobs timeout on the runner and 2.1.2 died on a Marketplace request timeout, so both tags stand on origin unpublished and 2.1.3 supersedes them; session 152 naming the two reviewing roles by voice and giving each its own vehicle, and session 153 taking the run of record off the host scheduler into a Podman container — 324 s to 26.4 s — with the one file that cannot follow it declared and the reason it cannot owed forward, and a guard that will not read a cancelled test as a pass
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 153 CLOSED, 2026-09-11 — the suite runs where process creation is cheap, and what cannot follow it is declared rather than discovered
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 153 | a Podman runner for the platform-independent tests, a host suite for what proves Windows, and a guard that will not read a cancelled test as a pass | CLOSED VERIFIED at round 2 (round 1 blocked on one real thing), landed `42c4397c`, closed `46d8a5c9`. **Not releasable** — the block ships from 156 |
+>
+> **324 seconds became 26.4.** Measured this session on this host: the whole
+> suite as `dabbler.yaml` declared it before, 324 s / 1,179 tests; the two
+> doors now, 24.6 s for the container's 1,129 and 1.8 s for the host's 50.
+> The mechanism is process creation, not saturation — a bare `node -e 0`
+> spawn costs 158.8 ms here and 18.9 ms in the WSL2 machine. **The session's
+> own run of record went through it: 28 seconds.** Only this repository
+> declares any of it — nothing in the shipped framework changed and no
+> default moved, because the next repository to adopt this is .NET or Java.
+>
+> **THE SEAM IS ONE FILE, AND MEASURING IS WHAT MADE IT ONE.** Four files
+> failed in the container on the first pass. Three were the image, not the
+> platform: `checks.test.ts` and `engines.test.ts` because an orphan with no
+> PID 1 to reap it stays a **zombie**, which `kill(pid, 0)` answers for
+> exactly as it answers for a live process, so the test reads a reaped tree
+> as a surviving one; `walk-jobs.test.ts` because `node:22-slim` carries no
+> `ps`, so the POSIX branch of `survivors()` found no process table and
+> reaped nothing while saying nothing. `--init` and `procps` fix all three.
+> Declaring them host-only would have written down "this proves Windows"
+> about three tests that prove no such thing, and left the container quietly
+> not proving the job runner's leak reaping.
+>
+> **`copilot.test.ts` is host-only for a reason that is owed forward.** It
+> spawns nothing and needs no seat: `sleep()` in
+> `src/transports/copilot.ts` **unrefs its deadline timer**, so when the
+> spawner never settles nothing holds the event loop open and the deadline
+> never fires. Windows keeps it alive, Linux does not — so those tests pass
+> here by luck, and a deadline that only fires when something else happens
+> to be keeping the loop alive can fail to fire in production. Not fixed:
+> this session declared that nothing in the shipped framework changes.
+> **`docs/design/suite-runners.md` carries it for a later session.**
+>
+> **Declaration ORDER is load-bearing.** Both doors name the same
+> `test_roots`, and `scopeForTest` gives a file to the FIRST matching suite.
+> Declared the obvious way round, `typescript` claimed `copilot.test.ts`,
+> the container declined it, and **no targeted command ran it anywhere** —
+> the one test the split exists to keep proving. `dabbler affected` printing
+> one command where there should have been two is what caught it.
+> `typescript-windows` is declared first and selects by a glob that names
+> the file; `check-suite-membership.mjs` holds that glob to the manifest and
+> refuses a manifest one glob cannot express.
+>
+> **A cancelled test is not a pass**, on both doors, named with its file.
+> Building the guard found that the host door emitted `spec` output, which
+> carries no `failureType` — so the guard was **blind there** until
+> `--test-reporter=tap` was asked for rather than inherited.
+>
+> **ROUND 1 CAUGHT THE SAME DEFECT TWICE, BOTH MINE.** The volumes were
+> accepted because a marker existed, so a moved `package-lock.json` would
+> never reinstall and the suite would run green against the previous
+> branch's dependencies; they now carry a sha256 of the lockfile they were
+> built from, written only after `npm ci` succeeds. And the image was cached
+> by tag alone, so editing the `Containerfile` changed nothing — it now
+> carries that file's digest as a label. Both are the same shape: **an
+> artefact accepted because it exists rather than because it is current.**
+>
+> **Five tests skip in the container that the host would run** — three
+> `.cmd`-shim resolutions, one `taskkill`, one that cannot raise its worker
+> priority. Their files hold too many platform-independent tests to move, so
+> nothing local proves those five and **CI on `windows-latest` is what
+> does**. That is the declared divergence, concretely, and it is session
+> 154's input.
+>
+> **The commit message on `42c4397c` still carries 360 s / 17.7 s / 1,067
+> tests.** The declaration is recorded before the work, and those were the
+> plan's figures; the measurement superseded them and
+> `docs/design/suite-runners.md` says so in its own words.
+>
 > ## SESSION 151 CLOSED, 2026-09-11 — one reading, one rule, and the model on the screen is the model that runs
 >
 > | session | what | state |

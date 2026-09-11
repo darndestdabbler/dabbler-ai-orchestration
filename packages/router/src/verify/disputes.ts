@@ -6,13 +6,14 @@
 // dispute converges instead of being re-raised until the cap.
 //
 // When the cap is reached with every blocking finding disputed, `verify
-// adjudicate` routes the disputes to a third provider -- one excluded harder
-// than any verifier: the orchestrator's provider AND every provider that
-// verified a round are all ineligible. The adjudicator judges each dispute
-// (UPHOLD or OVERRULE; it may not raise new findings) and its outcome lands
-// as one terminal `type: "adjudication"` ledger row the existing close gate
-// reads unchanged. One adjudication per session, ever; no verification round
-// may open after it.
+// adjudicate` dispatches the disputes as the **Auxiliary Reviewer** -- the
+// role whose own definition is *not the author and not the primary*, so "a
+// third voice, never a repeat one" is what the role IS rather than a
+// superset this file assembles on its way to a call. The auxiliary judges
+// each dispute (UPHOLD or OVERRULE; it may not raise new findings) and its
+// outcome lands as one terminal `type: "adjudication"` ledger row the
+// existing close gate reads unchanged. One adjudication per session, ever;
+// no verification round may open after it.
 
 import { statSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
@@ -40,6 +41,7 @@ import {
 import { readSessionState } from "../progress.ts";
 import { pythonRepr } from "../pythonJson.ts";
 import { NoCandidateError, RouterError, type RouteResult } from "../route.ts";
+import { ROLE_AUXILIARY_REVIEWER, reviewerExclusions } from "../selection.ts";
 import {
   OUTCOME_OVERRULED,
   VERDICT_ISSUES_FOUND,
@@ -266,20 +268,28 @@ export function recordDispute(
 
 
 /**
- * The exclusion superset: the orchestrator's effective provider AND every
- * provider that verified any round. The adjudicator is a third voice, never
- * a repeat one.
+ * The providers the Auxiliary Reviewer may not draw from: the author's, and
+ * every provider that has already reviewed a round.
+ *
+ * The rule is `selection.reviewerExclusions`, which is where each reviewing
+ * role's definition lives; what this adds is the reading of the ledger that
+ * the rule needs -- and it takes BOTH spellings, because archived rows are
+ * not rewritten and a round recorded before the rename still names a
+ * provider that must not review again.
  */
 export function adjudicationExclusions(
   orchestrator: OrchestratorIdentity,
   rounds: readonly Row[],
 ): string[] {
-  const providers = new Set<string>([orchestrator.effectiveProvider]);
-  for (const row of rounds) {
-    const provider = row["verifier_provider"];
-    if (provider) providers.add(String(provider));
-  }
-  return [...providers].sort();
+  const reviewed = rounds
+    .map((row) => row["reviewer_provider"] ?? row["verifier_provider"])
+    .filter((provider) => Boolean(provider))
+    .map((provider) => String(provider));
+  return reviewerExclusions(
+    ROLE_AUXILIARY_REVIEWER,
+    orchestrator.effectiveProvider,
+    reviewed,
+  );
 }
 
 /**
@@ -447,6 +457,7 @@ export async function runAdjudication(
   try {
     result = await dispatchVerification(prompt, {
       excludeProviders: excluded,
+      role: ROLE_AUXILIARY_REVIEWER,
       sessionNumber: current,
       transport: options.transport ?? null,
     });
@@ -505,8 +516,8 @@ export async function runAdjudication(
     type: "adjudication",
     verdict,
     blocking: !allOverruled,
-    verifier_model: result.model_name,
-    verifier_provider: result.provider,
+    reviewer_model: result.model_name,
+    reviewer_provider: result.provider,
     orchestrator_provider: orchestrator.effectiveProvider,
     findings: [],
     outcomes,

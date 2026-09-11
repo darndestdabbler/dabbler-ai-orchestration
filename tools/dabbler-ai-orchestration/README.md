@@ -25,14 +25,15 @@ the project is built from, module by module.
 
 **2. Automatic cross-provider verification.** Every session is reviewed
 before it closes by a model from a *different provider* than the one that
-did the work — the verifier is chosen by excluding the orchestrator's own
+did the work — the Primary Reviewer is defined as NOT THE AUTHOR, and
+where nobody has chosen a model it resolves by excluding the orchestrator's own
 provider, resolved from the model registry, never from a label a model
 reports about itself. Round 1 reviews the full evidence (the session's
 plan, `git status`, the complete diff, untracked files); when findings
 need fixing, later rounds review the fix delta, up to a bounded round cap.
 You don't have to remember to ask for it, and the AI cannot decide its own
 diff is too small to bother: a close with no verification evidence runs
-the verification itself, and when no cross-provider verifier can be
+the verification itself, and when no cross-provider reviewer can be
 reached the close stays blocked until an operator resolves it — there is
 no silent pass. A finding the orchestrator believes is wrong doesn't loop
 forever either: it can **dispute** the finding with evidence from the
@@ -76,7 +77,7 @@ click, and run in the repository itself.
 
 | | **Direct provider APIs** | **GitHub Copilot CLI seat** |
 |---|---|---|
-| Setup | Set `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_OPENAI_API_KEY` / `DABBLER_GEMINI_API_KEY` | Install the Copilot CLI and sign in; set `DABBLER_TRANSPORT=copilot-cli` |
+| Setup | Set `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_OPENAI_API_KEY` / `DABBLER_GEMINI_API_KEY` | Install the Copilot CLI and sign in; set the vehicle with `dabbler configure --transport copilot-cli` |
 | Spend | Metered API calls, every one recorded per model and per session | Covered by your existing Copilot subscription |
 | Best for | Anyone with provider accounts | Shops whose staff hold only a Copilot seat and cannot get provider keys |
 
@@ -110,7 +111,7 @@ while you weren't watching — months later, from the repo alone.
 
 **8. The machine owns the record.** All of the above is written through
 sanctioned, schema-validated writers; verification rounds land in a
-machine-only ledger with the raw verifier output saved before any parsing,
+machine-only ledger with the raw reviewer output saved before any parsing,
 and out-of-band edits are detectable. No code path accepts a hand-written
 verdict.
 

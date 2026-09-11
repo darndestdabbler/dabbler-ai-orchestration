@@ -46,7 +46,7 @@ session next` and do what it says until it says `done`.*
 - The repository has a `docs/sessions/session-plan.md` with a
   `### Session N of M:` block for the next session, and a `dabbler.yaml`
   at the root. (`dabbler bootstrap` makes both; see `quick-start.md`.)
-- The verifier needs a provider key in the environment —
+- The Primary Reviewer needs a provider key in the environment —
   `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY` or
   `DABBLER_GEMINI_API_KEY` — for a provider *other* than the engine's.
   Verification is cross-provider and there is no way to skip it.
@@ -231,7 +231,7 @@ on is the intervention the bound exists to force. If a step genuinely
 cannot be done, say so instead: `--status blocked` with the reason in
 `--notes`.
 
-The same shape carries the verifier's findings. When a round is blocking
+The same shape carries the Primary Reviewer's findings. When a round is blocking
 you are asked for a **disposition** per finding — `fix`, or `reject` with
 a reason and evidence paths — as JSON. A `fix` becomes a step named
 `fix-round-<N>`, checked by every plan step's checks; a `reject` becomes a
@@ -242,7 +242,7 @@ again. The step the framework is waiting on is written on `run.json` as
 `pending_step` until its report is accepted, which is what lets the call
 that resumes the session judge it before the phase's own work.
 
-### What the verifier can see, and what it may ask for
+### What the Primary Reviewer can see, and what it may ask for
 
 A round on the **Copilot seat** holds three tools — list, search, read —
 and the CLI runs them in its own process, so the framework can only
@@ -251,7 +251,7 @@ what it sees is the evidence bundle in front of it, and nothing else.
 
 That second case has one opening, and it is off unless your repository
 turns it on. With `verification.settings.api_file_requests: true`, an
-API verifier may **ask for files by path** — it emits a fenced
+API reviewer may **ask for files by path** — it emits a fenced
 `file-request` block naming them, and the framework is what opens them.
 Four things follow from the framework doing the opening rather than the
 model:
@@ -274,7 +274,7 @@ model:
 - The round records `mode: tools` **only if a file was actually
   delivered**. `operations_granted` says what was offered — `["read"]`
   where the setting is on — and `mode` says what the round had in front
-  of it, so a verifier that asked for nothing, or for nothing the
+  of it, so a reviewer that asked for nothing, or for nothing the
   framework could give it, records `mode: none` exactly as a blind round
   does. That is the distinction the measurement rests on: a round that
   saw only the evidence bundle is one of those, whatever it was offered.
@@ -290,7 +290,7 @@ complete suite as the run of record, and the close — four, for a session
 that declared itself releasable, whose publish runs between the push and
 the close. (The preverify phase runs nothing: the tests that run are each
 step's own checks and the complete suite as the run of record, and the
-verifier reviews without writing or running one.) None
+Primary Reviewer reviews without writing or running one.) None
 of them runs inside a `next` call. The framework starts each one detached
 and comes straight back:
 
@@ -486,7 +486,7 @@ that stalls a session:
 
 - **On this repository, the framework is source in the tree.** The engine
   may fix it. The fix is ordinary work — it rides in the session's own
-  diff and the verifier reviews it with everything else. Sessions 60 and
+  diff and the reviewer reviews it with everything else. Sessions 60 and
   62 both did exactly that on the operator's word. This is written down
   because session 62's engine wrote a correct diagnosis of a framework
   defect and then waited, believing the change was somebody else's to
@@ -862,7 +862,7 @@ Resume-by-id for the seat is owed, once one is measured.
   instruction.json    the current ask
   report.json         your current answer
   plan.json           the work plan
-  dispositions.json   the answer to the verifier's findings
+  dispositions.json   the answer to the reviewer's findings
   jobs/*.log          what the framework's own long work printed
   jobs/*.status.json  the exit code it ended on
   engine-01.log ...   one transcript per invocation, under `session drive`

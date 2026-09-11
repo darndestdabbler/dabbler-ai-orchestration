@@ -30,6 +30,7 @@ import {
   isStale,
   refreshStaleRecords,
   roleNames,
+  transportPresence,
   type FreshnessRow,
   type HttpGet,
 } from "../src/discovery.ts";
@@ -46,7 +47,7 @@ import {
 } from "../src/catalog.ts";
 import { HttpStatusError, HttpTimeoutError } from "../src/transports/api.ts";
 import { seatModel, type SeatEnumeration } from "../src/transports/copilot.ts";
-import { tempDir } from "./support/answers.ts";
+import { makeConfig, setProviderKeys, tempDir } from "./support/answers.ts";
 
 /**
  * What a block holds on disk, whatever scope it was written for.
@@ -616,7 +617,7 @@ describe("the catalog a session start brings up to date", () => {
 
 describe("the record-against-roles diff", () => {
   it("reports both directions", () => {
-    const roles = roleNames({ roles: { verifier: { prefer: ["gpt-ranked", "gpt-gone"] } } });
+    const roles = roleNames({ roles: { reviewer: { prefer: ["gpt-ranked", "gpt-gone"] } } });
     const known = new Map([
       ["gpt-ranked", [TRANSPORT_API]],
       ["gpt-unranked", [TRANSPORT_API]],
@@ -637,12 +638,12 @@ describe("the record-against-roles diff", () => {
     // inert on the API path rather than missing, and reporting it as missing
     // would train the reader to ignore the report.
     const roles = roleNames({
-      roles: { verifier: { prefer: ["gone"] }, generator: { prefer: ["gone"] } },
+      roles: { reviewer: { prefer: ["gone"] }, generator: { prefer: ["gone"] } },
     });
     const known = new Map([["seat-only", [TRANSPORT_SEAT, TRANSPORT_API, TRANSPORT_SEAT]]]);
     const drift = driftBetween(roles, known, []);
     assert.deepEqual(drift.unnamed, [["seat-only", "api,copilot-cli"]]);
-    assert.deepEqual(drift.unavailable, [["gone", "generator,verifier"]]);
+    assert.deepEqual(drift.unavailable, [["gone", "generator,reviewer"]]);
   });
 });
 
@@ -670,5 +671,36 @@ describe("reading what is in flight", () => {
       [],
     );
     assert.deepEqual(inFlightSessions(null), []);
+  });
+});
+
+describe("which vehicles this machine can reach", () => {
+  it("reads each kind for what it actually is, and names the reason an absent one is absent", () => {
+    // A vehicle nothing can reach is a way to fail rather than a choice, so
+    // presence is READ per kind: a key for the direct-API path, an answered
+    // seat for the seat, a named-and-existing directory for the scripted
+    // one. One test applied to all three would have to be wrong about two.
+    setCatalogPath(join(tempDir("presence-"), CATALOG_FILENAME));
+    const keyless = transportPresence(makeConfig());
+    const byName = (rows: ReturnType<typeof transportPresence>, id: string) =>
+      rows.find((row) => row.transport === id);
+    assert.equal(byName(keyless, TRANSPORT_API)?.present, false);
+    // Every absent one carries what would make it present, because "not
+    // offered" with no reason reads as a broken surface.
+    assert.ok(keyless.every((row) => row.present || row.note !== null));
+    // The seat's remedy is free, and says so: this repository has answered
+    // "what does reading the list cost" wrongly four times.
+    assert.match(String(byName(keyless, "copilot-cli")?.note), /free/);
+    // And the scripted transport is never present by accident: it is opted
+    // into by saying where the script lives.
+    assert.equal(byName(keyless, "offline")?.present, false);
+
+    setProviderKeys();
+    try {
+      assert.equal(byName(transportPresence(makeConfig()), TRANSPORT_API)?.present, true);
+      assert.equal(byName(transportPresence(makeConfig()), TRANSPORT_API)?.note, null);
+    } finally {
+      clearKeys();
+    }
   });
 });

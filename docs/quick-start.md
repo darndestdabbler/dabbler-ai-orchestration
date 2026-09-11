@@ -59,16 +59,15 @@ record — each verification round is written there *after* the tree
 snapshot it describes, so a committed ledger would present itself to the
 close gate as work done after verification.
 
-Finally it settles the transport **once**, with no question asked: if a
-GitHub Copilot seat is detected and you have no existing preference, it
-persists `DABBLER_TRANSPORT=copilot-cli` at **user** scope (HKCU on
-Windows, a marked block in `~/.profile` on POSIX) so every new shell and
-reboot inherits it. `--machine-scope` asks for the machine hive instead
-(HKLM, or `/etc/profile.d/dabbler-ai-router.sh`), which needs an elevated
-terminal; when it cannot be honoured the write falls back to user scope
-and says so rather than landing nowhere. An existing preference is never
-overridden. Force it either way with `--transport api|copilot-cli`, or
-leave it untouched with `--no-transport-detect`.
+**It writes nothing outside the project.** `--transport
+api|copilot-cli` sets the checkout's own vehicle, in its gitignored
+`local-overrides.yaml`; omit it and the project's configuration decides.
+Bootstrap used to detect a seat and persist `DABBLER_TRANSPORT` at user
+scope, and the one thing that reliably did was shadow whatever a later
+`dabbler configure` set — for every repository on the machine, from a
+per-project action — because the variable outranks every config layer.
+The variable is still *read*, so a deliberate override typed into a shell
+still works and the answer says which layer decided.
 
 Into a project with no session plan yet, it also scaffolds the two setup
 sessions into `docs/sessions/session-plan.md`. Tell your AI agent to
@@ -197,7 +196,7 @@ model is paid anything:
 2. **Is the deterministic evidence green?** The declared controls
    (`testing.controls`: compile, typecheck, lint, analyzer) and the tests
    the step's own changed paths select. A red required result comes back
-   to you here, because an exit code has already settled what a verifier
+   to you here, because an exit code has already settled what a reviewer
    would be paid to notice.
 
 **You do not commit while a step is open.** `dabbler bootstrap` installs a `pre-commit` hook that refuses a manual
@@ -225,12 +224,13 @@ dabbler verify
   complete working-tree diff, untracked file contents.
 - **Rounds ≥ 2** send only the fix delta (a diff from the previous
   round's recorded tree snapshot) plus the prior unresolved findings.
-- The verifier is always a **different provider** than the
-  orchestrator, on either transport; one retry excludes a failed
-  provider.
+- The **Primary Reviewer** is the role that returns the verdict, and it
+  is defined as *not the author*. Where nobody has selected a model it
+  resolves on a different provider than the orchestrator, on either
+  transport; one retry excludes a failed provider.
 - Each round appends one row to
   `.dabbler/runs/s<N>/rounds.jsonl` — machine-written only, never
-  edit it — with the raw verifier output saved alongside.
+  edit it — with the raw reviewer output saved alongside.
 - On blocking findings (`critical`/`major`): remediate, then re-run the
   same command. The loop suspends at the round cap
   (`verification.settings.max_rounds`, default 3). `dabbler verify
@@ -249,7 +249,7 @@ rung's exact command:
    mandatory (at least one existing repo path, optionally with a line
    range as `path:START-END`); prose-only disputes are refused. The
    next round presents the rebuttal beside the finding and the
-   verifier must UPHOLD it with reasons or WITHDRAW it.
+   Primary Reviewer must UPHOLD it with reasons or WITHDRAW it.
 
    ```
    dabbler verify dispute \
@@ -257,8 +257,10 @@ rung's exact command:
    ```
 
 2. **Adjudicate** — at the round cap, with every blocking finding
-   disputed, route the disputes to a third provider that neither
-   orchestrated nor verified any round. It judges each dispute
+   disputed, the **Auxiliary Reviewer** judges them. Its own definition
+   is *not the author and not the primary*, so a third voice is what the
+   role IS rather than a rule bolted on: no provider that orchestrated or
+   reviewed a round is eligible. It judges each dispute
    (UPHOLD or OVERRULE, with reasons; it may not raise new findings)
    and writes one terminal ledger row. All overruled → the session is
    clear to close; any upheld → the session is unresolved. One

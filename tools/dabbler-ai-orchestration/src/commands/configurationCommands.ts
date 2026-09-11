@@ -1,13 +1,19 @@
 // The Configuration section's controls: what the NEXT session is run with.
 //
-// Two settings and two controls, deliberately. `--engine` names who
-// orchestrates and the transport names how a provider is reached; they have
-// overridden each other here once already, at the level of an environment
-// variable, and a single "Copilot or Claude" switch would reproduce that one
-// level up where it is harder to see.
+// `--engine` names who orchestrates and the transport names how a provider
+// is reached; they have overridden each other here once already, at the
+// level of an environment variable, and a single "Copilot or Claude" switch
+// would reproduce that one level up where it is harder to see.
+//
+// **A vehicle belongs to a role.** The authoring model runs inside the
+// engine's own CLI; a reviewer is dispatched by the router over a transport,
+// and it is the reviewer's OWN transport rather than the machine's -- which
+// is the case this framework has stated since the transport reading was
+// written and no surface could act on. One word in front of a developer,
+// two kinds underneath.
 //
 // They are set in different places because they LIVE in different places.
-// The transport and the two models are router configuration, so the router
+// The transports and the models are router configuration, so the router
 // writes them -- this file never touches a config file, for the same reason
 // the trees never read a manifest. The engine is an argument to `session
 // start`, so its default belongs to the surface that offers to start one,
@@ -27,7 +33,7 @@ import {
   ENUMERATION_WORDS,
   FIDELITY_WORDS,
   PROVIDER_RELATION_WORDS,
-  VERIFIER_HELP,
+  REVIEWER_HELP,
 } from "../providers/solutionTreeModel";
 import type {
   ConfigurationModel,
@@ -35,8 +41,19 @@ import type {
   SolutionNode,
 } from "../providers/solutionTreeModel";
 
-/** The setting the Start pick reads for its default; the pane writes it. */
-export const ENGINE_SETTING = "dabbler.engine";
+/**
+ * The engine the next session is offered, as the router projects it.
+ *
+ * It lived in a VS Code setting until this read replaced it. A setting is
+ * invisible to `dabbler session start` typed in a terminal, so half a
+ * machine own configuration could not be seen by the one command that needs
+ * it; the choice is a file beside the catalog now, and both surfaces read it
+ * through the router.
+ */
+export function chosenEngineIn(projection: Projection | null | undefined): string | null {
+  const chosen = projection?.configuration?.engines?.chosen;
+  return chosen === undefined || chosen === null || chosen === "" ? null : chosen;
+}
 
 /** What a control needs of the editor, so the suite can drive one. */
 export interface ConfigurationUi {
@@ -51,8 +68,6 @@ export interface ConfigurationUi {
   showInformationMessage: (message: string) => unknown;
   showWarningMessage: (message: string) => unknown;
   workspaceRoot: () => string | undefined;
-  /** Where the engine default is remembered, which is not a config file. */
-  setEngine: (engine: string) => Thenable<void>;
   /** Open a file for reading, wherever on the machine it lives. */
   openFile: (path: string) => Thenable<unknown>;
 }
@@ -89,10 +104,6 @@ export function defaultConfigurationUi(): ConfigurationUi {
     showInformationMessage: (m) => vscode.window.showInformationMessage(m),
     showWarningMessage: (m) => vscode.window.showWarningMessage(m),
     workspaceRoot: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
-    setEngine: (engine) =>
-      vscode.workspace
-        .getConfiguration()
-        .update(ENGINE_SETTING, engine, vscode.ConfigurationTarget.Global),
     openFile: (path) =>
       vscode.workspace.openTextDocument(vscode.Uri.file(path)).then(
         (document) => vscode.window.showTextDocument(document, { preview: true }),
@@ -104,18 +115,19 @@ export function defaultConfigurationUi(): ConfigurationUi {
   };
 }
 
-/** The engine the next session is offered, or null when nobody has chosen. */
-export function chosenEngine(): string | null {
-  const declared = vscode.workspace.getConfiguration().get<string>(ENGINE_SETTING);
-  return declared === undefined || declared === "" ? null : declared;
-}
-
 const NEXT_SESSION = "This is the default for the NEXT session; a session in flight keeps what its record says.";
 
-/** What each transport costs, which is the half of the choice that matters. */
+/**
+ * What each transport costs, which is the half of the choice that matters.
+ *
+ * A seat bills AI CREDITS per token. Premium requests are the legacy
+ * platform, and this line said so for long enough that three engines in a
+ * row reasoned from it: the unit travels with the measurement or it does not
+ * travel.
+ */
 const TRANSPORT_MEANS: Record<string, string> = {
   api: "the provider's own endpoint, billed in tokens",
-  "copilot-cli": "a Copilot seat, billed in premium requests",
+  "copilot-cli": "a Copilot seat, billed in AI credits per token",
   offline: "scripted answers from disk: no network, no spend",
 };
 
@@ -156,6 +168,7 @@ function engineItems(
 function modelItems(
   models: readonly ConfigurationModel[],
   transport: string | undefined,
+  selected: string | null | undefined = null,
 ): vscode.QuickPickItem[] {
   return models.map((model) => ({
     label: model.model,
@@ -173,7 +186,9 @@ function modelItems(
     ]
       .filter((part) => part !== null && part !== "")
       .join(" · "),
-    detail: model.alias,
+    // Which one they already chose, so the list is a place to CHANGE a
+    // choice rather than a place to make one over again.
+    detail: model.model === selected ? "what you chose" : model.alias,
   }));
 }
 
@@ -191,10 +206,14 @@ export interface ConfigurationTarget {
  * than a report of what is here.
  */
 export async function setEngine(
+  router: Pick<Router, "configure">,
   target: ConfigurationTarget,
   launchable: readonly string[],
+  refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
+  const root = ui.workspaceRoot();
+  if (!root) return;
   const items = engineItems(target.projection ?? null, launchable);
   if (items.length === 0) {
     ui.showWarningMessage(
@@ -207,15 +226,18 @@ export async function setEngine(
     placeHolder: NEXT_SESSION,
   });
   if (!picked) return;
-  await ui.setEngine(picked.label);
-  ui.showInformationMessage(`${picked.label} is the engine the next session is offered. ${NEXT_SESSION}`);
+  // Through the ROUTER, into the user-level preferences beside the catalog.
+  // It was an editor setting, which `dabbler session start` typed in a
+  // terminal could not read -- so a machine could be configured in a way the
+  // one command that needs it could not see.
+  await write(router, root, { engine: picked.label }, ui, refreshed);
 }
 
 /** One router write, with whatever it said handed straight back. */
 async function write(
   router: Pick<Router, "configure">,
   root: string,
-  choice: { transport?: string; verifyingModel?: string },
+  choice: { engine?: string; transport?: string; reviewerTransport?: string; reviewerModel?: string },
   ui: ConfigurationUi,
   refreshed: () => void,
 ): Promise<void> {
@@ -346,14 +368,47 @@ export async function setRoleModel(
     ui.showInformationMessage(
       "The authoring model is the engine's own, declared when the session is " +
         "registered: run `dabbler session start` with `--model`, or use Start " +
-        "Session, which asks for it. Changing it here would not reach the run.",
+        "Session, which asks for it. Its vehicle is the engine CLI, set on the " +
+        "Engine row. Changing either here would not reach the run.",
     );
     return;
   }
-  const role = target.projection?.configuration?.verifying;
+  const role = target.projection?.configuration?.primaryReviewer;
+  // The vehicle first, and only where there is a choice to make. A machine
+  // with one reachable transport is told what carries the role rather than
+  // asked; a machine with two is asked, and nothing is picked for it. The
+  // two are separate writes deliberately: the candidate list on the row was
+  // read for the OUTGOING vehicle, so offering models from it after the
+  // vehicle moved would be offering a list the round will not use.
+  const vehicle = role?.vehicle;
+  if (vehicle && vehicle.options.length > 1) {
+    const chosen = await ui.pick(
+      vehicle.options.map((option) => ({
+        label: option.id,
+        description: option.means,
+        detail: option.id === vehicle.chosen ? "what carries it now" : undefined,
+      })),
+      {
+        title: "What carries the Primary Reviewer?",
+        placeHolder:
+          `${vehicle.chosen ?? "nothing"} now. A review may need the other ` +
+          `transport when provider independence requires it. ${NEXT_SESSION}`,
+      },
+    );
+    if (!chosen) return;
+    if (chosen.label !== vehicle.chosen) {
+      await write(router, root, { reviewerTransport: chosen.label }, ui, refreshed);
+      ui.showInformationMessage(
+        `The Primary Reviewer is carried by ${chosen.label}. Its models are ` +
+          "read from that vehicle, so open this row again to choose one.",
+      );
+      return;
+    }
+  }
   const items = modelItems(
     role?.candidates ?? [],
     target.projection?.configuration?.fidelityTransport,
+    role?.selected,
   );
   if (items.length === 0) {
     // Which record was read, and why it offered nothing. "No model
@@ -372,9 +427,9 @@ export async function setRoleModel(
     return;
   }
   const picked = await ui.pick(items, {
-    title: "Which model verifies the next session?",
-    placeHolder: VERIFIER_HELP + " " + NEXT_SESSION,
+    title: "Which model reviews the next session?",
+    placeHolder: REVIEWER_HELP + " " + NEXT_SESSION,
   });
   if (!picked) return;
-  await write(router, root, { verifyingModel: picked.label }, ui, refreshed);
+  await write(router, root, { reviewerModel: picked.label }, ui, refreshed);
 }

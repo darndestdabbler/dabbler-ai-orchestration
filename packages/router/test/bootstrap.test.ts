@@ -16,21 +16,20 @@ import {
   MANAGED_END,
   MANAGED_START,
   appendSuitesToProjectConfig,
-  SCOPE_MACHINE,
-  SCOPE_USER,
   detectEcosystems,
   ensureCommitGuard,
   ensureGitignore,
-  manualPersistHint,
-  persistedScope,
   renderProjectConfig,
-  resolveBootstrapTransport,
   scaffoldBootstrapSessions,
   scaffoldProjectConfig,
   scaffoldModuleManifest,
   writeInstructionFiles,
 } from "../src/bootstrap/index.ts";
-import { TRANSPORT_COPILOT_CLI, TRANSPORT_ENV_VAR } from "../src/config.ts";
+import {
+  LOCAL_OVERRIDES_FILENAME,
+  TRANSPORT_COPILOT_CLI,
+  TRANSPORT_ENV_VAR,
+} from "../src/config.ts";
 import {
   ID_GIT_REMOTE,
   ID_TESTING_SUITES,
@@ -55,91 +54,36 @@ function emptyRepo(): string {
   return makeAnsweredRepo({}).repo;
 }
 
-/** A writer that records what it was asked for and answers as told. */
-function writerThat(...answers: boolean[]): {
-  write: (machine: boolean) => boolean;
-  asked: boolean[];
-} {
-  const asked: boolean[] = [];
-  let index = 0;
-  return {
-    asked,
-    write: (machine: boolean): boolean => {
-      asked.push(machine);
-      return answers[index++] ?? false;
-    },
-  };
-}
-
-describe("which scope the preference lands at", () => {
-  it("writes user scope by default, without asking for elevation", () => {
-    const writer = writerThat(true);
-    assert.equal(persistedScope(false, true, writer.write), SCOPE_USER);
-    assert.deepEqual(writer.asked, [false]);
+/**
+ * The transport a bootstrap run names is written to the PROJECT's overlay
+ * and nothing outside it.
+ *
+ * `bootstrap` used to persist `DABBLER_TRANSPORT` at user scope. That
+ * variable outranks every config layer, so the one thing it reliably did was
+ * shadow whatever a later `dabbler configure` set -- for every repository on
+ * the machine, from a per-project action.
+ */
+describe("where a bootstrap run's transport lands", () => {
+  it("writes the project's own overlay and never the operator's environment", async () => {
+    const repo = emptyRepo();
+    const before = process.env[TRANSPORT_ENV_VAR];
+    const run = await capture(() =>
+      bootstrapVerb(["--project-dir", repo, "--transport", TRANSPORT_COPILOT_CLI]),
+    );
+    assert.equal(run.value, 0, run.stderr);
+    assert.match(
+      readFileSync(join(repo, LOCAL_OVERRIDES_FILENAME), "utf8"),
+      new RegExp(TRANSPORT_COPILOT_CLI),
+    );
+    // The account is untouched, whatever it held before.
+    assert.equal(process.env[TRANSPORT_ENV_VAR], before);
   });
 
-  it("writes machine scope when it was asked for and permitted", () => {
-    const writer = writerThat(true);
-    assert.equal(persistedScope(true, true, writer.write), SCOPE_MACHINE);
-    assert.deepEqual(writer.asked, [true]);
-  });
-
-  it("falls back to user scope when machine scope was not permitted", () => {
-    // The admin account is often a different user, and a preference that
-    // landed for the operator beats one that landed nowhere.
-    const writer = writerThat(true);
-    assert.equal(persistedScope(true, false, writer.write), SCOPE_USER);
-    assert.deepEqual(writer.asked, [false]);
-  });
-
-  it("falls back to user scope when the machine write itself fails", () => {
-    const writer = writerThat(false, true);
-    assert.equal(persistedScope(true, true, writer.write), SCOPE_USER);
-    assert.deepEqual(writer.asked, [true, false]);
-  });
-
-  it("reports that nothing landed when every scope fails", () => {
-    assert.equal(persistedScope(true, true, writerThat(false, false).write), null);
-  });
-
-  it("names a command the operator can run without another account", () => {
-    // A hint that says "re-run elevated" is useless when the admin account
-    // is a different user, so the hint is always the user-scope one.
-    const hint = manualPersistHint("copilot-cli");
-    assert.match(hint, new RegExp(TRANSPORT_ENV_VAR));
-    assert.match(hint, /copilot-cli/);
-    assert.ok(!hint.toLowerCase().includes("admin"));
-  });
-});
-
-describe("what the transport preference resolves to", () => {
-  it("takes an explicit choice over everything else", () => {
-    process.env[TRANSPORT_ENV_VAR] = "api";
-    const [value, reason] = resolveBootstrapTransport(TRANSPORT_COPILOT_CLI);
-    assert.equal(value, TRANSPORT_COPILOT_CLI);
-    assert.match(reason, /--transport/);
-  });
-
-  it("never overrides a preference already set", () => {
-    // Detection is a fact about the machine; a choice already made is a fact
-    // about the operator, and the second outranks the first.
-    process.env[TRANSPORT_ENV_VAR] = "api";
-    const [value, reason] = resolveBootstrapTransport(null);
-    assert.equal(value, null);
-    assert.match(reason, /already set to 'api'/);
-  });
-
-  it("leaves the default alone when nothing is set and no seat answers", () => {
-    // The seat probe shells out to a binary this machine may or may not
-    // have. Either answer is legitimate: what is asserted is that an unset
-    // preference never comes back as anything but a seat or the default.
-    delete process.env[TRANSPORT_ENV_VAR];
-    const [value, reason] = resolveBootstrapTransport(null);
-    if (value === null) assert.match(reason, /no Copilot seat detected/);
-    else {
-      assert.equal(value, TRANSPORT_COPILOT_CLI);
-      assert.match(reason, /detected a Copilot seat/);
-    }
+  it("changes nothing at all when no transport is named", async () => {
+    const repo = emptyRepo();
+    const run = await capture(() => bootstrapVerb(["--project-dir", repo]));
+    assert.equal(run.value, 0, run.stderr);
+    assert.ok(!existsSync(join(repo, LOCAL_OVERRIDES_FILENAME)));
   });
 });
 
@@ -336,7 +280,7 @@ describe("the Stop hook, at bootstrap", () => {
     const saved = process.env["CLAUDECODE"];
     process.env["CLAUDECODE"] = "1";
     try {
-      const run = await capture(() => bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]));
+      const run = await capture(() => bootstrapVerb(["--project-dir", repo]));
       assert.equal(run.value, 0, run.stderr);
       assert.match(run.stdout, /removed the stop gate from/);
       assert.deepEqual(JSON.parse(readFileSync(join(repo, ".claude", "settings.json"), "utf8")), {
@@ -344,7 +288,7 @@ describe("the Stop hook, at bootstrap", () => {
         theme: "dark",
       });
       // Nothing left to remove: the second run says nothing of it.
-      const again = await capture(() => bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]));
+      const again = await capture(() => bootstrapVerb(["--project-dir", repo]));
       assert.doesNotMatch(again.stdout, /stop gate/);
     } finally {
       if (saved === undefined) delete process.env["CLAUDECODE"];
@@ -535,7 +479,7 @@ describe("what setup does about the operator's typing", () => {
     const { repo, sessionsDir, calls } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const run = await capture(() =>
-      bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]),
+      bootstrapVerb(["--project-dir", repo]),
     );
     assert.equal(run.value, 0, run.stderr);
     assert.ok(existsSync(join(repo, "AGENTS.md")));
@@ -551,7 +495,7 @@ describe("what setup does about the operator's typing", () => {
     // says so again.
     declareSessionTask(sessionsDir, { sessionNumber: 1, task: "the work", releasable: false });
     const after = await capture(() =>
-      bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]),
+      bootstrapVerb(["--project-dir", repo]),
     );
     assert.match(after.stdout, /its land is what commits them/);
   });
@@ -560,7 +504,7 @@ describe("what setup does about the operator's typing", () => {
     // The close used to print `git push --set-upstream <remote> main` for a
     // remote nobody had created.
     const repo = emptyRepo();
-    await bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]);
+    await bootstrapVerb(["--project-dir", repo]);
     assert.ok(openDecisions(repo).map((row) => String(row["id"])).includes(ID_GIT_REMOTE));
   });
 
@@ -605,7 +549,7 @@ describe("what the Solution Explorer has to render", () => {
 
   it("writes the first projection, so the tree has content before any verb", async () => {
     const repo = emptyRepo();
-    await bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]);
+    await bootstrapVerb(["--project-dir", repo]);
     assert.ok(existsSync(join(repo, ".dabbler", "solution", "projection.json")));
   });
 });

@@ -437,7 +437,6 @@ describe("resolving a role against the seat", () => {
     roles: {
       generator: {
         prefer: ["claude-x", "gpt-x"],
-        require_provider_in: ["anthropic", "openai", "google"],
       },
     },
   };
@@ -522,13 +521,16 @@ describe("resolving a role against the seat", () => {
     );
   });
 
-  it("applies the role's provider filter", () => {
-    const config = {
-      roles: { generator: { prefer: ["claude-x", "gpt-x"], require_provider_in: ["openai"] } },
-    };
-    assert.deepEqual(resolveRoleCandidates(config, SEAT, "generator"), [
-      ["gpt-x", "openai"],
-    ]);
+  it("applies the caller's provider exclusion", () => {
+    // The role carries no provider set any more: the catalog already says
+    // what this machine reaches, and a filter listing the three vendors was
+    // a second inventory beside it. What remains is the CALLER's exclusion,
+    // which is a fact about this call rather than about the role.
+    const config = { roles: { generator: { prefer: ["claude-x", "gpt-x"] } } };
+    assert.deepEqual(
+      resolveRoleCandidates(config, SEAT, "generator", ["anthropic", "google"]),
+      [["gpt-x", "openai"]],
+    );
   });
 });
 

@@ -21,9 +21,13 @@ describe("resolving a cited path", () => {
 });
 
 describe("who an adjudication excludes", () => {
-  it("excludes the orchestrator's provider and every verifier that has spoken, sorted, once each", () => {
+  it("excludes the author's provider and every reviewer that has spoken, in either spelling, sorted, once each", () => {
+    // Both spellings, because archived rows are not rewritten: a ledger
+    // that predates the rename still names a provider that must not review
+    // this session again, and a reader that took only the new key would let
+    // it back in at the one point with no appeal.
     const identity = { effectiveProvider: "anthropic", provenance: null, source: "record", model: null, engine: "claude-code" };
-    assert.deepEqual(adjudicationExclusions(identity, [{ verifier_provider: "openai" }, { verifier_provider: "openai" }, { verifier_provider: "google" }, {}]), ["anthropic", "google", "openai"]);
+    assert.deepEqual(adjudicationExclusions(identity, [{ reviewer_provider: "openai" }, { verifier_provider: "openai" }, { verifier_provider: "google" }, {}]), ["anthropic", "google", "openai"]);
   });
 });
 

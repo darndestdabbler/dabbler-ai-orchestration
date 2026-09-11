@@ -16,6 +16,7 @@
         "secretResolver",
         "sessionState",
         "catalog",
+        "preferences",
         "resolution",
         "version"
       ]
@@ -74,7 +75,6 @@
         "driver",
         "agency",
         "approvedPlan",
-        "planReview",
         "session",
         "land"
       ]

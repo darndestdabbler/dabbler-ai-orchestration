@@ -645,8 +645,25 @@ suite("solutionTreeModel: what a session is run with", () => {
           excludes: [],
           fellThrough: false,
         },
-        verifying: {
-          role: "verifier",
+        primaryReviewer: {
+          role: "reviewer",
+          selected: "gpt-5.6-terra",
+          vehicle: {
+            kind: "transport",
+            options: [
+              { id: "api", means: "the provider's own endpoint, billed in tokens" },
+            ],
+            withheld: [
+              {
+                id: "copilot-cli",
+                means: "a Copilot seat, billed in AI credits per token",
+                note: "this machine's seat has not answered yet",
+              },
+            ],
+            chosen: "api",
+            decidedBy: "roles.reviewer.transport",
+            appliesTo: "next-session",
+          },
           chosen: {
             alias: "gpt-5-6-terra",
             model: "gpt-5.6-terra",
@@ -729,11 +746,22 @@ suite("solutionTreeModel: what a session is run with", () => {
       // Cross-provider is a LABEL now rather than a refusal: the row says
       // how this reviewer stands to the author, and says the price its own
       // source stated as a price rather than as a capability.
-      const verifying = rendered.find((row) => row.label === "Verifying model");
-      assert.ok(verifying?.description?.includes("gpt-5.6-terra"));
-      assert.ok(verifying?.tooltip?.includes("different provider"));
-      assert.ok(verifying?.tooltip?.includes("blind spots"));
-      assert.ok(verifying?.tooltip?.includes("PRICE and not a capability"));
+      const primaryReviewer = rendered.find((row) => row.label === "Primary Reviewer");
+      assert.ok(primaryReviewer?.description?.includes("gpt-5.6-terra"));
+      assert.ok(primaryReviewer?.tooltip?.includes("different provider"));
+      assert.ok(primaryReviewer?.tooltip?.includes("blind spots"));
+      assert.ok(primaryReviewer?.tooltip?.includes("PRICE and not a capability"));
+
+      // What carries the role, and why the vehicle it does not have is not
+      // there. "Not offered" with no reason reads as a broken pane.
+      assert.ok(primaryReviewer?.tooltip?.includes("You chose gpt-5.6-terra"));
+      assert.ok(primaryReviewer?.tooltip?.includes("nothing is substituted for it"));
+      assert.ok(primaryReviewer?.tooltip?.includes("Vehicle: api"));
+      assert.ok(primaryReviewer?.tooltip?.includes("roles.reviewer.transport"));
+      assert.ok(
+        primaryReviewer?.tooltip?.includes("copilot-cli is not offered"),
+        primaryReviewer?.tooltip,
+      );
 
       // And the engine's default carries the sentence that says why.
       const engine = rendered.find((row) => row.label === "Engine");
@@ -799,7 +827,7 @@ suite("solutionTreeModel: is the model we asked for the model that answered", ()
     "    timeout_seconds: 30",
     "    retry: { max_retries: 1, backoff_base_seconds: 0 }",
     "roles:",
-    "  verifier:",
+    "  reviewer:",
     "    prefer: [o-reviewer]",
     "escalation:",
     "  enabled: false",
@@ -961,19 +989,19 @@ suite("solutionTreeModel: is the model we asked for the model that answered", ()
     // provider; the other was said so by the seat, about itself.
     assert.strictEqual(p.configuration?.fidelityTransport, "api");
     assert.strictEqual(p.configuration?.authoring?.chosen?.fidelity, "honoured");
-    assert.strictEqual(p.configuration?.verifying?.chosen?.fidelity, "not-known");
+    assert.strictEqual(p.configuration?.primaryReviewer?.chosen?.fidelity, "not-known");
 
     const authoring = descriptorFor({ kind: "configRole", role: "authoring" }, p);
-    const verifying = descriptorFor({ kind: "configRole", role: "verifying" }, p);
+    const primaryReviewer = descriptorFor({ kind: "configRole", role: "primaryReviewer" }, p);
     // Three answers read as three: what the rows SAY differs, and the one
     // with no evidence does not read as the one with a provider's word.
-    assert.notStrictEqual(authoring.description, verifying.description);
+    assert.notStrictEqual(authoring.description, primaryReviewer.description);
     assert.ok(authoring.description?.includes("answers as itself"));
-    assert.ok(verifying.description?.includes("not known"));
-    assert.ok(!verifying.description?.includes("answers as itself"));
+    assert.ok(primaryReviewer.description?.includes("not known"));
+    assert.ok(!primaryReviewer.description?.includes("answers as itself"));
     // And the row says what the answer is an answer ABOUT, so the seat's
     // evidence can never be read as the API's.
-    assert.ok(verifying.tooltip?.includes("api"));
-    assert.ok(verifying.tooltip?.includes("echo"));
+    assert.ok(primaryReviewer.tooltip?.includes("api"));
+    assert.ok(primaryReviewer.tooltip?.includes("echo"));
   });
 });

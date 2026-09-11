@@ -16,8 +16,10 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
 import { readModuleSessionMarker } from "./checkout.ts";
+import { normalizeModelToken } from "./contracts/models.ts";
 import {
   TRANSPORT_COPILOT_CLI,
+  explainRoleTransport,
   explainTransport,
   loadConfig,
   type RouterConfig,
@@ -28,6 +30,7 @@ import {
   apiSelectableModels,
   checkFreshness,
   isStale,
+  transportPresence,
   type FreshnessRow,
   type RetiredModel,
 } from "./discovery.ts";
@@ -35,6 +38,7 @@ import { installedEngines } from "./engines.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { readExposure } from "./exposure.ts";
 import { platformNewlines } from "./journal.ts";
+import { PREFERENCES_FILENAME, chosenEngine } from "./preferences.ts";
 import { dumps } from "./pythonJson.ts";
 import { readBundleRecords } from "./land.ts";
 import { type ModuleEntry, type SolutionShape, consumersOf, ManifestError, solutionShape } from "./modules.ts";
@@ -60,10 +64,11 @@ import {
   reconcileResolution,
 } from "./resolution.ts";
 import {
-  ROLE_VERIFIER,
+  ROLE_PRIMARY_REVIEWER,
   modelFidelity,
+  type ResolveOptions,
   roundObservations,
-  verifierRefusal,
+  reviewerRefusal,
   type RoleResolution,
   type Fidelity,
   type ModelObservation,
@@ -257,8 +262,8 @@ const NOTHING_RESOLVES: RoleResolution<readonly [string, string, string]> = {
   rank: null,
   fellThrough: false,
   removed: [],
-  pin: null,
-  pinUnmet: null,
+  selected: null,
+  selectedUnmet: null,
 };
 
 /**
@@ -274,9 +279,18 @@ const NOTHING_RESOLVES: RoleResolution<readonly [string, string, string]> = {
  */
 export interface RoleReading {
   readonly enumeration: string;
+  /**
+   * How a role resolves here.
+   *
+   * `options.applySelection` is false for a SURFACE: a pane asks what could
+   * answer, so it must see the whole list and merely report the selection --
+   * a pane narrowed to the one model already chosen would offer the
+   * operator their own choice and no way back out of it.
+   */
   readonly resolve: (
     role: string,
     exclude: readonly string[] | null,
+    options?: ResolveOptions,
   ) => RoleResolution<readonly [string, string, string]>;
   readonly retired: ReadonlyMap<string, RetiredModel>;
   /**
@@ -363,8 +377,8 @@ export function roleReading(config: RouterConfig, transport: string): RoleReadin
   }
   return {
     enumeration,
-    resolve: (role, exclude) => {
-      const resolution = explainRoleCandidates(config, models, role, exclude);
+    resolve: (role, exclude, options) => {
+      const resolution = explainRoleCandidates(config, models, role, exclude, options);
       // The catalog has no aliases on either transport: an id is both what a
       // registry would have called the model and what goes on the wire, so
       // the third element carries the id rather than a second name for it.
@@ -432,7 +446,7 @@ function candidateNode(
  *
  * `excludes` carries the providers the role was resolved AGAINST, which is
  * where the cross-provider invariant becomes visible rather than restated --
- * the verifying role is resolved with the authoring model's provider
+ * the reviewing role is resolved with the authoring model's provider
  * excluded, by the same rule that excludes it immediately before the wire.
  */
 function roleNode(
@@ -441,7 +455,7 @@ function roleNode(
   exclude: readonly string[] | null,
   fidelity: (model: string) => Fidelity,
   /**
-   * The authoring model, on the verifying role: the one model this role may
+   * The authoring model, on a reviewing role: the one model this role may
    * not be, and the whole of what it may not be.
    *
    * It is a MODEL and no longer a provider. Excluding the author's provider
@@ -457,11 +471,15 @@ function roleNode(
   authorProvider: string | null = null,
 ): Node {
   const retired = reading.retired;
-  const resolution = reading.resolve(role, exclude);
+  // Everything this role COULD be, not the one thing it will be: a pane
+  // narrowed to the operator's own selection would offer them the choice
+  // they already made and no way back out of it. The selection is reported
+  // instead, and the row marks it.
+  const resolution = reading.resolve(role, exclude, { applySelection: false });
   // A model the catalog has stopped listing is not a candidate at all: it
   // left the active list for the archive when its source stopped naming it.
   // It is still SHOWN, from the archive, because an operator whose usual
-  // verifier vanished from a list needs to know it was withdrawn rather than
+  // reviewer vanished from a list needs to know it was withdrawn rather than
   // wonder what they broke -- and the archive holds an id and a date, which
   // is exactly what that question needs and nothing more.
   // The one rule, applied in the one reading, so what the pane OFFERS and
@@ -470,9 +488,20 @@ function roleNode(
   const served = resolution.candidates.filter(
     ([modelId]) =>
       !retired.has(modelId) &&
-      (notThisModel === null || verifierRefusal(notThisModel, modelId) === null),
+      (notThisModel === null || reviewerRefusal(notThisModel, modelId) === null),
   );
-  const chosen = served[0];
+  // What will actually answer: the operator's selection where they made one
+  // and it survives this call, and the head of the preference order where
+  // they did not. A row that showed the preference order's pick while a
+  // selection stood would be reporting something that does not happen --
+  // which is the defect this whole block of work exists to end.
+  const chosen =
+    resolution.selected === null
+      ? served[0]
+      : served.find(
+          ([modelId]) =>
+            normalizeModelToken(modelId) === normalizeModelToken(resolution.selected as string),
+        );
   return {
     role,
     chosen: chosen === undefined ? null : candidateNode(chosen, fidelity, retired, reading.priceCategory, authorProvider),
@@ -483,6 +512,11 @@ function roleNode(
       candidateNode([entry.id, entry.provider, entry.id], fidelity, retired, reading.priceCategory),
     ),
     excludes: [...(exclude ?? [])],
+    // What the operator chose, or null where nobody chose. Reported rather
+    // than applied here, and the two are different facts: a role with no
+    // selection resolves by preference, and one with a selection dispatches
+    // to it or stops.
+    selected: resolution.selected,
     // A role that fell past its own preference order picked a model nobody
     // named. The 364-request session is why that is worth a row.
     fellThrough: resolution.fellThrough,
@@ -518,7 +552,7 @@ const ENGINE_PROVIDERS: Readonly<Record<string, string>> = {
  * An undeclared role has no preference order, no provider set and no pin, so
  * `explainRole` returns every candidate in the order the transport listed
  * them -- and that is exactly what "every model this machine could author
- * with" means. Naming it rather than borrowing the verifier's role is the
+ * with" means. Naming it rather than borrowing a reviewing role is the
  * difference between asking a question and asking somebody else's.
  */
 const ROLE_EVERY_MODEL = "every-model";
@@ -567,9 +601,9 @@ function authoringNode(
   const retired = reading.retired;
   // Resolved through a role NOBODY declares, which is every model the
   // transport lists in the order it listed them. It used to borrow the
-  // verifier's role to mean "the whole catalog", and a role is not a synonym
-  // for that: a verifier pin collapsed this list to one model, and the
-  // verifier's own preferences and provider set reordered and filtered a
+  // reviewer's role to mean "the whole catalog", and a role is not a synonym
+  // for that: a reviewer pin collapsed this list to one model, and the
+  // reviewer's own preferences and provider set reordered and filtered a
   // list they have nothing to do with.
   const listed = reading
     .resolve(ROLE_EVERY_MODEL, null)
@@ -599,6 +633,116 @@ function authoringNode(
     fellThrough: false,
     enumeration: reading.enumeration,
     unavailable: reading.unavailable,
+  };
+}
+
+// --- The vehicle a role is reached through ----------------------------------
+//
+// **One word in front of a developer, two fields underneath.** A role is
+// dispatched through something, and that something is not the same KIND of
+// thing for every role: the authoring model runs inside the engine's own
+// CLI, and each reviewer is dispatched by the router over a transport. One
+// word, *vehicle*, because it is one question -- what carries this role --
+// and two fields, because the value sets and the writability differ.
+//
+// The authoring vehicle is a REPORT for the session in flight. Engine
+// identity is recorded at `session start`, so a control that appeared to
+// change it would be offering something the ledger will not honour; what a
+// person sets here is what the NEXT session is offered, and the row says so.
+//
+// **A vehicle nothing can reach is not offered.** Presence is read per kind,
+// because the three kinds are present for different reasons -- see
+// `discovery.transportPresence` and `engines.installedEngines`, each of
+// which already answers its own half and neither of which guesses.
+
+export const VEHICLE_ENGINE = "engine";
+export const VEHICLE_TRANSPORT = "transport";
+
+/** One option a vehicle row may offer, with what reaching it means. */
+function vehicleOption(id: string, means: string): Node {
+  return { id, means };
+}
+
+/**
+ * Why the engine is the engine, when a person chose it.
+ *
+ * Said once, because a pane and a terminal disagreeing about the same
+ * machine is the defect the preferences file exists to end: the choice used
+ * to live in a VS Code setting, where `dabbler session start` from a
+ * terminal could not read it.
+ */
+function enginePreferenceReason(engine: string): string {
+  return (
+    `${engine} is what this machine's ${PREFERENCES_FILENAME} chose. It is ` +
+    "read by `dabbler session start` from any terminal, which is why it is a " +
+    "file beside the catalog rather than an editor setting."
+  );
+}
+
+/**
+ * The authoring role's vehicle: the engine CLI, as this machine has it.
+ *
+ * `chosen` is the orchestrator's engine while a session is in flight and the
+ * machine's own default otherwise, and `settable` is false either way for
+ * the session on the record -- which is the sentence the pane needs, not a
+ * control it has to disable for reasons it invents.
+ */
+function engineVehicleNode(root: string): Node {
+  const reading = installedEngines();
+  const present = reading.engines.filter((entry) => entry.path !== null);
+  const inFlight = orchestratorOf(root).engine;
+  const preferred = chosenEngine();
+  return {
+    kind: VEHICLE_ENGINE,
+    // Only what this machine has: an engine with no CLI on PATH is a way to
+    // fail rather than a choice, and the engines row beside this one still
+    // reports the whole list with what is missing from it.
+    options: present.map((entry) => vehicleOption(entry.engine, entry.program)),
+    chosen: inFlight ?? preferred ?? reading.chosen,
+    // Which of the three the `chosen` above is. A row that could not say
+    // would leave a developer unable to tell a report from a choice from a
+    // default -- and the whole point of a preferences file is that a choice
+    // is a different thing from a machine's default.
+    decidedBy:
+      inFlight !== null
+        ? "session start"
+        : preferred !== null
+          ? PREFERENCES_FILENAME
+          : "installed on PATH",
+    // A choice here reaches the NEXT session and never the one on the
+    // record: engine identity is stamped when the session is registered.
+    appliesTo: "next-session",
+    reason: preferred === null ? reading.reason : enginePreferenceReason(preferred),
+  };
+}
+
+/**
+ * A reviewing role's vehicle: the transport it is dispatched over, and the
+ * transports this machine could put it on instead.
+ *
+ * Read PER ROLE. `config.explainRoleTransport` is what makes that true, and
+ * it is the repair of a thing this repository has stated and not done since
+ * the transport reading was written: reviewer selection may use the other
+ * transport when provider independence requires it, while one global reading
+ * scoped every role.
+ */
+function transportVehicleNode(config: RouterConfig, role: string): Node {
+  const reading = explainRoleTransport(config, role);
+  const presence = transportPresence(config);
+  return {
+    kind: VEHICLE_TRANSPORT,
+    options: presence
+      .filter((entry) => entry.present)
+      .map((entry) => vehicleOption(entry.transport, entry.means)),
+    // Why an absent one is absent. "Not offered" with no reason is how an
+    // operator comes to believe the pane is broken rather than honest.
+    withheld: presence
+      .filter((entry) => !entry.present)
+      .map((entry) => ({ id: entry.transport, means: entry.means, note: entry.note })),
+    chosen: reading.transport,
+    decidedBy: reading.decidedBy,
+    appliesTo: "next-session",
+    layers: reading.layers.map((layer) => ({ ...layer })),
   };
 }
 
@@ -636,23 +780,37 @@ export function configurationNode(root: string): Node {
   const engines = installedEngines();
   try {
     const transport = explainTransport(config);
-    // Read for the transport in force. A model's fidelity is not one fact:
-    // the same model on the seat and on the direct-API path is two different
-    // questions with two different kinds of answer.
-    const fidelity = fidelityOn(root, config, transport.transport);
-    // The enumeration the transport in force owns, with what that record
-    // says is no longer served -- read once, for both roles. A withdrawn
-    // model is withheld from what is offered rather than deleted from the
-    // record that still carries it.
-    const reading = roleReading(config, transport.transport);
+    // The authoring model runs inside the engine's CLI, so the list it is
+    // read from is the one the transport in force enumerates; the reviewing
+    // roles are read through their OWN vehicles, which is the whole of this
+    // step. One reading per transport, so two roles on one transport share
+    // the one file read rather than repeating it.
+    const readings = new Map<string, RoleReading>();
+    const readingFor = (name: string): RoleReading => {
+      const held = readings.get(name);
+      if (held !== undefined) return held;
+      const made = roleReading(config, name);
+      readings.set(name, made);
+      return made;
+    };
+    // A model's fidelity is not one fact: the same model on the seat and on
+    // the direct-API path is two different questions with two different
+    // kinds of answer, so it is read for the transport the ROLE is on.
+    const fidelityFor = (name: string): ((model: string) => Fidelity) =>
+      fidelityOn(root, config, name);
     // The authoring model is the ENGINE's, declared at `session start` and
     // kept on the record from that moment. It was resolved as a role until
     // now, and that role was dispatched by nothing -- `route()`'s fallback,
     // named by none of its four callers -- so the pane had two authors, one
-    // of which changed nothing, and it filtered the verifier list against
+    // of which changed nothing, and it filtered the reviewer list against
     // the wrong one.
-    const authoring = authoringNode(root, reading, fidelity);
+    const authoring = authoringNode(
+      root,
+      readingFor(transport.transport),
+      fidelityFor(transport.transport),
+    );
     const author = authoring["chosen"] as Node | null;
+    const primaryTransport = explainRoleTransport(config, ROLE_PRIMARY_REVIEWER).transport;
     return {
       transport: {
         effective: transport.transport,
@@ -665,23 +823,29 @@ export function configurationNode(root: string): Node {
       // API's.
       fidelityTransport: transport.transport,
       engines: {
-        chosen: engines.chosen,
-        reason: engines.reason,
+        // The preference where there is one, the machine's default where
+        // there is not. Two answers to "which engine" is how a pane and a
+        // terminal come to disagree about the same machine.
+        chosen: chosenEngine() ?? engines.chosen,
+        reason: chosenEngine() === null ? engines.reason : enginePreferenceReason(chosenEngine() as string),
         installed: engines.engines.map((entry) => ({ ...entry })),
       },
-      authoring,
+      authoring: { ...authoring, vehicle: engineVehicleNode(root) },
       // Not the author's PROVIDER: the author's own model, and nothing else.
       // Whether a second model from one vendor is far enough from the first
-      // is the developer's judgement, and step seven labels the pair so they
-      // can make it.
-      verifying: roleNode(
-        reading,
-        ROLE_VERIFIER,
-        null,
-        fidelity,
-        author === null ? null : String(author["model"]),
-        author === null ? null : String(author["provider"]),
-      ),
+      // is the developer's judgement, and the label on each option is what
+      // lets them make it.
+      primaryReviewer: {
+        ...roleNode(
+          readingFor(primaryTransport),
+          ROLE_PRIMARY_REVIEWER,
+          null,
+          fidelityFor(primaryTransport),
+          author === null ? null : String(author["model"]),
+          author === null ? null : String(author["provider"]),
+        ),
+        vehicle: transportVehicleNode(config, ROLE_PRIMARY_REVIEWER),
+      },
       records: checkFreshness(config, Date.now()).map(recordNode),
     };
   } catch (error) {

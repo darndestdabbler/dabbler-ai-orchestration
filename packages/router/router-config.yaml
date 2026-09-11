@@ -59,28 +59,33 @@ providers:
 transport:
   profile: copilot-cli
 
-# Selection is by role, and one resolver applies it on both transports
-# (ai_router.selection). A role declares the provider set it may draw from —
-# a hard filter — and a preference order, which is ordering only: a model the
-# order does not name still qualifies and simply sorts after the named ones.
-# That is what keeps a stale list from costing a candidate. Names are model
-# ids as each transport puts them on the wire, so a name that exists on only
-# one path is inert on the other rather than an error.
+# Selection is by role, and one resolver applies it on both transports.
+# A role declares a preference order and, where it needs one, its own
+# vehicle. `prefer` is ORDERING ONLY: a model the order does not name still
+# qualifies and simply sorts after the named ones, which is what keeps a
+# stale list from costing a candidate. Names are model ids as each transport
+# puts them on the wire, so a name that exists on only one path is inert on
+# the other rather than an error.
+#
+# What a person CHOSE is not here. A selection lives in this machine's
+# user-level preferences beside the model catalog, because which model
+# reviews is a fact about who is at this keyboard and what their machine can
+# reach -- one that travelled inside a checkout would tell the next clone
+# about somebody else's seat.
 roles:
-  verifier:
-    # A verifier's job is to be right about whether work ships, which is the
-    # wrong place to economise -- so this order names the models worth asking
-    # first. It is an ORDER and not a permission: nothing is refused for being
-    # absent from it, because which model is fit to review another is a
-    # judgement this framework has no data to make and the developer does.
+  # The Primary Reviewer: not the author, and the voice whose verdict blocks
+  # a close. A reviewer's job is to be right about whether work ships, which
+  # is the wrong place to economise -- so this order names the models worth
+  # asking first. It is an ORDER and not a permission: nothing is refused for
+  # being absent from it, because which model is fit to review another is a
+  # judgement this framework has no data to make and the developer does.
+  reviewer:
     prefer: [gpt-5.6-terra, gpt-5.6-sol, gpt-5.4, claude-sonnet-5]
-    require_provider_in: [anthropic, openai, google]
-  plan-review:
-    prefer: [gpt-5.4-mini, gemini-2.5-flash, claude-haiku-4.5]
-    require_provider_in: [anthropic, openai, google]
-  plan-review-escalated:
-    prefer: [claude-opus-5, gpt-5.5, gemini-3.1-pro-preview]
-    require_provider_in: [anthropic, openai, google]
+  # The Auxiliary Reviewer: not the author and not the primary. It is reached
+  # only when the primary's findings are disputed at the cap, and its own
+  # definition is what makes it a third voice rather than a repeat one.
+  auxiliary-reviewer:
+    prefer: [gpt-5.6-terra, gpt-5.6-sol, gpt-5.4, claude-sonnet-5]
 
 # The copilot-cli transport's own settings; inert unless that transport is
 # selected. Which models this seat has is not configured here and never was a

@@ -23,7 +23,7 @@ import {
   rootNodes,
 } from "./solutionTreeModel";
 import { reprojectSolution } from "../router/host";
-import { chosenEngine } from "../commands/configurationCommands";
+import { chosenEngineIn } from "../commands/configurationCommands";
 
 const PROJECTION_RELPATH = path.join(".dabbler", "solution", "projection.json");
 
@@ -176,7 +176,7 @@ export class SolutionTreeProvider
       // Read at paint time rather than cached: it is a setting, and a
       // setting changed in the settings editor must not need a window
       // reload to reach the row that reports it.
-      chosenEngine: chosenEngine(),
+      chosenEngine: chosenEngineIn(this.currentProjection()),
     });
 
     const item = new vscode.TreeItem(

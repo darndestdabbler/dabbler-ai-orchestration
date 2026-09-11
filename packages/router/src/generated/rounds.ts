@@ -10,7 +10,21 @@ export type Rounds = {
   phase?: "full" | "fix-delta";
   verdict: "VERIFIED" | "ISSUES_FOUND" | "WAIVED" | "REMEDIATED_AT_CAP";
   blocking: boolean;
+  /**
+   * The model that reviewed this round. Rows written before the role was renamed carry 'verifier_model' instead; readers take both, because archived rows are not rewritten.
+   */
+  reviewer_model?: string;
+  /**
+   * That model's provider. The pre-rename spelling is 'verifier_provider'.
+   */
+  reviewer_provider?: string;
+  /**
+   * Retired spelling of 'reviewer_model', still read so archived ledgers validate. No writer emits it.
+   */
   verifier_model?: string;
+  /**
+   * Retired spelling of 'reviewer_provider', still read so archived ledgers validate. No writer emits it.
+   */
   verifier_provider?: string;
   orchestrator_provider?: string;
   findings: Array<{
@@ -45,7 +59,7 @@ export type Rounds = {
   };
   recorded_at: string;
   /**
-   * The router version that recorded this round, as its own manifest declares it. Additive and absent on rows written before it existed. A round is the framework's own judgement of a change, so which framework made it is part of what the row says -- and unlike the verifier's model, nothing else in the row carries it.
+   * The router version that recorded this round, as its own manifest declares it. Additive and absent on rows written before it existed. A round is the framework's own judgement of a change, so which framework made it is part of what the row says -- and unlike the reviewer's model, nothing else in the row carries it.
    */
   framework_version?: string;
   transport?: string;
@@ -111,7 +125,7 @@ export type Rounds = {
     findings: Record<string, unknown>[];
   };
   /**
-   * The model id this round ASKED for -- what went on the wire. `verifier_model` is the alias or catalog id the ladder knew it by, which is not always the same string and is never the provider's answer.
+   * The model id this round ASKED for -- what went on the wire. `reviewer_model` is the alias or catalog id the ladder knew it by, which is not always the same string and is never the provider's answer.
    */
   requested_model?: string | null;
   /**

@@ -101,7 +101,7 @@ import { isArgvTooLarge, quoteForCmd, resolveProgram, spawnProgram, terminateTre
 import { hiddenSpawn } from "../journal.ts";
 import {
 } from "../seatCost.ts";
-import { explainRole, type RoleResolution } from "../selection.ts";
+import { explainRole, type ResolveOptions, type RoleResolution } from "../selection.ts";
 import { truthy, type RouterConfig } from "../config.ts";
 import { isOk, type APIResult, type DispatchRequest, type Transport } from "./base.ts";
 
@@ -1851,12 +1851,14 @@ export function explainRoleCandidates(
   models: readonly CatalogModel[],
   role: string,
   excludeProviders: readonly string[] | null = null,
+  options: ResolveOptions = {},
 ): RoleResolution<readonly [string, string]> {
   return explainRole(
     config,
     role,
     models.filter(selectable).map((entry) => [entry.id, entry.provider as string] as const),
     excludeProviders,
+    options,
   );
 }
 

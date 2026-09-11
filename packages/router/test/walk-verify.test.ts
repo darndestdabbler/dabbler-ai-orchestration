@@ -89,7 +89,7 @@ const repo = makeRepo(
     "docs/sessions/session-plan.md":
       "### Session 1 of 6: The widget\n1. Register.\n2. Make `widget()` return 2.\n3. Verify; close.\n\n" +
       "### Session 2 of 6: Again\n1. Register.\n2. Polish.\n\n### Session 3 of 6: Once more\n1. Register.\n2. Finish.\n\n" +
-      "### Session 4 of 6: The verifier asks\n1. Register.\n2. Change the widget.\n\n" +
+      "### Session 4 of 6: The reviewer asks\n1. Register.\n2. Change the widget.\n\n" +
       "### Session 5 of 6: And asks with nothing granted\n1. Register.\n2. Change it again.\n\n" +
       "### Session 6 of 6: And is given what it asked for\n1. Register.\n2. Change it once more.\n",
     "dabbler.yaml": "schema_version: 1\n",
@@ -158,7 +158,7 @@ function commitAt(name: string, when: string): string {
 }
 
 async function adjudicate(judgment: string): Promise<{ code: number; out: string; err: string }> {
-  // The adjudicator is a third provider: it cannot be the offline verifier,
+  // The auxiliary reviewer is a third provider: it cannot be the offline one,
   // so its one answer comes through the route seam.
   const restore = routeAnswers([["google", judgment]]);
   try {
@@ -177,7 +177,7 @@ function widget(returns: number): void {
 
 describe("a repository walked through the verification loop", () => {
   milestone("the router is pointed at scripted responses and session 1 is registered with its work changed", () => {
-    // The verifier's answers in dispatch order: session 1's two rounds, then
+    // The reviewer's answers in dispatch order: session 1's two rounds, then
     // one round each for the two adjudication sessions.
     script(ISSUE, "VERIFIED\n\nThe fix is right and the rebuttal was answered.\n", ISSUE, ISSUE, ASKS, ASKS);
     process.env[CONFIG_ENV_VAR] = join(tempDir("config-"), "router-config.yaml");
@@ -210,7 +210,7 @@ describe("a repository walked through the verification loop", () => {
     assert.equal(row["blocking"], true);
     assert.equal(row["phase"], "full");
     assert.equal(row["completion_tree"], reviewed);
-    assert.equal(row["verifier_provider"], "offline");
+    assert.equal(row["reviewer_provider"], "offline");
     const [finding] = row["findings"] as Record<string, unknown>[];
     assert.equal(finding["severity"], "major");
     assert.deepEqual(finding["evidencePaths"], ["src/widget.py"]);
@@ -304,7 +304,7 @@ describe("a repository walked through the verification loop", () => {
     assert.equal(verdictOf(3), "VERIFIED");
   });
 
-  milestone("session 4: the setting is on, the verifier asks for a file outside its scope, and the refusal is on the record while its verdict still stands", async () => {
+  milestone("session 4: the setting is on, the reviewer asks for a file outside its scope, and the refusal is on the record while its verdict still stands", async () => {
     // The one exposure this surface has: the block is parsed on every
     // round, so the case that matters is the one where the answer asks for
     // something it may not have. Nothing is delivered, so nothing is worth

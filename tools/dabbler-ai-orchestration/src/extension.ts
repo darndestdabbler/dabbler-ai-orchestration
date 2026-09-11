@@ -53,6 +53,7 @@ import { endGrant } from "./commands/moduleGrant";
 import {
   refreshRecord,
   viewRecord,
+  chosenEngineIn,
   setEngine,
   setRoleModel,
   setTransport,
@@ -359,18 +360,20 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     // The Configuration section's three controls. Two settings, two
     // controls, and a third for whichever model row was clicked: the engine
-    // is this extension's own setting because `session start` takes it as an
-    // argument, and the transport and the models are the router's because
-    // they are its configuration. Each refreshes the tree, because the row
-    // the operator just set is the one they are looking at.
+    // every one of them is the router's, because every one of them has to be
+    // readable from a terminal as well as from this pane. Each refreshes the
+    // tree, because the row the operator just set is the one they are
+    // looking at.
     vscode.commands.registerCommand("dabblerSolution.setEngine", async (node?: SolutionNode) => {
       // What Start Session can open is passed IN rather than imported by the
       // command: the pick reads this extension's setting and Start Session
       // reads it back, and a module that imported the other's list would
       // close the loop between the two.
       await setEngine(
+        productionRouter(),
         { node, projection: solutionProvider.currentProjection() },
         ENGINES.map((entry) => entry.engine),
+        () => solutionProvider.refresh(),
       );
       solutionProvider.refresh();
     }),
@@ -460,7 +463,15 @@ export function activate(context: vscode.ExtensionContext): void {
   // gates. The drives registry is a subscription, so a driver this window
   // started dies with the window rather than running on unseen.
   safeRegister("sessionCommands", () => {
-    registerSessionCommands(context);
+    registerSessionCommands(
+      context,
+      productionRouter(),
+      // The engine this machine chose, read off the projection at the moment
+      // the pick opens rather than at registration: the projection moves
+      // whenever a declaration does, and a default captured once would go
+      // stale the first time the operator changed it.
+      defaultSessionRunUi(() => chosenEngineIn(solutionProvider.currentProjection())),
+    );
   });
   safeRegister("cancelLifecycleCommands", () =>
     registerCancelLifecycleCommands(context, { refreshView: refreshAll }),

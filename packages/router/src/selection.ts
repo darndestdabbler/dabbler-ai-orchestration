@@ -18,9 +18,57 @@
 
 import { truthy, type RouterConfig } from "./config.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
+import { selectedModel } from "./preferences.ts";
 import { resolveSecret } from "./secretResolver.ts";
 
-export const ROLE_VERIFIER = "verifier";
+// --- The reviewing roles, named by voice ------------------------------------
+//
+// **A reviewer is not a verifier.** *Verifier* implies checking work against
+// a specification, which is the one thing this role does not do: it reviews
+// without writing or running a test, and the framework's own instructions
+// have said so all along. The noun changed; the authority did not -- a
+// Primary Reviewer still returns a verdict that blocks a close.
+//
+// Each role is DEFINED by what it may not be, and the definition lives here
+// rather than at the call site that happens to need it:
+//
+// - **Primary Reviewer** -- not the author.
+// - **Auxiliary Reviewer** -- not the author and not the primary. That is
+//   "a third voice, never a repeat one" as the role's own definition, rather
+//   than a superset a caller assembles on its way to a dispatch.
+
+/** The reviewer of record: returns the verdict a close reads. */
+export const ROLE_PRIMARY_REVIEWER = "reviewer";
+
+/** The third voice, reached only when the primary's findings are disputed. */
+export const ROLE_AUXILIARY_REVIEWER = "auxiliary-reviewer";
+
+/**
+ * The providers a reviewing role may not draw from, from the role itself.
+ *
+ * `reviewedProviders` is every provider that has already reviewed this
+ * session. The primary ignores it -- it is the first voice, so there is no
+ * repeat to avoid -- and the auxiliary is defined by it: a model that
+ * reviewed round 1 adjudicating its own disputed finding is a reviewer
+ * marking their own homework at the one point in the lifecycle with no
+ * appeal.
+ *
+ * An unknown role gets the author exclusion and nothing more: a role nobody
+ * declared is a first voice until something says otherwise.
+ */
+export function reviewerExclusions(
+  role: string,
+  authorProvider: string,
+  reviewedProviders: readonly string[] = [],
+): string[] {
+  const providers = new Set<string>([authorProvider].filter((name) => name !== ""));
+  if (role === ROLE_AUXILIARY_REVIEWER) {
+    for (const provider of reviewedProviders) {
+      if (provider !== "") providers.add(provider);
+    }
+  }
+  return [...providers].sort();
+}
 
 /**
  * A candidate as a transport enumerates it: the model id the preference
@@ -72,30 +120,47 @@ function normalizeProviders(providers: unknown): Set<string> {
   return out;
 }
 
+// --- Two fields, and neither needs a special name ---------------------------
+//
+// **`selected` is what the operator chose. `prefer` is the order tried where
+// nobody chose.** That is the whole of selection, and the two live in
+// different files because they are different KINDS of statement: `prefer`
+// ships in the config as an ordering, where a stale entry costs a slightly
+// older model and never a candidate; `selected` is a person's instruction,
+// so it lives in the user-level preferences beside the catalog, where a
+// person's choices live and a free refresh cannot reach.
+//
+// **A selection narrows and never widens.** It used to bypass the caller's
+// provider exclusion, on the argument that a default does not overrule a
+// person -- and what that actually bought was a model that reviewed round 1
+// adjudicating its own disputed finding, which is a reviewer marking their
+// own homework at the one point in the lifecycle with no appeal. The rule
+// was also stated twice, derived inline in `explainRole` while
+// `effectiveExclusion` claimed to be its only home, and two statements of
+// one rule disagree eventually. Both are gone: the caller's exclusion always
+// applies, and a selection it removes is an UNMET selection the caller stops
+// on rather than a silent substitution.
+
 export interface RoleDeclaration {
   readonly prefer: readonly string[];
-  readonly permitted: ReadonlySet<string>;
   /**
    * The one model a person chose for this role, or null where nobody did.
    *
-   * A pin is not a preference. `prefer` is an order and a stale entry in it
-   * costs a slightly older model; a pin is an instruction, and the runtime
-   * either honours it or stops. It exists because the surface used to write
-   * a choice to the front of `prefer` while the dispatch resolved the same
-   * role with the authoring model's provider excluded -- so a deliberately
-   * chosen same-provider verifier was dropped at dispatch, something else
-   * answered, and nothing anywhere said so.
+   * Read from this machine's preferences and never from a repository: which
+   * model reviews is a fact about who is at this keyboard and what their
+   * machine can reach, and one that travelled inside a checkout would tell
+   * the next clone about somebody else's seat.
    */
-  readonly pin: string | null;
+  readonly selected: string | null;
 }
 
 /**
- * The preference order and the permitted providers for `role`.
+ * The preference order and the selection for `role`.
  *
- * An undeclared role resolves to no preference and no provider restriction,
- * which is every reachable candidate in declared order. Refusing here would
- * make a role a thing that has to be declared before it can be asked for,
- * and the preference order is an optimisation rather than a permission.
+ * An undeclared role resolves to no preference and no selection, which is
+ * every reachable candidate in declared order. Refusing here would make a
+ * role a thing that has to be declared before it can be asked for, and the
+ * preference order is an optimisation rather than a permission.
  */
 export function roleDeclaration(
   config: RouterConfig,
@@ -104,31 +169,7 @@ export function roleDeclaration(
   const roleConfig = record(record(config["roles"])[role]);
   const preferRaw = roleConfig["prefer"];
   const prefer = (Array.isArray(preferRaw) ? preferRaw : []).map((id) => String(id));
-  const pinRaw = roleConfig["pin"];
-  const pin = typeof pinRaw === "string" && pinRaw.trim() !== "" ? pinRaw.trim() : null;
-  return { prefer, permitted: normalizeProviders(roleConfig["require_provider_in"]), pin };
-}
-
-/**
- * The providers a call may not draw from, once the role's own pin is read.
- *
- * **A default is not an override of a person.** Where nobody pinned, a role
- * resolving on its own still prefers a different provider, and the caller's
- * exclusion is what says so. Where somebody pinned, the exclusion is a
- * default they have already answered, so it is dropped -- and the pin either
- * dispatches or stops visibly, which is the whole difference between an
- * instruction and a preference.
- *
- * One home, because two would disagree: the ladder is built from it and the
- * assertion immediately before the wire re-checks it.
- */
-export function effectiveExclusion(
-  config: RouterConfig,
-  role: string,
-  requested: readonly string[] | null,
-): string[] {
-  if (roleDeclaration(config, role).pin !== null) return [];
-  return [...normalizeProviders(requested)].sort();
+  return { prefer, selected: selectedModel(role) };
 }
 
 /**
@@ -145,14 +186,30 @@ export function resolveRole<T extends Candidate>(
   role: string,
   candidates: readonly T[],
   excludeProviders: readonly string[] | null = null,
+  options: ResolveOptions = {},
 ): T[] {
-  return explainRole(config, role, candidates, excludeProviders).candidates;
+  return explainRole(config, role, candidates, excludeProviders, options).candidates;
+}
+
+/**
+ * Which question is being asked of the role.
+ *
+ * A DISPATCH asks "what will answer", so the operator's selection narrows
+ * the list to the one model they chose. A SURFACE asks "what could answer",
+ * so it must see the whole list or the operator could never change their
+ * own choice -- the pane would offer one model, which is the choice they
+ * already made, and no way back out of it.
+ */
+export interface ResolveOptions {
+  /** False to list every candidate and merely REPORT the selection. */
+  readonly applySelection?: boolean;
 }
 
 /** Why a candidate is not here: the rule that removed it, and nothing else. */
 export const REMOVED_EXCLUDED_PROVIDER = "excluded-provider";
-export const REMOVED_NOT_PERMITTED = "not-permitted";
 export const REMOVED_NO_PROVIDER = "no-provider";
+/** The operator chose a different model for this role. */
+export const REMOVED_NOT_SELECTED = "not-selected";
 
 export interface RemovedCandidate {
   readonly model: string;
@@ -179,9 +236,16 @@ export interface RoleResolution<T> {
   readonly fellThrough: boolean;
   readonly removed: readonly RemovedCandidate[];
   /** The model a person chose for this role, or null where nobody did. */
-  readonly pin: string | null;
-  /** The pinned model, when this machine cannot dispatch to it. */
-  readonly pinUnmet: string | null;
+  readonly selected: string | null;
+  /**
+   * The selected model, when nothing this call may dispatch to is it.
+   *
+   * A selection narrows and never widens, so a caller's exclusion can leave
+   * a selection unmet -- and that is a STOP the caller names, never a fall
+   * to the next candidate, because falling through is exactly the silent
+   * substitution a selection exists to prevent.
+   */
+  readonly selectedUnmet: string | null;
 }
 
 /**
@@ -199,10 +263,13 @@ export function explainRole<T extends Candidate>(
   role: string,
   candidates: readonly T[],
   excludeProviders: readonly string[] | null = null,
+  options: ResolveOptions = {},
 ): RoleResolution<T> {
-  const { prefer, permitted, pin } = roleDeclaration(config, role);
-  // A pin answers the caller's exclusion rather than being filtered by it.
-  const exclude = pin === null ? normalizeProviders(excludeProviders) : new Set<string>();
+  const { prefer, selected } = roleDeclaration(config, role);
+  const applySelection = options.applySelection !== false;
+  // The caller's exclusion ALWAYS applies. A selection that bypassed it let
+  // a model that reviewed round 1 adjudicate its own disputed finding.
+  const exclude = normalizeProviders(excludeProviders);
   const removed: RemovedCandidate[] = [];
   const surviving = candidates.filter((candidate) => {
     const provider = candidate[1];
@@ -213,7 +280,15 @@ export function explainRole<T extends Candidate>(
     };
     if (!provider) return drop(REMOVED_NO_PROVIDER);
     if (exclude.has(provider)) return drop(REMOVED_EXCLUDED_PROVIDER);
-    if (permitted.size > 0 && !permitted.has(provider)) return drop(REMOVED_NOT_PERMITTED);
+    // Reachability is not asked here and never was: a seat has no provider
+    // keys at all, and the direct-API path applies its own in `apiLadder`.
+    if (
+      applySelection &&
+      selected !== null &&
+      normalizeModelToken(model) !== normalizeModelToken(selected)
+    ) {
+      return drop(REMOVED_NOT_SELECTED);
+    }
     return true;
   });
   const rank = new Map(prefer.map((modelId, index) => [modelId, index]));
@@ -226,28 +301,19 @@ export function explainRole<T extends Candidate>(
       (left, right) =>
         (rank.get(left[0]) ?? prefer.length) - (rank.get(right[0]) ?? prefer.length),
     );
-  // A pin is one model or none. It is NOT the head of a ladder: falling from
-  // a pinned model to the next candidate is the silent substitution the pin
-  // exists to stop, so an unmet pin resolves to nothing and the caller says
-  // so out loud.
-  const ordered =
-    pin === null
-      ? sorted
-      : sorted.filter(
-          (candidate) => normalizeModelToken(String(candidate[0])) === normalizeModelToken(pin),
-        );
-  const chosen = ordered[0];
+  const chosen = sorted[0];
   const chosenRank = chosen === undefined ? undefined : rank.get(chosen[0]);
   return {
-    candidates: ordered,
+    candidates: sorted,
     preferenceDeclared: prefer.length > 0,
     rank: chosenRank ?? null,
     fellThrough: prefer.length > 0 && chosen !== undefined && chosenRank === undefined,
     removed,
-    pin,
-    // A pin nothing satisfies: the caller turns this into a stop that names
-    // the model, rather than dispatching to whatever was next.
-    pinUnmet: pin !== null && chosen === undefined ? pin : null,
+    selected,
+    // A selection nothing here satisfies: the caller turns this into a stop
+    // that names the model, rather than dispatching to whatever was next.
+    selectedUnmet:
+      applySelection && selected !== null && chosen === undefined ? selected : null,
   };
 }
 
@@ -286,10 +352,10 @@ export function fellThroughWarning<T extends Candidate>(
   );
 }
 
-// --- What a verifying model may be -----------------------------------------
+// --- What a reviewing model may be -----------------------------------------
 //
 // One rule survives, and it is the only one that needs no judgement this
-// framework cannot make: **the verifying model may not be the authoring
+// framework cannot make: **the reviewing model may not be the authoring
 // model.** Two strings compared -- no capability data, no provider
 // inference, no registry.
 //
@@ -301,17 +367,17 @@ export function fellThroughWarning<T extends Candidate>(
 // the developer's, and the surface labels the pair rather than refusing it.
 
 /**
- * Why this model may not verify that one, or null when it may.
+ * Why this model may not review that one, or null when it may.
  *
  * Ids are compared under the framework's one spelling rule, so a dated pin
  * and its alias are the same model here -- which is the case the comparison
  * exists for, since that is how a person picks the same model twice without
  * noticing.
  */
-export function verifierRefusal(author: string, verifier: string): string | null {
-  if (normalizeModelToken(author) !== normalizeModelToken(verifier)) return null;
+export function reviewerRefusal(author: string, reviewer: string): string | null {
+  if (normalizeModelToken(author) !== normalizeModelToken(reviewer)) return null;
   return (
-    `'${verifier}' cannot verify '${author}': they are the same model, and a ` +
+    `'${reviewer}' cannot review '${author}': they are the same model, and a ` +
     "model reviewing its own literal output is the one thing a second " +
     "opinion cannot be. Choosing a different model from the same provider " +
     "is allowed and is labelled as such -- whether two models of one family " +

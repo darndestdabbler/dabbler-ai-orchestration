@@ -14,11 +14,22 @@
 // declared envelope, and a path outside it is refused as an amendment
 // requirement rather than reported as a warning -- an envelope nothing
 // enforces is a comment. Then the declared controls and the step's own
-// targeted tests run, free, and a red one returns to the author. Only what
-// survives both is worth a model.
+// targeted tests run, free, and a red one returns to the author.
+//
+// **The plan this reads is `approved-plan.json`, and nothing writes one.**
+// Audited when `planReview` was deleted: zero instances across this
+// repository's ninety-three run directories, against eighty-six driven
+// plans, which carry none of the fields these checks read. Every verb here
+// therefore refuses with "session N has no plan" on a session driven the
+// way sessions are driven now. It is kept because a plan pre-registered and
+// hashed before the code was seen is a real thing to want back, and the
+// machinery for it is here and correct; what a reader must not do is take
+// its presence for evidence that anything runs it. The amendment no longer
+// buys a model's opinion first -- `appendAmendment` refuses an unapproved
+// plan, an undeclared step, and an amendment with no change in it, which is
+// what the review actually enforced.
 
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
 
 import { loadSelectionConfig, selectTests, targetedCommand } from "../affected.ts";
 import {
@@ -27,6 +38,7 @@ import {
   compareToEnvelope,
   effectivePlan,
   findStep,
+  appendAmendment,
   needsAmendment,
   planPath,
   readPlan,
@@ -36,7 +48,6 @@ import {
 import { writeErr, writeOut } from "../output.ts";
 import { loadConfig, type RouterConfig } from "../config.ts";
 import {
-  SESSION_PLAN_FILENAME,
   repoRootFor,
   runGit,
   snapshotWorktreeTree,
@@ -68,7 +79,6 @@ import {
   sessionRunDir,
   type Row,
 } from "../ledger.ts";
-import { PlanReviewError, reviewAmendment } from "../planReview.ts";
 import { readSessionState } from "../progress.ts";
 import { pythonRepr } from "../pythonJson.ts";
 import { loadSuitesChecked } from "../testEvidence.ts";
@@ -495,22 +505,6 @@ export function runStepStatus(sessionsDir: string): number {
   return EXIT_OK;
 }
 
-/**
- * The whole spec, not an excerpt: the plan reviewer derives a session's
- * goals by parsing every session heading, so a slice of one session reads as
- * a spec with no sessions in it.
- */
-function specText(sessionsDir: string): string {
-  try {
-    return readFileSync(join(sessionsDir, SESSION_PLAN_FILENAME), "utf8");
-  } catch (error) {
-    throw new StepRefusal(
-      `${sessionsDir}/${SESSION_PLAN_FILENAME} could not be read, so the ` +
-        `amendment has ` +
-        `nothing to be reviewed against: ${(error as Error).message}`,
-    );
-  }
-}
 
 /**
  * Widen the open step's envelope through the plan reviewer.
@@ -539,36 +533,24 @@ export async function runStepAmend(
     stepRow = found;
     approvedPlanFor(repoRoot, sessionsDir, current);
     const runDir = sessionRunDir(repoRoot, current);
-    let record: Row;
-    let plan: Plan | null;
+    // Appended directly. A cheap model used to read the amendment against a
+    // fixed checklist first, and the module that did it reviewed an artefact
+    // this framework stopped producing -- `approved-plan.json`, of which no
+    // instance exists anywhere. What the review actually enforced is here
+    // already and needs no model: `appendAmendment` refuses an unapproved
+    // plan, a step the plan does not declare, and an amendment carrying no
+    // change at all.
     try {
-      [record, plan] = await reviewAmendment(
-        runDir,
-        specText(sessionsDir),
-        current,
-        {
-          stepId: String(stepRow["step_id"]),
-          reason: options.reason,
-          addedFiles: [...addedFiles],
-          workspaceRoot: repoRoot,
-        },
-      );
+      appendAmendment(runDir, {
+        stepId: String(stepRow["step_id"]),
+        reason: options.reason,
+        addedFiles: [...addedFiles],
+      });
     } catch (error) {
-      if (
-        error instanceof PlanImmutableError ||
-        error instanceof PlanReviewError ||
-        error instanceof Error
-      ) {
+      if (error instanceof PlanImmutableError || error instanceof Error) {
         throw new StepRefusal((error as Error).message, EXIT_USAGE);
       }
       throw error;
-    }
-    if (plan === null) {
-      throw new StepRefusal(
-        `the amendment to ${pythonRepr(stepRow["step_id"])} was not approved ` +
-          `(${String(record["outcome"])}). The approved plan is unchanged.`,
-        EXIT_BLOCKING,
-      );
     }
   } catch (error) {
     if (!(error instanceof StepRefusal) && !(error instanceof LedgerError)) throw error;

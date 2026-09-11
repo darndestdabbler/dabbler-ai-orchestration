@@ -371,7 +371,7 @@ suite("the Dabbler terminal", () => {
     const spoken = plain(written.join(""));
     for (const command of [
       "dabbler session next",
-      "dabbler configure --verifying-model",
+      "dabbler configure --reviewer-model",
       "dabbler session cancel",
     ]) {
       assert.ok(spoken.includes(command), command);
@@ -1056,7 +1056,7 @@ suite("the first look, and the rule between voices", () => {
     // and then where the run is now.
     const order = [
       "earlier-job name=verification log=.dabbler/runs/s62/driver/jobs/verification.log exit=0",
-      "verify round=1 verdict=VERIFIED verifier=gpt-5.4",
+      "verify round=1 verdict=VERIFIED reviewer=gpt-5.4",
       "tests suite=dotnet stage=final-full outcome=passed",
       "earlier-job name=close log=.dabbler/runs/s62/driver/jobs/close.log",
       "phase session=062 now=complete",

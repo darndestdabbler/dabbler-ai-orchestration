@@ -184,9 +184,44 @@ export interface ConfigurationModel {
   providerRelation?: string | null;
 }
 
+/**
+ * What a role is dispatched THROUGH.
+ *
+ * One word in front of a developer and two kinds underneath, because the
+ * value sets and the writability differ: the authoring model runs inside the
+ * engine's own CLI, and a reviewer is dispatched by the router over a
+ * transport. `options` is only what this machine can actually reach -- a
+ * vehicle nothing can reach is a way to fail rather than a choice -- and
+ * `withheld` says why each absent one is absent, because "not offered" with
+ * no reason reads as a broken pane.
+ */
+export interface ConfigurationVehicle {
+  /** "engine" or "transport". */
+  kind: string;
+  options: Array<{ id: string; means: string }>;
+  withheld?: Array<{ id: string; means: string; note: string | null }>;
+  chosen: string | null;
+  decidedBy?: string | null;
+  /** Which session a change here reaches. Always the next one. */
+  appliesTo?: string;
+  reason?: string;
+  layers?: Array<{ source: string; value: string }>;
+}
+
 /** How a role resolves: what it would pick, and what it was resolved against. */
 export interface ConfigurationRole {
   role: string;
+  /** What carries this role: the engine's CLI, or the reviewer's transport. */
+  vehicle?: ConfigurationVehicle;
+  /**
+   * The model the operator CHOSE, or null where nobody chose.
+   *
+   * Reported and not applied to the list: a pane narrowed to the operator's
+   * own selection would offer them the choice they already made and no way
+   * back out of it. Where it is set, it is what the round dispatches to --
+   * used and never silently substituted.
+   */
+  selected?: string | null;
   chosen: ConfigurationModel | null;
   candidates: ConfigurationModel[];
   /** Models the record says are no longer served: offered to nobody. */
@@ -234,7 +269,8 @@ export interface ProjectionConfiguration {
   fidelityTransport?: string;
   engines?: ConfigurationEngines;
   authoring?: ConfigurationRole;
-  verifying?: ConfigurationRole;
+  /** The Primary Reviewer: the model that reviews the work, and is not its author. */
+  primaryReviewer?: ConfigurationRole;
   records?: ConfigurationRecord[];
   /** Why there is nothing to show: a config this router could not load. */
   unavailable?: string;
@@ -284,7 +320,7 @@ export type SolutionNode =
   | { kind: "configuration" }
   | { kind: "configEngine" }
   | { kind: "configTransport" }
-  | { kind: "configRole"; role: "authoring" | "verifying" }
+  | { kind: "configRole"; role: "authoring" | "primaryReviewer" }
   | { kind: "configRecord"; record: string };
 
 export interface RowDescriptor {
@@ -325,9 +361,9 @@ function configuration(p: Projection): ProjectionConfiguration {
 
 function configRole(
   p: Projection,
-  which: "authoring" | "verifying",
+  which: "authoring" | "primaryReviewer",
 ): ConfigurationRole | undefined {
-  return which === "authoring" ? configuration(p).authoring : configuration(p).verifying;
+  return which === "authoring" ? configuration(p).authoring : configuration(p).primaryReviewer;
 }
 
 /** How old a record is, in the units a person reads it in. */
@@ -377,7 +413,7 @@ export const PROVIDER_RELATION_WORDS: Record<string, string> = {
 };
 
 /** The one line of help under a list of possible reviewers. */
-export const VERIFIER_HELP =
+export const REVIEWER_HELP =
   "A different provider reduces the chance the reviewer shares the author's blind spots.";
 
 export const FIDELITY_WORDS: Record<ModelFidelity, string> = {
@@ -401,6 +437,36 @@ function modelText(model: ConfigurationModel | null | undefined): string {
   const fidelity = model.fidelity;
   const said = fidelity === undefined ? "" : ` · ${FIDELITY_WORDS[fidelity]}`;
   return `${model.model} (${model.provider})${said}`;
+}
+
+/** What the word "vehicle" is for, on the kind of vehicle this role has. */
+const VEHICLE_MEANS: Record<string, string> = {
+  engine: "the engine CLI the work is authored in",
+  transport: "the transport the router dispatches this role over",
+};
+
+/**
+ * What carries this role, said on the row.
+ *
+ * The alternatives are only what this machine can reach: a vehicle nothing
+ * can reach is a way to fail rather than a choice. An absent one is still
+ * NAMED, with the reason and the remedy, because a list that silently
+ * dropped a transport an operator expects to see reads as a broken pane.
+ */
+function vehicleText(vehicle: ConfigurationVehicle | null | undefined): string {
+  if (!vehicle) return "";
+  const kind = VEHICLE_MEANS[vehicle.kind] ?? vehicle.kind;
+  const others = vehicle.options.filter((option) => option.id !== vehicle.chosen);
+  const withheld = (vehicle.withheld ?? []).filter((entry) => entry.note !== null);
+  return [
+    `Vehicle: ${vehicle.chosen ?? "nothing chosen"} — ${kind}${
+      vehicle.decidedBy ? `, decided by ${vehicle.decidedBy}` : ""
+    }. It is the default for the NEXT session; a session in flight keeps what its record says.`,
+    others.length > 0
+      ? `This machine could also reach: ${others.map((option) => `${option.id} (${option.means})`).join("; ")}.`
+      : "Nothing else here can carry it.",
+    ...withheld.map((entry) => `${entry.id} is not offered: ${entry.note}.`),
+  ].join(" ");
 }
 
 function externals(p: Projection): ProjectionExternal[] {
@@ -533,7 +599,7 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
       if (config.engines) own.push({ kind: "configEngine" });
       if (config.transport) own.push({ kind: "configTransport" });
       if (config.authoring) own.push({ kind: "configRole", role: "authoring" });
-      if (config.verifying) own.push({ kind: "configRole", role: "verifying" });
+      if (config.primaryReviewer) own.push({ kind: "configRole", role: "primaryReviewer" });
       for (const row of config.records ?? []) {
         own.push({ kind: "configRecord", record: row.record });
       }
@@ -977,7 +1043,7 @@ export function descriptorFor(
         description: chosen ?? (installed.length === 0 ? "none installed" : "not chosen"),
         tooltip: [
           theirs
-            ? `You chose ${chosen}. Start Session offers it first.`
+            ? `You chose ${chosen}. Start Session offers it first, and so does \`dabbler session start\` typed in a terminal: the choice is a file beside this machine's model catalog, not an editor setting only one surface can read.`
             : (engines?.reason ?? "Nothing was read."),
           "What this sets is the default for the NEXT session: the engine is recorded per session at `session start` and never changes one in flight.",
         ].join("\n\n"),
@@ -1023,12 +1089,12 @@ export function descriptorFor(
       const chosenFidelity = role?.chosen?.fidelity;
       return {
         id: `config:role:${node.role}`,
-        label: authoring ? "Authoring model" : "Verifying model",
+        label: authoring ? "Authoring model" : "Primary Reviewer",
         description: `${modelText(role?.chosen)}${role?.fellThrough ? " ⚠" : ""}`,
         tooltip: [
           authoring
             ? "The engine's own model, declared when the session was registered. It is reported here and set there: changing it in this pane would not reach the run."
-            : `The model that reviews the work. The only model refused is the authoring model itself; every other is offered and labelled. ${VERIFIER_HELP}`,
+            : `The Primary Reviewer is defined as NOT THE AUTHOR: the only model refused is the authoring model itself, and every other is offered and labelled. Its verdict blocks a close. ${REVIEWER_HELP}`,
           // The label, in the row, in the same words the pick uses.
           !authoring && role?.chosen?.providerRelation
             ? `This one is on a ${PROVIDER_RELATION_WORDS[role.chosen.providerRelation] ?? role.chosen.providerRelation}.`
@@ -1036,6 +1102,14 @@ export function descriptorFor(
           role?.chosen?.priceCategory
             ? `Its source states a '${role.chosen.priceCategory}' price category. That is a PRICE and not a capability: this framework does not grade models.`
             : "",
+          // Two fields and no third: what the operator CHOSE, and the
+          // order tried where they chose nothing. A selection is used and
+          // never silently substituted, and it NARROWS -- a selection this
+          // call cannot reach is a stop that names it, not a fall to the
+          // next model.
+          role?.selected
+            ? `You chose ${role.selected}. It is what the round dispatches to, and nothing is substituted for it: if this call cannot reach it, the round stops and says so.`
+            : "Nobody has chosen a model here, so the preference order decides and a stale entry in it costs a slightly newer model, never a candidate.",
           role?.fellThrough
             ? "It fell past its own preference order, so what answers is a model nobody named. That is what billed one session 364 premium requests."
             : "",
@@ -1062,6 +1136,11 @@ export function descriptorFor(
                 )
                 .join(", ")}. The entry is kept, so a model that comes back is offered again.`
             : "",
+          // What carries this role. One word, two kinds: the engine's own
+          // CLI authors, and the router dispatches a reviewer over a
+          // transport -- and a vehicle this machine cannot reach is not
+          // among the alternatives, with the reason it is not.
+          vehicleText(role?.vehicle),
           role?.unavailable ? `Nothing can be offered here: ${role.unavailable}.` : "",
         ]
           .filter((line) => line !== "")

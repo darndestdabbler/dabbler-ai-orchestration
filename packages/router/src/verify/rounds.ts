@@ -39,10 +39,15 @@ import {
   workingTreeChanges,
 } from "../affected.ts";
 import { writeErr, writeOut } from "../output.ts";
-import { EVIDENCE_SERVED, FIDELITY_SUBSTITUTED, modelFidelity } from "../selection.ts";
+import {
+  EVIDENCE_SERVED,
+  FIDELITY_SUBSTITUTED,
+  ROLE_PRIMARY_REVIEWER,
+  modelFidelity,
+} from "../selection.ts";
 import {
   loadConfig,
-  resolveTransport,
+  explainRoleTransport,
   verificationRoundCap,
   type RouterConfig,
 } from "../config.ts";
@@ -118,13 +123,22 @@ export async function dispatchVerification(
     excludeProviders: readonly string[];
     /** The model the work was authored by, so the one rule holds at dispatch. */
     authorModel?: string | null;
+    /**
+     * Which reviewing role is speaking. The default is the Primary Reviewer,
+     * which is every round; the adjudication names the Auxiliary Reviewer,
+     * because the two roles are defined differently and a dispatch that
+     * borrowed the primary's role would resolve against the primary's
+     * preference order and the primary's selection.
+     */
+    role?: string;
     sessionNumber: number | null;
     transport?: string | null;
     followUp?: ((answer: string) => string | null) | null;
   },
 ): Promise<RouteResult> {
   const { DispatchError, route } = await import("../route.ts");
-  const { ROLE_VERIFIER } = await import("../selection.ts");
+  const { ROLE_PRIMARY_REVIEWER } = await import("../selection.ts");
+  const role = options.role ?? ROLE_PRIMARY_REVIEWER;
 
   const excluded = [...options.excludeProviders];
   let lastError: unknown = null;
@@ -132,7 +146,7 @@ export async function dispatchVerification(
     try {
       return await route(prompt, {
         taskType: "session-verification",
-        role: ROLE_VERIFIER,
+        role,
         sessionNumber: options.sessionNumber,
         excludeProviders: excluded,
         authorModel: options.authorModel ?? null,
@@ -501,8 +515,11 @@ export async function terminateAtCap(
   appendRound(repoRoot, current, row);
   recordSessionVerification(sessionsDir, current, VERDICT_REMEDIATED_AT_CAP, {
     rounds: latest["round"],
-    verifierModel: latest["verifier_model"] ?? null,
-    verifierProvider: latest["verifier_provider"] ?? null,
+    // Both spellings, because archived rows are not rewritten: a round
+    // recorded before the rename carries the old key and is still the round
+    // this terminal is about.
+    verifierModel: latest["reviewer_model"] ?? latest["verifier_model"] ?? null,
+    verifierProvider: latest["reviewer_provider"] ?? latest["verifier_provider"] ?? null,
     transport: latest["transport"] ?? null,
     unreviewedFindings: unreviewed.length,
   });
@@ -777,7 +794,13 @@ export async function runRound(
       allowFileRequests: apiFileRequests,
     });
 
-  const grant = grantFor(resolveTransport(config, options.transport ?? null));
+  // The ROLE's vehicle, because that is the transport the round is actually
+  // dispatched on and the grant is a property of the transport: a seat round
+  // holds three tools and a direct-API round holds none, so a grant resolved
+  // from the machine's transport would describe a round that is not this one.
+  const grant = grantFor(
+    explainRoleTransport(config, ROLE_PRIMARY_REVIEWER, options.transport ?? null).transport,
+  );
 
   // The reads happen exactly once, inside the dispatch, and what they
   // produced is what the round records: a second pass over the same answer
@@ -911,8 +934,8 @@ export async function runRound(
     phase: roundNumber === 1 ? "full" : "fix-delta",
     verdict,
     blocking: classification.blocking,
-    verifier_model: result.model_name,
-    verifier_provider: result.provider,
+    reviewer_model: result.model_name,
+    reviewer_provider: result.provider,
     orchestrator_provider: orchestrator.effectiveProvider,
     findings,
     completion_tree: completionTree,

@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { CATALOG_FILENAME, SOURCE_SEAT, catalogNow, setCatalogPath } from "../../src/catalog.ts";
+import { PREFERENCES_FILENAME, setPreferencesPath } from "../../src/preferences.ts";
 import { setSeatSource } from "../../src/discovery.ts";
 import { canonicalPath } from "../../src/journal.ts";
 
@@ -125,6 +126,12 @@ export function scratchDir(prefix: string): string {
 // reason rather than quietly writing home -- which is how the two suites
 // that needed it were found.
 setCatalogPath(join(scratchDir("catalog-"), CATALOG_FILENAME));
+
+// And the preferences beside it, for the same reason and by the same seam:
+// a test that read what the OPERATOR chose would pass on their machine and
+// fail on the next, and one that wrote it would change their choice as a
+// side effect of proving something else.
+setPreferencesPath(join(scratchDir("preferences-"), PREFERENCES_FILENAME));
 
 // And no worker opens the real seat. A session start refreshes the catalog
 // for itself, through a path with no argument to pass a stand-in down, so a

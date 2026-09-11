@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "rounds.jsonl row (one verification round)",
-  "description": "One row per completed verification round in .dabbler/runs/<set>/s<N>/rounds.jsonl. Written only by the CLI (ai_router.verify); the close gate reads it. A row that fails this schema on read is a refusal, never a skip. Two terminal row types may be written beside plain rounds: 'adjudication' (a third provider judged the recorded disputes) and 'remediated_at_cap' (every blocking finding of the last round was fixed and the cap left the fix unreviewed — the work lands labelled unreviewed, which is not a waiver: nothing was accepted over a standing finding). The retired 'waive' type stays readable because historical ledgers carry it; no writer emits it, and WAIVED is no longer in the writer's verdict vocabulary.",
+  "description": "One row per completed verification round in .dabbler/runs/<set>/s<N>/rounds.jsonl. Written only by the CLI (ai_router.verify); the close gate reads it. A row that fails this schema on read is a refusal, never a skip. Two terminal row types may be written beside plain rounds: 'adjudication' (the Auxiliary Reviewer judged the recorded disputes) and 'remediated_at_cap' (every blocking finding of the last round was fixed and the cap left the fix unreviewed — the work lands labelled unreviewed, which is not a waiver: nothing was accepted over a standing finding). The retired 'waive' type stays readable because historical ledgers carry it; no writer emits it, and WAIVED is no longer in the writer's verdict vocabulary.",
   "type": "object",
   "required": [
     "round",
@@ -35,13 +35,25 @@
     "blocking": {
       "type": "boolean"
     },
+    "reviewer_model": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The model that reviewed this round. Rows written before the role was renamed carry 'verifier_model' instead; readers take both, because archived rows are not rewritten."
+    },
+    "reviewer_provider": {
+      "type": "string",
+      "minLength": 1,
+      "description": "That model's provider. The pre-rename spelling is 'verifier_provider'."
+    },
     "verifier_model": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "description": "Retired spelling of 'reviewer_model', still read so archived ledgers validate. No writer emits it."
     },
     "verifier_provider": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "description": "Retired spelling of 'reviewer_provider', still read so archived ledgers validate. No writer emits it."
     },
     "orchestrator_provider": {
       "type": "string"
@@ -143,7 +155,7 @@
     "framework_version": {
       "type": "string",
       "minLength": 1,
-      "description": "The router version that recorded this round, as its own manifest declares it. Additive and absent on rows written before it existed. A round is the framework's own judgement of a change, so which framework made it is part of what the row says -- and unlike the verifier's model, nothing else in the row carries it."
+      "description": "The router version that recorded this round, as its own manifest declares it. Additive and absent on rows written before it existed. A round is the framework's own judgement of a change, so which framework made it is part of what the row says -- and unlike the reviewer's model, nothing else in the row carries it."
     },
     "transport": {
       "type": "string"
@@ -416,7 +428,7 @@
         "string",
         "null"
       ],
-      "description": "The model id this round ASKED for -- what went on the wire. `verifier_model` is the alias or catalog id the ladder knew it by, which is not always the same string and is never the provider's answer."
+      "description": "The model id this round ASKED for -- what went on the wire. `reviewer_model` is the alias or catalog id the ladder knew it by, which is not always the same string and is never the provider's answer."
     },
     "served_model": {
       "type": [
@@ -570,9 +582,19 @@
       },
       "then": true,
       "else": {
-        "required": [
-          "verifier_model",
-          "verifier_provider"
+        "allOf": [
+          {
+            "anyOf": [
+              { "required": ["reviewer_model"] },
+              { "required": ["verifier_model"] }
+            ]
+          },
+          {
+            "anyOf": [
+              { "required": ["reviewer_provider"] },
+              { "required": ["verifier_provider"] }
+            ]
+          }
         ],
         "properties": {
           "verdict": {

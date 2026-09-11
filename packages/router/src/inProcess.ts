@@ -484,6 +484,13 @@ export class InProcessRouter implements Router {
      * `ApprovedPlan` is generated from AND refuses a plan whose content is
      * not backed by a sanctioned write; both arrive here as the refusal
      * `read` turns a throw into.
+     *
+     * **Nothing calls it.** Audited when `planReview` was deleted: no
+     * `approved-plan.json` exists in any of this repository's run
+     * directories, and the only caller of this verb anywhere is its own
+     * test. It survives as a published contract verb -- a consumer outside
+     * this repository may hold a plan from before the driven one replaced
+     * it -- and a reader who finds it should expect to find nothing.
      */
     read: (o: RepositoryTarget & { readonly sessionNumber: number }) =>
       this.read(
@@ -589,9 +596,10 @@ export class InProcessRouter implements Router {
     // window was opened, and the repository the operator clicked in is the
     // one being configured.
     const args = ["--repo-root", o.repoRoot];
+    optional(args, "--engine", o.engine);
     optional(args, "--transport", o.transport);
-    optional(args, "--authoring-model", o.authoringModel);
-    optional(args, "--verifying-model", o.verifyingModel);
+    optional(args, "--reviewer-transport", o.reviewerTransport);
+    optional(args, "--reviewer-model", o.reviewerModel);
     return this.text("configure", args, o.repoRoot);
   }
 
@@ -599,7 +607,7 @@ export class InProcessRouter implements Router {
     const args = ["--project-dir", o.projectDir];
     optional(args, "--repo-name", o.repoName);
     optional(args, "--remote", o.remote);
-    if (o.noTransportDetect === true) args.push("--no-transport-detect");
+    optional(args, "--transport", o.transport);
     return this.text("bootstrap", args, o.projectDir);
   }
 }

@@ -134,8 +134,8 @@ export function makeConfig(overrides: Record<string, unknown> = {}): Record<stri
       openai: { api_key_env: "TEST_OPENAI_KEY", base_url: "https://fake.openai.test/v1", ...provider },
     },
     roles: {
-      generator: { prefer: ["g-flash", "g-pro", "a-opus"], require_provider_in: ["anthropic", "openai", "google"] },
-      verifier: { prefer: ["o-gpt", "a-sonnet"], require_provider_in: ["anthropic", "openai", "google"] },
+      generator: { prefer: ["g-flash", "g-pro", "a-opus"] },
+      reviewer: { prefer: ["o-gpt", "a-sonnet"] },
     },
     escalation: {
       enabled: true,

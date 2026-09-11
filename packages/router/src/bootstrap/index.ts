@@ -50,7 +50,6 @@ import { MANIFEST_RELPATH } from "../modules.ts";
 
 export * from "./templates.ts";
 export * from "./detect.ts";
-export * from "./env.ts";
 
 /**
  * Scaffold the two setup sessions into a repository that has no session plan

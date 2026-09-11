@@ -1540,7 +1540,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "which provider answers, and the next round is charged to that " +
           "one; a key that is missing rather than unreachable is set in the " +
           "environment, never in a file.",
-        command: "dabbler configure --verifying-model <alias or id>",
+        command: "dabbler configure --reviewer-model <id>",
       },
       cancelChoice(),
     ],

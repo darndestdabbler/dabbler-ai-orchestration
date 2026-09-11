@@ -41,7 +41,7 @@ import { readSessionState } from "./progress.ts";
 import { PACKAGE_ROOT } from "./paths.ts";
 import { DispatchError, NoCandidateError, RouterError, route } from "./route.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
-import { ROLE_VERIFIER } from "./selection.ts";
+import { ROLE_PRIMARY_REVIEWER } from "./selection.ts";
 import { readText } from "./textfile.ts";
 
 export const TRIAGE_SCHEMA = "triage.schema.json";
@@ -355,7 +355,7 @@ export async function triage(
     try {
       result = await route(attempt === 0 ? prompt : `${prompt}\n\n${RESHAPE}`, {
         taskType: "session-triage",
-        role: ROLE_VERIFIER,
+        role: ROLE_PRIMARY_REVIEWER,
         sessionNumber,
         excludeProviders: excluded,
         transport: options.transport ?? null,

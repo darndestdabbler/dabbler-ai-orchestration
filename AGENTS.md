@@ -181,8 +181,23 @@ it was restored from the later commit and re-rendered with
   Code terminal once the extension has installed its shim.
 - Provider keys via env vars: `DABBLER_ANTHROPIC_API_KEY`,
   `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`. Never in config or logs.
-- Transport preference: CLI flag `--transport` > `DABBLER_TRANSPORT` env >
-  `transport.profile` in router-config.yaml > default `api`.
+- **Vehicle** is what a role is dispatched through, and each role carries
+  its own. Authoring's is the engine CLI; each reviewer's is a transport,
+  read per role: CLI flag `--transport` > `DABBLER_TRANSPORT` env >
+  `roles.<role>.transport` > `transport.profile` in router-config.yaml >
+  default `api`. A vehicle nothing on this machine can reach is not offered.
+- **Nothing writes `DABBLER_TRANSPORT` for you.** `bootstrap` used to
+  persist it at user scope, and the variable outranks every config layer —
+  so it shadowed the very preference a later run tried to set, for every
+  repository on the machine. It is read and never written now, and
+  `--no-transport-detect` retired with the writing; `dabbler configure
+  --transport` writes the checkout's own overlay instead.
+- **What the operator CHOSE lives beside the model catalog**, in
+  `preferences.json` under this platform's per-user data directory: the
+  engine, and the model selected for a role. The catalog is a reading and is
+  rebuildable for nothing, so a choice stored in it is a choice the next
+  free refresh wipes. A selection is used and never silently substituted; a
+  selection this call cannot reach is a stop that names it.
 - Git Bash heredocs mangle backslashes on this host — write files with
   your editing tools, never with a heredoc.
 
@@ -247,8 +262,9 @@ Everything the framework now does for itself happens inside those calls:
 declaring the work, each step's own checks, cross-provider verification
 and its remediation rounds, the complete suite as the run of record, the
 commit, the push, and the close. The tests that run are each step's own
-checks and that complete suite: the verifier reviews without writing or
-running one, and no other test run happens between a step and the round.
+checks and that complete suite: the Primary Reviewer reviews without
+writing or running one, and no other test run happens between a step and
+the round.
 None of them is yours to run, and none of them is yours to skip ahead to
 — the instruction in hand is the whole of what is asked. `dabbler
 version` says which router this is; report it when you report a problem.
@@ -284,8 +300,10 @@ supposed to ship and did not must not read as one that shipped.
 - State files (`docs/sessions/sessions.json`) and everything under
   `.dabbler/runs/`
   are written by the router only — never by hand, never "fixed up".
-- Verification verdicts come from the verifier. A verdict token the
-  framework did not hand you does not exist.
+- Verdicts come from the **Primary Reviewer** -- *not the author* -- and
+  a disputed impasse from the **Auxiliary Reviewer** -- *not the author
+  and not the primary*, so a third voice is the role's own definition. A
+  verdict token the framework did not hand you does not exist.
 - API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,
   `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The
   same rule covers a feed PAT: configuration names it and never holds it.
@@ -326,8 +344,10 @@ exists. GitHub Copilot loads all three files at once and de-duplicates
 nothing, which is exactly why only this one carries the body.
 
 Copilot seats: declare `--model` on the first call, the one that
-registers, and prefer `DABBLER_TRANSPORT=copilot-cli` when routing
-through the seat. Cross-provider verification stays cross-provider on
-every transport.
+registers, and set the vehicle with `dabbler configure --transport
+copilot-cli` when routing through the seat -- nothing persists
+`DABBLER_TRANSPORT` for you any more, because a variable that outranks
+every config layer shadowed the very preference a later run set. Review
+stays cross-provider on every transport.
 
 <!-- dabbler:managed:end -->

@@ -41,15 +41,14 @@ export type RouterConfig = {
     generation_params?: Record<string, unknown>;
   }>;
   /**
-   * Selection by role, applied identically on both transports. A role declares the provider set it may draw from (a hard filter) and a preference order (ordering only -- a model the order does not name still qualifies and simply sorts after the named ones). Names in 'prefer' are model ids as each transport puts them on the wire, so a name that matches nothing on this path is inert rather than an error. A role may also carry a 'pin': the one model a person chose for it, which the runtime honours or stops on -- distinct from 'prefer', which is only an order.
+   * Selection by role, applied identically on both transports. A role declares a preference order and a vehicle, and nothing else. 'prefer' is ORDERING ONLY -- a model the order does not name still qualifies and simply sorts after the named ones -- so a stale entry costs a slightly older model and never a candidate; names in it are model ids as each transport puts them on the wire, so a name that matches nothing on this path is inert rather than an error. What a person CHOSE is not here: a selection lives in this machine's user-level preferences beside the catalog, because which model reviews is a fact about who is at this keyboard and what their machine can reach.
    */
   roles?: Record<string, {
     prefer?: string[];
-    require_provider_in?: string[];
     /**
-     * The one model a person chose for this role. A pin is an instruction rather than an ordering: the caller's provider exclusion does not apply over it, nothing is substituted for it, and a pin this machine cannot dispatch to is a visible stop.
+     * This role's own vehicle: the transport it is dispatched over, where it differs from the machine's. A configured default, so a --transport flag and DABBLER_TRANSPORT still outrank it; a role that names none resolves exactly as the machine does. It exists because reviewer selection may need the other transport when provider independence requires it, which this framework stated long before any surface could act on it.
      */
-    pin?: string;
+    transport?: "api" | "copilot-cli" | "offline";
   }>;
   escalation: {
     enabled: boolean;

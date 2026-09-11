@@ -379,6 +379,12 @@ testing:
           - packages/router/test/projection.test.ts
           - packages/router/test/route.test.ts
           - packages/router/test/walk-bootstrap.test.ts
+      # What the operator CHOSE, beside what this machine READ. The catalog
+      # is rebuildable for nothing and a choice stored in it is a choice the
+      # next free refresh wipes, so the two are two files.
+      - when: packages/router/src/preferences.ts
+        select:
+          - packages/router/test/preferences.test.ts
       # Neither of these has a file of its own any more: the rebuild folded
       # both into the configuration test, which is where a caller meets
       # them. Naming a deleted file is worse than naming the one that runs.

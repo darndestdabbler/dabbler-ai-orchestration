@@ -14,12 +14,14 @@ staged by hand once and is kept, so the shots can be retaken:
 
 ```
 git init                                  (in C:\temp\s64-walk)
-dabbler bootstrap --project-dir . --no-transport-detect
+dabbler bootstrap --project-dir .
 ```
 
-`--no-transport-detect` matters: bootstrap otherwise persists
-`DABBLER_TRANSPORT` in the operator's own environment, and a walk must not
-change the machine it is walking on. Then a `testing.suites` entry was
+Nothing there touches the machine the walk runs on. Bootstrap once
+persisted `DABBLER_TRANSPORT` in the operator's own environment and no
+longer does -- the variable outranks every config layer, so it shadowed
+the very preference a later run set -- and the flag that turned that off,
+`--no-transport-detect`, retired with it. Then a `testing.suites` entry was
 added to `dabbler.yaml` (one suite, `node tests/run.mjs`), a two-session
 plan replaced the scaffolded one, `src/widget.mjs` plus
 `tests/{run.mjs,test_widget.mjs}` were written — one function, one test,

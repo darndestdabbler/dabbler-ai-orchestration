@@ -142,13 +142,16 @@ export async function runSetUpProjectFlow(
   // insists.
   const remote = ui.askRemote ? ((await ui.askRemote()) ?? "").trim() : "";
 
-  // `noTransportDetect`, deliberately. Setting up one project is not a
-  // statement about how this machine routes every other one, and a click
-  // that quietly persisted a user-scoped environment variable is the kind of
-  // side effect somebody finds weeks later while debugging a different repo.
-  // A person who wants the preference changed runs `dabbler bootstrap
+  // No transport, deliberately. Setting up one project is not a statement
+  // about how it routes: the project's own configuration decides, and this
+  // click has no answer to contribute. `bootstrap` used to persist a
+  // user-scoped environment variable here, which is the kind of side effect
+  // somebody finds weeks later while debugging a different repository -- and
+  // that variable outranks every config layer, so it also shadowed whatever
+  // a later `dabbler configure` set. A person who wants a transport for this
+  // checkout sets it on the Configuration pane, or runs `dabbler configure
   // --transport <x>` and means it.
-  const options = { projectDir: root, noTransportDetect: true, ...(remote ? { remote } : {}) };
+  const options = { projectDir: root, ...(remote ? { remote } : {}) };
   let result = await router.bootstrap(options);
   if (!result.ok && ui.initRepository) {
     // `bootstrap` refuses a directory that is not a git repository. That is

@@ -118,16 +118,16 @@ weighted by model. What the shipped catalog records:
 
 **Think in pairs, not in single models.** A different provider always checks
 the session's work — that rule does not bend on a seat — so Dabbler picks the
-verifier from the seat's models *excluding your engine's vendor*. An engine on
-`claude-sonnet-4.6` (weight 1) leaves the verifier free to be one of the
+reviewer from the seat's models *excluding your engine's vendor*. An engine on
+`claude-sonnet-4.6` (weight 1) leaves the reviewer free to be one of the
 zero-weight GPT models. An engine on a zero-weight GPT does the opposite: it
-forces the verifier onto Anthropic or Google, where the cheapest confirmed
+forces the reviewer onto Anthropic or Google, where the cheapest confirmed
 model is 1 and the dearest is 15.
 
 ### B — you have direct API keys
 
 This is the setup with no seat: each vendor bills your own account, per token.
-You need all three keys, because the verifier is always a different vendor
+You need all three keys, because the reviewer is always a different vendor
 from the engine:
 
 ```
@@ -165,7 +165,7 @@ command. Without it the session runs on the seat, and the seat is billed.
   mkdir C:\temp\uat-json
   cd C:\temp\uat-json
   git init -b master
-  dabbler bootstrap --no-transport-detect
+  dabbler bootstrap
   ```
 
 **Expect bootstrap to say what it wrote, and that it committed it:**
@@ -190,8 +190,12 @@ bootstrap has already dealt with its own files. Note the line above it too —
 **no test suite was declared**, because at this moment nothing in the folder
 says how tests run. Step 5 is where you fix that, and it is not optional.
 
-`--no-transport-detect` is what the button passes, deliberately: setting up
-one project is not a statement about how your machine routes every other one.
+Nothing here touches your machine outside the project. Bootstrap used to
+detect a Copilot seat and persist `DABBLER_TRANSPORT` at user scope, and
+that variable outranks every config layer -- so setting up one project
+changed how every other one routed, and shadowed whatever a later `dabbler
+configure` set. Name the vehicle for THIS checkout with `dabbler configure
+--transport copilot-cli` when you want one.
 
 ---
 

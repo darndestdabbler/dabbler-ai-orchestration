@@ -236,7 +236,7 @@ describe("loading a config", () => {
   it("refuses an unknown key in a role", () => {
     // A typo'd role key would silently drop the declaration it meant.
     const base = makeConfig();
-    (base["roles"] as Record<string, Record<string, unknown>>)["verifier"]["require_provider"] = ["openai"];
+    (base["roles"] as Record<string, Record<string, unknown>>)["reviewer"]["require_provider"] = ["openai"];
     assert.match(refusal(() => loadConfigFrom(sources({ base }))), /schema validation/);
   });
 
@@ -244,7 +244,7 @@ describe("loading a config", () => {
     // Ordering only: a stale name costs a slightly older model, never a
     // candidate, so it must not refuse the load.
     const base = makeConfig();
-    (base["roles"] as Record<string, Record<string, unknown>>)["verifier"]["prefer"] = ["retired-last-year"];
+    (base["roles"] as Record<string, Record<string, unknown>>)["reviewer"]["prefer"] = ["retired-last-year"];
     assert.ok(loadConfigFrom(sources({ base }))["roles"]);
   });
 

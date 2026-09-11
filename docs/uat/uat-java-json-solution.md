@@ -124,17 +124,17 @@ it through its registry and refuses a model it does not know, because a
 seat's own label does not say which vendor answered.
 
 **Think in pairs, not in single models.** A different provider always checks
-the session's work, so the verifier comes from the seat's models *excluding
+the session's work, so the reviewer comes from the seat's models *excluding
 your engine's vendor*. An engine on a weight-1 Anthropic model leaves the
-verifier free to be a zero-weight GPT; an engine on a zero-weight GPT forces
-the verifier onto Anthropic or Google, where the cheapest confirmed model is
+reviewer free to be a zero-weight GPT; an engine on a zero-weight GPT forces
+the reviewer onto Anthropic or Google, where the cheapest confirmed model is
 1 and the dearest 15. The full weight table is in
 `docs/uat/uat-dotnet-json-solution.md`.
 
 ### B — you have direct API keys
 
 Each vendor bills your own account, per token. You need all three, because
-the verifier is always a different vendor from the engine:
+the reviewer is always a different vendor from the engine:
 
 ```
 DABBLER_ANTHROPIC_API_KEY
@@ -168,7 +168,7 @@ session next` of the session.
   mkdir C:\temp\uat-java
   cd C:\temp\uat-java
   git init -b master
-  dabbler bootstrap --no-transport-detect
+  dabbler bootstrap
   ```
 
 **Expect bootstrap to say what it wrote, and that it committed it:**

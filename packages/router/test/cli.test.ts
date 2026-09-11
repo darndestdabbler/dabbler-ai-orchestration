@@ -27,6 +27,7 @@ import { VERSION } from "../src/version.ts";
 import { readCandidateRecord } from "../src/impact.ts";
 import { readBundleRecord } from "../src/land.ts";
 import { capture } from "../src/output.ts";
+import { writePreferences } from "../src/preferences.ts";
 import { readRawSessionState } from "../src/progress.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
 import { makeAnsweredSandbox, tempDir } from "./support/answers.ts";
@@ -202,6 +203,26 @@ describe("dabbler session, the whole surface", () => {
       assert.ok(result.out.includes(name), name);
     }
     assert.ok(!result.out.includes("not yet"));
+  });
+
+  it("takes the engine this machine chose when the flag names none, and says how to choose one", async () => {
+    // The whole reason the choice is a file beside the catalog rather than
+    // an editor setting: `session start` typed at a terminal could not read
+    // a setting, so half a machine's configuration was invisible to the one
+    // command that needs it. The flag still wins, because a person who typed
+    // one meant it.
+    writePreferences({ engine: "" });
+    const unchosen = await run(() => sessionVerb(["start"]));
+    assert.equal(unchosen.code, 2);
+    assert.match(unchosen.err, /dabbler configure --engine/);
+
+    // With a choice on the record the start gets past the engine argument
+    // and refuses for the NEXT reason instead, which is what proves it read
+    // the file rather than the flag.
+    writePreferences({ engine: "claude-code" });
+    const chosen = await run(() => sessionVerb(["start"]));
+    assert.ok(!chosen.err.includes("required: --engine"), chosen.err);
+    writePreferences({ engine: "" });
   });
 
   it("refuses a subcommand that does not exist, and says so differently", async () => {

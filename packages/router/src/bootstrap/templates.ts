@@ -99,8 +99,9 @@ export const SHARED_BODY =
   "declaring the work, each step's own checks, cross-provider verification\n" +
   "and its remediation rounds, the complete suite as the run of record, the\n" +
   "commit, the push, and the close. The tests that run are each step's own\n" +
-  "checks and that complete suite: the verifier reviews without writing or\n" +
-  "running one, and no other test run happens between a step and the round.\n" +
+  "checks and that complete suite: the Primary Reviewer reviews without\n" +
+  "writing or running one, and no other test run happens between a step and\n" +
+  "the round.\n" +
   "None of them is yours to run, and none of them is yours to skip ahead to\n" +
   "— the instruction in hand is the whole of what is asked. `dabbler\n" +
   "version` says which router this is; report it when you report a problem.\n" +
@@ -136,8 +137,10 @@ export const SHARED_BODY =
   "- State files (`docs/sessions/sessions.json`) and everything under\n" +
   "  `.dabbler/runs/`\n" +
   "  are written by the router only — never by hand, never \"fixed up\".\n" +
-  "- Verification verdicts come from the verifier. A verdict token the\n" +
-  "  framework did not hand you does not exist.\n" +
+  "- Verdicts come from the **Primary Reviewer** -- *not the author* -- and\n" +
+  "  a disputed impasse from the **Auxiliary Reviewer** -- *not the author\n" +
+  "  and not the primary*, so a third voice is the role's own definition. A\n" +
+  "  verdict token the framework did not hand you does not exist.\n" +
   "- API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,\n" +
   "  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The\n" +
   "  same rule covers a feed PAT: configuration names it and never holds it.\n" +
@@ -192,9 +195,11 @@ export const AGENTS_TAIL =
   "nothing, which is exactly why only this one carries the body.\n" +
   "\n" +
   "Copilot seats: declare `--model` on the first call, the one that\n" +
-  "registers, and prefer `DABBLER_TRANSPORT=copilot-cli` when routing\n" +
-  "through the seat. Cross-provider verification stays cross-provider on\n" +
-  "every transport.\n";
+  "registers, and set the vehicle with `dabbler configure --transport\n" +
+  "copilot-cli` when routing through the seat -- nothing persists\n" +
+  "`DABBLER_TRANSPORT` for you any more, because a variable that outranks\n" +
+  "every config layer shadowed the very preference a later run set. Review\n" +
+  "stays cross-provider on every transport.\n";
 
 /**
  * Gemini CLI reads `GEMINI.md` unless `context.fileName` says otherwise.
@@ -309,7 +314,7 @@ export const DECOMPOSITION_PROMPT =
   "  modules that depend on it, and the module that composes the others\n" +
   "  last.\n" +
   "- Keep scope tight: at most ~3 work steps per session. A session whose\n" +
-  "  evidence bundle a verifier cannot read is too large, and the evidence cap\n" +
+  "  evidence bundle a reviewer cannot read is too large, and the evidence cap\n" +
   "  is the measure of that — treat it as a planning signal, not a threshold\n" +
   "  to get under.\n";
 
@@ -407,7 +412,7 @@ export const PROJECT_CONFIG_TESTING_HEADER =
   "# Which tests answer for which path, and what proves the suite was green.\n" +
   "# Nothing runs the selected tests before verification: the tests that run\n" +
   "# are each step's own checks, and the complete suite is recorded once,\n" +
-  "# against the final verified tree. The verifier reviews without writing\n" +
+  "# against the final verified tree. The Primary Reviewer reviews without\n" +
   "# or running one. The selection is what the record NAMES as affected by a\n" +
   "# change, and what `dabbler affected` prints.\n" +
   "#\n" +
@@ -429,7 +434,7 @@ export const PROJECT_CONFIG_TESTING_HEADER =
   "# before every verification round, one entry per kind -- compile,\n" +
   "# typecheck, lint, analyzer -- each a `command` (argv for `node`, never a\n" +
   "# shim like `npm`) whose exit code is the fact; `required: true` sends a red\n" +
-  "# result back to the author instead of buying a verifier's opinion on it:\n" +
+  "# result back to the author instead of buying a reviewer's opinion on it:\n" +
   "#\n" +
   "#   controls:\n" +
   "#     - kind: typecheck\n" +

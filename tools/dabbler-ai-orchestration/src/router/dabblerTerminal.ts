@@ -649,12 +649,19 @@ function recordedAt(value: unknown): Date | null {
   return Number.isNaN(at.getTime()) ? null : at;
 }
 
-/** The fields a verification round is said with. */
+/**
+ * The fields a verification round is said with.
+ *
+ * Both spellings of the reviewing model, because archived rows are not
+ * rewritten: a ledger recorded before the role was renamed carries
+ * `verifier_model`, and a reader that took only the new key would print a
+ * round with no reviewer against it.
+ */
 function roundFields(row: Record<string, unknown>): Record<string, string> {
   return {
     round: String(row["round"] ?? "?"),
     verdict: String(row["verdict"] ?? "?"),
-    verifier: String(row["verifier_model"] ?? ""),
+    reviewer: String(row["reviewer_model"] ?? row["verifier_model"] ?? ""),
   };
 }
 

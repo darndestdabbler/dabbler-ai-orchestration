@@ -36,7 +36,7 @@
 // verifies correctly, and turning a maintenance signal into an outage is how
 // maintenance signals get suppressed.
 
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -54,7 +54,12 @@ import {
   type CatalogScope,
   type TransportBlock,
 } from "./catalog.ts";
-import { truthy, type RouterConfig } from "./config.ts";
+import {
+  TRANSPORT_COPILOT_CLI,
+  TRANSPORT_OFFLINE,
+  truthy,
+  type RouterConfig,
+} from "./config.ts";
 import { STATE_FILENAME, resolveSessionsDir } from "./evidence.ts";
 import {
   HttpStatusError,
@@ -62,6 +67,7 @@ import {
   httpGetJson,
 } from "./transports/api.ts";
 import { resolveSecret } from "./secretResolver.ts";
+import { resolveResponsesDir } from "./transports/offline.ts";
 import { providerReachable } from "./selection.ts";
 import {
   PLATFORM_AI_CREDITS,
@@ -920,6 +926,80 @@ export function apiSelectableModels(
   return (block?.models ?? []).filter(
     (entry) => entry.provider !== null && providerReachable(config, entry.provider),
   );
+}
+
+/**
+ * One transport this machine could actually reach, and what makes it so.
+ *
+ * A vehicle nothing can reach is not offered: a list that included a seat
+ * this machine has no seat for, or a direct-API path with no key anywhere,
+ * would be a menu of ways to fail rather than a choice. `note` is what to do
+ * about a transport that is ALMOST present -- the seat installed but never
+ * asked, whose remedy is free -- because "not offered" without a reason is
+ * how an operator comes to believe the pane is broken.
+ */
+export interface TransportPresence {
+  readonly transport: string;
+  readonly present: boolean;
+  /** What reaching it means here, in the words a person weighs it in. */
+  readonly means: string;
+  /** What would make an absent one present, or null when nothing would. */
+  readonly note: string | null;
+}
+
+/**
+ * Which transports this machine can reach, each read for what it actually
+ * IS rather than guessed from one test applied to all three.
+ *
+ * - `api` is present when some configured provider's key resolves. A key is
+ *   the whole of what that path needs, and a machine with none cannot
+ *   dispatch to a vendor however many models a catalog remembers.
+ * - `copilot-cli` is present when the seat has ANSWERED: the catalog holds a
+ *   block scoped to this seat. A `copilot` on PATH that has never been asked
+ *   is not a seat this framework can enumerate, and the remedy is free.
+ * - `offline` is present when a response directory is named AND exists. It
+ *   is opted into by saying where the script lives, so it can never be
+ *   reached by accident -- which is also why it is never present by default.
+ *
+ * Free on every transport: a file read, a key lookup, and a directory stat.
+ * Nothing here spawns a process or opens a connection, because this answers
+ * a pane that repaints whenever a declaration moves.
+ */
+export function transportPresence(config: RouterConfig): TransportPresence[] {
+  const keyed = Object.entries(record(config["providers"])).some(
+    ([, cfg]) => isRecord(cfg) && enabledFlag(cfg) && Boolean(resolveSecret(String(cfg["api_key_env"] ?? ""))),
+  );
+  const seat = seatBlock() !== null;
+  let offline = false;
+  try {
+    offline = existsSync(resolveResponsesDir(config));
+  } catch {
+    offline = false;
+  }
+  return [
+    {
+      transport: TRANSPORT_API,
+      present: keyed,
+      means: "the provider's own endpoint, billed in tokens",
+      note: keyed ? null : "no configured provider's API key resolves in this environment",
+    },
+    {
+      transport: TRANSPORT_COPILOT_CLI,
+      present: seat,
+      means: "a Copilot seat, billed in AI credits per token",
+      note: seat
+        ? null
+        : `this machine's seat has not answered yet -- \`${CATALOG_REFRESH_COMMAND}\` asks it, free`,
+    },
+    {
+      transport: TRANSPORT_OFFLINE,
+      present: offline,
+      means: "scripted answers from disk: no network, no spend",
+      note: offline
+        ? null
+        : "no response directory is named, or the one named does not exist",
+    },
+  ];
 }
 
 export function currentApiScope(config: RouterConfig): CatalogScope {

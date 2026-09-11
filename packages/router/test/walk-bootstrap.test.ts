@@ -58,7 +58,7 @@ describe("a project on its first day", () => {
     assert.ok(!existsSync(join(folder, ".git")));
 
     const setup = await capture(() =>
-      bootstrapVerb(["--project-dir", folder, "--no-transport-detect"]),
+      bootstrapVerb(["--project-dir", folder]),
     );
     assert.equal(setup.value, 0, setup.stderr);
     assert.match(setup.stdout, /initialised a git repository/);
@@ -88,7 +88,7 @@ describe("a project on its first day", () => {
 
     // --- the bootstrap ------------------------------------------------------
     const setup = await capture(() =>
-      bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]),
+      bootstrapVerb(["--project-dir", repo]),
     );
     assert.equal(setup.value, 0, setup.stderr);
     milestones.push("bootstrapped");
@@ -219,7 +219,7 @@ describe("a project on its first day", () => {
     );
 
     const setup = await capture(() =>
-      bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]),
+      bootstrapVerb(["--project-dir", repo]),
     );
     assert.equal(setup.value, 0, setup.stderr);
 
@@ -240,7 +240,7 @@ describe("a project on its first day", () => {
     git(folder, "init", "-q", "--bare", bare);
 
     const setup = await capture(() =>
-      bootstrapVerb(["--project-dir", folder, "--no-transport-detect", "--remote", bare]),
+      bootstrapVerb(["--project-dir", folder, "--remote", bare]),
     );
     assert.equal(setup.value, 0, setup.stderr);
 
@@ -270,7 +270,7 @@ describe("a project on its first day", () => {
     git(bare, "symbolic-ref", "HEAD", "refs/heads/placeholder");
 
     const setup = await capture(() =>
-      bootstrapVerb(["--project-dir", folder, "--no-transport-detect", "--remote", bare]),
+      bootstrapVerb(["--project-dir", folder, "--remote", bare]),
     );
     assert.equal(setup.value, 0, setup.stderr);
 
@@ -300,7 +300,7 @@ describe("a project on its first day", () => {
     const repo = makeRepo(PROJECT, { origin: true });
 
     const setup = await capture(() =>
-      bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]),
+      bootstrapVerb(["--project-dir", repo]),
     );
     assert.equal(setup.value, 0, setup.stderr);
 

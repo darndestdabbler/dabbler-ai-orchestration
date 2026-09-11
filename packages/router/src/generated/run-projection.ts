@@ -40,7 +40,7 @@ export type RunProjectionRun = {
   verification: {
     rounds: number;
     last_verdict: "VERIFIED" | "ISSUES_FOUND" | "WAIVED" | "REMEDIATED_AT_CAP" | null;
-    verifier_provider: string | null;
+    reviewer_provider: string | null;
     transport: string | null;
     accepted_tree_digest?: string | null;
     blocking_findings?: number;

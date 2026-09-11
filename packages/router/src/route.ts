@@ -25,10 +25,10 @@
 import {
   TRANSPORT_COPILOT_CLI,
   TRANSPORT_OFFLINE,
+  explainRoleTransport,
   loadConfig,
   providerDefaults,
   resolveGenerationParams,
-  resolveTransport,
   truthy,
   type RouterConfig,
 } from "./config.ts";
@@ -36,10 +36,8 @@ import { apiBlock, apiSelectableModels } from "./discovery.ts";
 import { recordCall, type CallRecord } from "./metrics.ts";
 import { isNoRouterMode } from "./runtimeMode.ts";
 import {
-  ROLE_VERIFIER,
-  effectiveExclusion,
   fellThroughWarning,
-  verifierRefusal,
+  reviewerRefusal,
   type Candidate as RoleCandidate,
   type RoleResolution,
 } from "./selection.ts";
@@ -527,7 +525,7 @@ export function assertNotExcluded(
  * again here, against the author this call actually has, because a rule the
  * surface keeps and the runtime does not is not a rule.
  *
- * The words are `verifierRefusal`'s, so the operator reads one sentence
+ * The words are `reviewerRefusal`'s, so the operator reads one sentence
  * wherever this is refused.
  */
 export function assertNotTheAuthor(
@@ -535,7 +533,7 @@ export function assertNotTheAuthor(
   authorModel: string | null | undefined,
 ): void {
   if (!authorModel) return;
-  const refusal = verifierRefusal(authorModel, candidate.model_id);
+  const refusal = reviewerRefusal(authorModel, candidate.model_id);
   if (refusal === null) return;
   throw new ExcludedProviderError(`${refusal} Refusing to dispatch.`);
 }
@@ -576,11 +574,11 @@ export function apiLadder(
 /**
  * Why a ladder is empty, in words the person who has to act can act on.
  *
- * A pin nobody can dispatch to is its own situation and is named as one: the
- * operator chose that model, and telling them "no candidate survived the
- * exclusion" would describe a rule that was not even applied to their choice.
- * It never falls to the next model, because falling through is the silent
- * substitution the pin exists to stop.
+ * A SELECTION nobody can dispatch to is its own situation and is named as
+ * one: the operator chose that model, and telling them "no candidate
+ * survived the exclusion" would leave out the half of the sentence they can
+ * act on. It never falls to the next model, because falling through is the
+ * silent substitution a selection exists to stop.
  */
 function unreachableLadder(
   resolution: RoleResolution<readonly [string, string]>,
@@ -589,18 +587,19 @@ function unreachableLadder(
   exclude: readonly string[],
   unread: boolean,
 ): string {
-  if (resolution.pinUnmet !== null) {
+  if (resolution.selectedUnmet !== null) {
     return (
-      `the '${role}' role is pinned to '${resolution.pinUnmet}', and this ` +
-      "machine cannot dispatch to it: " +
+      `you chose '${resolution.selectedUnmet}' for the '${role}' role, and ` +
+      "this call cannot dispatch to it: " +
       (unread
-        ? "it has not read its model lists yet, or holds a reading taken " +
-          "for a different seat or set of keys"
-        : "the transport in force does not list that model, or its " +
-          "provider has no key here") +
+        ? "this machine has not read its model lists yet, or holds a " +
+          "reading taken for a different seat or set of keys"
+        : "the transport in force does not list that model, its provider " +
+          `has no key here, or this call excludes its provider ` +
+          `(${renderList(exclude)})`) +
       `. Nothing was substituted for it. Refresh the catalog with \`${REFRESH_COMMAND}\`, ` +
-      "or choose a model this machine lists with `dabbler configure " +
-      `--${role === ROLE_VERIFIER ? "verifying" : "authoring"}-model <id>\`.`
+      "or choose a model this call can reach with `dabbler configure " +
+      "--reviewer-model <id>`."
     );
   }
   return (
@@ -788,7 +787,7 @@ export interface RouteOptions {
    * The model this call's work was authored by, where the caller knows it.
    *
    * The one rule is asserted immediately before the wire from this, not only
-   * where a choice is written. `configure` refuses a verifier equal to the
+   * where a choice is written. `configure` refuses a reviewer equal to the
    * author when the pin is SET, and a pin outlives the session it was set
    * in: the next session declares a different model at `session start`, the
    * pin is honoured over the caller's provider exclusion because a default
@@ -871,11 +870,22 @@ async function routeLive(
   if (isNoRouterMode()) return buildNoRouterStub();
 
   const config = getConfig();
-  const transportName = resolveTransport(config, options.transport ?? null);
-  // Read once, here, and used both to build the ladder and to re-assert
-  // immediately before the wire. A caller's exclusion is a default, and a
-  // default does not overrule a person who pinned this role.
-  const exclude = effectiveExclusion(config, role, options.excludeProviders ?? null);
+  // **The ROLE's vehicle, not the machine's.** Every role is dispatched
+  // through something, and it is not always the same something: this module
+  // has said since the transport reading was written that reviewer selection
+  // may use the other transport when provider independence requires it, and
+  // a dispatch that read one global transport was the half of that sentence
+  // nothing did. A role that declares none resolves exactly as the machine
+  // does, so a repository that never wanted two vehicles has one.
+  const transportName = explainRoleTransport(config, role, options.transport ?? null).transport;
+  // The caller's exclusion, used both to build the ladder and to re-assert
+  // immediately before the wire. It ALWAYS applies: a selection narrows the
+  // candidates and never widens them past it, because a selection that
+  // bypassed the exclusion let a model that reviewed round 1 adjudicate its
+  // own disputed finding.
+  const exclude = [
+    ...new Set((options.excludeProviders ?? []).map((name) => String(name).trim().toLowerCase())),
+  ].sort();
 
   const path = buildPath(config, transportName, role, taskType, exclude);
 

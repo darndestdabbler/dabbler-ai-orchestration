@@ -1,11 +1,11 @@
 // Selection by role: the one rule both transports resolve candidates
-// through. A role declares the provider set it may draw from -- a hard
-// filter -- and a preference order, which is ordering only.
+// through. Two fields and no third -- `selected` is what the operator chose
+// and `prefer` is the order tried where nobody chose.
 //
-// Every rule here is a function of a configuration and a candidate list, so
-// the tests hand it both. The only environment they touch is the provider
-// keys, because a provider whose key does not resolve is not a candidate
-// anywhere.
+// Every rule here is a function of a configuration, a candidate list and
+// this machine's preferences, so the tests hand it all three. The only
+// environment they touch is the provider keys, because a provider whose key
+// does not resolve is not a candidate anywhere.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
@@ -17,24 +17,41 @@ import {
   FIDELITY_SUBSTITUTED,
   FIDELITY_UNKNOWN,
   REMOVED_EXCLUDED_PROVIDER,
-  REMOVED_NOT_PERMITTED,
-  ROLE_VERIFIER,
-  effectiveExclusion,
+  REMOVED_NOT_SELECTED,
+  ROLE_AUXILIARY_REVIEWER,
+  ROLE_PRIMARY_REVIEWER,
+  reviewerExclusions,
   explainRole,
   modelFidelity,
   roundObservations,
-  verifierRefusal,
+  reviewerRefusal,
   resolveRole,
   roleDeclaration,
   type Candidate,
 } from "../src/selection.ts";
+import { writePreferences } from "../src/preferences.ts";
 import { makeConfig, setProviderKeys } from "./support/answers.ts";
 
 const KEYS = ["TEST_ANTHROPIC_KEY", "TEST_GOOGLE_KEY", "TEST_OPENAI_KEY"];
 
+/**
+ * What this machine chose, for one role, in the file where choices live.
+ *
+ * Written through the preferences module rather than into a config, which
+ * is the point of this step: a selection is a fact about who is at this
+ * keyboard, so it does not travel inside a repository.
+ */
+function withSelection(selected: Readonly<Record<string, string>>): void {
+  for (const [role, model] of Object.entries(selected)) {
+    writePreferences({ role, selected: model });
+  }
+}
+
 beforeEach(setProviderKeys);
 afterEach(() => {
   for (const name of KEYS) delete process.env[name];
+  // Every test here starts from a machine that has chosen nothing.
+  writePreferences({ role: ROLE_PRIMARY_REVIEWER, selected: "" });
 });
 
 const CANDIDATES: ReadonlyArray<readonly [string, string]> = [
@@ -48,22 +65,25 @@ function ids(candidates: ReadonlyArray<Candidate>): string[] {
 }
 
 describe("what a role declares", () => {
-  it("reads a preference order and a permitted provider set", () => {
+  it("reads a preference order, and nothing about which providers it may draw from", () => {
+    // Two fields and no third. `require_provider_in` listed the three
+    // vendors, which is a second inventory beside the catalog -- and the
+    // catalog already says what this machine reaches.
     const declaration = roleDeclaration(
-      makeConfig({ roles: { r: { prefer: ["g-one"], require_provider_in: ["Google"] } } }),
+      makeConfig({ roles: { r: { prefer: ["g-one"] } } }),
       "r",
     );
     assert.deepEqual(declaration.prefer, ["g-one"]);
-    assert.deepEqual([...declaration.permitted], ["google"]);
+    assert.equal(declaration.selected, null);
   });
 
-  it("gives an undeclared role no preference and no restriction", () => {
+  it("gives an undeclared role no preference and no selection", () => {
     // Refusing here would make a role a thing that has to be declared before
     // it can be asked for, and the preference order is an optimisation
     // rather than a permission.
     const declaration = roleDeclaration(makeConfig(), "nobody-declared-me");
     assert.deepEqual(declaration.prefer, []);
-    assert.equal(declaration.permitted.size, 0);
+    assert.equal(declaration.selected, null);
   });
 });
 
@@ -83,11 +103,6 @@ describe("resolving a role", () => {
   it("treats a preference naming nothing as inert", () => {
     const config = makeConfig({ roles: { r: { prefer: ["retired-model", "o-one"] } } });
     assert.deepEqual(ids(resolveRole(config, "r", CANDIDATES)), ["o-one", "a-one", "g-one"]);
-  });
-
-  it("treats require_provider_in as a hard filter", () => {
-    const config = makeConfig({ roles: { r: { require_provider_in: ["openai"] } } });
-    assert.deepEqual(resolveRole(config, "r", CANDIDATES), [["o-one", "openai"]]);
   });
 
   it("removes a provider the exclusion names even when a preference names it", () => {
@@ -137,18 +152,14 @@ describe("resolving a role", () => {
     assert.equal(unrestricted.rank, null);
 
     // Nothing survives: no chosen candidate, so nothing fell through either.
-    const empty = explainRole(
-      makeConfig({ roles: { r: { require_provider_in: ["openai"] } } }),
-      "r",
-      CANDIDATES,
-      ["openai"],
-    );
+    const empty = explainRole(makeConfig(), "r", CANDIDATES, [
+      "anthropic",
+      "openai",
+      "google",
+    ]);
     assert.deepEqual(empty.candidates, []);
     assert.equal(empty.fellThrough, false);
-    assert.deepEqual(
-      empty.removed.map((row) => row.rule).sort(),
-      [REMOVED_EXCLUDED_PROVIDER, REMOVED_NOT_PERMITTED, REMOVED_NOT_PERMITTED].sort(),
-    );
+    assert.deepEqual(new Set(empty.removed.map((row) => row.rule)), new Set([REMOVED_EXCLUDED_PROVIDER]));
   });
 
   it("carries the transport's own handle through untouched", () => {
@@ -168,46 +179,79 @@ describe("resolving a role", () => {
     // end cross-vendor verification the day a vendor ships a model no
     // preference order names yet.
     assert.deepEqual(
-      resolveRole(makeConfig(), ROLE_VERIFIER, [["brand-new-model", "google"]] as const),
+      resolveRole(makeConfig(), ROLE_PRIMARY_REVIEWER, [["brand-new-model", "google"]] as const),
       [["brand-new-model", "google"]],
     );
   });
 });
 
-describe("a model a person pinned", () => {
-  it("is the one candidate, and the caller's exclusion does not overrule it", () => {
-    // The defect this exists for: the surface wrote a choice to the front of
-    // a preference order while the dispatch resolved the same role with the
-    // authoring model's provider excluded, so a deliberately chosen
-    // same-provider verifier was dropped and something else answered with
-    // nothing said. A caller's exclusion is a DEFAULT; a pin is a person.
-    const config = makeConfig({ roles: { verifier: { pin: "o-one" } } });
+describe("what a reviewing role may not be", () => {
+  it("keeps the primary off the author and the auxiliary off every prior reviewer", () => {
+    // The role's own definition, not a superset a caller assembles: the
+    // primary is the first voice, so a prior reviewer is nothing to it; the
+    // auxiliary is reached only at a disputed impasse, and a model that
+    // reviewed round 1 judging its own disputed finding is a reviewer
+    // marking their own homework at the one point with no appeal.
     assert.deepEqual(
-      ids(resolveRole(config, ROLE_VERIFIER, CANDIDATES, ["openai"])),
+      reviewerExclusions(ROLE_PRIMARY_REVIEWER, "anthropic", ["openai"]),
+      ["anthropic"],
+    );
+    assert.deepEqual(
+      reviewerExclusions(ROLE_AUXILIARY_REVIEWER, "anthropic", ["openai", "openai"]),
+      ["anthropic", "openai"],
+    );
+  });
+});
+
+describe("a model a person selected", () => {
+  it("narrows the candidates to it, and never widens past the caller's exclusion", () => {
+    // What the deleted bypass actually bought: a selection that overruled
+    // the exclusion let a model that reviewed round 1 adjudicate its own
+    // disputed finding, which is a reviewer marking their own homework at
+    // the one point in the lifecycle with no appeal.
+    withSelection({ [ROLE_PRIMARY_REVIEWER]: "o-one" });
+    assert.deepEqual(
+      ids(resolveRole(makeConfig(), ROLE_PRIMARY_REVIEWER, CANDIDATES)),
       ["o-one"],
     );
-    assert.deepEqual(effectiveExclusion(config, ROLE_VERIFIER, ["openai"]), []);
+    const excluded = explainRole(makeConfig(), ROLE_PRIMARY_REVIEWER, CANDIDATES, ["openai"]);
+    assert.deepEqual(excluded.candidates, []);
+    assert.equal(excluded.selectedUnmet, "o-one");
   });
 
-  it("resolves to nothing rather than to the next model, and names the pin", () => {
-    // Falling from a pinned model to the next candidate IS the silent
-    // substitution the pin exists to stop, so an unmet pin is empty and the
-    // caller turns it into a stop.
-    const resolution = explainRole(
-      makeConfig({ roles: { verifier: { pin: "nothing-lists-this" } } }),
-      ROLE_VERIFIER,
-      CANDIDATES,
-    );
+  it("resolves to nothing rather than to the next model, and names the selection", () => {
+    // Falling from a selected model to the next candidate IS the silent
+    // substitution a selection exists to stop, so an unmet selection is
+    // empty and the caller turns it into a stop that names the model.
+    withSelection({ [ROLE_PRIMARY_REVIEWER]: "nothing-lists-this" });
+    const resolution = explainRole(makeConfig(), ROLE_PRIMARY_REVIEWER, CANDIDATES);
     assert.deepEqual(resolution.candidates, []);
-    assert.equal(resolution.pinUnmet, "nothing-lists-this");
+    assert.equal(resolution.selectedUnmet, "nothing-lists-this");
+    assert.deepEqual(
+      new Set(resolution.removed.map((row) => row.rule)),
+      new Set([REMOVED_NOT_SELECTED]),
+    );
   });
 
-  it("leaves a role nobody pinned preferring a different provider", () => {
-    // A default is not an override of a person, and where there is no person
-    // the default still holds: this is the cross-provider preference, intact.
+  it("is reported rather than applied when a surface asks what COULD answer", () => {
+    // A pane narrowed to the operator's own selection would offer them the
+    // choice they already made and no way back out of it.
+    withSelection({ [ROLE_PRIMARY_REVIEWER]: "o-one" });
+    const surface = explainRole(
+      makeConfig(),
+      ROLE_PRIMARY_REVIEWER,
+      CANDIDATES,
+      null,
+      { applySelection: false },
+    );
+    assert.deepEqual(ids(surface.candidates).sort(), ["a-one", "g-one", "o-one"]);
+    assert.equal(surface.selected, "o-one");
+    assert.equal(surface.selectedUnmet, null);
+  });
+
+  it("leaves a role nobody selected resolving by preference, under the exclusion", () => {
     const config = makeConfig();
-    assert.deepEqual(effectiveExclusion(config, ROLE_VERIFIER, ["openai"]), ["openai"]);
-    assert.ok(!ids(resolveRole(config, ROLE_VERIFIER, CANDIDATES, ["openai"])).includes("o-one"));
+    assert.ok(!ids(resolveRole(config, ROLE_PRIMARY_REVIEWER, CANDIDATES, ["openai"])).includes("o-one"));
   });
 });
 
@@ -228,9 +272,9 @@ describe("what a verifying model may be", () => {
     // because whether two models of one family share a blind spot is a
     // judgement this framework has no data to make -- and the refusal says
     // so rather than leaving the developer to assume it was checked.
-    assert.equal(verifierRefusal("claude-opus-5", "gpt-5.6-terra"), null);
-    assert.equal(verifierRefusal("gpt-5.6-sol", "gpt-5.6-terra"), null);
-    const refused = String(verifierRefusal("claude-opus-5", "claude-opus-5"));
+    assert.equal(reviewerRefusal("claude-opus-5", "gpt-5.6-terra"), null);
+    assert.equal(reviewerRefusal("gpt-5.6-sol", "gpt-5.6-terra"), null);
+    const refused = String(reviewerRefusal("claude-opus-5", "claude-opus-5"));
     assert.match(refused, /they are the same model/);
     assert.match(refused, /same provider is allowed/);
   });
@@ -238,7 +282,7 @@ describe("what a verifying model may be", () => {
   it("reads a dated pin and its undated id as the same model", () => {
     // The case the comparison exists for: this is how a person picks the
     // same model twice without noticing they have.
-    assert.ok(verifierRefusal("claude-sonnet-5", "claude-sonnet-5-20260101") !== null);
+    assert.ok(reviewerRefusal("claude-sonnet-5", "claude-sonnet-5-20260101") !== null);
   });
 });
 

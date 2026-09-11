@@ -1,17 +1,30 @@
 // `dabbler bootstrap` -- set a consumer project up to run the session
 // workflow.
 //
-// Two of its effects reach outside the project and are kept deliberately: the
-// `.gitignore` rewrite, because a tracked run ledger makes verified work look
-// like it changed after verification; and the durable `DABBLER_TRANSPORT`
-// preference, because the transport belongs to the operator's account rather
-// than to any one repository. `--no-transport-detect` is how a caller that
-// must not touch the host opts out of the second.
+// **One effect reaches outside the project**, and it is kept deliberately:
+// the `.gitignore` rewrite, because a tracked run ledger makes verified work
+// look like it changed after verification.
+//
+// **Nothing here writes the operator's environment.** It used to persist
+// `DABBLER_TRANSPORT` at user scope, and that variable outranks every config
+// layer -- so a preference a bootstrap run could shadow was a preference that
+// did nothing, which is a trap this repository has already paid for once. The
+// variable is still READ, because a deliberate override typed into a shell is
+// not the same thing as one written behind the operator's back, and
+// `explainTransport` names the layer that decided so the shadowing is
+// visible. `--transport` now writes the project's own machine-local overlay,
+// which is the layer a machine's choice about a checkout belongs at.
 
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { TRANSPORT_ENV_VAR, VALID_TRANSPORTS, loadConfig } from "../config.ts";
+import {
+  LOCAL_OVERRIDES_FILENAME,
+  TRANSPORT_ENV_VAR,
+  VALID_TRANSPORTS,
+  loadConfig,
+  writeConfigurationChoice,
+} from "../config.ts";
 import { freshnessWarnings } from "../discovery.ts";
 import { SESSIONS_DIRNAME, ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
 import { haveCommonHistory, remoteDefaultBranch, repoRelativePath, runGit } from "../journal.ts";
@@ -25,15 +38,11 @@ import {
   DECOMPOSITION_PROMPT,
   IGNORE_RULE,
   PLAN_PROMPT,
-  SCOPE_USER,
   declaresPackaging,
   detectEcosystems,
   detectPackaging,
   ensureCommitGuard,
   ensureGitignore,
-  manualPersistHint,
-  persistTransportPreference,
-  resolveBootstrapTransport,
   scaffoldBootstrapSessions,
   scaffoldModuleManifest,
   scaffoldProjectConfig,
@@ -55,7 +64,6 @@ function usage(): string {
     "                        [--print-plan-prompt]",
     "                        [--print-decomposition-prompt]",
     `                        [--transport {${CHOICES.join(",")}}]`,
-    "                        [--no-transport-detect] [--machine-scope]",
     "",
     "options:",
     "  --project-dir PROJECT_DIR",
@@ -67,28 +75,19 @@ function usage(): string {
     "                        one cannot close its first session. An existing",
     "                        remote is left exactly as it is.",
     "  --transport {" + CHOICES.join(",") + "}",
-    "                        remember this transport in the persistent",
-    `                        ${TRANSPORT_ENV_VAR} environment variable.`,
-    "                        Omitted: an existing preference is kept,",
-    "                        otherwise a detected Copilot seat sets it",
-    "                        automatically.",
-    "  --no-transport-detect",
-    "                        do not touch the transport preference at all",
-    "  --machine-scope       persist the transport preference for every",
-    "                        account on the machine instead of this one.",
-    "                        Requires elevation, and is the wrong choice",
-    "                        when the admin account is a different user.",
+    `                        how a provider is reached from this checkout,`,
+    `                        written to ${LOCAL_OVERRIDES_FILENAME}. Nothing`,
+    "                        outside the project is touched: this used to be",
+    `                        persisted as ${TRANSPORT_ENV_VAR}, which outranks`,
+    "                        every config layer and so shadowed the very",
+    "                        preference a later run tried to set. Omitted:",
+    "                        the project's own configuration decides.",
     "",
   ].join("\n");
 }
 
 const VALUE_FLAGS = new Set(["--project-dir", "--repo-name", "--remote", "--transport"]);
-const BARE_FLAGS = new Set([
-  "--print-plan-prompt",
-  "--print-decomposition-prompt",
-  "--no-transport-detect",
-  "--machine-scope",
-]);
+const BARE_FLAGS = new Set(["--print-plan-prompt", "--print-decomposition-prompt"]);
 
 interface Parsed {
   readonly projectDir: string;
@@ -97,8 +96,6 @@ interface Parsed {
   readonly printPlanPrompt: boolean;
   readonly printDecompositionPrompt: boolean;
   readonly transport: string | null;
-  readonly noTransportDetect: boolean;
-  readonly machineScope: boolean;
 }
 
 function parseArgs(argv: readonly string[]): Parsed | string {
@@ -130,8 +127,6 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     printPlanPrompt: flags.has("--print-plan-prompt"),
     printDecompositionPrompt: flags.has("--print-decomposition-prompt"),
     transport: values.get("--transport") ?? null,
-    noTransportDetect: flags.has("--no-transport-detect"),
-    machineScope: flags.has("--machine-scope"),
   };
 }
 
@@ -143,33 +138,31 @@ function isDirectory(path: string): boolean {
   }
 }
 
+/**
+ * The transport an operator named, written where a machine's choice about a
+ * CHECKOUT belongs: the project's own gitignored overlay.
+ *
+ * It used to be persisted as an environment variable at user scope, which
+ * outranks every config layer -- so the one thing it reliably did was shadow
+ * whatever a later `dabbler configure` set, silently, for every repository
+ * on the machine. Nothing here touches the host now, and a run that names no
+ * transport changes nothing at all.
+ */
 function applyTransportPreference(parsed: Parsed): void {
-  const [value, reason] = resolveBootstrapTransport(parsed.transport);
-  if (value === null) {
-    writeOut(`bootstrap: transport unchanged — ${reason}\n`);
-    return;
-  }
-  const scope = persistTransportPreference(value, {
-    machine: parsed.machineScope,
+  if (parsed.transport === null) return;
+  const written = writeConfigurationChoice(parsed.projectDir, {
+    transport: parsed.transport,
   });
-  if (scope !== null) {
-    const downgrade =
-      parsed.machineScope && scope === SCOPE_USER
-        ? " (machine scope was requested but unavailable, so this " +
-          "applies to your account only)"
-        : "";
+  for (const line of written.changed) writeOut(`bootstrap: ${line}\n`);
+  writeOut(`bootstrap: written to ${written.path}\n`);
+  const shadow = process.env[TRANSPORT_ENV_VAR];
+  if (shadow) {
     writeOut(
-      `bootstrap: ${reason}; persisted ${TRANSPORT_ENV_VAR}=` +
-        `${value} at ${scope} scope${downgrade} (open a new ` +
-        "terminal to pick it up)\n",
+      `bootstrap: ${TRANSPORT_ENV_VAR} is set to '${shadow}' in this ` +
+        "environment and outranks the file, so it is what a session started " +
+        "from here will use.\n",
     );
-    return;
   }
-  writeErr(
-    `bootstrap: ${reason}, but ${TRANSPORT_ENV_VAR} could not ` +
-      `be written at ${SCOPE_USER} scope either. Set it ` +
-      `yourself: ${manualPersistHint(value)}\n`,
-  );
 }
 
 export async function bootstrapVerb(argv: string[]): Promise<number> {
@@ -285,7 +278,7 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   if (hook !== null) {
     writeOut(`bootstrap: installed the step-execution commit guard at ${hook}\n`);
   }
-  if (!parsed.noTransportDetect) applyTransportPreference(parsed);
+  applyTransportPreference(parsed);
 
   const configPath = scaffoldProjectConfig(project);
   if (configPath !== null) written.push(configPath);

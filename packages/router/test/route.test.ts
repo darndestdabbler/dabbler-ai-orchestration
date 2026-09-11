@@ -16,6 +16,7 @@ import { stringify } from "yaml";
 import { deliverFileRequests, grantForTransport } from "../src/agency.ts";
 import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { loadMetrics } from "../src/metrics.ts";
+import { writePreferences } from "../src/preferences.ts";
 import {
   ExcludedProviderError,
   NoCandidateError,
@@ -113,6 +114,9 @@ beforeEach(() => {
 
 afterEach(() => {
   for (const name of KEYS) delete process.env[name];
+  // Back to a machine that has chosen nothing: a selection is a file, so it
+  // outlives the test that wrote it unless the test takes it back.
+  writePreferences({ role: "reviewer", selected: "" });
   delete process.env[CONFIG_ENV_VAR];
   delete process.env["DABBLER_NO_ROUTER"];
   delete process.env["DABBLER_TRANSPORT"];
@@ -173,31 +177,39 @@ describe("the ladder a call may take", () => {
     assert.throws(() => apiLadder(makeConfig(), "generator", "general", []), NoCandidateError);
   });
 
-  it("stops visibly when a pinned model cannot be dispatched, and substitutes nothing", () => {
-    // A pin is an instruction rather than the head of a ladder. The stop
-    // names the model the operator chose, why this machine cannot reach it,
-    // and the command that carries each way forward -- the shape session 147
-    // gave a stop -- because "no candidate survived the exclusion" would
-    // describe a rule that was never applied to their choice.
-    const config = makeConfig({ roles: { verifier: { pin: "o-nothing-lists-this" } } });
+  it("stops visibly when a selected model cannot be dispatched, and substitutes nothing", () => {
+    // A selection is an instruction rather than the head of a ladder. The
+    // stop names the model the operator chose, why this call cannot reach
+    // it, and the command that carries the way forward -- the shape session
+    // 147 gave a stop -- because "no candidate survived the exclusion" would
+    // leave out the half of the sentence they can act on.
+    writePreferences({ role: "reviewer", selected: "o-nothing-lists-this" });
+    const config = makeConfig();
     assert.throws(
-      () => apiLadder(config, "verifier", "general", []),
-      /pinned to 'o-nothing-lists-this'/,
+      () => apiLadder(config, "reviewer", "general", []),
+      /you chose 'o-nothing-lists-this'/,
     );
     assert.throws(
-      () => apiLadder(config, "verifier", "general", []),
+      () => apiLadder(config, "reviewer", "general", []),
       /Nothing was substituted for it/,
     );
-    assert.throws(() => apiLadder(config, "verifier", "general", []), /dabbler configure/);
+    assert.throws(() => apiLadder(config, "reviewer", "general", []), /dabbler configure/);
   });
 
-  it("dispatches to the pinned model even on the provider the caller excluded", () => {
-    // The author's provider is excluded by DEFAULT, and a default does not
-    // overrule a person: the pinned model is what the round reaches.
-    const config = makeConfig({ roles: { verifier: { pin: "o-gpt" } } });
+  it("narrows to the selected model, and stops rather than widening past the exclusion", () => {
+    // A selection NARROWS. It used to bypass the caller's exclusion, and
+    // what that bought was a model that reviewed round 1 adjudicating its
+    // own disputed finding -- a reviewer marking their own homework at the
+    // one point in the lifecycle with no appeal.
+    writePreferences({ role: "reviewer", selected: "o-gpt" });
+    const config = makeConfig();
     assert.deepEqual(
-      apiLadder(config, "verifier", "general", ["openai"]).map((entry) => entry.model_id),
+      apiLadder(config, "reviewer", "general", []).map((entry) => entry.model_id),
       ["o-gpt"],
+    );
+    assert.throws(
+      () => apiLadder(config, "reviewer", "general", ["openai"]),
+      /you chose 'o-gpt'/,
     );
   });
 
@@ -241,7 +253,7 @@ describe("the ladder a call may take", () => {
     seedApiCatalog(config);
     process.env["TEST_OPENAI_KEY"] = "test-key";
     (config["providers"] as Record<string, Record<string, unknown>>)["openai"]["enabled"] = false;
-    const reached = apiLadder(config, "verifier", "general", []).map((entry) => entry.provider);
+    const reached = apiLadder(config, "reviewer", "general", []).map((entry) => entry.provider);
     assert.ok(!reached.includes("openai"), reached.join(", "));
     assert.ok(reached.length > 0, "the reachable providers still resolve");
   });
@@ -581,7 +593,7 @@ describe("a prompt over the model's input budget", () => {
         provider_defaults: {
           google: { max_context_tokens: 1000, max_output_tokens: 100 },
         },
-        roles: { generator: { require_provider_in: ["google"] } },
+        roles: { generator: { prefer: ["g-flash"] } },
       }),
     );
     await assert.rejects(() => route("x".repeat(5000), { role: "generator" }), PromptTooLargeError);
@@ -646,6 +658,30 @@ describe("dispatching over the direct-API transport", () => {
     assert.equal(row?.["billed_usage_unavailable"], null);
     assert.equal(row?.["requested_model_id"], "g-flash");
     assert.equal(row?.["served_model_id"], "g-served");
+  });
+
+  it("dispatches a role over the role's OWN vehicle, not the machine's", async () => {
+    // What step three of session 152 is for, and round 1 found missing: the
+    // per-role vehicle was projected and written and nothing read it at
+    // dispatch, so the machine's transport decided every round. A role that
+    // declares none still resolves exactly as the machine does.
+    configOnDisk(
+      makeConfig({
+        transport: { profile: "offline" },
+        roles: { generator: { prefer: ["g-flash"], transport: "api" } },
+      }),
+    );
+    restoreHttp = setHttpSource(() => Promise.resolve(googleAnswer("the answer")));
+
+    // The machine is on the scripted transport, which needs a response
+    // directory it has not been given; the role is on the direct API, and
+    // that is the one the call takes.
+    const own = await route("say hi", { role: "generator", taskType: "formatting" });
+    assert.equal(own.transport, "api");
+
+    // And a role that names no vehicle follows the machine, which here is
+    // an offline transport with nowhere to read from.
+    await assert.rejects(() => route("say hi", { role: "nobody-declared-me" }));
   });
 
   it("walks the role order on an escalation and records the history", async () => {

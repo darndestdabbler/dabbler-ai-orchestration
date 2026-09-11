@@ -1212,3 +1212,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: none — this round's verifier could not look at the tree
 - Raw round output: `.dabbler/runs/s151/`
+
+## Session 152 verification — VERIFIED after 2 round(s)
+
+- Verifier: gpt-5-6-terra (openai) over api
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: none — this round's verifier could not look at the tree
+- Raw round output: `.dabbler/runs/s152/`

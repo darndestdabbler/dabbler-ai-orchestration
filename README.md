@@ -28,12 +28,15 @@ There is one implementation, in TypeScript, and it runs two ways:
    the work.
 3. `dabbler verify` runs the verification loop **before commit**: round 1
    reviews the full working-tree diff; rounds ≥ 2 review only the fix
-   delta. The verifier is always a different provider than the
-   orchestrator. Rounds append to a machine-only ledger under
+   delta. The **Primary Reviewer** is defined as *not the author*, and
+   where nobody has chosen a model it resolves on a different provider
+   than the orchestrator. Rounds append to a machine-only ledger under
    `.dabbler/runs/`. A contested blocking finding has a sanctioned exit
    ladder instead of an impasse: `verify dispute` records an
    evidence-backed rebuttal the next round must engage, and `verify
-   adjudicate` routes recorded disputes to a third provider that neither
+   adjudicate` hands the disputes to the **Auxiliary Reviewer** — *not
+   the author and not the primary*, so a third voice is the role's own
+   definition rather than a rule bolted on — which neither
    orchestrated nor verified. At the round cap the loop ends itself:
    **remediated at the cap** when every blocking finding was fixed and the
    cap left the fix unreviewed (the work lands, labelled unreviewed),
@@ -159,22 +162,35 @@ vendor's own console, joined by the API key a repository names as its own.
 
 Verification may cross transports: an orchestrator on the direct API can be
 verified through the Copilot CLI on another provider's model, and vice
-versa. The provider-independence rule (verifier provider ≠ orchestrator
-provider) holds on both paths, and is asserted at the call site rather than
-only filtered during selection.
+versa. Each role carries its own **vehicle**: authoring's is the engine
+CLI, and each reviewer's is a transport, so a review may take the other
+transport when provider independence requires it. The one rule that is
+asserted at the wire rather than merely filtered during selection is the
+rule that needs no judgement: the reviewing model may not be the AUTHORING
+model. Which provider a reviewer is on is a label the person weighs, not a
+refusal the framework makes.
 
 ### Selection is by role
 
-A role declares the provider set it may draw from — a hard filter — and a
-preference order, which is **ordering only**. A model the preference order
-does not name still qualifies and simply sorts after the named ones, so a
-list that has gone stale costs a slightly older model and never costs a
-candidate. Roles are declared once under `roles:` in `router-config.yaml`
-and applied identically on both transports.
+Two fields, and neither needs a special name. **`prefer`** is a preference
+order and is **ordering only**: a model the order does not name still
+qualifies and simply sorts after the named ones, so a list that has gone
+stale costs a slightly older model and never costs a candidate. It is
+declared under `roles:` in `router-config.yaml` and applied identically on
+both transports.
+
+**`selected`** is what the operator chose, and it lives somewhere else on
+purpose: in `preferences.json` beside this machine's model catalog, at the
+user level. The catalog is a reading and is rebuildable for nothing, so a
+selection stored inside it is a selection the next free refresh wipes; and
+which model reviews is a fact about who is at this keyboard rather than
+about the project. A selection is used and never silently substituted, and
+it NARROWS — a selection a call cannot reach is a stop that names the model
+rather than a fall to the next one.
 
 ### Model discovery
 
-A role says what a verifier may be; a discovery record says what currently
+A role says what a reviewer may be; a discovery record says what currently
 exists. There are two records because there are two mechanisms:
 
 - **Direct API.** `dabbler discovery refresh` reads each vendor's models
@@ -213,7 +229,7 @@ accident. Capability metadata ranks; it never filters.
 
 **Enumeration refuses to run while a session is in flight**, and a stale
 record only ever warns — `session start` prints the warning and names the
-invocation. A session that changed its own verifier pool mid-run would have
+invocation. A session that changed its own reviewer pool mid-run would have
 edited the conditions of its own review, and a maintenance signal that can
 cause an outage is a maintenance signal that gets suppressed.
 
@@ -265,8 +281,16 @@ independent. The env var reaches only processes started after it was
 written; `--transport` has to be repeated on every command; and instruction
 files are read by some clients and not others.
 
-This selects the transport for routine dispatch; verifier selection may
-still use the other transport when provider independence requires it.
+This is the MACHINE's vehicle, used where no role says otherwise. A role
+may carry its own — `roles.<role>.transport`, read between the environment
+variable and `transport.profile` — because a review may need the other
+transport when provider independence requires it.
+
+**Nothing persists the environment variable for you.** `bootstrap` used to
+write it at user scope, and a variable that outranks every config layer
+shadowed the very preference a later run set, for every repository on the
+machine. It is read and never written; `--no-transport-detect` retired
+with the writing.
 
 ## Credentials
 

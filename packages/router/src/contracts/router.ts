@@ -331,10 +331,19 @@ export interface DepsVerbs {
  * surface that offers to start one rather than to the router's config.
  */
 export interface ConfigureOptions extends RepositoryTarget {
+  /**
+   * The engine the next session is offered, written to the USER-level
+   * preferences beside the catalog. It lived in an editor setting, where
+   * `dabbler session start` from a terminal could not read it -- so half a
+   * machine's configuration was invisible to the command that needs it.
+   */
+  readonly engine?: string;
+  /** The machine's own vehicle, used where no role says otherwise. */
   readonly transport?: string;
-  /** By registry alias or by model id; the router accepts either. */
-  readonly authoringModel?: string;
-  readonly verifyingModel?: string;
+  /** The Primary Reviewer's own vehicle, where it differs from the machine's. */
+  readonly reviewerTransport?: string;
+  /** By the id the catalog lists, which is the id that goes on the wire. */
+  readonly reviewerModel?: string;
 }
 
 export interface VerifyReanchorOptions extends RepositoryTarget {
@@ -374,15 +383,15 @@ export interface BootstrapOptions {
   readonly projectDir: string;
   readonly repoName?: string;
   /**
-   * Leave the machine's transport preference exactly as it is.
+   * How a provider is reached from this checkout.
    *
-   * `bootstrap` otherwise detects a transport and persists
-   * `DABBLER_TRANSPORT` at USER scope -- which is right for a person running
-   * it deliberately at a terminal, and wrong for a click that sets up one
-   * project: a per-project action does not get to change how every other
-   * project on the machine routes.
+   * Written to the project's own machine-local overlay and nowhere else.
+   * `bootstrap` used to persist `DABBLER_TRANSPORT` at USER scope, and that
+   * variable outranks every config layer -- so a per-project action changed
+   * how every other project on the machine routed, and shadowed the
+   * preference any later run tried to set.
    */
-  readonly noTransportDetect?: boolean;
+  readonly transport?: string;
   /**
    * Where this project pushes: the one parameter the framework cannot
    * determine for itself.
@@ -501,10 +510,16 @@ export interface Router {
   /**
    * Set what the next session is run with, and re-derive the projection.
    *
-   * It refuses rather than accepting a choice the dispatch would not honour:
-   * a verifying model on the authoring model's own provider, or one below
-   * its declared capability tier, comes back as a refusal in the selection
-   * rule's own words.
+   * It refuses rather than accepting a choice the dispatch would not honour,
+   * in the selection rule's own words. The one model refused is the
+   * AUTHORING model itself; a second model on the author's own provider is
+   * accepted and labelled, because whether two models of one family share a
+   * blind spot is a judgement this framework has no data to make.
+   *
+   * Two destinations, by what the setting IS. A vehicle and a reviewer model
+   * belong to the repository's machine-local overlay; the engine belongs to
+   * the user-level preferences beside the catalog, because it is a fact
+   * about who is at this keyboard and the terminal has to be able to read it.
    */
   configure(options: ConfigureOptions): Promise<RouterResult<RouterText>>;
   bootstrap(options: BootstrapOptions): Promise<RouterResult<RouterText>>;

@@ -1532,8 +1532,11 @@ export function buildVerificationView(
     rounds: reviewed.length,
     stoppedAtRound: stopped["round"] ?? null,
     cap,
-    verifierModel: stopped["verifier_model"] ?? null,
-    verifierProvider: stopped["verifier_provider"] ?? null,
+    // Both spellings. Archived rows are not rewritten, so a repository whose
+    // ledger predates the rename still has rounds keyed `verifier_*`, and a
+    // reader that took only the new key would render them blank.
+    verifierModel: stopped["reviewer_model"] ?? stopped["verifier_model"] ?? null,
+    verifierProvider: stopped["reviewer_provider"] ?? stopped["verifier_provider"] ?? null,
     transport: stopped["transport"] ?? null,
     agency: agencyView(stopped),
     findings,

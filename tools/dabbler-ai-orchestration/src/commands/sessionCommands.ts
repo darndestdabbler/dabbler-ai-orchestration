@@ -28,7 +28,6 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { chosenEngine } from "./configurationCommands";
 import type { Router } from "dabbler-ai-router";
 import { SESSIONS_REL, type SessionsRepository } from "../utils/fileSystem";
 import { productionRouter } from "../router/host";
@@ -301,7 +300,21 @@ export function engineOutputChannel(): vscode.OutputChannel {
   return engineChannel;
 }
 
-export function defaultSessionRunUi(): SessionRunUi {
+/**
+ * The Start Session pick.
+ *
+ * `chosen` is a THUNK for the engine this machine chose, read from the
+ * projection by the caller rather than from an editor setting here -- a
+ * thunk because this factory runs once at registration and the projection
+ * moves every time a declaration does. It is read from
+ * the caller rather than from an editor setting here: the choice lives in
+ * the user-level preferences beside the catalog so that `dabbler session
+ * start` typed in a terminal reads the same answer this pane does. Null
+ * where nobody has chosen, which is the first-run case and is not a default.
+ */
+export function defaultSessionRunUi(
+  chosen: () => string | null = () => null,
+): SessionRunUi {
   return {
     pickEngine: () =>
       vscode.window
@@ -311,10 +324,10 @@ export function defaultSessionRunUi(): SessionRunUi {
           // applied: identity is recorded per session at `session start`,
           // and a start that skipped the question would be choosing on the
           // operator's behalf at the one moment they are being asked.
-          engineOrder(chosenEngine()).map((entry) => ({
+          engineOrder(chosen()).map((entry) => ({
             label: entry.label,
             description:
-              entry.engine === chosenEngine()
+              entry.engine === chosen()
                 ? `${entry.description} — your default`
                 : entry.description,
             entry,

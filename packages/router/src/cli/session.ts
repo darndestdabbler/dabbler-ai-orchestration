@@ -22,6 +22,7 @@ import {
   commandEngine,
 } from "../engines.ts";
 import { SessionsRootNotFoundError, resolveSessionsDir } from "../evidence.ts";
+import { chosenEngine } from "../preferences.ts";
 import { DECIDERS } from "../writers.ts";
 import {
   EXIT_BOUNDARY,
@@ -77,7 +78,10 @@ const IMPLEMENTED = Object.keys(SUMMARY);
  */
 const OPTIONS: Record<string, readonly string[]> = {
   start: [
-    "  --engine ENGINE          required: claude-code | gemini | copilot",
+    "  --engine ENGINE          claude-code | gemini | copilot. Required unless this",
+    "                           machine has chosen one with `dabbler configure",
+    "                           --engine`, which a terminal reads and an editor",
+    "                           setting could not; the flag wins over the choice",
     "  --provider PROVIDER      required: anthropic | openai | google",
     "  --model MODEL            required for a Copilot seat; identity resolves through",
     "                           the model registry rather than the seat label",
@@ -498,9 +502,20 @@ export async function sessionVerb(argv: string[]): Promise<number> {
   }
 
   if (subcommand === "start") {
-    const engine = values.get("--engine");
+    // The flag, and otherwise what this machine CHOSE. The choice lives in
+    // the user-level preferences beside the model catalog for exactly this
+    // reason: it used to be a VS Code setting, which a terminal cannot read
+    // -- so half a machine's configuration was invisible to the one command
+    // that needs it, and every start typed at a shell asked again. The flag
+    // still wins, because a person who typed one meant it.
+    const engine = values.get("--engine") ?? chosenEngine() ?? undefined;
     if (engine === undefined) {
-      writeErr("dabbler session start: the following arguments are required: --engine\n");
+      writeErr(
+        "dabbler session start: the following arguments are required: --engine\n" +
+          "  This machine has chosen no engine either. Set one once, and every\n" +
+          "  start here is offered it:\n" +
+          "    dabbler configure --engine <claude-code|gemini|copilot>\n",
+      );
       return EXIT_USAGE;
     }
     const totalSessions = integer(values.get("--total-sessions"), "--total-sessions");

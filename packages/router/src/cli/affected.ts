@@ -134,7 +134,7 @@ export async function affectedVerb(argv: string[]): Promise<number> {
           "fetches only when its refspec says so. Fetch them first, and let " +
           "bootstrap make that permanent:\n" +
           `  git fetch ${upstreamRemote(repoRoot)} '${ROUND_REFSPEC}'\n` +
-          "  dabbler bootstrap --no-transport-detect\n" +
+          "  dabbler bootstrap\n" +
           "If the round was recorded before rounds were anchored, or its ref " +
           "was never pushed, re-anchor it onto a commit this history passed " +
           "through:\n" +

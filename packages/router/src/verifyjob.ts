@@ -21,7 +21,7 @@ import { recordCall } from "./metrics.ts";
 import { classifyBlocking, parseVerificationResponse } from "./verdict.ts";
 
 /**
- * The verifier's prompt: the configured template with its three placeholders
+ * The reviewer's prompt: the configured template with its three placeholders
  * filled, or the built-in template when the config carries none.
  *
  * Python's `str.replace` substitutes EVERY occurrence and treats the
@@ -63,8 +63,8 @@ export interface AutoVerification {
   readonly verdict: string;
   readonly blocking: boolean;
   readonly issue_count: number;
-  readonly verifier_model: string;
-  readonly verifier_provider: string;
+  readonly reviewer_model: string;
+  readonly reviewer_provider: string;
 }
 
 /** The half of `RouteResult` this job reads, so a caller need not build one. */
@@ -75,11 +75,11 @@ export interface VerifiableResult {
 }
 
 /**
- * Verify a routed response with a different-provider verifier; returns the
- * verification block, or null when no verifier survives.
+ * Review a routed response with a different-provider reviewer; returns the
+ * verification block, or null when no reviewer survives.
  *
  * Best-effort by contract: the routed call already succeeded and was paid for,
- * so a verifier that cannot be reached loses the review rather than the
+ * so a reviewer that cannot be reached loses the review rather than the
  * answer. The exclusion is not best-effort -- it is the working provider, and
  * `route` refuses rather than picking it.
  *
@@ -95,7 +95,7 @@ export async function autoVerify(
   config: RouterConfig,
 ): Promise<AutoVerification | null> {
   const { RouterError, route } = await import("./route.ts");
-  const { ROLE_VERIFIER } = await import("./selection.ts");
+  const { ROLE_PRIMARY_REVIEWER } = await import("./selection.ts");
 
   const template = config["_verification_template"];
   const prompt = buildVerificationPrompt(
@@ -108,7 +108,7 @@ export async function autoVerify(
   try {
     result = await route(prompt, {
       taskType: "verification",
-      role: ROLE_VERIFIER,
+      role: ROLE_PRIMARY_REVIEWER,
       excludeProviders: [routeResult.provider],
     });
   } catch (error) {
@@ -137,7 +137,7 @@ export async function autoVerify(
     verdict,
     blocking: classification.blocking,
     issue_count: issues.length,
-    verifier_model: result.model_name,
-    verifier_provider: result.provider,
+    reviewer_model: result.model_name,
+    reviewer_provider: result.provider,
   };
 }

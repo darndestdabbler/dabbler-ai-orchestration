@@ -377,14 +377,16 @@ suite("set up new project", () => {
     assert.strictEqual(offers.length, 0);
   });
 
-  test("does not change how this machine routes, to set up one project", async () => {
-    // `bootstrap` otherwise persists DABBLER_TRANSPORT at USER scope. That is
-    // right for a person running it at a terminal and wrong for a click: a
-    // side effect somebody finds weeks later debugging a different repo.
+  test("names no transport, because setting up one project is not a statement about how it routes", async () => {
+    // `bootstrap` used to persist DABBLER_TRANSPORT at USER scope, which is
+    // a side effect somebody finds weeks later debugging a different repo --
+    // and that variable outranks every config layer, so it also shadowed
+    // whatever a later `dabbler configure` set. The click contributes no
+    // answer at all now; the project's own configuration decides.
     const fake = fakeRouter(0);
     const { ui } = setUpUi("D:\\ws");
     await runSetUpProjectFlow(ui, fake.router);
-    assert.strictEqual(fake.bootstrapOptions[0]?.noTransportDetect, true);
+    assert.strictEqual(fake.bootstrapOptions[0]?.transport, undefined);
   });
 
   test("cancelling the folder question cancels the command", async () => {
@@ -1262,7 +1264,6 @@ suite("the Configuration section's model pick", () => {
         showInformationMessage: (message) => informed.push(message),
         showWarningMessage: () => undefined,
         workspaceRoot: () => "D:/ws",
-        setEngine: () => Promise.resolve(),
         openFile: () => Promise.resolve(undefined),
       },
     };
@@ -1282,7 +1283,7 @@ suite("the Configuration section's model pick", () => {
       modules: [],
       configuration: {
         fidelityTransport: "api",
-        verifying: {
+        primaryReviewer: {
           role: "verifier",
           chosen: null,
           candidates: [
@@ -1298,7 +1299,7 @@ suite("the Configuration section's model pick", () => {
     const { router } = fakeRouter(0, "");
     await setRoleModel(
       router,
-      { node: { kind: "configRole", role: "verifying" }, projection },
+      { node: { kind: "configRole", role: "primaryReviewer" }, projection },
       () => undefined,
       ui,
     );
@@ -1322,7 +1323,7 @@ suite("the Configuration section's model pick", () => {
       modules: [],
       configuration: {
         fidelityTransport: "copilot-cli",
-        verifying: {
+        primaryReviewer: {
           role: "verifier",
           chosen: null,
           candidates: [
@@ -1349,7 +1350,7 @@ suite("the Configuration section's model pick", () => {
     const { router } = fakeRouter(0, "");
     await setRoleModel(
       router,
-      { node: { kind: "configRole", role: "verifying" }, projection },
+      { node: { kind: "configRole", role: "primaryReviewer" }, projection },
       () => undefined,
       ui,
     );
@@ -1382,6 +1383,66 @@ suite("the Configuration section's model pick", () => {
     assert.strictEqual(offered.length, 0);
     assert.strictEqual(configureOptions.length, 0);
     assert.ok(informed.some((line) => line.includes("session start")), informed.join(" | "));
+  });
+
+  test("states a vehicle with one option and asks about one with two, picking neither on its own", async () => {
+    // A vehicle is offered wherever more than one is PRESENT, and a machine
+    // that can reach only one is told what carries the role rather than
+    // asked a question with one answer. Nothing is picked for the operator:
+    // the pick that returns undefined writes nothing at all.
+    const withVehicle = (options: Array<{ id: string; means: string }>): Projection =>
+      ({
+        solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+        modules: [],
+        configuration: {
+          fidelityTransport: "api",
+          primaryReviewer: {
+            role: "reviewer",
+            vehicle: { kind: "transport", options, chosen: "api", withheld: [] },
+            chosen: null,
+            candidates: [model({ alias: "one", model: "o-one", provider: "openai" })],
+            excludes: [],
+            fellThrough: false,
+          },
+        },
+      }) as unknown as Projection;
+
+    // One reachable vehicle: the first question asked is about the MODEL.
+    const single = capturingUi();
+    await setRoleModel(
+      fakeRouter(0, "").router,
+      {
+        node: { kind: "configRole", role: "primaryReviewer" },
+        projection: withVehicle([{ id: "api", means: "the provider's own endpoint" }]),
+      },
+      () => undefined,
+      single.ui,
+    );
+    assert.strictEqual(single.options.length, 1);
+    assert.ok(single.options[0]?.title?.includes("model"), single.options[0]?.title);
+
+    // Two reachable vehicles: the first question asked is about the VEHICLE,
+    // and cancelling it writes nothing.
+    const pair = capturingUi();
+    const { router, configureOptions } = fakeRouter(0, "");
+    await setRoleModel(
+      router,
+      {
+        node: { kind: "configRole", role: "primaryReviewer" },
+        projection: withVehicle([
+          { id: "api", means: "the provider's own endpoint" },
+          { id: "copilot-cli", means: "a Copilot seat" },
+        ]),
+      },
+      () => undefined,
+      pair.ui,
+    );
+    assert.ok(pair.options[0]?.title?.includes("carries"), pair.options[0]?.title);
+    assert.deepStrictEqual(
+      pair.offered.map((item) => item.label),
+      ["api", "copilot-cli"],
+    );
+    assert.strictEqual(configureOptions.length, 0);
   });
 });
 
@@ -1424,7 +1485,6 @@ suite("the ai-model-catalog row's two actions", () => {
       showInformationMessage: () => undefined,
       showWarningMessage: () => undefined,
       workspaceRoot: () => "D:/ws",
-      setEngine: () => Promise.resolve(),
       openFile: (path) => {
         opened.push(path);
         return Promise.resolve(undefined);

@@ -132,7 +132,7 @@
         "verification": {
           "type": "object",
           "required": [
-            "rounds", "last_verdict", "verifier_provider", "transport"
+            "rounds", "last_verdict", "reviewer_provider", "transport"
           ],
           "additionalProperties": false,
           "properties": {
@@ -140,7 +140,7 @@
             "last_verdict": {
               "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED", "REMEDIATED_AT_CAP", null]
             },
-            "verifier_provider": { "type": ["string", "null"] },
+            "reviewer_provider": { "type": ["string", "null"] },
             "transport": { "type": ["string", "null"] },
             "accepted_tree_digest": { "type": ["string", "null"] },
             "blocking_findings": { "type": "integer", "minimum": 0 },

@@ -691,7 +691,7 @@ export const DEFAULT_DRIVER_INVOCATIONS = 24;
  * shipped default.
  *
  * Its own bound rather than a third key under `verification.settings`: a
- * verification round buys a verifier's opinion and an invocation buys an
+ * verification round buys a reviewer's opinion and an invocation buys an
  * authoring engine's turn -- on a seat, one premium request each -- and
  * the two are spent by different loops. The fallback rule is the round
  * caps' own: a malformed or non-positive value is the default, never no
@@ -764,7 +764,7 @@ export interface TransportReading {
  * project-local `local-overrides.yaml` merged over it -- the overlay is a
  * config source, not a precedence tier, so nothing above it changes its
  * answer. An unknown value fails loud at whichever level supplied it. This
- * selects the transport for routine dispatch; verifier selection may still use
+ * selects the transport for routine dispatch; reviewer selection may still use
  * the other transport when provider independence requires it.
  *
  * Only the DECIDING layer is validated, which is what `resolveTransport` has
@@ -806,6 +806,57 @@ export function resolveTransport(
   return explainTransport(config, cliFlag).transport;
 }
 
+/** The layer name a role's own transport is set at. */
+export const TRANSPORT_SOURCE_ROLE = "roles.<role>.transport";
+
+/**
+ * The transport one ROLE is reached through, and which layer decided it.
+ *
+ * **A vehicle belongs to a role, not to a machine.** This module has said in
+ * its own words since the transport reading was written that reviewer
+ * selection may use the other transport when provider independence requires
+ * it, while every surface read one global transport and scoped both roles
+ * through it -- so the single reading could already be wrong about the row
+ * it matters most for. A role's own `transport` sits between the flag and
+ * the environment variable in nothing: it is a CONFIG-layer value, so it
+ * outranks the global `transport.profile` and is outranked by everything
+ * above that, which is the same shape `explainTransport` already has.
+ *
+ * A role that declares none resolves exactly as before, which is what keeps
+ * a repository that never wanted two vehicles from acquiring one.
+ */
+export function explainRoleTransport(
+  config: RouterConfig,
+  role: string,
+  cliFlag?: string | null,
+): TransportReading {
+  const declared = record(record(config["roles"])[role])["transport"];
+  if (declared === undefined || declared === null || String(declared).trim() === "") {
+    return explainTransport(config, cliFlag);
+  }
+  const global = explainTransport(config, cliFlag);
+  const own: TransportLayer = {
+    source: TRANSPORT_SOURCE_ROLE.replace("<role>", role),
+    value: String(declared),
+  };
+  // The flag and the environment variable are still above a config value:
+  // a role's transport is a configured default, not an override of what the
+  // operator typed at this call.
+  const above = global.layers.filter(
+    (layer) => layer.source === TRANSPORT_SOURCE_FLAG || layer.source === TRANSPORT_SOURCE_ENV,
+  );
+  const layers = [...above, own, ...global.layers.filter((layer) => !above.includes(layer))];
+  const decided = layers[0] as TransportLayer;
+  const normalized = decided.value.trim().toLowerCase();
+  if (!(VALID_TRANSPORTS as readonly string[]).includes(normalized)) {
+    throw new ConfigError(
+      `${decided.source} must be one of ${renderList(VALID_TRANSPORTS)}, ` +
+        `got '${decided.value}'`,
+    );
+  }
+  return { transport: normalized, decidedBy: decided.source, layers };
+}
+
 // --- Writing the machine's own choice ---------------------------------------
 //
 // One writer, and it is here because this module is what decides what a
@@ -821,11 +872,10 @@ export function resolveTransport(
 
 /** What the operator chose; an absent member is a thing they did not touch. */
 export interface ConfigurationChoice {
+  /** The machine's own vehicle: `transport.profile`. */
   readonly transport?: string;
-  /** The `roles.generator` model, by the id the transport puts on the wire. */
-  readonly authoringModel?: string;
-  /** The `roles.verifier` model, likewise. */
-  readonly verifyingModel?: string;
+  /** The Primary Reviewer's own vehicle: `roles.reviewer.transport`. */
+  readonly reviewerTransport?: string;
 }
 
 /** What was written, and where. */
@@ -848,7 +898,7 @@ const OVERLAY_HEADER =
  * machine is set up the way it is, and a writer that dropped them would be
  * charging them their notes for using a control.
  *
- * This validates shape and nothing else. Whether a chosen verifier may
+ * This validates shape and nothing else. Whether a chosen reviewer may
  * review a chosen author is a question about selection, and it is asked
  * before this is called -- config.ts knowing about roles' semantics would
  * be an import cycle and, worse, a second home for a rule selection owns.
@@ -873,18 +923,19 @@ export function writeConfigurationChoice(
     document.setIn(["transport", "profile"], transport);
     changed.push(`transport.profile is now '${transport}'`);
   }
-  for (const [role, model] of [
-    ["generator", choice.authoringModel],
-    ["verifier", choice.verifyingModel],
-  ] as const) {
-    if (model === undefined) continue;
-    // A PIN, not the front of a preference order. Written to the order, a
-    // person's choice was still only an ordering, and the dispatch resolved
-    // the same role with the authoring model's provider excluded -- so a
-    // deliberately chosen same-provider verifier was dropped and something
-    // else answered with nothing said. A pin is honoured or it stops.
-    document.setIn(["roles", role, "pin"], model);
-    changed.push(`roles.${role} is pinned to '${model}'`);
+  if (choice.reviewerTransport !== undefined) {
+    const transport = choice.reviewerTransport.trim().toLowerCase();
+    if (!(VALID_TRANSPORTS as readonly string[]).includes(transport)) {
+      throw new ConfigError(
+        `transport must be one of ${renderList(VALID_TRANSPORTS)}, ` +
+          `got '${choice.reviewerTransport}'`,
+      );
+    }
+    // The ROLE's own vehicle, not the machine's: a configured default that a
+    // typed flag and the environment variable still outrank, which is what
+    // keeps it a preference rather than a second global.
+    document.setIn(["roles", "reviewer", "transport"], transport);
+    changed.push(`the Primary Reviewer's vehicle is now '${transport}'`);
   }
   writeFileSync(path, document.toString(), "utf8");
   return { path, changed };

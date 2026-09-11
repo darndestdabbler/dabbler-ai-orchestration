@@ -1,19 +1,28 @@
 // The extension's mocha suite, as argv.
 //
-// `npm run test:unit` is the door CI and `dabbler.yaml` use, and it stays
-// exactly as it is. This is a second door, for the one caller that cannot
-// use the first: a work plan's check is argv spawned with NO shell, and on
-// Windows `npm` is a `.cmd` shim that argv cannot reach. Without this a
-// step that changes only extension sources has no mechanical check, which
-// is a step the driver would close on the engine's word.
+// `npm run test:unit` is the door CI uses, and it stays exactly as it is.
+// This is a second door, for the one caller that cannot use the first: a
+// work plan's check is argv spawned with NO shell, and on Windows `npm` is
+// a `.cmd` shim that argv cannot reach. Without this a step that changes
+// only extension sources has no mechanical check, which is a step the
+// driver would close on the engine's word.
 //
-// Two things it must do that a bare mocha argv cannot. It runs from the
-// extension package's own directory, because `ts-node/register` resolves
-// its `tsconfig.json` from the working directory and the repository root's
-// is not the extension's -- pointed at the wrong one, every spec fails to
-// compile on `suite` and `test` being undeclared. And it finds that
-// directory from its own location rather than from where it was invoked,
-// so the caller may name it from anywhere.
+// **Neither door configures the suite.** How it runs -- the compiler hook,
+// the vscode stub, the arming that keeps the suite off this machine's own
+// records, the ui and the timeout -- is `.mocharc.json` beside the
+// package's manifest, which mocha finds from the package directory whoever
+// invoked it. It used to be flags here and flags in the npm script, two
+// copies of one list, and the copies drifted: the arming existed in this
+// one alone, so CI ran the suite unarmed for eleven consecutive red runs.
+// A door names its spec paths and nothing else.
+//
+// Two things it must still do that a bare mocha argv cannot. It runs from
+// the extension package's own directory, because `ts-node/register` and the
+// config lookup both resolve from the working directory and the repository
+// root's `tsconfig.json` is not the extension's -- pointed at the wrong
+// one, every spec fails to compile on `suite` and `test` being undeclared.
+// And it finds that directory from its own location rather than from where
+// it was invoked, so the caller may name it from anywhere.
 //
 // Spec paths may be written either way, because two callers write them
 // differently and both are right where they stand. A person copying the
@@ -24,9 +33,8 @@
 // which directory the runner works in. With no specs at all it runs the
 // whole suite.
 
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -55,31 +63,9 @@ const result = spawnSync(
   process.execPath,
   [
     join(packageRoot, "node_modules", "mocha", "bin", "mocha.js"),
-    "--require",
-    "ts-node/register",
-    "--require",
-    "./src/test/vscode-stub.js",
-    "--ui",
-    "tdd",
-    "--timeout",
-    "120000",
     ...(specs.length > 0 ? specs : ["src/test/suite/**/*.test.ts"]),
   ],
-  {
-    cwd: packageRoot,
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      // This suite may not read the machine it runs on. The router's own
-      // suite says where its catalog is through an import seam; this one
-      // reaches the router through its published contract, which does not
-      // export the modules behind it, so the runner says it here -- for
-      // every spec, rather than per test, because a spec that forgot would
-      // read the operator's own model catalog and pass here while failing
-      // on anyone else's machine.
-      DABBLER_CATALOG_PATH: join(mkdtempSync(join(tmpdir(), "dabbler-suite-")), "ai-model-catalog.json"),
-    },
-  },
+  { cwd: packageRoot, stdio: "inherit" },
 );
 
 // A signal is not an exit code, and a run that was killed did not pass.

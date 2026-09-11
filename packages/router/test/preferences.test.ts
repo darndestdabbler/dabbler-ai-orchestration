@@ -19,6 +19,7 @@ import {
 } from "../src/catalog.ts";
 import {
   PREFERENCES_FILENAME,
+  PREFERENCES_PATH_ENV,
   chosenEngine,
   currentPreferencesPath,
   readPreferences,
@@ -117,5 +118,37 @@ describe("what this machine has chosen", () => {
     writePreferences({ role: "auxiliary-reviewer", selected: "" });
     assert.equal(selectedModel("auxiliary-reviewer"), null);
     assert.equal(selectedModel("reviewer"), "gpt-5.6-terra");
+  });
+
+  it("refuses this machine's own file under either runner, on the catalog's rule", () => {
+    // One statement of what a test run is, in catalog.ts, imported here:
+    // the two records are refused together or the second one is refused by
+    // whichever runner somebody remembered. The choice is the more
+    // dangerous of the two to touch -- a catalog is rebuildable for
+    // nothing, and an operator's engine and model selections are not.
+    const armed = currentPreferencesPath();
+    const namedPath = process.env[PREFERENCES_PATH_ENV];
+    const testContext = process.env["NODE_TEST_CONTEXT"];
+    const entry = process.argv[1];
+    try {
+      setPreferencesPath(null);
+      delete process.env[PREFERENCES_PATH_ENV];
+      assert.throws(() => currentPreferencesPath(), /setPreferencesPath/, "under node:test");
+
+      delete process.env["NODE_TEST_CONTEXT"];
+      process.argv[1] = "/repo/tools/x/node_modules/mocha/bin/mocha.js";
+      assert.throws(() => currentPreferencesPath(), /setPreferencesPath/, "under mocha");
+
+      process.env[PREFERENCES_PATH_ENV] = "/tmp/somewhere/preferences.json";
+      assert.equal(currentPreferencesPath(), "/tmp/somewhere/preferences.json");
+    } finally {
+      if (entry === undefined) process.argv.splice(1, 1);
+      else process.argv[1] = entry;
+      if (testContext === undefined) delete process.env["NODE_TEST_CONTEXT"];
+      else process.env["NODE_TEST_CONTEXT"] = testContext;
+      if (namedPath === undefined) delete process.env[PREFERENCES_PATH_ENV];
+      else process.env[PREFERENCES_PATH_ENV] = namedPath;
+      setPreferencesPath(armed);
+    }
   });
 });

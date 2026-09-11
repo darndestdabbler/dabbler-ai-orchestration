@@ -148,6 +148,25 @@ function lint(): number {
     process.stderr.write("workspace-check: ci-suites check failed\n");
     worst = Math.max(worst, ciSuites);
   }
+  // And the three that had no auditor of their own. Session 153 wrote
+  // `check-suite-membership.mjs` and `check-cancelled-guard.mjs` and left
+  // them named in comments: no control declared them, no workflow invoked
+  // them, and both passed by nobody asking. That is the same defect as the
+  // gate this session repaired, one layer down -- a protection nothing runs
+  // is a protection with a date on it -- so the split's manifest, the
+  // cancelled-test guard and the gate-to-suite rule are proved on every
+  // session's own lint run.
+  for (const [what, script] of [
+    ["suite-membership", "check-suite-membership.mjs"],
+    ["cancelled-guard", "check-cancelled-guard.mjs"],
+    ["ci-divergence", "check-ci-divergence.mjs"],
+  ] as const) {
+    const code = run([join(REPO_ROOT, "scripts", script)], REPO_ROOT);
+    if (code !== 0) {
+      process.stderr.write(`workspace-check: ${what} check failed\n`);
+      worst = Math.max(worst, code);
+    }
+  }
   return worst;
 }
 

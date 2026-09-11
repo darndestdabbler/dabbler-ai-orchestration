@@ -14,6 +14,7 @@ import { describe, it } from "node:test";
 import {
   CATALOG_DIR_NAME,
   CATALOG_FILENAME,
+  CATALOG_PATH_ENV,
   PLATFORM_COPILOT_USAGE,
   SOURCE_API,
   SOURCE_SEAT,
@@ -23,8 +24,11 @@ import {
   type TransportBlock,
   blockFor,
   catalogPath,
+  currentCatalogPath,
   foldListing,
   readCatalog,
+  setCatalogPath,
+  underTestRunner,
   writeBlock,
 } from "../src/catalog.ts";
 import { PROVIDER_SOURCE_ENUMERATION, apiCatalogBlock } from "../src/discovery.ts";
@@ -239,5 +243,65 @@ describe("the catalog on this machine", () => {
       [["claude-fable-5-1", null, null]],
     );
     assert.deepEqual(api?.scope, { providers: ["anthropic"] });
+  });
+});
+
+describe("a test may not read the machine it runs on", () => {
+  // The seam is only as good as the refusal behind it, and the refusal
+  // watched one runner out of two: `NODE_TEST_CONTEXT` is set by `node:test`
+  // and by nothing else, so the extension suite -- mocha -- read an unarmed
+  // path without stopping and got the operator's real catalog back. It
+  // passed here and would have failed on any other machine, which is the
+  // whole failure mode the seam exists for.
+  const MOCHA = "/repo/tools/x/node_modules/mocha/bin/mocha.js";
+
+  it("recognises both runners, and nothing else", () => {
+    assert.equal(underTestRunner({ NODE_TEST_CONTEXT: "child-v8" }, ["node", "/repo/x.js"]), true);
+    assert.equal(underTestRunner({}, ["node", MOCHA]), true);
+    // Windows spells the same entry the other way, and it is the host this
+    // repository's CI runs on.
+    assert.equal(
+      underTestRunner({}, ["node", "D:\\repo\\node_modules\\mocha\\bin\\_mocha"]),
+      true,
+    );
+    // An ordinary run is not a test run: the operator's own catalog is what
+    // `dabbler discovery refresh` is FOR, and a guard that fired here would
+    // refuse the product its own record.
+    assert.equal(underTestRunner({}, ["node", "/repo/packages/router/dist/dabbler.cjs"]), false);
+    assert.equal(underTestRunner({}, ["node"]), false);
+  });
+
+  it("stops an unarmed read under either runner, and names the seam", () => {
+    const armed = currentCatalogPath();
+    const namedPath = process.env[CATALOG_PATH_ENV];
+    const testContext = process.env["NODE_TEST_CONTEXT"];
+    const entry = process.argv[1];
+    try {
+      setCatalogPath(null);
+      delete process.env[CATALOG_PATH_ENV];
+      assert.throws(() => currentCatalogPath(), /setCatalogPath/, "under node:test");
+
+      // The same read, in a process that is mocha rather than node:test.
+      delete process.env["NODE_TEST_CONTEXT"];
+      process.argv[1] = MOCHA;
+      assert.throws(() => currentCatalogPath(), /setCatalogPath/, "under mocha");
+
+      // And what the extension suite actually does: say where its catalog is
+      // through the environment, because it reaches this module through the
+      // package's contract and cannot call the seam.
+      process.env[CATALOG_PATH_ENV] = "/tmp/somewhere/ai-model-catalog.json";
+      assert.equal(currentCatalogPath(), "/tmp/somewhere/ai-model-catalog.json");
+    } finally {
+      if (entry === undefined) process.argv.splice(1, 1);
+      else process.argv[1] = entry;
+      if (testContext === undefined) delete process.env["NODE_TEST_CONTEXT"];
+      else process.env["NODE_TEST_CONTEXT"] = testContext;
+      if (namedPath === undefined) delete process.env[CATALOG_PATH_ENV];
+      else process.env[CATALOG_PATH_ENV] = namedPath;
+      // Back to the path the suite armed at load, never to null: the arming
+      // is what keeps every other test in this worker off the operator's
+      // own file.
+      setCatalogPath(armed);
+    }
   });
 });

@@ -745,6 +745,16 @@ testing:
           - packages/router/test/walk-bootstrap.test.ts
       - when: packages/router/scripts/
         select: []
+      # This repository's own control scripts, on the same reasoning as the
+      # router's above: a control answers for itself by RUNNING, and every
+      # one of these rides in the lint control, which is `required` and runs
+      # before verification on every session. The exceptions are
+      # `scripts/suite.mjs`, `scripts/suite-membership.json` and the
+      # `Containerfile`, which change which machine every test runs on and
+      # are `repo_wide` above -- and repo_wide is read first, so this rule
+      # cannot narrow them.
+      - when: scripts/
+        select: []
       - when: packages/router/build.mjs
         select: []
       - when: packages/router/.eslintrc.json

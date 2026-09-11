@@ -165,6 +165,41 @@ export function catalogPath(
   return join(catalogDir(env, platform, home), CATALOG_FILENAME);
 }
 
+/**
+ * Is this process a test run?
+ *
+ * **One statement of it, for both records and both runners.** The catalog
+ * and the preferences are each refused their machine-level path under a
+ * test, and the rule for *what a test is* lives here alone: two copies would
+ * be two opinions about whether a run is one, and the second would be the
+ * one nobody updated.
+ *
+ * Two runners, recognised two ways, because they offer two different facts:
+ *
+ *   - `node:test` sets `NODE_TEST_CONTEXT` in every test process and nothing
+ *     else sets it.
+ *   - mocha sets nothing at all, so it is recognised by being the process
+ *     the interpreter was pointed at. Both doors into the extension suite
+ *     run `node_modules/mocha/bin/mocha.js`, whether through the package's
+ *     npm script or through `scripts/run-unit.mjs`.
+ *
+ * Recognising mocha is the repair, not an addition: the guard below watched
+ * `node:test` alone, so the extension suite's read of an unarmed path did
+ * not stop -- it returned the operator's real catalog and the suite read the
+ * machine it was running on.
+ *
+ * Env and argv are parameters so the rule can be proved against both
+ * signatures without a test having to become one.
+ */
+export function underTestRunner(
+  env: NodeJS.ProcessEnv = process.env,
+  argv: readonly string[] = process.argv,
+): boolean {
+  if (env["NODE_TEST_CONTEXT"] !== undefined) return true;
+  const entry = argv[1];
+  return entry !== undefined && entry.split(/[\\/]/).includes("mocha");
+}
+
 let configuredPath: string | null = null;
 
 /**
@@ -193,13 +228,12 @@ export function currentCatalogPath(): string {
   if (configuredPath !== null) return configuredPath;
   // The second suite's way in. `setCatalogPath` is an import, and the
   // extension's suite reaches this module through the package's contract
-  // rather than through its internals, so it could not call the seam and
-  // was reading the operator's own catalog -- the same defect the seam was
-  // armed against, through the one door the guard below does not watch,
-  // since `NODE_TEST_CONTEXT` is set by `node:test` and by nothing else.
+  // rather than through its internals, so it cannot call the seam. It says
+  // so through the environment instead, once for the whole run, in the
+  // mocha configuration both of its doors read.
   const named = process.env[CATALOG_PATH_ENV];
   if (named !== undefined && named.trim() !== "") return named.trim();
-  if (process.env["NODE_TEST_CONTEXT"] !== undefined) {
+  if (underTestRunner()) {
     throw new Error(
       "no catalog path is set: a test may not read or write this machine's " +
         "own model catalog. Call setCatalogPath() with a path under the " +

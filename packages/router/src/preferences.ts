@@ -26,7 +26,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { catalogDir } from "./catalog.ts";
+import { catalogDir, underTestRunner } from "./catalog.ts";
 import { VERSION } from "./version.ts";
 
 /** The shape this router writes and the only one it reads. */
@@ -100,12 +100,15 @@ export function setPreferencesPath(path: string | null): void {
  *
  * **Under the test runner the machine's own path is refused**, exactly as
  * the catalog's is: a test says where its file is, or it does not get one.
+ * Which runs are tests is `underTestRunner`, stated once in catalog.ts and
+ * imported here rather than restated -- two readings of what a test run is
+ * is how the catalog's guard came to watch one runner out of two.
  */
 export function currentPreferencesPath(): string {
   if (configuredPath !== null) return configuredPath;
   const named = process.env[PREFERENCES_PATH_ENV];
   if (named !== undefined && named.trim() !== "") return named.trim();
-  if (process.env["NODE_TEST_CONTEXT"] !== undefined) {
+  if (underTestRunner()) {
     throw new Error(
       "no preferences path is set: a test may not read or write this " +
         "machine's own preferences. Call setPreferencesPath() with a path " +

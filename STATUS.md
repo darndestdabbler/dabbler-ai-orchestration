@@ -1,7 +1,73 @@
-# STATUS — sessions 113–154 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.3 IS PUBLISHED to the Marketplace, carrying 148 and 149. 2.1.0 and 2.1.2 never shipped** — 2.1.0 refused over a walk-jobs timeout on the runner and 2.1.2 died on a Marketplace request timeout, so both tags stand on origin unpublished and 2.1.3 supersedes them; session 152 naming the two reviewing roles by voice and giving each its own vehicle, and session 153 taking the run of record off the host scheduler into a Podman container — 324 s to 26.4 s — with the one file that cannot follow it declared and the reason it cannot owed forward, and a guard that will not read a cancelled test as a pass, and session 154 closing the dark gate behind the extension suite's second door — CI had been red for eleven consecutive runs while three sessions closed VERIFIED through the other one — by arming the seam once where both doors read it, making the refusal cover mocha as well as node:test, and holding every gate to the suite it stands for with a divergence that is declared rather than forbidden
+# STATUS — sessions 113–155 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.3 IS PUBLISHED to the Marketplace, carrying 148 and 149. 2.1.0 and 2.1.2 never shipped** — 2.1.0 refused over a walk-jobs timeout on the runner and 2.1.2 died on a Marketplace request timeout, so both tags stand on origin unpublished and 2.1.3 supersedes them; session 152 naming the two reviewing roles by voice and giving each its own vehicle, and session 153 taking the run of record off the host scheduler into a Podman container — 324 s to 26.4 s — with the one file that cannot follow it declared and the reason it cannot owed forward, and a guard that will not read a cancelled test as a pass, and session 154 closing the dark gate behind the extension suite's second door — CI had been red for eleven consecutive runs while three sessions closed VERIFIED through the other one — by arming the seam once where both doors read it, making the refusal cover mocha as well as node:test, and holding every gate to the suite it stands for with a divergence that is declared rather than forbidden, and session 155 organising the Configuration section by the thing being configured rather than by the mechanism that configures it — two participants, five leaves, the Auxiliary Reviewer given the surface it has never had, and a projection re-derived whenever it is read, because nothing in a workspace can watch a user-level catalog
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 155 CLOSED, 2026-09-11 — the Configuration section a person reads, and a projection that is never stale
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 155 | two participants and five leaves in place of five rows named after implementation, the Auxiliary Reviewer given a surface, and the projection re-derived whenever it is read | CLOSED VERIFIED at round 2 (round 1 clean, Minor-only), landed `3a090381`, closed `5315505e`. **Not releasable** — the block ships from 156 |
+>
+> **THE SECTION IS ORGANISED BY THE THING BEING CONFIGURED.** It had grown
+> five rows named after the mechanism — *Engine*, *Transport*, *Authoring
+> model*, *Primary Reviewer*, and a row for the model catalog — so a
+> developer had to already know that *Engine* meant what the authoring AI
+> runs inside and *Transport* meant how a reviewer is reached. Two nodes
+> replace them, each naming a participant: **Authoring AI** (Vehicle, Model)
+> and **Reviewing AI** (Vehicle, Primary Model, Auxiliary Model). Every leaf
+> reads a field the projection already carried after 152, save one.
+>
+> **THE AUXILIARY REVIEWER HAS BEEN DISPATCHABLE SINCE 152 AND HAD NO
+> SURFACE.** Nothing showed what would adjudicate a disputed finding and
+> nothing could choose it. It has a role node now, resolved through its own
+> vehicle against the one rule that can be known between sessions — not the
+> author — and `configure --auxiliary-model` selects for it. The rest of its
+> definition, every provider that has already reviewed a round, is read from
+> the session's record at the adjudication, so the node carries
+> `narrowedAtDispatch` rather than letting a list drawn between sessions read
+> as final. Both reviewing roles go through ONE check in `configure`, not two
+> copies of it. A selection there still narrows and never widens: a model the
+> round excludes is a stop that names it.
+>
+> **THE CATALOG ROW WENT AND ITS TWO ACTIONS PARTED COMPANY.** *Refresh* is
+> the Configuration node's own action, with the record's age, path, command
+> and cost moved into that node's tooltip; *View the JSON* is deleted — it
+> opened a machine-written record in an editor and invited a hand-edit that
+> survives until the next refresh replaces the block whole. The `openFile`
+> seam went with it, since that command was its only caller.
+>
+> **THE DEFECT WAS NEVER THE CATALOG'S: NOTHING CAN WATCH WHAT THE
+> PROJECTION IS DERIVED FROM.** `SolutionTreeProvider` watched six workspace
+> paths and not one is a configuration input; the catalog and the preferences
+> live at the USER level, outside any `RelativePattern`'s reach. It derived
+> only over a MISSING file, so a projection that exists and is wrong stood
+> until a manifest happened to move — which is how the pane spent session 152
+> rendering a file eight minutes old. It now derives at activation whatever is
+> on disk, and `dabbler discovery refresh` re-derives after it writes.
+>
+> **THE RUN OF RECORD CAUGHT WHAT A SINGLE-FILE RUN CANNOT.** Both new router
+> tests load a config, which asks git where the repository is, and session
+> 96's whole-suite preload refuses a spawned git — green through `node --test
+> <file>`, red in the container. Each answers git from a table now. The
+> framework's credential-free checks caught the same class one step earlier:
+> the refresh test read THIS machine's `DABBLER_*_API_KEY` and enumerated
+> three vendors for real; it takes them out of the environment and seams the
+> seat, and went from 1.8 s to 0.5 s.
+>
+> **OWED, from the reviewer's Minor findings (both real).**
+> 1. **Reviewing AI → Vehicle reads one thing and writes another.** The row
+>    renders `primaryReviewer.vehicle`, which `roles.reviewer.transport` may
+>    decide, while its action writes the machine-wide `transport`. That is
+>    deliberate — one Vehicle row stands over both reviewing roles and only
+>    the primary has a vehicle flag — and the row marks itself and names the
+>    layer when a role override outranks it, but the mismatch stands and no
+>    test covers the case.
+> 2. **The refresh test proves re-derivation, not a NEW reading.** With the
+>    machine's keys out of the environment no vendor answers, so the block
+>    stands as it was; the assertion is that the projection agrees with the
+>    catalog on disk. Proving it reads a catalog that CHANGED needs an armed
+>    enumeration seam.
+>
 > ## SESSION 154 CLOSED, 2026-09-11 — one door into each suite, and the gate that had stopped being read
 >
 > | session | what | state |

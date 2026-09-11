@@ -1,7 +1,98 @@
-# STATUS — sessions 113–149 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.3 IS PUBLISHED to the Marketplace, carrying 148 and 149. 2.1.0 and 2.1.2 never shipped** — 2.1.0 refused over a walk-jobs timeout on the runner and 2.1.2 died on a Marketplace request timeout, so both tags stand on origin unpublished and 2.1.3 supersedes them
+# STATUS — sessions 113–150 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.3 IS PUBLISHED to the Marketplace, carrying 148 and 149. 2.1.0 and 2.1.2 never shipped** — 2.1.0 refused over a walk-jobs timeout on the runner and 2.1.2 died on a Marketplace request timeout, so both tags stand on origin unpublished and 2.1.3 supersedes them
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 150 CLOSED, 2026-09-11 — one catalog, at the user level, and nothing in that path can bill a token
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 150 | the two model records replaced by one `ai-model-catalog.json` per machine, the prompting probe deleted, three freshness rows collapsed to one, and the Configuration pane given one row with two actions | CLOSED VERIFIED at round 2 (round 1 blocked on one real thing), landed `f5149963`, closed `cffae499`. **Not releasable** — the block ships from 152 |
+>
+> **The catalog is one user-level file and nothing ships.**
+> `%LOCALAPPDATA%\dabbler\ai-model-catalog.json`, or the XDG equivalent, one
+> block per transport, written only for a transport the machine has. The
+> tracked `copilot-catalog.lock` is gone from git, from the router manifest's
+> `files` and therefore from the VSIX; `.dabbler/api-models.lock` is gone;
+> `lockfile.ts`, its test and `smol-toml` went with them. Both records were
+> derived and free to rebuild, so neither was migrated. `catalog.ts` takes
+> `lockfile`'s place in `boundaries.json`, under `platform`.
+>
+> **A block is believed only for the machine it was read on, and that is the
+> whole point.** Round 1's blocking finding was right and it was a judgement
+> I had made deliberately: I had the scope check as the REFRESH's question
+> and gave readers an unscoped `blockOf`, so a block recorded on another
+> account stayed believed until a refresh replaced it — and a refresh that
+> failed, or had not run, left that account's models dispatchable. There is
+> one reading now, `blockFor`, and no second one to reach for: routing, the
+> pane, drift and freshness all refuse a block recorded for another seat or
+> another key set. The seat's identity is read free from the CLI's own
+> `~/.copilot/config.json` (`lastLoggedInUser`), which is the only statement
+> of it there is — the ACP reply names models and never the account.
+>
+> **The probe is deleted and nothing under the catalog can dispatch to a
+> model.** `discoverModels`, the scopes, the projection, the confirmation
+> prompt and the 720-hour clock are gone, and with them `echoed_model`,
+> `confirmed_at`, `confirmed_on_cli_version`, `probed_at`,
+> `premium_request_weight`, `probe_premium_requests`, `last_probe_at`,
+> `last_probe_error`, the `confirmed`/`listed` split and `echoObservations`.
+> Fidelity reads a verification round's own requested/served pair, which is
+> evidence the framework already produces for nothing. `dabbler copilot
+> refresh` keeps the free reading and lost every flag that selected models to
+> prompt.
+>
+> **The price category was read free on every refresh and thrown away.** The
+> seat states `copilotUsage`, `copilotEnablement` and `copilotPriceCategory`
+> for every model it lists; the writer kept two and dropped the third.
+> `price_category` is now stored verbatim under the seat's own name for it,
+> beside a `cost` carrying the multiplier, the text the seat stated and the
+> platform that bills it. Where a source states neither — every vendor model
+> on the API path — both are null and nothing is guessed.
+>
+> **One row, one verb, one answer about cost.** `checkFreshness` returns one
+> `ai-model-catalog` row aged against the oldest block the machine holds;
+> `api-enumeration`, `seat-catalog` and `seat-list` are gone.
+> `dabbler discovery enumerate` became `dabbler discovery refresh` and covers
+> every transport the machine has. `REFRESH_COST` has one entry and it says
+> *Nothing*. The Explorer row carries *Update the Catalog* and *View the
+> JSON*, both taking the router's own command and the router's own path.
+>
+> **The daily refresh is a DAY, not an age**, on whichever transports the
+> machine has — a transport it holds no credential for is not a stale reading
+> to chase, which is what reopened the seat at every session start of a
+> keyless machine (round 1's nit, and a real cadence defect).
+>
+> **THE LIFECYCLE LOCK'S WAIT WAS SHORTER THAN ITS OWN HOLDS.** The run of
+> record failed on `walk-impact`, and it failed identically at HEAD with this
+> session's work stashed — pre-existing, not this session's. Measured on the
+> suite's own load, sampling every `.lifecycle.lock` once a second: four
+> locks held **14, 17, 18 and 31 seconds** by processes alive the whole time
+> and released normally afterwards. The waiter gave up at 30, so a slow
+> winner read as "the lifecycle lock is contended" — true of nothing.
+> `LOCK_WAIT_SECONDS` is 180 now, six times the worst hold; a holder that
+> DIED is still reclaimed in a quarter of a second by the staleness check.
+> **This is not the 149 pid trap** — the pid theory was wrong and the
+> measurement disproved it.
+>
+> **Three machine facts the suite must never read**, each with a seam armed
+> in `test/support/repo.ts`: `setCatalogPath` (a test wrote a fixture seat
+> into the operator's real catalog before the guard existed),
+> `setSeatSource` (day-zero reading means a session start opens the seat, and
+> a machine with the CLI installed would spawn it from a test about something
+> else) and `setSeatIdentity`. `currentCatalogPath` REFUSES the machine's own
+> path under the test runner rather than defaulting to it, which is how two
+> of the three were found.
+>
+> ## OPEN FOR 151 — the registry, the one rule, and the pin
+>
+> Session 151's plan stands unchanged and its ground is now clear: the
+> catalog is the inventory, `explainRoleCandidates` takes `CatalogModel[]`,
+> and `seatBlock()` / `apiBlock(config)` are the two scoped readings to build
+> on. Its step 8 still owns the "entitlement, not existence" sweep —
+> `AGENTS.md`, `docs/model-and-pricing-sources.md`, `README.md`,
+> `docs/quick-start.md`, `docs/acp-walkthrough.md` and `docs/model-fidelity.md`
+> all still describe a probe that no longer exists and a
+> `dabbler discovery enumerate` that is now `refresh`.
+>
 > ## SESSION 149 CLOSED, 2026-09-10 — the flake that refused a release, the gate that could not pass, and 2.1.3 published
 >
 > | session | what | state |

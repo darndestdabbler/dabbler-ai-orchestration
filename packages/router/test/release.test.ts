@@ -1,0 +1,332 @@
+// The one act that cannot be taken back.
+//
+// The property worth pinning is that nothing here decides. A version pushed
+// to a public registry is downloadable by everyone from that moment, npm
+// refuses `unpublish` after 72 hours, and a Marketplace version slot is never
+// reusable -- so the framework states what would ship and waits, and does the
+// typing only once there is an answer.
+
+import assert from "node:assert/strict";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, it } from "node:test";
+
+import { reaskPublication, servedVersions } from "../src/cli/release.ts";
+import { capture } from "../src/output.ts";
+import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/packaging.ts";
+import {
+  answerOwed,
+  blockingDecisions,
+  currentDecisions,
+  publicationDecisionId,
+  raisePublicationDecision,
+  readOwed,
+} from "../src/owedDecisions.ts";
+import { makeAnsweredSandbox, tempDir } from "./support/answers.ts";
+
+const VERSION = "2.0.0";
+
+describe("what an answer means", () => {
+  it("tags one artifact, because there is one", () => {
+    // There were two until 2026-09-02, with an order between them: the
+    // router to npm first, because the extension bundles it and a
+    // Marketplace version whose npm half was missing would be the broken
+    // half-release. npm is retired — the router ships INSIDE the extension —
+    // so there is no half that can be missing and nothing to sequence.
+    assert.deepEqual(tagsFor("publish", VERSION), ["vsix-v2.0.0"]);
+  });
+
+  it("builds a release candidate without publishing it", () => {
+    // The workflow classifies an `-rcN` tag as build-only, so the artifact is
+    // downloadable from the run and installable by hand while the listing
+    // does not move. A rehearsal is not a release, and the brief says that of
+    // itself rather than leaving the reader to discover it.
+    assert.deepEqual(tagsFor("release-candidate", VERSION), ["vsix-v2.0.0-rc1"]);
+  });
+
+  it("tags nothing at all for an answer that declines", () => {
+    assert.deepEqual(tagsFor("not yet", VERSION), []);
+  });
+
+  it("tags nothing for an answer nobody offered", () => {
+    // A vocabulary this does not know is not a licence to guess at a release.
+    assert.deepEqual(tagsFor("ship it", VERSION), []);
+  });
+});
+
+describe("reading what would ship", () => {
+  it("takes the versions from the packages themselves", () => {
+    const root = tempDir("release-");
+    mkdirSync(join(root, "packages", "router"), { recursive: true });
+    writeFileSync(
+      join(root, "packages", "router", "package.json"),
+      JSON.stringify({ name: "dabbler-ai-router", version: "2.1.0" }),
+      "utf8",
+    );
+    assert.equal(packageVersion(root, "packages/router/package.json"), "2.1.0");
+  });
+
+  it("reports a package it cannot read rather than inventing a version", () => {
+    assert.equal(packageVersion(tempDir("release-"), "packages/router/package.json"), null);
+  });
+
+  it("takes the version from version.json and refuses a manifest that is stale", () => {
+    // An install showed router 2.0.0 beside extension 2.7.0 -- two things
+    // where the operator has one. npm and the Marketplace each need a
+    // literal version in their own manifest, so ONE SOURCE means one file
+    // that declares it and a stamping step that writes it everywhere;
+    // `release` asks whether that stamping is current before it tags.
+    const root = tempDir("release-");
+    const write = (rel: string, doc: unknown): void => {
+      const path = join(root, ...rel.split("/"));
+      mkdirSync(join(path, ".."), { recursive: true });
+      writeFileSync(path, JSON.stringify(doc), "utf8");
+    };
+    const stamped = (
+      canonical: string,
+      router: string,
+      extension: string,
+      dependency: string,
+    ): void => {
+      write("version.json", { version: canonical });
+      write("packages/router/package.json", { name: "dabbler-ai-router", version: router });
+      // Where the repository actually declares it: the extension BUNDLES the
+      // router, so it is a build-time dependency, and declaring it at runtime
+      // made a plain `vsce package` resolve a production tree.
+      write("tools/dabbler-ai-orchestration/package.json", {
+        version: extension,
+        devDependencies: { "dabbler-ai-router": dependency },
+      });
+    };
+
+    stamped("2.8.0", "2.8.0", "2.8.0", "2.8.0");
+    assert.deepEqual(releaseVersion(root), { version: "2.8.0", reason: "" });
+
+    // A manifest left behind by a bump: named, with the command that fixes it.
+    stamped("2.8.0", "2.0.0", "2.8.0", "2.8.0");
+    assert.deepEqual(releaseVersion(root).version, null);
+    assert.match(String(releaseVersion(root).reason), /stamp:version/);
+
+    // And the dependency, EXACTLY: the extension bundles the router, so a
+    // range that merely contains the number is not this version being named.
+    stamped("2.8.0", "2.8.0", "2.8.0", "^2.0.0");
+    assert.equal(releaseVersion(root).version, null);
+    stamped("2.8.0", "2.8.0", "2.8.0", "12.8.0");
+    assert.equal(releaseVersion(root).version, null);
+    write("tools/dabbler-ai-orchestration/package.json", { version: "2.8.0" });
+    assert.equal(releaseVersion(root).version, null);
+
+    // Which field holds it is the manifest's business: what this asks is
+    // that the bundled router IS the version being released. Reading only
+    // one field made the declaration's move silently mean "declares
+    // nothing", which refuses the release with a sentence about staleness.
+    write("tools/dabbler-ai-orchestration/package.json", {
+      version: "2.8.0",
+      dependencies: { "dabbler-ai-router": "2.8.0" },
+    });
+    assert.equal(releaseVersion(root).version, "2.8.0");
+  });
+
+  it("has one version in this repository, and every manifest carries it", () => {
+    // The control that keeps the merge merged after the session that made
+    // it: it reads the repository itself, so a half-stamped release is a red
+    // suite rather than two artifacts nobody can say the version of.
+    const here = join(import.meta.dirname, "..", "..", "..");
+    const agreed = releaseVersion(here);
+    assert.equal(agreed.reason, "");
+    assert.equal(agreed.version, canonicalVersion(here));
+    assert.deepEqual(tagsFor("publish", agreed.version ?? ""), [`vsix-v${agreed.version}`]);
+  });
+});
+
+describe("what the Marketplace says it serves", () => {
+  it("reads the versions out of a gallery answer, newest first", () => {
+    // The parsing is here and the network call is not: a test that asked the
+    // Marketplace would be a test of the Marketplace, green or red for
+    // reasons that have nothing to do with this repository.
+    assert.deepEqual(
+      servedVersions({
+        results: [
+          {
+            extensions: [
+              {
+                extensionName: "dabbler-ai-orchestration",
+                versions: [{ version: "2.0.0" }, { version: "1.0.4" }],
+              },
+            ],
+          },
+        ],
+      }),
+      ["2.0.0", "1.0.4"],
+    );
+  });
+
+  it("separates a query that matched nothing from an answer it cannot read", () => {
+    // Two different facts, and only one of them is about the release. A
+    // query that matched no extension IS "the Marketplace serves nothing";
+    // an answer in a shape this reader does not recognise says nothing at
+    // all, and reporting it as a missing version would tell an operator
+    // mid-release that their publish failed on the evidence of a schema
+    // change.
+    assert.deepEqual(servedVersions({ results: [] }), []);
+    assert.deepEqual(servedVersions({ results: [{ extensions: [] }] }), []);
+    for (const unreadable of [{}, null, { results: {} }, { results: [{}] }]) {
+      assert.deepEqual(servedVersions(unreadable), null);
+    }
+    // A recognised shape whose version entries are not versions is empty,
+    // not unreadable: the rows are there and none of them names one.
+    assert.deepEqual(servedVersions({ results: [{ extensions: [{ versions: [{}, 3] }] }] }), []);
+  });
+});
+
+describe("the brief the operator answers", () => {
+  it("states the cost of a wrong answer, not only the choices", () => {
+    // The whole reason this is a brief and not a prompt: the reader has to
+    // be able to tell what they cannot take back.
+    const { repo } = makeAnsweredSandbox();
+    const row = raisePublicationDecision(repo, { version: "2.0.0" });
+    assert.match(String(row?.["determined"]), /cannot be recalled/);
+    assert.deepEqual(
+      (row?.["options"] as Array<{ label: string }>).map((option) => option.label),
+      ["publish", "release-candidate", "not yet"],
+    );
+  });
+
+  it("does not recommend the answer that defeats the session", () => {
+    // This session exists BECAUSE the product is uninstallable, so the answer
+    // leaving it uninstallable cannot be the recommended one. An earlier
+    // draft recommended the release candidate and called it "the whole
+    // path", which was false -- it never touches the Marketplace -- and was
+    // a recommendation to not do the thing.
+    const { repo } = makeAnsweredSandbox();
+    const row = raisePublicationDecision(repo, { version: "2.0.0" });
+    assert.deepEqual(row?.["recommendation"], "publish");
+    const rc = (row?.["options"] as { label: string; consequence: string }[]).find(
+      (option) => option.label === "release-candidate",
+    );
+    // And it says so of itself: a build that publishes nothing.
+    assert.match(String(rc?.consequence), /BUILDS and does/);
+    assert.match(String(rc?.consequence), /not publish/);
+  });
+
+  it("does not block a close, because an unpublished product is not unverified", () => {
+    const { repo } = makeAnsweredSandbox();
+    raisePublicationDecision(repo, { version: "2.0.0" });
+    assert.deepEqual(blockingDecisions(repo), []);
+  });
+
+  it("asks once, however often the verb runs", () => {
+    const { repo } = makeAnsweredSandbox();
+    raisePublicationDecision(repo, { version: "2.0.0" });
+    assert.equal(raisePublicationDecision(repo, { version: "2.0.0" }), null);
+  });
+
+  it("carries the operator's answer, and nobody else's", () => {
+    // `answeredBy` is "operator" and there is no other value: a verdict a
+    // model can write is a verdict a model can be wrong about.
+    const { repo } = makeAnsweredSandbox();
+    raisePublicationDecision(repo, { version: "2.0.0" });
+    answerOwed(repo, publicationDecisionId("2.0.0"), "not yet");
+    const row = currentDecisions(repo).find(
+      (r) => String(r["id"]) === publicationDecisionId("2.0.0"),
+    );
+    assert.equal(row?.["answer"], "not yet");
+    assert.equal(row?.["answeredBy"], "operator");
+  });
+
+  it("settles the version it names, and leaves the next release to ask again", () => {
+    // The loop, not the single refusal. `raiseDisposition` returns null for
+    // an id whose row is answered -- answered is settled -- so under one id
+    // for every release the first answer settles them all. The answer this
+    // repository holds was given on 2026-09-02 for 2.8.0, to npm and the
+    // Marketplace, and npm was retired that same day; it went on to
+    // authorise vsix-v2.0.15, 2.0.16, 2.0.17 and 2.0.18 with nobody asked.
+    const { repo } = makeAnsweredSandbox();
+    raisePublicationDecision(repo, { version: "2.0.0" });
+    answerOwed(repo, publicationDecisionId("2.0.0"), "publish");
+
+    // Read back off disk, never off a return value: the row is the record.
+    const decided = () =>
+      currentDecisions(repo).filter((r) => String(r["id"]).startsWith("publication:"));
+    const first = decided().find((r) => String(r["id"]) === publicationDecisionId("2.0.0"));
+    assert.equal(first?.["answer"], "publish");
+
+    // The next version is a new question. It is raised rather than folded
+    // away, it is open, and nothing has authorised it.
+    const next = raisePublicationDecision(repo, { version: "2.0.1" });
+    assert.equal(next?.["id"], publicationDecisionId("2.0.1"));
+    const onDisk = decided().find((r) => String(r["id"]) === publicationDecisionId("2.0.1"));
+    assert.equal(onDisk?.["state"], "open");
+    assert.equal(onDisk?.["answer"], undefined);
+    // The brief says which version this answer settles, so the reader is not
+    // relying on the id to know it.
+    assert.match(String(onDisk?.["determined"]), /This answer settles 2\.0\.1 and nothing else/);
+    // And the first version's answer is untouched by any of it.
+    assert.equal(decided().find((r) => String(r["id"]) === publicationDecisionId("2.0.0"))?.["answer"], "publish");
+    // Still asked once per version, however often the verb runs.
+    assert.equal(raisePublicationDecision(repo, { version: "2.0.1" }), null);
+  });
+});
+
+describe("a version that was held until something was true", () => {
+  const HELD = "2.1.0";
+
+  /** The current row for the held version, off disk. */
+  function row(repo: string): Record<string, unknown> | undefined {
+    return currentDecisions(repo).find(
+      (candidate) => String(candidate["id"]) === publicationDecisionId(HELD),
+    );
+  }
+
+  async function reask(repo: string, reason: string | undefined): Promise<number> {
+    return (
+      await capture(() =>
+        Promise.resolve(
+          reaskPublication(repo, HELD, publicationDecisionId(HELD), reason),
+        ),
+      )
+    ).value;
+  }
+
+  it("is put back to the operator when it becomes true, and authorises nothing by being asked", async () => {
+    // The stop this closes: an answer is settled, so a release held for a
+    // defect stayed held after the defect was fixed with nothing but a
+    // person remembering it. 2.1.0 was held at the close of 145 because the
+    // pane was wrong on a seat.
+    const { repo } = makeAnsweredSandbox();
+    raisePublicationDecision(repo, { version: HELD });
+    answerOwed(repo, publicationDecisionId(HELD), "not yet", null, "the pane is wrong on a seat");
+
+    // A re-ask with no reason is refused: the operator is being asked again
+    // because something happened, and the record has to say what.
+    assert.equal(await reask(repo, undefined), 2);
+    assert.equal(row(repo)?.["answer"], "not yet");
+
+    assert.equal(await reask(repo, "the pane now reads the seat's own catalog"), 0);
+    const asked = row(repo);
+    assert.equal(asked?.["state"], "open");
+    assert.equal(asked?.["answer"], undefined);
+    // Both halves are on the record: what was held, and what changed.
+    const superseded = readOwed(repo).filter(
+      (candidate) =>
+        String(candidate["id"]) === publicationDecisionId(HELD) &&
+        candidate["event"] === "superseded",
+    );
+    assert.match(String(superseded.at(-1)?.["note"]), /answered 'not yet'/);
+    assert.match(String(superseded.at(-1)?.["note"]), /reads the seat's own catalog/);
+    // An open question is not an authorisation, and it still does not block
+    // a close: an unpublished product is not an unverified one.
+    assert.deepEqual(blockingDecisions(repo), []);
+  });
+
+  it("never re-asks an answer that already authorised a tag", async () => {
+    // Asking a person to consent twice to the same publication is pressure,
+    // not process -- and the answer that carries it out is already on the
+    // record for `dabbler release` to act on.
+    const { repo } = makeAnsweredSandbox();
+    raisePublicationDecision(repo, { version: HELD });
+    answerOwed(repo, publicationDecisionId(HELD), "publish");
+    assert.equal(await reask(repo, "I would like to be asked again"), 1);
+    assert.equal(row(repo)?.["answer"], "publish");
+  });
+});

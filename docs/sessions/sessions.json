@@ -3051,9 +3051,9 @@
     {
       "number": 155,
       "title": "The Configuration section a person reads, and a projection that is never stale",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-11T17:16:58.786000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-11T17:50:50.322000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

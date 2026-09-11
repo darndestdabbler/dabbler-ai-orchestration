@@ -8546,7 +8546,7 @@ proved for half the developers who would use it.
 
 ---
 
-### Session 150 of 154: One catalog, at the user level, that costs nothing to be right
+### Session 150 of 156: One catalog, at the user level, that costs nothing to be right
 
 **The file that says which models exist is a committed snapshot of one
 developer's seat.** `packages/router/copilot-catalog.lock` is tracked in git,
@@ -8641,11 +8641,11 @@ own requested/served pair with no catalog echo to draw on. The freshness
 reading is one row, whichever transports are present. The daily refresh runs
 once on the first session of a day and not again that day.
 
-**Not releasable.** The block ships from 153.
+**Not releasable.** The block ships from 156.
 
 ---
 
-### Session 151 of 154: One reading, one rule, and the model on the screen is the model that runs
+### Session 151 of 156: One reading, one rule, and the model on the screen is the model that runs
 
 **Three rules are deleted and one survives.** The survivor is the only one
 that needs no judgment: the verifying model may not be the authoring model —
@@ -8752,11 +8752,11 @@ its whole catalog for both. A price category is shown for a model whose
 source stated one, and none is shown for a model whose source did not. The tests that assert the deleted rules are
 deleted with them.
 
-**Not releasable.** The block ships from 153.
+**Not releasable.** The block ships from 156.
 
 ---
 
-### Session 152 of 154: Two reviewers, a vehicle each, and a selection that is only a selection
+### Session 152 of 156: Two reviewers, a vehicle each, and a selection that is only a selection
 
 **`verifier` becomes `reviewer`, and the roles are named by voice rather than
 by phase.** *Verifier* implies checking work against a specification, which is
@@ -8840,11 +8840,154 @@ resolves to a provider that reviewed a round, selection or no selection. A
 machine with no seat writes no seat block and reads no seat preference. The
 tests that assert the deleted mechanisms are deleted with them.
 
-**Not releasable.** The block ships from 153.
+**Not releasable.** The block ships from 156.
 
 ---
 
-### Session 153 of 154: The Configuration section a person reads, and a projection that is never stale
+### Session 153 of 156: The suite runs where process creation is cheap, and the seat stays where it is
+
+**Measured on this machine on 2026-09-11.** The router suite as the run of
+record took **360 seconds** on the host and **17.7 seconds** in a
+CPU-bounded Podman container — twenty times. The mechanism is not
+throughput: a bare `node -e 0` spawn costs **158.8ms** on this Windows host
+and **18.9ms** inside the WSL2 machine, eight and a half times cheaper. The
+host has twenty cores, sixty-four gigabytes, Defender real-time protection
+off, and a suite bounded to four concurrent files. Nothing was saturated.
+Session 136 measured that this suite's load is **process creation rather
+than saturation**; this is that finding with a remedy attached.
+
+**The cost is not the clock, it is the keyboard.** Six minutes of relentless
+spawning on the scheduler the editor shares leaves the operator typing about
+one character every two or three seconds. Bounding the work to four cores
+inside a virtual machine costs nothing measurable and takes it off the host
+entirely.
+
+**The container cannot run the whole suite, and the way it fails is the
+trap.** `copilot.test.ts` does not skip on Linux — it **hangs**. Thirty-two
+of its tests come back `cancelledByParent` with *Promise resolution is still
+pending but the event loop has already resolved*: there is no `copilot`
+binary in the image, and those tests exercise the Windows spawn path itself
+(`quoteForCmd`, `resolveProgram`, `terminateTree`). Run alone, the file
+reports `# fail 0` with thirty-two cancelled. **A runner that read the
+failure count would call that green**, having silently stopped proving the
+Copilot seat — the transport this repository is actually operated on.
+
+**The split follows that seam and no other.** Everything platform-
+independent runs in the container, which is nearly all of it: 1,067 tests
+pass there identically. The seat and spawn-coupled tests stay on the host,
+where there are few enough of them to be cheap. A test is on the host
+because it proves something about Windows, and the declaration says which
+and why.
+
+**CI is not moved, and the divergence is declared.** Both workflow jobs run
+on `windows-latest`, and that is what proves the platform; the container is
+the local loop's speed rather than a substitute for Windows evidence. Two
+doors into one suite is exactly what session 154 exists to hold together, so
+this session leaves the difference **written down** rather than discovered
+later — which is the failure mode the very next session is about.
+
+**Only this repository.** The declaration is this repo's own `dabbler.yaml`
+and a `Containerfile` beside it; nothing in the shipped framework changes
+and no default moves. The next repository to adopt this framework is .NET or
+Java and will want none of it, and a container runner in the shipped
+defaults would be this machine's fact travelling to every other machine —
+the mistake the model catalog already taught this repository once.
+
+**The dependencies are Linux ones and they are cached.** Three named volumes
+hold `node_modules` for the root and both workspaces; `npm ci` into them
+takes 5.8 seconds and survives between runs, and the operator's Windows
+`node_modules` is never touched or read. The repository is bind-mounted; the
+tests write to the container's own `/tmp`, so nothing crosses back.
+
+**This session is verified under the declaration it writes**, which is how
+it is proved: a gate is proved by running it, and a container suite that
+could not carry its own session's run of record would have been worth
+nothing. The POC has already run the mechanics end to end, so what is left
+is the declaration and the guard.
+
+**Steps.** (1) The runner: a `Containerfile`, the three dependency volumes,
+and the container suite declared in this repository's `dabbler.yaml`. (2)
+The split: the seat and spawn-coupled tests declared as a host suite, with
+the reason each is there; the container suite covers the rest. (3) A control
+that fails on a **cancelled** test and not only on a failed one, so a suite
+that has stopped proving something can never read as green.
+
+**Tests.** The container suite runs the platform-independent tests and
+records a run of record indistinguishable from the host's except in
+duration. The host suite still proves the seat path, and a machine without a
+seat still skips rather than hangs. A run carrying a cancelled test fails
+the control, and the control names the test and says what stopped being
+proved. A dependency volume that is empty is populated rather than read as
+a suite with no tests in it.
+
+**Not releasable.** The block ships from 156.
+
+### Session 154 of 156: One door into each suite, and a gate that stopped being read
+
+**CI has been red for eleven consecutive runs**, since session 150's own
+commit, and the whole of it is one line. `npm run test:unit` in
+`tools/dabbler-ai-orchestration` does not set `DABBLER_CATALOG_PATH`, and a
+spec session 150 wrote requires it: `257 passing, 1 failing`, on `TypeError:
+The "path" argument must be of type string. Received undefined`. The Router
+suite job is green. The Extension suite job has not been green since the
+catalog seam landed.
+
+**The suite has two doors and the framework watches the other one.**
+`dabbler.yaml` declares the extension suite as `node
+tools/dabbler-ai-orchestration/scripts/run-unit.mjs`, which arms the seam
+before mocha starts; the workflow runs the package's own `npm run test:unit`,
+which does not. Sessions 150, 151 and 152 each closed **VERIFIED** on a run
+of record taken through the armed door while the gate behind the unarmed one
+was red the whole time. Nothing lied; the framework read the door it was
+told to read.
+
+**The patch is small and it is not the point.** Arm once — a mocha
+`--require` beside the existing `vscode-stub.js` — so both doors arm the
+same seam in the same place and neither can drift from the other by being
+edited alone.
+
+**The guard does not cover the door it was armed against.**
+`catalog.currentCatalogPath` refuses this machine's own path only when
+`NODE_TEST_CONTEXT` is set, which `node:test` sets and mocha does not. Under
+the npm door an unarmed read therefore does not stop — it silently returns
+the operator's real catalog and the suite reads the machine it is running
+on. Session 151 found the extension suite doing exactly that and armed the
+runner; the guard itself still watches one runner out of two, which is why
+arming the second door is a repair and not the repair.
+
+**The control is the repair.** `check-ci-suites` already asserts that every
+workflow names a runner and a script that exist — what it cannot see is that
+the runner a workflow names is not the runner the framework runs. The
+declared suites and the workflow commands are held to each other, and a
+difference is legal **only where the declaration says so**. Session 153
+leaves exactly one such difference behind on purpose — a container suite
+locally, a Windows job in CI — so the control is written to carry a declared
+divergence rather than to forbid every one, which is what would have made it
+unmergeable a session later.
+
+**D257, from session 122, is the precedent and it is the same shape**: a
+lapsed protection is repaired with a control rather than with a patch,
+because the patch fixes the instance and the control fixes the class. Three
+sessions closed over a dark gate here, and what let them was not the missing
+environment variable.
+
+**Steps.** (1) Arm the seam once, in one place both doors reach; CI green.
+(2) The guard covers both runners, so an unarmed read stops with the reason
+instead of quietly reading the operator's machine. (3) The control holds the
+workflows and the declared suites to each other, with session 153's
+divergence named in the declaration rather than special-cased in the check.
+
+**Tests.** The extension suite arms its catalog path through either door. An
+unarmed read under mocha stops and names the seam, as it already does under
+`node:test`. The control refuses a workflow whose command is not the
+declared suite's, accepts one the declaration marks as deliberately
+different, and refuses a declaration that claims a divergence no workflow
+has. CI is green on the commit that closes this session, which is the only
+evidence that actually settles it.
+
+**Not releasable.** The block ships from 156.
+
+### Session 155 of 156: The Configuration section a person reads, and a projection that is never stale
 
 **The Configuration section is organised by the thing being configured, not
 by the mechanism that configures it.** It grew five rows named after
@@ -8916,9 +9059,9 @@ refuses a provider that reviewed a round, selection or no selection. An
 activation over a projection written by an older router renders the current
 shape. A discovery refresh leaves a projection that reads the new catalog.
 
-**Not releasable.** The block ships from 154.
+**Not releasable.** The block ships from 156.
 
-### Session 154 of 154: The walk on both transports, and the release that carries the block
+### Session 156 of 156: The walk on both transports, and the release that carries the block
 
 **Every defect in this block was found on a Copilot seat, and every line it
 rewrites is also on the direct-API path** — where the registry it deletes was

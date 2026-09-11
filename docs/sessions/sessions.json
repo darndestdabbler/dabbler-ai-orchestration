@@ -2971,9 +2971,9 @@
     {
       "number": 151,
       "title": "One reading, one rule, and the model on the screen is the model that runs",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-11T06:29:26.629000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-11T09:57:34.216000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

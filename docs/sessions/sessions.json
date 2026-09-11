@@ -3031,9 +3031,9 @@
     {
       "number": 154,
       "title": "One door into each suite, and a gate that stopped being read",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-11T16:31:10.753000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-11T16:53:02.697000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

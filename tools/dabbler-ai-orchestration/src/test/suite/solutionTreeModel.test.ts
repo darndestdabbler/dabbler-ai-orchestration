@@ -652,16 +652,15 @@ suite("solutionTreeModel: what a session is run with", () => {
           excludes: ["anthropic"],
           fellThrough: false,
         },
+        // One row, because there is one catalog: it was three, and two of
+        // them were two dates on one file.
         records: [
           {
-            record: "seat-catalog", path: "C:/router/copilot-catalog.lock", present: true,
-            datedAt: "2026-09-01T10:00:00Z", ageHours: 30, thresholdHours: 720,
-            command: "dabbler copilot refresh", stale: false, notes: [],
-          },
-          {
-            record: "api-enumeration", path: "C:/repo/.dabbler/api-models.lock", present: false,
-            datedAt: null, ageHours: null, thresholdHours: 24,
-            command: "dabbler discovery enumerate", stale: true, notes: [],
+            record: "ai-model-catalog",
+            path: "C:/Users/dev/AppData/Local/dabbler/ai-model-catalog.json",
+            present: true, datedAt: "2026-09-01T10:00:00Z", ageHours: 30,
+            thresholdHours: 24, command: "dabbler discovery refresh",
+            cost: "Nothing.", stale: true, notes: [],
           },
         ],
         ...over,
@@ -694,18 +693,18 @@ suite("solutionTreeModel: what a session is run with", () => {
       const rows = childrenOf(root, p);
       assert.deepStrictEqual(
         rows.map((n) => n.kind),
-        ["configEngine", "configTransport", "configRole", "configRole", "configRecord", "configRecord"],
+        ["configEngine", "configTransport", "configRole", "configRole", "configRecord"],
       );
       const rendered = rows.map((n) => descriptorFor(n, p));
 
-      // The record's own age and the command that re-dates it, before
-      // anybody asks for a refresh.
-      const seat = rendered.find((row) => row.label === "seat-catalog");
-      assert.strictEqual(seat?.description, "30h old");
-      assert.ok(seat?.tooltip?.includes("dabbler copilot refresh"));
-      const api = rendered.find((row) => row.label === "api-enumeration");
-      assert.strictEqual(api?.description, "no record yet");
-      assert.strictEqual(api?.icon?.tone, "attention");
+      // The catalog's own age, where it lives, the command that re-reads
+      // it and what that costs -- all before anybody asks for a refresh.
+      const catalog = rendered.find((row) => row.label === "ai-model-catalog");
+      assert.strictEqual(catalog?.description, "30h old");
+      assert.ok(catalog?.tooltip?.includes("dabbler discovery refresh"));
+      assert.ok(catalog?.tooltip?.includes("ai-model-catalog.json"));
+      assert.ok(catalog?.tooltip?.includes("Nothing."));
+      assert.strictEqual(catalog?.icon?.tone, "attention");
 
       // A transport a layer above is overriding says so; the value alone
       // would look exactly like one that is in force.

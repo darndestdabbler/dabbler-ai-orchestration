@@ -6,8 +6,16 @@ import { existsSync, mkdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { describe, it } from "node:test";
 
-import { emptyRecord, mergeRecord, writeRecord } from "../src/discovery.ts";
+import {
+  SOURCE_API,
+  SOURCE_SEAT,
+  TRANSPORT_API,
+  TRANSPORT_SEAT,
+  writeBlock,
+  type CatalogModel,
+} from "../src/catalog.ts";
 import { configurationNode, project, writeProjection } from "../src/projection.ts";
+import { setSeatIdentity } from "../src/transports/copilot.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 import { resetProjectRootCache } from "../src/config.ts";
 
@@ -160,6 +168,23 @@ describe("the module projection", () => {
   });
 });
 
+/** The seat this machine is on, for a test that writes a block for it. */
+const SEAT = { host: "https://github.com", login: "someone" };
+
+/** One model, as the seat's own free reading records it. */
+function seatModelRow(id: string, provider: string): CatalogModel {
+  return {
+    id,
+    provider,
+    provider_source: "name-prefix-heuristic",
+    display_name: id,
+    enabled: true,
+    price_category: null,
+    cost: null,
+    listed_at: "2026-09-11T00:00:00Z",
+  };
+}
+
 describe("what a session would be run with", () => {
   const KEYS = [
     "DABBLER_ANTHROPIC_API_KEY",
@@ -237,6 +262,20 @@ describe("what a session would be run with", () => {
     const root = tempDir("configuration-");
     const ungit = inRepository(root);
     try {
+      // What this machine read from its own seat. Nothing ships a catalog
+      // any more: a seat machine's models are the ones its seat listed.
+      setSeatIdentity(SEAT);
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models: [
+          seatModelRow("claude-haiku-4.5", "anthropic"),
+          seatModelRow("gpt-5.6-sol", "openai"),
+          seatModelRow("gemini-3.1-pro-preview", "google"),
+        ],
+        retired: [{ id: "claude-sonnet-4.6", retired_at: "2026-09-10T00:00:00Z" }],
+      });
       const configuration = configurationNode(root);
       const authoring = configuration["authoring"] as Role & { enumeration: string };
       const verifying = configuration["verifying"] as Role & { enumeration: string };
@@ -253,21 +292,56 @@ describe("what a session would be run with", () => {
         (verifying.chosen as unknown as { provider: string }).provider,
         (authoring.chosen as unknown as { provider: string }).provider,
       );
-      // And the seat's own retirement mark is rendered rather than
-      // re-derived: the shipped catalog carries models the seat stopped
-      // listing, and not one of them is offered.
+      // And the archive is rendered rather than re-derived: a model the seat
+      // stopped listing is named with the date it went, and is not offered.
       const offered = new Set(authoring.candidates.map((candidate) => candidate.model));
-      for (const candidate of authoring.withheld) {
-        assert.ok(candidate.retired !== null);
-        assert.ok(!offered.has(candidate.model));
-      }
+      assert.deepEqual(
+        authoring.withheld.map((candidate) => [candidate.model, candidate.retired?.since]),
+        [["claude-sonnet-4.6", "2026-09-10T00:00:00Z"]],
+      );
+      assert.ok(!offered.has("claude-sonnet-4.6"));
     } finally {
       ungit();
       restore();
     }
   });
 
-  it("withholds a model the record says is no longer served, and says since when", () => {
+  it("offers nothing from a block another seat recorded, however fresh it is", () => {
+    // Round 1's blocking finding. The scope check was the refresh's question
+    // alone, so a block recorded on another account was still believed until
+    // a refresh replaced it -- and a refresh that failed, or had not run yet,
+    // left that account's models selectable. Re-login and profile migration
+    // are ordinary operations, and this is the wrong-seat authority the whole
+    // catalog exists to end.
+    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
+    const root = tempDir("configuration-");
+    const ungit = inRepository(root);
+    try {
+      setSeatIdentity({ host: SEAT.host, login: "somebody-else" });
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models: [seatModelRow("claude-haiku-4.5", "anthropic")],
+        retired: [],
+      });
+
+      const authoring = configurationNode(root)["authoring"] as Role & {
+        enumeration: string;
+        unavailable: string | null;
+      };
+      assert.deepEqual(authoring.candidates, []);
+      assert.equal(authoring.chosen, null);
+      // And it says what it is rather than showing an empty list: this
+      // machine has not read ITS seat, which one free command fixes.
+      assert.match(String(authoring.unavailable), /has not read its seat/);
+    } finally {
+      ungit();
+      restore();
+    }
+  });
+
+  it("withholds a model the catalog says is no longer served, and says since when", () => {
     const restore = withKeys();
     const root = tempDir("configuration-");
     const ungit = inRepository(root);
@@ -278,48 +352,23 @@ describe("what a session would be run with", () => {
       assert.deepEqual(before.withheld, []);
 
       // The vendor stopped serving exactly the model the role would have
-      // picked: the record keeps the entry, marked, and the offer drops it.
-      const provider = String(
-        (before.candidates[0] as unknown as { provider: string }).provider,
-      );
-      writeRecord(
-        join(root, ".dabbler", "api-models.lock"),
-        mergeRecord(
-          mergeRecord(
-            emptyRecord(),
-            [
-              {
-                provider,
-                entries: [
-                  {
-                    id: chosen,
-                    provider,
-                    provider_source: "vendor-enumeration",
-                    display_name: null,
-                    created_at: null,
-                    max_context_tokens: null,
-                    max_output_tokens: null,
-                    capabilities: [],
-                    enumerated_at: null,
-                    retired_at: null,
-                    raw: {},
-                  },
-                ],
-                error: null,
-              },
-            ],
-            "2026-09-01T00:00:00Z",
-          ),
-          [{ provider, entries: [], error: null }],
-          "2026-09-09T00:00:00Z",
-        ),
-      );
+      // picked. The archive keeps an id and a date and nothing else, which
+      // is enough to answer "where did that model go?" and nothing else.
+      // Scoped to the keys this test sets: a block recorded for another key
+      // set is not a reading of this machine and is not believed.
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-09T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic", "google", "openai"] },
+        models: [],
+        retired: [{ id: chosen, retired_at: "2026-09-09T00:00:00Z" }],
+      });
 
       const after = configurationNode(root)["authoring"] as Role;
       assert.ok(!after.candidates.some((candidate) => candidate.model === chosen));
       assert.deepEqual(
-        after.withheld.map((candidate) => [candidate.model, candidate.retired?.since, candidate.retired?.lastSeenAt]),
-        [[chosen, "2026-09-09T00:00:00Z", "2026-09-01T00:00:00Z"]],
+        after.withheld.map((candidate) => [candidate.model, candidate.retired?.since]),
+        [[chosen, "2026-09-09T00:00:00Z"]],
       );
       // The role still resolves: withholding one model is not emptying a
       // ladder, and the registry entry that declares it is untouched.

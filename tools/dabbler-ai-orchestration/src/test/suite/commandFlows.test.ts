@@ -45,7 +45,12 @@ import {
 import * as fs from "fs";
 import { ROUTER_VERSION } from "dabbler-ai-router";
 import { prerequisiteReport, type ToolProbe } from "../../commands/troubleshoot";
-import { setRoleModel, type ConfigurationUi } from "../../commands/configurationCommands";
+import {
+  refreshRecord,
+  setRoleModel,
+  viewRecord,
+  type ConfigurationUi,
+} from "../../commands/configurationCommands";
 import type { ConfigurationModel } from "../../providers/solutionTreeModel";
 import type { DriveHandle } from "../../router/driveProcess";
 import { openDabblerTerminal } from "../../router/dabblerTerminal";
@@ -1247,6 +1252,7 @@ suite("the Configuration section's model pick", () => {
         showWarningMessage: () => undefined,
         workspaceRoot: () => "D:/ws",
         setEngine: () => Promise.resolve(),
+        openFile: () => Promise.resolve(undefined),
       },
     };
   }
@@ -1290,5 +1296,64 @@ suite("the Configuration section's model pick", () => {
     assert.ok(offered[1].description?.includes("not known"), offered[1].description);
     // And what the answer is an answer ABOUT travels with it.
     assert.ok(offered[0].description?.includes("api"));
+  });
+});
+
+suite("the ai-model-catalog row's two actions", () => {
+  const PATH = "C:/Users/dev/AppData/Local/dabbler/ai-model-catalog.json";
+  const ROW = {
+    record: "ai-model-catalog",
+    path: PATH,
+    present: true,
+    datedAt: "2026-09-11T00:00:00Z",
+    ageHours: 2,
+    thresholdHours: 24,
+    command: "dabbler discovery refresh",
+    cost: "Nothing.",
+    stale: false,
+    notes: [] as string[],
+  };
+  const PROJECTION = {
+    solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+    modules: [],
+    configuration: { records: [ROW] },
+  } as unknown as Projection;
+
+  test("runs the verb the router named and opens the path the router gave", async () => {
+    // Both halves of one rule: where a machine keeps its catalog and which
+    // invocation re-reads it are the router's facts, and a second answer
+    // spelled in a pane is the one that goes stale. The cost travels with
+    // the question, because this repository has answered "what does a
+    // refresh cost" wrongly four times.
+    const ran: Array<readonly string[]> = [];
+    const opened: string[] = [];
+    let asked = "";
+    const ui: ConfigurationUi = {
+      confirm: (message) => {
+        asked = message;
+        return Promise.resolve(true);
+      },
+      runVerb: (_title, _cwd, args) => ran.push(args),
+      pick: () => Promise.resolve(undefined),
+      showInformationMessage: () => undefined,
+      showWarningMessage: () => undefined,
+      workspaceRoot: () => "D:/ws",
+      setEngine: () => Promise.resolve(),
+      openFile: (path) => {
+        opened.push(path);
+        return Promise.resolve(undefined);
+      },
+    };
+    const target = {
+      node: { kind: "configRecord" as const, record: ROW.record },
+      projection: PROJECTION,
+    };
+
+    await refreshRecord(target, ui);
+    assert.deepStrictEqual(ran, [["discovery", "refresh"]]);
+    assert.ok(asked.includes("Nothing."), asked);
+
+    await viewRecord(target, ui);
+    assert.deepStrictEqual(opened, [PATH]);
   });
 });

@@ -15,7 +15,7 @@
         "runtimeMode",
         "secretResolver",
         "sessionState",
-        "lockfile",
+        "catalog",
         "resolution",
         "version"
       ]

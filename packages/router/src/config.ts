@@ -114,7 +114,9 @@ export const CRITIQUE_ENFORCE_SET = "145-lite-enforcement-and-projection";
 // Keys required in transports.copilot-cli when that transport is selected.
 // Roles are not among them: selection is by role on both transports, so the
 // declaration is top-level and a seat block does not own it.
-const COPILOT_CLI_REQUIRED_KEYS = ["lockfile"];
+// The seat block has no required key: which models the seat has is read
+// from the seat, into this machine's own catalog, and never configured.
+const COPILOT_CLI_REQUIRED_KEYS: readonly string[] = [];
 
 // --- Small helpers over untyped YAML ----------------------------------------
 

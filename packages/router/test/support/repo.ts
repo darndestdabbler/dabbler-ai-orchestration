@@ -14,6 +14,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSy
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { CATALOG_FILENAME, SOURCE_SEAT, catalogNow, setCatalogPath } from "../../src/catalog.ts";
+import { setSeatSource } from "../../src/discovery.ts";
 import { canonicalPath } from "../../src/journal.ts";
 
 /**
@@ -112,6 +114,36 @@ function tempRoot(): string {
 export function scratchDir(prefix: string): string {
   return mkdtempSync(join(tempRoot(), `${prefix}${RUN}-`));
 }
+
+// The model catalog is user-level, so its default path is the machine's own.
+// Every worker that reaches this module gets one under the suite's temp root
+// instead: a test that read the operator's catalog would pass here and fail
+// on a machine with a different seat, and a test that WROTE it would edit
+// the operator's record as a side effect of proving something else.
+// `currentCatalogPath` refuses the machine's path under the test runner, so
+// a worker that reaches the catalog without this arming fails with the
+// reason rather than quietly writing home -- which is how the two suites
+// that needed it were found.
+setCatalogPath(join(scratchDir("catalog-"), CATALOG_FILENAME));
+
+// And no worker opens the real seat. A session start refreshes the catalog
+// for itself, through a path with no argument to pass a stand-in down, so a
+// machine that happens to have the Copilot CLI installed would spawn it from
+// a test about something else. This suite's machine has no seat unless a
+// test says otherwise.
+setSeatSource(() =>
+  Promise.resolve({
+    known: false,
+    models: [],
+    current_model_id: null,
+    modes: [],
+    reasoning_efforts: [],
+    cli_version: null,
+    read_at: catalogNow(),
+    source: SOURCE_SEAT,
+    reason: "this suite's machine has no seat",
+  }),
+);
 
 const GIT_CONFIG =
   "[user]\n\tname = Dabbler Test\n\temail = test@example.invalid\n" +

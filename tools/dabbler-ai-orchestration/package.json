@@ -197,9 +197,15 @@
       },
       {
         "command": "dabblerSolution.refreshRecord",
-        "title": "Refresh the Model Record",
+        "title": "Update the Catalog",
         "category": "Dabbler",
         "icon": "$(sync)"
+      },
+      {
+        "command": "dabblerSolution.viewRecord",
+        "title": "View the JSON",
+        "category": "Dabbler",
+        "icon": "$(json)"
       },
       {
         "command": "dabblerSolution.showImpact",
@@ -313,6 +319,10 @@
         },
         {
           "command": "dabblerSolution.refreshRecord",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.viewRecord",
           "when": "false"
         },
         {
@@ -437,6 +447,11 @@
           "command": "dabblerSolution.refreshRecord",
           "when": "view == dabblerSolutionTree && viewItem == dabblerConfigRecord",
           "group": "1_set@1"
+        },
+        {
+          "command": "dabblerSolution.viewRecord",
+          "when": "view == dabblerSolutionTree && viewItem == dabblerConfigRecord",
+          "group": "1_set@2"
         },
         {
           "command": "dabblerSolution.openRepository",

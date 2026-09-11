@@ -371,11 +371,14 @@ testing:
         select:
           - packages/router/test/metrics.test.ts
           - packages/router/test/route.test.ts
-      - when: packages/router/src/lockfile.ts
+      - when: packages/router/src/catalog.ts
         select:
-          - packages/router/test/lockfile.test.ts
-          - packages/router/test/metrics.test.ts
+          - packages/router/test/catalog.test.ts
+          - packages/router/test/copilot.test.ts
           - packages/router/test/discovery.test.ts
+          - packages/router/test/projection.test.ts
+          - packages/router/test/route.test.ts
+          - packages/router/test/walk-bootstrap.test.ts
       # Neither of these has a file of its own any more: the rebuild folded
       # both into the configuration test, which is where a caller meets
       # them. Naming a deleted file is worse than naming the one that runs.
@@ -550,7 +553,6 @@ testing:
           - packages/router/test/land.test.ts
       - when: packages/router/src/pythonJson.ts
         select:
-          - packages/router/test/lockfile.test.ts
           - packages/router/test/ledger.test.ts
           - packages/router/test/writers.test.ts
       - when: packages/router/src/textfile.ts
@@ -559,7 +561,9 @@ testing:
           - packages/router/test/metrics.test.ts
       - when: packages/router/src/version.ts
         select:
-          - packages/router/test/lockfile.test.ts
+          - packages/router/test/cli.test.ts
+          - packages/router/test/ledger.test.ts
+          - packages/router/test/writers.test.ts
       # Where the bundled config, the schemas and the templates are found.
       # Every module that reads one of them depends on this answer.
       - when: packages/router/src/paths.ts
@@ -630,7 +634,6 @@ testing:
           - packages/router/test/acp.test.ts
           - packages/router/test/config.test.ts
           - packages/router/test/metrics.test.ts
-          - packages/router/test/lockfile.test.ts
           - packages/router/test/transports.test.ts
           - packages/router/test/selection.test.ts
           - packages/router/test/route.test.ts
@@ -655,7 +658,7 @@ testing:
       # what EVERY test compiles and links against are `repo_wide` above.
       - when: packages/router/package.json
         select:
-          - packages/router/test/lockfile.test.ts
+          - packages/router/test/cli.test.ts
       # Everything under `tools/` that the rule above does not reach: the
       # manifest has its own rule, the sources have theirs, and what is left
       # is the build script, the Playwright layer and the packaging files.
@@ -677,9 +680,6 @@ testing:
         select:
           - packages/router/test/prompts.test.ts
           - packages/router/test/walk-verify.test.ts
-      - when: packages/router/copilot-catalog.lock
-        select:
-          - packages/router/test/copilot.test.ts
       - when: packages/router/router-config.yaml
         select:
           - packages/router/test/config.test.ts

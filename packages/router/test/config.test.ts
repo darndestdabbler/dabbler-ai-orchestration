@@ -254,14 +254,6 @@ describe("loading a config", () => {
     assert.ok(loadConfigFrom(sources({ base }))["roles"]);
   });
 
-  it("refuses a seat transport block with no lockfile", () => {
-    // Selecting the seat and silently falling back to a keyless API path is
-    // worse than refusing to load.
-    const base = makeConfig();
-    delete (base["transports"] as Record<string, Record<string, unknown>>)["copilot-cli"]["lockfile"];
-    assert.match(refusal(() => loadConfigFrom(sources({ base }))), /lockfile/);
-  });
-
   it("refuses seat timeouts that cannot all fire", () => {
     const base = makeConfig();
     (base["transports"] as Record<string, Record<string, unknown>>)["copilot-cli"]["timeouts"] = {
@@ -319,9 +311,9 @@ describe("the machine-local overlay", () => {
 
   it("keeps the base when the overlay names one key of a block", () => {
     const config = loadConfigFrom(
-      sources({ overrides: { transports: { "copilot-cli": { lockfile: "seat.lock" } } } }),
+      sources({ overrides: { transports: { "copilot-cli": { binary: "copilot-next" } } } }),
     );
-    assert.equal(nested(config, "transports")["copilot-cli"]["lockfile"], "seat.lock");
+    assert.equal(nested(config, "transports")["copilot-cli"]["binary"], "copilot-next");
     assert.ok(config["roles"]);
   });
 

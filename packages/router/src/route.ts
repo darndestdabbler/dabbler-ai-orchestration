@@ -47,16 +47,13 @@ import {
   OfflineTransport,
   resolveResponsesDir,
 } from "./transports/offline.ts";
+import { type CatalogModel } from "./catalog.ts";
 import {
   CopilotCliTransport,
   REFRESH_COMMAND,
-  getCliVersion,
-  loadCatalog,
-  resolveLockfilePath,
   explainRoleCandidates,
   resolveTransportTimeouts,
-  validateCatalog,
-  type Catalog,
+  seatModels,
 } from "./transports/copilot.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -372,7 +369,7 @@ interface RouteState {
   config: RouterConfig | null;
   rateLimiters: Record<string, RateLimiter>;
   copilotTransport: CopilotCliTransport | null;
-  copilotCatalog: Catalog | null;
+  copilotCatalog: readonly CatalogModel[] | null;
 }
 
 const state: RouteState = {
@@ -399,26 +396,27 @@ export function resetForTests(): void {
  */
 export function installCopilotForTests(
   transport: CopilotCliTransport,
-  catalog: Catalog,
+  catalog: readonly CatalogModel[],
 ): void {
   state.copilotTransport = transport;
   state.copilotCatalog = catalog;
 }
 
 /**
- * Load and fail-closed-validate the seat catalog, and build the CLI
+ * Read the seat's models from this machine's catalog, and build the CLI
  * transport, once per process.
  *
- * An unreadable or invalid lockfile STOPS dispatch with an actionable
- * message. Never a silent fallback to the API transport: that would put a
- * cross-provider verification on the provider the operator was routing away
- * from, and nothing downstream could tell.
+ * A catalog this machine has not read yet STOPS dispatch with an actionable
+ * message, and the action is one free command. Never a silent fallback to
+ * the API transport: that would put a cross-provider verification on the
+ * provider the operator was routing away from, and nothing downstream could
+ * tell.
  *
  * The transport is cached because its invocation breaker is a per-process
  * count of billed spawns; a fresh transport per call would reset the ceiling
  * every time it mattered.
  */
-function getCopilot(config: RouterConfig): [CopilotCliTransport, Catalog] {
+function getCopilot(config: RouterConfig): [CopilotCliTransport, readonly CatalogModel[]] {
   if (state.copilotTransport !== null && state.copilotCatalog !== null) {
     return [state.copilotTransport, state.copilotCatalog];
   }
@@ -430,33 +428,17 @@ function getCopilot(config: RouterConfig): [CopilotCliTransport, Catalog] {
         "has no transports.copilot-cli block",
     );
   }
-  const lockfile = resolveLockfilePath(config);
-  let catalog: Catalog;
-  try {
-    catalog = loadCatalog(lockfile);
-  } catch (error: unknown) {
+  const catalog = seatModels();
+  if (catalog === null || catalog.length === 0) {
     throw new RouterError(
-      `the copilot-cli catalog lockfile at '${lockfile}' could ` +
-        `not be loaded (${error instanceof Error ? error.message : String(error)}). ` +
-        `Rebuild it with \`${REFRESH_COMMAND} --all\`, or switch the transport ` +
-        "back to 'api'.",
+      "the copilot-cli transport is selected and this machine's model " +
+        "catalog holds nothing for it. Read the seat's own list with " +
+        `\`${REFRESH_COMMAND}\` -- it costs nothing and sends no prompt -- ` +
+        "or switch the transport back to 'api'.",
     );
   }
 
   const binary = String(cliConfig["binary"] ?? "copilot");
-  const validation = validateCatalog(catalog, {
-    liveCliVersion: getCliVersion({ binary }),
-  });
-  if (!validation.ok) {
-    throw new RouterError(
-      "the copilot-cli catalog lockfile failed fail-closed validation: " +
-        validation.reasons.join("; "),
-    );
-  }
-  for (const warning of validation.warnings) {
-    process.stderr.write(`ai_router: copilot-cli catalog: ${warning}\n`);
-  }
-
   const maxInvocations = cliConfig["max_invocations_per_session"];
   state.copilotCatalog = catalog;
   state.copilotTransport = new CopilotCliTransport({
@@ -581,7 +563,7 @@ function warnIfFellThrough<T extends RoleCandidate>(
 /** The same, over the seat's confirmed catalog. */
 export function seatLadder(
   config: RouterConfig,
-  catalog: Catalog,
+  catalog: readonly CatalogModel[],
   role: string,
   exclude: readonly string[],
 ): Candidate[] {

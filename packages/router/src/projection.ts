@@ -61,7 +61,6 @@ import {
 import {
   ROLE_GENERATOR,
   ROLE_VERIFIER,
-  echoObservations,
   explainRegistryCandidates,
   modelFidelity,
   roundObservations,
@@ -70,12 +69,7 @@ import {
   type ModelObservation,
 } from "./selection.ts";
 import { archivedRounds } from "./ledger.ts";
-import {
-  explainRoleCandidates,
-  loadCatalog,
-  resolveLockfilePath,
-  type Catalog,
-} from "./transports/copilot.ts";
+import { REFRESH_COMMAND, explainRoleCandidates, seatBlock } from "./transports/copilot.ts";
 
 type Node = Record<string, unknown>;
 
@@ -233,13 +227,10 @@ function fidelityOn(root: string, config: RouterConfig, transport: string): (mod
     // No run record here yet, which is most repositories. Not knowing is an
     // answer this reading is built to give.
   }
-  if (transport === TRANSPORT_COPILOT_CLI) {
-    try {
-      observations.push(...echoObservations(loadCatalog(resolveLockfilePath(config)).models));
-    } catch {
-      // No seat configured, or no catalog probed. Again: not known.
-    }
-  }
+  // A round's own requested/served pair is the whole of the evidence. The
+  // catalog carries no echo to draw on, because the turn that bought one was
+  // deleted: fidelity reads from work that was happening anyway, and nothing
+  // is spent pre-emptively to answer a question no round has asked yet.
   return (model) => modelFidelity(model, observations);
 }
 
@@ -285,39 +276,40 @@ function roleReading(root: string, config: RouterConfig, transport: string): Rol
     return {
       enumeration: ENUMERATION_API_REGISTRY,
       resolve: (role, exclude) => explainRegistryCandidates(config, role, exclude),
-      retired: retiredModels(config, root),
+      retired: retiredModels(config),
       unavailable: null,
     };
   }
-  let catalog: Catalog;
-  try {
-    catalog = loadCatalog(resolveLockfilePath(config));
-  } catch (error) {
+  const block = seatBlock();
+  if (block === null) {
     return {
       enumeration: ENUMERATION_SEAT_CATALOG,
       resolve: () => NOTHING_RESOLVES,
       retired: new Map(),
-      // The reason, not a blank list: "no models" and "your seat catalog
-      // could not be read" are different problems with different remedies.
-      unavailable: `the seat catalog could not be read (${
-        error instanceof Error ? error.message : String(error)
-      })`,
+      // The reason, not a blank list: "no models" and "this machine has not
+      // read its seat yet" are different problems with different remedies,
+      // and this one's remedy is free.
+      unavailable:
+        "this machine has not read its seat's model list yet " +
+        `(\`${REFRESH_COMMAND}\` reads it, free)`,
     };
   }
+  // An id and a date and nothing else, which is all the archive holds: the
+  // provider a retired model had is not a claim worth keeping about a model
+  // nobody can select.
   const retired = new Map<string, RetiredModel>();
-  for (const entry of catalog.models) {
-    if (entry.retired_at === null) continue;
+  for (const entry of block.retired) {
     retired.set(entry.id, {
       id: entry.id,
-      provider: entry.provider,
-      lastSeenAt: entry.listed_at,
+      provider: "",
+      lastSeenAt: null,
       retiredAt: entry.retired_at,
     });
   }
   return {
     enumeration: ENUMERATION_SEAT_CATALOG,
     resolve: (role, exclude) => {
-      const resolution = explainRoleCandidates(config, catalog, role, exclude);
+      const resolution = explainRoleCandidates(config, block.models, role, exclude);
       // The seat has no aliases: an id is both what the registry would call
       // the model and what goes on the wire.
       return {
@@ -375,18 +367,21 @@ function roleNode(
 ): Node {
   const retired = reading.retired;
   const resolution = reading.resolve(role, exclude);
-  // A model the record says is no longer served is not offered. Withheld
-  // rather than dropped: the row says which model and since when, because an
-  // operator whose usual verifier vanished from a list needs to know it was
-  // withdrawn rather than wonder what they broke.
+  // A model the catalog has stopped listing is not a candidate at all: it
+  // left the active list for the archive when its source stopped naming it.
+  // It is still SHOWN, from the archive, because an operator whose usual
+  // verifier vanished from a list needs to know it was withdrawn rather than
+  // wonder what they broke -- and the archive holds an id and a date, which
+  // is exactly what that question needs and nothing more.
   const served = resolution.candidates.filter(([modelId]) => !retired.has(modelId));
-  const withheld = resolution.candidates.filter(([modelId]) => retired.has(modelId));
   const chosen = served[0];
   return {
     role,
     chosen: chosen === undefined ? null : candidateNode(chosen, fidelity, retired),
     candidates: served.map((candidate) => candidateNode(candidate, fidelity, retired)),
-    withheld: withheld.map((candidate) => candidateNode(candidate, fidelity, retired)),
+    withheld: [...retired.values()].map((entry) =>
+      candidateNode([entry.id, entry.provider, entry.id], fidelity, retired),
+    ),
     excludes: [...(exclude ?? [])],
     // A role that fell past its own preference order picked a model nobody
     // named. The 364-request session is why that is worth a row.
@@ -467,7 +462,7 @@ export function configurationNode(root: string): Node {
         author === null ? null : [String(author["provider"])],
         fidelity,
       ),
-      records: checkFreshness(config, Date.now(), root).map(recordNode),
+      records: checkFreshness(config, Date.now()).map(recordNode),
     };
   } catch (error) {
     return {

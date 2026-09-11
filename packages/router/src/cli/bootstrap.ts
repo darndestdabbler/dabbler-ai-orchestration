@@ -500,8 +500,8 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
 function absentRecordNotices(projectDir: string): string[] {
   try {
     const config = loadConfig(undefined, projectDir);
-    const stale = freshnessWarnings(config, Date.now(), true, projectDir);
-    const existing = new Set(freshnessWarnings(config, Date.now(), false, projectDir));
+    const stale = freshnessWarnings(config, Date.now(), true);
+    const existing = new Set(freshnessWarnings(config, Date.now(), false));
     return stale.filter((line) => !existing.has(line));
   } catch {
     return [];

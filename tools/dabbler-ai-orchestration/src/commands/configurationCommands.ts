@@ -35,7 +35,7 @@ export const ENGINE_SETTING = "dabbler.engine";
 
 /** What a control needs of the editor, so the suite can drive one. */
 export interface ConfigurationUi {
-  /** The one confirmation this section asks for: a probe costs something. */
+  /** The one confirmation this section asks for. */
   confirm: (message: string, action: string) => Thenable<boolean>;
   /** Run one router verb where the operator can watch it. */
   runVerb: (title: string, cwd: string, args: readonly string[]) => void;
@@ -48,6 +48,8 @@ export interface ConfigurationUi {
   workspaceRoot: () => string | undefined;
   /** Where the engine default is remembered, which is not a config file. */
   setEngine: (engine: string) => Thenable<void>;
+  /** Open a file for reading, wherever on the machine it lives. */
+  openFile: (path: string) => Thenable<unknown>;
 }
 
 export function defaultConfigurationUi(): ConfigurationUi {
@@ -56,11 +58,11 @@ export function defaultConfigurationUi(): ConfigurationUi {
       vscode.window
         .showInformationMessage(message, { modal: true }, action)
         .then((choice) => choice === action),
-    // A terminal, and not the in-process router: enumerating three vendors
-    // or probing a seat is exactly the kind of work the in-process contract
-    // says belongs in a terminal, because it runs on the extension host's UI
-    // thread. It is also the work an operator should SEE happening -- they
-    // are paying for it.
+    // A terminal, and not the in-process router: reading three vendor
+    // endpoints and opening a conversation on a seat is exactly the kind of
+    // work the in-process contract says belongs in a terminal, because it
+    // runs on the extension host's UI thread. It is also work an operator
+    // should SEE happening, even when it is free.
     runVerb: (title, cwd, args) => {
       const cli = resolveRouterCli();
       if (cli === null) {
@@ -86,6 +88,14 @@ export function defaultConfigurationUi(): ConfigurationUi {
       vscode.workspace
         .getConfiguration()
         .update(ENGINE_SETTING, engine, vscode.ConfigurationTarget.Global),
+    openFile: (path) =>
+      vscode.workspace.openTextDocument(vscode.Uri.file(path)).then(
+        (document) => vscode.window.showTextDocument(document, { preview: true }),
+        () =>
+          vscode.window.showWarningMessage(
+            `There is nothing at ${path} yet. Update the catalog to read one -- it costs nothing.`,
+          ),
+      ),
   };
 }
 
@@ -237,16 +247,15 @@ export async function setTransport(
 }
 
 /**
- * Re-date one record, which is the only thing in this section that reaches
- * a vendor at all.
+ * Update the catalog: re-read every transport this machine has.
  *
- * The command run is the one the ROUTER named on the row -- `dabbler
- * discovery enumerate` or `dabbler copilot refresh` -- rather than one
- * spelled here: which invocation re-dates which record is the discovery
+ * The command run is the one the ROUTER named on the row rather than one
+ * spelled here: which invocation re-reads the catalog is the discovery
  * module's fact, and a copy of it in a pane is the copy that goes stale.
  *
- * It asks first, and the question carries the cost. Everything else here is
- * a file read, so the one thing that is not says so before it happens.
+ * It asks first, and the question carries the cost -- which is nothing, and
+ * says so, because an operator who has read this repository's older words
+ * has been told otherwise.
  */
 export async function refreshRecord(
   target: ConfigurationTarget,
@@ -276,6 +285,26 @@ export async function refreshRecord(
   );
   if (!agreed) return;
   ui.runVerb(`Dabbler: ${row.record}`, root, args);
+}
+
+/**
+ * Open the catalog this machine reads, so an operator can see what it says.
+ *
+ * The path is the router's, off the same row: where a machine keeps its
+ * catalog is a per-platform fact the discovery module already resolves, and
+ * a second resolution here is the one that would disagree with it.
+ */
+export async function viewRecord(
+  target: ConfigurationTarget,
+  ui: ConfigurationUi = defaultConfigurationUi(),
+): Promise<void> {
+  if (!target.node || target.node.kind !== "configRecord") return;
+  const named = target.node.record;
+  const row = (target.projection?.configuration?.records ?? []).find(
+    (record) => record.record === named,
+  );
+  if (!row) return;
+  await ui.openFile(row.path);
 }
 
 /**

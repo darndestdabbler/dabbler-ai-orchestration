@@ -1050,19 +1050,20 @@ export function descriptorFor(
       return {
         id: `config:record:${node.record}`,
         label: node.record,
-        description: row?.present ? agePhrase(row.ageHours) : "no record yet",
-        // The age is here BEFORE anyone asks for a refresh, and so is the
-        // command that would buy one: a probe costs something, and asking
-        // for one should be a decision rather than a surprise.
+        // *Not read yet* and not "no record": a machine that has never
+        // refreshed is the ordinary first-run case, and the reading that
+        // fixes it is free and one menu item away.
+        description: row?.present ? agePhrase(row.ageHours) : "not read yet",
         tooltip: [
           row?.present
-            ? `Dated ${row.datedAt}; it is read as stale past ${Math.round(row.thresholdHours)}h.`
-            : `Nothing has been recorded at ${row?.path ?? "this path"} yet.`,
+            ? `Last updated ${row.datedAt}; read as stale past ${Math.round(row.thresholdHours)}h.`
+            : "This machine has not read its model catalog yet.",
+          `It lives at ${row?.path ?? "this machine's own data directory"}.`,
           ...(row?.notes ?? []),
-          // The cost BEFORE the click, so asking for a refresh is a
-          // decision rather than a surprise. It is the only thing in this
-          // section that reaches a vendor at all.
-          `Click to run \`${row?.command ?? ""}\`. ${row?.cost ?? ""}`.trim(),
+          // What it costs, before the click. The answer is nothing, and it
+          // is said here because the question has been answered wrongly
+          // often enough to be worth pre-empting.
+          `Update the catalog runs \`${row?.command ?? ""}\`. ${row?.cost ?? ""}`.trim(),
         ].join("\n"),
         icon: {
           id: "database",

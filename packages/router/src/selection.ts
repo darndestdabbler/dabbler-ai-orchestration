@@ -533,27 +533,6 @@ export function modelFidelity(
 }
 
 /**
- * A seat catalog's echoes as observations.
- *
- * Structural rather than imported: the catalog's own type lives with the
- * transport that writes it, and selection has never depended on a transport.
- * An entry with no echo becomes an observation that says nothing, which is
- * what it is -- dropping it would leave a probed-and-silent model
- * indistinguishable from one never probed at all.
- */
-export function echoObservations(
-  entries: readonly { readonly id: string; readonly echoed_model?: unknown }[],
-): ModelObservation[] {
-  return entries.map((entry) => ({
-    requested: entry.id,
-    served: typeof entry.echoed_model === "string" && entry.echoed_model !== ""
-      ? entry.echoed_model
-      : null,
-    evidence: EVIDENCE_ECHO,
-  }));
-}
-
-/**
  * The one transport whose `served_model` is the provider's own word. Named
  * as the allowed case rather than as the excluded one: a transport added
  * later is an echo until somebody shows it is not.

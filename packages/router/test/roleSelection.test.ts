@@ -20,7 +20,6 @@ import {
   REMOVED_NOT_PERMITTED,
   REMOVED_UNTRUSTED_VERIFIER,
   ROLE_VERIFIER,
-  echoObservations,
   explainRole,
   modelFidelity,
   roundObservations,
@@ -400,19 +399,12 @@ describe("whether the model asked for is the model that answered", () => {
     );
   });
 
-  it("reads a seat catalog's echoes as echoes, and a round's served ids as the provider's word", () => {
-    const observations = echoObservations([
-      { id: "claude-haiku-4.5", echoed_model: "claude-haiku-4.5" },
-      { id: "gemini-3.8-flash", echoed_model: null },
-      { id: "gpt-5.5" },
-    ]);
-    // An exact catalog echo is NOT approval -- the whole of the seat's
-    // evidence reads as not known, which is what session 145 must render.
-    assert.equal(modelFidelity("claude-haiku-4.5", observations), FIDELITY_UNKNOWN);
-    // Probed and silent, and never probed: both say nothing too.
-    assert.equal(modelFidelity("gemini-3.8-flash", observations), FIDELITY_UNKNOWN);
-    assert.equal(modelFidelity("gpt-5.5", observations), FIDELITY_UNKNOWN);
-    // A round on the direct-API path carries the provider's own statement.
+  it("reads fidelity from a round's own pair, with no catalog echo to draw on", () => {
+    // The probe that pre-bought an echo is deleted, and nothing is lost that
+    // was ever worth having: an exact catalog echo never established
+    // fidelity in the first place, and a round's requested/served pair is
+    // recorded as a by-product of work that was happening anyway. This is
+    // the whole of the evidence now.
     const rounds = roundObservations([
       { requested_model: "gpt-5.6-terra", served_model: "gpt-5.6-terra", transport: "api" },
       { requested_model: "gpt-5.4", served_model: null, transport: "api" },

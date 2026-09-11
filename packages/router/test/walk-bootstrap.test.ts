@@ -29,6 +29,8 @@ import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../sr
 import { capture } from "../src/output.ts";
 import { ID_GIT_REMOTE, openDecisions } from "../src/owedDecisions.ts";
 import { solutionShape } from "../src/modules.ts";
+import { CATALOG_FILENAME } from "../src/catalog.ts";
+import { RECORD_CATALOG } from "../src/discovery.ts";
 import { git, gitOut, makeRepo, scratchDir, writeFiles } from "./support/repo.ts";
 
 /**
@@ -289,11 +291,12 @@ describe("a project on its first day", () => {
     assert.match(setup.stderr, /--rewrite-history/);
   });
 
-  it("names the project directory's own .dabbler in the discovery line, not the working directory's", async () => {
-    // Every other line of a `--project-dir` run names the project. This one
-    // took the working directory instead, so it reported on a folder the
-    // command had been told not to act on -- and sent a reader looking for a
-    // file that was never going to be there. Walk finding 7, D264.
+  it("names this machine's own catalog in the discovery line, and no project's", async () => {
+    // D264 was this line naming the working directory's `.dabbler` on a
+    // `--project-dir` run, reporting on a folder the command had been told
+    // not to act on. The defect cannot recur: a catalog is a reading of the
+    // MACHINE -- its seat, its keys -- and has no project directory to take
+    // the wrong one of.
     const repo = makeRepo(PROJECT, { origin: true });
 
     const setup = await capture(() =>
@@ -303,13 +306,10 @@ describe("a project on its first day", () => {
 
     const line = setup.stdout
       .split(/\r?\n/)
-      .find((each) => each.startsWith("discovery: api-enumeration:"));
+      .find((each) => each.startsWith(`discovery: ${RECORD_CATALOG}:`));
     assert.ok(line !== undefined, `no api-enumeration line in:\n${setup.stdout}`);
-    assert.ok(
-      line.includes(join(repo, ".dabbler", "api-models.lock")),
-      `the line names another project's record: ${line}`,
-    );
-    // And not this suite's own working directory, which is what it named.
-    assert.ok(!line.includes(join(process.cwd(), ".dabbler", "api-models.lock")), line);
+    assert.ok(line.includes(CATALOG_FILENAME), `the line names no catalog: ${line}`);
+    assert.ok(!line.includes(join(repo, ".dabbler")), line);
+    assert.ok(!line.includes(join(process.cwd(), ".dabbler")), line);
   });
 });

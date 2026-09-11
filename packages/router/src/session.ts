@@ -160,7 +160,7 @@ import { writeErr, writeOut } from "./output.ts";
  * age -- and what may not happen is a failure: a vendor that could not be
  * reached leaves the record as it was and says so.
  *
- * The refusal in `dabbler discovery enumerate` still holds and is not
+ * The refusal in `dabbler discovery refresh` still holds and is not
  * contradicted: this runs BEFORE the session exists, so no session is
  * changing its own verifier pool while running.
  */
@@ -297,10 +297,32 @@ export function acquireLock(sessionsDir: string, workerId?: string): string {
   throw new LockContentionError(`could not acquire ${path}`);
 }
 
+/**
+ * How long a waiter gives a live holder before it calls the lock contended.
+ *
+ * **Measured, 2026-09-11, on this suite's own load** -- `node --test
+ * --test-concurrency=4` over the whole router suite, with every
+ * `.lifecycle.lock` under the temp root sampled once a second. Holds are not
+ * milliseconds under that load: four locks were held 14, 17, 18 and 31
+ * seconds by processes that were alive the whole time and released normally
+ * afterwards. At thirty seconds the last of them lost the race, and
+ * `walk-impact`'s driver stopped with "the lifecycle lock is contended" --
+ * which was true of nothing: the holder was working and finished.
+ *
+ * So the deadline was shorter than the work it was waiting on, and a waiter
+ * that gives up on a live winner turns a slow save into a stopped session.
+ * Three minutes is six times the worst hold measured. It costs nothing in
+ * the ordinary case, where the lock is free on the first attempt, and it
+ * does not weaken the fence: a holder that DIED is still reclaimed within a
+ * quarter of a second by the staleness check, which reads the pid rather
+ * than waiting for any deadline at all.
+ */
+const LOCK_WAIT_SECONDS = 180;
+
 export function acquireLockWithTimeout(
   sessionsDir: string,
   workerId?: string,
-  timeoutSeconds = 30,
+  timeoutSeconds = LOCK_WAIT_SECONDS,
 ): string {
   const deadline = Date.now() + timeoutSeconds * 1000;
   for (;;) {

@@ -7,14 +7,11 @@
 // tests that use the network use LOOPBACK only -- because what they assert
 // is what Node itself throws, which a hand-built error cannot prove.
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
 import { createServer, type AddressInfo } from "node:net";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { PROVENANCE_HAND_EDITED } from "../src/lockfile.ts";
 import {
-  ENUMERATE_COMMAND,
   ENUMERATION_ERRORS,
   ERROR_HTTP_STATUS,
   ERROR_NETWORK,
@@ -22,35 +19,48 @@ import {
   ERROR_PARSE,
   ERROR_TIMEOUT,
   ERROR_UNKNOWN,
-  RECORD_API,
-  RECORD_SEAT,
-  apiRecordAge,
+  CATALOG_REFRESH_COMMAND,
+  RECORD_CATALOG,
   checkFreshness,
-  computeDrift,
   driftBetween,
-  dumpsRecord,
-  emptyRecord,
   enumerateProvider,
   freshnessMessage,
   freshnessWarnings,
   inFlightSessions,
   isStale,
-  loadRecord,
-  mergeRecord,
-  recordProvenance,
   refreshStaleRecords,
-  retiredModels,
   roleNames,
-  writeRecord,
-  type ApiModelEntry,
   type FreshnessRow,
   type HttpGet,
-  type ModelRecord,
-  type ProviderResult,
 } from "../src/discovery.ts";
+import {
+  CATALOG_FILENAME,
+  SOURCE_API,
+  SOURCE_SEAT,
+  TRANSPORT_API,
+  TRANSPORT_SEAT,
+  readCatalog,
+  setCatalogPath,
+  writeBlock,
+  type TransportBlock,
+} from "../src/catalog.ts";
 import { HttpStatusError, HttpTimeoutError } from "../src/transports/api.ts";
-import { loadCatalog, seatModel, type SeatEnumeration } from "../src/transports/copilot.ts";
-import { seed, tempDir } from "./support/answers.ts";
+import { seatModel, type SeatEnumeration } from "../src/transports/copilot.ts";
+import { tempDir } from "./support/answers.ts";
+
+/**
+ * What a block holds on disk, whatever scope it was written for.
+ *
+ * The framework has no such reader, deliberately -- a consumer may only
+ * believe a block recorded for this machine. These tests are asking a
+ * different question: what did the writer put there.
+ */
+function writtenBlock(
+  catalog: ReturnType<typeof readCatalog>,
+  transport: string,
+): TransportBlock | null {
+  return catalog?.transports[transport] ?? null;
+}
 
 const KEYS = ["TEST_ANTHROPIC_KEY", "TEST_GOOGLE_KEY", "TEST_OPENAI_KEY"];
 const clearKeys = (): void => {
@@ -63,40 +73,6 @@ const NOW = Date.UTC(2026, 7, 27, 12, 0, 0);
 
 function stamp(hoursAgo: number): string {
   return new Date(NOW - hoursAgo * 3_600_000).toISOString().replace(/\.\d+Z$/, "Z");
-}
-
-function entry(fields: Partial<ApiModelEntry> & { id: string; provider: string }): ApiModelEntry {
-  return {
-    provider_source: "vendor-enumeration",
-    display_name: null,
-    created_at: null,
-    max_context_tokens: null,
-    max_output_tokens: null,
-    capabilities: [],
-    enumerated_at: null,
-    retired_at: null,
-    raw: {},
-    ...fields,
-  };
-}
-
-/** Every modelled field, and none of the unmodelled remainder. */
-function withoutRaw(recordValue: ModelRecord): unknown {
-  const strip = (value: object): unknown =>
-    Object.fromEntries(Object.entries(value).filter(([key]) => key !== "raw"));
-  return {
-    meta: strip(recordValue.meta),
-    providers: recordValue.providers.map(strip),
-    models: recordValue.models.map(strip),
-  };
-}
-
-function answered(provider: string, entries: ApiModelEntry[] = []): ProviderResult {
-  return { provider, entries, error: null };
-}
-
-function failed(provider: string, error: string): ProviderResult {
-  return { provider, entries: [], error };
 }
 
 function providerConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -294,233 +270,13 @@ describe("reading a vendor's models endpoint", () => {
   });
 });
 
-// --- Unknown is never unsupported --------------------------------------------
-
-describe("a field a vendor stops reporting", () => {
-  it("keeps its last known value rather than being blanked", () => {
-    const known = mergeRecord(emptyRecord(), [
-      answered("google", [
-        entry({
-          id: "gemini-x",
-          provider: "google",
-          max_context_tokens: 1000,
-          capabilities: ["generateContent"],
-        }),
-      ]),
-    ]);
-    const quiet = mergeRecord(known, [
-      answered("google", [entry({ id: "gemini-x", provider: "google" })]),
-    ]);
-
-    assert.equal(quiet.models[0]!.max_context_tokens, 1000);
-    assert.deepEqual(quiet.models[0]!.capabilities, ["generateContent"]);
-  });
-
-  it("is written by omission, because a placeholder would read as a measurement", () => {
-    const path = join(tempDir("record-"), "api-models.lock");
-    writeRecord(
-      path,
-      mergeRecord(emptyRecord(), [
-        answered("anthropic", [entry({ id: "claude-x", provider: "anthropic" })]),
-      ]),
-    );
-    const text = readFileSync(path, "utf8");
-
-    assert.ok(!text.includes("max_context_tokens"));
-    assert.ok(!text.includes("capabilities"));
-    assert.equal(loadRecord(path).models[0]!.max_context_tokens, null);
-  });
-
-  it("does not empty a provider whose attempt failed", () => {
-    const known = mergeRecord(emptyRecord(), [
-      answered("openai", [entry({ id: "gpt-x", provider: "openai" })]),
-    ]);
-    const after = mergeRecord(known, [failed("openai", "TimeoutError")]);
-
-    assert.deepEqual(
-      after.models.map((model) => model.id),
-      ["gpt-x"],
-    );
-    assert.equal(after.providers.find((row) => row.name === "openai")!.last_error, "TimeoutError");
-  });
-
-  it("marks a model the answering vendor no longer returns, and keeps it", () => {
-    // Marked, never deleted: a deletion is indistinguishable from a model
-    // that was never there, and one bad enumeration could take the only
-    // verifier a role had. The entry stays, says when it was last seen and
-    // when it went, stops being offered, and shows up as drift.
-    const known = mergeRecord(
-      emptyRecord(),
-      [
-        answered("openai", [
-          entry({ id: "gpt-old", provider: "openai" }),
-          entry({ id: "gpt-new", provider: "openai" }),
-        ]),
-      ],
-      stamp(100),
-    );
-    const after = mergeRecord(
-      known,
-      [answered("openai", [entry({ id: "gpt-new", provider: "openai" })])],
-      stamp(1),
-    );
-
-    const old = after.models.find((model) => model.id === "gpt-old")!;
-    assert.equal(old.retired_at, stamp(1));
-    assert.equal(old.enumerated_at, stamp(100));
-    assert.equal(after.models.find((model) => model.id === "gpt-new")?.retired_at, null);
-
-    // A model that comes back has the mark cleared rather than a second
-    // entry written.
-    const back = mergeRecord(
-      after,
-      [
-        answered("openai", [
-          entry({ id: "gpt-old", provider: "openai" }),
-          entry({ id: "gpt-new", provider: "openai" }),
-        ]),
-      ],
-      stamp(0),
-    );
-    assert.equal(back.models.filter((model) => model.id === "gpt-old").length, 1);
-    assert.equal(back.models.find((model) => model.id === "gpt-old")?.retired_at, null);
-  });
-
-  it("keeps a retired entry out of what the records are known to carry", () => {
-    // The one reading both the drift diff and the pane's offer go through:
-    // the file still has the model, and the record no longer vouches for it.
-    const directory = tempDir("retired-");
-    const settings = providerConfig({
-      discovery: { record: join(directory, "api-models.lock") },
-    });
-    const record = mergeRecord(
-      mergeRecord(
-        emptyRecord(),
-        [answered("openai", [entry({ id: "gpt-old", provider: "openai" }), entry({ id: "gpt-new", provider: "openai" })])],
-        stamp(100),
-      ),
-      [answered("openai", [entry({ id: "gpt-new", provider: "openai" })])],
-      stamp(1),
-    );
-    writeRecord(join(directory, "api-models.lock"), record);
-
-    const retired = retiredModels(settings);
-    assert.deepEqual([...retired.keys()], ["gpt-old"]);
-    assert.equal(retired.get("gpt-old")?.lastSeenAt, stamp(100));
-    // A role still naming it is drift, which is where a withdrawn model is
-    // supposed to become visible.
-    assert.deepEqual(
-      computeDrift({ ...settings, roles: { verifier: { prefer: ["gpt-old"] } } }, NOW).unavailable,
-      [["gpt-old", "verifier"]],
-    );
-  });
-
-  it("retires nothing from a record it cannot read", () => {
-    const directory = tempDir("retired-");
-    writeFileSync(join(directory, "api-models.lock"), "not toml at all\n", "utf8");
-    assert.deepEqual(
-      [
-        ...retiredModels(
-          providerConfig({ discovery: { record: join(directory, "api-models.lock") } }),
-        ).keys(),
-      ],
-      [],
-    );
-  });
-});
-
-// --- The record --------------------------------------------------------------
-
-describe("the record and its writer", () => {
-  it("round-trips through the writer, byte for byte", () => {
-    const path = join(tempDir("record-"), "api-models.lock");
-    const written = writeRecord(
-      path,
-      mergeRecord(emptyRecord("keys-a"), [
-        answered("anthropic", [entry({ id: "claude-x", provider: "anthropic", display_name: "X" })]),
-        // A vendor that answered and listed nothing: zero is a measurement,
-        // and must not read back as never-enumerated.
-        answered("google"),
-      ]),
-    );
-
-    // `raw` is the unmodelled remainder a reader picked up and a writer must
-    // not drop; the claim about it is byte-identity of the rendered text,
-    // which is the second assertion.
-    assert.deepEqual(withoutRaw(loadRecord(path)), withoutRaw(written));
-    assert.equal(dumpsRecord(loadRecord(path)), readFileSync(path, "utf8"));
-  });
-
-  it("reports an edit made after the write as hand-edited", () => {
-    const path = join(tempDir("record-"), "api-models.lock");
-    writeRecord(
-      path,
-      mergeRecord(emptyRecord(), [
-        answered("anthropic", [entry({ id: "claude-x", provider: "anthropic" })]),
-      ]),
-    );
-    writeFileSync(path, readFileSync(path, "utf8").replace("claude-x", "claude-y"), "utf8");
-
-    assert.equal(recordProvenance(loadRecord(path)), PROVENANCE_HAND_EDITED);
-  });
-
-  it("creates the record's home on the first write", () => {
-    // The default lives under `.dabbler/`, which does not exist on a fresh
-    // checkout; the sanctioned writer is the only way to make the record, so
-    // it has to be able to make it the first time.
-    const path = join(tempDir("record-"), ".dabbler", "api-models.lock");
-    writeRecord(path, emptyRecord());
-    assert.equal(loadRecord(path).meta.key_set_id, "default");
-  });
-});
-
-// --- Freshness ---------------------------------------------------------------
-
-const PROVIDERS = ["anthropic", "google", "openai"];
-
-function aged(hours: number, providers: readonly string[] = PROVIDERS): ModelRecord {
-  return mergeRecord(
-    emptyRecord(),
-    providers.map((name) => answered(name)),
-    stamp(hours),
-  );
-}
-
-describe("how old a record's evidence is", () => {
-  it("takes the record's age from its stalest enabled vendor", () => {
-    // Three endpoints this project does not control: one key expiring while
-    // the others answer is an operational path, not an edge case, and
-    // `meta.enumerated_at` advances whenever ANY vendor answers.
-    const record = mergeRecord(aged(100), [answered("anthropic"), answered("google")], stamp(1));
-    assert.equal(apiRecordAge(record, PROVIDERS).datedAt, stamp(100));
-  });
-
-  it("names a vendor the record has never carried", () => {
-    const age = apiRecordAge(aged(1, ["anthropic", "openai"]), PROVIDERS);
-    assert.match(age.notes.join(" "), /google has never been enumerated/);
-  });
-
-  it("says an entry is older than its date when the last attempt failed", () => {
-    const record = mergeRecord(aged(1), [failed("openai", ERROR_TIMEOUT)], stamp(1));
-    assert.match(apiRecordAge(record, PROVIDERS).notes.join(" "), /last attempt failed/);
-  });
-
-  it("falls back to the record-level date when no vendor is enumerable", () => {
-    // With no enumerable provider configured there is no per-vendor evidence
-    // to be conservative about.
-    const age = apiRecordAge(aged(5), []);
-    assert.equal(age.datedAt, stamp(5));
-    assert.deepEqual(age.notes, []);
-  });
-});
-
 describe("judging a freshness row", () => {
   function row(overrides: Partial<FreshnessRow> = {}): FreshnessRow {
     return {
-      record: RECORD_API,
+      record: RECORD_CATALOG,
       path: "/repo/.dabbler/api-models.lock",
       threshold_hours: 24,
-      command: ENUMERATE_COMMAND,
+      command: CATALOG_REFRESH_COMMAND,
       present: true,
       dated_at: stamp(2),
       age_hours: 2,
@@ -543,7 +299,7 @@ describe("judging a freshness row", () => {
     // A bare "run this" repeated at every session start is what an operator
     // learns to scroll past.
     const message = freshnessMessage(row({ present: false }));
-    assert.match(message, new RegExp(ENUMERATE_COMMAND));
+    assert.match(message, new RegExp(CATALOG_REFRESH_COMMAND));
     assert.match(message, /drift/);
     assert.match(message, /Nothing is blocked/);
   });
@@ -558,75 +314,92 @@ describe("judging a freshness row", () => {
   });
 });
 
-describe("dating both records together", () => {
-  function config(directory: string, discovery: Record<string, unknown> = {}): Record<string, unknown> {
-    return providerConfig({
-      discovery: { record: join(directory, "api-models.lock"), ...discovery },
-    });
+describe("how old this machine's reading is", () => {
+  /** A catalog under the suite's temp root holding exactly these blocks. */
+  function catalogOf(blocks: Record<string, string>): void {
+    const path = join(tempDir("fresh-"), CATALOG_FILENAME);
+    setCatalogPath(path);
+    for (const [transport, refreshedAt] of Object.entries(blocks)) {
+      writeBlock(
+        transport,
+        {
+          refreshed_at: refreshedAt,
+          source: transport === TRANSPORT_SEAT ? SOURCE_SEAT : SOURCE_API,
+          scope: {},
+          models: [],
+          retired: [],
+        },
+        { path },
+      );
+    }
   }
 
-  it("calls an absent record stale and names the invocation that fixes it", () => {
-    const rows = checkFreshness(config(tempDir("fresh-")), NOW);
-    const api = rows.find((entry) => entry.record === RECORD_API)!;
-    assert.equal(api.present, false);
-    assert.equal(isStale(api), true);
+  it("is one row, whichever transports this machine has", () => {
+    // Three rows, and each was named for its implementation: `seat-catalog`
+    // and `seat-list` were two dates on one file, and `api-enumeration` was
+    // a file that never exists without provider keys -- so a seat-only
+    // laptop read one row permanently stale about a record it was never
+    // going to have. One catalog, one row.
+    setCatalogPath(join(tempDir("fresh-"), CATALOG_FILENAME));
+    const unread = checkFreshness(providerConfig(), NOW);
+    assert.deepEqual(unread.map((entry) => entry.record), [RECORD_CATALOG]);
+    assert.equal(unread[0]?.present, false);
+    assert.equal(isStale(unread[0]!), true);
+    assert.match(freshnessMessage(unread[0]!), new RegExp(CATALOG_REFRESH_COMMAND));
+
+    // A seat and no keys: one row, current, dated by the one block there
+    // is -- and no second row reporting on a transport this machine has not
+    // got and is never going to read.
+    catalogOf({ [TRANSPORT_SEAT]: stamp(1) });
+    const seatOnly = checkFreshness(providerConfig(), NOW);
+    assert.equal(seatOnly.length, 1);
+    assert.equal(isStale(seatOnly[0]!), false);
+    assert.equal(seatOnly[0]?.dated_at, stamp(1));
+
+    // Both, and the row ages against the older of them: a machine is only
+    // as current as the transport it has not re-read.
+    catalogOf({ [TRANSPORT_SEAT]: stamp(1), [TRANSPORT_API]: stamp(100) });
+    const both = checkFreshness(providerConfig(), NOW);
+    assert.equal(both.length, 1);
+    assert.equal(both[0]?.dated_at, stamp(100));
+    assert.equal(isStale(both[0]!), true);
   });
 
-  it("keeps a record that was never made out of the per-session warnings", () => {
-    // A record that exists and has aged is one command from current and is
-    // worth saying every time; one that was never made is a repository that
-    // has not run discovery, and saying so at every session start for the
-    // life of the repository is a warning nothing ever answers. `bootstrap`
-    // says that one, once, where a project is set up.
-    const settings = config(tempDir("fresh-"));
-    assert.ok(freshnessWarnings(settings, NOW, true).length > 0);
-    assert.deepEqual(freshnessWarnings(settings, NOW, false), []);
-  });
-
-  it("ages each record against its own threshold", () => {
-    // The seat is not on the API's clock: a probe costs premium requests, so
-    // the same age that is stale for a free metadata call is not.
-    const directory = tempDir("fresh-");
-    const settings = config(directory, { max_age_hours: 24, seat_max_age_hours: 720 });
-    writeRecord(join(directory, "api-models.lock"), aged(100));
-    seed(directory, {
-      "copilot-catalog.lock": `[meta]\ncli_version = "x"\nseat_id = "s"\nprobed_at = "${stamp(100)}"\n`,
-    });
-    settings["_config_path"] = join(directory, "router-config.yaml");
-    settings["transports"] = { "copilot-cli": { lockfile: "copilot-catalog.lock" } };
-
-    const rows = checkFreshness(settings, NOW);
-    assert.equal(isStale(rows.find((row) => row.record === RECORD_API)!), true);
-    assert.equal(isStale(rows.find((row) => row.record === RECORD_SEAT)!), false);
+  it("keeps a catalog that was never read out of the per-session warnings", () => {
+    // One that exists and has aged is one free command from current and is
+    // worth saying every time; one that was never read is a machine that has
+    // not run discovery, and saying so at every session start forever is a
+    // warning nothing ever answers. `bootstrap` says that one, once.
+    setCatalogPath(join(tempDir("fresh-"), CATALOG_FILENAME));
+    assert.ok(freshnessWarnings(providerConfig(), NOW, true).length > 0);
+    assert.deepEqual(freshnessWarnings(providerConfig(), NOW, false), []);
   });
 });
 
-describe("the record a session start brings up to date", () => {
-  /** A config whose API record and seat catalog are both in `directory`. */
-  function config(directory: string): Record<string, unknown> {
-    const settings = providerConfig({
-      discovery: { record: join(directory, "api-models.lock"), max_age_hours: 24 },
-    });
-    settings["_config_path"] = join(directory, "router-config.yaml");
-    settings["transports"] = { "copilot-cli": { lockfile: "copilot-catalog.lock" } };
-    return settings;
-  }
+describe("the catalog a session start brings up to date", () => {
+  /** The api scope the three test keys produce, and one seat to be on. */
+  const SCOPE = { providers: ["anthropic", "google", "openai"] };
+  const SEAT = { host: "https://github.com", login: "someone" };
+  const SEAT_SCOPE = { seat_host: SEAT.host, seat_login: SEAT.login };
 
-  /**
-   * The seat catalog: two dates in one file, on two clocks.
-   *
-   * `probed` is when a model last answered, which is a billed turn each and
-   * is never refreshed here. `listed` is when the seat last stated what it
-   * has, which is free -- and is the half this path brings up to date.
-   */
-  function seatCatalog(directory: string, probed: number, listed = 0): string {
-    const path = join(directory, "copilot-catalog.lock");
-    seed(directory, {
-      "copilot-catalog.lock":
-        `[meta]\ncli_version = "x"\nseat_id = "s"\n` +
-        `probed_at = "${stamp(probed)}"\nenumerated_at = "${stamp(listed)}"\n` +
-        'enumeration_source = "acp-session-new"\n',
-    });
+  /** A catalog under the suite's temp root, with the blocks a test wants. */
+  function catalogAt(blocks: Record<string, Partial<TransportBlock>>): string {
+    const path = join(tempDir("refresh-"), CATALOG_FILENAME);
+    for (const [transport, block] of Object.entries(blocks)) {
+      writeBlock(
+        transport,
+        {
+          refreshed_at: stamp(1),
+          source: transport === TRANSPORT_SEAT ? SOURCE_SEAT : SOURCE_API,
+          scope: {},
+          models: [],
+          retired: [],
+          ...block,
+        },
+        { path },
+      );
+    }
+    setCatalogPath(path);
     return path;
   }
 
@@ -643,23 +416,21 @@ describe("the record a session start brings up to date", () => {
         reasoning_efforts: [],
         cli_version: "x",
         read_at: stamp(0),
-        source: "acp-session-new",
+        source: SOURCE_SEAT,
         reason: null,
       });
   }
 
   /** A seat nothing may reach: this path must not open one. */
   const noSeat = (): Promise<SeatEnumeration> => {
-    assert.fail("the seat was read for a record that is not stale");
+    assert.fail("the seat was read for a block that is not stale");
   };
 
-  it("re-reads both free records before the work, and nothing that costs", async () => {
-    const directory = tempDir("refresh-");
-    const recordPath = join(directory, "api-models.lock");
-    writeRecord(recordPath, aged(100));
-    // The confirmations are a decade old and the list a week: only the free
-    // half moves, whatever the priced half's age.
-    const seatPath = seatCatalog(directory, 10_000, 168);
+  it("re-reads both transports before the work, and nothing that costs", async () => {
+    const path = catalogAt({
+      [TRANSPORT_API]: { refreshed_at: stamp(100) },
+      [TRANSPORT_SEAT]: { refreshed_at: stamp(168) },
+    });
     for (const name of KEYS) process.env[name] = "k";
     const vendor = new RecordingGet(
       { data: [{ id: "claude-new" }] },
@@ -667,77 +438,151 @@ describe("the record a session start brings up to date", () => {
       { data: [{ id: "gpt-new" }] },
     );
 
-    const lines = await refreshStaleRecords(config(directory), {
+    const lines = await refreshStaleRecords(providerConfig(), {
       now: NOW,
       get: vendor.get,
       enumerateSeat: seatSays("gpt-seat", "claude-seat"),
     });
 
-    // One free metadata call per enabled vendor, and the record now says so.
+    // One free metadata call per enabled vendor, and the catalog says so.
     assert.equal(vendor.calls.length, 3);
-    assert.match(lines.join("\n"), /re-read before this session's work/);
+    assert.match(lines.join("\n"), /the seat block has been re-read/);
+    assert.match(lines.join("\n"), /the api block has been re-read/);
     assert.match(lines.join("\n"), /no tokens billed/);
+    assert.match(lines.join("\n"), /no prompt sent/);
+
+    const catalog = readCatalog(path);
     assert.deepEqual(
-      loadRecord(recordPath).models.map((model) => model.id).sort(),
+      writtenBlock(catalog, TRANSPORT_API)?.models.map((model) => model.id).sort(),
       ["claude-new", "gemini-new", "gpt-new"],
     );
-    // The seat's list is the seat's own statement, recorded free.
-    assert.match(lines.join("\n"), /no prompt sent/);
-    const catalog = loadCatalog(seatPath);
-    assert.deepEqual([...catalog.meta.candidate_universe], ["gpt-seat", "claude-seat"]);
-    // And the priced half is untouched: not one confirmation was bought. The
-    // free half now carries the seat's own word for what it will dispatch,
-    // which is `listed` -- a reading, never a confirmation.
-    assert.equal(catalog.meta.probed_at, stamp(10_000));
-    assert.deepEqual(catalog.models.map((model) => model.enablement), [
-      "listed",
-      "listed",
-    ]);
+    // The seat's list is the seat's own statement, recorded free, with the
+    // cost it stated and no figure anybody bought.
+    assert.deepEqual(
+      writtenBlock(catalog, TRANSPORT_SEAT)?.models.map((model) => [model.id, model.cost?.stated_as]),
+      [
+        ["gpt-seat", "1x"],
+        ["claude-seat", "1x"],
+      ],
+    );
   });
 
-  it("reads nothing at all against records that are current", async () => {
-    const directory = tempDir("refresh-");
-    writeRecord(join(directory, "api-models.lock"), aged(1));
-    seatCatalog(directory, 10_000, 1);
+  it("runs once on the first session of a day, and not again that day", async () => {
+    // The operator's own cadence, and a day rather than an age: an age lands
+    // the refresh at a different hour every day -- twenty-five hours after
+    // the last, then fifty -- while the question a developer has is whether
+    // this is today's reading.
     for (const name of KEYS) process.env[name] = "k";
-    const vendor = new RecordingGet();
+    // A local noon, so "an hour ago" and "yesterday evening" are the same
+    // two days whatever zone this suite runs in.
+    const noon = new Date(2026, 7, 27, 12, 0, 0).getTime();
+    const at = (hoursAgo: number): string =>
+      new Date(noon - hoursAgo * 3_600_000).toISOString().replace(/\.\d+Z$/, "Z");
 
+    catalogAt({
+      [TRANSPORT_API]: { refreshed_at: at(1), scope: SCOPE },
+      [TRANSPORT_SEAT]: { refreshed_at: at(1), scope: SEAT_SCOPE },
+    });
+    const quiet = new RecordingGet();
     assert.deepEqual(
-      await refreshStaleRecords(config(directory), {
-        now: NOW,
+      await refreshStaleRecords(providerConfig(), {
+        now: noon,
+        get: quiet.get,
+        enumerateSeat: noSeat,
+        identity: SEAT,
+      }),
+      [],
+    );
+    assert.equal(quiet.calls.length, 0);
+
+    // Yesterday evening: thirteen hours, an age a 24-hour threshold would
+    // still call fresh. It is a different day, so the first session of this
+    // one re-reads.
+    catalogAt({
+      [TRANSPORT_API]: { refreshed_at: at(13), scope: SCOPE },
+      [TRANSPORT_SEAT]: { refreshed_at: at(13), scope: SEAT_SCOPE },
+    });
+    const today = new RecordingGet({ data: [] }, { models: [] }, { data: [] });
+    assert.ok(
+      (
+        await refreshStaleRecords(providerConfig(), {
+          now: noon,
+          get: today.get,
+          enumerateSeat: seatSays("gpt-seat"),
+          identity: SEAT,
+        })
+      ).length > 0,
+    );
+    assert.equal(today.calls.length, 3);
+  });
+
+  it("does not reopen the seat all day for a transport this machine has not got", async () => {
+    // Round 1's nit, and it is a cadence defect: a seat-only machine has an
+    // `api` block scoped to keys it no longer holds, no refresh can replace
+    // it because no vendor answers, and asking "is that block current" at
+    // every session start reopened the seat every time. A transport with no
+    // credentials is not a reading that has gone stale; it is one this
+    // machine does not have, and the block it left behind is already not
+    // believed by anything.
+    for (const name of KEYS) delete process.env[name];
+    catalogAt({
+      [TRANSPORT_API]: { refreshed_at: stamp(400), scope: SCOPE },
+      [TRANSPORT_SEAT]: { refreshed_at: new Date().toISOString().replace(/\.\d+Z$/, "Z"), scope: SEAT_SCOPE },
+    });
+    const vendor = new RecordingGet();
+    assert.deepEqual(
+      await refreshStaleRecords(providerConfig(), {
         get: vendor.get,
         enumerateSeat: noSeat,
+        identity: SEAT,
       }),
       [],
     );
     assert.equal(vendor.calls.length, 0);
   });
 
-  it("leaves a record that was never made to bootstrap", async () => {
-    const directory = tempDir("refresh-");
-    seatCatalog(directory, 1, 1);
-    const vendor = new RecordingGet();
-    assert.deepEqual(
-      await refreshStaleRecords(config(directory), {
-        now: NOW,
-        get: vendor.get,
-        enumerateSeat: noSeat,
-      }),
-      [],
-    );
-    assert.equal(vendor.calls.length, 0);
+  it("re-reads a block recorded for another machine, whatever the date says", async () => {
+    // The one guard this file has already needed. A catalog that arrived
+    // from somebody else's seat -- a roamed profile, a re-login as another
+    // account -- is not a reading of THIS machine, and no date makes it one.
+    for (const name of KEYS) process.env[name] = "k";
+    catalogAt({
+      [TRANSPORT_SEAT]: { refreshed_at: stamp(1), scope: { seat_login: "op-personal" } },
+    });
+    const vendor = new RecordingGet({ data: [] }, { models: [] }, { data: [] });
+    const lines = await refreshStaleRecords(providerConfig(), {
+      now: NOW,
+      get: vendor.get,
+      enumerateSeat: seatSays("gpt-seat"),
+      identity: { host: "https://github.com", login: "someone-else" },
+    });
+    assert.match(lines.join("\n"), /the seat block has been re-read/);
   });
 
-  it("leaves each record standing when its source cannot be reached, and says which", async () => {
-    const directory = tempDir("refresh-");
-    const recordPath = join(directory, "api-models.lock");
-    writeRecord(recordPath, mergeRecord(emptyRecord(), [answered("anthropic", [entry({ id: "held", provider: "anthropic" })])], stamp(100)));
-    const seatPath = seatCatalog(directory, 1, 168);
-    const seatBefore = readFileSync(seatPath);
+  it("leaves each block standing when its source cannot be reached, and says which", async () => {
+    const path = catalogAt({
+      [TRANSPORT_API]: {
+        refreshed_at: stamp(100),
+        models: [
+          {
+            id: "held",
+            provider: "anthropic",
+            provider_source: "vendor-enumeration",
+            display_name: null,
+            enabled: true,
+            price_category: null,
+            cost: null,
+            listed_at: stamp(100),
+          },
+        ],
+      },
+      [TRANSPORT_SEAT]: { refreshed_at: stamp(168) },
+    });
+    const seatBefore = JSON.stringify(writtenBlock(readCatalog(path), TRANSPORT_SEAT));
     process.env["TEST_ANTHROPIC_KEY"] = "k";
     const exploding: HttpGet = () => Promise.reject(new HttpTimeoutError("too slow"));
 
-    const lines = await refreshStaleRecords(config(directory), {
+    const lines = await refreshStaleRecords(providerConfig(), {
       now: NOW,
       get: exploding,
       // A seat that could not be read is not a seat with no models.
@@ -750,20 +595,20 @@ describe("the record a session start brings up to date", () => {
           reasoning_efforts: [],
           cli_version: null,
           read_at: stamp(0),
-          source: "acp-session-new",
+          source: SOURCE_SEAT,
           reason: "'copilot' is not on PATH",
         }),
     });
 
     assert.match(lines.join("\n"), /could not be read/);
-    assert.match(lines.join("\n"), /what the record already held stands/);
     assert.match(lines.join("\n"), /not on PATH/);
-    assert.match(lines.join("\n"), /nothing was probed/);
+    assert.match(lines.join("\n"), /nothing was spent/);
+    // An outage at one end retires nothing at the other.
     assert.deepEqual(
-      loadRecord(recordPath).models.map((model) => model.id),
+      writtenBlock(readCatalog(path), TRANSPORT_API)?.models.map((model) => model.id),
       ["held"],
     );
-    assert.deepEqual(readFileSync(seatPath), seatBefore);
+    assert.equal(JSON.stringify(writtenBlock(readCatalog(path), TRANSPORT_SEAT)), seatBefore);
   });
 });
 
@@ -773,8 +618,8 @@ describe("the record-against-roles diff", () => {
   it("reports both directions", () => {
     const roles = roleNames({ roles: { verifier: { prefer: ["gpt-ranked", "gpt-gone"] } } });
     const known = new Map([
-      ["gpt-ranked", [RECORD_API]],
-      ["gpt-unranked", [RECORD_API]],
+      ["gpt-ranked", [TRANSPORT_API]],
+      ["gpt-unranked", [TRANSPORT_API]],
     ]);
     const drift = driftBetween(roles, known, []);
     assert.deepEqual(
@@ -794,9 +639,9 @@ describe("the record-against-roles diff", () => {
     const roles = roleNames({
       roles: { verifier: { prefer: ["gone"] }, generator: { prefer: ["gone"] } },
     });
-    const known = new Map([["seat-only", [RECORD_SEAT, RECORD_API, RECORD_SEAT]]]);
+    const known = new Map([["seat-only", [TRANSPORT_SEAT, TRANSPORT_API, TRANSPORT_SEAT]]]);
     const drift = driftBetween(roles, known, []);
-    assert.deepEqual(drift.unnamed, [["seat-only", "api-enumeration,seat-catalog"]]);
+    assert.deepEqual(drift.unnamed, [["seat-only", "api,copilot-cli"]]);
     assert.deepEqual(drift.unavailable, [["gone", "generator,verifier"]]);
   });
 });

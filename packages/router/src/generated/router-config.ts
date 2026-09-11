@@ -66,7 +66,6 @@ export type RouterConfig = {
     };
     "copilot-cli"?: {
       binary?: string;
-      lockfile?: string;
       billed_usage_unavailable?: boolean;
       max_invocations_per_session?: number;
       timeouts?: {
@@ -121,9 +120,7 @@ export type RouterConfig = {
   };
   discovery?: {
     key_set_id?: string;
-    record?: string;
     max_age_hours?: number;
-    seat_max_age_hours?: number;
   };
   /**
    * How far `dabbler session drive` may go. Declared in the repository's dabbler.yaml (it is a repository-owned block) and read here after the merge.

@@ -52,6 +52,7 @@ import { openModule } from "./commands/openModule";
 import { endGrant } from "./commands/moduleGrant";
 import {
   refreshRecord,
+  viewRecord,
   setEngine,
   setRoleModel,
   setTransport,
@@ -380,12 +381,15 @@ export function activate(context: vscode.ExtensionContext): void {
         () => solutionProvider.refresh(),
       ),
     ),
-    // The one thing in the Configuration section that reaches a vendor. It
-    // asks first, with the cost in the question, and runs in a terminal
-    // rather than in-process: the operator is paying for it, so they watch
-    // it happen.
+    // The one thing in the Configuration section that reaches a vendor or a
+    // seat. It asks first, with the cost in the question -- which is nothing
+    // -- and runs in a terminal rather than in-process, because it is work an
+    // operator should watch happen.
     vscode.commands.registerCommand("dabblerSolution.refreshRecord", (node?: SolutionNode) =>
       refreshRecord({ node, projection: solutionProvider.currentProjection() }),
+    ),
+    vscode.commands.registerCommand("dabblerSolution.viewRecord", (node?: SolutionNode) =>
+      viewRecord({ node, projection: solutionProvider.currentProjection() }),
     ),
     vscode.commands.registerCommand("dabblerSolution.setRoleModel", (node?: SolutionNode) =>
       setRoleModel(

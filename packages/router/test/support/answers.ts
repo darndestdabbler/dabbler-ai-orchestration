@@ -147,7 +147,7 @@ export function makeConfig(overrides: Record<string, unknown> = {}): Record<stri
       triggers: { empty_response: true, max_tokens_hit: true, min_output_tokens: 30, refusal_detection: true },
       refusal_phrases: ["i can't help with", "i'm unable to"],
     },
-    transports: { "copilot-cli": { lockfile: "copilot-catalog.lock" } },
+    transports: { "copilot-cli": { binary: "copilot" } },
     metrics: { enabled: true },
     ...overrides,
   };

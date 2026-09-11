@@ -50,7 +50,6 @@ const SENSITIVE_PREFIXES: readonly string[] = [".dabbler/", "packages/router/sch
 const SENSITIVE_BASENAMES: ReadonlySet<string> = new Set([
   "router-config.yaml",
   "local-overrides.yaml",
-  "copilot-catalog.lock",
   "session-state.json",
 ]);
 const DEPENDENCY_BASENAMES: ReadonlySet<string> = new Set([

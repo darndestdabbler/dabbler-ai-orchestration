@@ -39,15 +39,30 @@ import {
   type DispatchOutcome,
 } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import {
-  CopilotCliTransport,
-  catalogMeta,
-  modelEntry,
-  type Catalog,
-} from "../src/transports/copilot.ts";
+import { CopilotCliTransport } from "../src/transports/copilot.ts";
+import { type CatalogModel } from "../src/catalog.ts";
 import { setHttpSource } from "../src/transports/api.ts";
 import type { APIResult } from "../src/transports/base.ts";
 import { gitAnswers, makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
+
+/** A catalog entry, as the seat's own free reading records one. */
+function seatEntry(
+  id: string,
+  provider: string,
+  overrides: Partial<CatalogModel> = {},
+): CatalogModel {
+  return {
+    id,
+    provider,
+    provider_source: "name-prefix-heuristic",
+    display_name: id,
+    enabled: true,
+    price_category: null,
+    cost: null,
+    listed_at: "2026-09-11T00:00:00Z",
+    ...overrides,
+  };
+}
 
 const KEYS = ["TEST_ANTHROPIC_KEY", "TEST_GOOGLE_KEY", "TEST_OPENAI_KEY"];
 
@@ -200,18 +215,16 @@ describe("the ladder a call may take", () => {
 });
 
 describe("the seat's ladder", () => {
-  const CATALOG: Catalog = {
-    meta: catalogMeta({ cli_version: "v", seat_id: "t" }),
-    models: [
-      modelEntry({ id: "claude-x", provider: "anthropic", enablement: "confirmed" }),
-      modelEntry({ id: "gpt-x", provider: "openai", enablement: "confirmed" }),
-      modelEntry({ id: "unconfirmed-x", provider: "google", enablement: "unconfirmed" }),
-    ],
-  };
+  const CATALOG: readonly CatalogModel[] = [
+    seatEntry("claude-x", "anthropic"),
+    seatEntry("gpt-x", "openai"),
+    seatEntry("withheld-x", "google", { enabled: false }),
+  ];
 
-  it("draws only on confirmed entries", () => {
-    // An unconfirmed entry is a claim nobody probed; dispatching to one
-    // would make the catalog's confirmation meaningless.
+  it("draws only on what the seat says it will dispatch", () => {
+    // The seat's word is taken as readily when it withholds a model as when
+    // it offers one, and dispatching to one it withheld would make its own
+    // statement mean nothing.
     assert.deepEqual(
       seatLadder(makeConfig(), CATALOG, "generator", []).map((entry) => entry.alias),
       ["claude-x", "gpt-x"],
@@ -225,7 +238,7 @@ describe("the seat's ladder", () => {
     );
   });
 
-  it("fails closed when the exclusion leaves no confirmed entry", () => {
+  it("fails closed when the exclusion leaves no entry", () => {
     assert.throws(
       () => seatLadder(makeConfig(), CATALOG, "generator", ["anthropic", "openai", "google"]),
       NoCandidateError,
@@ -725,13 +738,7 @@ describe("dispatching over the seat", () => {
           wait: () => Promise.resolve(0),
         }),
       }),
-      {
-        meta: catalogMeta({ cli_version: "v", seat_id: "t" }),
-        models: [
-          modelEntry({ id: "claude-x", provider: "anthropic", enablement: "confirmed" }),
-          modelEntry({ id: "gpt-x", provider: "openai", enablement: "confirmed" }),
-        ],
-      },
+      [seatEntry("claude-x", "anthropic"), seatEntry("gpt-x", "openai")],
     );
   }
 
@@ -756,7 +763,7 @@ describe("dispatching over the seat", () => {
     await assert.rejects(() => route("x", { transport: "copilot-cli" }), /generic-unknown/);
   });
 
-  it("stops on an unreadable catalog instead of falling back to the API", async () => {
+  it("stops on a catalog this machine has not read instead of falling back to the API", async () => {
     // The alternative that looks harmless is the worst option available: it
     // would put a cross-provider verification on the provider the operator
     // was routing away from, and nothing downstream could tell. The message
@@ -765,7 +772,7 @@ describe("dispatching over the seat", () => {
     configOnDisk();
     await assert.rejects(
       () => route("say hi", { transport: "copilot-cli" }),
-      /could not be loaded/,
+      /catalog holds nothing for it/,
     );
   });
 });

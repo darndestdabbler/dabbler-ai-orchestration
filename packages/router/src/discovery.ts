@@ -8,20 +8,19 @@
 // **Enumeration is free on every surface** -- a metadata request here, a
 // protocol reply on the seat, and neither bills a token. That is the whole
 // reason the default cadence is 24 hours: freshness costs nothing, so the
-// knob is a preference rather than a budget control. What the seat keeps a
-// month-long clock for is the other half of its record, CONFIRMING that a
-// model answers, which is a real turn and is billed like one.
+// knob is a preference rather than a budget control. Nothing in this path
+// can dispatch to a model, at any age, which is what makes "is a refresh
+// expensive" a question nobody has to answer again.
 //
 // Three rules shape everything below.
 //
-// **A field a vendor stops reporting degrades to unknown, never to
-// unsupported.** Vendors report unequally already -- one returns token
-// limits and generation methods, another a display name and a creation date,
-// a third little beyond an identifier -- and a hard capability filter would
-// disqualify every model from the quietest vendor and end cross-vendor
-// verification by accident. Unknown is written by omission, a fresh unknown
-// never overwrites a known value, and nothing here filters a candidate on
-// metadata.
+// **A field a vendor does not report is unknown, never unsupported.**
+// Vendors report unequally -- one returns token limits and generation
+// methods, another a display name, a third little beyond an identifier -- and
+// a hard capability filter would disqualify every model from the quietest
+// vendor and end cross-vendor verification by accident. The catalog records
+// what a source stated and nothing else, and nothing here filters a
+// candidate on metadata.
 //
 // **The framework reports the gap between the record and the roles; it does
 // not close it silently.** Enumeration keeps the record fresh on its own,
@@ -37,43 +36,44 @@
 // verifies correctly, and turning a maintenance signal into an outage is how
 // maintenance signals get suppressed.
 
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join, resolve as resolvePath } from "node:path";
+import { readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 
-import { parse as parseToml } from "smol-toml";
-
-import { projectRoot, truthy, type RouterConfig } from "./config.ts";
-import { STATE_FILENAME, resolveSessionsDir } from "./evidence.ts";
 import {
-  digestText,
-  provenance,
-  renderDocument,
-  setOrDrop,
-  utcNow,
-  writeDocument,
-  writerId,
-  type LockTable,
-} from "./lockfile.ts";
+  SOURCE_API,
+  TRANSPORT_API,
+  TRANSPORT_SEAT,
+  blockFor,
+  catalogNow,
+  catalogPresent,
+  currentCatalogPath,
+  foldListing,
+  readCatalog,
+  writeBlock,
+  type CatalogModel,
+  type CatalogScope,
+  type TransportBlock,
+} from "./catalog.ts";
+import { truthy, type RouterConfig } from "./config.ts";
+import { STATE_FILENAME, resolveSessionsDir } from "./evidence.ts";
 import {
   HttpStatusError,
   HttpTimeoutError,
   httpGetJson,
 } from "./transports/api.ts";
 import { resolveSecret } from "./secretResolver.ts";
-import { workingDirectory } from "./workdir.ts";
 import {
   PLATFORM_AI_CREDITS,
   SEAT_COST_COMMAND,
   costUnit,
 } from "./seatCost.ts";
 import {
-  adoptSeatEnumeration,
-  confirmedModels,
   enumerateSeatModels,
-  loadCatalog,
-  resolveLockfilePath,
-  writeCatalog,
+  readSeatIdentity,
+  recordSeatEnumeration,
+  seatBlock,
   type SeatEnumeration,
+  type SeatIdentity,
 } from "./transports/copilot.ts";
 
 export const RECORD_SOURCE = "vendor-enumeration";
@@ -84,55 +84,42 @@ export const RECORD_SOURCE = "vendor-enumeration";
 // same-provider exclusion turns on.
 export const PROVIDER_SOURCE_ENUMERATION = "vendor-enumeration";
 
-export const ENUMERATE_COMMAND = "dabbler discovery enumerate";
 export const DRIFT_COMMAND = "dabbler discovery drift";
 export const SEAT_REFRESH_COMMAND = "dabbler copilot refresh";
 
-export const DEFAULT_RECORD_FILENAME = ".dabbler/api-models.lock";
 export const DEFAULT_MAX_AGE_HOURS = 24.0;
-// The seat's CONFIRMATIONS are not on the same clock and must not be: each
-// one is a real turn, so a 24-hour warning about them would fire every day
-// of a month for a refresh nobody should run daily -- and a warning that is
-// always on is a warning that is always ignored. What the seat LISTS is free
-// and is on the free clock; see `RECORD_SEAT_LIST`.
-export const DEFAULT_SEAT_MAX_AGE_HOURS = 720.0;
-
-export const RECORD_API = "api-enumeration";
-export const RECORD_SEAT = "seat-catalog";
-/**
- * The seat catalog holds TWO facts on two clocks, and only one of them costs
- * anything: what the seat lists, read free over its own protocol, and which
- * of those models answered when asked, which is a billed turn each. They are
- * dated separately because a month-old list is stale and a month-old set of
- * confirmations is not -- and while there was one row, the free half
- * inherited the priced half's clock and went unrefreshed for as long as it
- * liked.
- */
-export const RECORD_SEAT_LIST = "seat-list";
-export const SEAT_LIST_COMMAND = "dabbler copilot refresh --list-only";
 
 /**
- * What re-dating each record costs, said before anybody asks for one.
+ * The one dated record, and the one row an operator reads.
  *
- * It is here, beside the thresholds the same fact already decides, because
- * the cost IS the reason the two records are on different clocks. A surface
- * that offers a refresh has to be able to say what the operator is buying,
- * and a sentence written into a pane would be a second statement of
+ * It was three -- `api-enumeration`, `seat-catalog` and `seat-list` -- and
+ * each was named for its implementation rather than for what it holds. Two
+ * of them were two dates on one file, and the third was a file that never
+ * exists on a machine without provider keys, so it read stale forever on
+ * every seat-only laptop. There is one catalog now, so there is one row.
+ */
+export const RECORD_CATALOG = "ai-model-catalog";
+
+/** The one verb that brings it up to date, whatever transports are here. */
+export const CATALOG_REFRESH_COMMAND = "dabbler discovery refresh";
+
+/**
+ * What re-reading the catalog costs, said before anybody asks for one.
+ *
+ * One entry, because there is one refresh and one answer: nothing. The
+ * sentence stays because the question keeps being asked -- four engines in a
+ * row have reasoned their way to "finding out what exists is expensive" --
+ * and because a pane that said it itself would be a second statement of
  * something this module already knows.
  */
 export const REFRESH_COST: Readonly<Record<string, string>> = {
-  [RECORD_API]:
-    "Three metadata requests, one per enabled vendor. They bill no tokens.",
-  [RECORD_SEAT_LIST]:
-    "Nothing: the seat states its own models in the reply to opening a " +
-    "conversation, and no prompt is sent. It is on the same clock as the " +
-    "API record for exactly that reason, and a session refreshes it itself.",
-  [RECORD_SEAT]:
-    "Reading what the seat lists is free -- it is a protocol reply, not a " +
-    "prompt. What costs is CONFIRMING that a model answers: one real turn " +
-    `per model, billed in ${costUnit(PLATFORM_AI_CREDITS)} per token, ` +
-    `which \`${SEAT_COST_COMMAND}\` measures. That is why the confirmations ` +
-    "in this record are allowed to be a month old.",
+  [RECORD_CATALOG]:
+    "Nothing. One metadata request per enabled vendor, and the seat states " +
+    "its own models in the reply to opening a conversation -- no prompt is " +
+    "sent on either path and no token is billed. What a session actually " +
+    `spends on a seat is billed in ${costUnit(PLATFORM_AI_CREDITS)} per ` +
+    `token, which \`${SEAT_COST_COMMAND}\` measures, and reading this list ` +
+    "is not part of it.",
 };
 
 // --- What a failed enumeration is called -------------------------------------
@@ -196,6 +183,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * A string off the wire or `null`; anything else is not a string and must
+ * not become one by coercion.
+ */
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" && value !== "" ? value : null;
+}
+
+/** A positive count off the wire, or `null` for unknown. */
+function optionalInt(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  if (value <= 0) return null;
+  return Math.trunc(value);
+}
+
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item !== "");
+}
+
 function record(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
 }
@@ -248,277 +255,6 @@ export interface ApiModelEntry {
    * silently drops what a future version wrote.
    */
   readonly raw: Record<string, unknown>;
-}
-
-/**
- * What the last enumeration attempt against one vendor did.
- *
- * A failed attempt annotates rather than empties: an endpoint that timed out
- * is not a vendor that withdrew its catalog, and deleting the models would
- * turn a network blip into a drift report claiming every role names a model
- * that does not exist.
- */
-export interface ProviderStatus {
-  readonly name: string;
-  readonly enumerated_at: string | null;
-  readonly model_count: number | null;
-  readonly last_error: string | null;
-  readonly last_error_at: string | null;
-  readonly raw: Record<string, unknown>;
-}
-
-export interface RecordMeta {
-  readonly key_set_id: string;
-  readonly source: string;
-  readonly enumerated_at: string | null;
-  readonly written_by: string | null;
-  readonly written_at: string | null;
-  readonly content_digest: string | null;
-  readonly raw: Record<string, unknown>;
-}
-
-export interface ModelRecord {
-  readonly meta: RecordMeta;
-  readonly providers: readonly ProviderStatus[];
-  readonly models: readonly ApiModelEntry[];
-}
-
-export function emptyRecord(keySetId = "default"): ModelRecord {
-  return {
-    meta: {
-      key_set_id: keySetId,
-      source: RECORD_SOURCE,
-      enumerated_at: null,
-      written_by: null,
-      written_at: null,
-      content_digest: null,
-      raw: {},
-    },
-    providers: [],
-    models: [],
-  };
-}
-
-function optionalString(value: unknown): string | null {
-  return typeof value === "string" && value !== "" ? value : null;
-}
-
-/**
- * A token limit off the wire, or `null` for unknown.
- *
- * A bool, a string, a negative or a non-finite value is not a limit, and
- * unknown is the honest answer for those -- never zero, which would read as
- * a model that accepts no input.
- */
-function optionalInt(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value)) return null;
-  if (value <= 0) return null;
-  return Math.trunc(value);
-}
-
-function stringList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === "string" && item !== "");
-}
-
-/**
- * A count off the wire, or `null` for unknown.
- *
- * Zero is a measurement here and not an absence: a vendor that answered and
- * listed nothing is a fact worth keeping, and folding it into unknown would
- * make an empty catalog indistinguishable from an endpoint never read.
- */
-function optionalCount(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value)) return null;
-  if (value < 0) return null;
-  return Math.trunc(value);
-}
-
-/**
- * Read an enumeration record.
- *
- * Raw bytes, not `readText`: Python hands this file to `tomllib` in binary,
- * so a CRLF checkout is what its parser sees too.
- */
-export function loadRecord(path: string): ModelRecord {
-  const data: unknown = parseToml(readFileSync(path, "utf8"));
-  const metaRaw = isRecord(data) ? data["meta"] : undefined;
-  if (!isRecord(metaRaw)) {
-    throw new RecordError(`discovery record '${path}' has no [meta] table`);
-  }
-  if (!("key_set_id" in metaRaw)) {
-    throw new RecordError(
-      "discovery record [meta] is missing required key 'key_set_id'",
-    );
-  }
-  const meta: RecordMeta = {
-    key_set_id: String(metaRaw["key_set_id"]),
-    source: String(metaRaw["source"] ?? RECORD_SOURCE),
-    enumerated_at: optionalString(metaRaw["enumerated_at"]),
-    written_by: optionalString(metaRaw["written_by"]),
-    written_at: optionalString(metaRaw["written_at"]),
-    content_digest: optionalString(metaRaw["content_digest"]),
-    raw: { ...metaRaw },
-  };
-  const providers: ProviderStatus[] = [];
-  const providerRows =
-    isRecord(data) && Array.isArray(data["providers"]) ? data["providers"] : [];
-  for (const row of providerRows) {
-    if (!isRecord(row) || !("name" in row)) {
-      throw new RecordError(
-        `discovery record has a malformed [[providers]] entry: ${JSON.stringify(row)}`,
-      );
-    }
-    providers.push({
-      name: String(row["name"]),
-      enumerated_at: optionalString(row["enumerated_at"]),
-      model_count: optionalCount(row["model_count"]),
-      last_error: optionalString(row["last_error"]),
-      last_error_at: optionalString(row["last_error_at"]),
-      raw: { ...row },
-    });
-  }
-  const models: ApiModelEntry[] = [];
-  const modelRows = isRecord(data) && Array.isArray(data["models"]) ? data["models"] : [];
-  for (const row of modelRows) {
-    if (!isRecord(row) || !("id" in row)) {
-      throw new RecordError(
-        `discovery record has a malformed [[models]] entry: ${JSON.stringify(row)}`,
-      );
-    }
-    models.push({
-      id: String(row["id"]),
-      provider: String(row["provider"] ?? ""),
-      provider_source: String(row["provider_source"] ?? PROVIDER_SOURCE_ENUMERATION),
-      display_name: optionalString(row["display_name"]),
-      created_at: optionalString(row["created_at"]),
-      max_context_tokens: optionalInt(row["max_context_tokens"]),
-      max_output_tokens: optionalInt(row["max_output_tokens"]),
-      capabilities: stringList(row["capabilities"]),
-      enumerated_at: optionalString(row["enumerated_at"]),
-      retired_at: optionalString(row["retired_at"]),
-      raw: { ...row },
-    });
-  }
-  return { meta, providers, models };
-}
-
-/**
- * A table starts from the entry as read, so unmodelled keys keep their
- * original position and an entry nothing touched re-renders byte for byte.
- *
- * The restricted format the lockfile writer accepts is scalars and flat
- * string arrays; a future key holding a nested table would be refused there
- * rather than silently flattened here, which is the writer's contract.
- */
-function metaMapping(meta: RecordMeta): LockTable {
-  const out = { ...meta.raw } as LockTable;
-  out["key_set_id"] = meta.key_set_id;
-  out["source"] = meta.source;
-  setOrDrop(out, "enumerated_at", meta.enumerated_at);
-  setOrDrop(out, "written_by", meta.written_by);
-  setOrDrop(out, "written_at", meta.written_at);
-  setOrDrop(out, "content_digest", meta.content_digest);
-  return out;
-}
-
-function providerMapping(status: ProviderStatus): LockTable {
-  const out = { ...status.raw } as LockTable;
-  out["name"] = status.name;
-  setOrDrop(out, "enumerated_at", status.enumerated_at);
-  setOrDrop(out, "model_count", status.model_count);
-  setOrDrop(out, "last_error", status.last_error);
-  setOrDrop(out, "last_error_at", status.last_error_at);
-  return out;
-}
-
-function entryMapping(entry: ApiModelEntry): LockTable {
-  const out = { ...entry.raw } as LockTable;
-  out["id"] = entry.id;
-  setOrDrop(out, "provider", entry.provider || null);
-  setOrDrop(out, "provider_source", entry.provider_source || null);
-  setOrDrop(out, "display_name", entry.display_name);
-  setOrDrop(out, "created_at", entry.created_at);
-  setOrDrop(out, "max_context_tokens", entry.max_context_tokens);
-  setOrDrop(out, "max_output_tokens", entry.max_output_tokens);
-  setOrDrop(out, "capabilities", entry.capabilities.length > 0 ? [...entry.capabilities] : null);
-  setOrDrop(out, "enumerated_at", entry.enumerated_at);
-  setOrDrop(out, "retired_at", entry.retired_at);
-  return out;
-}
-
-export function dumpsRecord(recordValue: ModelRecord): string {
-  const tables: Array<readonly [string, LockTable]> = [
-    ["[meta]", metaMapping(recordValue.meta)],
-  ];
-  for (const status of recordValue.providers) {
-    tables.push(["[[providers]]", providerMapping(status)]);
-  }
-  for (const entry of recordValue.models) {
-    tables.push(["[[models]]", entryMapping(entry)]);
-  }
-  return renderDocument(tables);
-}
-
-/**
- * SHA-256 over the record rendered with the digest key itself elided, so the
- * same content digests the same whether or not it has been stamped.
- */
-export function recordDigest(recordValue: ModelRecord): string {
-  return digestText(
-    dumpsRecord({
-      meta: { ...recordValue.meta, content_digest: null },
-      providers: recordValue.providers,
-      models: recordValue.models,
-    }),
-  );
-}
-
-export function stampRecord(
-  recordValue: ModelRecord,
-  writtenAt: string | null = null,
-): ModelRecord {
-  const meta: RecordMeta = {
-    ...recordValue.meta,
-    written_by: writerId("dabbler.discovery"),
-    written_at: writtenAt ?? utcNow(),
-    content_digest: null,
-  };
-  const unstamped: ModelRecord = {
-    meta,
-    providers: recordValue.providers,
-    models: recordValue.models,
-  };
-  return {
-    meta: { ...meta, content_digest: recordDigest(unstamped) },
-    providers: recordValue.providers,
-    models: recordValue.models,
-  };
-}
-
-export function recordProvenance(recordValue: ModelRecord): string {
-  const meta = recordValue.meta;
-  return provenance({
-    storedDigest: meta.content_digest,
-    recomputedDigest: recordDigest(recordValue),
-    writtenBy: meta.written_by,
-    writtenAt: meta.written_at,
-  });
-}
-
-/**
- * Write the record, stamped. The sanctioned writer, and the only one: a
- * record with no writer leaves hand-editing as the sole remedy for
- * staleness, which destroys the empirical signal the file exists to carry.
- */
-export function writeRecord(
-  path: string,
-  recordValue: ModelRecord,
-  writtenAt: string | null = null,
-): ModelRecord {
-  const stamped = stampRecord(recordValue, writtenAt);
-  writeDocument(path, dumpsRecord(stamped));
-  return stamped;
 }
 
 // --- Enumeration ------------------------------------------------------------
@@ -787,175 +523,111 @@ export async function enumerateAll(
 }
 
 /**
- * Fresh wins where fresh knows something; prior survives where it does not.
- * A vendor that stopped reporting a field leaves the last known value
- * standing rather than blanking it -- and either way the value is never read
- * as an absence of capability.
+ * Which providers this machine holds a key for.
+ *
+ * The scope an `api` block was read for. A provider whose endpoint timed out
+ * is still in scope -- the key is present and the block is this machine's --
+ * while one with no key, or one this build cannot enumerate, is not part of
+ * what was asked.
  */
-function mergeEntry(prior: ApiModelEntry, fresh: ApiModelEntry): ApiModelEntry {
+export function apiScope(results: readonly ProviderResult[]): CatalogScope {
+  const absent: ReadonlySet<string> = new Set([
+    ERROR_NO_API_KEY,
+    ERROR_PROVIDER_DISABLED,
+    ERROR_PROVIDER_UNSUPPORTED,
+  ]);
+  const providers = results
+    .filter((result) => result.error === null || !absent.has(result.error))
+    .map((result) => result.provider)
+    .sort();
+  return { providers };
+}
+
+/**
+ * One vendor model as the catalog records it.
+ *
+ * No vendor states a cost or a price band in the metadata this enumeration
+ * reads, so both are null and stay null: the catalog repeats what a source
+ * said and holds no opinion where the source was silent.
+ */
+export function apiCatalogModel(entry: ApiModelEntry, at: string): CatalogModel {
   return {
-    ...fresh,
-    raw: prior.raw,
-    display_name: fresh.display_name || prior.display_name,
-    created_at: fresh.created_at || prior.created_at,
-    max_context_tokens:
-      fresh.max_context_tokens !== null ? fresh.max_context_tokens : prior.max_context_tokens,
-    max_output_tokens:
-      fresh.max_output_tokens !== null ? fresh.max_output_tokens : prior.max_output_tokens,
-    capabilities: fresh.capabilities.length > 0 ? fresh.capabilities : prior.capabilities,
+    id: entry.id,
+    provider: entry.provider === "" ? null : entry.provider,
+    provider_source: entry.provider_source,
+    display_name: entry.display_name,
+    enabled: true,
+    price_category: null,
+    cost: null,
+    listed_at: entry.enumerated_at ?? at,
   };
 }
 
 /**
- * Fold enumeration `results` into `recordValue`, touching nothing else.
+ * The vendor enumeration as the catalog's `api` block, or `null` when no
+ * vendor answered.
  *
- * A vendor that answered is authoritative about which of its models it
- * currently serves, so a model it no longer returns is MARKED with the date
- * it went and keeps everything else it had -- its provider, its last-seen
- * date, its metadata. It stops being offered and it shows up in the drift
- * diff, which is where a role naming a withdrawn model becomes visible.
- *
- * Marked rather than deleted, because the two are not the same risk. A
- * deletion is indistinguishable from a model that was never there, and one
- * bad enumeration -- a proxy answering with an empty list, a vendor's beta
- * endpoint -- could take the only verifier a role had with nothing left to
- * say what happened. A model that comes back has the mark cleared rather
- * than a second entry written.
- *
- * A vendor that failed keeps everything it had and gains the failure beside
- * it.
+ * A vendor that answered is authoritative about its own models and nobody
+ * else's, so what a vendor that failed had stands: its models stay listed
+ * rather than being retired by an outage at the other end. No vendor
+ * answering at all writes no block, because that is a machine that read
+ * nothing rather than a machine whose models are gone.
  */
-export function mergeRecord(
-  recordValue: ModelRecord,
+export function apiCatalogBlock(
   results: readonly ProviderResult[],
-  enumeratedAt: string | null = null,
-): ModelRecord {
-  const stamp = enumeratedAt ?? utcNow();
+  previous: TransportBlock | null,
+  at: string,
+): TransportBlock | null {
   const answered = new Set(results.filter(resultOk).map((result) => result.provider));
-
-  // Python keys this map on the `(provider, id)` TUPLE; a Map keys on
-  // identity, so the pair has to become one string -- and the separator has
-  // to be a character neither field can hold, or `("a b", "c")` and
-  // `("a", "b c")` would collide on a space. Written as an escape, because a
-  // raw NUL in a source file is invisible to a reader and makes every tool
-  // that reads it call the file binary.
-  const pairKey = (provider: string, id: string): string =>
-    `${provider}\u0000${id}`;
-  const returned = new Set<string>();
-  for (const result of results) {
-    if (!resultOk(result)) continue;
-    for (const entry of result.entries) returned.add(pairKey(entry.provider, entry.id));
-  }
-  const models: ApiModelEntry[] = recordValue.models
-    .filter((entry) => !answered.has(entry.provider) || !returned.has(pairKey(entry.provider, entry.id)))
-    .map((entry) =>
-      // Only a vendor that ANSWERED can retire its own model; a failed
-      // attempt is not a withdrawal, and neither is another vendor's answer.
-      answered.has(entry.provider) && entry.retired_at === null
-        ? { ...entry, retired_at: stamp }
-        : entry,
-    );
-  const priorByKey = new Map<string, ApiModelEntry>();
-  for (const entry of recordValue.models) {
-    priorByKey.set(pairKey(entry.provider, entry.id), entry);
-  }
-  for (const result of results) {
-    if (!resultOk(result)) continue;
-    for (const entry of result.entries) {
-      const fresh: ApiModelEntry = { ...entry, enumerated_at: stamp };
-      const prior = priorByKey.get(pairKey(fresh.provider, fresh.id));
-      models.push(prior ? mergeEntry(prior, fresh) : fresh);
-    }
-  }
-
-  const statuses = new Map<string, ProviderStatus>();
-  for (const status of recordValue.providers) statuses.set(status.name, status);
-  for (const result of results) {
-    const prior = statuses.get(result.provider) ?? {
-      name: result.provider,
-      enumerated_at: null,
-      model_count: null,
-      last_error: null,
-      last_error_at: null,
-      raw: {},
-    };
-    statuses.set(
-      result.provider,
-      resultOk(result)
-        ? {
-            ...prior,
-            enumerated_at: stamp,
-            model_count: result.entries.length,
-            last_error: null,
-            last_error_at: null,
-          }
-        : { ...prior, last_error: result.error, last_error_at: stamp },
-    );
-  }
-
+  if (answered.size === 0) return null;
+  const listing: CatalogModel[] = [
+    ...(previous?.models ?? []).filter((entry) => !answered.has(entry.provider ?? "")),
+    ...results
+      .filter(resultOk)
+      .flatMap((result) => result.entries.map((entry) => apiCatalogModel(entry, at))),
+  ];
+  const folded = foldListing(previous, listing, at);
   return {
-    meta: {
-      ...recordValue.meta,
-      enumerated_at: answered.size > 0 ? stamp : recordValue.meta.enumerated_at,
-    },
-    providers: [...statuses.keys()].sort().map((name) => statuses.get(name) as ProviderStatus),
-    models,
+    refreshed_at: at,
+    source: SOURCE_API,
+    scope: apiScope(results),
+    models: folded.models,
+    retired: folded.retired,
   };
+}
+
+/**
+ * Write what the vendors answered into this machine's catalog.
+ *
+ * The previous block is read for the scope this read was taken under, so a
+ * block recorded for another key set is folded onto nothing rather than
+ * having another machine's models retired into it.
+ */
+export function recordApiEnumeration(
+  results: readonly ProviderResult[],
+  at: string = catalogNow(),
+): TransportBlock | null {
+  const scope = apiScope(results);
+  const previous = blockFor(readCatalog(), TRANSPORT_API, scope);
+  const block = apiCatalogBlock(results, previous, at);
+  if (block !== null) writeBlock(TRANSPORT_API, block, { at });
+  return block;
 }
 
 // --- Configuration ----------------------------------------------------------
 
 export interface DiscoverySettings {
   readonly key_set_id: string;
-  readonly record: string;
   readonly max_age_hours: number;
-  readonly seat_max_age_hours: number;
 }
 
 export function discoverySettings(config: RouterConfig): DiscoverySettings {
   const block = record(config["discovery"]);
   return {
     key_set_id: String(block["key_set_id"] || "default"),
-    record: String(block["record"] || DEFAULT_RECORD_FILENAME),
     max_age_hours:
       "max_age_hours" in block ? Number(block["max_age_hours"]) : DEFAULT_MAX_AGE_HOURS,
-    seat_max_age_hours:
-      "seat_max_age_hours" in block
-        ? Number(block["seat_max_age_hours"])
-        : DEFAULT_SEAT_MAX_AGE_HOURS,
   };
-}
-
-/**
- * The record `discovery.record` names, resolved against the project that
- * named it -- one resolution, so a reader and a writer cannot disagree about
- * which file they mean.
- *
- * A relative record path resolves against the PROJECT, never against the
- * package. The seat catalog ships because it is the operator's seat and
- * belongs to the distribution; this record is derived from whichever key set
- * happens to be present, so a build that swept it up would publish one
- * checkout's credentials-shaped view of the world to every consumer.
- *
- * `projectDir` names WHICH project, for a caller that was told to act
- * somewhere other than where it is standing. `dabbler bootstrap
- * --project-dir X` run from elsewhere reported the working directory's
- * `.dabbler` in the one discovery line while every other line of the same
- * run named X, which sent a reader to a file that was never going to be
- * there (D264). Omitting it keeps the working directory, which is the right
- * project for `session start` and for `dabbler discovery`.
- */
-export function resolveRecordPath(config: RouterConfig, projectDir?: string): string {
-  const value = discoverySettings(config).record;
-  if (isAbsolute(value)) return value;
-  // The project's git toplevel where it has one, and the named directory
-  // itself where it does not: bootstrap prints this line for a folder that
-  // may have been `git init`ed one second ago or not at all, and reporting
-  // the working directory for a project outside a repository is the same
-  // defect one step along.
-  const root = projectRoot(projectDir);
-  const base = root ?? (projectDir === undefined ? workingDirectory() : resolvePath(projectDir));
-  return join(base, ...value.split("/"));
 }
 
 // --- Freshness --------------------------------------------------------------
@@ -1092,100 +764,6 @@ function makeRow(
   };
 }
 
-/**
- * Enabled providers this framework can actually enumerate.
- *
- * A provider with no adapter is not a hole in the record; a provider that is
- * enabled and has an adapter and is missing from the record is.
- */
-export function enumerableProviders(config: RouterConfig): string[] {
-  return Object.entries(record(config["providers"]))
-    .filter(
-      ([name, cfg]) => isRecord(cfg) && enabledFlag(cfg) && name in ADAPTERS,
-    )
-    .map(([name]) => name)
-    .sort();
-}
-
-/**
- * The API record aged against its stalest enabled vendor.
- *
- * `meta.enumerated_at` advances whenever any vendor answers, so reading it
- * alone would report the whole record fresh while one vendor's key is
- * expired and its entries are weeks old. Partial failure is an expected
- * operational path here -- three endpoints this project does not control --
- * so freshness is taken from the oldest per-vendor stamp and every vendor
- * that is missing or last failed is named.
- */
-function apiFreshness(
-  config: RouterConfig,
-  path: string,
-  threshold: number,
-  now: number,
-): FreshnessRow {
-  if (!existsSync(path)) {
-    return makeRow(RECORD_API, path, threshold, ENUMERATE_COMMAND, null, false, now);
-  }
-  let recordValue: ModelRecord;
-  try {
-    recordValue = loadRecord(path);
-  } catch {
-    // An unreadable record is not a fresh one, and it is also not an outage:
-    // the row says so and the invocation that rewrites it is named right
-    // there.
-    return makeRow(RECORD_API, path, threshold, ENUMERATE_COMMAND, null, true, now);
-  }
-  const age = apiRecordAge(recordValue, enumerableProviders(config));
-  return makeRow(
-    RECORD_API, path, threshold, ENUMERATE_COMMAND, age.datedAt, true, now, age.notes,
-  );
-}
-
-/**
- * How old an API record is, and what the record-level date cannot say.
- *
- * A record is only as current as its stalest ENABLED vendor:
- * `meta.enumerated_at` advances whenever any vendor answers, so reading it
- * alone would report the whole record fresh while one vendor's key is
- * expired and its entries are weeks old. The date returned is the oldest
- * per-vendor stamp, and every vendor that is missing, undated or last failed
- * is named.
- */
-export function apiRecordAge(
-  recordValue: ModelRecord,
-  expected: readonly string[],
-): { datedAt: string | null; notes: string[] } {
-  const statuses = new Map(recordValue.providers.map((status) => [status.name, status]));
-  let oldest: readonly [number, string] | null = null;
-  const notes: string[] = [];
-  for (const name of expected) {
-    const status = statuses.get(name);
-    if (status === undefined || !status.enumerated_at) {
-      notes.push(`${name} has never been enumerated`);
-      continue;
-    }
-    if (status.last_error) {
-      notes.push(
-        `${name}'s last attempt failed (${status.last_error}), so its ` +
-          "entries are older than this date",
-      );
-    }
-    const parsed = parseTimestamp(status.enumerated_at);
-    if (parsed === null) {
-      notes.push(`${name} carries an unreadable date`);
-      continue;
-    }
-    if (oldest === null || parsed < oldest[0]) oldest = [parsed, status.enumerated_at];
-  }
-  // With no enumerable provider configured there is no per-vendor evidence
-  // to be conservative about, so the record-level date is all there is.
-  const datedAt = oldest
-    ? oldest[1]
-    : expected.length > 0
-      ? null
-      : recordValue.meta.enumerated_at;
-  return { datedAt, notes };
-}
 
 /**
  * Both records' ages against their thresholds.
@@ -1198,49 +776,30 @@ export function apiRecordAge(
 export function checkFreshness(
   config: RouterConfig,
   now: number = Date.now(),
-  projectDir?: string,
 ): FreshnessRow[] {
-  const settings = discoverySettings(config);
-  const rows = [
-    apiFreshness(config, resolveRecordPath(config, projectDir), settings.max_age_hours, now),
+  const path = currentCatalogPath();
+  const catalog = readCatalog(path);
+  // The oldest block this machine holds. A machine with one transport is
+  // aged against that transport, and one with neither is *not read yet*:
+  // there is no reading to be old.
+  const stamps = Object.values(catalog?.transports ?? {})
+    .map((block) => block.refreshed_at)
+    .filter((stamp) => stamp.length > 0)
+    .sort();
+  // No notes. A note makes a row stale -- that is what the field is for, and
+  // it is how a partially-read record says so -- and which transports this
+  // machine has is not a defect in the reading.
+  return [
+    makeRow(
+      RECORD_CATALOG,
+      path,
+      discoverySettings(config).max_age_hours,
+      CATALOG_REFRESH_COMMAND,
+      stamps[0] ?? null,
+      catalogPresent(path),
+      now,
+    ),
   ];
-
-  // `projectDir` reaches the API record's row and not this one, and that is
-  // the distinction rather than an omission: the seat catalog resolves
-  // against the config that names it because it belongs to the distribution
-  // and to the operator's seat, while the API record belongs to whichever
-  // project derived it.
-  let seatPath = "(no transports.copilot-cli.lockfile configured)";
-  let seatPresent = false;
-  let seatDated: string | null = null;
-  let seatListed: string | null = null;
-  try {
-    const resolved = resolveLockfilePath(config);
-    seatPath = resolved;
-    seatPresent = existsSync(resolved);
-    if (seatPresent) {
-      const catalog = loadCatalog(resolved);
-      seatDated = catalog.meta.probed_at;
-      seatListed = catalog.meta.enumerated_at;
-    }
-  } catch {
-    // An unconfigured or unreadable seat catalog is reported as a stale
-    // record, which is what it is. It is never an error: this check has to
-    // be safe to run on a machine that has no seat at all.
-  }
-  rows.push(
-    makeRow(
-      RECORD_SEAT, seatPath, settings.seat_max_age_hours, SEAT_REFRESH_COMMAND,
-      seatDated, seatPresent, now,
-    ),
-    // The free half, on the free clock. One file, two dates: what the seat
-    // said it has, and what answered when asked.
-    makeRow(
-      RECORD_SEAT_LIST, seatPath, settings.max_age_hours, SEAT_LIST_COMMAND,
-      seatListed, seatPresent, now,
-    ),
-  );
-  return rows;
 }
 
 /** The warning lines for the stale records, and nothing for the fresh ones. */
@@ -1266,9 +825,8 @@ export function freshnessWarnings(
   config: RouterConfig,
   now: number = Date.now(),
   includeAbsent = true,
-  projectDir?: string,
 ): string[] {
-  return checkFreshness(config, now, projectDir)
+  return checkFreshness(config, now)
     .filter(isStale)
     .filter((row) => includeAbsent || row.present)
     .map((row) => `discovery: ${freshnessMessage(row)}`);
@@ -1305,48 +863,136 @@ export async function refreshStaleRecords(
   config: RouterConfig,
   options: {
     readonly now?: number;
-    readonly projectDir?: string;
     readonly get?: HttpGet;
     /** The seat's own list, as a seam a test speaks through. */
     readonly enumerateSeat?: () => Promise<SeatEnumeration>;
+    /** Which seat this machine is on, for the scope check. */
+    readonly identity?: SeatIdentity | null;
   } = {},
 ): Promise<string[]> {
   const now = options.now ?? Date.now();
-  const rows = checkFreshness(config, now, options.projectDir);
-  const seatRow = rows.find((candidate) => candidate.record === RECORD_SEAT_LIST);
-  const lines: string[] = [];
-  if (seatRow !== undefined && seatRow.present && isStale(seatRow)) {
-    lines.push(...(await refreshSeatList(config, seatRow, options.enumerateSeat)));
-  }
-  const row = rows.find((candidate) => candidate.record === RECORD_API);
-  if (row === undefined || !row.present || !isStale(row)) return lines;
-  const path = resolveRecordPath(config, options.projectDir);
+  if (!refreshDue(config, now, options.identity)) return [];
+  return refreshCatalog(config, options);
+}
+
+/**
+ * Which providers this machine holds a usable key for, from configuration
+ * alone.
+ *
+ * The `api` block's scope, computed without calling anybody: it is the
+ * question "what was this reading taken for", and asking a vendor to answer
+ * it would make the check cost what the check is guarding.
+ */
+/**
+ * This machine's `api` block, or `null` when it has none it may believe.
+ *
+ * Scoped, like every reading of a block: a block recorded when a different
+ * set of provider keys was present is a reading of a machine this is not,
+ * and a refresh that has not happened yet -- or could not reach a vendor --
+ * must not leave those models offered in the meantime.
+ */
+export function apiBlock(config: RouterConfig): TransportBlock | null {
+  return blockFor(readCatalog(), TRANSPORT_API, currentApiScope(config));
+}
+
+export function currentApiScope(config: RouterConfig): CatalogScope {
+  const providers = Object.entries(record(config["providers"]))
+    .filter(([name, cfg]) => {
+      if (!isRecord(cfg) || !enabledFlag(cfg)) return false;
+      if (ADAPTERS[name] === undefined) return false;
+      return Boolean(resolveSecret(String(cfg["api_key_env"] ?? "")));
+    })
+    .map(([name]) => name)
+    .sort();
+  return { providers };
+}
+
+/** The calendar day a stamp falls on, in the machine's own reckoning. */
+function dayOf(value: string | number): string {
+  return new Date(value).toDateString();
+}
+
+/**
+ * Whether the first session of today has yet to read the catalog.
+ *
+ * The operator's own cadence: once at the beginning of the first session run
+ * on any given day. A day and not an age, because an age makes the refresh
+ * land at a different hour every day -- twenty-five hours after the last one,
+ * then fifty, then seventy-five -- while a developer's question is "is this
+ * today's reading".
+ *
+ * A block read for a scope that is not this machine's current one is unread
+ * whatever the date says: a catalog carried over from another seat, or from
+ * a key set that has since changed, is not a reading of this machine.
+ */
+export function refreshDue(
+  config: RouterConfig,
+  now: number = Date.now(),
+  identity: SeatIdentity | null = readSeatIdentity(),
+): boolean {
+  // Only the transports this machine HAS. A seat it is not logged in to and
+  // a vendor set it holds no key for are not readings that have gone stale;
+  // they are transports to be silent about. Asking for them would reopen the
+  // seat at every session start of a keyless machine, because a refresh that
+  // reaches no vendor cannot replace the block whose scope no longer
+  // matches -- which is the cadence defect round 1 caught.
+  const due = (block: TransportBlock | null): boolean =>
+    block === null || dayOf(block.refreshed_at) !== dayOf(now);
+  const seated = identity !== null;
+  const keyed = (currentApiScope(config)["providers"] ?? []).length > 0;
+  if (!seated && !keyed) return false;
+  return (seated && due(seatBlock(identity))) || (keyed && due(apiBlock(config)));
+}
+
+/**
+ * Read every transport this machine has, and record what each one said.
+ *
+ * Whichever transports are here: a seat with no provider keys refreshes the
+ * seat block and leaves the `api` block standing, and keys with no seat do
+ * the converse. A transport that could not be read leaves its block exactly
+ * as it was -- an outage at one end is not a withdrawal at the other -- and
+ * says which one and why.
+ *
+ * Nothing here can dispatch to a model, so there is no age at which this
+ * becomes expensive and no reason to ask an operator first.
+ */
+export async function refreshCatalog(
+  config: RouterConfig,
+  options: {
+    readonly get?: HttpGet;
+    readonly enumerateSeat?: () => Promise<SeatEnumeration>;
+  } = {},
+): Promise<string[]> {
+  const lines: string[] = [...(await refreshSeat(options.enumerateSeat))];
   try {
-    const current = loadRecord(path);
     const results = options.get === undefined
       ? await enumerateAll(config)
       : await enumerateAll(config, null, options.get);
-    const merged = mergeRecord(current, results);
-    writeRecord(path, merged);
-    const failed = results.filter((result) => !resultOk(result));
+    const block = recordApiEnumeration(results);
+    if (block === null) {
+      lines.push(
+        "discovery: no vendor answered, so the api block stands as it was " +
+          `-- \`${CATALOG_REFRESH_COMMAND}\` when one is reachable again`,
+      );
+      return lines;
+    }
     lines.push(
-      `discovery: ${RECORD_API} was ${freshnessAge(row)} and has been ` +
-        `re-read before this session's work -- ${merged.models.length} ` +
+      `discovery: the api block has been re-read -- ${block.models.length} ` +
         "model(s) recorded, no tokens billed",
     );
-    for (const result of failed) {
+    for (const result of results.filter((candidate) => !resultOk(candidate))) {
       lines.push(
         `discovery: ${result.provider} could not be read ` +
-          `(${String(result.error)}); what the record already held stands`,
+          `(${String(result.error)}); what the catalog already held stands`,
       );
     }
     return lines;
   } catch (error) {
     lines.push(
-      `discovery: ${RECORD_API} is stale and could not be re-read ` +
+      "discovery: the api block could not be re-read " +
         `(${error instanceof Error ? error.message : String(error)}); ` +
-        `the record stands as it was -- \`${ENUMERATE_COMMAND}\` when the ` +
-        "vendor is reachable again",
+        `the catalog stands as it was -- \`${CATALOG_REFRESH_COMMAND}\` ` +
+        "when the vendor is reachable again",
     );
     return lines;
   }
@@ -1355,56 +1001,54 @@ export async function refreshStaleRecords(
 /**
  * Re-read what the seat lists, which costs nothing.
  *
- * The free half of the seat catalog, brought up to date on the same terms as
- * the API record: it opens a conversation, takes the list from the reply and
- * closes -- no prompt, no token, no credit. **The priced half is untouched.**
- * Confirming that a model answers is a real turn per model, and no automatic
- * path in this framework may buy one; what this writes is what the seat said
- * it has, with a model it has stopped listing marked rather than dropped.
+ * It opens a conversation, takes the list from the reply and closes -- no
+ * prompt, no token, no credit. There is no second, priced half to leave
+ * alone any more: what this writes is what the seat said it has, with a
+ * model it has stopped listing moved to the archive rather than dropped.
  *
- * A seat that could not be read leaves the catalog exactly as it was and
- * says so, like every other reading here.
+ * A seat that could not be read leaves the block exactly as it was and says
+ * so, like every other reading here.
  */
-async function refreshSeatList(
-  config: RouterConfig,
-  row: FreshnessRow,
+let seatSource: (() => Promise<SeatEnumeration>) | null = null;
+
+/**
+ * The seam the seat's own list is read through when no caller supplies one.
+ *
+ * `session start` refreshes the catalog for itself, so the seat is opened by
+ * a path with no arguments to pass a stand-in through -- and a suite whose
+ * machine happens to have the CLI installed would then spawn it. Production
+ * leaves this null and opens the real seat.
+ */
+export function setSeatSource(source: (() => Promise<SeatEnumeration>) | null): void {
+  seatSource = source;
+}
+
+async function refreshSeat(
   enumerateSeat?: () => Promise<SeatEnumeration>,
 ): Promise<string[]> {
+  const read = enumerateSeat ?? seatSource ?? enumerateSeatModels;
   try {
-    const path = resolveLockfilePath(config);
-    const before = loadCatalog(path);
-    const seat = enumerateSeat === undefined
-      ? await enumerateSeatModels()
-      : await enumerateSeat();
+    const seat = await read();
     if (!seat.known) {
       return [
-        `discovery: ${RECORD_SEAT_LIST} was ${freshnessAge(row)} and the ` +
-          `seat could not be read (${seat.reason ?? "no reason given"}); the ` +
-          "catalog stands as it was, and nothing was probed",
+        "discovery: the seat could not be read " +
+          `(${seat.reason ?? "no reason given"}); the catalog stands as it ` +
+          "was, and nothing was spent",
       ];
     }
-    const after = adoptSeatEnumeration(before, seat);
-    writeCatalog(path, after);
+    const block = recordSeatEnumeration(seat);
     return [
-      `discovery: ${RECORD_SEAT_LIST} was ${freshnessAge(row)} and has been ` +
-        `re-read before this session's work -- ${after.meta.candidate_universe.length} ` +
+      `discovery: the seat block has been re-read -- ${block?.models.length ?? 0} ` +
         "model(s) the seat lists, free, no prompt sent",
     ];
   } catch (error) {
     return [
-      `discovery: ${RECORD_SEAT_LIST} is stale and could not be re-read ` +
+      "discovery: the seat block could not be re-read " +
         `(${error instanceof Error ? error.message : String(error)}); the ` +
-        `catalog stands as it was -- \`${SEAT_LIST_COMMAND}\` when the seat ` +
-        "is reachable again",
+        `catalog stands as it was -- \`${SEAT_REFRESH_COMMAND}\` when the ` +
+        "seat is reachable again",
     ];
   }
-}
-
-/** How old a row is, in the words the freshness line already uses. */
-function freshnessAge(row: FreshnessRow): string {
-  return row.age_hours === null
-    ? "undated"
-    : `${fixed0(row.age_hours)}h old against a ${fixed0(row.threshold_hours)}h threshold`;
 }
 
 // --- Drift ------------------------------------------------------------------
@@ -1436,25 +1080,14 @@ export interface RetiredModel {
  * Best-effort by design: a repository with no record, or an unreadable one,
  * retires nothing. Absent evidence is not evidence of withdrawal.
  */
-export function retiredModels(
-  config: RouterConfig,
-  projectDir?: string,
-): Map<string, RetiredModel> {
+export function retiredModels(config: RouterConfig): Map<string, RetiredModel> {
   const out = new Map<string, RetiredModel>();
-  try {
-    const path = resolveRecordPath(config, projectDir);
-    if (!existsSync(path)) return out;
-    for (const entry of loadRecord(path).models) {
-      if (entry.retired_at === null) continue;
-      out.set(entry.id, {
-        id: entry.id,
-        provider: entry.provider,
-        lastSeenAt: entry.enumerated_at,
-        retiredAt: entry.retired_at,
-      });
-    }
-  } catch {
-    /* an unreadable record retires nothing, and says so in freshness */
+  // An id and a date and nothing else, which is the whole of what the
+  // archive holds: it answers "where did that model go?" and refuses to
+  // answer anything else, so nothing in it can go stale. Scoped, like every
+  // reading of a block: another key set's archive is not this machine's.
+  for (const entry of apiBlock(config)?.retired ?? []) {
+    out.set(entry.id, { id: entry.id, provider: "", lastSeenAt: null, retiredAt: entry.retired_at });
   }
   return out;
 }
@@ -1491,30 +1124,11 @@ function knownModels(config: RouterConfig): Map<string, string[]> {
     else known.set(id, [source]);
   };
 
-  const recordPath = resolveRecordPath(config);
-  if (existsSync(recordPath)) {
-    try {
-      for (const entry of loadRecord(recordPath).models) {
-        // A retired entry is kept in the file and is not knowledge that the
-        // model exists: it is the record saying the vendor stopped serving
-        // it, which is exactly what a role still naming it needs to hear.
-        if (entry.retired_at === null) add(entry.id, RECORD_API);
-      }
-    } catch {
-      /* an unreadable record contributes nothing, and says so in freshness */
-    }
-  }
-
-  try {
-    const seatPath = resolveLockfilePath(config);
-    if (existsSync(seatPath)) {
-      for (const entry of confirmedModels(loadCatalog(seatPath))) {
-        if (entry.retired_at === null) add(entry.id, RECORD_SEAT);
-      }
-    }
-  } catch {
-    /* no seat here, which is a legitimate machine */
-  }
+  // Only what a transport currently lists. A retired id is the catalog
+  // saying the model stopped being served, which is exactly what a role
+  // still naming it needs to hear, so it is not knowledge that it exists.
+  for (const entry of apiBlock(config)?.models ?? []) add(entry.id, TRANSPORT_API);
+  for (const entry of seatBlock()?.models ?? []) add(entry.id, TRANSPORT_SEAT);
   return known;
 }
 
@@ -1529,8 +1143,8 @@ function joinUnique(values: readonly string[]): string {
  *
  * Reported, never closed. Ranking one model above another is a judgment
  * metadata cannot make, so this produces the gap and names the invocation
- * that acts on it; a model may propose an ordering, enumeration or a probe
- * confirms it, and the writer records it. Nothing here enables a model.
+ * that acts on it; a model may propose an ordering and the enumeration
+ * records what exists. Nothing here enables a model.
  */
 export function computeDrift(config: RouterConfig, now: number = Date.now()): Drift {
   return driftBetween(roleNames(config), knownModels(config), checkFreshness(config, now));

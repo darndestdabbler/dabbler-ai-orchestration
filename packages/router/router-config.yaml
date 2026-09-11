@@ -85,12 +85,12 @@ roles:
     require_provider_in: [anthropic, openai, google]
 
 # The copilot-cli transport's own settings; inert unless that transport is
-# selected. The catalog lockfile is model-truth for this seat; the roles above
-# are intent.
+# selected. Which models this seat has is not configured here and never was a
+# property of a repository: it is read from the seat itself, free, into this
+# machine's own ai-model-catalog.json.
 transports:
   copilot-cli:
     binary: copilot
-    lockfile: copilot-catalog.lock   # relative to this file's directory
     billed_usage_unavailable: true    # honest non-accounting; seat spend is measured by ai_router.seat_cost
     max_invocations_per_session: 200  # per-process hard circuit breaker, not a budget
     # Dispatch ceilings; must satisfy spawn < first_byte < total. total is a
@@ -101,23 +101,20 @@ transports:
       first_byte_seconds: 30
       total_seconds: 1200
 
-# Model discovery. The direct-API path enumerates each vendor's models
-# endpoint; the seat cannot enumerate — the CLI has no list-models command —
-# so its catalog stays probe-confirmed. Enumeration is a metadata request and
-# bills no tokens, which is why max_age_hours is a freshness preference and
-# not a budget control. seat_max_age_hours is far longer because a probe does
-# cost premium requests, and a warning that fires every day is a warning that
-# gets suppressed. Neither threshold ever blocks anything.
+# Model discovery. The direct-API path reads each vendor's models endpoint;
+# the seat states its own list in the reply to opening a conversation. Both
+# are free — a metadata request and a protocol reply, neither billing a token
+# — which is why max_age_hours is a freshness preference and not a budget
+# control, and why it never blocks anything.
 #
-# record resolves against the project root, not this file's directory, and
-# lives under the gitignored .dabbler/ tree: it is derived from whichever key
-# set is present, so it is neither committed nor packaged. The seat catalog
-# ships because it belongs to the distribution; this one belongs to a machine.
+# Where the reading is KEPT is not configurable and is not in any repository:
+# one ai-model-catalog.json per machine, under that platform's own per-user
+# data directory. A catalog is a reading of this machine's seat and this
+# machine's keys, and a copy of it that travels in a package tells every
+# other machine about somebody else's.
 discovery:
   key_set_id: default
-  record: .dabbler/api-models.lock
   max_age_hours: 24
-  seat_max_age_hours: 720
 
 # How capable a model is, as an ORDER rather than a judgement in code. Most
 # capable first, and the names mean only their position in this list: a

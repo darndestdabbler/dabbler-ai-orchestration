@@ -1,7 +1,112 @@
-# STATUS — sessions 113–155 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.3 IS PUBLISHED to the Marketplace, carrying 148 and 149. 2.1.0 and 2.1.2 never shipped** — 2.1.0 refused over a walk-jobs timeout on the runner and 2.1.2 died on a Marketplace request timeout, so both tags stand on origin unpublished and 2.1.3 supersedes them; session 152 naming the two reviewing roles by voice and giving each its own vehicle, and session 153 taking the run of record off the host scheduler into a Podman container — 324 s to 26.4 s — with the one file that cannot follow it declared and the reason it cannot owed forward, and a guard that will not read a cancelled test as a pass, and session 154 closing the dark gate behind the extension suite's second door — CI had been red for eleven consecutive runs while three sessions closed VERIFIED through the other one — by arming the seam once where both doors read it, making the refusal cover mocha as well as node:test, and holding every gate to the suite it stands for with a divergence that is declared rather than forbidden, and session 155 organising the Configuration section by the thing being configured rather than by the mechanism that configures it — two participants, five leaves, the Auxiliary Reviewer given the surface it has never had, and a projection re-derived whenever it is read, because nothing in a workspace can watch a user-level catalog
+# STATUS — sessions 113–156 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.3 IS PUBLISHED to the Marketplace, carrying 148 and 149. 2.1.0 and 2.1.2 never shipped** — 2.1.0 refused over a walk-jobs timeout on the runner and 2.1.2 died on a Marketplace request timeout, so both tags stand on origin unpublished and 2.1.3 supersedes them; session 152 naming the two reviewing roles by voice and giving each its own vehicle, and session 153 taking the run of record off the host scheduler into a Podman container — 324 s to 26.4 s — with the one file that cannot follow it declared and the reason it cannot owed forward, and a guard that will not read a cancelled test as a pass, and session 154 closing the dark gate behind the extension suite's second door — CI had been red for eleven consecutive runs while three sessions closed VERIFIED through the other one — by arming the seam once where both doors read it, making the refusal cover mocha as well as node:test, and holding every gate to the suite it stands for with a divergence that is declared rather than forbidden, session 155 organising the Configuration section by the thing being configured rather than by the mechanism that configures it — two participants, five leaves, the Auxiliary Reviewer given the surface it has never had, and a projection re-derived whenever it is read, because nothing in a workspace can watch a user-level catalog — and session 156 walking the whole model-catalog block on both transports and both engines BEFORE publishing it, which is the entire argument for the order: twenty-one numbered readings, eleven defects fixed and four raised, five of them stopping an operator and every one of those five sitting in the block that was about to ship, **and 2.2.0 IS PUBLISHED**
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 156 CLOSED, 2026-09-11 — the block walked on both transports, and 2.2.0 published
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 156 | the model-catalog block walked on both transports and both engines, eleven defects fixed and four raised, and the block shipped | CLOSED VERIFIED at round 1 (Minor-only), landed `d9759b28`, closed `a4bbc8ef`. **RELEASED: `vsix-v2.2.0` is on origin and packaging reported published** |
+>
+> **THE PLAN IS EMPTY: `close` reports "no session is left to run; the plan
+> declares no more."** Session 156 was the last one declared. The next
+> session has to be planned before it can be started.
+>
+> **THE WALK FOUND FIVE DEFECTS THAT STOP AN OPERATOR, AND ALL FIVE WERE IN
+> THE BLOCK ABOUT TO BE PUBLISHED.** That is the whole case for walking before
+> releasing rather than after. `docs/uat/uat-model-catalog-walk.md` is the
+> record: twenty-one numbered entries — eleven product defects, two readings,
+> one document error and seven confirmations — each with its disposition, and
+> the counts add up. The five:
+>
+> 1. **A model selection was a one-way door.** After one `configure
+>    --reviewer-model`, every later selection was refused — including models
+>    the transport plainly lists, and including an empty value — with `It
+>    lists: <the model you already chose>`. One argument: `offered()` took
+>    `applySelection`'s default, so it checked each new name against a list
+>    the stored pin had already collapsed to one. `roleNode` passes
+>    `applySelection: false` for exactly this reason and says so; the pane's
+>    pick list is built from that reading and documented as "a place to CHANGE
+>    a choice". The pane offered the change and the router refused it.
+>    Reproduced identically on both transports.
+> 2. **Five of the seat's twenty-six models were unreachable**, and the
+>    refusal said the transport does not list a model the transport lists.
+>    SPLIT: the false sentence is fixed (three cases now, and the middle one
+>    says the limit is the framework's, not your seat's); *offering* them is
+>    owed, because every round records `reviewer_provider` and an adjudication
+>    excludes by provider — a model whose vendor cannot be named cannot be
+>    excluded, so it is a decision about what a reviewer may be.
+> 3. **Under Claude Code no authoring MODEL is declared** — `session start`
+>    takes none, so the orchestrator row is `{engine, provider}` — and
+>    `providerRelation` was computed from the author's model alone. The label
+>    that replaced three deleted rules appeared on **no row at all, on either
+>    transport, on the engine this repository runs on**. Fixed by labelling
+>    from the author's PROVIDER, which the ledger has. The same-model refusal
+>    still needs a model identifier and stays asserted at the wire.
+> 4. **The pane downgrades a projection a newer router wrote** (D276, owed).
+>    Session 155 made `SolutionTreeProvider` derive at activation whatever is
+>    on disk — right when the extension is newer, and backwards when it is
+>    not. The deriver is the extension's OWN bundled router: this repository's
+>    projection lacked `auxiliaryReviewer` at session start while the tree's
+>    source emits it, and neither the bundled dist nor installed 2.1.3 knows
+>    the node. Raised rather than patched: a projection carries no version, so
+>    a reader cannot tell an older writer's output from a newer one's.
+> 5. **One rule, two verbs, one guard.** `dabbler discovery refresh` refused
+>    mid-session and `dabbler copilot refresh` did not, while both write the
+>    seat block of the same catalog — measured side by side in one session.
+>    Session 154's shape one layer over. The refusal now has one home,
+>    `refreshRefusal`, and both doors read it.
+>
+> **ALSO FIXED:** a wrong-scope catalog reported **fresh** — `checkFreshness`
+> was the last unscoped reader, the one `catalog.ts` names by name, and a
+> machine whose whole record belongs to somebody else was told it needed
+> nothing (its dead twin `lastRefreshedAt` went too); the authoring list was
+> unfiltered until the ledger named an engine, so a repository on its first
+> day offered Gemini as a model Claude Code could author with; the auxiliary
+> accepted the primary's own model, a pairing guaranteed to stop every
+> adjudication; the api path's "not read yet" message offered `dabbler copilot
+> refresh`, which reads the seat and no provider endpoint; `discovery drift`
+> listed 202 ids as qualifying, embeddings and whisper among them (131 now);
+> and the refresh summary claimed every transport when one had failed.
+>
+> **WHAT THE WALK PROVED, not just what it found.** A refresh costs nothing on
+> both transports and says so (5.9 s, 26 + 196 models, no prompt sent). The
+> engine really does narrow authoring — 11 Anthropic models against the
+> reviewer's 125. The pin holds at the wire: two real seat turns, pinned to
+> two different models, both opened on the model asked for. And **67 of 67**
+> api rounds since session 120 served the model they requested.
+>
+> **OWED, and each is a decision on the log.**
+> - **D274 — there is no seat evidence under this block.** The 57 clean seat
+>   rounds in the record are all from sessions 93–99, before the catalog
+>   existed; 100–155 all ran on `api` because `DABBLER_TRANSPORT=api` is set
+>   in this machine's environment and outranks every config layer. One real
+>   session with it cleared and the vehicle set to the seat is what settles
+>   it, and that spends AI credits, so it is the operator's call. The reviewer
+>   raised the same gap independently and called it a material limitation on
+>   the release evidence.
+> - **D275 — a seat's `config_option_update` is NOT served-model evidence.**
+>   Measured twice: `model.currentValue` came back `gpt-5.6-sol` whatever was
+>   pinned, so it is the seat's own default being re-broadcast. One turn would
+>   have read as a silent mid-turn model switch. Nothing reads the field
+>   today; it is written down because it is the first thing a session looking
+>   for served-model evidence over ACP will find.
+> - **D276 — the projection downgrade above.**
+> - **Half of finding 7** — whether a provider-unknown model may hold a
+>   reviewing role at all.
+>
+> **THREE MINOR FINDINGS FROM THE ROUND ITSELF, none blocking, all real** —
+> the tree may not move after a verdict, so they are owed rather than fixed:
+> 1. `RoleReading.listed` does not meet its own documented contract on the API
+>    transport. It is built from `models`, which on api is already
+>    `apiSelectableModels(...)`, so a listed-but-unselectable api id still
+>    falls to the "not listed" branch. One line: build it from `block.models`.
+> 2. The refresh-guard test proves `refreshRefusal` and not that
+>    `copilotVerb(["refresh"])` calls it — session 154's own lesson, check a
+>    control is WIRED and not just written. The reviewer supplied the test.
+> 3. The walk record names the router it walked with as 2.1.3, which is true
+>    and is one version behind what shipped.
+>
 > ## SESSION 155 CLOSED, 2026-09-11 — the Configuration section a person reads, and a projection that is never stale
 >
 > | session | what | state |

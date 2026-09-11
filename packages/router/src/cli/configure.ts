@@ -2,9 +2,18 @@
 //
 // The settings a person chooses and the framework cannot work out for
 // itself: the VEHICLE each role is reached through, and which model reviews.
-// Each is written to the machine-local overlay, which is the layer a
-// machine's choice belongs at, and each is checked against the rules
-// selection already owns before anything is written.
+// Each is checked against the rules selection already owns before anything is
+// written.
+//
+// **Two layers, and which one a setting lands in is not arbitrary.** A
+// VEHICLE is a property of this checkout -- one repository may need the seat
+// while another runs on keys -- so `--transport` and `--reviewer-transport`
+// go to the machine-local overlay beside the project. An ENGINE and a MODEL
+// are properties of the person and their machine, so they go to
+// `preferences.json` at the user level, beside the catalog, where a terminal
+// in any repository and a pane in any window read one answer. The answer says
+// which file it wrote, every time, because a setting whose home is a guess is
+// a setting somebody will look for in the wrong place.
 //
 // **A vehicle belongs to a role.** `--transport` is the machine's own, used
 // where no role says otherwise; `--reviewer-transport` is the Primary
@@ -48,7 +57,7 @@ import {
 } from "../config.ts";
 import { BUILT_IN_ENGINES } from "../engines.ts";
 import { repoRootFor } from "../journal.ts";
-import { PREFERENCES_FILENAME, writePreferences } from "../preferences.ts";
+import { PREFERENCES_FILENAME, selectedModel, writePreferences } from "../preferences.ts";
 import { workingDirectory } from "../workdir.ts";
 import { orchestratorOf, roleReading, tryWriteProjection, type RoleReading } from "../projection.ts";
 import {
@@ -56,6 +65,7 @@ import {
   ROLE_PRIMARY_REVIEWER,
   reviewerRefusal,
 } from "../selection.ts";
+import { normalizeModelToken } from "../contracts/models.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;
@@ -101,9 +111,27 @@ function usage(): string {
   ].join("\n");
 }
 
-/** Every model the transport in force lists, in the order a role prefers. */
+/**
+ * Every model the transport in force lists, in the order a role prefers.
+ *
+ * **`applySelection: false`, and the flag is the whole of this function.**
+ * The default applies the selection already stored, which collapses the list
+ * to the one model that is pinned -- so the verb that EXISTS to change a
+ * selection checked every new name against a list containing only the old
+ * one. The first choice was accepted and every choice after it was refused,
+ * including plainly-listed models and an empty value, with `It lists: <the
+ * model you already chose>`. A selection became unchangeable from every
+ * surface the framework offers, and the only way out was hand-editing the
+ * preferences file.
+ *
+ * `roleNode` in `../projection.ts` passes the same flag for the same reason
+ * and says so; this is the other half of that sentence. The pane's own pick
+ * list is built from that reading, marks the current model `what you chose`,
+ * and is documented as "a place to CHANGE a choice" -- so before this, the
+ * pane offered the change and the router refused it.
+ */
 function offered(reading: RoleReading, role: string): Array<readonly [string, string, string]> {
-  return reading.resolve(role, null).candidates;
+  return reading.resolve(role, null, { applySelection: false }).candidates;
 }
 
 /**
@@ -120,6 +148,27 @@ function offered(reading: RoleReading, role: string): Array<readonly [string, st
 function offeredId(reading: RoleReading, role: string, named: string): string | null {
   const match = offered(reading, role).find(([modelId]) => modelId === named);
   return match === undefined ? null : match[0];
+}
+
+/** How many names to spell before a refusal stops being readable. */
+const NAMES_IN_A_REFUSAL = 12;
+
+/**
+ * What the transport offers, as a sentence a person can act on.
+ *
+ * The direct-API path offers 125 models on this machine. Spelling all of them
+ * makes the refusal a wall that scrolls the refusal itself off the screen, so
+ * the count leads and the names follow up to a limit.
+ */
+function namesOffered(ids: readonly string[]): string {
+  const sorted = [...ids].sort();
+  if (sorted.length === 0) return "It offers none.";
+  const shown = sorted.slice(0, NAMES_IN_A_REFUSAL);
+  const rest = sorted.length - shown.length;
+  return (
+    `It offers ${sorted.length}: ${shown.join(", ")}` +
+    (rest > 0 ? `, and ${rest} more.` : ".")
+  );
 }
 
 
@@ -209,20 +258,35 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     const reading = readingFor(transport);
     const modelId = offeredId(reading, role, value);
     if (modelId === null) {
-      // A transport that has read nothing and one that lists other models
-      // are different problems: the first has a free remedy and the second
-      // needs a different name. Saying "not a model this registry declares"
-      // over the first is what sent an operator looking for a registry that
-      // no longer decides anything.
+      // THREE problems, not two, and each has a different remedy:
+      //
+      //   - the transport has read nothing, which is free to fix;
+      //   - the transport lists this model and no role may draw on it,
+      //     because nothing here can place its provider; and
+      //   - the name is simply not in the record.
+      //
+      // The middle one used to be told as the third, so an operator was
+      // informed that their seat does not list `grok-4.6` while their seat
+      // was listing it. Saying "not a model this registry declares" over the
+      // first is what sent an operator looking for a registry that no longer
+      // decides anything.
+      if (reading.unavailable !== null) {
+        return { refusal: `'${value}' cannot be checked: ${reading.unavailable}.` };
+      }
+      if (reading.listed.has(value)) {
+        return {
+          refusal:
+            `'${value}' is listed by the ${transport} transport and cannot be ` +
+            "chosen for a role: nothing here can say which vendor is behind it, " +
+            "and an adjudication excludes every provider that has already " +
+            "reviewed a round -- an unplaceable one cannot be excluded. It is " +
+            "a limit of this framework and not of your seat.",
+        };
+      }
       return {
         refusal:
-          reading.unavailable !== null
-            ? `'${value}' cannot be checked: ${reading.unavailable}.`
-            : `'${value}' is not a model the ${transport} transport lists. ` +
-              `It lists: ${offered(reading, role)
-                .map(([id]) => id)
-                .sort()
-                .join(", ")}.`,
+          `'${value}' is not a model the ${transport} transport lists. ` +
+          namesOffered(offered(reading, role).map(([id]) => id)),
       };
     }
     const refusal = author === null ? null : reviewerRefusal(author, modelId);
@@ -244,6 +308,35 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
       options.auxiliaryModel,
     );
     if ("refusal" in checked) return { ...empty, refusal: checked.refusal };
+    // **Not the primary either, where the primary is pinned.**
+    //
+    // The rest of the auxiliary's definition is read at the round -- every
+    // provider that has already reviewed -- and cannot be checked against a
+    // preference written between sessions. This one part can: "not the
+    // primary" is the role's own definition, and the primary's pin is in the
+    // same file this command is about to write. Accepting the pair produced a
+    // configuration guaranteed to stop: the primary reviews round 1, its
+    // provider is excluded at the adjudication, and an auxiliary pinned to its
+    // model is excluded with it -- every time, and the operator was told so in
+    // the abstract while being allowed to do it.
+    const primary =
+      named["reviewerModel"] ?? selectedModel(ROLE_PRIMARY_REVIEWER);
+    if (
+      primary !== null &&
+      primary !== undefined &&
+      normalizeModelToken(String(primary)) === normalizeModelToken(checked.modelId)
+    ) {
+      return {
+        ...empty,
+        refusal:
+          `'${checked.modelId}' is already the Primary Reviewer, and the ` +
+          "Auxiliary Reviewer is the THIRD voice at an impasse: it is not the " +
+          "author and not the primary. An adjudication excludes every provider " +
+          "that has already reviewed a round, so this pair would stop every " +
+          "adjudication rather than settle one. Choose a different model, or " +
+          "change the Primary Reviewer first.",
+      };
+    }
     named["auxiliaryModel"] = checked.modelId;
   }
   if (options.transport !== undefined) {

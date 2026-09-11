@@ -85,50 +85,38 @@ constant and optional, which is the definition of a button. Walk finding 6.
 
 ### A — you have a GitHub Copilot seat
 
-This is the setup with no API keys of your own: the seat pays, in premium
-requests. Nothing here reads `DABBLER_ANTHROPIC_API_KEY` or its siblings, and
-you do not need them set.
+This is the setup with no API keys of your own: the seat pays, in **AI
+credits, per token**. Nothing here reads `DABBLER_ANTHROPIC_API_KEY` or its
+siblings, and you do not need them set.
 
 ```
 copilot --version
-echo %DABBLER_TRANSPORT%
 ```
 
-**Expect** a Copilot CLI version from the first, and `copilot-cli` from the
-second. If the second is empty, either set it, or add `--transport
-copilot-cli` to the **first** `dabbler session next` of each session — the
-transport is kept on the run from there, so once is enough.
+**Expect** a Copilot CLI version. Then tell this checkout to use the seat:
+
+```
+dabbler configure --transport copilot-cli
+```
+
+**Nothing sets `DABBLER_TRANSPORT` for you, and you probably should not set it
+yourself.** That variable outranks every configuration layer on the machine,
+so one repository's set-up used to change how every other one routed. If it is
+already set in your environment, `configure` will tell you so and tell you
+which value wins.
 
 **Your session names its model, and that is not optional.** In the UI, the
-Start Session flow asks for it and refuses to launch a seat without one.
-Dabbler resolves the model through its registry and refuses one it does not
-know, because a seat's own label does not say which vendor answered.
+Start Session flow asks for it and refuses to launch a seat without one,
+because a seat's own label does not say which vendor answered.
 
-**What it costs, and how to keep it low.** Every call is a premium request,
-weighted by model. What the shipped catalog records:
-
-| weight | models |
-| --- | --- |
-| 0 | `gpt-5.4`, `gpt-5.3-codex`, `gpt-5.4-mini`, `gpt-5-mini` |
-| 1 | `claude-sonnet-4.6`, `claude-sonnet-4.5`, `claude-fable-5` |
-| 3 | `claude-opus-4.5`, `claude-opus-4.6` |
-| 7.5 | `gpt-5.5` |
-| 14 | `gemini-3.5-flash` |
-| 15 | `claude-opus-4.8` |
-
-**Think in pairs, not in single models.** A different provider always checks
-the session's work — that rule does not bend on a seat — so Dabbler picks the
-reviewer from the seat's models *excluding your engine's vendor*. An engine on
-`claude-sonnet-4.6` (weight 1) leaves the reviewer free to be one of the
-zero-weight GPT models. An engine on a zero-weight GPT does the opposite: it
-forces the reviewer onto Anthropic or Google, where the cheapest confirmed
-model is 1 and the dearest is 15.
+**Which models you may name is read from your seat, not from a list Dabbler
+ships.** Step 0 is where you read it, and everything below depends on having
+done that.
 
 ### B — you have direct API keys
 
 This is the setup with no seat: each vendor bills your own account, per token.
-You need all three keys, because the reviewer is always a different vendor
-from the engine:
+Set the keys you have:
 
 ```
 DABBLER_ANTHROPIC_API_KEY
@@ -136,14 +124,86 @@ DABBLER_OPENAI_API_KEY
 DABBLER_GEMINI_API_KEY
 ```
 
+Then tell this checkout to use them:
+
 ```
-echo %DABBLER_TRANSPORT%
+dabbler configure --transport api
 ```
 
-**Expect** empty. If it says `copilot-cli`, that machine is set up for part A,
-and you tell each session to use your keys instead by adding `--transport api`
-to the **first** `dabbler session next` of the session — once, not to every
-command. Without it the session runs on the seat, and the seat is billed.
+**A reviewer that is a different vendor from the engine is a label and no
+longer a refusal.** Dabbler tells you whether a model you are choosing is on
+the same provider as the one authoring, and lets you decide: a different
+vendor *reduces* the chance the reviewer shares the author's blind spots and
+does not eliminate it, and that is a judgement about your work rather than one
+a tool can make for you. Two keys are enough to have the choice; three give
+you more of it.
+
+**If `DABBLER_TRANSPORT` is set to `copilot-cli` in your environment**, it
+outranks the line above and the seat is billed. `configure` says so when it
+happens.
+
+---
+
+## Step 0 — Read what this machine can reach
+
+**Nothing ships a model list.** Dabbler used to carry one inside the
+extension — fourteen names, chosen by hand, updated whenever somebody
+remembered — and a list that travels in a package is a list about somebody
+else's machine. What you may choose is now read from *your* seat and *your*
+keys, on this machine, into one file, and reading it is free on both
+transports: a vendor's models endpoint is a metadata request, and a seat
+states its own models in the reply to opening a conversation. No prompt is
+sent and no token is billed.
+
+Do this once per machine, before the first session. A machine that has never
+read its list is not broken — it reads *not read yet*, and the remedy is the
+line below.
+
+- **Framework —** nothing yet. This is a machine-level reading, not a
+  repository one, and there is no repository at this point in the
+  walkthrough for the framework to have acted in. From here on the framework
+  refreshes a record that has gone stale at the start of a session, for
+  nothing, and says when it did.
+- **You —** run **Dabbler: Update the Catalog** from the Configuration
+  section of the Dabbler pane. It asks once, says what it costs — nothing —
+  and runs in a terminal where you can watch it. There is no repository open
+  yet on your first time through, so this walkthrough takes the same
+  operation from the command line instead; the button is what you will use
+  every time after this one.
+- **Underneath —**
+  ```
+  dabbler discovery refresh
+  ```
+
+**Expect two lines and a summary, and the numbers to be yours rather than
+these:**
+
+```
+discovery: the seat block has been re-read -- 26 model(s) the seat lists, free, no prompt sent
+discovery: the api block has been re-read -- 196 model(s) recorded, no tokens billed
+refresh: the catalog has been re-read where this machine could be read ...
+```
+
+**A transport you do not have is skipped and says so**, and it never empties
+the block for the one you do: a seat with no provider keys re-reads the seat
+alone, and keys with no seat leave the seat's block exactly where it was.
+That is what *unread* means here, and it is not the same as *empty*.
+
+**The reading is yours and only yours.** The file records whose seat and
+which set of keys it was taken with, and a block recorded for a different
+seat or a different key set is treated as unread rather than believed — no
+age makes it say more. Copying this file between machines therefore does
+nothing useful.
+
+Two things follow for the rest of this walkthrough:
+
+- **Refresh between sessions, not during one.** A session that changed its
+  own reviewer pool while running would have edited the conditions of its own
+  review, so the refresh is refused while one is in flight and says so.
+- **The list you can choose from is the list you just read.** Whatever your
+  seat lists today is what **Dabbler: Set the Model** offers and what
+  `dabbler configure --reviewer-model` accepts — the same set, from the same
+  reading, so the pane cannot offer a model the command would refuse.
 
 ---
 
@@ -490,9 +550,12 @@ uses.
   dabbler session start --sessions-dir docs/sessions --engine claude-code --provider anthropic
   dabbler session next --sessions-dir docs/sessions
   ```
-  On a seat the first line takes `--engine copilot --provider openai --model
-  gpt-5.4`, and the first `next` of the session carries `--transport
-  copilot-cli` unless `DABBLER_TRANSPORT` already says so.
+  On a seat the first line adds `--engine copilot --provider openai --model
+  <one your seat listed in step 0>`; the vehicle is already set, because
+  `dabbler configure --transport copilot-cli` in the prerequisites set it for
+  this checkout. No `next` carries a transport: a `next` names nothing about
+  identity, because the session is in flight and its identity is on the
+  record.
 
 **Expect the start to say where it put the session:**
 

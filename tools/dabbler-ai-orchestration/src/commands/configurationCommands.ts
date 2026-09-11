@@ -312,6 +312,14 @@ export async function refreshRecord(
       row.cost ?? "",
       "",
       `It runs \`${row.command}\` in a terminal, where you can watch it.`,
+      "",
+      // The one condition under which the answer is no, said before the
+      // click rather than in the terminal afterwards. The refusal is the
+      // right one -- a session that re-reads its own verifier pool mid-run
+      // has edited the conditions of its own review -- but a question that
+      // promises an operation it is in no position to offer teaches the
+      // reader to distrust the next question too.
+      "While a session is in flight the refresh is refused, because a session that changes its own verifier pool while running has edited the conditions of its own review. Run it between sessions.",
     ].join("\n"),
     "Refresh",
   );

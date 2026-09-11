@@ -473,14 +473,15 @@ export function writeBlock(
   return catalog;
 }
 
-/** When this machine last refreshed anything, or `null` for *not read yet*. */
-export function lastRefreshedAt(catalog: Catalog | null): string | null {
-  const stamps = Object.values(catalog?.transports ?? {})
-    .map((block) => block.refreshed_at)
-    .filter((stamp) => stamp.length > 0)
-    .sort();
-  return stamps.length > 0 ? (stamps[stamps.length - 1] as string) : null;
-}
+// There is no `lastRefreshedAt` here, and the absence is deliberate.
+//
+// One lived here with no caller at all, walking `catalog.transports`
+// directly -- which is the one thing `blockFor` exists to stop. It was a
+// second, unscoped statement of "how old is this machine's reading", the
+// reader this file's own header binds to scope, and it would have aged a
+// block recorded for somebody else's seat as though it were ours. Age is
+// asked through `checkFreshness`, which reads each transport through its
+// own scoped block, and the answer has one home.
 
 /** Whether this machine has a catalog file at all, for a surface that says so. */
 export function catalogPresent(path: string = currentCatalogPath()): boolean {

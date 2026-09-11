@@ -922,4 +922,140 @@ describe("what a session would be run with", () => {
       restore();
     }
   });
+
+  it("lets a selection be changed, and refuses an auxiliary that is already the primary", () => {
+    // **Two halves of one trap, found by walking the block before shipping
+    // it.** `configure` checked each new name against a list the stored
+    // selection had already collapsed to one model, so the FIRST choice was
+    // accepted and every choice after it was refused -- `gpt-5.6-terra` is
+    // not a model the copilot-cli transport lists. It lists: gpt-5.6-sol --
+    // including an empty value, which is how a selection became unchangeable
+    // from every surface the framework offers. The pane's pick list is built
+    // from the same reading with the selection merely reported, and marks the
+    // current model `what you chose`, so the pane offered the change and the
+    // verb refused it.
+    //
+    // The second half is the pair that is accepted and cannot work: the
+    // Auxiliary Reviewer is the third voice at an impasse, an adjudication
+    // excludes every provider that has already reviewed a round, and the
+    // primary reviews round 1 -- so an auxiliary pinned to the primary's own
+    // model stops every adjudication it is ever asked to settle. "Not the
+    // primary" is the one part of the role's definition that IS knowable
+    // between sessions, and the primary's pin is in the file being written.
+    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
+    const root = tempDir("configuration-");
+    const ungit = inRepository(root);
+    try {
+      setSeatIdentity(SEAT);
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models: [
+          catalogModelRow("gpt-5.6-sol", "openai"),
+          catalogModelRow("gpt-5.6-terra", "openai"),
+          catalogModelRow("claude-haiku-4.5", "anthropic"),
+          // Listed by the seat, and placeable by nothing here.
+          { ...catalogModelRow("mai-code-1.1-flash", "openai"), provider: null },
+        ],
+        retired: [],
+      });
+      withoutOverlay(root);
+
+      assert.equal(configure({ repoRoot: root, reviewerModel: "gpt-5.6-sol" }).refusal, null);
+      // The change the verb exists for. Before this it read `'gpt-5.6-terra'
+      // is not a model the copilot-cli transport lists`.
+      assert.equal(configure({ repoRoot: root, reviewerModel: "gpt-5.6-terra" }).refusal, null);
+      assert.equal(
+        roleDeclaration(loadConfig(undefined, root), ROLE_PRIMARY_REVIEWER).selected,
+        "gpt-5.6-terra",
+      );
+
+      // And the pair that would stop every adjudication is refused where the
+      // operator is choosing, not at a round they will never reach.
+      const same = String(configure({ repoRoot: root, auxiliaryModel: "gpt-5.6-terra" }).refusal);
+      assert.match(same, /already the Primary Reviewer/);
+      assert.match(same, /THIRD voice/);
+      // A different model for the third voice is exactly what the role wants.
+      assert.equal(configure({ repoRoot: root, auxiliaryModel: "claude-haiku-4.5" }).refusal, null);
+
+      // A model the transport LISTS and no role may draw on is a third
+      // answer, and it used to be told as the second: an operator was
+      // informed that their seat does not list `mai-code-1.1-flash` while
+      // their seat was listing it. Five of this machine's twenty-six seat
+      // models are in that state -- every one whose vendor the name
+      // heuristic cannot place -- and the reason is the framework's, not the
+      // seat's, so the refusal says which.
+      const unplaceable = String(
+        configure({ repoRoot: root, reviewerModel: "mai-code-1.1-flash" }).refusal,
+      );
+      assert.match(unplaceable, /is listed by the copilot-cli transport/);
+      assert.match(unplaceable, /a limit of this framework and not of your seat/);
+    } finally {
+      withoutOverlay(root);
+      ungit();
+      restore();
+    }
+  });
+
+  it("narrows the authoring list by the engine a preference names, before any session has run", () => {
+    // The authoring filter read the engine from the LEDGER alone, so a
+    // repository on its first day named none and the list was not filtered at
+    // all: every model the transport lists was offered as one Claude Code
+    // could author with, while the Vehicle leaf directly above it read
+    // `claude-code` from the same preferences this ignored. Two leaves of one
+    // node, read from two places, disagreeing on exactly the machine the
+    // first-run sessions were about.
+    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
+    const root = tempDir("configuration-");
+    const ungit = inRepository(root);
+    try {
+      setSeatIdentity(SEAT);
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models: [
+          catalogModelRow("claude-haiku-4.5", "anthropic"),
+          catalogModelRow("claude-opus-5", "anthropic"),
+          catalogModelRow("gpt-5.6-sol", "openai"),
+          catalogModelRow("gemini-3.1-pro-preview", "google"),
+        ],
+        retired: [],
+      });
+      // No ledger at all: nothing has been started in this repository.
+      writePreferences({ engine: "claude-code" });
+      withoutOverlay(root);
+
+      const node = configurationNode(root);
+      const authoring = node["authoring"] as Role & { engine: string | null };
+      assert.equal(authoring.engine, "claude-code");
+      assert.deepEqual(
+        authoring.candidates.map((candidate) => candidate.model).sort(),
+        ["claude-haiku-4.5", "claude-opus-5"],
+      );
+
+      // And the label the deleted rules were replaced BY is finally on the
+      // rows. Claude Code's `session start` takes no `--model`, so there is
+      // no authoring model to compare against and every candidate carried
+      // `providerRelation: null` -- on the engine this repository itself runs
+      // on. The engine's PROVIDER is enough to label with and is on the
+      // record from the moment a session starts.
+      const primary = node["primaryReviewer"] as {
+        candidates: { model: string; providerRelation: string | null }[];
+      };
+      const relations = new Map(
+        primary.candidates.map((candidate) => [candidate.model, candidate.providerRelation]),
+      );
+      assert.equal(relations.get("claude-opus-5"), "same-provider");
+      assert.equal(relations.get("gpt-5.6-sol"), "different-provider");
+    } finally {
+      // The engine is a preference and `withoutOverlay` clears selections
+      // only, so it is cleared here rather than left to narrow a later run.
+      writePreferences({ engine: "" });
+      withoutOverlay(root);
+      ungit();
+      restore();
+    }
+  });
 });

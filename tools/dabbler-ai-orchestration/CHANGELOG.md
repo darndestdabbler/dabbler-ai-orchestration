@@ -10,6 +10,93 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.2.0] — 2026-09-11
+
+**The list of models you can choose from is now read from your machine, and
+no longer arrives inside this extension.** Until this release Dabbler carried
+fourteen model names, picked by hand and updated whenever somebody
+remembered. A list that travels in a package is a list about somebody else's
+machine: it went stale the week a vendor shipped anything, it could not know
+what your Copilot seat actually offers, and it refused models you were paying
+for. It is gone. What you may choose is read from your own seat and your own
+API keys, into one file on your machine, and that reading costs nothing to
+take — a vendor's model endpoint is a metadata request, and a seat states its
+own models in the reply to opening a conversation. No prompt is sent and no
+token is billed.
+
+This is a minor release rather than a patch because what you are allowed to
+choose has changed, a refusal you had yesterday is gone, and a file that used
+to be installed with the extension now belongs to your machine.
+
+### Added
+
+- **Update the Catalog**, on the Configuration section, re-reads what this
+  machine can reach. It asks first, tells you the cost — nothing — and runs
+  in a terminal you can watch. Dabbler also re-reads a record that has gone
+  stale at the start of a session, for nothing, and says when it did.
+- **The Configuration section is organised by who is being configured.**
+  Five rows named after the machinery — Engine, Transport, Authoring model,
+  Primary Reviewer, and one for the catalog — become two participants:
+  **Authoring AI**, with its Vehicle and Model, and **Reviewing AI**, with
+  its Vehicle, Primary Model and Auxiliary Model.
+- **The Auxiliary Reviewer has a surface.** It is the third voice that
+  settles a disagreement between the session and its reviewer, it has been
+  dispatchable for some time, and nothing showed it or let you choose it.
+  Now both.
+- **Every model you are offered says what is known about it**: which vendor
+  is behind it, what its source says it costs, and whether it is on the same
+  provider as the model doing the authoring.
+
+### Changed
+
+- **Choosing a reviewer on the same provider as the author is allowed.** It
+  used to be refused. A different vendor *reduces* the chance your reviewer
+  shares the author's blind spots and does not eliminate it — and the old
+  rule waved through two models of one family under different names, which
+  is the case it was named for. So Dabbler labels the choice and leaves it to
+  you. The one thing still refused is a model reviewing its own output.
+- **A model you choose is dispatched or the run stops and names it.** No
+  silent substitution: if the model you pinned cannot be reached, you are
+  told which and why rather than quietly given another.
+- **Your catalog is yours.** The reading records whose seat and which keys it
+  was taken with, and a reading taken on a different machine is treated as
+  not-read rather than believed. Copying the file between machines does
+  nothing.
+- **Costs name the platform that bills them.** A Copilot seat is billed in AI
+  credits per token; where a number comes from the older premium-request
+  scheme, it says so instead of being presented as money.
+- **Nothing writes `DABBLER_TRANSPORT` for you any more.** That variable
+  outranks every other setting, so setting up one project used to change how
+  every other one on the machine routed. Set a checkout's vehicle from the
+  Configuration section, or with `dabbler configure --transport`; where the
+  variable is set and wins anyway, Dabbler now says so instead of letting you
+  believe your setting took.
+
+### Fixed
+
+- **You can change a model you have already chosen.** Choosing a second one
+  was refused — including models your seat plainly lists, and including
+  clearing the choice — so the first selection you made was the last one you
+  could make from any surface. Found by walking the release before shipping
+  it.
+- **A refusal no longer tells you your seat does not list a model your seat
+  lists.** Where Dabbler cannot work out which vendor is behind a model it
+  says so, and says that the limit is its own rather than your seat's.
+- **The Auxiliary Reviewer refuses the model already chosen as the Primary
+  Reviewer**, where it used to accept it — a pairing that would have stopped
+  every disagreement it was asked to settle.
+- **A catalog read on somebody else's machine no longer reports as fresh.**
+  It reports as not-yours, which is the state that has a remedy.
+- **The models offered for authoring are narrowed to the ones your engine can
+  run** on a repository that has not held a session yet, instead of offering
+  every model on the transport.
+- **A refresh is refused during a session by both of the commands that can
+  make one**, not just one of them; and the question the button asks now says
+  so before you click rather than after.
+- **`dabbler discovery drift` reports the models a role could actually use**,
+  instead of listing every id on record — including the embedding, speech and
+  video models that can never answer a prompt.
+
 ## [2.1.3] — 2026-09-10
 
 **Two versions in a row did not reach you, and neither had anything wrong

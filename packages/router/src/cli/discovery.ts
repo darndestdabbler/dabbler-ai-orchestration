@@ -21,7 +21,8 @@ import {
   freshnessMessage,
   isStale,
   refreshCatalog,
-  sessionsInFlight,
+  refreshRefusal,
+  roleNames,
 } from "../discovery.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -97,7 +98,7 @@ export async function discoveryVerb(argv: string[]): Promise<number> {
 
   const config = loadConfig();
   if (subcommand === "drift") {
-    writeOut(formatDrift(computeDrift(config)) + "\n");
+    writeOut(formatDrift(computeDrift(config), roleNames(config).size > 0) + "\n");
     return EXIT_OK;
   }
   if (subcommand === "status") {
@@ -113,15 +114,9 @@ async function commandRefresh(
   config: ReturnType<typeof loadConfig>,
   dryRun: boolean,
 ): Promise<number> {
-  const inFlight = sessionsInFlight();
-  if (inFlight.length > 0 && !dryRun) {
-    writeErr(
-      "refresh: refused -- a session is in flight (" +
-        inFlight.join("; ") +
-        "). Discovery runs between sessions: a session that changes " +
-        "its own verifier pool while running has edited the conditions " +
-        "of its own review.\n",
-    );
+  const refusal = dryRun ? null : refreshRefusal();
+  if (refusal !== null) {
+    writeErr(`refresh: ${refusal}\n`);
     return EXIT_REFUSED;
   }
   const path = currentCatalogPath();
@@ -142,9 +137,14 @@ async function commandRefresh(
   // its catalog, and the refresh is still reported.
   const here = workingDirectory();
   tryWriteProjection(repoRootFor(here) ?? here);
+  // "Every transport this machine has" is what was ATTEMPTED, not what was
+  // read: a seat that is not on PATH and a vendor that did not answer each
+  // leave their block standing and say so in the lines above. The summary
+  // said the stronger thing, which is the half a reader remembers.
   writeOut(
-    `refresh: the catalog at ${path} has been re-read for every transport ` +
-      "this machine has. No tokens were billed: a models endpoint is a " +
+    `refresh: the catalog at ${path} has been re-read where this machine ` +
+      "could be read; a transport that could not be reached says so above and " +
+      "keeps the block it had. No tokens were billed: a models endpoint is a " +
       "metadata request, and a seat states its own list in a protocol reply.\n",
   );
   return EXIT_OK;

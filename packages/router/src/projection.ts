@@ -25,6 +25,7 @@ import {
   type RouterConfig,
 } from "./config.ts";
 import {
+  CATALOG_REFRESH_COMMAND,
   REFRESH_COST,
   apiBlock,
   apiSelectableModels,
@@ -307,6 +308,18 @@ export interface RoleReading {
    * shows nothing rather than a guess.
    */
   readonly priceCategory: ReadonlyMap<string, string>;
+  /**
+   * Every id this transport's block LISTS, offered or not.
+   *
+   * Not the same question as "what could a role resolve to", and the
+   * difference is what a refusal has to be able to say. Five of this seat's
+   * twenty-six models carry a provider the name heuristic cannot place, and
+   * they are filtered out of every role -- so `'grok-4.6' is not a model the
+   * copilot-cli transport lists` was simply untrue: the transport lists it and
+   * the framework declines to offer it, which is a different sentence with a
+   * different remedy.
+   */
+  readonly listed: ReadonlySet<string>;
   /** Why this transport can offer nothing, or null when it can. */
   readonly unavailable: string | null;
 }
@@ -353,15 +366,22 @@ export function roleReading(config: RouterConfig, transport: string): RoleReadin
       resolve: () => NOTHING_RESOLVES,
       retired: new Map(),
       priceCategory: new Map(),
+      listed: new Set<string>(),
       // The reason, not a blank list: "no models" and "this machine has not
       // read its seat yet" are different problems with different remedies,
       // and this one's remedy is free.
+      // **Each branch names the verb that fixes ITS transport.** Both used to
+      // name `dabbler copilot refresh`, which re-reads the seat's list and
+      // touches no provider endpoint -- so the machine with no api reading at
+      // all, which is exactly the machine that needs the right answer, was
+      // sent to the other transport. A remedy that does not remedy is worse
+      // than none: the operator runs it, it succeeds, and nothing changes.
       unavailable: seat
         ? "this machine has not read its seat's model list yet " +
           `(\`${REFRESH_COMMAND}\` reads it, free)`
         : "this machine has not read its providers' model lists yet, or it " +
           "holds a reading taken for a different set of keys " +
-          `(\`${REFRESH_COMMAND}\` reads them, free)`,
+          `(\`${CATALOG_REFRESH_COMMAND}\` reads them, free)`,
     };
   }
   // An id and a date and nothing else, which is all the archive holds: the
@@ -400,6 +420,10 @@ export function roleReading(config: RouterConfig, transport: string): RoleReadin
         .filter((entry) => entry.price_category !== null)
         .map((entry) => [entry.id, entry.price_category as string]),
     ),
+    // The block's own ids, before any role filters them: what the transport
+    // LISTS, which is what a refusal must be able to distinguish from what a
+    // role may draw on.
+    listed: new Set(models.map((entry) => entry.id)),
     unavailable: null,
   };
 }
@@ -597,7 +621,19 @@ function authoringNode(
   reading: RoleReading,
   fidelity: (model: string) => Fidelity,
 ): Node {
-  const { engine, model } = orchestratorOf(root);
+  const { engine: inFlight, model } = orchestratorOf(root);
+  // **The ledger, and where the ledger is silent, the preference.**
+  //
+  // The ledger names an engine once a session has started here, so a
+  // repository on its FIRST day named none and this list was not filtered at
+  // all: the Authoring AI node offered every model the transport lists --
+  // Gemini and GPT among them -- as models Claude Code could author with,
+  // while the Vehicle leaf directly above it read `claude-code` from
+  // `preferences.json`. Two leaves of one node, read from two places,
+  // disagreeing on exactly the machine sessions 131 and 132 were about.
+  // `engineVehicleNode` already reads `inFlight ?? preferred`; this is the
+  // same reading, so the two leaves cannot come apart again.
+  const engine = inFlight ?? chosenEngine();
   const vendor = engine === null ? undefined : ENGINE_PROVIDERS[engine];
   const retired = reading.retired;
   // Resolved through a role NOBODY declares, which is every model the
@@ -812,7 +848,29 @@ export function configurationNode(root: string): Node {
     );
     const author = authoring["chosen"] as Node | null;
     const authorModel = author === null ? null : String(author["model"]);
-    const authorProvider = author === null ? null : String(author["provider"]);
+    // **The author's PROVIDER survives an engine that declares no model.**
+    //
+    // Claude Code's `session start` takes no `--model` and the seat's does, so
+    // a Claude Code session records `{engine, provider}` and no model at all.
+    // Reading the provider off `chosen` alone therefore left it null for the
+    // whole life of every Claude Code session -- and `candidateNode` computes
+    // `providerRelation` only when it has one, so `different provider` /
+    // `same provider` appeared on NO row, on either transport, on the engine
+    // this repository itself runs on. The label was the entire replacement
+    // for three rules session 151 deleted, and it was invisible.
+    //
+    // The engine's provider is enough to label every option and is on the
+    // ledger from `session start`. What it is NOT enough for is the
+    // same-model refusal below, which genuinely needs a model identifier
+    // Claude Code does not report -- so `authorModel` stays null there and
+    // the assertion at the wire remains the only place that rule can be made.
+    const authoringEngine = authoring["engine"] as string | null;
+    const authorProvider =
+      author !== null
+        ? String(author["provider"])
+        : authoringEngine === null
+          ? null
+          : (ENGINE_PROVIDERS[authoringEngine] ?? null);
     const primaryTransport = explainRoleTransport(config, ROLE_PRIMARY_REVIEWER).transport;
     const auxiliaryTransport = explainRoleTransport(config, ROLE_AUXILIARY_REVIEWER).transport;
     /** A reviewing role as this machine would resolve it, on its own vehicle. */

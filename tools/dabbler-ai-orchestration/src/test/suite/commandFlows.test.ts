@@ -1561,5 +1561,12 @@ suite("the Configuration node's refresh", () => {
     assert.deepStrictEqual(ran, [["discovery", "refresh"]]);
     assert.ok(asked.includes("Nothing."), asked);
     assert.ok(asked.includes(ROW.command), asked);
+    // And the one condition under which the answer is no, said BEFORE the
+    // click. The refusal is the right one -- a session that re-reads its own
+    // verifier pool mid-run has edited the conditions of its own review --
+    // but until now the question promised a refresh it was in no position to
+    // offer, and the operator found out in the terminal afterwards.
+    assert.ok(asked.includes("While a session is in flight"), asked);
+    assert.ok(asked.includes("verifier pool"), asked);
   });
 });

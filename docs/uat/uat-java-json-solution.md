@@ -106,35 +106,34 @@ button. Walk finding 6.
 
 ### A — you have a GitHub Copilot seat
 
-No API keys of your own: the seat pays, in premium requests. Nothing here
-reads `DABBLER_ANTHROPIC_API_KEY` or its siblings.
+No API keys of your own: the seat pays, in **AI credits, per token**. Nothing
+here reads `DABBLER_ANTHROPIC_API_KEY` or its siblings.
 
 ```
 copilot --version
-echo %DABBLER_TRANSPORT%
 ```
 
-**Expect** a Copilot CLI version, and `copilot-cli`. If the second is empty,
-either set it, or add `--transport copilot-cli` to the **first** `dabbler
-session next` of each session — the transport is kept from there.
+**Expect** a Copilot CLI version. Then tell this checkout to use the seat:
+
+```
+dabbler configure --transport copilot-cli
+```
+
+**Nothing sets `DABBLER_TRANSPORT` for you.** That variable outranks every
+configuration layer on the machine, so one repository's set-up used to change
+how every other one routed. If it is already set, `configure` says so and
+says which value wins.
 
 **Your session names its model, and that is not optional.** The Start Session
-flow asks for it and refuses to launch a seat without one; Dabbler resolves
-it through its registry and refuses a model it does not know, because a
-seat's own label does not say which vendor answered.
+flow asks for it and refuses to launch a seat without one, because a seat's
+own label does not say which vendor answered.
 
-**Think in pairs, not in single models.** A different provider always checks
-the session's work, so the reviewer comes from the seat's models *excluding
-your engine's vendor*. An engine on a weight-1 Anthropic model leaves the
-reviewer free to be a zero-weight GPT; an engine on a zero-weight GPT forces
-the reviewer onto Anthropic or Google, where the cheapest confirmed model is
-1 and the dearest 15. The full weight table is in
-`docs/uat/uat-dotnet-json-solution.md`.
+**What you may name is read from your seat, not from a list Dabbler ships.**
+Step 0 reads it, free, and everything below assumes you have.
 
 ### B — you have direct API keys
 
-Each vendor bills your own account, per token. You need all three, because
-the reviewer is always a different vendor from the engine:
+Each vendor bills your own account, per token. Set the keys you have:
 
 ```
 DABBLER_ANTHROPIC_API_KEY
@@ -142,13 +141,72 @@ DABBLER_OPENAI_API_KEY
 DABBLER_GEMINI_API_KEY
 ```
 
+Then tell this checkout to use them:
+
 ```
-echo %DABBLER_TRANSPORT%
+dabbler configure --transport api
 ```
 
-**Expect** empty. If it says `copilot-cli`, that machine is set up for part A
-and the seat will be billed; add `--transport api` to the **first** `dabbler
-session next` of the session.
+**A reviewer on a different vendor from the engine is a label and no longer a
+refusal.** Dabbler tells you whether the model you are choosing is on the same
+provider as the one authoring, and lets you decide. Two keys are enough to
+have the choice; three give you more of it. If `DABBLER_TRANSPORT` says
+`copilot-cli` in your environment it outranks the line above and the seat is
+billed — `configure` says so when it happens.
+
+---
+
+## Step 0 — Read what this machine can reach
+
+**Nothing ships a model list.** Dabbler used to carry one inside the
+extension — fourteen names, chosen by hand — and a list that travels in a
+package is a list about somebody else's machine. What you may choose is read
+from *your* seat and *your* keys, into one file on this machine, and reading
+it is free on both transports: a vendor's models endpoint is a metadata
+request, and a seat states its own models in the reply to opening a
+conversation. No prompt is sent and no token is billed.
+
+Do this once per machine, before the first session.
+
+- **Framework —** nothing yet: this is a machine-level reading rather than a
+  repository one, and there is no repository at this point for the framework
+  to have acted in. From the first session onwards it re-reads a record that
+  has gone stale at the start of a session, for nothing, and says when it did.
+- **You —** run **Dabbler: Update the Catalog** from the Configuration
+  section of the Dabbler pane. It asks once, says what it costs — nothing —
+  and runs in a terminal you can watch. On your first time through there is no
+  repository open yet, so take it from the command line; the button is what
+  you use every time after this one.
+- **Underneath —**
+  ```
+  dabbler discovery refresh
+  ```
+
+**Expect two lines and a summary, with your machine's numbers rather than
+these:**
+
+```
+discovery: the seat block has been re-read -- 26 model(s) the seat lists, free, no prompt sent
+discovery: the api block has been re-read -- 196 model(s) recorded, no tokens billed
+refresh: the catalog has been re-read where this machine could be read ...
+```
+
+**A transport you do not have is skipped and says so**, and it never empties
+the block for the one you do — a seat with no provider keys re-reads the seat
+alone, and keys with no seat leave the seat's block exactly where it was.
+*Unread* is not *empty*.
+
+**The reading is yours alone.** The file records whose seat and which set of
+keys it was taken with, and a block recorded for a different seat or key set
+reads as unread rather than believed, whatever its age. Copying the file
+between machines achieves nothing.
+
+**Refresh between sessions, not during one:** a session that changed its own
+reviewer pool while running would have edited the conditions of its own
+review, so the refresh is refused while one is in flight and says why. And the
+list you just read is exactly what **Dabbler: Set the Model** offers and what
+`dabbler configure --reviewer-model` accepts — one reading, so the pane cannot
+offer a model the command would refuse.
 
 ---
 

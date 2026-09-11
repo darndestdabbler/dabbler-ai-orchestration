@@ -23,12 +23,16 @@ import {
   CATALOG_REFRESH_COMMAND,
   RECORD_CATALOG,
   checkFreshness,
+  computeDrift,
+  currentApiScope,
   driftBetween,
   enumerateProvider,
+  formatDrift,
   freshnessMessage,
   freshnessWarnings,
   inFlightSessions,
   isStale,
+  refreshRefusal,
   refreshStaleRecords,
   roleNames,
   setSeatSource,
@@ -45,11 +49,12 @@ import {
   readCatalog,
   setCatalogPath,
   writeBlock,
+  type CatalogModel,
   type TransportBlock,
 } from "../src/catalog.ts";
 import { HttpStatusError, HttpTimeoutError } from "../src/transports/api.ts";
-import { seatModel, type SeatEnumeration } from "../src/transports/copilot.ts";
-import { gitAnswers, makeConfig, setProviderKeys, tempDir } from "./support/answers.ts";
+import { seatModel, seatScope, type SeatEnumeration } from "../src/transports/copilot.ts";
+import { gitAnswers, makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
 import { resetProjectRootCache } from "../src/config.ts";
 import { discoveryVerb } from "../src/cli/discovery.ts";
 import { standIn } from "../src/workdir.ts";
@@ -79,6 +84,20 @@ const NOW = Date.UTC(2026, 7, 27, 12, 0, 0);
 
 function stamp(hoursAgo: number): string {
   return new Date(NOW - hoursAgo * 3_600_000).toISOString().replace(/\.\d+Z$/, "Z");
+}
+
+/** One catalog entry, with only the fields a reading of the ids needs. */
+function catalogRow(id: string, provider = "openai"): CatalogModel {
+  return {
+    id,
+    provider,
+    provider_source: "test",
+    display_name: null,
+    enabled: true,
+    price_category: null,
+    cost: null,
+    listed_at: stamp(1),
+  };
 }
 
 function providerConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -321,17 +340,26 @@ describe("judging a freshness row", () => {
 });
 
 describe("how old this machine's reading is", () => {
-  /** A catalog under the suite's temp root holding exactly these blocks. */
-  function catalogOf(blocks: Record<string, string>): void {
+  /**
+   * A catalog under the suite's temp root holding exactly these blocks.
+   *
+   * Each block carries the scope its transport actually has, because that is
+   * what makes it THIS machine's reading: age is read through `blockFor` like
+   * every other reader, so a block written under a scope nobody is on is
+   * unread and contributes no date. Writing `{}` for both was how these cases
+   * passed while the age reading was the one unscoped reader left.
+   */
+  function catalogOf(blocks: Record<string, string>, config = providerConfig()): void {
     const path = join(tempDir("fresh-"), CATALOG_FILENAME);
     setCatalogPath(path);
     for (const [transport, refreshedAt] of Object.entries(blocks)) {
+      const seat = transport === TRANSPORT_SEAT;
       writeBlock(
         transport,
         {
           refreshed_at: refreshedAt,
-          source: transport === TRANSPORT_SEAT ? SOURCE_SEAT : SOURCE_API,
-          scope: {},
+          source: seat ? SOURCE_SEAT : SOURCE_API,
+          scope: seat ? seatScope(null) : currentApiScope(config),
           models: [],
           retired: [],
         },
@@ -339,6 +367,37 @@ describe("how old this machine's reading is", () => {
       );
     }
   }
+
+  it("reads a block recorded for another machine as unread rather than fresh", () => {
+    // `catalog.ts` binds four readers to scope and names this one among them.
+    // It was the one that walked `transports` directly, so a catalog carried
+    // over from another seat aged as this machine's own and reported FRESH --
+    // the single word that stops an operator refreshing, told to the one
+    // machine whose whole record belongs to somebody else.
+    const path = join(tempDir("fresh-"), CATALOG_FILENAME);
+    setCatalogPath(path);
+    writeBlock(
+      TRANSPORT_SEAT,
+      {
+        refreshed_at: stamp(1),
+        source: SOURCE_SEAT,
+        scope: { seat_host: "https://github.com", seat_login: "somebody-else" },
+        models: [],
+        retired: [],
+      },
+      { path },
+    );
+
+    const row = checkFreshness(providerConfig(), NOW)[0]!;
+    assert.equal(row.present, true);
+    // Unread, not stale: no date, because there is no reading to be old.
+    assert.equal(row.dated_at, null);
+    assert.equal(isStale(row), true);
+    // And it says WHICH transport, because "your record is old" and "your
+    // record is somebody else's" have the same remedy and are not the same
+    // fact.
+    assert.match(freshnessMessage(row), /copilot-cli block it holds was read for a different/);
+  });
 
   it("is one row, whichever transports this machine has", () => {
     // Three rows, and each was named for its implementation: `seat-catalog`
@@ -650,6 +709,52 @@ describe("the record-against-roles diff", () => {
     assert.deepEqual(drift.unnamed, [["seat-only", "api,copilot-cli"]]);
     assert.deepEqual(drift.unavailable, [["gone", "generator,reviewer"]]);
   });
+
+  it("leaves out what no role could resolve to, and says so when no role names a model", () => {
+    // Two ways this report outlived the registry it was written against.
+    //
+    // It listed every id in the record as one that "still qualifies and
+    // simply sorts last" -- 202 of them on this machine, of which 71 were
+    // embeddings, speech, image and video models that qualify for nothing.
+    // The chat rule belongs here for the same reason it belongs where a role
+    // resolves: a report that contradicts the offer teaches its reader to
+    // skip it.
+    const path = join(tempDir("drift-"), CATALOG_FILENAME);
+    setCatalogPath(path);
+    setProviderKeys();
+    try {
+      writeBlock(
+        TRANSPORT_API,
+        {
+          refreshed_at: stamp(1),
+          source: SOURCE_API,
+          scope: currentApiScope(providerConfig()),
+          models: [
+            catalogRow("gpt-5.5"),
+            catalogRow("text-embedding-3-small"),
+            catalogRow("whisper-1"),
+          ],
+          retired: [],
+        },
+        { path },
+      );
+      const drift = computeDrift(providerConfig(), NOW);
+      assert.deepEqual(
+        drift.unnamed.map(([model]) => model),
+        ["gpt-5.5"],
+      );
+    } finally {
+      clearKeys();
+    }
+
+    // And the other half: with the registry gone, a configuration whose roles
+    // name no model cannot have anything MISSING from the record, so a count
+    // of zero there is vacuous rather than clean. The two read identically on
+    // a screen, which is why the report says which one it means.
+    const vacuous = formatDrift({ unnamed: [], unavailable: [], freshness: [] }, false);
+    assert.match(vacuous, /no role in this configuration names a model/);
+    assert.doesNotMatch(vacuous.split("\n")[1] ?? "", /\(0\)/);
+  });
 });
 
 // --- Refresh never happens inside a session ----------------------------------
@@ -676,6 +781,33 @@ describe("reading what is in flight", () => {
       [],
     );
     assert.deepEqual(inFlightSessions(null), []);
+  });
+
+  it("states the refusal once, so both doors into the catalog read the same rule", () => {
+    // `dabbler discovery refresh` refused mid-session and `dabbler copilot
+    // refresh` did not, while both write the seat block of the same catalog:
+    // in one session, on one machine, the first said a session that changes
+    // its own verifier pool has edited the conditions of its own review, and
+    // the second did it and reported success. The rule had one statement and
+    // one of its two doors; this is the statement, and both doors call it.
+    const root = tempDir("refusal-");
+    seed(root, {
+      "docs/sessions/sessions.json": JSON.stringify({
+        schemaVersion: 5,
+        sessions: [{ number: 7, status: "in-progress" }],
+      }),
+    });
+    assert.match(String(refreshRefusal(join(root, "docs", "sessions"))), /session 7/);
+    assert.match(String(refreshRefusal(join(root, "docs", "sessions"))), /verifier pool/);
+
+    const idle = tempDir("refusal-idle-");
+    seed(idle, {
+      "docs/sessions/sessions.json": JSON.stringify({
+        schemaVersion: 5,
+        sessions: [{ number: 7, status: "complete" }],
+      }),
+    });
+    assert.equal(refreshRefusal(join(idle, "docs", "sessions")), null);
   });
 });
 
@@ -751,7 +883,17 @@ describe("what a refresh leaves behind", () => {
     const dated = stamp(1);
     writeBlock(
       TRANSPORT_API,
-      { refreshed_at: dated, source: SOURCE_API, scope: {}, models: [], retired: [] },
+      {
+        refreshed_at: dated,
+        source: SOURCE_API,
+        // The scope this machine is on with its keys taken away: the empty
+        // provider set, which is a scope and not an absent one. Age is read
+        // through `blockFor` now, so a block written under a scope nobody is
+        // on carries no date to report.
+        scope: { providers: [] },
+        models: [],
+        retired: [],
+      },
       { path },
     );
     setCatalogPath(path);

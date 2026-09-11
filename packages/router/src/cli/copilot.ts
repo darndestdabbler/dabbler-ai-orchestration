@@ -15,6 +15,7 @@
 // configuration -- which lockfile, and which binary.
 
 import { loadConfig } from "../config.ts";
+import { refreshRefusal } from "../discovery.ts";
 import { enumerateSeatModels, runRefresh } from "../transports/copilot.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -103,6 +104,17 @@ export async function copilotVerb(argv: string[]): Promise<number> {
       );
       return EXIT_USAGE;
     }
+  }
+
+  // The same rule `dabbler discovery refresh` is held to, read from the one
+  // place it is stated. This verb writes the seat block of the same catalog,
+  // so a session that may not refresh through the other door may not refresh
+  // through this one -- and until now it could, in the same session, and was
+  // told it had succeeded.
+  const refusal = args.dryRun ? null : refreshRefusal();
+  if (refusal !== null) {
+    writeErr(`refresh: ${refusal}\n`);
+    return EXIT_ERROR;
   }
 
   try {

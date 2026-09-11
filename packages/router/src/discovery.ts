@@ -48,6 +48,7 @@ import {
   catalogPresent,
   currentCatalogPath,
   foldListing,
+  isChatModelId,
   readCatalog,
   writeBlock,
   type CatalogModel,
@@ -786,16 +787,42 @@ export function checkFreshness(
 ): FreshnessRow[] {
   const path = currentCatalogPath();
   const catalog = readCatalog(path);
-  // The oldest block this machine holds. A machine with one transport is
+  // **Scoped, like every other reading of a block.** `catalog.ts` binds four
+  // readers to scope and names this one among them -- "how old this machine's
+  // reading is" -- and this is the one that used to walk `transports`
+  // directly. A block recorded for another seat or another set of keys then
+  // aged as though it were ours, and reported FRESH, which is the single word
+  // that stops an operator refreshing: the machine that most needed a refresh
+  // was the one told it did not need one.
+  const believable = [seatBlock(), apiBlock(config)].filter(
+    (block): block is TransportBlock => block !== null,
+  );
+  // A block the file HOLDS that this machine may not believe. Naming the
+  // transport is the difference between "your record is old" and "your record
+  // is somebody else's", which have the same remedy and are not the same
+  // fact. A note makes the row stale, which is what the field is for.
+  const unread: string[] = [];
+  if (catalog?.transports[TRANSPORT_SEAT] !== undefined && seatBlock() === null) {
+    unread.push(TRANSPORT_SEAT);
+  }
+  if (catalog?.transports[TRANSPORT_API] !== undefined && apiBlock(config) === null) {
+    unread.push(TRANSPORT_API);
+  }
+  const notes =
+    unread.length === 0
+      ? []
+      : [
+          `the ${unread.join(" and ")} block it holds was read for a different ` +
+            "seat or a different set of keys, so it is unread rather than stale " +
+            "and no age makes it say more",
+        ];
+  // The oldest block this machine may BELIEVE. A machine with one transport is
   // aged against that transport, and one with neither is *not read yet*:
   // there is no reading to be old.
-  const stamps = Object.values(catalog?.transports ?? {})
+  const stamps = believable
     .map((block) => block.refreshed_at)
     .filter((stamp) => stamp.length > 0)
     .sort();
-  // No notes. A note makes a row stale -- that is what the field is for, and
-  // it is how a partially-read record says so -- and which transports this
-  // machine has is not a defect in the reading.
   return [
     makeRow(
       RECORD_CATALOG,
@@ -805,6 +832,7 @@ export function checkFreshness(
       stamps[0] ?? null,
       catalogPresent(path),
       now,
+      notes,
     ),
   ];
 }
@@ -1231,11 +1259,22 @@ function knownModels(config: RouterConfig): Map<string, string[]> {
     else known.set(id, [source]);
   };
 
-  // Only what a transport currently lists. A retired id is the catalog
-  // saying the model stopped being served, which is exactly what a role
-  // still naming it needs to hear, so it is not knowledge that it exists.
-  for (const entry of apiBlock(config)?.models ?? []) add(entry.id, TRANSPORT_API);
-  for (const entry of seatBlock()?.models ?? []) add(entry.id, TRANSPORT_SEAT);
+  // Only what a transport currently lists, and only what could hold a role.
+  // A retired id is the catalog saying the model stopped being served, which
+  // is exactly what a role still naming it needs to hear, so it is not
+  // knowledge that it exists.
+  //
+  // The chat rule applies here for the same reason it applies where a role is
+  // resolved: a vendor lists everything it serves, and this report said of
+  // `text-embedding-3-small` and `whisper-1` that they "still qualify and
+  // simply sort last". They qualify for nothing. One rule over the ids, read
+  // in both places, rather than a report that contradicts the offer.
+  for (const entry of apiBlock(config)?.models ?? []) {
+    if (isChatModelId(entry.id)) add(entry.id, TRANSPORT_API);
+  }
+  for (const entry of seatBlock()?.models ?? []) {
+    if (isChatModelId(entry.id)) add(entry.id, TRANSPORT_SEAT);
+  }
   return known;
 }
 
@@ -1285,19 +1324,34 @@ export function driftBetween(
   return { unnamed, unavailable, freshness: [...freshness] };
 }
 
-export function formatDrift(drift: Drift): string {
+export function formatDrift(drift: Drift, rolesNameModels = true): string {
   const lines = ["drift: record against roles"];
-  lines.push(
-    `  named in a role, in no record (${drift.unavailable.length}) -- ` +
-      "these roles fall through to whatever else survives:",
-  );
-  for (const [modelId, roles] of drift.unavailable) {
-    lines.push(`    ${modelId}  [${roles}]`);
+  // **When no role names a model, this half is not empty -- it is vacuous**,
+  // and the two read identically on a screen. The registry that named models
+  // per role was deleted, so on a configuration that declares no preference
+  // order the count is zero because there was nothing to compare, not because
+  // everything a role wanted was found. A report that cannot tell those apart
+  // trains its reader to skip it.
+  if (!rolesNameModels) {
+    lines.push(
+      "  named in a role, in no record: nothing to report -- no role in this " +
+        "configuration names a model, so there is nothing that could be missing " +
+        "from the record. A role that names none resolves over the catalog in " +
+        "the order the transport listed it.",
+    );
+  } else {
+    lines.push(
+      `  named in a role, in no record (${drift.unavailable.length}) -- ` +
+        "these roles fall through to whatever else survives:",
+    );
+    for (const [modelId, roles] of drift.unavailable) {
+      lines.push(`    ${modelId}  [${roles}]`);
+    }
+    if (drift.unavailable.length === 0) lines.push("    (none)");
   }
-  if (drift.unavailable.length === 0) lines.push("    (none)");
   lines.push(
     `  in a record, named in no role (${drift.unnamed.length}) -- ` +
-      "these still qualify and simply sort last:",
+      "these are the models a role could resolve to and simply sort last:",
   );
   for (const [modelId, records] of drift.unnamed) {
     lines.push(`    ${modelId}  [${records}]`);
@@ -1318,6 +1372,28 @@ export function formatDrift(drift: Drift): string {
  * Read from the machine-written state and from nothing else -- the presence
  * of a lock file or a run directory is not the record.
  */
+/**
+ * Why a refresh may not happen now, or `null` when it may.
+ *
+ * **One rule, and every door that writes the catalog reads it here.** It was
+ * stated once, inside `dabbler discovery refresh`, while `dabbler copilot
+ * refresh` wrote the same seat block of the same file and walked straight
+ * past it: the two verbs answered the same question differently in the same
+ * session, one refusing with a reason about editing the conditions of your own
+ * review and the other reporting success. A rule applied at one of its two
+ * doors is not a rule; it is a habit the other door does not have.
+ */
+export function refreshRefusal(sessionsDir?: string | null): string | null {
+  const inFlight = sessionsInFlight(sessionsDir);
+  if (inFlight.length === 0) return null;
+  return (
+    "refused -- a session is in flight (" +
+    inFlight.join("; ") +
+    "). Discovery runs between sessions: a session that changes its own " +
+    "verifier pool while running has edited the conditions of its own review."
+  );
+}
+
 export function sessionsInFlight(sessionsDir?: string | null): string[] {
   let root: string;
   try {

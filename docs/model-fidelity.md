@@ -24,9 +24,11 @@ Most of what follows was on disk before a single call was made:
 - **`RouteResult.served_model_id`** — what answered, per call.
 - **`verify/rounds.ts`** writes `requested_model` beside `served_model` on
   every verification round, and has since the 364-request session.
-- **The Copilot seat catalog** (`copilot-catalog.lock`) carries
-  `echoed_model` beside each model's `id`, written by the probe
-  `dabbler copilot` runs.
+- **A seat echo** was recorded beside each catalogued model, written by the
+  probe `dabbler copilot refresh` used to run. Both are gone: an echo could
+  only ever establish a substitution and never fidelity, which is the
+  asymmetry this page exists to state, so paying a prompt per model for it
+  bought nothing the round's own pair does not give free.
 - **The API transport** already compares the two per call and writes a NOTE
   to stderr when they differ.
 

@@ -23,7 +23,12 @@ import { VALID_TRANSPORTS, type Router } from "dabbler-ai-router";
 
 import { resolveRouterCli } from "../router/terminalShim";
 
-import { ENUMERATION_WORDS, FIDELITY_WORDS } from "../providers/solutionTreeModel";
+import {
+  ENUMERATION_WORDS,
+  FIDELITY_WORDS,
+  PROVIDER_RELATION_WORDS,
+  VERIFIER_HELP,
+} from "../providers/solutionTreeModel";
 import type {
   ConfigurationModel,
   Projection,
@@ -154,12 +159,20 @@ function modelItems(
 ): vscode.QuickPickItem[] {
   return models.map((model) => ({
     label: model.model,
-    description:
+    // The row's own words, not a second set: one vocabulary means the pick
+    // and the row cannot come to say different things about one model.
+    description: [
+      model.provider,
+      model.providerRelation ? PROVIDER_RELATION_WORDS[model.providerRelation] : null,
       model.fidelity === undefined
-        ? model.provider
-        : `${model.provider} · ${FIDELITY_WORDS[model.fidelity]}${
-            transport ? ` on ${transport}` : ""
-          }`,
+        ? null
+        : `${FIDELITY_WORDS[model.fidelity]}${transport ? ` on ${transport}` : ""}`,
+      // What the source said it costs, in the source's own word, and
+      // nothing at all where the source said nothing.
+      model.priceCategory ? `${model.priceCategory} price` : null,
+    ]
+      .filter((part) => part !== null && part !== "")
+      .join(" · "),
     detail: model.alias,
   }));
 }
@@ -202,7 +215,7 @@ export async function setEngine(
 async function write(
   router: Pick<Router, "configure">,
   root: string,
-  choice: { transport?: string; authoringModel?: string; verifyingModel?: string },
+  choice: { transport?: string; verifyingModel?: string },
   ui: ConfigurationUi,
   refreshed: () => void,
 ): Promise<void> {
@@ -308,12 +321,16 @@ export async function viewRecord(
 }
 
 /**
- * Which model authors, and which one verifies.
+ * Which model verifies the next session.
  *
- * The candidates offered are the ones the router already resolved for that
- * role -- for the verifier, the list left after the authoring model's own
- * provider is excluded. The refusals still come from the router: a list is
- * an offer, and the rule is what decides.
+ * The candidates offered are the ones the router already resolved, and the
+ * refusals still come from the router: a list is an offer, and the rule is
+ * what decides.
+ *
+ * **The authoring model is not set here and cannot be.** It is the engine's,
+ * declared at `session start` and on the ledger from that moment, so this
+ * says so rather than offering a choice the record will not honour -- which
+ * is what it used to do, writing a role that nothing dispatched.
  */
 export async function setRoleModel(
   router: Pick<Router, "configure">,
@@ -325,9 +342,15 @@ export async function setRoleModel(
   if (!root) return;
   if (!target.node || target.node.kind !== "configRole") return;
   const authoring = target.node.role === "authoring";
-  const role = authoring
-    ? target.projection?.configuration?.authoring
-    : target.projection?.configuration?.verifying;
+  if (authoring) {
+    ui.showInformationMessage(
+      "The authoring model is the engine's own, declared when the session is " +
+        "registered: run `dabbler session start` with `--model`, or use Start " +
+        "Session, which asks for it. Changing it here would not reach the run.",
+    );
+    return;
+  }
+  const role = target.projection?.configuration?.verifying;
   const items = modelItems(
     role?.candidates ?? [],
     target.projection?.configuration?.fidelityTransport,
@@ -349,18 +372,9 @@ export async function setRoleModel(
     return;
   }
   const picked = await ui.pick(items, {
-    title: authoring ? "Which model authors the next session's calls?" : "Which model verifies it?",
-    placeHolder:
-      !authoring && (role?.excludes ?? []).length > 0
-        ? `From another provider than the authoring model's (${(role?.excludes ?? []).join(", ")}). ${NEXT_SESSION}`
-        : NEXT_SESSION,
+    title: "Which model verifies the next session?",
+    placeHolder: VERIFIER_HELP + " " + NEXT_SESSION,
   });
   if (!picked) return;
-  await write(
-    router,
-    root,
-    authoring ? { authoringModel: picked.label } : { verifyingModel: picked.label },
-    ui,
-    refreshed,
-  );
+  await write(router, root, { verifyingModel: picked.label }, ui, refreshed);
 }

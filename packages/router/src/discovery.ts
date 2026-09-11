@@ -62,6 +62,7 @@ import {
   httpGetJson,
 } from "./transports/api.ts";
 import { resolveSecret } from "./secretResolver.ts";
+import { providerReachable } from "./selection.ts";
 import {
   PLATFORM_AI_CREDITS,
   SEAT_COST_COMMAND,
@@ -893,6 +894,32 @@ export async function refreshStaleRecords(
  */
 export function apiBlock(config: RouterConfig): TransportBlock | null {
   return blockFor(readCatalog(), TRANSPORT_API, currentApiScope(config));
+}
+
+/**
+ * The models the direct-API path may actually dispatch to.
+ *
+ * **Selection can never land on a model the process could not call.** The
+ * registry enumeration this replaced checked each candidate's provider was
+ * enabled and keyed; the catalog reading did not, on the argument that a
+ * block whose recorded scope no longer matches reads as unread. That is true
+ * and it is not the same guarantee -- the scope moves all at once, so it
+ * says nothing about THIS candidate's provider being reachable right now,
+ * and `buildPath`'s "unreachable: a candidate only survives selection if its
+ * provider is configured" is only true while this is applied.
+ *
+ * It belongs HERE and not in the shared enumeration rule, because a seat has
+ * no provider API keys at all: applying it there is what made a Copilot seat
+ * with eighteen working models read "nothing resolves", which is the defect
+ * session 145 shipped and 146 repaired.
+ */
+export function apiSelectableModels(
+  config: RouterConfig,
+  block: TransportBlock | null = apiBlock(config),
+): readonly CatalogModel[] {
+  return (block?.models ?? []).filter(
+    (entry) => entry.provider !== null && providerReachable(config, entry.provider),
+  );
 }
 
 export function currentApiScope(config: RouterConfig): CatalogScope {

@@ -23,30 +23,33 @@ export type RouterConfig = {
     };
   }>;
   /**
-   * How capable a model is, as an ORDER: most capable first, and a tier name means only its position here. A verifying model may not sit below the authoring model's tier, because a review is worth what the reviewer is. Data rather than a judgement compiled into a function, because capability is a thing vendors change. This list is the one home for the names -- a model whose capability_tier is not one of these is refused at load, and the shape is checked here while the membership is checked there.
+   * What a direct-API dispatch needs that the catalog does not state: how much output to ask for, how large a prompt may get, which system prompt to send, and the provider's own generation knobs. There are NO MODEL NAMES in this block, which is the point of it -- a block with no model names in it cannot go stale the week a vendor ships a model nobody has added. The seat reads none of it: the CLI exposes no knobs.
    */
-  capability_tiers?: string[];
-  models: Record<string, {
-    provider: string;
+  provider_defaults?: Record<string, {
     /**
-     * Which tier of capability_tiers this model sits in. Absent is UNKNOWN and never unsupported: a model the record says nothing about stays eligible, because a hard filter on missing metadata would end cross-vendor verification by accident.
+     * The SMALLEST window this provider serves: all it does is refuse an oversized prompt early.
      */
-    capability_tier?: string;
-    model_id?: string;
-    is_enabled?: boolean;
-    is_enabled_as_verifier?: boolean;
     max_context_tokens?: number;
+    /**
+     * This framework's output budget for the provider, well under every model's ceiling.
+     */
     max_output_tokens?: number;
+    /**
+     * One consolidated file with an H2 section per provider slug; it was always read per provider.
+     */
     system_prompt_file?: string;
-    notes?: string;
     generation_params?: Record<string, unknown>;
   }>;
   /**
-   * Selection by role, applied identically on both transports. A role declares the provider set it may draw from (a hard filter) and a preference order (ordering only -- a model the order does not name still qualifies and simply sorts after the named ones). Names in 'prefer' are model ids as each transport puts them on the wire, so a name that matches nothing on this path is inert rather than an error.
+   * Selection by role, applied identically on both transports. A role declares the provider set it may draw from (a hard filter) and a preference order (ordering only -- a model the order does not name still qualifies and simply sorts after the named ones). Names in 'prefer' are model ids as each transport puts them on the wire, so a name that matches nothing on this path is inert rather than an error. A role may also carry a 'pin': the one model a person chose for it, which the runtime honours or stops on -- distinct from 'prefer', which is only an order.
    */
   roles?: Record<string, {
     prefer?: string[];
     require_provider_in?: string[];
+    /**
+     * The one model a person chose for this role. A pin is an instruction rather than an ordering: the caller's provider exclusion does not apply over it, nothing is substituted for it, and a pin this machine cannot dispatch to is a visible stop.
+     */
+    pin?: string;
   }>;
   escalation: {
     enabled: boolean;
@@ -75,6 +78,9 @@ export type RouterConfig = {
       };
     };
   };
+  /**
+   * Per task type, the generation knobs that task wants, keyed by PROVIDER. These were always provider-shaped: effort and thinking are Anthropic vocabulary, reasoning_effort OpenAI, thinking_budget Google.
+   */
   task_type_params?: Record<string, unknown>;
   /**
    * Suites, deterministic controls, and the path-to-test selection rules. A repository declares this in its own tracked dabbler.yaml; the block appears here because that file is deep-merged onto this one and the merged result is validated as a whole.

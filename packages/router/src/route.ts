@@ -26,17 +26,20 @@ import {
   TRANSPORT_COPILOT_CLI,
   TRANSPORT_OFFLINE,
   loadConfig,
+  providerDefaults,
   resolveGenerationParams,
   resolveTransport,
   truthy,
   type RouterConfig,
 } from "./config.ts";
+import { apiBlock, apiSelectableModels } from "./discovery.ts";
 import { recordCall, type CallRecord } from "./metrics.ts";
 import { isNoRouterMode } from "./runtimeMode.ts";
 import {
-  ROLE_GENERATOR,
-  explainRegistryCandidates,
+  ROLE_VERIFIER,
+  effectiveExclusion,
   fellThroughWarning,
+  verifierRefusal,
   type Candidate as RoleCandidate,
   type RoleResolution,
 } from "./selection.ts";
@@ -514,6 +517,30 @@ export function assertNotExcluded(
 }
 
 /**
+ * The one rule, asserted where a dispatch cannot get past it.
+ *
+ * A pin is honoured over the caller's provider exclusion, deliberately: a
+ * default does not overrule a person. But a pin outlives the session that
+ * set it, and `configure` can only check it against the author of the day it
+ * was written -- so the next session declares a different model, the pin is
+ * still honoured, and the model reviews its own literal output. Checked
+ * again here, against the author this call actually has, because a rule the
+ * surface keeps and the runtime does not is not a rule.
+ *
+ * The words are `verifierRefusal`'s, so the operator reads one sentence
+ * wherever this is refused.
+ */
+export function assertNotTheAuthor(
+  candidate: Candidate,
+  authorModel: string | null | undefined,
+): void {
+  if (!authorModel) return;
+  const refusal = verifierRefusal(authorModel, candidate.model_id);
+  if (refusal === null) return;
+  throw new ExcludedProviderError(`${refusal} Refusing to dispatch.`);
+}
+
+/**
  * The direct-API ladder for a role: every enabled, reachable, unexcluded
  * registry entry in the role's order. Empty is not a ladder -- a call with
  * nothing to dispatch to fails closed here rather than silently picking a
@@ -525,23 +552,67 @@ export function apiLadder(
   taskType: string,
   exclude: readonly string[],
 ): Candidate[] {
-  const models = record(config["models"]);
-  const resolution = explainRegistryCandidates(config, role, exclude);
+  // The catalog is the inventory on this path as it already is on the seat's:
+  // what this machine's own vendors listed, scoped to the keys that read them,
+  // so a block recorded for a different key set reads as unread rather than
+  // believed. There is no alias -- the id the vendor lists is the id that goes
+  // on the wire.
+  const block = apiBlock(config);
+  // Reachability is the direct-API path own guard, applied here and not in
+  // the shared enumeration rule: a seat has no provider keys at all.
+  const resolution = explainRoleCandidates(config, apiSelectableModels(config, block), role, exclude);
   warnIfFellThrough(resolution, role);
-  const ladder: Candidate[] = resolution.candidates.map(([, , alias]) => ({
-    alias,
-    model_id: String(record(models[alias])["model_id"]),
-    provider: String(record(models[alias])["provider"]),
+  const ladder: Candidate[] = resolution.candidates.map(([modelId, provider]) => ({
+    alias: modelId,
+    model_id: modelId,
+    provider,
   }));
   if (ladder.length === 0) {
-    throw new NoCandidateError(
-      "no enabled model in router-config.yaml survives the " +
-        `provider exclusion ${renderList(exclude)} for the '${role}' role ` +
-        `(task_type='${taskType}'). Enable a model from a surviving ` +
-        "provider, or set its API key.",
-    );
+    throw new NoCandidateError(unreachableLadder(resolution, role, taskType, exclude, block === null));
   }
   return ladder;
+}
+
+/**
+ * Why a ladder is empty, in words the person who has to act can act on.
+ *
+ * A pin nobody can dispatch to is its own situation and is named as one: the
+ * operator chose that model, and telling them "no candidate survived the
+ * exclusion" would describe a rule that was not even applied to their choice.
+ * It never falls to the next model, because falling through is the silent
+ * substitution the pin exists to stop.
+ */
+function unreachableLadder(
+  resolution: RoleResolution<readonly [string, string]>,
+  role: string,
+  taskType: string,
+  exclude: readonly string[],
+  unread: boolean,
+): string {
+  if (resolution.pinUnmet !== null) {
+    return (
+      `the '${role}' role is pinned to '${resolution.pinUnmet}', and this ` +
+      "machine cannot dispatch to it: " +
+      (unread
+        ? "it has not read its model lists yet, or holds a reading taken " +
+          "for a different seat or set of keys"
+        : "the transport in force does not list that model, or its " +
+          "provider has no key here") +
+      `. Nothing was substituted for it. Refresh the catalog with \`${REFRESH_COMMAND}\`, ` +
+      "or choose a model this machine lists with `dabbler configure " +
+      `--${role === ROLE_VERIFIER ? "verifying" : "authoring"}-model <id>\`.`
+    );
+  }
+  return (
+    (unread
+      ? "this machine has not read its providers' model lists yet, or it " +
+        "holds a reading taken for a different set of keys -- " +
+        `\`${REFRESH_COMMAND}\` reads them, free. `
+      : "no model this machine's providers list survives the ") +
+    `provider exclusion ${renderList(exclude)} for the '${role}' role ` +
+    `(task_type='${taskType}'). Set a surviving provider's API key, or ` +
+    "refresh the catalog."
+  );
 }
 
 /**
@@ -574,8 +645,7 @@ export function seatLadder(
   );
   if (ladder.length === 0) {
     throw new NoCandidateError(
-      "copilot-cli: no confirmed catalog entry survives the " +
-        `provider exclusion ${renderList(exclude)} for the '${role}' role`,
+      unreachableLadder(resolution, role, "seat", exclude, catalog.length === 0),
     );
   }
   return ladder;
@@ -714,6 +784,19 @@ export interface RouteOptions {
   readonly role?: string;
   readonly sessionNumber?: number | null;
   readonly excludeProviders?: readonly string[] | null;
+  /**
+   * The model this call's work was authored by, where the caller knows it.
+   *
+   * The one rule is asserted immediately before the wire from this, not only
+   * where a choice is written. `configure` refuses a verifier equal to the
+   * author when the pin is SET, and a pin outlives the session it was set
+   * in: the next session declares a different model at `session start`, the
+   * pin is honoured over the caller's provider exclusion because a default
+   * does not overrule a person, and the model reviews its own output. A
+   * rule the surface keeps and the runtime does not is the split session 144
+   * exists to close.
+   */
+  readonly authorModel?: string | null;
   readonly transport?: string | null;
   /**
    * One further turn, decided from the first answer. Return the text to send
@@ -771,13 +854,28 @@ async function routeLive(
 ): Promise<RouteResult> {
   const taskType = options.taskType ?? "general";
   const context = options.context ?? "";
-  const role = options.role ?? ROLE_GENERATOR;
+  // Named by the caller, always. It used to fall back to a 'generator' role
+  // that nothing dispatched -- every one of this function's four callers
+  // names a role, and none named that one -- so the fallback's only effect
+  // was to give the pane a second author it could filter the wrong list
+  // against.
+  const role = options.role;
+  if (role === undefined || role.trim() === "") {
+    throw new RouterError(
+      "route() needs the role this call is dispatching as: a role decides " +
+        "which models may answer and what generation settings they get, and " +
+        "there is no default worth guessing.",
+    );
+  }
 
   if (isNoRouterMode()) return buildNoRouterStub();
 
   const config = getConfig();
   const transportName = resolveTransport(config, options.transport ?? null);
-  const exclude = normalizeExclusions(options.excludeProviders);
+  // Read once, here, and used both to build the ladder and to re-assert
+  // immediately before the wire. A caller's exclusion is a default, and a
+  // default does not overrule a person who pinned this role.
+  const exclude = effectiveExclusion(config, role, options.excludeProviders ?? null);
 
   const path = buildPath(config, transportName, role, taskType, exclude);
 
@@ -792,6 +890,10 @@ async function routeLive(
 
   for (;;) {
     assertNotExcluded(current, exclude);
+    // The pin is honoured over the exclusion; it is not honoured over the
+    // one rule. Asserted per candidate, so an escalation cannot step onto
+    // the author either.
+    assertNotTheAuthor(current, options.authorModel);
 
     const [systemPrompt, userMessage] = buildPrompt(
       content,
@@ -952,13 +1054,12 @@ function buildPath(
     };
   }
 
-  const models = record(config["models"]);
   const providers = record(config["providers"]);
   return {
     ladder: apiLadder(config, role, taskType, exclude),
     escalates: true,
     dispatch: (candidate, systemPrompt, userMessage, genParams) => {
-      const entry = record(models[candidate.alias]);
+      const defaults = providerDefaults(config, candidate.provider);
       const api = new DirectApiTransport(
         candidate.provider,
         record(providers[candidate.provider]),
@@ -967,13 +1068,13 @@ function buildPath(
         model_id: candidate.model_id,
         system_prompt: systemPrompt,
         user_message: userMessage,
-        max_tokens: Number(entry["max_output_tokens"]),
+        max_tokens: Number(defaults["max_output_tokens"]),
         generation_params: genParams,
       });
     },
-    modelConfig: (candidate) => record(models[candidate.alias]),
+    modelConfig: (candidate) => providerDefaults(config, candidate.provider),
     generationParams: (candidate) =>
-      resolveGenerationParams(candidate.alias, taskType, config),
+      resolveGenerationParams(candidate.provider, taskType, config),
     rateLimit: (candidate) => {
       const limiter = state.rateLimiters[candidate.provider];
       if (limiter === undefined) {

@@ -67,14 +67,12 @@ transport:
 # ids as each transport puts them on the wire, so a name that exists on only
 # one path is inert on the other rather than an error.
 roles:
-  generator:
-    prefer: [claude-sonnet-5, gpt-5.5, gemini-3.1-pro-preview]
-    require_provider_in: [anthropic, openai, google]
   verifier:
     # A verifier's job is to be right about whether work ships, which is the
-    # wrong place to economise. Entries the registry marks
-    # is_enabled_as_verifier: false are refused on both transports, so this
-    # order never names one.
+    # wrong place to economise -- so this order names the models worth asking
+    # first. It is an ORDER and not a permission: nothing is refused for being
+    # absent from it, because which model is fit to review another is a
+    # judgement this framework has no data to make and the developer does.
     prefer: [gpt-5.6-terra, gpt-5.6-sol, gpt-5.4, claude-sonnet-5]
     require_provider_in: [anthropic, openai, google]
   plan-review:
@@ -116,285 +114,104 @@ discovery:
   key_set_id: default
   max_age_hours: 24
 
-# How capable a model is, as an ORDER rather than a judgement in code. Most
-# capable first, and the names mean only their position in this list: a
-# verifying model may not sit below the authoring model's tier, because a
-# review is worth what the reviewer is. It is data because capability is a
-# thing vendors change — a tier compiled into a function goes stale the week
-# after a release and nobody can see that it has. The list is the one home
-# for the names; a model naming a tier that is not here is refused at load.
-capability_tiers: [frontier, workhorse, fast]
-
-# --- Model Registry ---
-# is_enabled: in the routed pool at all (identity-only entries set false —
-#   they exist so orchestrator identity can resolve).
-# is_enabled_as_verifier: trusted to review another model's output. It is a
-#   property of the record rather than of a role, because it says what a model
-#   may be asked to do and not which order the candidates are tried in.
-# capability_tier: which tier of capability_tiers this model sits in. Absent
-#   is UNKNOWN, never unsupported: a model the record says nothing about
-#   stays eligible, because a hard filter on missing metadata would end
-#   cross-vendor verification by accident the first time a vendor ships one.
-models:
-  gemini-flash:
-    provider: google
-    model_id: gemini-2.5-flash
-    capability_tier: fast
-    is_enabled: true
-    is_enabled_as_verifier: true
-    max_context_tokens: 1048576
-    max_output_tokens: 65536
-    system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Best for simple analysis, formatting, boilerplate generation."
-    generation_params:
-      thinking_budget: 0
-
-  gemini-pro:
-    provider: google
-    model_id: gemini-2.5-pro
-    capability_tier: workhorse
-    is_enabled: true
-    is_enabled_as_verifier: true
-    max_context_tokens: 1048576
-    max_output_tokens: 65536
-    system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Medium-complexity analysis, documentation, code review."
-    generation_params:
-      thinking_budget: -1
-
-  gemini-3-1-pro:
-    provider: google
-    model_id: gemini-3.1-pro-preview
-    capability_tier: frontier
-    is_enabled: true
-    # New model: generator + explicit-call only until calibrated.
-    is_enabled_as_verifier: false
-    max_context_tokens: 1048576
-    max_output_tokens: 65536
-    system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Frontier Google Pro (preview id; may change at GA)."
-    generation_params:
-      thinking_level: HIGH
-
-  sonnet:
-    provider: anthropic
-    model_id: claude-sonnet-5
-    capability_tier: workhorse
-    is_enabled: true
-    is_enabled_as_verifier: true
+# --- Per-provider dispatch defaults ---
+# What a direct-API dispatch needs to know that the catalog does not state:
+# how much output to ask for, how big a prompt may get, which system prompt to
+# send, and the provider's own generation knobs. There are NO MODEL NAMES in
+# this block, and that is the whole point of it -- a block with no model names
+# in it cannot go stale the week a vendor ships a model nobody has added here.
+#
+# The numbers are this framework's budgets rather than any model's ceiling:
+# every model these providers serve accepts far more output than is asked for
+# here, and `max_context_tokens` is the SMALLEST window that provider serves,
+# because the only thing it does is refuse a prompt early.
+#
+# The seat reads none of this: `route.ts` returns `{}` for both model config
+# and generation params on that transport, because the CLI exposes no knobs.
+provider_defaults:
+  anthropic:
     max_context_tokens: 200000
-    max_output_tokens: 16000
+    max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Anthropic quality without Opus cost."
     generation_params:
       effort: medium
       thinking:
-        enabled: false
-        type: adaptive
-
-  opus:
-    provider: anthropic
-    model_id: claude-opus-5
-    capability_tier: frontier
-    is_enabled: true
-    is_enabled_as_verifier: true
-    max_context_tokens: 200000
-    max_output_tokens: 32000
-    system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Reserved for complex architectural reasoning."
-    generation_params:
-      effort: high
-      thinking:
         enabled: true
         type: adaptive
-
-  fable:
-    provider: anthropic
-    model_id: claude-fable-5
-    # Registered, not routed: enabling it is an operator decision, not a
-    # default.
-    capability_tier: frontier
-    is_enabled: false
-    is_enabled_as_verifier: false
-    max_context_tokens: 200000
-    max_output_tokens: 32000
-    system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Claude Fable 5. Present so a Fable-5 orchestrator can record its identity."
-
-  gpt-5-4:
-    provider: openai
-    model_id: gpt-5.4
-    capability_tier: frontier
-    is_enabled: true
-    is_enabled_as_verifier: true
+  openai:
     max_context_tokens: 272000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Frontier OpenAI model; cross-provider verifier for Anthropic/Google output."
     generation_params:
       reasoning_effort: high
-
-  gpt-5-5:
-    provider: openai
-    model_id: gpt-5.5
-    capability_tier: frontier
-    is_enabled: true
-    is_enabled_as_verifier: true
-    max_context_tokens: 272000
-    max_output_tokens: 32000
+  google:
+    max_context_tokens: 1048576
+    max_output_tokens: 65536
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Frontier OpenAI model (GPT-5.5). Cross-provider verifier + consensus engine."
     generation_params:
-      reasoning_effort: high
+      thinking_budget: -1
 
-  gpt-5-6-sol:
-    provider: openai
-    model_id: gpt-5.6-sol
-    capability_tier: frontier
-    is_enabled: true
-    is_enabled_as_verifier: true
-    max_context_tokens: 272000
-    max_output_tokens: 32000
-    system_prompt_file: prompt-templates/system-prompts.md
-    notes: "GPT-5.6 'Sol' — the most capable of the 5.6 variants."
-    generation_params:
-      reasoning_effort: high
-
-  gpt-5-6-terra:
-    provider: openai
-    model_id: gpt-5.6-terra
-    capability_tier: frontier
-    is_enabled: true
-    is_enabled_as_verifier: true
-    max_context_tokens: 272000
-    max_output_tokens: 32000
-    system_prompt_file: prompt-templates/system-prompts.md
-    # Published per-1M-token price, recorded in notes because the model
-    # schema (src/generated/router-config.ts) has no structured pricing
-    # field: $2.00 in / $12.00 out, against Sol's $5.00 / $30.00.
-    notes: "GPT-5.6 'Terra' -- verification-grade at less than half Sol's price."
-    generation_params:
-      reasoning_effort: high
-
-  gpt-5-6-luna:
-    provider: openai
-    model_id: gpt-5.6-luna
-    capability_tier: workhorse
-    is_enabled: true
-    # Enabled so a discovery fan-out can prefer it by name, kept out of the
-    # verifier pool so it can never review work it is not strong enough to
-    # judge.
-    is_enabled_as_verifier: false
-    max_context_tokens: 272000
-    max_output_tokens: 32000
-    system_prompt_file: prompt-templates/system-prompts.md
-    notes: "GPT-5.6 'Luna' — breadth-of-findings work only."
-    generation_params:
-      reasoning_effort: high
-
-  haiku:
-    provider: anthropic
-    model_id: claude-haiku-4-5-20251001
-    capability_tier: fast
-    is_enabled: true
-    # Enabled so a follow-through study can prefer it by name, kept out of the
-    # verifier pool for the same reason as Luna.
-    is_enabled_as_verifier: false
-    max_context_tokens: 200000
-    max_output_tokens: 8000
-    system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Anthropic's small model. Used as a stand-in for a reader who will not puzzle things out."
-
-  gpt-5-4-mini:
-    provider: openai
-    model_id: gpt-5.4-mini
-    capability_tier: fast
-    is_enabled: true
-    is_enabled_as_verifier: true
-    max_context_tokens: 400000
-    max_output_tokens: 16000
-    system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Small OpenAI model; cross-provider verifier for Gemini output."
-    generation_params:
-      reasoning_effort: medium
-
-  # --- Identity-registry-only entries ---
-  # Orchestrator models outside the routed pool that must still resolve in
-  # the registry so identity resolution and the verifier exclusion can
-  # derive their effective provider. is_enabled: false keeps them out of
-  # every selection path.
-  gemini-3-pro:
-    provider: google
-    model_id: gemini-3-pro-preview
-    capability_tier: frontier
-    is_enabled: false
-    is_enabled_as_verifier: false
-    notes: "Identity registry only: Gemini Code Assist orchestrator sessions."
-
+# Per task type, the generation knobs that task wants, keyed by PROVIDER --
+# the same re-keying as provider_defaults and for the same reason. These were
+# always provider-shaped rather than model-shaped: `effort` and `thinking` are
+# Anthropic's vocabulary, `reasoning_effort` is OpenAI's and `thinking_budget`
+# is Google's, and every entry for one provider said very nearly the same
+# thing. Where two models of one provider disagreed, the value that is valid
+# for EVERY model that provider serves wins -- Google's 0 became 128, because
+# Pro rejects 0 ("only works in thinking mode") and 128 is its minimum.
 task_type_params:
   formatting:
-    sonnet: {effort: low, thinking: {enabled: false}}
-    opus: {effort: low, thinking: {enabled: false}}
-    gemini-flash: {thinking_budget: 0}
-    gemini-pro: {thinking_budget: 128}   # Pro rejects 0 ("only works in thinking mode"); 128 is its minimum
-    gpt-5-4-mini: {reasoning_effort: none}
-    gpt-5-4: {reasoning_effort: none}
+    anthropic: {effort: low, thinking: {enabled: false}}
+    google: {thinking_budget: 128}
+    openai: {reasoning_effort: none}
   summarization:
-    sonnet: {effort: low, thinking: {enabled: false}}
-    opus: {effort: low, thinking: {enabled: false}}
-    gemini-flash: {thinking_budget: 0}
-    gemini-pro: {thinking_budget: 128}   # Pro rejects 0 ("only works in thinking mode"); 128 is its minimum
-    gpt-5-4-mini: {reasoning_effort: none}
-    gpt-5-4: {reasoning_effort: low}
+    anthropic: {effort: low, thinking: {enabled: false}}
+    google: {thinking_budget: 128}
+    openai: {reasoning_effort: low}
   documentation:
-    sonnet: {effort: low, thinking: {enabled: false}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4-mini: {reasoning_effort: low}
+    anthropic: {effort: low, thinking: {enabled: false}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: low}
   session-close-out:
-    sonnet: {effort: low, thinking: {enabled: false}}
-    gemini-pro: {thinking_budget: 128}   # Pro rejects 0 ("only works in thinking mode"); 128 is its minimum
-    gpt-5-4-mini: {reasoning_effort: none}
+    anthropic: {effort: low, thinking: {enabled: false}}
+    google: {thinking_budget: 128}
+    openai: {reasoning_effort: none}
   test-generation:
-    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4-mini: {reasoning_effort: medium}
+    anthropic: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: medium}
   code-review:
-    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4-mini: {reasoning_effort: medium}
+    anthropic: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: medium}
   analysis:
-    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4-mini: {reasoning_effort: medium}
+    anthropic: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: medium}
   refactoring:
-    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4-mini: {reasoning_effort: medium}
+    anthropic: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: medium}
   session-verification:
-    sonnet: {effort: high, thinking: {enabled: true, type: adaptive}}
-    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4: {reasoning_effort: high}
-    gpt-5-4-mini: {reasoning_effort: high}
+    anthropic: {effort: high, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: high}
   security-review:
-    sonnet: {effort: high, thinking: {enabled: true, type: adaptive}}
-    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4: {reasoning_effort: high}
+    anthropic: {effort: high, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: high}
   architecture:
-    opus: {effort: max, thinking: {enabled: true, type: adaptive}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4: {reasoning_effort: xhigh}
+    anthropic: {effort: max, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: xhigh}
   planning:
-    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4: {reasoning_effort: high}
+    anthropic: {effort: high, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: high}
   verification:
-    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
-    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4: {reasoning_effort: high}
-    gpt-5-4-mini: {reasoning_effort: medium}
+    anthropic: {effort: high, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: high}
 
 escalation:
   enabled: true

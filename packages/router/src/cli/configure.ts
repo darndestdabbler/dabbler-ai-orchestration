@@ -14,30 +14,29 @@
 // other side: `session start` takes it as an argument, so the default belongs
 // to whichever surface offers to start one.
 //
-// The two refusals are read from selection rather than restated. A verifying
-// model on the authoring model's own provider is refused because
-// cross-provider review is an invariant of dispatch; one below the authoring
-// model's declared tier is refused because a review is worth what the
-// reviewer is. Both sentences come back from `verifierRefusal`, so the
-// operator reads the rule's own words and not this file's paraphrase of them.
+// **It offers from the list it checks against.** Both come from
+// `projection.roleReading`, the one transport-scoped reading of the
+// catalog, so the models this verb accepts are exactly the models the pane
+// offered on the same machine. They used to be two lists: this verb walked
+// the model registry whatever the transport was, and on a seat -- whose
+// models were never in that registry -- it refused every model the pane had
+// just listed.
+//
+// The refusal is read from selection rather than restated, so the operator
+// reads the rule's own words and not this file's paraphrase of them.
 
 import {
   ConfigError,
   VALID_TRANSPORTS,
+  explainTransport,
   loadConfig,
   writeConfigurationChoice,
   type ConfigurationChoice,
-  type RouterConfig,
 } from "../config.ts";
 import { repoRootFor } from "../journal.ts";
 import { workingDirectory } from "../workdir.ts";
-import { tryWriteProjection } from "../projection.ts";
-import {
-  ROLE_GENERATOR,
-  ROLE_VERIFIER,
-  explainRegistryCandidates,
-  verifierRefusal,
-} from "../selection.ts";
+import { orchestratorOf, roleReading, tryWriteProjection, type RoleReading } from "../projection.ts";
+import { ROLE_VERIFIER, verifierRefusal } from "../selection.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;
@@ -46,8 +45,8 @@ const EXIT_USAGE = 2;
 
 function usage(): string {
   return [
-    "usage: dabbler configure [-h] [--transport T] [--authoring-model M]",
-    "                         [--verifying-model M] [--repo-root PATH]",
+    "usage: dabbler configure [-h] [--transport T] [--verifying-model M]",
+    "                         [--repo-root PATH]",
     "",
     "  what the NEXT session is run with, written to local-overrides.yaml",
     "",
@@ -55,72 +54,42 @@ function usage(): string {
     `  --transport T           ${VALID_TRANSPORTS.join(" | ")}; how a provider is`,
     "                          reached. An environment variable outranks this file,",
     "                          and the answer says so when one does",
-    "  --authoring-model M     the model the generator role tries first, by registry",
-    "                          alias or by model id",
-    "  --verifying-model M     likewise for the verifier role. Refused on the",
-    "                          authoring model's own provider, and refused below its",
-    "                          declared capability tier",
+    "  --verifying-model M     the model that reviews the next session, named as",
+    "                          the transport in force lists it. The one refusal",
+    "                          is the AUTHORING model itself -- which is the",
+    "                          engine's, declared at `session start` -- and",
+    "                          another model on the same provider is allowed",
     "  --repo-root PATH        the repository; derived from the cwd when absent",
     "  -h, --help              show this message",
     "",
   ].join("\n");
 }
 
+/** Every model the transport in force lists, in the order a role prefers. */
+function offered(reading: RoleReading, role: string): Array<readonly [string, string, string]> {
+  return reading.resolve(role, null).candidates;
+}
+
 /**
- * The registry alias for what the operator named.
+ * The catalog id for what the operator named, or null when it lists nothing
+ * by that name.
  *
- * An alias is the key; a model id is what a role's preference order carries
- * and what a person is likelier to have in front of them. Both are accepted,
- * and neither is guessed at: a name that matches nothing comes back null and
- * is refused with the aliases listed.
+ * This replaces `aliasFor`, which walked `config["models"]` on every
+ * transport -- including the seat, whose models were never in there, so on a
+ * seat it refused every model the pane had just offered. There is no alias
+ * to resolve any more: the catalog's id is what the surface shows, what this
+ * checks, and what goes on the wire, so the name an operator gives is the
+ * name that is written.
  */
-export function aliasFor(config: RouterConfig, named: string): string | null {
-  const models = config["models"];
-  if (typeof models !== "object" || models === null) return null;
-  const entries = Object.entries(models as Record<string, unknown>);
-  if (entries.some(([alias]) => alias === named)) return named;
-  const byId = entries.find(
-    ([, entry]) =>
-      typeof entry === "object" &&
-      entry !== null &&
-      String((entry as Record<string, unknown>)["model_id"] ?? "") === named,
-  );
-  return byId === undefined ? null : byId[0];
+function offeredId(reading: RoleReading, role: string, named: string): string | null {
+  const match = offered(reading, role).find(([modelId]) => modelId === named);
+  return match === undefined ? null : match[0];
 }
 
-/** The model id a role's preference order carries for that alias. */
-function modelIdOf(config: RouterConfig, alias: string): string {
-  const entry = (config["models"] as Record<string, Record<string, unknown>>)[alias];
-  return String(entry?.["model_id"] ?? alias);
-}
-
-/** The authoring model in force once this choice is applied. */
-function effectiveAuthor(config: RouterConfig, chosen: string | null): string | null {
-  if (chosen !== null) return chosen;
-  const resolved = explainRegistryCandidates(config, ROLE_GENERATOR).candidates[0];
-  return resolved === undefined ? null : resolved[2];
-}
-
-/**
- * The verifier that would answer for that author today, resolved the way the
- * dispatch resolves it -- with the author's own provider excluded.
- */
-function resolvedVerifier(config: RouterConfig, author: string | null): string | null {
-  if (author === null) return null;
-  const models = config["models"] as Record<string, Record<string, unknown>>;
-  const provider = String(models[author]?.["provider"] ?? "");
-  const resolved = explainRegistryCandidates(
-    config,
-    ROLE_VERIFIER,
-    provider === "" ? null : [provider],
-  ).candidates[0];
-  return resolved === undefined ? null : resolved[2];
-}
 
 export interface ConfigureOptions {
   readonly repoRoot: string;
   readonly transport?: string;
-  readonly authoringModel?: string;
   readonly verifyingModel?: string;
 }
 
@@ -141,53 +110,54 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   const empty = { changed: [], path: null, shadowed: null };
   const choice: ConfigurationChoice = {};
   const named: Record<string, string> = {};
-  for (const [key, value] of [
-    ["authoringModel", options.authoringModel],
-    ["verifyingModel", options.verifyingModel],
-  ] as const) {
-    if (value === undefined) continue;
-    const alias = aliasFor(config, value);
-    if (alias === null) {
+  // The transport in force decides which catalog block is read, so a choice
+  // is checked against the list the operator was actually offered on the
+  // machine they are standing at -- and where this same call is ALSO setting
+  // the transport, the one being set is the one to check against. Checking
+  // the outgoing transport would refuse `--transport copilot-cli
+  // --verifying-model <a seat model>` for naming a model the transport it is
+  // leaving does not list, which is the one pair of flags a person switching
+  // machines would type together.
+  const transport = explainTransport(config, options.transport ?? null).transport;
+  const reading = roleReading(config, transport);
+  const value = options.verifyingModel;
+  if (value !== undefined) {
+    const modelId = offeredId(reading, ROLE_VERIFIER, value);
+    if (modelId === null) {
+      // A transport that has read nothing and one that lists other models
+      // are different problems: the first has a free remedy and the second
+      // needs a different name. Saying "not a model this registry declares"
+      // over the first is what sent an operator looking for a registry that
+      // no longer decides anything.
       return {
         ...empty,
         refusal:
-          `'${value}' is not a model this registry declares. Its models are: ` +
-          `${Object.keys(config["models"] as Record<string, unknown>).sort().join(", ")}.`,
+          reading.unavailable !== null
+            ? `'${value}' cannot be checked: ${reading.unavailable}.`
+            : `'${value}' is not a model the ${transport} transport lists. ` +
+              `It lists: ${offered(reading, ROLE_VERIFIER)
+                .map(([id]) => id)
+                .sort()
+                .join(", ")}.`,
       };
     }
-    named[key] = alias;
-  }
-  // Only a choice of MODEL is checked against the pair rule. A transport is
-  // a different setting, and refusing it because two models that were
-  // already in force disagree would leave an operator unable to change the
-  // one thing they came to change.
-  if (named["authoringModel"] || named["verifyingModel"]) {
-    const author = effectiveAuthor(config, named["authoringModel"] ?? null);
-    // The model being chosen AND the one already in force: raising the
-    // authoring model can put a verifier that was fine below the floor, and
-    // accepting that silently would be the pane making a promise the
-    // dispatch does not keep.
-    const verifier = named["verifyingModel"] ?? resolvedVerifier(config, author);
-    if (author !== null && verifier !== null) {
-      const refusal = verifierRefusal(config, author, verifier);
-      if (refusal !== null) {
-        return {
-          ...empty,
-          refusal: named["verifyingModel"]
-            ? refusal
-            : `${refusal} Choose the verifying model first, or choose both at once.`,
-        };
-      }
-    }
+    // The one rule, against the model that ACTUALLY authors: the engine's,
+    // declared at `session start` and on the record from that moment. The
+    // pane used to filter this list against a role nothing dispatched, so it
+    // was checking the choice against the wrong author.
+    const author = orchestratorOf(options.repoRoot).model;
+    const refusal = author === null ? null : verifierRefusal(author, modelId);
+    if (refusal !== null) return { ...empty, refusal };
+    named["verifyingModel"] = modelId;
   }
   if (options.transport !== undefined) {
     Object.assign(choice, { transport: options.transport });
   }
-  if (named["authoringModel"]) {
-    Object.assign(choice, { authoringModel: modelIdOf(config, named["authoringModel"]) });
-  }
+  // The id the catalog lists is what was checked and is what is written:
+  // there is no second name for a model to be translated into on the way to
+  // the file, which is the round trip `aliasFor` and `modelIdOf` existed for.
   if (named["verifyingModel"]) {
-    Object.assign(choice, { verifyingModel: modelIdOf(config, named["verifyingModel"]) });
+    Object.assign(choice, { verifyingModel: named["verifyingModel"] });
   }
   if (Object.keys(choice).length === 0) {
     return { ...empty, refusal: "nothing to set: name a transport or a model." };
@@ -216,7 +186,7 @@ export async function configureVerb(argv: string[]): Promise<number> {
     return EXIT_OK;
   }
   const values = new Map<string, string>();
-  const flags = ["--transport", "--authoring-model", "--verifying-model", "--repo-root"];
+  const flags = ["--transport", "--verifying-model", "--repo-root"];
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index] as string;
     if (!flags.includes(flag)) {
@@ -238,9 +208,6 @@ export async function configureVerb(argv: string[]): Promise<number> {
   const options: ConfigureOptions = {
     repoRoot: values.get("--repo-root") ?? repoRootFor(here) ?? here,
     ...(values.has("--transport") ? { transport: values.get("--transport") as string } : {}),
-    ...(values.has("--authoring-model")
-      ? { authoringModel: values.get("--authoring-model") as string }
-      : {}),
     ...(values.has("--verifying-model")
       ? { verifyingModel: values.get("--verifying-model") as string }
       : {}),

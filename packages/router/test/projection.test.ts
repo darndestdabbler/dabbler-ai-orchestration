@@ -2,7 +2,7 @@
 // in dependency order, with who-uses-whom derived and never declared.
 
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -14,10 +14,13 @@ import {
   writeBlock,
   type CatalogModel,
 } from "../src/catalog.ts";
+import { configure } from "../src/cli/configure.ts";
 import { configurationNode, project, writeProjection } from "../src/projection.ts";
+import { ROLE_VERIFIER, roleDeclaration } from "../src/selection.ts";
+import { seatLadder } from "../src/route.ts";
 import { setSeatIdentity } from "../src/transports/copilot.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
-import { resetProjectRootCache } from "../src/config.ts";
+import { loadConfig, resetProjectRootCache } from "../src/config.ts";
 
 type Module = {
   slug: string;
@@ -171,8 +174,8 @@ describe("the module projection", () => {
 /** The seat this machine is on, for a test that writes a block for it. */
 const SEAT = { host: "https://github.com", login: "someone" };
 
-/** One model, as the seat's own free reading records it. */
-function seatModelRow(id: string, provider: string): CatalogModel {
+/** One model, as either transport's own free reading records it. */
+function catalogModelRow(id: string, provider: string): CatalogModel {
   return {
     id,
     provider,
@@ -270,27 +273,46 @@ describe("what a session would be run with", () => {
         source: SOURCE_SEAT,
         scope: { seat_host: SEAT.host, seat_login: SEAT.login },
         models: [
-          seatModelRow("claude-haiku-4.5", "anthropic"),
-          seatModelRow("gpt-5.6-sol", "openai"),
-          seatModelRow("gemini-3.1-pro-preview", "google"),
+          catalogModelRow("claude-haiku-4.5", "anthropic"),
+          catalogModelRow("gpt-5.6-sol", "openai"),
+          catalogModelRow("gemini-3.1-pro-preview", "google"),
         ],
         retired: [{ id: "claude-sonnet-4.6", retired_at: "2026-09-10T00:00:00Z" }],
+      });
+      // The engine that is running this session, and the model it declared
+      // at `session start`: the authoring row REPORTS that rather than
+      // resolving a role, because that is the model which authors.
+      seed(root, {
+        "docs/sessions/sessions.json": JSON.stringify({
+          schemaVersion: 5,
+          sessions: [
+            {
+              number: 1,
+              status: "in-progress",
+              orchestrator: { engine: "copilot", provider: "google", model: "gemini-3.1-pro-preview" },
+            },
+          ],
+        }),
       });
       const configuration = configurationNode(root);
       const authoring = configuration["authoring"] as Role & { enumeration: string };
       const verifying = configuration["verifying"] as Role & { enumeration: string };
 
       assert.equal(authoring.enumeration, "seat-catalog");
-      assert.ok(authoring.chosen !== null, "the seat's catalog resolves an authoring model");
+      assert.equal(authoring.chosen?.model, "gemini-3.1-pro-preview");
+      // A seat fronts every vendor it lists, so the engine narrows nothing.
       assert.ok(authoring.candidates.length > 1);
-      // Cross-provider review still holds on this path: the verifier is
-      // resolved with the authoring model's provider excluded, and the seat
-      // fronts more than one provider.
+      // The verifying row draws on the same catalog, less the one model it
+      // may not be. It is not resolved with the author's PROVIDER excluded
+      // any more: which models of one vendor are far enough apart to review
+      // each other is the developer's judgement, not this framework's.
       assert.equal(verifying.enumeration, "seat-catalog");
       assert.ok(verifying.chosen !== null);
-      assert.notEqual(
-        (verifying.chosen as unknown as { provider: string }).provider,
-        (authoring.chosen as unknown as { provider: string }).provider,
+      assert.ok(
+        !verifying.candidates.some(
+          (candidate) => candidate.model === (authoring.chosen as unknown as { model: string }).model,
+        ),
+        "the authoring model is not offered as its own verifier",
       );
       // And the archive is rendered rather than re-derived: a model the seat
       // stopped listing is named with the date it went, and is not offered.
@@ -306,6 +328,251 @@ describe("what a session would be run with", () => {
     }
   });
 
+  /** The overlay `configure` writes, removed, so each call decides afresh. */
+  function withoutOverlay(root: string): void {
+    rmSync(join(root, "local-overrides.yaml"), { force: true });
+    resetProjectRootCache();
+  }
+
+  it("offers exactly the models `configure` accepts, on each transport", () => {
+    // Defect 1, from both ends at once. The pane resolved through the one
+    // reading of the catalog while `configure` walked the model registry on
+    // every transport -- so on a seat, whose models were never in that
+    // registry, the verb refused every model the pane had just listed. One
+    // reading means the offer and the acceptance cannot disagree, and the
+    // only way to prove that is to offer a list and then accept all of it.
+    for (const transport of ["copilot-cli", "api"] as const) {
+      const seat = transport === "copilot-cli";
+      const restore = seat ? withEnv({ DABBLER_TRANSPORT: "copilot-cli" }) : withKeys();
+      const root = tempDir("configuration-");
+      const ungit = inRepository(root);
+      try {
+        if (seat) {
+          setSeatIdentity(SEAT);
+          writeBlock(TRANSPORT_SEAT, {
+            refreshed_at: "2026-09-11T00:00:00Z",
+            source: SOURCE_SEAT,
+            scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+            // Ids the deleted registry never declared, which is the case
+            // that used to be refused out of hand.
+            models: [
+              catalogModelRow("claude-haiku-4.5", "anthropic"),
+              catalogModelRow("gpt-5.6-sol", "openai"),
+              catalogModelRow("gpt-5.6-terra", "openai"),
+            ],
+            retired: [],
+          });
+        } else {
+          writeBlock(TRANSPORT_API, {
+            refreshed_at: "2026-09-11T00:00:00Z",
+            source: SOURCE_API,
+            scope: { providers: ["anthropic", "google", "openai"] },
+            models: [
+              catalogModelRow("claude-opus-5", "anthropic"),
+              catalogModelRow("gpt-5.6-terra", "openai"),
+              catalogModelRow("gemini-3.1-pro-preview", "google"),
+            ],
+            retired: [],
+          });
+        }
+
+        const verifying = configurationNode(root)["verifying"] as Role;
+        assert.ok(verifying.candidates.length > 1, `${transport} offers a choice`);
+        for (const candidate of verifying.candidates) {
+          withoutOverlay(root);
+          const outcome = configure({ repoRoot: root, verifyingModel: candidate.model });
+          assert.equal(
+            outcome.refusal,
+            null,
+            `${transport} offered ${candidate.model} and then refused it`,
+          );
+        }
+        // And the converse: a name the transport does not list is refused,
+        // rather than written and discovered at dispatch.
+        withoutOverlay(root);
+        assert.match(
+          String(configure({ repoRoot: root, verifyingModel: "no-such-model" }).refusal),
+          /is not a model the .* transport lists/,
+        );
+      } finally {
+        withoutOverlay(root);
+        ungit();
+        restore();
+      }
+    }
+  });
+
+  it("refuses only the authoring model itself, and accepts its provider-mate", () => {
+    // The one rule, from the verb's side: two ids compared. A second model
+    // from the same vendor is accepted because whether it shares the first's
+    // blind spot is a judgement this framework has no data to make -- and
+    // the seat below fronts two OpenAI models, which is exactly that case.
+    //
+    // The author is the ORCHESTRATOR's model, off the ledger, because that
+    // is the model that authors. It used to be a role's resolution, and that
+    // role was dispatched by nothing, so the rule was being applied to a
+    // model no call would ever use.
+    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
+    const root = tempDir("configuration-");
+    const ungit = inRepository(root);
+    try {
+      setSeatIdentity(SEAT);
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models: [
+          catalogModelRow("gpt-5.6-terra", "openai"),
+          catalogModelRow("gpt-5.6-sol", "openai"),
+        ],
+        retired: [],
+      });
+      const author = "gpt-5.6-terra";
+      seed(root, {
+        "docs/sessions/sessions.json": JSON.stringify({
+          schemaVersion: 5,
+          sessions: [
+            {
+              number: 1,
+              status: "in-progress",
+              orchestrator: { engine: "copilot", provider: "openai", model: author },
+            },
+          ],
+        }),
+      });
+      assert.equal((configurationNode(root)["authoring"] as Role).chosen?.model, author);
+
+      withoutOverlay(root);
+      assert.match(
+        String(configure({ repoRoot: root, verifyingModel: author }).refusal),
+        /they are the same model/,
+      );
+      withoutOverlay(root);
+      assert.equal(
+        configure({ repoRoot: root, verifyingModel: "gpt-5.6-sol" }).refusal,
+        null,
+        "a different model on the same provider is the developer's call to make",
+      );
+    } finally {
+      withoutOverlay(root);
+      ungit();
+      restore();
+    }
+  });
+
+  it("writes a pin the loader accepts and the dispatch honours over its own default", () => {
+    // End to end, because every half of this has been wrong on its own: the
+    // verb writes it, the SCHEMA has to accept it (roles refuse an unknown
+    // key, so a pin the schema did not declare would be written and then
+    // rejected on the next load), and the ladder has to prefer it over the
+    // exclusion it would otherwise apply.
+    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
+    const root = tempDir("configuration-");
+    const ungit = inRepository(root);
+    try {
+      setSeatIdentity(SEAT);
+      const models = [
+        catalogModelRow("gpt-5.6-terra", "openai"),
+        catalogModelRow("claude-opus-5", "anthropic"),
+      ];
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models,
+        retired: [],
+      });
+      withoutOverlay(root);
+      assert.equal(configure({ repoRoot: root, verifyingModel: "claude-opus-5" }).refusal, null);
+
+      const reloaded = loadConfig(undefined, root);
+      assert.equal(roleDeclaration(reloaded, ROLE_VERIFIER).pin, "claude-opus-5");
+      // Anthropic is excluded by the caller, and the pin outranks it: the
+      // round reaches the model the person chose, not the next one down.
+      assert.deepEqual(
+        seatLadder(reloaded, models, ROLE_VERIFIER, ["anthropic"]).map((entry) => entry.model_id),
+        ["claude-opus-5"],
+      );
+    } finally {
+      withoutOverlay(root);
+      ungit();
+      restore();
+    }
+  });
+
+  it("checks a model against the transport the same call is setting", () => {
+    // Round one nit. Switching machines is one command -- set the transport
+    // and name a model on it -- and the check read the transport being LEFT,
+    // so it refused a seat model for being absent from the API list.
+    const restore = withKeys();
+    const root = tempDir("configuration-");
+    const ungit = inRepository(root);
+    try {
+      setSeatIdentity(SEAT);
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models: [catalogModelRow("gpt-5.6-terra", "openai")],
+        retired: [],
+      });
+      withoutOverlay(root);
+      assert.equal(
+        configure({ repoRoot: root, transport: "copilot-cli", verifyingModel: "gpt-5.6-terra" }).refusal,
+        null,
+      );
+    } finally {
+      withoutOverlay(root);
+      ungit();
+      restore();
+    }
+  });
+  it("does not resolve the authoring list through the verifier role", () => {
+    // Round one nit, and it was mine: the authoring row borrowed the
+    // verifier role to mean "the whole catalog". A role is not a synonym
+    // for that -- with a verifier PIN set, the authoring list collapsed to
+    // the one pinned model, and the verifier own preferences and provider
+    // set reordered a list they have nothing to do with.
+    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
+    const root = tempDir("configuration-");
+    const ungit = inRepository(root);
+    try {
+      setSeatIdentity(SEAT);
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models: [
+          catalogModelRow("claude-opus-5", "anthropic"),
+          catalogModelRow("gpt-5.6-terra", "openai"),
+        ],
+        retired: [],
+      });
+      seed(root, {
+        "docs/sessions/sessions.json": JSON.stringify({
+          schemaVersion: 5,
+          sessions: [
+            {
+              number: 1,
+              status: "in-progress",
+              orchestrator: { engine: "copilot", provider: "openai", model: "gpt-5.6-terra" },
+            },
+          ],
+        }),
+        "local-overrides.yaml": ["roles:", "  verifier:", "    pin: claude-opus-5", ""].join("\n"),
+      });
+      const authoring = configurationNode(root)["authoring"] as Role;
+      // Two models on the seat, and the pin belongs to the other role.
+      assert.deepEqual(
+        authoring.candidates.map((candidate) => candidate.model).sort(),
+        ["claude-opus-5", "gpt-5.6-terra"],
+      );
+    } finally {
+      withoutOverlay(root);
+      ungit();
+      restore();
+    }
+  });
   it("offers nothing from a block another seat recorded, however fresh it is", () => {
     // Round 1's blocking finding. The scope check was the refresh's question
     // alone, so a block recorded on another account was still believed until
@@ -322,7 +589,7 @@ describe("what a session would be run with", () => {
         refreshed_at: "2026-09-11T00:00:00Z",
         source: SOURCE_SEAT,
         scope: { seat_host: SEAT.host, seat_login: SEAT.login },
-        models: [seatModelRow("claude-haiku-4.5", "anthropic")],
+        models: [catalogModelRow("claude-haiku-4.5", "anthropic")],
         retired: [],
       });
 
@@ -346,25 +613,41 @@ describe("what a session would be run with", () => {
     const root = tempDir("configuration-");
     const ungit = inRepository(root);
     try {
-      const before = configurationNode(root)["authoring"] as Role;
+      // What this machine read from its own vendors. Scoped to the keys this
+      // test sets: a block recorded for another key set is not a reading of
+      // this machine and is not believed.
+      const scope = { providers: ["anthropic", "google", "openai"] };
+      const served = [
+        catalogModelRow("claude-sonnet-5", "anthropic"),
+        catalogModelRow("gpt-5.6-terra", "openai"),
+      ];
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-09T00:00:00Z",
+        source: SOURCE_API,
+        scope,
+        models: served,
+        retired: [],
+      });
+
+      // The verifying row, because it is the one that RESOLVES a model:
+      // the authoring row reports what the ledger says the engine declared.
+      const before = configurationNode(root)["verifying"] as Role;
       const chosen = before.chosen?.model;
-      assert.ok(chosen !== undefined, "the bundled registry resolves an authoring model");
+      assert.ok(chosen !== undefined, "the catalog's api block resolves a verifying model");
       assert.deepEqual(before.withheld, []);
 
       // The vendor stopped serving exactly the model the role would have
       // picked. The archive keeps an id and a date and nothing else, which
       // is enough to answer "where did that model go?" and nothing else.
-      // Scoped to the keys this test sets: a block recorded for another key
-      // set is not a reading of this machine and is not believed.
       writeBlock(TRANSPORT_API, {
         refreshed_at: "2026-09-09T00:00:00Z",
         source: SOURCE_API,
-        scope: { providers: ["anthropic", "google", "openai"] },
-        models: [],
+        scope,
+        models: served.filter((model) => model.id !== chosen),
         retired: [{ id: chosen, retired_at: "2026-09-09T00:00:00Z" }],
       });
 
-      const after = configurationNode(root)["authoring"] as Role;
+      const after = configurationNode(root)["verifying"] as Role;
       assert.ok(!after.candidates.some((candidate) => candidate.model === chosen));
       assert.deepEqual(
         after.withheld.map((candidate) => [candidate.model, candidate.retired?.since]),

@@ -398,12 +398,18 @@ whichever transports that machine has. `api-enumeration`, `seat-catalog` and
 
 ### 8. The stale vocabulary goes with it
 
-Three places still say a probe establishes "entitlement, not existence", which
+Three places said a probe establishes "entitlement, not existence", which
 session 148 overturned when it made the seat's own free statement authoritative
 (`ENABLEMENT_LISTED`): `AGENTS.md`, `docs/model-and-pricing-sources.md`, and
 `discovery.ts`'s `REFRESH_COST[RECORD_SEAT]`. A fourth was not listed here
-before: `router-config.yaml` still tells its reader that "the seat cannot
+before: `router-config.yaml` told its reader that "the seat cannot
 enumerate — the CLI has no list-models command", which session 146 disproved.
+
+**Done.** Session 150 cleared the two in code, and session 151 cleared the
+documents — along with `README.md`, `docs/quick-start.md`,
+`docs/acp-walkthrough.md` and `docs/model-fidelity.md`, which were teaching
+the same probe and the `dabbler discovery enumerate` that is now `refresh`.
+A control over those six pages keeps the phrases from coming back.
 What a probe uniquely bought was **fidelity** — `echoed_model` — and nothing
 else, which is why §10 deletes the probe rather than re-describing it.
 

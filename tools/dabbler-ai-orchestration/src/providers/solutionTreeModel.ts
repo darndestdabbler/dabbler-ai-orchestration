@@ -173,6 +173,15 @@ export interface ConfigurationModel {
    * `withheld` and never in `candidates`.
    */
   retired?: { since: string; lastSeenAt: string | null } | null;
+  /**
+   * The price category the model's own source stated, verbatim, or null
+   * where it stated none. A PRICE and never a capability: this framework
+   * cannot grade a model, and a tag that implied it could would be teaching
+   * a developer to distrust the pane.
+   */
+  priceCategory?: string | null;
+  /** How this model's provider stands to the authoring model's. */
+  providerRelation?: string | null;
 }
 
 /** How a role resolves: what it would pick, and what it was resolved against. */
@@ -344,9 +353,32 @@ function agePhrase(hours: number | null): string {
  * saying and a pane that swallowed it would be back to a list from nowhere.
  */
 export const ENUMERATION_WORDS: Record<string, string> = {
-  "api-registry": "direct-API model registry",
+  "api-catalog": "vendors' own model lists",
   "seat-catalog": "seat's own catalog",
 };
+
+/**
+ * How a candidate's provider stands to the authoring model's, in words.
+ *
+ * This is the whole of what cross-provider review is now: a LABEL the person
+ * choosing can weigh, where there used to be a refusal. A different provider
+ * reduces the chance the reviewer shares the author's blind spots -- it does
+ * not eliminate it, and the same provider does not guarantee it, which is
+ * why the framework states the fact and leaves the judgement where the data
+ * to make it actually is.
+ *
+ * One vocabulary, read by the row AND by the pick. Two copies of a
+ * vocabulary drift, and sessions 143 and 147 each paid for finding that out.
+ */
+export const PROVIDER_RELATION_WORDS: Record<string, string> = {
+  "different-provider": "different provider",
+  "same-provider": "same provider",
+  "provider-unknown": "provider unknown",
+};
+
+/** The one line of help under a list of possible reviewers. */
+export const VERIFIER_HELP =
+  "A different provider reduces the chance the reviewer shares the author's blind spots.";
 
 export const FIDELITY_WORDS: Record<ModelFidelity, string> = {
   honoured: "answers as itself",
@@ -988,7 +1020,6 @@ export function descriptorFor(
     case "configRole": {
       const role = configRole(p, node.role);
       const authoring = node.role === "authoring";
-      const excluded = role?.excludes ?? [];
       const chosenFidelity = role?.chosen?.fidelity;
       return {
         id: `config:role:${node.role}`,
@@ -996,10 +1027,15 @@ export function descriptorFor(
         description: `${modelText(role?.chosen)}${role?.fellThrough ? " ⚠" : ""}`,
         tooltip: [
           authoring
-            ? "What the framework's own calls are authored by, from the registry."
-            : excluded.length > 0
-              ? `From another provider than the authoring model's (${excluded.join(", ")}): cross-provider review is an invariant of this framework, not a preference, and this list is what enforcing it leaves.`
-              : "The model that reviews the work.",
+            ? "The engine's own model, declared when the session was registered. It is reported here and set there: changing it in this pane would not reach the run."
+            : `The model that reviews the work. The only model refused is the authoring model itself; every other is offered and labelled. ${VERIFIER_HELP}`,
+          // The label, in the row, in the same words the pick uses.
+          !authoring && role?.chosen?.providerRelation
+            ? `This one is on a ${PROVIDER_RELATION_WORDS[role.chosen.providerRelation] ?? role.chosen.providerRelation}.`
+            : "",
+          role?.chosen?.priceCategory
+            ? `Its source states a '${role.chosen.priceCategory}' price category. That is a PRICE and not a capability: this framework does not grade models.`
+            : "",
           role?.fellThrough
             ? "It fell past its own preference order, so what answers is a model nobody named. That is what billed one session 364 premium requests."
             : "",

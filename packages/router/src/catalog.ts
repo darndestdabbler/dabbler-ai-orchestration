@@ -37,6 +37,17 @@ export const CATALOG_FILENAME = "ai-model-catalog.json";
 /** The directory name under the platform's own per-user data root. */
 export const CATALOG_DIR_NAME = "dabbler";
 
+/**
+ * Where a suite that cannot call `setCatalogPath` says its catalog is.
+ *
+ * For a test runner outside this package: the extension's suite reaches the
+ * router through its published contract, which deliberately does not export
+ * the modules behind it, so the import seam is not available to it. Its
+ * runner sets this for every spec, which is what keeps a second suite from
+ * reading -- or writing -- the machine it happens to run on.
+ */
+export const CATALOG_PATH_ENV = "DABBLER_CATALOG_PATH";
+
 /** The two transports a block can be written for. */
 export const TRANSPORT_SEAT = "copilot-cli";
 export const TRANSPORT_API = "api";
@@ -180,6 +191,14 @@ export function setCatalogPath(path: string | null): void {
  */
 export function currentCatalogPath(): string {
   if (configuredPath !== null) return configuredPath;
+  // The second suite's way in. `setCatalogPath` is an import, and the
+  // extension's suite reaches this module through the package's contract
+  // rather than through its internals, so it could not call the seam and
+  // was reading the operator's own catalog -- the same defect the seam was
+  // armed against, through the one door the guard below does not watch,
+  // since `NODE_TEST_CONTEXT` is set by `node:test` and by nothing else.
+  const named = process.env[CATALOG_PATH_ENV];
+  if (named !== undefined && named.trim() !== "") return named.trim();
   if (process.env["NODE_TEST_CONTEXT"] !== undefined) {
     throw new Error(
       "no catalog path is set: a test may not read or write this machine's " +
@@ -432,4 +451,52 @@ export function lastRefreshedAt(catalog: Catalog | null): string | null {
 /** Whether this machine has a catalog file at all, for a surface that says so. */
 export function catalogPresent(path: string = currentCatalogPath()): boolean {
   return existsSync(path);
+}
+
+/**
+ * The families a vendor's list carries that cannot answer a prompt.
+ *
+ * A vendor's model list is everything it serves, and on this machine that is
+ * 196 ids of which 70 are embeddings, transcription, speech, image, video and
+ * moderation models. None of them can be a generator or a verifier, and a
+ * surface that offered one would be offering a choice that fails at dispatch.
+ *
+ * It is a rule over the ids and deliberately NOT a curated list of the models
+ * that may be offered: a list of permitted models is a second inventory to
+ * maintain, which is the thing this whole block of work deleted. The cost of
+ * a rule is that it reads a name rather than a capability, so a chat model
+ * whose name says nothing and an image model with an unlikely codename are
+ * both possible -- the first stays offered, and the second is filtered by the
+ * dispatch failing rather than by a list nobody remembered to update.
+ */
+const NON_CHAT_ID = new RegExp(
+  [
+    "embed",
+    "whisper",
+    "tts",
+    "dall-e",
+    "image",
+    "imagen",
+    "veo",
+    "sora",
+    "moderation",
+    "audio",
+    "realtime",
+    "transcribe",
+    "speech",
+    "rerank",
+    "guard",
+    "computer-use",
+  ].join("|"),
+  "i",
+);
+
+/** True when the id names something that can answer a prompt. */
+export function isChatModelId(id: string): boolean {
+  const trimmed = id.trim();
+  if (trimmed === "") return false;
+  // `aqa` is Google's attributed-question-answering endpoint and is the one
+  // id short enough that a substring rule would reach into other names.
+  if (trimmed.toLowerCase() === "aqa") return false;
+  return !NON_CHAT_ID.test(trimmed);
 }

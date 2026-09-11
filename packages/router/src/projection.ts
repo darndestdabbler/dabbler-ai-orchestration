@@ -24,9 +24,10 @@ import {
 } from "./config.ts";
 import {
   REFRESH_COST,
+  apiBlock,
+  apiSelectableModels,
   checkFreshness,
   isStale,
-  retiredModels,
   type FreshnessRow,
   type RetiredModel,
 } from "./discovery.ts";
@@ -59,11 +60,10 @@ import {
   reconcileResolution,
 } from "./resolution.ts";
 import {
-  ROLE_GENERATOR,
   ROLE_VERIFIER,
-  explainRegistryCandidates,
   modelFidelity,
   roundObservations,
+  verifierRefusal,
   type RoleResolution,
   type Fidelity,
   type ModelObservation,
@@ -247,7 +247,7 @@ function fidelityOn(root: string, config: RouterConfig, transport: string): (mod
 // Nothing here enumerates anything: the seat catalog is a dated file, exactly
 // as the registry is, and reading a file is all a pane may do.
 
-export const ENUMERATION_API_REGISTRY = "api-registry";
+export const ENUMERATION_API_CATALOG = "api-catalog";
 export const ENUMERATION_SEAT_CATALOG = "seat-catalog";
 
 /** Nothing resolved, said as a resolution rather than as an absence. */
@@ -257,41 +257,96 @@ const NOTHING_RESOLVES: RoleResolution<readonly [string, string, string]> = {
   rank: null,
   fellThrough: false,
   removed: [],
+  pin: null,
+  pinUnmet: null,
 };
 
-/** How a role is resolved on the transport in force, and over what. */
-interface RoleReading {
+/**
+ * How a role is resolved on the transport in force, and over what.
+ *
+ * This is THE reading, and it is exported because the pane is not its only
+ * caller: `dabbler configure` checks an operator's choice against the same
+ * list the pane offered them. A surface that offers from one enumeration
+ * while the verb that accepts the choice reads another is the whole of
+ * defect 1 -- `configure` walked the model registry on every transport,
+ * including the seat, whose models were never in there, so on a seat it
+ * refused every model the pane had just listed.
+ */
+export interface RoleReading {
   readonly enumeration: string;
   readonly resolve: (
     role: string,
     exclude: readonly string[] | null,
   ) => RoleResolution<readonly [string, string, string]>;
   readonly retired: ReadonlyMap<string, RetiredModel>;
+  /**
+   * The price category a model's own source stated, for the models whose
+   * source stated one.
+   *
+   * The seat's own token, verbatim, kept by session 150 after years of being
+   * read free and thrown away. It is a PRICE and is labelled as one: a
+   * framework that rendered it as capability would be grading models on data
+   * it does not have, and a *not recommended* tag on a new frontier model
+   * because a price has not landed is how a tool teaches a developer it is
+   * brittle. A source that stated none contributes no entry, and the surface
+   * shows nothing rather than a guess.
+   */
+  readonly priceCategory: ReadonlyMap<string, string>;
   /** Why this transport can offer nothing, or null when it can. */
   readonly unavailable: string | null;
 }
 
-function roleReading(root: string, config: RouterConfig, transport: string): RoleReading {
-  if (transport !== TRANSPORT_COPILOT_CLI) {
-    return {
-      enumeration: ENUMERATION_API_REGISTRY,
-      resolve: (role, exclude) => explainRegistryCandidates(config, role, exclude),
-      retired: retiredModels(config),
-      unavailable: null,
-    };
-  }
-  const block = seatBlock();
+/** How a candidate's provider stands to the authoring model's. */
+export const PROVIDER_DIFFERENT = "different-provider";
+export const PROVIDER_SAME = "same-provider";
+export const PROVIDER_UNKNOWN = "provider-unknown";
+
+/**
+ * Where the deleted cross-provider rule went.
+ *
+ * It is a label because it was never a fact this framework could establish.
+ * A different provider REDUCES the chance the reviewer shares the author's
+ * blind spots; it does not eliminate it, and the same provider does not
+ * guarantee it -- `gpt-5.6-sol` and `gpt-5.6-terra` are different ids and
+ * very likely the same base model, which the old rule would have waved
+ * through. Told to the person choosing, who can weigh it; not enforced as a
+ * judgement over data nobody has.
+ */
+export function providerRelation(author: string | null, provider: string): string {
+  if (author === null || author === "" || provider === "") return PROVIDER_UNKNOWN;
+  return author === provider ? PROVIDER_SAME : PROVIDER_DIFFERENT;
+}
+
+export function roleReading(config: RouterConfig, transport: string): RoleReading {
+  const seat = transport === TRANSPORT_COPILOT_CLI;
+  const enumeration = seat ? ENUMERATION_SEAT_CATALOG : ENUMERATION_API_CATALOG;
+  // Both transports read the same record and differ only in which block of
+  // it is theirs, and each block is fetched through its own scoped reading
+  // -- `seatBlock` against this machine's seat, `apiBlock` against the set
+  // of provider keys present. A block recorded for another seat or another
+  // key set comes back null from both, so it reads as UNREAD rather than
+  // believed: that is session 150's round-1 finding, and it is the reason
+  // neither reading takes an unscoped shortcut to `readCatalog`.
+  const block = seat ? seatBlock() : apiBlock(config);
+  // What the direct-API path could actually dispatch to, which is what the
+  // pane may offer: a provider whose key this machine does not hold is not
+  // a candidate, and the seat is not filtered this way because it has none.
+  const models = block === null ? [] : seat ? block.models : apiSelectableModels(config, block);
   if (block === null) {
     return {
-      enumeration: ENUMERATION_SEAT_CATALOG,
+      enumeration,
       resolve: () => NOTHING_RESOLVES,
       retired: new Map(),
+      priceCategory: new Map(),
       // The reason, not a blank list: "no models" and "this machine has not
       // read its seat yet" are different problems with different remedies,
       // and this one's remedy is free.
-      unavailable:
-        "this machine has not read its seat's model list yet " +
-        `(\`${REFRESH_COMMAND}\` reads it, free)`,
+      unavailable: seat
+        ? "this machine has not read its seat's model list yet " +
+          `(\`${REFRESH_COMMAND}\` reads it, free)`
+        : "this machine has not read its providers' model lists yet, or it " +
+          "holds a reading taken for a different set of keys " +
+          `(\`${REFRESH_COMMAND}\` reads them, free)`,
     };
   }
   // An id and a date and nothing else, which is all the archive holds: the
@@ -307,11 +362,12 @@ function roleReading(root: string, config: RouterConfig, transport: string): Rol
     });
   }
   return {
-    enumeration: ENUMERATION_SEAT_CATALOG,
+    enumeration,
     resolve: (role, exclude) => {
-      const resolution = explainRoleCandidates(config, block.models, role, exclude);
-      // The seat has no aliases: an id is both what the registry would call
-      // the model and what goes on the wire.
+      const resolution = explainRoleCandidates(config, models, role, exclude);
+      // The catalog has no aliases on either transport: an id is both what a
+      // registry would have called the model and what goes on the wire, so
+      // the third element carries the id rather than a second name for it.
       return {
         ...resolution,
         candidates: resolution.candidates.map(
@@ -320,15 +376,27 @@ function roleReading(root: string, config: RouterConfig, transport: string): Rol
       };
     },
     retired,
+    // The source's own token for what a model costs, for the models whose
+    // source stated one. Read free on every refresh and, until 150, thrown
+    // away; kept verbatim rather than translated, because the seat's word
+    // for its own prices is the only word there is for them.
+    priceCategory: new Map(
+      models
+        .filter((entry) => entry.price_category !== null)
+        .map((entry) => [entry.id, entry.price_category as string]),
+    ),
     unavailable: null,
   };
 }
 
-/** One model a role could resolve to, as the registry declares it. */
+/** One model a role could resolve to, as this machine's catalog lists it. */
 function candidateNode(
   candidate: readonly [string, string, string],
   fidelity: (model: string) => Fidelity,
   retired: ReadonlyMap<string, RetiredModel>,
+  priceCategory: ReadonlyMap<string, string> = new Map(),
+  /** The authoring model's provider, on a row that is choosing a reviewer. */
+  authorProvider: string | null = null,
 ): Node {
   const [modelId, provider, alias] = candidate;
   const withdrawn = retired.get(modelId);
@@ -341,6 +409,14 @@ function candidateNode(
     model: modelId,
     provider,
     fidelity: fidelity(modelId),
+    // What the source said this costs, in the source's own word for it, and
+    // null where the source said nothing. Never inferred.
+    priceCategory: priceCategory.get(modelId) ?? null,
+    // Where the cross-provider rule went: a label the person weighs, not a
+    // refusal the framework makes. Only meaningful on a row that is
+    // choosing a reviewer, so it is null on every other.
+    providerRelation:
+      authorProvider === null ? null : providerRelation(authorProvider, provider),
     // Present only on a model the dated record says stopped being served,
     // and it carries when the vendor last had it -- a row that withheld a
     // model without saying since when would read as a bug in the pane.
@@ -364,6 +440,21 @@ function roleNode(
   role: string,
   exclude: readonly string[] | null,
   fidelity: (model: string) => Fidelity,
+  /**
+   * The authoring model, on the verifying role: the one model this role may
+   * not be, and the whole of what it may not be.
+   *
+   * It is a MODEL and no longer a provider. Excluding the author's provider
+   * withheld every model that vendor serves from the list, which asserted
+   * something this framework cannot know -- that two models of one family
+   * share a blind spot -- while failing to stop the thing it was named for,
+   * since `gpt-5.6-sol` reviewing `gpt-5.6-terra` is very likely one model
+   * reviewing itself and passes a provider test only because the two ids
+   * differ. What remains is the rule that needs no judgement.
+   */
+  notThisModel: string | null = null,
+  /** The authoring model provider, so each option can be LABELLED against it. */
+  authorProvider: string | null = null,
 ): Node {
   const retired = reading.retired;
   const resolution = reading.resolve(role, exclude);
@@ -373,14 +464,23 @@ function roleNode(
   // verifier vanished from a list needs to know it was withdrawn rather than
   // wonder what they broke -- and the archive holds an id and a date, which
   // is exactly what that question needs and nothing more.
-  const served = resolution.candidates.filter(([modelId]) => !retired.has(modelId));
+  // The one rule, applied in the one reading, so what the pane OFFERS and
+  // what `configure` ACCEPTS are the same set: the pane cannot show a choice
+  // the verb would refuse, and the verb cannot refuse one the pane showed.
+  const served = resolution.candidates.filter(
+    ([modelId]) =>
+      !retired.has(modelId) &&
+      (notThisModel === null || verifierRefusal(notThisModel, modelId) === null),
+  );
   const chosen = served[0];
   return {
     role,
-    chosen: chosen === undefined ? null : candidateNode(chosen, fidelity, retired),
-    candidates: served.map((candidate) => candidateNode(candidate, fidelity, retired)),
+    chosen: chosen === undefined ? null : candidateNode(chosen, fidelity, retired, reading.priceCategory, authorProvider),
+    candidates: served.map((candidate) =>
+      candidateNode(candidate, fidelity, retired, reading.priceCategory, authorProvider),
+    ),
     withheld: [...retired.values()].map((entry) =>
-      candidateNode([entry.id, entry.provider, entry.id], fidelity, retired),
+      candidateNode([entry.id, entry.provider, entry.id], fidelity, retired, reading.priceCategory),
     ),
     excludes: [...(exclude ?? [])],
     // A role that fell past its own preference order picked a model nobody
@@ -389,6 +489,114 @@ function roleNode(
     // Which record this list came from, and why it is empty when it is. A
     // pane that said "nothing resolves" without saying what it had read is
     // the defect this carries the answer to.
+    enumeration: reading.enumeration,
+    unavailable: reading.unavailable,
+  };
+}
+
+/**
+ * Which vendors this engine's CLI can actually author with.
+ *
+ * A provider-specific CLI constraint, and one the code has known since
+ * identity was written without a single surface reading it: Claude Code runs
+ * Anthropic models and nothing else, the Gemini CLI runs Google's, and a
+ * Copilot seat fronts whatever its seat lists. Null means "every provider
+ * this transport lists", which is the seat's answer.
+ *
+ * The VERIFIER is not narrowed by any of this: it is dispatched by the
+ * router over its own transport rather than by the engine's CLI, so the
+ * engine has no say in what may review the work.
+ */
+const ENGINE_PROVIDERS: Readonly<Record<string, string>> = {
+  "claude-code": "anthropic",
+  gemini: "google",
+};
+
+/**
+ * A role name nothing declares, which resolves to the whole enumeration.
+ *
+ * An undeclared role has no preference order, no provider set and no pin, so
+ * `explainRole` returns every candidate in the order the transport listed
+ * them -- and that is exactly what "every model this machine could author
+ * with" means. Naming it rather than borrowing the verifier's role is the
+ * difference between asking a question and asking somebody else's.
+ */
+const ROLE_EVERY_MODEL = "every-model";
+
+/**
+ * The orchestrator as the ledger records it: the engine that is running this
+ * session and the model it declared at `session start`.
+ *
+ * Read rather than resolved. Nothing here picks an authoring model, because
+ * nothing in this framework does: a person names it when they register the
+ * session, and every surface that appeared to choose one was offering
+ * something the ledger would not honour.
+ */
+export function orchestratorOf(root: string): { engine: string | null; model: string | null } {
+  try {
+    const raw = readRawSessionState(sessionsDirFor(root));
+    const sessions = Array.isArray(raw?.["sessions"]) ? (raw?.["sessions"] as Node[]) : [];
+    const row = sessions.find((entry) => entry["status"] === "in-progress") ?? sessions.at(-1);
+    const block: Node =
+      row !== undefined && typeof row["orchestrator"] === "object" && row["orchestrator"] !== null
+        ? (row["orchestrator"] as Node)
+        : {};
+    const text = (value: unknown): string | null =>
+      typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+    return { engine: text(block["engine"]), model: text(block["model"]) };
+  } catch {
+    return { engine: null, model: null };
+  }
+}
+
+/**
+ * The authoring row: what is authoring, and what this engine could author
+ * with instead.
+ *
+ * `chosen` is the orchestrator's own model and is therefore a REPORT. The
+ * candidates are the transport's catalog narrowed to the providers this
+ * engine's CLI can run, which is the only filtering an engine does.
+ */
+function authoringNode(
+  root: string,
+  reading: RoleReading,
+  fidelity: (model: string) => Fidelity,
+): Node {
+  const { engine, model } = orchestratorOf(root);
+  const vendor = engine === null ? undefined : ENGINE_PROVIDERS[engine];
+  const retired = reading.retired;
+  // Resolved through a role NOBODY declares, which is every model the
+  // transport lists in the order it listed them. It used to borrow the
+  // verifier's role to mean "the whole catalog", and a role is not a synonym
+  // for that: a verifier pin collapsed this list to one model, and the
+  // verifier's own preferences and provider set reordered and filtered a
+  // list they have nothing to do with.
+  const listed = reading
+    .resolve(ROLE_EVERY_MODEL, null)
+    .candidates.filter(
+      ([modelId, provider]) =>
+        !retired.has(modelId) && (vendor === undefined || provider === vendor),
+    );
+  const chosen =
+    model === null ? null : (listed.find(([id]) => id === model) ?? [model, "", model] as const);
+  return {
+    role: "authoring",
+    engine,
+    // The model is declared at `session start`, so this row reports rather
+    // than sets. A surface that offered to change it would be offering
+    // something the ledger will not honour.
+    declaredAtStart: true,
+    chosen: chosen === null ? null : candidateNode(chosen, fidelity, retired, reading.priceCategory),
+    candidates: listed.map((candidate) =>
+      candidateNode(candidate, fidelity, retired, reading.priceCategory),
+    ),
+    // The archive, rendered rather than re-derived: an operator whose usual
+    // model vanished from a list needs to know it was withdrawn.
+    withheld: [...retired.values()].map((entry) =>
+      candidateNode([entry.id, entry.provider, entry.id], fidelity, retired, reading.priceCategory),
+    ),
+    excludes: [],
+    fellThrough: false,
     enumeration: reading.enumeration,
     unavailable: reading.unavailable,
   };
@@ -436,8 +644,14 @@ export function configurationNode(root: string): Node {
     // says is no longer served -- read once, for both roles. A withdrawn
     // model is withheld from what is offered rather than deleted from the
     // record that still carries it.
-    const reading = roleReading(root, config, transport.transport);
-    const authoring = roleNode(reading, ROLE_GENERATOR, null, fidelity);
+    const reading = roleReading(config, transport.transport);
+    // The authoring model is the ENGINE's, declared at `session start` and
+    // kept on the record from that moment. It was resolved as a role until
+    // now, and that role was dispatched by nothing -- `route()`'s fallback,
+    // named by none of its four callers -- so the pane had two authors, one
+    // of which changed nothing, and it filtered the verifier list against
+    // the wrong one.
+    const authoring = authoringNode(root, reading, fidelity);
     const author = authoring["chosen"] as Node | null;
     return {
       transport: {
@@ -456,11 +670,17 @@ export function configurationNode(root: string): Node {
         installed: engines.engines.map((entry) => ({ ...entry })),
       },
       authoring,
+      // Not the author's PROVIDER: the author's own model, and nothing else.
+      // Whether a second model from one vendor is far enough from the first
+      // is the developer's judgement, and step seven labels the pair so they
+      // can make it.
       verifying: roleNode(
         reading,
         ROLE_VERIFIER,
-        author === null ? null : [String(author["provider"])],
+        null,
         fidelity,
+        author === null ? null : String(author["model"]),
+        author === null ? null : String(author["provider"]),
       ),
       records: checkFreshness(config, Date.now()).map(recordNode),
     };

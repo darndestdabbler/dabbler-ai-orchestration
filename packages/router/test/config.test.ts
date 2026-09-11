@@ -191,7 +191,7 @@ describe("where the three layers come from", () => {
 describe("loading a config", () => {
   it("loads the bundled default", () => {
     const config = loadConfigFrom(sources());
-    assert.ok(config["models"]);
+    assert.ok(config["provider_defaults"]);
     assert.match(String(config["_config_path"]), /router-config\.yaml$/);
   });
 
@@ -231,12 +231,6 @@ describe("loading a config", () => {
     base["packaging"] = { release: "tag" };
     const config = loadConfigFrom(sources({ base }));
     assert.deepEqual(config["packaging"], { release: "tag" });
-  });
-
-  it("refuses a model referencing a provider that does not exist", () => {
-    const base = makeConfig();
-    (base["models"] as Record<string, Record<string, unknown>>)["flash"]["provider"] = "mystery";
-    assert.match(refusal(() => loadConfigFrom(sources({ base }))), /unknown provider/);
   });
 
   it("refuses an unknown key in a role", () => {
@@ -288,7 +282,7 @@ describe("the machine-local overlay", () => {
       sources({ overrides: { transport: { profile: "copilot-cli" } } }),
     );
     assert.equal(resolveTransport(config), "copilot-cli");
-    assert.ok(config["models"]);
+    assert.ok(config["provider_defaults"]);
     assert.match(String(config["_local_overrides_path"]), /local-overrides\.yaml$/);
   });
 
@@ -348,9 +342,9 @@ describe("the tracked project config", () => {
     const testing = config["testing"] as { suites: Array<{ command: string }> };
     assert.equal(testing.suites[0].command, "mvn -q test");
     assert.match(String(config["_project_config_path"]), /dabbler\.yaml$/);
-    // Providers, models and roles stay distribution facts: a repository
-    // declaring how to run its tests must not have to fork the registry.
-    assert.ok(config["models"] && config["roles"]);
+    // Providers, their dispatch settings and roles stay distribution facts:
+    // a repository declaring how to run its tests must not have to fork them.
+    assert.ok(config["provider_defaults"] && config["roles"]);
   });
 
   it("lets the machine override the distribution and not the repository", () => {
@@ -458,26 +452,28 @@ describe("the critique pipeline", () => {
 });
 
 describe("generation params", () => {
-  it("deep-merges a task override over the model defaults", () => {
+  it("deep-merges a task override over the provider's defaults", () => {
+    // Both halves are keyed by PROVIDER: `effort` and `thinking` are
+    // Anthropic's vocabulary rather than any one model's, and a block with no
+    // model names in it cannot go stale when a vendor ships a new model.
     const config = makeConfig();
-    (config["models"] as Record<string, Record<string, unknown>>)["sonnet"]["generation_params"] = {
-      effort: "medium",
-      thinking: { enabled: true, type: "adaptive" },
-    };
+    (config["provider_defaults"] as Record<string, Record<string, unknown>>)["anthropic"][
+      "generation_params"
+    ] = { effort: "medium", thinking: { enabled: true, type: "adaptive" } };
     config["task_type_params"] = {
-      formatting: { sonnet: { effort: "low", thinking: { enabled: false } } },
+      formatting: { anthropic: { effort: "low", thinking: { enabled: false } } },
     };
-    const params = resolveGenerationParams("sonnet", "formatting", config);
+    const params = resolveGenerationParams("anthropic", "formatting", config);
     assert.equal(params["effort"], "low");
     assert.deepEqual(params["thinking"], { enabled: false, type: "adaptive" });
   });
 
-  it("returns the model defaults when nothing overrides them", () => {
+  it("returns the provider's defaults when nothing overrides them", () => {
     const config = makeConfig();
-    (config["models"] as Record<string, Record<string, unknown>>)["opus"]["generation_params"] = {
-      effort: "high",
-    };
-    assert.deepEqual(resolveGenerationParams("opus", "x", config), { effort: "high" });
+    (config["provider_defaults"] as Record<string, Record<string, unknown>>)["anthropic"][
+      "generation_params"
+    ] = { effort: "high" };
+    assert.deepEqual(resolveGenerationParams("anthropic", "x", config), { effort: "high" });
   });
 });
 
@@ -486,15 +482,22 @@ describe("prompt templates", () => {
     const config = loadConfigFrom(sources());
     assert.ok(Object.hasOwn(config["_task_templates"] as object, "code-review"));
     assert.ok(config["_verification_template"]);
-    assert.ok(nested(config, "models")["sonnet"]["_system_prompt"]);
+    // The system prompt file is split by PROVIDER and always was -- one H2
+    // section per provider slug, named identically by every model entry that
+    // used to carry it.
+    assert.ok(nested(config, "provider_defaults")["anthropic"]["_system_prompt"]);
   });
 
   it("falls back to the default when the named file is absent", () => {
     const base = makeConfig();
-    (base["models"] as Record<string, Record<string, unknown>>)["flash"]["system_prompt_file"] =
-      "absent.md";
+    (base["provider_defaults"] as Record<string, Record<string, unknown>>)["google"][
+      "system_prompt_file"
+    ] = "absent.md";
     const config = loadConfigFrom(sources({ base }));
-    assert.match(String(nested(config, "models")["flash"]["_system_prompt"]), /expert software engineer/);
+    assert.match(
+      String(nested(config, "provider_defaults")["google"]["_system_prompt"]),
+      /expert software engineer/,
+    );
   });
 });
 

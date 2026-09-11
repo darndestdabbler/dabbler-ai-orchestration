@@ -16,58 +16,37 @@ import {
   resolveOrchestratorIdentity,
 } from "../src/identity.ts";
 
-const REGISTRY = {
-  sonnet: { provider: "anthropic", model_id: "claude-sonnet-5" },
-  "gpt-5-4": { provider: "openai", model_id: "gpt-5.4" },
-  "gemini-pro": { provider: "google", model_id: "gemini-2.5-pro" },
-};
-
-/** No catalog at all, so the seat fallback cannot answer by accident. */
-const NO_CATALOG: ReadonlyArray<{ id: string; provider: string }> = [];
+const CATALOG: ReadonlyArray<{ id: string; provider: string }> = [
+  { id: "claude-sonnet-5", provider: "anthropic" },
+  { id: "gpt-5.4", provider: "openai" },
+  { id: "gemini-2.5-pro", provider: "google" },
+];
 
 function identity(block: unknown): ReturnType<typeof resolveOrchestratorIdentity> {
-  return resolveOrchestratorIdentity(block, {
-    modelsRegistry: REGISTRY,
-    catalog: NO_CATALOG,
-  });
+  return resolveOrchestratorIdentity(block, { catalog: CATALOG });
 }
 
 describe("resolving a model to its provider", () => {
-  it("matches an exact registry key and an exact model id", () => {
-    assert.equal(resolveModelProvider("sonnet", REGISTRY, NO_CATALOG), "anthropic");
-    assert.equal(resolveModelProvider("gpt-5.4", REGISTRY, NO_CATALOG), "openai");
+  it("reads this machine's catalog, on either transport, under one spelling", () => {
+    // The registry that used to answer first is gone: it named fourteen
+    // models a repository had been edited with and could say nothing about
+    // any other. The catalog is what the machine's own vendors and seat
+    // listed, so an id neither of them lists resolves nothing.
+    assert.equal(resolveModelProvider("claude-sonnet-5", CATALOG), "anthropic");
+    assert.equal(resolveModelProvider("gpt-5.4", CATALOG), "openai");
+    assert.equal(resolveModelProvider("mystery-9000", CATALOG), null);
   });
 
-  it("strips a date suffix from a claude id", () => {
-    assert.equal(
-      resolveModelProvider("claude-sonnet-5-20260101", REGISTRY, NO_CATALOG),
-      "anthropic",
-    );
+  it("strips a date suffix from a claude id and from nothing else", () => {
+    // An invented dated variant of another provider's id must NOT normalize
+    // onto a real entry.
+    assert.equal(resolveModelProvider("claude-sonnet-5-20260101", CATALOG), "anthropic");
+    assert.equal(resolveModelProvider("gpt-5.4-20251001", CATALOG), null);
   });
 
-  it("does not strip a date suffix off another provider's id", () => {
-    // An invented dated variant must NOT normalize onto a real entry.
-    assert.equal(resolveModelProvider("gpt-5.4-20251001", REGISTRY, NO_CATALOG), null);
-  });
-
-  it("resolves nothing for a model nobody declares", () => {
-    assert.equal(resolveModelProvider("mystery-9000", REGISTRY, NO_CATALOG), null);
-  });
-
-  it("falls back to the confirmed seat catalog, which is documented truth", () => {
-    // Membership in the seat's confirmed universe is a lookup, never a
-    // name-prefix guess.
-    assert.equal(
-      resolveModelProvider("Claude-X", REGISTRY, [{ id: "claude-x", provider: "anthropic" }]),
-      "anthropic",
-    );
-  });
-
-  it("refuses a catalog entry whose provenance is not a known provider", () => {
-    assert.equal(
-      resolveModelProvider("claude-x", REGISTRY, [{ id: "claude-x", provider: "acme" }]),
-      null,
-    );
+  it("matches case-insensitively, and refuses a provider it does not route to", () => {
+    assert.equal(resolveModelProvider("Claude-X", [{ id: "claude-x", provider: "anthropic" }]), "anthropic");
+    assert.equal(resolveModelProvider("claude-x", [{ id: "claude-x", provider: "acme" }]), null);
   });
 });
 
@@ -76,10 +55,10 @@ describe("resolving the orchestrator's identity", () => {
     const resolved = identity({
       engine: "claude-code",
       provider: "openai",
-      model: "sonnet",
+      model: "claude-sonnet-5",
     });
     assert.equal(resolved.effectiveProvider, "anthropic");
-    assert.equal(resolved.source, "model-registry");
+    assert.equal(resolved.source, "model-catalog");
   });
 
   it("never trusts a Copilot seat's label", () => {

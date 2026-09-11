@@ -7,25 +7,25 @@
 // candidate universe: a preference list that has gone stale costs a slightly
 // older model and never costs a candidate.
 //
-// The transports differ only in what they can enumerate -- the model registry
-// on the direct-API path, the confirmed seat catalog on the Copilot path.
-// Both hand their enumeration to `resolveRole`, so the rule has one
-// implementation.
+// The transports differ only in which block of this machine's catalog is
+// theirs -- the seat's on the Copilot path, the vendors' on the direct-API
+// one. Both hand their enumeration to `resolveRole`, so the rule has one
+// implementation, and neither has an alias: the id a source lists is the id
+// that goes on the wire.
 //
 // A provider whose key does not resolve is not a candidate anywhere:
 // selection can never land on a model the process could not call.
 
-import { capabilityTiers, truthy, type RouterConfig } from "./config.ts";
+import { truthy, type RouterConfig } from "./config.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
 import { resolveSecret } from "./secretResolver.ts";
 
-export const ROLE_GENERATOR = "generator";
 export const ROLE_VERIFIER = "verifier";
 
 /**
  * A candidate as a transport enumerates it: the model id the preference
  * order names, that model's provider, and anything the transport carries
- * along -- the registry alias, on the direct-API path.
+ * along.
  */
 export type Candidate = readonly [string, string, ...unknown[]];
 
@@ -75,6 +75,18 @@ function normalizeProviders(providers: unknown): Set<string> {
 export interface RoleDeclaration {
   readonly prefer: readonly string[];
   readonly permitted: ReadonlySet<string>;
+  /**
+   * The one model a person chose for this role, or null where nobody did.
+   *
+   * A pin is not a preference. `prefer` is an order and a stale entry in it
+   * costs a slightly older model; a pin is an instruction, and the runtime
+   * either honours it or stops. It exists because the surface used to write
+   * a choice to the front of `prefer` while the dispatch resolved the same
+   * role with the authoring model's provider excluded -- so a deliberately
+   * chosen same-provider verifier was dropped at dispatch, something else
+   * answered, and nothing anywhere said so.
+   */
+  readonly pin: string | null;
 }
 
 /**
@@ -92,40 +104,41 @@ export function roleDeclaration(
   const roleConfig = record(record(config["roles"])[role]);
   const preferRaw = roleConfig["prefer"];
   const prefer = (Array.isArray(preferRaw) ? preferRaw : []).map((id) => String(id));
-  return { prefer, permitted: normalizeProviders(roleConfig["require_provider_in"]) };
+  const pinRaw = roleConfig["pin"];
+  const pin = typeof pinRaw === "string" && pinRaw.trim() !== "" ? pinRaw.trim() : null;
+  return { prefer, permitted: normalizeProviders(roleConfig["require_provider_in"]), pin };
 }
 
 /**
- * Normalized ids the registry does not trust to review another model's
- * output.
+ * The providers a call may not draw from, once the role's own pin is read.
  *
- * Trust is a property of the model, not of the path that reaches it. The
- * seat catalog carries no such flag, so without this the seat could verify
- * with a model the registry explicitly marks untrusted -- the exact gap the
- * flag exists to close. A model the registry says nothing about stays
- * eligible: an absent record is unknown, never unsupported, and a hard
- * filter on missing metadata would end cross-vendor verification by
- * accident.
+ * **A default is not an override of a person.** Where nobody pinned, a role
+ * resolving on its own still prefers a different provider, and the caller's
+ * exclusion is what says so. Where somebody pinned, the exclusion is a
+ * default they have already answered, so it is dropped -- and the pin either
+ * dispatches or stops visibly, which is the whole difference between an
+ * instruction and a preference.
+ *
+ * One home, because two would disagree: the ladder is built from it and the
+ * assertion immediately before the wire re-checks it.
  */
-function untrustedAsVerifier(config: RouterConfig): Set<string> {
-  const tokens = new Set<string>();
-  for (const [alias, entry] of Object.entries(record(config["models"]))) {
-    if (!isRecord(entry)) continue;
-    if (flagOn(entry, "is_enabled_as_verifier")) continue;
-    tokens.add(normalizeModelToken(alias));
-    if (entry["model_id"]) tokens.add(normalizeModelToken(String(entry["model_id"])));
-  }
-  return tokens;
+export function effectiveExclusion(
+  config: RouterConfig,
+  role: string,
+  requested: readonly string[] | null,
+): string[] {
+  if (roleDeclaration(config, role).pin !== null) return [];
+  return [...normalizeProviders(requested)].sort();
 }
 
 /**
  * The candidates that survive `role`, in preference order.
  *
- * Survival is the role's provider set, the caller's exclusion, and -- for
- * the verifier role -- the registry's judgment about which models may review
- * another's work. The preference order only sorts, and the sort is stable,
- * so candidates the order does not name keep the sequence the transport
- * enumerated them in.
+ * Survival is the role's provider set and the caller's exclusion, and
+ * nothing else: which model may review which is a judgement this framework
+ * does not make from data it does not have. The preference order only sorts,
+ * and the sort is stable, so candidates the order does not name keep the
+ * sequence the transport enumerated them in.
  */
 export function resolveRole<T extends Candidate>(
   config: RouterConfig,
@@ -139,7 +152,6 @@ export function resolveRole<T extends Candidate>(
 /** Why a candidate is not here: the rule that removed it, and nothing else. */
 export const REMOVED_EXCLUDED_PROVIDER = "excluded-provider";
 export const REMOVED_NOT_PERMITTED = "not-permitted";
-export const REMOVED_UNTRUSTED_VERIFIER = "untrusted-verifier";
 export const REMOVED_NO_PROVIDER = "no-provider";
 
 export interface RemovedCandidate {
@@ -166,6 +178,10 @@ export interface RoleResolution<T> {
   /** True when a preference order is declared and the chosen candidate is outside it. */
   readonly fellThrough: boolean;
   readonly removed: readonly RemovedCandidate[];
+  /** The model a person chose for this role, or null where nobody did. */
+  readonly pin: string | null;
+  /** The pinned model, when this machine cannot dispatch to it. */
+  readonly pinUnmet: string | null;
 }
 
 /**
@@ -173,8 +189,8 @@ export interface RoleResolution<T> {
  *
  * The selection rule is unchanged and lives here once; `resolveRole` is the
  * projection of this for every caller that only wants the list. The removals
- * are recorded per rule rather than counted, because "no trusted verifier
- * was reachable" and "every candidate was on the excluded provider" are
+ * are recorded per rule rather than counted, because "nothing this machine
+ * lists survived" and "every candidate was on the excluded provider" are
  * different problems with different answers, and a round that says only
  * which model answered can distinguish neither.
  */
@@ -184,9 +200,9 @@ export function explainRole<T extends Candidate>(
   candidates: readonly T[],
   excludeProviders: readonly string[] | null = null,
 ): RoleResolution<T> {
-  const { prefer, permitted } = roleDeclaration(config, role);
-  const exclude = normalizeProviders(excludeProviders);
-  const untrusted = role === ROLE_VERIFIER ? untrustedAsVerifier(config) : new Set<string>();
+  const { prefer, permitted, pin } = roleDeclaration(config, role);
+  // A pin answers the caller's exclusion rather than being filtered by it.
+  const exclude = pin === null ? normalizeProviders(excludeProviders) : new Set<string>();
   const removed: RemovedCandidate[] = [];
   const surviving = candidates.filter((candidate) => {
     const provider = candidate[1];
@@ -198,21 +214,28 @@ export function explainRole<T extends Candidate>(
     if (!provider) return drop(REMOVED_NO_PROVIDER);
     if (exclude.has(provider)) return drop(REMOVED_EXCLUDED_PROVIDER);
     if (permitted.size > 0 && !permitted.has(provider)) return drop(REMOVED_NOT_PERMITTED);
-    if (untrusted.size > 0 && untrusted.has(normalizeModelToken(model))) {
-      return drop(REMOVED_UNTRUSTED_VERIFIER);
-    }
     return true;
   });
   const rank = new Map(prefer.map((modelId, index) => [modelId, index]));
   // `Array.prototype.sort` is stable in every engine this runs on, which is
   // what makes an unranked candidate keep its enumerated position -- the
   // same guarantee Python's `sorted` gives.
-  const ordered = surviving
+  const sorted = surviving
     .slice()
     .sort(
       (left, right) =>
         (rank.get(left[0]) ?? prefer.length) - (rank.get(right[0]) ?? prefer.length),
     );
+  // A pin is one model or none. It is NOT the head of a ladder: falling from
+  // a pinned model to the next candidate is the silent substitution the pin
+  // exists to stop, so an unmet pin resolves to nothing and the caller says
+  // so out loud.
+  const ordered =
+    pin === null
+      ? sorted
+      : sorted.filter(
+          (candidate) => normalizeModelToken(String(candidate[0])) === normalizeModelToken(pin),
+        );
   const chosen = ordered[0];
   const chosenRank = chosen === undefined ? undefined : rank.get(chosen[0]);
   return {
@@ -221,6 +244,10 @@ export function explainRole<T extends Candidate>(
     rank: chosenRank ?? null,
     fellThrough: prefer.length > 0 && chosen !== undefined && chosenRank === undefined,
     removed,
+    pin,
+    // A pin nothing satisfies: the caller turns this into a stop that names
+    // the model, rather than dispatching to whatever was next.
+    pinUnmet: pin !== null && chosen === undefined ? pin : null,
   };
 }
 
@@ -259,151 +286,38 @@ export function fellThroughWarning<T extends Candidate>(
   );
 }
 
-/**
- * Registry aliases that survive `role`, in preference order.
- *
- * The direct-API path's enumeration. An entry qualifies when it is enabled
- * and its provider is enabled with a resolvable API key; the role itself,
- * including the verifier-trust rule, is applied by `resolveRole`.
- */
-export function registryCandidates(
-  config: RouterConfig,
-  role: string,
-  excludeProviders: readonly string[] | null = null,
-): string[] {
-  return explainRegistryCandidates(config, role, excludeProviders).candidates.map(
-    ([, , alias]) => alias,
-  );
-}
-
-/**
- * Every registry entry a role could draw on, before the role is applied.
- *
- * Enabled, with a named provider, and that provider reachable -- selection
- * can never land on a model the process could not call.
- */
-function registryEnumeration(
-  config: RouterConfig,
-): Array<readonly [string, string, string]> {
-  const reachable = new Map<string, boolean>();
-  const candidates: Array<readonly [string, string, string]> = [];
-  for (const [alias, entry] of Object.entries(record(config["models"]))) {
-    if (!isRecord(entry) || !flagOn(entry, "is_enabled")) continue;
-    const provider = String(entry["provider"] ?? "").trim().toLowerCase();
-    if (!provider) continue;
-    if (!reachable.has(provider)) {
-      reachable.set(provider, providerReachable(config, provider));
-    }
-    if (!reachable.get(provider)) continue;
-    candidates.push([String(entry["model_id"] ?? alias), provider, alias]);
-  }
-  return candidates;
-}
-
-/**
- * The same enumeration, with how the role resolved over it.
- *
- * Split from `registryCandidates` rather than duplicated: the enumeration
- * rule -- enabled entry, named provider, reachable provider -- has one home,
- * and the caller that wants to WARN about the resolution reads the same list
- * the caller that wants to dispatch reads.
- */
-export function explainRegistryCandidates(
-  config: RouterConfig,
-  role: string,
-  excludeProviders: readonly string[] | null = null,
-): RoleResolution<readonly [string, string, string]> {
-  return explainRole(config, role, registryEnumeration(config), excludeProviders);
-}
-
 // --- What a verifying model may be -----------------------------------------
 //
-// Two constraints, and a surface that offers a person a verifier has to hold
-// its offer to both. Neither is invented here: the first is an invariant of
-// dispatch already, and this reads it rather than restating it; the second is
-// an ORDER declared in the registry, so what "not much weaker" means is data
-// a vendor's next release can revise rather than a comparison compiled into a
-// function where it would quietly go stale.
-
-/**
- * Where a model sits in the declared order, or null when nothing says.
- *
- * Null is the common answer and it is not a failure: a registry that has
- * ranked nothing, or a model added before anybody ranked it, both land here,
- * and both mean the same thing -- there is no floor to apply.
- */
-export function tierRank(config: RouterConfig, alias: string): number | null {
-  const entry = record(record(config["models"])[alias]);
-  const tier = entry["capability_tier"];
-  if (typeof tier !== "string" || tier === "") return null;
-  const rank = capabilityTiers(config).indexOf(tier);
-  return rank < 0 ? null : rank;
-}
+// One rule survives, and it is the only one that needs no judgement this
+// framework cannot make: **the verifying model may not be the authoring
+// model.** Two strings compared -- no capability data, no provider
+// inference, no registry.
+//
+// It is stated with its limit, because the limit is the honest part. It
+// stops a model reviewing its own literal output, and it does NOT stop
+// correlated review: `gpt-5.6-sol` and `gpt-5.6-terra` are different ids and
+// very likely the same base model, and a rule that pretended to know
+// otherwise would be grading models on data nobody has. That judgement is
+// the developer's, and the surface labels the pair rather than refusing it.
 
 /**
  * Why this model may not verify that one, or null when it may.
  *
- * **The cross-provider half is not decided here.** The verifying role is
- * resolved with the authoring model's provider excluded -- the same call the
- * dispatch makes, applying the same exclusion it asserts again immediately
- * before the wire -- and a model that is not among the survivors is refused
- * with the rule that removed it. A second copy of "not the same provider"
- * written in this function is exactly the drift the invariant cannot afford:
- * it is load-bearing, and a copy of it would be the one that goes stale.
- *
- * The tier half is applied only where BOTH models declare one. An absent
- * record is unknown and never unsupported, and a floor that refused over
- * missing metadata would end cross-vendor verification the first week a
- * vendor shipped a model nobody had ranked.
+ * Ids are compared under the framework's one spelling rule, so a dated pin
+ * and its alias are the same model here -- which is the case the comparison
+ * exists for, since that is how a person picks the same model twice without
+ * noticing.
  */
-export function verifierRefusal(
-  config: RouterConfig,
-  authorAlias: string,
-  verifierAlias: string,
-): string | null {
-  const models = record(config["models"]);
-  const authorProvider = String(record(models[authorAlias])["provider"] ?? "");
-  const resolution = explainRegistryCandidates(
-    config,
-    ROLE_VERIFIER,
-    authorProvider === "" ? null : [authorProvider],
-  );
-  if (!resolution.candidates.some(([, , alias]) => alias === verifierAlias)) {
-    const verifierId = String(record(models[verifierAlias])["model_id"] ?? verifierAlias);
-    const removed = resolution.removed.find((row) => row.model === verifierId);
-    return (
-      `'${verifierAlias}' cannot verify '${authorAlias}': ` +
-      (removed === undefined
-        ? "it is not a model this configuration can dispatch to -- it is " +
-          "absent from the registry, disabled, or its provider has no key."
-        : REMOVAL_REASONS[removed.rule] ??
-          `the '${ROLE_VERIFIER}' role removed it (${removed.rule}).`)
-    );
-  }
-  const authorRank = tierRank(config, authorAlias);
-  const verifierRank = tierRank(config, verifierAlias);
-  if (authorRank === null || verifierRank === null) return null;
-  if (verifierRank <= authorRank) return null;
-  const tiers = capabilityTiers(config);
+export function verifierRefusal(author: string, verifier: string): string | null {
+  if (normalizeModelToken(author) !== normalizeModelToken(verifier)) return null;
   return (
-    `'${verifierAlias}' cannot verify '${authorAlias}': the registry ranks ` +
-    `it '${tiers[verifierRank]}' and the authoring model '${tiers[authorRank]}', ` +
-    "and a review is worth what the reviewer is."
+    `'${verifier}' cannot verify '${author}': they are the same model, and a ` +
+    "model reviewing its own literal output is the one thing a second " +
+    "opinion cannot be. Choosing a different model from the same provider " +
+    "is allowed and is labelled as such -- whether two models of one family " +
+    "share a blind spot is a judgement this framework has no data to make."
   );
 }
-
-/** What each removal rule means to the person who chose the model. */
-const REMOVAL_REASONS: Record<string, string> = {
-  [REMOVED_EXCLUDED_PROVIDER]:
-    "it is on the authoring model's own provider, and cross-provider review " +
-    "is an invariant of this framework rather than a preference.",
-  [REMOVED_UNTRUSTED_VERIFIER]:
-    "the registry marks it is_enabled_as_verifier: false, so it is not " +
-    "trusted to review another model's output.",
-  [REMOVED_NOT_PERMITTED]:
-    "its provider is outside the set the verifier role may draw from.",
-  [REMOVED_NO_PROVIDER]: "it names no provider.",
-};
 
 // --- Whether the model asked for is the model that answered ---------------
 //

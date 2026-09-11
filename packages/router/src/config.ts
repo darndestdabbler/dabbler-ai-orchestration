@@ -12,8 +12,10 @@
 // of fact:
 //
 // 1. The bundled `router-config.yaml` is package data and therefore the
-//    *published* default: providers, models, roles and transports. It must
-//    stay correct for a fresh install that has provider API keys and no seat.
+//    *published* default: providers, their dispatch settings, roles and
+//    transports. WHICH models exist is not among them and never was a
+//    property of a repository -- that is read from this machine's own
+//    vendors and seat, into its own catalog.
 // 2. `dabbler.yaml` at the repository root is **tracked**, and carries what
 //    the repository owns -- its suites, its selection rules, how it
 //    publishes, which of its paths are sensitive. CI reads these and so does
@@ -444,31 +446,6 @@ export function loadConfigFrom(sources: ConfigSources): RouterConfig {
     if (isRecord(provider) && !("enabled" in provider)) provider["enabled"] = true;
   }
 
-  const providerNames = Object.keys(record(config["providers"]));
-  const tierNames = capabilityTiers(config);
-  for (const [modelName, modelConfig] of Object.entries(
-    record(config["models"]),
-  )) {
-    const provider = record(modelConfig)["provider"];
-    if (!providerNames.includes(String(provider))) {
-      throw new ConfigError(
-        `Model '${modelName}' references unknown provider ` +
-          `'${String(provider)}'. Available: ${renderList([...providerNames].sort())}`,
-      );
-    }
-    // The same rule one line above, for the other thing a model entry names
-    // that something else declares. A misspelt tier would otherwise read as
-    // an ABSENT one, and absent means unknown -- so the model would quietly
-    // stop being held to a floor instead of failing where it was written.
-    const tier = record(modelConfig)["capability_tier"];
-    if (tier !== undefined && tier !== null && !tierNames.includes(String(tier))) {
-      throw new ConfigError(
-        `Model '${modelName}' names capability_tier '${String(tier)}', ` +
-          `which capability_tiers does not declare. Declared: ${renderList(tierNames)}`,
-      );
-    }
-  }
-
   validateCopilotBlock(config);
   applyRunCoreDefaults(config);
   resolveCritiqueBlock(config);
@@ -484,20 +461,6 @@ export function loadConfigFrom(sources: ConfigSources): RouterConfig {
 
 function renderList(items: readonly string[]): string {
   return `[${items.map((item) => `'${item}'`).join(", ")}]`;
-}
-
-/**
- * The declared capability tiers, most capable first.
- *
- * The ORDER is the whole content: a tier name means its position in this
- * list and nothing else, which is what lets a vendor's next release be
- * absorbed by editing data instead of a comparison in code. Empty where none
- * is declared, and an empty order holds nobody to anything -- a repository
- * that has not ranked its models has not asked for a floor.
- */
-export function capabilityTiers(config: RouterConfig): string[] {
-  const declared = config["capability_tiers"];
-  return (Array.isArray(declared) ? declared : []).map((tier) => String(tier));
 }
 
 /**
@@ -877,20 +840,6 @@ const OVERLAY_HEADER =
   " published: it states a fact about this machine, not about the project.";
 
 /**
- * Put a model at the head of a role's preference order.
- *
- * The head and not the whole list: a preference order is an order rather
- * than a permission, and replacing it with one entry would turn a choice of
- * what to try FIRST into a declaration that nothing else may be tried --
- * which is how a role comes to have no candidate at all the day that model
- * is unreachable.
- */
-function preferFirst(existing: unknown, modelId: string): string[] {
-  const order = (Array.isArray(existing) ? existing : []).map((entry) => String(entry));
-  return [modelId, ...order.filter((entry) => entry !== modelId)];
-}
-
-/**
  * Write the operator's choice into the machine-local overlay, keeping
  * whatever else the file says.
  *
@@ -924,17 +873,18 @@ export function writeConfigurationChoice(
     document.setIn(["transport", "profile"], transport);
     changed.push(`transport.profile is now '${transport}'`);
   }
-  // Read as plain data rather than as nodes: `getIn` hands back the YAML
-  // node for a sequence, and a node is not an array.
-  const current = record(document.toJS() as unknown);
   for (const [role, model] of [
     ["generator", choice.authoringModel],
     ["verifier", choice.verifyingModel],
   ] as const) {
     if (model === undefined) continue;
-    const order = preferFirst(record(record(current["roles"])[role])["prefer"], model);
-    document.setIn(["roles", role, "prefer"], order);
-    changed.push(`roles.${role} tries '${model}' first`);
+    // A PIN, not the front of a preference order. Written to the order, a
+    // person's choice was still only an ordering, and the dispatch resolved
+    // the same role with the authoring model's provider excluded -- so a
+    // deliberately chosen same-provider verifier was dropped and something
+    // else answered with nothing said. A pin is honoured or it stops.
+    document.setIn(["roles", role, "pin"], model);
+    changed.push(`roles.${role} is pinned to '${model}'`);
   }
   writeFileSync(path, document.toString(), "utf8");
   return { path, changed };
@@ -945,15 +895,29 @@ export function writeConfigurationChoice(
  * defaults overlaid by `task_type_params[task_type][model_name]`.
  */
 export function resolveGenerationParams(
-  modelName: string,
+  provider: string,
   taskType: string,
   config: RouterConfig,
 ): Record<string, unknown> {
-  const modelConfig = record(record(config["models"])[modelName]);
-  const params = deepCopy(record(modelConfig["generation_params"]));
+  const defaults = record(record(config["provider_defaults"])[provider]);
+  const params = deepCopy(record(defaults["generation_params"]));
   const taskBlock = record(record(config["task_type_params"])[taskType]);
-  const overrides = record(taskBlock[modelName]);
+  const overrides = record(taskBlock[provider]);
   return deepMerge(params, overrides);
+}
+
+/**
+ * What a direct-API dispatch needs that the catalog does not state.
+ *
+ * Keyed by provider and by nothing else: the catalog's id is what goes on the
+ * wire, and everything here is a property of how this framework talks to that
+ * vendor rather than of which model answers.
+ */
+export function providerDefaults(
+  config: RouterConfig,
+  provider: string,
+): Record<string, unknown> {
+  return record(record(config["provider_defaults"])[provider]);
 }
 
 // --- Prompt templates ---------------------------------------------------------
@@ -988,24 +952,25 @@ function loadPromptTemplates(config: RouterConfig, configDir: string): void {
     return sections;
   };
 
-  for (const modelConfig of Object.values(record(config["models"]))) {
-    if (!isRecord(modelConfig)) continue;
-    const promptFile = modelConfig["system_prompt_file"];
+  // The system prompt file was always split by PROVIDER -- one H2 section per
+  // provider slug -- and every model entry named the same file. Reading it
+  // per provider is what it was already doing; it just used to store the
+  // answer thirteen times, once per model.
+  for (const [provider, defaults] of Object.entries(record(config["provider_defaults"]))) {
+    if (!isRecord(defaults)) continue;
+    const promptFile = defaults["system_prompt_file"];
     if (!promptFile || typeof promptFile !== "string") continue;
     const fullPath = resolveRelative(promptFile);
     if (fullPath === null) {
-      modelConfig["_system_prompt"] = DEFAULT_SYSTEM_PROMPT;
+      defaults["_system_prompt"] = DEFAULT_SYSTEM_PROMPT;
       continue;
     }
     const sections = sectionsOf(fullPath, 2);
     if (Object.keys(sections).length === 0) {
-      modelConfig["_system_prompt"] = readText(fullPath).trim();
+      defaults["_system_prompt"] = readText(fullPath).trim();
       continue;
     }
-    const providerSlug = String(modelConfig["provider"] ?? "")
-      .trim()
-      .toLowerCase();
-    modelConfig["_system_prompt"] = sections[providerSlug] ?? DEFAULT_SYSTEM_PROMPT;
+    defaults["_system_prompt"] = sections[provider.trim().toLowerCase()] ?? DEFAULT_SYSTEM_PROMPT;
   }
 
   config["_task_templates"] = {};

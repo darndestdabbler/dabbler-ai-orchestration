@@ -90,6 +90,7 @@ import {
   TRANSPORT_SEAT,
   blockFor,
   foldListing,
+  isChatModelId,
   readCatalog,
   writeBlock,
   type CatalogModel,
@@ -1827,7 +1828,15 @@ export function seatBlock(
  * seat stopped naming it.
  */
 function selectable(entry: CatalogModel): boolean {
-  return entry.enabled && entry.provider !== null && KNOWN_PROVIDERS.has(entry.provider);
+  return (
+    entry.enabled &&
+    entry.provider !== null &&
+    KNOWN_PROVIDERS.has(entry.provider) &&
+    // A vendor lists everything it serves, and most of what it serves cannot
+    // answer a prompt. The rule is over the id, because a curated list of the
+    // models that may be offered is the second inventory this work deleted.
+    isChatModelId(entry.id)
+  );
 }
 
 /**
@@ -1864,20 +1873,6 @@ export function resolveRoleCandidates(
 export interface ConfirmedCatalogEntry {
   readonly id: string;
   readonly provider: string;
-}
-
-/**
- * Every seat model this machine has read, or an empty list.
- *
- * Best-effort by design, and the only reader that is: a catalog this machine
- * has not read yet resolves nothing rather than stopping identity
- * resolution, because a bare model id with no trustworthy provenance is
- * exactly what its caller must fail closed on.
- */
-export function confirmedCatalogEntries(): ConfirmedCatalogEntry[] {
-  return (seatModels() ?? [])
-    .filter((entry) => entry.provider !== null)
-    .map((entry) => ({ id: entry.id, provider: entry.provider as string }));
 }
 
 // --- Seat catalog refresh ----------------------------------------------------

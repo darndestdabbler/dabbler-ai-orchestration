@@ -9,6 +9,9 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { SOURCE_API, TRANSPORT_API, catalogNow, writeBlock } from "../../src/catalog.ts";
+import { type RouterConfig } from "../../src/config.ts";
+import { currentApiScope } from "../../src/discovery.ts";
 import { setGitSource, type RunGitOptions } from "../../src/journal.ts";
 import { NoCandidateError, setRouteSource, type RouteOptions, type RouteResult } from "../../src/route.ts";
 import { SANDBOX_SEED, scratchDir } from "./repo.ts";
@@ -130,13 +133,6 @@ export function makeConfig(overrides: Record<string, unknown> = {}): Record<stri
       google: { api_key_env: "TEST_GOOGLE_KEY", base_url: "https://fake.google.test/v1beta", ...provider },
       openai: { api_key_env: "TEST_OPENAI_KEY", base_url: "https://fake.openai.test/v1", ...provider },
     },
-    models: {
-      flash: { provider: "google", model_id: "g-flash", max_context_tokens: 1000000, max_output_tokens: 65536 },
-      pro: { provider: "google", model_id: "g-pro", max_context_tokens: 1000000, max_output_tokens: 65536 },
-      sonnet: { provider: "anthropic", model_id: "a-sonnet", max_context_tokens: 200000, max_output_tokens: 16000 },
-      opus: { provider: "anthropic", model_id: "a-opus", max_context_tokens: 200000, max_output_tokens: 32000 },
-      gpt: { provider: "openai", model_id: "o-gpt", max_context_tokens: 272000, max_output_tokens: 32000 },
-    },
     roles: {
       generator: { prefer: ["g-flash", "g-pro", "a-opus"], require_provider_in: ["anthropic", "openai", "google"] },
       verifier: { prefer: ["o-gpt", "a-sonnet"], require_provider_in: ["anthropic", "openai", "google"] },
@@ -147,10 +143,52 @@ export function makeConfig(overrides: Record<string, unknown> = {}): Record<stri
       triggers: { empty_response: true, max_tokens_hit: true, min_output_tokens: 30, refusal_detection: true },
       refusal_phrases: ["i can't help with", "i'm unable to"],
     },
+    provider_defaults: {
+      anthropic: { max_context_tokens: 200000, max_output_tokens: 32000 },
+      google: { max_context_tokens: 1000000, max_output_tokens: 65536 },
+      openai: { max_context_tokens: 272000, max_output_tokens: 32000 },
+    },
     transports: { "copilot-cli": { binary: "copilot" } },
     metrics: { enabled: true },
     ...overrides,
   };
+}
+
+/** The models `makeConfig` names, as the vendors would have listed them. */
+export const FIXTURE_API_MODELS: ReadonlyArray<readonly [string, string]> = [
+  ["g-flash", "google"],
+  ["g-pro", "google"],
+  ["a-sonnet", "anthropic"],
+  ["a-opus", "anthropic"],
+  ["o-gpt", "openai"],
+];
+
+/**
+ * What this machine's vendors listed, written where the direct-API path reads
+ * it. The catalog is the inventory on that path, so a test that expects a
+ * ladder has to say what the machine was told -- and the block is scoped by
+ * `currentApiScope`, so it is believed only for the keys the test set.
+ */
+export function seedApiCatalog(
+  config: Record<string, unknown>,
+  models: ReadonlyArray<readonly [string, string]> = FIXTURE_API_MODELS,
+): void {
+  writeBlock(TRANSPORT_API, {
+    refreshed_at: catalogNow(),
+    source: SOURCE_API,
+    scope: currentApiScope(config as RouterConfig),
+    models: models.map(([id, provider]) => ({
+      id,
+      provider,
+      provider_source: "vendor-endpoint",
+      display_name: id,
+      enabled: true,
+      price_category: null,
+      cost: null,
+      listed_at: catalogNow(),
+    })),
+    retired: [],
+  });
 }
 
 /** The three provider keys `makeConfig` names, set so selection does not refuse reachability. */

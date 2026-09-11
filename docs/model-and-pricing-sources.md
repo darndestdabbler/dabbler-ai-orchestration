@@ -14,7 +14,7 @@ credits, on any of the three surfaces. If you are reasoning about the cost of
 
 | surface | how to enumerate | cost | measured |
 | --- | --- | --- | --- |
-| Direct API (Anthropic, OpenAI, Google) | `dabbler discovery enumerate` | **free** — 2.4 s, 195 models | 2026-09-10 |
+| Direct API (Anthropic, OpenAI, Google) | `dabbler discovery refresh` | **free** — 2.4 s, 195 models | 2026-09-10 |
 | GitHub Copilot seat | `session/new` over `copilot --acp` returns `models.availableModels` | **free** | 2026-09-05, CLI 1.0.83 |
 | Claude Code CLI | **cannot be enumerated** — see below | — | 2026-09-10 |
 
@@ -86,26 +86,21 @@ re-establish what the seat had already said. That is how `claude-opus-5` and
 `claude-sonnet-5` came to be missing from an operator's Configuration pane on
 the day their seat began listing them.
 
-The catalog now carries three enablement states, and they are not the same
-evidence:
+**Session 150 finished the job and session 151 removed the vocabulary.**
+There is no `confirmed`/`listed` split any more, because there is no probe
+to be confirmed by: everything the source lists is listed, and that is the
+one state. The catalog is one `ai-model-catalog.json` per machine, under
+this platform's own per-user data directory, with one block per transport —
+and a block recorded for another seat or another set of keys reads as unread
+rather than believed, so nobody's machine is ever told about somebody else's
+models.
 
-| state | what it means | what it cost |
-| --- | --- | --- |
-| `confirmed` | a real turn was taken and the model answered | one billed turn |
-| `listed` | the seat states it can dispatch this model | free |
-| `unconfirmed` | neither a probe nor an enumeration has said | — |
-
-Selection accepts `confirmed` and `listed`. The probe scopes (`--quorum`,
-`--stale`) still read `confirmed` alone, because re-probing is for what a
-probe has already answered for, and an enumeration never lowers a
-`confirmed` entry: a free reading must not be able to undo a turn that
-happened.
-
-**What the probe is still for is fidelity** — whether the model that answered
-is the model that was asked for, which is `echoed_model` and is the subject
-of `docs/model-fidelity.md`. That question is a property of the vendor's
-routing and the CLI version rather than of one seat, so it is answered once
-and shared through the committed lockfile, not re-bought per developer.
+**Fidelity — whether the model that answered is the model that was asked
+for — is read from a verification round's own requested and served pair**,
+which is the subject of `docs/model-fidelity.md`. It is evidence this
+framework already produces for nothing, as a by-product of work that was
+happening anyway, which is why buying it with a prompt was never worth what
+it cost.
 
 ## The Copilot seat's model list, free
 
@@ -172,7 +167,7 @@ list arrives over the protocol, not as a subcommand.
 
 ## The direct-API list, free
 
-`dabbler discovery enumerate` reads each enabled vendor's models endpoint —
+`dabbler discovery refresh` reads each enabled vendor's models endpoint —
 a metadata request that bills no tokens. Measured 2026-09-10: **2.4 seconds,
 195 models** (Anthropic 11, OpenAI 129, Google 55), written to the dated
 record `.dabbler/api-models.lock`.
@@ -186,19 +181,28 @@ role names.
 
 `claude --help` has no models command; `--model` takes an alias (`opus`,
 `sonnet`, `fable`) or a full model name. **Its reachable set is the Anthropic
-key's API enumeration**, which `discovery enumerate` already collects. Do not
+key's API enumeration**, which `discovery refresh` already collects. Do not
 maintain a third list.
 
-## What the prompting probe is still for
+## There is no prompting probe
 
-`dabbler copilot refresh` sends a real prompt to each named model. That is
-the only way to establish that a model **actually answers on this seat** —
-entitlement, not existence. Keep it for confirmation, never for enumeration,
-and never in an automatic path.
+There was one. `dabbler copilot refresh` used to send a real prompt to each
+named model to establish that it **answers on this seat**, and session 151
+deleted it along with the model registry it maintained. Nothing under the
+catalog path can bill a token now, which is the point: four engines in a row
+reasoned their way from a probe's cost to "finding out what models exist is
+expensive", and the question is unaskable rather than merely answered.
+
+What the probe was thought to establish, the seat states for itself and for
+free, in the reply to opening a conversation. What it could genuinely
+establish — that the model asked for is the model that answered — is read
+from a verification round's own requested and served pair, which is evidence
+this framework already produces as a by-product of work that was happening
+anyway.
 
 ## Re-measuring
 
-- Direct API: `dabbler discovery enumerate` (free, seconds)
+- Direct API: `dabbler discovery refresh` (free, seconds)
 - Seat list and multipliers: `enumerateSeatModels` (free — it opens a
   conversation and sends no prompt), or the SDK's `models.list`. **Not
   `dabbler agent prompt`**, which takes a real turn and bills for it

@@ -24,8 +24,9 @@
 // which directory the runner works in. With no specs at all it runs the
 // whole suite.
 
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -64,7 +65,21 @@ const result = spawnSync(
     "120000",
     ...(specs.length > 0 ? specs : ["src/test/suite/**/*.test.ts"]),
   ],
-  { cwd: packageRoot, stdio: "inherit" },
+  {
+    cwd: packageRoot,
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      // This suite may not read the machine it runs on. The router's own
+      // suite says where its catalog is through an import seam; this one
+      // reaches the router through its published contract, which does not
+      // export the modules behind it, so the runner says it here -- for
+      // every spec, rather than per test, because a spec that forgot would
+      // read the operator's own model catalog and pass here while failing
+      // on anyone else's machine.
+      DABBLER_CATALOG_PATH: join(mkdtempSync(join(tmpdir(), "dabbler-suite-")), "ai-model-catalog.json"),
+    },
+  },
 );
 
 // A signal is not an exit code, and a run that was killed did not pass.

@@ -62,9 +62,10 @@ as the seat stated them on the §2 run's `open` line:
 | mai-code-1.1-flash, mai-code-1-flash-picker | 1x | kimi-k3, kimi-k2.7-code | 1x |
 
 These are the seat's own statement of its request multipliers, free to
-read, where `copilot-catalog.lock` samples them today by making a billed
-call per model (`dabbler copilot refresh --all` costs 39 premium
-requests). They are not prices: GitHub has billed the seat per token
+read. The maintained catalog that sampled them instead -- by making a
+billed call per model -- is gone, and with it the reason anyone believed
+finding out what models exist was expensive. They are not prices: GitHub
+has billed the seat per token
 since 2026-06-01 (`STATUS.md`, under session 96), and the multipliers
 are the legacy request weights. The seat's metadata and the catalog do
 not agree everywhere — the catalog's probe sampled `gpt-5.4` at 0 and

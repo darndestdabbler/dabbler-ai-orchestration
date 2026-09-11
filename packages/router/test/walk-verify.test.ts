@@ -34,7 +34,7 @@ import { runReopen } from "../src/verify/reopen.ts";
 import { runRound } from "../src/verify/rounds.ts";
 import { setHttpSource } from "../src/transports/api.ts";
 import { flipStateToClosed, registerSessionStart } from "../src/writers.ts";
-import { makeConfig, routeAnswers, setProviderKeys, tempDir } from "./support/answers.ts";
+import { makeConfig, routeAnswers, seedApiCatalog, setProviderKeys, tempDir } from "./support/answers.ts";
 import { git, gitOut, makeRepo, writeFiles } from "./support/repo.ts";
 
 let broken: string | null = null;
@@ -374,6 +374,9 @@ describe("a repository walked through the verification loop", () => {
       transport: { profile: "api" },
       verification: { settings: { api_file_requests: true } },
     });
+    // The direct-API ladder is this machine's catalog, so a walk that
+    // dispatches over the wire has to say what its vendors listed.
+    seedApiCatalog(config);
 
     const bodies: Array<Record<string, unknown>> = [];
     const restoreHttp = setHttpSource((_url, init) => {

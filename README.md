@@ -177,18 +177,24 @@ and applied identically on both transports.
 A role says what a verifier may be; a discovery record says what currently
 exists. There are two records because there are two mechanisms:
 
-- **Direct API — enumeration.** `dabbler discovery enumerate` reads each
-  vendor's models endpoint and writes `.dabbler/api-models.lock`. A models
-  endpoint is a metadata request and **bills no tokens on any of the three
-  vendors**, so the default 24-hour cadence is a freshness preference
-  rather than a budget control. The record is derived from whichever key
-  set is present, so it lives outside the package and is neither committed
-  nor shipped — unlike the seat catalog, which belongs to the
-  distribution.
-- **Copilot seat — empirical probe.** The CLI has no list-models command,
-  so its catalog is a maintained candidate universe confirmed by
-  `dabbler copilot refresh`. That does cost premium requests, which is why
-  its staleness threshold is far longer.
+- **Direct API.** `dabbler discovery refresh` reads each vendor's models
+  endpoint. A models endpoint is a metadata request and **bills no tokens
+  on any of the three vendors**.
+- **Copilot seat.** The CLI has no list-models command, but the seat states
+  its own models in the reply to opening a conversation — free, with no
+  prompt sent.
+
+Both readings land in **one file per machine**,
+`ai-model-catalog.json` under this platform's own per-user data directory,
+with one block per transport. Nothing ships a catalog and nothing commits
+one: a catalog is a reading of THIS machine's seat and THIS machine's keys,
+and a copy that travelled in a package would tell every other machine about
+somebody else's models. A block recorded for a different seat or a different
+key set is read as unread rather than believed.
+
+Neither reading can bill a token, so the 24-hour cadence is a freshness
+preference rather than a budget control, and there is no question about what
+a refresh costs.
 
 `dabbler discovery status` reports both records' ages — **the API record is
 aged against its stalest enabled vendor**, so one vendor answering never

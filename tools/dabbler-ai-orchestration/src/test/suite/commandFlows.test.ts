@@ -1237,18 +1237,29 @@ suite("Troubleshoot's prerequisite report", () => {
 
 suite("the Configuration section's model pick", () => {
   /** A pick that records what it was offered and takes the first item. */
-  function capturingUi(): { ui: ConfigurationUi; offered: vscode.QuickPickItem[] } {
+  function capturingUi(): {
+    ui: ConfigurationUi;
+    offered: vscode.QuickPickItem[];
+    /** The options the list was offered WITH, which is where the help line rides. */
+    options: vscode.QuickPickOptions[];
+    informed: string[];
+  } {
     const offered: vscode.QuickPickItem[] = [];
+    const options: vscode.QuickPickOptions[] = [];
+    const informed: string[] = [];
     return {
       offered,
+      options,
+      informed,
       ui: {
         confirm: () => Promise.resolve(false),
         runVerb: () => undefined,
-        pick: (items) => {
+        pick: (items, pickOptions) => {
           offered.push(...items);
+          options.push(pickOptions);
           return Promise.resolve(undefined);
         },
-        showInformationMessage: () => undefined,
+        showInformationMessage: (message) => informed.push(message),
         showWarningMessage: () => undefined,
         workspaceRoot: () => "D:/ws",
         setEngine: () => Promise.resolve(),
@@ -1296,6 +1307,81 @@ suite("the Configuration section's model pick", () => {
     assert.ok(offered[1].description?.includes("not known"), offered[1].description);
     // And what the answer is an answer ABOUT travels with it.
     assert.ok(offered[0].description?.includes("api"));
+  });
+
+  test("labels each option's provider against the author, and prices only what a source priced", async () => {
+    // Where the deleted cross-provider RULE went. Every model is offered --
+    // the only one refused is the authoring model itself -- and each carries
+    // how it stands to the author, so the person weighs what the framework
+    // cannot judge. The price is the source's own word for its own price,
+    // shown where a source stated one and absent where none did; a model
+    // graded on a price it never stated is how a tool teaches a developer
+    // that its tags mean nothing.
+    const projection = {
+      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+      modules: [],
+      configuration: {
+        fidelityTransport: "copilot-cli",
+        verifying: {
+          role: "verifier",
+          chosen: null,
+          candidates: [
+            model({
+              alias: "mate",
+              model: "claude-opus-5",
+              provider: "anthropic",
+              providerRelation: "same-provider",
+              priceCategory: "high",
+            }),
+            model({
+              alias: "other",
+              model: "gpt-5.6-terra",
+              provider: "openai",
+              providerRelation: "different-provider",
+            }),
+          ],
+          excludes: [],
+          fellThrough: false,
+        },
+      },
+    } as unknown as Projection;
+    const { ui, offered, options } = capturingUi();
+    const { router } = fakeRouter(0, "");
+    await setRoleModel(
+      router,
+      { node: { kind: "configRole", role: "verifying" }, projection },
+      () => undefined,
+      ui,
+    );
+    assert.ok(offered[0].description?.includes("same provider"), offered[0].description);
+    assert.ok(offered[0].description?.includes("high price"), offered[0].description);
+    assert.ok(offered[1].description?.includes("different provider"), offered[1].description);
+    // Nothing said, nothing shown: no price is invented for the second.
+    assert.ok(!offered[1].description?.includes("price"), offered[1].description);
+    // And the one line of help travels with the list, where the choice is made.
+    assert.ok(options[0]?.placeHolder?.includes("blind spots"), options[0]?.placeHolder);
+  });
+
+  test("does not offer to set the authoring model, because the ledger would not honour it", async () => {
+    // It is the engine's, declared when the session is registered. The pane used to
+    // write a role that nothing dispatched, so the control appeared to work
+    // and changed nothing about which model authored anything.
+    const projection = {
+      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+      modules: [],
+      configuration: { authoring: { role: "authoring", chosen: null, candidates: [], excludes: [], fellThrough: false } },
+    } as unknown as Projection;
+    const { ui, offered, informed } = capturingUi();
+    const { router, configureOptions } = fakeRouter(0, "");
+    await setRoleModel(
+      router,
+      { node: { kind: "configRole", role: "authoring" }, projection },
+      () => undefined,
+      ui,
+    );
+    assert.strictEqual(offered.length, 0);
+    assert.strictEqual(configureOptions.length, 0);
+    assert.ok(informed.some((line) => line.includes("session start")), informed.join(" | "));
   });
 });
 

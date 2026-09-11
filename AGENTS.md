@@ -80,22 +80,26 @@ refresh would spend:
   its cost — measured on 2026-09-05 and transcribed in
   `docs/acp-walkthrough.md` §1. The newer SDK route (`client.listModels()`,
   RPC `models.list`) carries per-token prices instead of a legacy multiplier.
-- **The direct-API list costs nothing**: `dabbler discovery enumerate` read
+- **The direct-API list costs nothing**: `dabbler discovery refresh` read
   three vendors and 195 models in 2.4 seconds, billing no tokens.
 - **The Claude CLI cannot be enumerated** — no list command. Its reachable
   set IS the Anthropic key's API enumeration. Do not maintain a third list.
 
-**The trap is `copilot-catalog.lock`.** Its `premium_request_weight` and
-`probe_premium_requests` are the legacy unit, and `copilot refresh
---dry-run` prints costs in premium requests. An engine that reasons from
-those numbers concludes that finding out what models exist is expensive. It
-is not, and the samples are wrong besides: the catalog sampled `gpt-5.4` at
-0 where the seat states 1x, and re-probing it on 2026-09-10 moved the sample
-to 1 — the same finding bought twice with a billed call.
+**There is nothing left in this path that can bill a token.** Session 151
+deleted the prompting probe with the model registry it fed, so the question
+an engine keeps reaching for — "how expensive is a refresh?" — is no longer
+merely answered but unaskable: `dabbler discovery refresh` reads each
+vendor's metadata endpoint and opens one conversation on the seat, and
+neither sends a prompt. What a session actually spends on a seat is a
+different question, billed in AI credits per token and measured by `dabbler
+seat-cost`.
 
-`dabbler copilot refresh` sends a real prompt per model. It establishes that
-a model ANSWERS on this seat — entitlement, not existence. Never use it to
-enumerate.
+**What this machine was told is one file**, `ai-model-catalog.json` under
+this platform's own per-user data directory, with one block per transport.
+It is a reading of THIS machine's seat and THIS machine's keys, and a block
+recorded for another account or another key set is read as unread rather
+than believed. Nothing ships a catalog: a copy that travelled in a package
+would tell every machine about somebody else's.
 
 ### `session close --force` closes the WHOLE PLAN, not one session
 

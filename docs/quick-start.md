@@ -383,65 +383,40 @@ transport:
 An explicitly-named config — `--config`, or `AI_ROUTER_CONFIG` — takes
 neither layer: a caller who named a file meant that file.
 
-## Refreshing the seat catalog
+## Refreshing the model catalog
 
-On the `copilot-cli` transport, the packaged `copilot-catalog.lock` records
-what this seat can dispatch: which models answered, on which CLI build,
-and a one-call `probe_premium_requests` sample each. The CLI has no
-`list-models` command and no provider field, so every value in it was
-earned by a real billed call. Refresh it with:
+What models this machine can dispatch to is read into one file, and reading
+it costs nothing on either transport: each vendor states its models at a
+metadata endpoint, and a Copilot seat states its own in the reply to opening
+a conversation. No prompt is sent on either path.
 
 ```
-dabbler copilot refresh [--quorum|--stale|--models a,b|--all] [--dry-run]
+dabbler discovery refresh
 ```
 
-The scopes exist because cost is the design constraint — a refresh that
-costs 39 premium requests to answer "did my seat survive the
-auto-update?" is one nobody runs, and a lockfile whose only writer is
-too expensive to run is a lockfile people edit by hand:
+It covers whichever transports this machine actually has -- a seat with no
+provider keys refreshes its seat block and leaves the rest standing -- and
+a session start does it for you, once on the first session of any given day.
 
-| Scope | Probes | Premium requests (this seat) |
-|---|---|---|
-| `--quorum` (default) | the cheapest confirmed model of each provider | **1.33** |
-| `--models a,b` | the ids you name | their recorded samples |
-| `--stale` | entries confirmed on some other CLI build, cheapest first | varies |
-| `--all` | the whole declared candidate universe | **39** + entries never sampled |
+The reading lands in `ai-model-catalog.json` under this platform's own
+per-user data directory (`%LOCALAPPDATA%\dabbler\` on Windows, the XDG
+equivalent elsewhere), one block per transport. **Nothing ships a catalog.**
+A catalog is a reading of THIS machine's seat and THIS machine's keys, so a
+copy that travelled in a package would tell every machine about somebody
+else's models -- and a block recorded for another seat or another set of
+keys is read as unread rather than believed.
 
-The quorum is exactly enough to re-establish the ≥2-distinct-provider
-invariant and re-date the CLI version. `--all` must be asked for by name.
+A model that stops being listed is not deleted from the record: it moves to
+`retired` with the date it went, so an operator whose usual model vanished
+from a list is told it was withdrawn rather than left wondering what they
+broke.
 
-Samples are what the seat reported for one call, and the seat reports
-fractions for sub-premium models — `claude-haiku-4.5` measures 0.33.
-They are observations, never prices: they fund the cost preview below
-and never feed model selection. Real spend is measured afterwards by
-`dabbler seat-cost`.
-
-- **Priced before it spends.** Every run prints its projected cost from
-  the samples already in the file, names entries of unknown cost as
-  unknown (never zero), and asks for confirmation above the threshold.
-  `--dry-run` prints the plan and probes nothing. Unattended runs
-  without `--yes` fail closed rather than prompting into the void.
-- **Merge, never clobber.** A run that probed three models rewrites
-  those three; every other entry survives byte for byte, provenance
-  included. A previously-confirmed entry whose probe fails today is not
-  demoted — a transient CLI failure is not a withdrawn model — so the
-  failure is recorded and the prior confirmation stands, visibly stale.
-- **Reports a diff, not a success message**: entries confirmed, entries
-  newly failing, samples that moved, the CLI version re-dated. An
-  unchanged refresh says so.
-- **Stamps what wrote it.** The writer records `written_by`,
-  `written_at` and a `content_digest` over what it wrote. A later load
-  whose contents disagree with that digest is reported as **hand-edited
-  provenance**, in the same channel as version drift. Detection, not
-  enforcement: you may still edit the file, but the record will say you
-  did — and the values there are empirical or they are nothing.
-- Adding a model is a **data edit** to `[meta].candidate_universe`
-  followed by a probe. An id outside that array is refused before it can
-  buy a premium request with a typo.
-
-CLI version drift is a warning, not a refusal: the seat CLI auto-updates
-on its own schedule. Every stale-catalog message names the exact refresh
-invocation that resolves it.
+**There is no prompting probe and no way to spend a token here.** There was
+one until session 151 -- it sent a real prompt per model to establish that
+the model answered -- and every flag that chose models to prompt went with
+it. Whether the model asked for is the model that answered is now read from
+a verification round's own requested and served pair, which this framework
+produces for nothing as a by-product of the work.
 
 ## Talking to an agent over its own protocol
 

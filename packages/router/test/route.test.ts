@@ -22,6 +22,7 @@ import {
   PromptTooLargeError,
   apiLadder,
   assertNotExcluded,
+  assertNotTheAuthor,
   buildPrompt,
   classifyEscalationReason,
   detectTruncation,
@@ -43,7 +44,7 @@ import { CopilotCliTransport } from "../src/transports/copilot.ts";
 import { type CatalogModel } from "../src/catalog.ts";
 import { setHttpSource } from "../src/transports/api.ts";
 import type { APIResult } from "../src/transports/base.ts";
-import { gitAnswers, makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
+import { gitAnswers, makeConfig, seed, seedApiCatalog, setProviderKeys, tempDir } from "./support/answers.ts";
 
 /** A catalog entry, as the seat's own free reading records one. */
 function seatEntry(
@@ -98,6 +99,10 @@ function metricRows(): Array<Record<string, unknown>> {
 
 beforeEach(() => {
   setProviderKeys();
+  // What this machine's vendors listed. The direct-API ladder is the catalog
+  // now, as the seat's already was, so a test that expects to dispatch has to
+  // say what the machine was told it could dispatch to.
+  seedApiCatalog(makeConfig());
   // `bootstrap` persists this at user scope on a seat machine, and it
   // outranks the config a test writes.
   delete process.env["DABBLER_TRANSPORT"];
@@ -142,20 +147,103 @@ describe("normalizing the exclusion", () => {
 });
 
 describe("the ladder a call may take", () => {
-  it("is the role's order over the registry", () => {
+  it("is the role's order over what this machine's vendors listed", () => {
     assert.deepEqual(
-      apiLadder(makeConfig(), "generator", "general", []).map((entry) => entry.alias),
-      ["flash", "pro", "opus", "sonnet", "gpt"],
+      apiLadder(makeConfig(), "generator", "general", []).map((entry) => entry.model_id),
+      ["g-flash", "g-pro", "a-opus", "a-sonnet", "o-gpt"],
     );
   });
 
-  it("carries the id that goes on the wire beside the alias", () => {
+  it("carries the id the vendor listed, which is the id that goes on the wire", () => {
+    // There is no alias on either transport now: the catalog's id is what the
+    // surface shows, what a choice is checked against, and what is dispatched.
     const [first] = apiLadder(makeConfig(), "generator", "general", []);
     assert.deepEqual([first?.alias, first?.model_id, first?.provider], [
-      "flash",
+      "g-flash",
       "g-flash",
       "google",
     ]);
+  });
+
+  it("is not read at all when it was taken for a different set of keys", () => {
+    // 150's round-one finding, on the dispatch path: a block recorded against
+    // another machine's keys is unread rather than believed, so it can never
+    // put a model on the wire that this machine cannot reach.
+    delete process.env["TEST_OPENAI_KEY"];
+    assert.throws(() => apiLadder(makeConfig(), "generator", "general", []), NoCandidateError);
+  });
+
+  it("stops visibly when a pinned model cannot be dispatched, and substitutes nothing", () => {
+    // A pin is an instruction rather than the head of a ladder. The stop
+    // names the model the operator chose, why this machine cannot reach it,
+    // and the command that carries each way forward -- the shape session 147
+    // gave a stop -- because "no candidate survived the exclusion" would
+    // describe a rule that was never applied to their choice.
+    const config = makeConfig({ roles: { verifier: { pin: "o-nothing-lists-this" } } });
+    assert.throws(
+      () => apiLadder(config, "verifier", "general", []),
+      /pinned to 'o-nothing-lists-this'/,
+    );
+    assert.throws(
+      () => apiLadder(config, "verifier", "general", []),
+      /Nothing was substituted for it/,
+    );
+    assert.throws(() => apiLadder(config, "verifier", "general", []), /dabbler configure/);
+  });
+
+  it("dispatches to the pinned model even on the provider the caller excluded", () => {
+    // The author's provider is excluded by DEFAULT, and a default does not
+    // overrule a person: the pinned model is what the round reaches.
+    const config = makeConfig({ roles: { verifier: { pin: "o-gpt" } } });
+    assert.deepEqual(
+      apiLadder(config, "verifier", "general", ["openai"]).map((entry) => entry.model_id),
+      ["o-gpt"],
+    );
+  });
+
+  it("refuses the authoring model at the wire, however it got there", () => {
+    // Round 1's blocking finding. A pin is honoured OVER the caller's
+    // provider exclusion, deliberately -- a default does not overrule a
+    // person -- and a pin outlives the session that set it: `configure`
+    // could only check it against the author of the day it was written, so
+    // the next session declares that same model at `session start` and the
+    // pinned verifier is the author. The rule is asserted again here,
+    // against the author this call actually has, because a rule the surface
+    // keeps and the runtime does not is not a rule.
+    const candidate = { alias: "a-opus", model_id: "a-opus", provider: "anthropic" };
+    assert.throws(() => assertNotTheAuthor(candidate, "a-opus"), /they are the same model/);
+    // Under the framework's one spelling, so a dated pin of the same model
+    // is caught rather than read as a second one.
+    const dated = { alias: "c", model_id: "claude-opus-5", provider: "anthropic" };
+    assert.throws(
+      () => assertNotTheAuthor(dated, "claude-opus-5-20260101"),
+      ExcludedProviderError,
+    );
+    // Another model is fine, including one on the author's own provider:
+    // that pair is the developer's judgement and is labelled, not refused.
+    assert.doesNotThrow(() => assertNotTheAuthor(candidate, "a-sonnet"));
+    // And a caller that does not know the author asserts nothing.
+    assert.doesNotThrow(() => assertNotTheAuthor(candidate, null));
+  });
+
+  it("drops a model whose provider this machine cannot reach", () => {
+    // Round 1's second blocking finding. The registry enumeration checked
+    // that a candidate's provider was enabled and keyed; the catalog one did
+    // not, on the argument that an out-of-scope block reads as unread --
+    // true, and not the same guarantee, because the scope moves all at once
+    // and says nothing about THIS provider being reachable now. `buildPath`
+    // asserts a candidate's provider has a rate limiter and calls the miss
+    // unreachable; that is only true while this holds.
+    delete process.env["TEST_OPENAI_KEY"];
+    const config = makeConfig();
+    // The block was read for all three, so it is still this machine's -- and
+    // the one provider whose key has gone is not a candidate in it.
+    seedApiCatalog(config);
+    process.env["TEST_OPENAI_KEY"] = "test-key";
+    (config["providers"] as Record<string, Record<string, unknown>>)["openai"]["enabled"] = false;
+    const reached = apiLadder(config, "verifier", "general", []).map((entry) => entry.provider);
+    assert.ok(!reached.includes("openai"), reached.join(", "));
+    assert.ok(reached.length > 0, "the reachable providers still resolve");
   });
 
   it("fails closed when the exclusion leaves no candidate", () => {
@@ -175,7 +263,7 @@ describe("the ladder a call may take", () => {
   it("names the remedy in the refusal", () => {
     assert.throws(
       () => apiLadder(makeConfig(), "generator", "formatting", ["google", "openai", "anthropic"]),
-      /Enable a model from a surviving provider, or set its API key/,
+      /Set a surviving provider's API key, or refresh the catalog/,
     );
   });
 
@@ -485,20 +573,18 @@ describe("a prompt over the model's input budget", () => {
   it("stops the call before anything is dispatched", async () => {
     // The budget is checked where the prompt is built, which is before the
     // transport is reached at all.
+    // The window is the provider's smallest now rather than a named model's,
+    // because a dispatch reads what this framework sends a VENDOR and the
+    // catalog says only which models that vendor lists.
     configOnDisk(
       makeConfig({
-        models: {
-          tiny: {
-            provider: "google",
-            model_id: "g-tiny",
-            max_context_tokens: 1000,
-            max_output_tokens: 100,
-          },
+        provider_defaults: {
+          google: { max_context_tokens: 1000, max_output_tokens: 100 },
         },
-        roles: { generator: { prefer: ["g-tiny"] } },
+        roles: { generator: { require_provider_in: ["google"] } },
       }),
     );
-    await assert.rejects(() => route("x".repeat(5000)), PromptTooLargeError);
+    await assert.rejects(() => route("x".repeat(5000), { role: "generator" }), PromptTooLargeError);
   });
 });
 
@@ -507,7 +593,7 @@ describe("--no-router mode", () => {
     // No config, no keys, no network -- and it must still answer.
     process.env["DABBLER_NO_ROUTER"] = "1";
     resetRuntimeMode();
-    const result = await route("anything");
+    const result = await route("anything", { role: "generator" });
     assert.equal(result.model_name, "no-router-mode");
     assert.equal(result.transport, "none");
   });
@@ -546,9 +632,9 @@ describe("dispatching over the direct-API transport", () => {
       return Promise.resolve(googleAnswer("the answer"));
     });
 
-    const result = await route("say hi", { taskType: "formatting", sessionNumber: 3 });
+    const result = await route("say hi", { role: "generator", taskType: "formatting", sessionNumber: 3 });
     assert.equal(result.content, "the answer");
-    assert.equal(result.model_name, "flash"); // roles.generator.prefer[0]
+    assert.equal(result.model_name, "g-flash"); // roles.generator.prefer[0]
     assert.equal(result.transport, "api");
     assert.deepEqual([result.input_tokens, result.output_tokens], [10, 100]);
     assert.equal(result.served_model_id, "g-served");
@@ -572,13 +658,13 @@ describe("dispatching over the direct-API transport", () => {
       ),
     );
 
-    const result = await route("say hi", { taskType: "formatting" });
+    const result = await route("say hi", { role: "generator", taskType: "formatting" });
     assert.equal(result.escalated, true);
-    assert.deepEqual(result.escalation_history, [["flash", "empty_response"]]);
-    assert.equal(result.model_name, "pro");
+    assert.deepEqual(result.escalation_history, [["g-flash", "empty_response"]]);
+    assert.equal(result.model_name, "g-pro");
     const [row] = metricRows();
     assert.equal(row?.["escalated"], true);
-    assert.equal(row?.["model"], "pro");
+    assert.equal(row?.["model"], "g-pro");
   });
 
   it("stops at max_escalations even with candidates left", async () => {
@@ -601,7 +687,7 @@ describe("dispatching over the direct-API transport", () => {
       return Promise.resolve(googleAnswer("", 0)); // every model empties
     });
 
-    const result = await route("say hi");
+    const result = await route("say hi", { role: "generator" });
     assert.equal(result.escalation_history.length, 1);
     assert.equal(urls.length, 2);
   });
@@ -624,12 +710,12 @@ describe("dispatching over the direct-API transport", () => {
       );
     });
 
-    const result = await route("say hi", { excludeProviders: ["google", "openai"] });
+    const result = await route("say hi", { role: "generator", excludeProviders: ["google", "openai"] });
     assert.equal(result.provider, "anthropic");
     assert.ok(!urls.join(" ").includes("google"));
 
     await assert.rejects(
-      () => route("say hi", { excludeProviders: ["google", "openai", "anthropic"] }),
+      () => route("say hi", { role: "generator", excludeProviders: ["google", "openai", "anthropic"] }),
       NoCandidateError,
     );
   });
@@ -670,6 +756,7 @@ describe("dispatching over the direct-API transport", () => {
     // Only the OpenAI candidate survives, so both turns are its own and the
     // ladder has no step to take: what the wire sees is the two turns.
     const result = await route("review this", {
+      role: "generator",
       excludeProviders: ["google", "anthropic"],
       followUp: (answer) => {
         const outcome = deliverFileRequests(tree, grant, answer);
@@ -707,7 +794,7 @@ describe("dispatching over the offline transport", () => {
         transport: { profile: "offline" },
       }),
     );
-    const result = await route("say hi");
+    const result = await route("say hi", { role: "generator" });
     assert.equal(result.content, "short\n");
     assert.equal(result.provider, "offline");
     assert.equal(result.escalated, false);
@@ -745,7 +832,7 @@ describe("dispatching over the seat", () => {
   it("records the conversation id and that the spend is not visible here", async () => {
     configOnDisk();
     installFakeSeat(SEAT_ANSWER);
-    const result = await route("do a thing", { transport: "copilot-cli", sessionNumber: 3 });
+    const result = await route("do a thing", { role: "generator", transport: "copilot-cli", sessionNumber: 3 });
     assert.equal(result.content, "seat answer");
     assert.equal(result.transport, "copilot-cli");
     assert.equal(result.transport_session_id, "conv-42");
@@ -760,7 +847,7 @@ describe("dispatching over the seat", () => {
   it("raises a dispatch failure rather than returning empty content", async () => {
     configOnDisk();
     installFakeSeat("not json at all\n");
-    await assert.rejects(() => route("x", { transport: "copilot-cli" }), /generic-unknown/);
+    await assert.rejects(() => route("x", { role: "generator", transport: "copilot-cli" }), /generic-unknown/);
   });
 
   it("stops on a catalog this machine has not read instead of falling back to the API", async () => {
@@ -771,7 +858,7 @@ describe("dispatching over the seat", () => {
     // file is wrong and handed no verb edits the file.
     configOnDisk();
     await assert.rejects(
-      () => route("say hi", { transport: "copilot-cli" }),
+      () => route("say hi", { role: "generator", transport: "copilot-cli" }),
       /catalog holds nothing for it/,
     );
   });

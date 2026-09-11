@@ -647,9 +647,23 @@ suite("solutionTreeModel: what a session is run with", () => {
         },
         verifying: {
           role: "verifier",
-          chosen: { alias: "gpt-5-6-terra", model: "gpt-5.6-terra", provider: "openai" },
-          candidates: [{ alias: "gpt-5-6-terra", model: "gpt-5.6-terra", provider: "openai" }],
-          excludes: ["anthropic"],
+          chosen: {
+            alias: "gpt-5-6-terra",
+            model: "gpt-5.6-terra",
+            provider: "openai",
+            providerRelation: "different-provider",
+            priceCategory: "high",
+          },
+          candidates: [
+            {
+              alias: "gpt-5-6-terra",
+              model: "gpt-5.6-terra",
+              provider: "openai",
+              providerRelation: "different-provider",
+              priceCategory: "high",
+            },
+          ],
+          excludes: [],
           fellThrough: false,
         },
         // One row, because there is one catalog: it was three, and two of
@@ -712,11 +726,14 @@ suite("solutionTreeModel: what a session is run with", () => {
       assert.ok(transport?.description?.includes("api"));
       assert.ok(transport?.tooltip?.includes("transport.profile says 'copilot-cli' and is overridden"));
 
-      // The cross-provider invariant is shown, not restated: the row says
-      // what excluding the authoring model's provider left.
+      // Cross-provider is a LABEL now rather than a refusal: the row says
+      // how this reviewer stands to the author, and says the price its own
+      // source stated as a price rather than as a capability.
       const verifying = rendered.find((row) => row.label === "Verifying model");
       assert.ok(verifying?.description?.includes("gpt-5.6-terra"));
-      assert.ok(verifying?.tooltip?.includes("anthropic"));
+      assert.ok(verifying?.tooltip?.includes("different provider"));
+      assert.ok(verifying?.tooltip?.includes("blind spots"));
+      assert.ok(verifying?.tooltip?.includes("PRICE and not a capability"));
 
       // And the engine's default carries the sentence that says why.
       const engine = rendered.find((row) => row.label === "Engine");
@@ -757,6 +774,18 @@ suite("solutionTreeModel: is the model we asked for the model that answered", ()
   };
 
   /** A registry of two models, so what is asserted is the reading and not the shipped list. */
+  /** One model, as a vendor's own free enumeration records it. */
+  const catalogRow = (id: string, provider: string): Record<string, unknown> => ({
+    id,
+    provider,
+    provider_source: "vendor-endpoint",
+    display_name: id,
+    enabled: true,
+    price_category: null,
+    cost: null,
+    listed_at: "2026-08-01T09:00:00Z",
+  });
+
   const CONFIG = [
     "providers:",
     "  anthropic:",
@@ -769,21 +798,9 @@ suite("solutionTreeModel: is the model we asked for the model that answered", ()
     "    rate_limit: { requests_per_minute: 10, tokens_per_minute: 100 }",
     "    timeout_seconds: 30",
     "    retry: { max_retries: 1, backoff_base_seconds: 0 }",
-    "models:",
-    "  author:",
-    "    provider: anthropic",
-    "    model_id: a-author",
-    "  reviewer:",
-    "    provider: openai",
-    "    model_id: o-reviewer",
     "roles:",
-    "  generator:",
-    "    prefer: [a-author]",
     "  verifier:",
     "    prefer: [o-reviewer]",
-    "transports:",
-    "  copilot-cli:",
-    "    lockfile: copilot-catalog.lock",
     "escalation:",
     "  enabled: false",
     "  max_escalations: 0",
@@ -809,31 +826,19 @@ suite("solutionTreeModel: is the model we asked for the model that answered", ()
     }
     writeFileTree(root, {
       "router-config.yaml": CONFIG,
-      // Two dated records, each with a date NO probe could produce: a
-      // refresh would stamp them with now. They are how the next test tells
-      // a record that was read from one that was fetched.
-      ".dabbler/api-models.lock": [
-        "[meta]",
-        'key_set_id = "test"',
-        'enumerated_at = "2026-08-01T09:00:00Z"',
-        "[[providers]]",
-        'name = "anthropic"',
-        'enumerated_at = "2026-08-01T09:00:00Z"',
-        "[[providers]]",
-        'name = "openai"',
-        'enumerated_at = "2026-08-01T09:00:00Z"',
-        "",
-      ].join("\n"),
-      "copilot-catalog.lock": [
-        "[meta]",
-        'cli_version = "test"',
-        'seat_id = "test-seat"',
-        'probed_at = "2026-08-02T09:00:00Z"',
-        "[[models]]",
-        'id = "o-reviewer"',
-        'echoed_model = "o-reviewer"',
-        "",
-      ].join("\n"),
+      // The engine and the model it declared when the session was
+      // registered. The authoring row REPORTS this rather than resolving a
+      // role, because this is the model that authors.
+      "docs/sessions/sessions.json": JSON.stringify({
+        schemaVersion: 5,
+        sessions: [
+          {
+            number: 1,
+            status: "in-progress",
+            orchestrator: { engine: "copilot", provider: "anthropic", model: "a-author" },
+          },
+        ],
+      }),
       // Two rounds, and they are the two KINDS of evidence. The first is on
       // the direct-API path, where the served id is the provider's own
       // statement of what answered. The second is a seat round, where the
@@ -856,6 +861,36 @@ suite("solutionTreeModel: is the model we asked for the model that answered", ()
     process.env.DABBLER_TRANSPORT = "api";
     process.env.TEST_ANTHROPIC_KEY = "k";
     process.env.TEST_OPENAI_KEY = "k";
+    // What this machine's vendors listed, with a date NO refresh could
+    // produce: a refresh stamps now, so the date below is how the next test
+    // tells a record that was READ from one that was fetched. The runner
+    // points the catalog at a temp file, so this writes nothing of the
+    // operator's.
+    const catalog = process.env.DABBLER_CATALOG_PATH as string;
+    fs.mkdirSync(path.dirname(catalog), { recursive: true });
+    fs.writeFileSync(
+      catalog,
+      JSON.stringify({
+        schema_version: 1,
+        written_by: "test",
+        written_at: "2026-08-01T09:00:00Z",
+        transports: {
+          api: {
+            refreshed_at: "2026-08-01T09:00:00Z",
+            source: "vendor-enumeration",
+            // The set of providers whose keys are present: a block recorded
+            // for any other set is not a reading of this machine.
+            scope: { providers: ["anthropic", "openai"] },
+            models: [
+              catalogRow("a-author", "anthropic"),
+              catalogRow("o-reviewer", "openai"),
+            ],
+            retired: [],
+          },
+        },
+      }),
+      "utf8",
+    );
   });
 
   teardown(() => {
@@ -913,16 +948,14 @@ suite("solutionTreeModel: is the model we asked for the model that answered", ()
       fs.readFileSync(path.join(root, ".dabbler", "solution", "projection.json"), "utf8"),
     ) as Projection;
 
-    // Both records are present and carry the dates the fixture wrote.
+    // One record now, not three, and it carries the date the fixture wrote
+    // rather than the one a refresh would have stamped.
     const records = p.configuration?.records ?? [];
-    assert.strictEqual(
-      records.find((row) => row.record === "api-enumeration")?.datedAt,
-      "2026-08-01T09:00:00Z",
+    assert.deepStrictEqual(
+      records.map((row) => row.record),
+      ["ai-model-catalog"],
     );
-    assert.strictEqual(
-      records.find((row) => row.record === "seat-catalog")?.datedAt,
-      "2026-08-02T09:00:00Z",
-    );
+    assert.strictEqual(records[0]?.datedAt, "2026-08-01T09:00:00Z");
 
     // Both models answered as themselves. Only one of them was said so by a
     // provider; the other was said so by the seat, about itself.

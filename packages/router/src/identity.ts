@@ -19,9 +19,11 @@
 import { loadConfig } from "./config.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { pythonRepr } from "./pythonJson.ts";
+import { type CatalogModel } from "./catalog.ts";
+import { apiBlock } from "./discovery.ts";
 import {
   KNOWN_PROVIDERS,
-  confirmedCatalogEntries,
+  seatModels,
   type ConfirmedCatalogEntry,
 } from "./transports/copilot.ts";
 
@@ -33,7 +35,7 @@ export const MULTI_PROVIDER_ENGINES: ReadonlySet<string> = new Set([
 export const PROVENANCE_DIRECT = "direct";
 export const PROVENANCE_ASSERTED = "asserted";
 
-export const SOURCE_MODEL_REGISTRY = "model-registry";
+export const SOURCE_MODEL_CATALOG = "model-catalog";
 export const SOURCE_PROVIDER_FIELD = "provider-field";
 
 
@@ -50,9 +52,6 @@ export interface OrchestratorIdentity {
   readonly model: string | null;
   readonly engine: string | null;
 }
-
-/** A model registry: alias -> `{ provider, model_id, … }`. */
-export type ModelsRegistry = Record<string, unknown>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -85,13 +84,35 @@ export function classifyIdentityProvenance(engine: unknown): string | null {
 export { normalizeModelToken } from "./contracts/models.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
 
-function loadDefaultRegistry(): ModelsRegistry {
+/**
+ * Every model this machine's catalog lists, on either transport.
+ *
+ * The registry this used to read is gone, and with it the three lookups that
+ * came before the catalog. What replaces it is both blocks rather than the
+ * seat's alone:  read only the seat, so on a
+ * machine with provider keys and no seat -- which is what a direct-API
+ * developer has -- the fallback resolved nothing and identity would have
+ * failed closed on every model.
+ *
+ * Each block is fetched through its own SCOPED reading, so a block recorded
+ * for another seat or another key set is not read at all.
+ */
+function catalogEntries(): ConfirmedCatalogEntry[] {
+  const entries: ConfirmedCatalogEntry[] = [];
+  const blocks: Array<readonly CatalogModel[]> = [seatModels() ?? []];
   try {
-    const models = loadConfig()["models"];
-    return isRecord(models) ? models : {};
+    blocks.push(apiBlock(loadConfig())?.models ?? []);
   } catch {
-    return {};
+    // An unreadable config resolves no api block and stops nothing: this is
+    // the one reader that is best-effort by design, because its caller must
+    // fail closed on a bare id it cannot vouch for anyway.
   }
+  for (const block of blocks) {
+    for (const entry of block) {
+      if (entry.provider !== null) entries.push({ id: entry.id, provider: entry.provider });
+    }
+  }
+  return entries;
 }
 
 /**
@@ -101,7 +122,7 @@ function loadDefaultRegistry(): ModelsRegistry {
  */
 function catalogProvider(
   token: string,
-  entries: readonly ConfirmedCatalogEntry[] = confirmedCatalogEntries(),
+  entries: readonly ConfirmedCatalogEntry[] = catalogEntries(),
 ): string | null {
   for (const entry of entries) {
     if (normalizeModelToken(entry.id) === token) {
@@ -112,54 +133,22 @@ function catalogProvider(
   return null;
 }
 
-function providerOf(entry: unknown): string | null {
-  if (!isRecord(entry)) return null;
-  const provider = entry["provider"];
-  if (provider === undefined || provider === null || provider === "") return null;
-  return String(provider).trim().toLowerCase();
-}
-
 /**
- * Canonical lowercase provider for a model string, or null. Four bounded
- * lookups: exact registry key, exact model_id, normalized token across both,
- * then the confirmed seat-catalog universe.
+ * Canonical lowercase provider for a model string, or null.
+ *
+ * One lookup now: the model this machine's own catalog lists, on either
+ * transport, matched under the framework's one spelling rule so a dated pin
+ * resolves to the same model as its undated id. The three registry lookups
+ * that preceded it are gone with the registry, which named fourteen models a
+ * repository happened to have been edited with and could say nothing about
+ * any other.
  */
 export function resolveModelProvider(
   model: unknown,
-  modelsRegistry?: ModelsRegistry | null,
   catalog?: readonly ConfirmedCatalogEntry[],
 ): string | null {
   if (typeof model !== "string" || model.trim() === "") return null;
-  const registry =
-    modelsRegistry !== undefined && modelsRegistry !== null
-      ? modelsRegistry
-      : loadDefaultRegistry();
-
-  const exact = providerOf(registry[model]);
-  if (exact !== null) return exact;
-
-  for (const entry of Object.values(registry)) {
-    if (isRecord(entry) && entry["model_id"] === model) {
-      const provider = providerOf(entry);
-      if (provider !== null) return provider;
-    }
-  }
-
-  const token = normalizeModelToken(model);
-  for (const [alias, entry] of Object.entries(registry)) {
-    if (!isRecord(entry)) continue;
-    const modelId = entry["model_id"];
-    const matches =
-      normalizeModelToken(alias) === token ||
-      (typeof modelId === "string" &&
-        modelId !== "" &&
-        normalizeModelToken(modelId) === token);
-    if (!matches) continue;
-    const provider = providerOf(entry);
-    if (provider !== null) return provider;
-  }
-
-  return catalogProvider(token, catalog);
+  return catalogProvider(normalizeModelToken(model), catalog);
 }
 
 function trimmedOrNull(value: unknown): string | null {
@@ -178,7 +167,6 @@ function trimmedOrNull(value: unknown): string | null {
 export function resolveOrchestratorIdentity(
   orchestrator: unknown,
   options: {
-    modelsRegistry?: ModelsRegistry | null;
     catalog?: readonly ConfirmedCatalogEntry[];
   } = {},
 ): OrchestratorIdentity {
@@ -194,12 +182,12 @@ export function resolveOrchestratorIdentity(
   const multi = isMultiProviderEngine(engine);
 
   if (model !== null) {
-    const provider = resolveModelProvider(model, options.modelsRegistry, options.catalog);
+    const provider = resolveModelProvider(model, options.catalog);
     if (provider) {
       return {
         effectiveProvider: provider,
         provenance,
-        source: SOURCE_MODEL_REGISTRY,
+        source: SOURCE_MODEL_CATALOG,
         model,
         engine,
       };
@@ -251,7 +239,6 @@ export function resolveSessionOrchestratorIdentity(
   sessionsDir: string,
   sessionNumber?: number | null,
   options: {
-    modelsRegistry?: ModelsRegistry | null;
     catalog?: readonly ConfirmedCatalogEntry[];
   } = {},
 ): OrchestratorIdentity {

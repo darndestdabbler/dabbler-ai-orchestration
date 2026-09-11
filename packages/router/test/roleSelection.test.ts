@@ -18,14 +18,12 @@ import {
   FIDELITY_UNKNOWN,
   REMOVED_EXCLUDED_PROVIDER,
   REMOVED_NOT_PERMITTED,
-  REMOVED_UNTRUSTED_VERIFIER,
   ROLE_VERIFIER,
+  effectiveExclusion,
   explainRole,
   modelFidelity,
   roundObservations,
   verifierRefusal,
-  providerReachable,
-  registryCandidates,
   resolveRole,
   roleDeclaration,
   type Candidate,
@@ -44,31 +42,6 @@ const CANDIDATES: ReadonlyArray<readonly [string, string]> = [
   ["o-one", "openai"],
   ["g-one", "google"],
 ];
-
-/**
- * The fixture registry plus the two entries the trust rule needs: one model
- * the registry refuses as a verifier, and one it disables outright.
- */
-function registryConfig(): Record<string, unknown> {
-  const config = makeConfig();
-  const models = config["models"] as Record<string, unknown>;
-  models["gpt-mini"] = {
-    provider: "openai",
-    model_id: "o-mini",
-    max_context_tokens: 272000,
-    max_output_tokens: 32000,
-    is_enabled_as_verifier: false,
-  };
-  models["ghost"] = {
-    provider: "anthropic",
-    model_id: "a-ghost",
-    max_context_tokens: 200000,
-    max_output_tokens: 16000,
-    is_enabled: false,
-    is_enabled_as_verifier: false,
-  };
-  return config;
-}
 
 function ids(candidates: ReadonlyArray<Candidate>): string[] {
   return candidates.map((candidate) => candidate[0]);
@@ -178,19 +151,6 @@ describe("resolving a role", () => {
     );
   });
 
-  it("names the rule that removed each candidate, not merely that one was", () => {
-    // "No trusted verifier was reachable" and "every candidate was on the
-    // excluded provider" are different problems with different answers.
-    const resolved = explainRole(registryConfig(), ROLE_VERIFIER, [
-      ["o-mini", "openai"],
-      ["a-one", "anthropic"],
-    ] as const);
-    assert.deepEqual(resolved.candidates.map((c) => c[0]), ["a-one"]);
-    assert.deepEqual(resolved.removed, [
-      { model: "o-mini", provider: "openai", rule: REMOVED_UNTRUSTED_VERIFIER },
-    ]);
-  });
-
   it("carries the transport's own handle through untouched", () => {
     const config = makeConfig({ roles: { r: { prefer: ["o-one"] } } });
     const resolved = resolveRole(config, "r", [
@@ -203,29 +163,51 @@ describe("resolving a role", () => {
     );
   });
 
-  it("refuses a model the registry distrusts as a verifier, however it is spelled", () => {
-    // Trust is a property of the model, not of the path that reaches it, so
-    // it has to hold on the seat too -- the catalog carries no such flag and
-    // spells ids differently.
-    const config = registryConfig();
-    (config["roles"] as Record<string, Record<string, unknown>>)["verifier"] = {
-      prefer: ["o-mini"],
-    };
-    const resolved = resolveRole(config, ROLE_VERIFIER, [
-      ["O-Mini", "openai"],
-      ["a-sonnet", "anthropic"],
-    ] as const);
-    assert.deepEqual(ids(resolved), ["a-sonnet"]);
-  });
-
-  it("keeps a model the registry has never heard of eligible", () => {
-    // Absent metadata is unknown, never unsupported: filtering on it would
-    // end cross-vendor verification the day a seat ships a model the
-    // registry has not heard of.
+  it("keeps a model nothing has ever said anything about eligible", () => {
+    // Absent metadata is unknown, never unsupported: a filter on it would
+    // end cross-vendor verification the day a vendor ships a model no
+    // preference order names yet.
     assert.deepEqual(
-      resolveRole(registryConfig(), ROLE_VERIFIER, [["brand-new-model", "google"]] as const),
+      resolveRole(makeConfig(), ROLE_VERIFIER, [["brand-new-model", "google"]] as const),
       [["brand-new-model", "google"]],
     );
+  });
+});
+
+describe("a model a person pinned", () => {
+  it("is the one candidate, and the caller's exclusion does not overrule it", () => {
+    // The defect this exists for: the surface wrote a choice to the front of
+    // a preference order while the dispatch resolved the same role with the
+    // authoring model's provider excluded, so a deliberately chosen
+    // same-provider verifier was dropped and something else answered with
+    // nothing said. A caller's exclusion is a DEFAULT; a pin is a person.
+    const config = makeConfig({ roles: { verifier: { pin: "o-one" } } });
+    assert.deepEqual(
+      ids(resolveRole(config, ROLE_VERIFIER, CANDIDATES, ["openai"])),
+      ["o-one"],
+    );
+    assert.deepEqual(effectiveExclusion(config, ROLE_VERIFIER, ["openai"]), []);
+  });
+
+  it("resolves to nothing rather than to the next model, and names the pin", () => {
+    // Falling from a pinned model to the next candidate IS the silent
+    // substitution the pin exists to stop, so an unmet pin is empty and the
+    // caller turns it into a stop.
+    const resolution = explainRole(
+      makeConfig({ roles: { verifier: { pin: "nothing-lists-this" } } }),
+      ROLE_VERIFIER,
+      CANDIDATES,
+    );
+    assert.deepEqual(resolution.candidates, []);
+    assert.equal(resolution.pinUnmet, "nothing-lists-this");
+  });
+
+  it("leaves a role nobody pinned preferring a different provider", () => {
+    // A default is not an override of a person, and where there is no person
+    // the default still holds: this is the cross-provider preference, intact.
+    const config = makeConfig();
+    assert.deepEqual(effectiveExclusion(config, ROLE_VERIFIER, ["openai"]), ["openai"]);
+    assert.ok(!ids(resolveRole(config, ROLE_VERIFIER, CANDIDATES, ["openai"])).includes("o-one"));
   });
 });
 
@@ -239,87 +221,24 @@ describe("spelling a model id", () => {
   });
 });
 
-describe("enumerating the model registry", () => {
-  it("resolves against the registry in the role's order", () => {
-    assert.deepEqual(registryCandidates(registryConfig(), "generator").slice(0, 3), [
-      "flash",
-      "pro",
-      "opus",
-    ]);
-  });
-
-  it("never lets a disabled model survive", () => {
-    assert.ok(!registryCandidates(registryConfig(), "generator").includes("ghost"));
-  });
-
-  it("drops every model of a provider whose key does not resolve", () => {
-    // Selection can never land on a model the process could not call.
-    delete process.env["TEST_GOOGLE_KEY"];
-    const config = registryConfig();
-    assert.equal(providerReachable(config, "google"), false);
-    const names = registryCandidates(config, "generator");
-    assert.ok(!names.includes("flash") && !names.includes("pro"));
-    assert.ok(names.includes("sonnet"));
-  });
-
-  it("drops every model of a disabled provider", () => {
-    const config = registryConfig();
-    (config["providers"] as Record<string, Record<string, unknown>>)["openai"]["enabled"] =
-      false;
-    assert.ok(!registryCandidates(config, "generator").includes("gpt"));
-  });
-
-  it("drops the entries the registry does not trust to verify", () => {
-    const names = registryCandidates(registryConfig(), ROLE_VERIFIER);
-    assert.ok(!names.includes("gpt-mini"));
-    assert.ok(names.includes("sonnet"));
-  });
-
-  it("is empty when every provider is excluded", () => {
-    assert.deepEqual(
-      registryCandidates(registryConfig(), "generator", ["google", "openai", "anthropic"]),
-      [],
-    );
-  });
-});
-
 describe("what a verifying model may be", () => {
-  it("refuses the authoring model's own provider, from the invariant's own reading", () => {
-    // Not a comparison written here: the verifying role is resolved with the
-    // authoring model's provider excluded -- the same exclusion the dispatch
-    // asserts immediately before the wire -- and the refusal names the rule
-    // that removed the candidate.
-    const config = registryConfig();
-    assert.equal(verifierRefusal(config, "opus", "gpt"), null);
-    const refused = verifierRefusal(config, "opus", "sonnet");
-    assert.match(String(refused), /authoring model's own provider/);
-    // And the OTHER reason the same reading removes a candidate still reads
-    // as its own reason rather than as this one.
-    assert.match(String(verifierRefusal(config, "opus", "gpt-mini")), /is_enabled_as_verifier/);
+  it("refuses only the authoring model itself, and says what it does not claim", () => {
+    // One rule and one comparison: no capability data, no provider inference,
+    // no registry. A different model on the SAME provider is accepted,
+    // because whether two models of one family share a blind spot is a
+    // judgement this framework has no data to make -- and the refusal says
+    // so rather than leaving the developer to assume it was checked.
+    assert.equal(verifierRefusal("claude-opus-5", "gpt-5.6-terra"), null);
+    assert.equal(verifierRefusal("gpt-5.6-sol", "gpt-5.6-terra"), null);
+    const refused = String(verifierRefusal("claude-opus-5", "claude-opus-5"));
+    assert.match(refused, /they are the same model/);
+    assert.match(refused, /same provider is allowed/);
   });
 
-  it("refuses a verifier below the authoring model's tier, ranked by the registry", () => {
-    // The order is data. Nothing here asserts that 'frontier' beats 'fast':
-    // it asserts that the list's own order decides, which is why reversing
-    // the list reverses the refusal.
-    const tiers = { capability_tiers: ["high", "low"] };
-    const config = registryConfig();
-    Object.assign(config, tiers);
-    const models = config["models"] as Record<string, Record<string, unknown>>;
-    models["opus"]["capability_tier"] = "high";
-    models["gpt"]["capability_tier"] = "low";
-    assert.match(String(verifierRefusal(config, "opus", "gpt")), /a review is worth what/);
-    // Upwards is fine, and so is a model the registry has not ranked: an
-    // absent tier is unknown, never unsupported.
-    assert.equal(verifierRefusal(config, "gpt", "opus"), null);
-    delete models["gpt"]["capability_tier"];
-    assert.equal(verifierRefusal(config, "opus", "gpt"), null);
-    // The registry ranks; nothing here does. With the order reversed, the
-    // same pair is refused the other way round.
-    models["gpt"]["capability_tier"] = "low";
-    config["capability_tiers"] = ["low", "high"];
-    assert.equal(verifierRefusal(config, "opus", "gpt"), null);
-    assert.match(String(verifierRefusal(config, "gpt", "opus")), /a review is worth what/);
+  it("reads a dated pin and its undated id as the same model", () => {
+    // The case the comparison exists for: this is how a person picks the
+    // same model twice without noticing they have.
+    assert.ok(verifierRefusal("claude-sonnet-5", "claude-sonnet-5-20260101") !== null);
   });
 });
 

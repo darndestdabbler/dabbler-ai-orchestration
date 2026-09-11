@@ -116,6 +116,8 @@ export async function dispatchVerification(
   prompt: string,
   options: {
     excludeProviders: readonly string[];
+    /** The model the work was authored by, so the one rule holds at dispatch. */
+    authorModel?: string | null;
     sessionNumber: number | null;
     transport?: string | null;
     followUp?: ((answer: string) => string | null) | null;
@@ -133,6 +135,7 @@ export async function dispatchVerification(
         role: ROLE_VERIFIER,
         sessionNumber: options.sessionNumber,
         excludeProviders: excluded,
+        authorModel: options.authorModel ?? null,
         transport: options.transport ?? null,
         followUp: options.followUp ?? null,
       });
@@ -813,6 +816,7 @@ export async function runRound(
   try {
     result = await dispatchVerification(promptBody, {
       excludeProviders: exclude,
+      authorModel: orchestrator.model,
       sessionNumber: current,
       transport: options.transport ?? null,
       followUp,

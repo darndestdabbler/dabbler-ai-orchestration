@@ -2951,9 +2951,9 @@
     {
       "number": 150,
       "title": "One catalog, at the user level, that costs nothing to be right",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-11T03:25:15.029000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-11T06:26:14.565000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

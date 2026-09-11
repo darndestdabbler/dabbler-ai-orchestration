@@ -7,6 +7,7 @@
 // tests that use the network use LOOPBACK only -- because what they assert
 // is what Node itself throws, which a hand-built error cannot prove.
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer, type AddressInfo } from "node:net";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -30,6 +31,7 @@ import {
   isStale,
   refreshStaleRecords,
   roleNames,
+  setSeatSource,
   transportPresence,
   type FreshnessRow,
   type HttpGet,
@@ -47,7 +49,10 @@ import {
 } from "../src/catalog.ts";
 import { HttpStatusError, HttpTimeoutError } from "../src/transports/api.ts";
 import { seatModel, type SeatEnumeration } from "../src/transports/copilot.ts";
-import { makeConfig, setProviderKeys, tempDir } from "./support/answers.ts";
+import { gitAnswers, makeConfig, setProviderKeys, tempDir } from "./support/answers.ts";
+import { resetProjectRootCache } from "../src/config.ts";
+import { discoveryVerb } from "../src/cli/discovery.ts";
+import { standIn } from "../src/workdir.ts";
 
 /**
  * What a block holds on disk, whatever scope it was written for.
@@ -702,5 +707,82 @@ describe("which vehicles this machine can reach", () => {
     } finally {
       clearKeys();
     }
+  });
+});
+
+describe("what a refresh leaves behind", () => {
+  it("re-derives the projection the pane reads, so the reading it asked for is the one on the screen", async () => {
+    // The defect one layer down from the pane's. A refresh changes what this
+    // machine can reach, and the surface renders a DERIVED file -- so
+    // without this the reading the operator asked for is the one thing the
+    // pane does not show until something unrelated moves a declaration.
+    // Nothing here reaches a vendor OR a seat, and both are arranged rather
+    // than assumed: the seat is a seam, and this machine's provider keys are
+    // taken out of the environment for the duration. A test that left either
+    // to what the machine happens to have would read the machine it runs on
+    // -- and would enumerate three vendors for real on the developer's.
+    // The seat is a SEAM here, and armed on purpose: a suite that let this
+    // fall through to `enumerateSeatModels` would open a conversation on
+    // whatever seat the machine running it happens to have.
+    setSeatSource(() =>
+      Promise.resolve({
+        known: false,
+        models: [],
+        current_model_id: null,
+        modes: [],
+        reasoning_efforts: [],
+        cli_version: null,
+        read_at: stamp(0),
+        source: SOURCE_SEAT,
+        reason: "no seat in this test",
+      }),
+    );
+    const keys = ["DABBLER_ANTHROPIC_API_KEY", "DABBLER_OPENAI_API_KEY", "DABBLER_GEMINI_API_KEY"];
+    const held = keys.map((name) => [name, process.env[name]] as const);
+    for (const name of keys) delete process.env[name];
+    const root = tempDir("refresh-projection-");
+    // Where the repository is, answered from a table: loading a config asks
+    // git, and a suite that spawned it would be reading the machine.
+    const ungit = gitAnswers([
+      [["rev-parse", "--show-toplevel"], { stdout: root.split("\\").join("/") }],
+    ]);
+    resetProjectRootCache();
+    const path = join(tempDir("refresh-projection-catalog-"), CATALOG_FILENAME);
+    const dated = stamp(1);
+    writeBlock(
+      TRANSPORT_API,
+      { refreshed_at: dated, source: SOURCE_API, scope: {}, models: [], retired: [] },
+      { path },
+    );
+    setCatalogPath(path);
+    const projectionFile = join(root, ".dabbler", "solution", "projection.json");
+    assert.equal(existsSync(projectionFile), false, "precondition: nothing derived yet");
+
+    let code: number;
+    try {
+      code = await standIn(root, () => discoveryVerb(["refresh"]));
+    } finally {
+      setSeatSource(null);
+      ungit();
+      resetProjectRootCache();
+      for (const [name, value] of held) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+    assert.equal(code, 0);
+
+    assert.ok(existsSync(projectionFile), "the refresh left the pane reading nothing");
+    const projection = JSON.parse(readFileSync(projectionFile, "utf8")) as {
+      configuration: { records: { record: string; path: string; datedAt: string | null }[] };
+    };
+    const [record] = projection.configuration.records;
+    assert.equal(record?.record, RECORD_CATALOG);
+    // The catalog THIS machine reads, as it stands after the refresh. No
+    // vendor could answer, so the block stands as it was -- and the pane
+    // reads that, from a projection there was none of before the verb ran.
+    assert.equal(record?.path, path);
+    assert.equal(record?.datedAt, writtenBlock(readCatalog(path), TRANSPORT_API)?.refreshed_at);
+    assert.equal(record?.datedAt, dated);
   });
 });

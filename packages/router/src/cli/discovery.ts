@@ -10,6 +10,9 @@
 
 import { currentCatalogPath } from "../catalog.ts";
 import { loadConfig } from "../config.ts";
+import { repoRootFor } from "../journal.ts";
+import { tryWriteProjection } from "../projection.ts";
+import { workingDirectory } from "../workdir.ts";
 import {
   ADAPTER_COUNT,
   checkFreshness,
@@ -131,6 +134,14 @@ async function commandRefresh(
     return EXIT_OK;
   }
   for (const line of await refreshCatalog(config)) writeOut(`  ${line}\n`);
+  // What this machine can reach has just changed, and the pane reads a
+  // DERIVED file: without this the reading the operator asked for is the one
+  // thing the surface does not show until something unrelated moves a
+  // declaration. The same writer every verb that moves a declaration uses,
+  // and it never throws -- a checkout that is not a repository still gets
+  // its catalog, and the refresh is still reported.
+  const here = workingDirectory();
+  tryWriteProjection(repoRootFor(here) ?? here);
   writeOut(
     `refresh: the catalog at ${path} has been re-read for every transport ` +
       "this machine has. No tokens were billed: a models endpoint is a " +

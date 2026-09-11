@@ -52,7 +52,6 @@ import { openModule } from "./commands/openModule";
 import { endGrant } from "./commands/moduleGrant";
 import {
   refreshRecord,
-  viewRecord,
   chosenEngineIn,
   setEngine,
   setRoleModel,
@@ -390,9 +389,6 @@ export function activate(context: vscode.ExtensionContext): void {
     // operator should watch happen.
     vscode.commands.registerCommand("dabblerSolution.refreshRecord", (node?: SolutionNode) =>
       refreshRecord({ node, projection: solutionProvider.currentProjection() }),
-    ),
-    vscode.commands.registerCommand("dabblerSolution.viewRecord", (node?: SolutionNode) =>
-      viewRecord({ node, projection: solutionProvider.currentProjection() }),
     ),
     vscode.commands.registerCommand("dabblerSolution.setRoleModel", (node?: SolutionNode) =>
       setRoleModel(

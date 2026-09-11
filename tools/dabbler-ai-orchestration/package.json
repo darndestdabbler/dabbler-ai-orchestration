@@ -179,19 +179,19 @@
       },
       {
         "command": "dabblerSolution.setEngine",
-        "title": "Set Engine for the Next Session",
+        "title": "Set the Authoring Vehicle",
         "category": "Dabbler",
         "icon": "$(edit)"
       },
       {
         "command": "dabblerSolution.setTransport",
-        "title": "Set Transport for the Next Session",
+        "title": "Set the Reviewing Vehicle",
         "category": "Dabbler",
         "icon": "$(edit)"
       },
       {
         "command": "dabblerSolution.setRoleModel",
-        "title": "Set Model for the Next Session",
+        "title": "Set the Model",
         "category": "Dabbler",
         "icon": "$(edit)"
       },
@@ -200,12 +200,6 @@
         "title": "Update the Catalog",
         "category": "Dabbler",
         "icon": "$(sync)"
-      },
-      {
-        "command": "dabblerSolution.viewRecord",
-        "title": "View the JSON",
-        "category": "Dabbler",
-        "icon": "$(json)"
       },
       {
         "command": "dabblerSolution.showImpact",
@@ -322,10 +316,6 @@
           "when": "false"
         },
         {
-          "command": "dabblerSolution.viewRecord",
-          "when": "false"
-        },
-        {
           "command": "dabblerSolution.showImpact",
           "when": "false"
         },
@@ -430,12 +420,12 @@
         },
         {
           "command": "dabblerSolution.setEngine",
-          "when": "view == dabblerSolutionTree && viewItem == dabblerConfigEngine",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfigVehicle;authoring$/",
           "group": "1_set@1"
         },
         {
           "command": "dabblerSolution.setTransport",
-          "when": "view == dabblerSolutionTree && viewItem == dabblerConfigTransport",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfigVehicle;reviewing$/",
           "group": "1_set@1"
         },
         {
@@ -445,13 +435,8 @@
         },
         {
           "command": "dabblerSolution.refreshRecord",
-          "when": "view == dabblerSolutionTree && viewItem == dabblerConfigRecord",
+          "when": "view == dabblerSolutionTree && viewItem == dabblerConfiguration",
           "group": "1_set@1"
-        },
-        {
-          "command": "dabblerSolution.viewRecord",
-          "when": "view == dabblerSolutionTree && viewItem == dabblerConfigRecord",
-          "group": "1_set@2"
         },
         {
           "command": "dabblerSolution.openRepository",

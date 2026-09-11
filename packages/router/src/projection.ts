@@ -64,6 +64,7 @@ import {
   reconcileResolution,
 } from "./resolution.ts";
 import {
+  ROLE_AUXILIARY_REVIEWER,
   ROLE_PRIMARY_REVIEWER,
   modelFidelity,
   type ResolveOptions,
@@ -810,7 +811,22 @@ export function configurationNode(root: string): Node {
       fidelityFor(transport.transport),
     );
     const author = authoring["chosen"] as Node | null;
+    const authorModel = author === null ? null : String(author["model"]);
+    const authorProvider = author === null ? null : String(author["provider"]);
     const primaryTransport = explainRoleTransport(config, ROLE_PRIMARY_REVIEWER).transport;
+    const auxiliaryTransport = explainRoleTransport(config, ROLE_AUXILIARY_REVIEWER).transport;
+    /** A reviewing role as this machine would resolve it, on its own vehicle. */
+    const reviewingNode = (role: string, roleTransport: string): Node => ({
+      ...roleNode(
+        readingFor(roleTransport),
+        role,
+        null,
+        fidelityFor(roleTransport),
+        authorModel,
+        authorProvider,
+      ),
+      vehicle: transportVehicleNode(config, role),
+    });
     return {
       transport: {
         effective: transport.transport,
@@ -835,16 +851,23 @@ export function configurationNode(root: string): Node {
       // Whether a second model from one vendor is far enough from the first
       // is the developer's judgement, and the label on each option is what
       // lets them make it.
-      primaryReviewer: {
-        ...roleNode(
-          readingFor(primaryTransport),
-          ROLE_PRIMARY_REVIEWER,
-          null,
-          fidelityFor(primaryTransport),
-          author === null ? null : String(author["model"]),
-          author === null ? null : String(author["provider"]),
-        ),
-        vehicle: transportVehicleNode(config, ROLE_PRIMARY_REVIEWER),
+      primaryReviewer: reviewingNode(ROLE_PRIMARY_REVIEWER, primaryTransport),
+      // The third voice, which has been dispatchable since the roles were
+      // named and has never had a surface. It is resolved here against the
+      // one rule that can be known now -- not the author -- because the rest
+      // of its definition is the providers that have already reviewed a
+      // round, and there is no round at the time a pane is drawn. The list
+      // is therefore what this role COULD be, and the sentence below says
+      // what narrows it at the adjudication rather than letting a final-
+      // looking list imply that nothing does.
+      auxiliaryReviewer: {
+        ...reviewingNode(ROLE_AUXILIARY_REVIEWER, auxiliaryTransport),
+        narrowedAtDispatch:
+          "At an adjudication, every provider that has already reviewed a " +
+          "round is excluded as well -- read from the session's own record " +
+          "at that moment. A selection narrows and never widens, so a model " +
+          "chosen here that the round excludes is a stop that names it, " +
+          "never a fall to the next candidate.",
       },
       records: checkFreshness(config, Date.now()).map(recordNode),
     };

@@ -17,7 +17,11 @@ import {
 import { configure } from "../src/cli/configure.ts";
 import { configurationNode, project, writeProjection } from "../src/projection.ts";
 import { chosenEngine, writePreferences } from "../src/preferences.ts";
-import { ROLE_PRIMARY_REVIEWER, roleDeclaration } from "../src/selection.ts";
+import {
+  ROLE_AUXILIARY_REVIEWER,
+  ROLE_PRIMARY_REVIEWER,
+  roleDeclaration,
+} from "../src/selection.ts";
 import { seatLadder } from "../src/route.ts";
 import { setSeatIdentity } from "../src/transports/copilot.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
@@ -341,7 +345,9 @@ describe("what a session would be run with", () => {
    */
   function withoutOverlay(root: string): void {
     rmSync(join(root, "local-overrides.yaml"), { force: true });
-    writePreferences({ role: ROLE_PRIMARY_REVIEWER, selected: "" });
+    for (const role of [ROLE_PRIMARY_REVIEWER, ROLE_AUXILIARY_REVIEWER]) {
+      writePreferences({ role, selected: "" });
+    }
     resetProjectRootCache();
   }
 
@@ -831,6 +837,87 @@ describe("what a session would be run with", () => {
         ["claude-sonnet-5"],
       );
     } finally {
+      ungit();
+      restore();
+    }
+  });
+
+  it("offers the Auxiliary Reviewer on its own vehicle, and `configure` selects for it", () => {
+    // The third voice has been dispatchable since the roles were named and
+    // has had no surface at all: nothing showed what would adjudicate a
+    // disputed finding and nothing could choose it. What it may be HERE is
+    // the one rule that can be known between sessions -- not the author --
+    // and the rest of its definition, every provider that has already
+    // reviewed a round, is read from the session's own record at the
+    // adjudication, which is why the list is not narrowed by it now.
+    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
+    const root = tempDir("configuration-");
+    const ungit = inRepository(root);
+    const author = "claude-opus-5";
+    try {
+      setSeatIdentity(SEAT);
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models: [
+          catalogModelRow(author, "anthropic"),
+          catalogModelRow("claude-haiku-4.5", "anthropic"),
+          catalogModelRow("gpt-5.6-terra", "openai"),
+        ],
+        retired: [],
+      });
+      seed(root, {
+        "docs/sessions/sessions.json": JSON.stringify({
+          schemaVersion: 5,
+          sessions: [
+            {
+              number: 1,
+              status: "in-progress",
+              orchestrator: { engine: "claude-code", provider: "anthropic", model: author },
+            },
+          ],
+        }),
+      });
+      withoutOverlay(root);
+      const auxiliary = configurationNode(root)["auxiliaryReviewer"] as Role & {
+        role: string;
+        vehicle: { chosen: string };
+        narrowedAtDispatch: string;
+      };
+      assert.equal(auxiliary.role, "auxiliary-reviewer");
+      assert.equal(auxiliary.vehicle.chosen, "copilot-cli");
+      // The author, and nothing else. The author's PROVIDER-mate is offered
+      // like any other model, because whether two models of one vendor share
+      // a blind spot is a judgement this framework has no data to make.
+      assert.deepEqual(
+        auxiliary.candidates.map((candidate) => candidate.model).sort(),
+        ["claude-haiku-4.5", "gpt-5.6-terra"],
+      );
+      // And the list says what will narrow it later, rather than reading as
+      // final while a round is about to exclude half of it.
+      assert.match(auxiliary.narrowedAtDispatch, /already reviewed a round/);
+
+      // The verb writes for this role by the same rule and into the same
+      // preferences, under the role's own name.
+      assert.equal(configure({ repoRoot: root, auxiliaryModel: "gpt-5.6-terra" }).refusal, null);
+      const reloaded = loadConfig(undefined, root);
+      assert.equal(roleDeclaration(reloaded, ROLE_AUXILIARY_REVIEWER).selected, "gpt-5.6-terra");
+      // One role at a time: choosing a third voice is not choosing a first.
+      assert.equal(roleDeclaration(reloaded, ROLE_PRIMARY_REVIEWER).selected, null);
+
+      withoutOverlay(root);
+      assert.match(
+        String(configure({ repoRoot: root, auxiliaryModel: "no-such-model" }).refusal),
+        /is not a model the copilot-cli transport lists/,
+      );
+      withoutOverlay(root);
+      assert.match(
+        String(configure({ repoRoot: root, auxiliaryModel: author }).refusal),
+        /they are the same model/,
+      );
+    } finally {
+      withoutOverlay(root);
       ungit();
       restore();
     }

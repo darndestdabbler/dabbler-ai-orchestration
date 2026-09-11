@@ -600,6 +600,7 @@ export class InProcessRouter implements Router {
     optional(args, "--transport", o.transport);
     optional(args, "--reviewer-transport", o.reviewerTransport);
     optional(args, "--reviewer-model", o.reviewerModel);
+    optional(args, "--auxiliary-model", o.auxiliaryModel);
     return this.text("configure", args, o.repoRoot);
   }
 

@@ -48,7 +48,6 @@ import { prerequisiteReport, type ToolProbe } from "../../commands/troubleshoot"
 import {
   refreshRecord,
   setRoleModel,
-  viewRecord,
   type ConfigurationUi,
 } from "../../commands/configurationCommands";
 import type { ConfigurationModel } from "../../providers/solutionTreeModel";
@@ -1264,7 +1263,6 @@ suite("the Configuration section's model pick", () => {
         showInformationMessage: (message) => informed.push(message),
         showWarningMessage: () => undefined,
         workspaceRoot: () => "D:/ws",
-        openFile: () => Promise.resolve(undefined),
       },
     };
   }
@@ -1444,9 +1442,79 @@ suite("the Configuration section's model pick", () => {
     );
     assert.strictEqual(configureOptions.length, 0);
   });
+
+  test("picks the Auxiliary Reviewer from its own candidates and writes it as that role", async () => {
+    // The third voice has been dispatchable since the roles were named and
+    // has had no surface at all. It is picked through the same control as
+    // the primary, against ITS OWN list, and what is written is the
+    // auxiliary's selection -- a pick that wrote the reviewer's would have
+    // moved the verdict this session did not ask to move.
+    const projection = {
+      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+      modules: [],
+      configuration: {
+        fidelityTransport: "api",
+        primaryReviewer: {
+          role: "reviewer",
+          chosen: model({ alias: "p", model: "gpt-5.6-terra", provider: "openai" }),
+          candidates: [model({ alias: "p", model: "gpt-5.6-terra", provider: "openai" })],
+          excludes: [],
+          fellThrough: false,
+        },
+        auxiliaryReviewer: {
+          role: "auxiliary-reviewer",
+          // Two vehicles present, and no vehicle question is asked here:
+          // the auxiliary has no vehicle flag of its own, so offering one
+          // would be a control that silently writes nothing.
+          vehicle: {
+            kind: "transport",
+            options: [
+              { id: "api", means: "the provider's own endpoint" },
+              { id: "copilot-cli", means: "a Copilot seat" },
+            ],
+            chosen: "api",
+            withheld: [],
+          },
+          chosen: null,
+          candidates: [model({ alias: "aux", model: "gemini-3.1-pro-preview", provider: "google" })],
+          excludes: [],
+          fellThrough: false,
+        },
+      },
+    } as unknown as Projection;
+    const picked: vscode.QuickPickItem[] = [];
+    const options: vscode.QuickPickOptions[] = [];
+    const ui: ConfigurationUi = {
+      confirm: () => Promise.resolve(false),
+      runVerb: () => undefined,
+      pick: (items, pickOptions) => {
+        picked.push(...items);
+        options.push(pickOptions);
+        return Promise.resolve(items[0]);
+      },
+      showInformationMessage: () => undefined,
+      showWarningMessage: () => undefined,
+      workspaceRoot: () => "D:/ws",
+    };
+    const { router, configureOptions } = fakeRouter(0, "written");
+    await setRoleModel(
+      router,
+      { node: { kind: "configRole", role: "auxiliaryReviewer" }, projection },
+      () => undefined,
+      ui,
+    );
+    assert.deepStrictEqual(
+      picked.map((item) => item.label),
+      ["gemini-3.1-pro-preview"],
+    );
+    assert.ok(options[0]?.title?.includes("adjudicates"), options[0]?.title);
+    assert.deepStrictEqual(configureOptions, [
+      { repoRoot: "D:/ws", auxiliaryModel: "gemini-3.1-pro-preview" },
+    ]);
+  });
 });
 
-suite("the ai-model-catalog row's two actions", () => {
+suite("the Configuration node's refresh", () => {
   const PATH = "C:/Users/dev/AppData/Local/dabbler/ai-model-catalog.json";
   const ROW = {
     record: "ai-model-catalog",
@@ -1466,14 +1534,16 @@ suite("the ai-model-catalog row's two actions", () => {
     configuration: { records: [ROW] },
   } as unknown as Projection;
 
-  test("runs the verb the router named and opens the path the router gave", async () => {
-    // Both halves of one rule: where a machine keeps its catalog and which
-    // invocation re-reads it are the router's facts, and a second answer
-    // spelled in a pane is the one that goes stale. The cost travels with
-    // the question, because this repository has answered "what does a
-    // refresh cost" wrongly four times.
+  test("runs the verb the router named, off the Configuration node rather than a row of its own", async () => {
+    // The catalog's row is gone: it was named after the mechanism, and its
+    // second action -- open the JSON in an editor -- invited a hand-edit of
+    // a machine-written record that survives until the next refresh
+    // replaces the block whole. What is left is the reading being brought
+    // up to date, which belongs to the section. Which invocation re-reads
+    // it is still the router's fact, and the cost travels with the
+    // question, because this repository has answered "what does a refresh
+    // cost" wrongly four times.
     const ran: Array<readonly string[]> = [];
-    const opened: string[] = [];
     let asked = "";
     const ui: ConfigurationUi = {
       confirm: (message) => {
@@ -1485,21 +1555,11 @@ suite("the ai-model-catalog row's two actions", () => {
       showInformationMessage: () => undefined,
       showWarningMessage: () => undefined,
       workspaceRoot: () => "D:/ws",
-      openFile: (path) => {
-        opened.push(path);
-        return Promise.resolve(undefined);
-      },
-    };
-    const target = {
-      node: { kind: "configRecord" as const, record: ROW.record },
-      projection: PROJECTION,
     };
 
-    await refreshRecord(target, ui);
+    await refreshRecord({ node: { kind: "configuration" }, projection: PROJECTION }, ui);
     assert.deepStrictEqual(ran, [["discovery", "refresh"]]);
     assert.ok(asked.includes("Nothing."), asked);
-
-    await viewRecord(target, ui);
-    assert.deepStrictEqual(opened, [PATH]);
+    assert.ok(asked.includes(ROW.command), asked);
   });
 });

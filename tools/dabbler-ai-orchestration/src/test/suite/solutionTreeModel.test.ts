@@ -639,7 +639,15 @@ suite("solutionTreeModel: what a session is run with", () => {
           ],
         },
         authoring: {
-          role: "generator",
+          role: "authoring",
+          vehicle: {
+            kind: "engine",
+            options: [{ id: "claude-code", means: "claude" }],
+            withheld: [],
+            chosen: "claude-code",
+            decidedBy: "installed on PATH",
+            appliesTo: "next-session",
+          },
           chosen: { alias: "opus", model: "claude-opus-5", provider: "anthropic" },
           candidates: [{ alias: "opus", model: "claude-opus-5", provider: "anthropic" }],
           excludes: [],
@@ -683,6 +691,27 @@ suite("solutionTreeModel: what a session is run with", () => {
           excludes: [],
           fellThrough: false,
         },
+        auxiliaryReviewer: {
+          role: "auxiliary-reviewer",
+          chosen: {
+            alias: "gemini",
+            model: "gemini-3.1-pro-preview",
+            provider: "google",
+            providerRelation: "different-provider",
+          },
+          candidates: [
+            {
+              alias: "gemini",
+              model: "gemini-3.1-pro-preview",
+              provider: "google",
+              providerRelation: "different-provider",
+            },
+          ],
+          excludes: [],
+          fellThrough: false,
+          narrowedAtDispatch:
+            "At an adjudication, every provider that has already reviewed a round is excluded as well.",
+        },
         // One row, because there is one catalog: it was three, and two of
         // them were two dates on one file.
         records: [
@@ -721,52 +750,66 @@ suite("solutionTreeModel: what a session is run with", () => {
       assert.strictEqual(section.expandable, true);
       assert.ok(section.description?.includes("claude-code"));
 
-      const rows = childrenOf(root, p);
+      // Two participants, each naming a thing being configured rather than
+      // the mechanism that configures it, and five leaves under them.
+      const parents = childrenOf(root, p);
       assert.deepStrictEqual(
-        rows.map((n) => n.kind),
-        ["configEngine", "configTransport", "configRole", "configRole", "configRecord"],
+        parents.map((n) => descriptorFor(n, p).label),
+        ["Authoring AI", "Reviewing AI"],
       );
-      const rendered = rows.map((n) => descriptorFor(n, p));
+      const leaves = parents.flatMap((parent) => childrenOf(parent, p));
+      const rendered = leaves.map((n) => descriptorFor(n, p));
+      assert.deepStrictEqual(
+        rendered.map((row) => row.label),
+        ["Vehicle", "Model", "Vehicle", "Primary Model", "Auxiliary Model"],
+      );
+      // Every leaf is a leaf: the section is two deep and no deeper.
+      assert.ok(leaves.every((leaf) => childrenOf(leaf, p).length === 0));
 
-      // The catalog's own age, where it lives, the command that re-reads
-      // it and what that costs -- all before anybody asks for a refresh.
-      const catalog = rendered.find((row) => row.label === "ai-model-catalog");
-      assert.strictEqual(catalog?.description, "30h old");
-      assert.ok(catalog?.tooltip?.includes("dabbler discovery refresh"));
-      assert.ok(catalog?.tooltip?.includes("ai-model-catalog.json"));
-      assert.ok(catalog?.tooltip?.includes("Nothing."));
-      assert.strictEqual(catalog?.icon?.tone, "attention");
+      // The catalog's own age, where it lives, the command that re-reads it
+      // and what that costs -- all before anybody asks for a refresh. It was
+      // a row named after the mechanism; it is the section's own tooltip and
+      // the section's own action now.
+      assert.ok(section.tooltip?.includes("30h old"), section.tooltip);
+      assert.ok(section.tooltip?.includes("dabbler discovery refresh"));
+      assert.ok(section.tooltip?.includes("ai-model-catalog.json"));
+      assert.ok(section.tooltip?.includes("Nothing."));
+      assert.strictEqual(section.icon?.tone, "attention");
 
-      // A transport a layer above is overriding says so; the value alone
-      // would look exactly like one that is in force.
-      const transport = rendered.find((row) => row.label === "Transport");
-      assert.ok(transport?.description?.includes("api"));
-      assert.ok(transport?.tooltip?.includes("transport.profile says 'copilot-cli' and is overridden"));
+      // The authoring AI: what it runs inside, and the model it declared at
+      // `session start` -- reported here and set there.
+      const [authoringVehicle, authoringModel] = rendered;
+      assert.strictEqual(authoringVehicle?.description, "claude-code");
+      assert.ok(authoringVehicle?.tooltip?.includes("the engine CLI the work is authored in"));
+      assert.ok(authoringModel?.description?.includes("claude-opus-5"));
+      assert.ok(authoringModel?.tooltip?.includes("declared when the session was registered"));
+
+      // A vehicle a layer above is overriding says so; the value alone would
+      // look exactly like one that is in force.
+      const reviewingVehicle = rendered[2];
+      assert.ok(reviewingVehicle?.description?.includes("api"));
+      assert.ok(reviewingVehicle?.tooltip?.includes("roles.reviewer.transport"));
+      assert.ok(
+        reviewingVehicle?.tooltip?.includes("copilot-cli is not offered"),
+        reviewingVehicle?.tooltip,
+      );
 
       // Cross-provider is a LABEL now rather than a refusal: the row says
       // how this reviewer stands to the author, and says the price its own
       // source stated as a price rather than as a capability.
-      const primaryReviewer = rendered.find((row) => row.label === "Primary Reviewer");
+      const primaryReviewer = rendered[3];
       assert.ok(primaryReviewer?.description?.includes("gpt-5.6-terra"));
       assert.ok(primaryReviewer?.tooltip?.includes("different provider"));
-      assert.ok(primaryReviewer?.tooltip?.includes("blind spots"));
       assert.ok(primaryReviewer?.tooltip?.includes("PRICE and not a capability"));
-
-      // What carries the role, and why the vehicle it does not have is not
-      // there. "Not offered" with no reason reads as a broken pane.
       assert.ok(primaryReviewer?.tooltip?.includes("You chose gpt-5.6-terra"));
       assert.ok(primaryReviewer?.tooltip?.includes("nothing is substituted for it"));
-      assert.ok(primaryReviewer?.tooltip?.includes("Vehicle: api"));
-      assert.ok(primaryReviewer?.tooltip?.includes("roles.reviewer.transport"));
-      assert.ok(
-        primaryReviewer?.tooltip?.includes("copilot-cli is not offered"),
-        primaryReviewer?.tooltip,
-      );
 
-      // And the engine's default carries the sentence that says why.
-      const engine = rendered.find((row) => row.label === "Engine");
-      assert.strictEqual(engine?.description, "claude-code");
-      assert.ok(engine?.tooltip?.includes("only engine CLI on PATH"));
+      // And the third voice, which is what this section never had: what it
+      // is for, and what narrows it at the round, in the router's own words.
+      const auxiliary = rendered[4];
+      assert.ok(auxiliary?.description?.includes("gemini-3.1-pro-preview"));
+      assert.ok(auxiliary?.tooltip?.includes("disputed"), auxiliary?.tooltip);
+      assert.ok(auxiliary?.tooltip?.includes("already reviewed a round"));
 
       // The other half: a document that carries no configuration produces no
       // rows. Nothing is derived here and nothing is asked for.

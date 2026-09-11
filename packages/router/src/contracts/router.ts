@@ -344,6 +344,13 @@ export interface ConfigureOptions extends RepositoryTarget {
   readonly reviewerTransport?: string;
   /** By the id the catalog lists, which is the id that goes on the wire. */
   readonly reviewerModel?: string;
+  /**
+   * The Auxiliary Reviewer's model: the third voice at a disputed impasse,
+   * by the same id rule. What makes it a third voice -- every provider that
+   * has already reviewed a round -- is read at the adjudication, so a
+   * selection it excludes stops that round rather than being substituted.
+   */
+  readonly auxiliaryModel?: string;
 }
 
 export interface VerifyReanchorOptions extends RepositoryTarget {

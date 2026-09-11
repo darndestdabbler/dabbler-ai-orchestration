@@ -68,8 +68,6 @@ export interface ConfigurationUi {
   showInformationMessage: (message: string) => unknown;
   showWarningMessage: (message: string) => unknown;
   workspaceRoot: () => string | undefined;
-  /** Open a file for reading, wherever on the machine it lives. */
-  openFile: (path: string) => Thenable<unknown>;
 }
 
 export function defaultConfigurationUi(): ConfigurationUi {
@@ -104,14 +102,6 @@ export function defaultConfigurationUi(): ConfigurationUi {
     showInformationMessage: (m) => vscode.window.showInformationMessage(m),
     showWarningMessage: (m) => vscode.window.showWarningMessage(m),
     workspaceRoot: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
-    openFile: (path) =>
-      vscode.workspace.openTextDocument(vscode.Uri.file(path)).then(
-        (document) => vscode.window.showTextDocument(document, { preview: true }),
-        () =>
-          vscode.window.showWarningMessage(
-            `There is nothing at ${path} yet. Update the catalog to read one -- it costs nothing.`,
-          ),
-      ),
   };
 }
 
@@ -237,7 +227,13 @@ export async function setEngine(
 async function write(
   router: Pick<Router, "configure">,
   root: string,
-  choice: { engine?: string; transport?: string; reviewerTransport?: string; reviewerModel?: string },
+  choice: {
+    engine?: string;
+    transport?: string;
+    reviewerTransport?: string;
+    reviewerModel?: string;
+    auxiliaryModel?: string;
+  },
   ui: ConfigurationUi,
   refreshed: () => void,
 ): Promise<void> {
@@ -298,11 +294,12 @@ export async function refreshRecord(
 ): Promise<void> {
   const root = ui.workspaceRoot();
   if (!root) return;
-  if (!target.node || target.node.kind !== "configRecord") return;
-  const named = target.node.record;
-  const row = (target.projection?.configuration?.records ?? []).find(
-    (record) => record.record === named,
-  );
+  // The Configuration node's own action now, because there is ONE catalog
+  // and a row for it under the participants would have been a row named
+  // after the mechanism again. The record is still the router's: what it is
+  // called, what re-reads it and what that costs are read off the projection
+  // rather than spelled here.
+  const row = (target.projection?.configuration?.records ?? [])[0];
   if (!row) return;
   const argv = row.command.trim().split(/\s+/);
   // The router's own line, with its program name dropped: what is left is
@@ -320,26 +317,6 @@ export async function refreshRecord(
   );
   if (!agreed) return;
   ui.runVerb(`Dabbler: ${row.record}`, root, args);
-}
-
-/**
- * Open the catalog this machine reads, so an operator can see what it says.
- *
- * The path is the router's, off the same row: where a machine keeps its
- * catalog is a per-platform fact the discovery module already resolves, and
- * a second resolution here is the one that would disagree with it.
- */
-export async function viewRecord(
-  target: ConfigurationTarget,
-  ui: ConfigurationUi = defaultConfigurationUi(),
-): Promise<void> {
-  if (!target.node || target.node.kind !== "configRecord") return;
-  const named = target.node.record;
-  const row = (target.projection?.configuration?.records ?? []).find(
-    (record) => record.record === named,
-  );
-  if (!row) return;
-  await ui.openFile(row.path);
 }
 
 /**
@@ -363,24 +340,30 @@ export async function setRoleModel(
   const root = ui.workspaceRoot();
   if (!root) return;
   if (!target.node || target.node.kind !== "configRole") return;
-  const authoring = target.node.role === "authoring";
-  if (authoring) {
+  const which = target.node.role;
+  if (which === "authoring") {
     ui.showInformationMessage(
       "The authoring model is the engine's own, declared when the session is " +
         "registered: run `dabbler session start` with `--model`, or use Start " +
         "Session, which asks for it. Its vehicle is the engine CLI, set on the " +
-        "Engine row. Changing either here would not reach the run.",
+        "Vehicle row above it. Changing either here would not reach the run.",
     );
     return;
   }
-  const role = target.projection?.configuration?.primaryReviewer;
+  const primary = which === "primaryReviewer";
+  const role = target.projection?.configuration?.[which];
   // The vehicle first, and only where there is a choice to make. A machine
   // with one reachable transport is told what carries the role rather than
   // asked; a machine with two is asked, and nothing is picked for it. The
   // two are separate writes deliberately: the candidate list on the row was
   // read for the OUTGOING vehicle, so offering models from it after the
   // vehicle moved would be offering a list the round will not use.
-  const vehicle = role?.vehicle;
+  //
+  // The Primary Reviewer's only: that is the role whose own vehicle this
+  // framework has a flag for, and offering the auxiliary a choice that
+  // writes nothing would be a control that silently does nothing. The
+  // Reviewing AI's Vehicle row sets the machine's, which carries both.
+  const vehicle = primary ? role?.vehicle : undefined;
   if (vehicle && vehicle.options.length > 1) {
     const chosen = await ui.pick(
       vehicle.options.map((option) => ({
@@ -427,9 +410,22 @@ export async function setRoleModel(
     return;
   }
   const picked = await ui.pick(items, {
-    title: "Which model reviews the next session?",
-    placeHolder: REVIEWER_HELP + " " + NEXT_SESSION,
+    title: primary
+      ? "Which model reviews the next session?"
+      : "Which model adjudicates a disputed finding?",
+    placeHolder:
+      (primary
+        ? REVIEWER_HELP
+        : "It is reached only at an impasse, and never from a provider that has already reviewed the session.") +
+      " " +
+      NEXT_SESSION,
   });
   if (!picked) return;
-  await write(router, root, { reviewerModel: picked.label }, ui, refreshed);
+  await write(
+    router,
+    root,
+    primary ? { reviewerModel: picked.label } : { auxiliaryModel: picked.label },
+    ui,
+    refreshed,
+  );
 }

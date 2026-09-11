@@ -19,6 +19,13 @@
 // other side: `session start` takes it as an argument, so the default belongs
 // to whichever surface offers to start one.
 //
+// **Both reviewing roles are set here, through one check.** The Primary
+// Reviewer returns the verdict and the Auxiliary Reviewer is the third voice
+// at a disputed impasse; what separates them is read at the round -- every
+// provider that has already reviewed one -- and cannot be checked against a
+// preference written between sessions, so the rule this verb applies is one
+// rule and lives here once.
+//
 // **It offers from the list it checks against.** Both come from
 // `projection.roleReading`, the one transport-scoped reading of the
 // catalog, so the models this verb accepts are exactly the models the pane
@@ -44,7 +51,11 @@ import { repoRootFor } from "../journal.ts";
 import { PREFERENCES_FILENAME, writePreferences } from "../preferences.ts";
 import { workingDirectory } from "../workdir.ts";
 import { orchestratorOf, roleReading, tryWriteProjection, type RoleReading } from "../projection.ts";
-import { ROLE_PRIMARY_REVIEWER, reviewerRefusal } from "../selection.ts";
+import {
+  ROLE_AUXILIARY_REVIEWER,
+  ROLE_PRIMARY_REVIEWER,
+  reviewerRefusal,
+} from "../selection.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;
@@ -55,7 +66,7 @@ function usage(): string {
   return [
     "usage: dabbler configure [-h] [--engine E] [--transport T]",
     "                         [--reviewer-transport T] [--reviewer-model M]",
-    "                         [--repo-root PATH]",
+    "                         [--auxiliary-model M] [--repo-root PATH]",
     "",
     "  what the NEXT session is run with",
     "",
@@ -78,6 +89,12 @@ function usage(): string {
     "                          refusal is the AUTHORING model itself -- which is",
     "                          the engine's, declared at `session start` -- and",
     "                          another model on the same provider is allowed",
+    "  --auxiliary-model M     the model that adjudicates a disputed finding,",
+    "                          named as the auxiliary role's own transport lists",
+    "                          it. Checked by the same rule; the round excludes",
+    "                          every provider that has already reviewed it, and a",
+    "                          selection it excludes is a stop and never a",
+    "                          substitution",
     "  --repo-root PATH        the repository; derived from the cwd when absent",
     "  -h, --help              show this message",
     "",
@@ -114,6 +131,8 @@ export interface ConfigureOptions {
   /** The Primary Reviewer's own vehicle, where it differs from the machine's. */
   readonly reviewerTransport?: string;
   readonly reviewerModel?: string;
+  /** The Auxiliary Reviewer's model: the third voice at a disputed impasse. */
+  readonly auxiliaryModel?: string;
 }
 
 export interface ConfigureOutcome {
@@ -133,16 +152,6 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   const empty = { changed: [], path: null, shadowed: null };
   const choice: ConfigurationChoice = {};
   const named: Record<string, string> = {};
-  // The reviewer's OWN vehicle decides which catalog block a reviewer model
-  // is checked against, because that is the transport the round will be
-  // dispatched over. Where this same call is also setting a vehicle, the one
-  // being SET is the one to check against: checking the outgoing vehicle
-  // would refuse `--reviewer-transport copilot-cli --reviewer-model <a seat
-  // model>` for naming a model the transport it is leaving does not list,
-  // which is the one pair of flags a person switching machines would type
-  // together. The machine's `--transport` stands in where no reviewer
-  // vehicle is named, which is how a repository that never wanted two
-  // vehicles keeps the behaviour it had.
   if (
     options.reviewerTransport !== undefined &&
     !(VALID_TRANSPORTS as readonly string[]).includes(options.reviewerTransport)
@@ -154,15 +163,51 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
         `It is one of: ${VALID_TRANSPORTS.join(", ")}.`,
     };
   }
-  const transport =
-    options.reviewerTransport ??
+  // Each reviewing role is checked against ITS OWN vehicle, because that is
+  // the transport its round will be dispatched over. The machine's own
+  // stands in where no role vehicle is named, and where this same call is
+  // SETTING a vehicle it is the one being set that decides -- checking the
+  // outgoing vehicle would refuse `--reviewer-transport copilot-cli
+  // --reviewer-model <a seat model>` for naming a model the transport it is
+  // leaving does not list, which is the one pair of flags a person switching
+  // machines would type together. A repository that never wanted two
+  // vehicles keeps the behaviour it had.
+  const transportFor = (role: string, roleOverride?: string): string =>
+    roleOverride ??
     (options.transport !== undefined
       ? explainTransport(config, options.transport).transport
-      : explainRoleTransport(config, ROLE_PRIMARY_REVIEWER).transport);
-  const reading = roleReading(config, transport);
-  const value = options.reviewerModel;
-  if (value !== undefined) {
-    const modelId = offeredId(reading, ROLE_PRIMARY_REVIEWER, value);
+      : explainRoleTransport(config, role).transport);
+  const readings = new Map<string, RoleReading>();
+  const readingFor = (name: string): RoleReading => {
+    const held = readings.get(name);
+    if (held !== undefined) return held;
+    const made = roleReading(config, name);
+    readings.set(name, made);
+    return made;
+  };
+  // The one rule, against the model that ACTUALLY authors: the engine's,
+  // declared at `session start` and on the record from that moment. The pane
+  // used to filter this list against a role nothing dispatched, so it was
+  // checking the choice against the wrong author.
+  const author = orchestratorOf(options.repoRoot).model;
+  /**
+   * One named model, checked for one reviewing role: the catalog id to
+   * write, or the refusal to return.
+   *
+   * Both reviewing roles come through here rather than through two copies of
+   * it. They differ in the vehicle their list is read from and in nothing
+   * else -- the rule each is held to at this point is the same rule, since
+   * what makes the auxiliary a THIRD voice is read from the session's record
+   * at the round and cannot be checked against a preference written between
+   * sessions.
+   */
+  const checkedModel = (
+    role: string,
+    transport: string,
+    value: string,
+  ): { modelId: string } | { refusal: string } => {
+    const reading = readingFor(transport);
+    const modelId = offeredId(reading, role, value);
     if (modelId === null) {
       // A transport that has read nothing and one that lists other models
       // are different problems: the first has a free remedy and the second
@@ -170,25 +215,36 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
       // over the first is what sent an operator looking for a registry that
       // no longer decides anything.
       return {
-        ...empty,
         refusal:
           reading.unavailable !== null
             ? `'${value}' cannot be checked: ${reading.unavailable}.`
             : `'${value}' is not a model the ${transport} transport lists. ` +
-              `It lists: ${offered(reading, ROLE_PRIMARY_REVIEWER)
+              `It lists: ${offered(reading, role)
                 .map(([id]) => id)
                 .sort()
                 .join(", ")}.`,
       };
     }
-    // The one rule, against the model that ACTUALLY authors: the engine's,
-    // declared at `session start` and on the record from that moment. The
-    // pane used to filter this list against a role nothing dispatched, so it
-    // was checking the choice against the wrong author.
-    const author = orchestratorOf(options.repoRoot).model;
     const refusal = author === null ? null : reviewerRefusal(author, modelId);
-    if (refusal !== null) return { ...empty, refusal };
-    named["reviewerModel"] = modelId;
+    return refusal === null ? { modelId } : { refusal };
+  };
+  if (options.reviewerModel !== undefined) {
+    const checked = checkedModel(
+      ROLE_PRIMARY_REVIEWER,
+      transportFor(ROLE_PRIMARY_REVIEWER, options.reviewerTransport),
+      options.reviewerModel,
+    );
+    if ("refusal" in checked) return { ...empty, refusal: checked.refusal };
+    named["reviewerModel"] = checked.modelId;
+  }
+  if (options.auxiliaryModel !== undefined) {
+    const checked = checkedModel(
+      ROLE_AUXILIARY_REVIEWER,
+      transportFor(ROLE_AUXILIARY_REVIEWER),
+      options.auxiliaryModel,
+    );
+    if ("refusal" in checked) return { ...empty, refusal: checked.refusal };
+    named["auxiliaryModel"] = checked.modelId;
   }
   if (options.transport !== undefined) {
     Object.assign(choice, { transport: options.transport });
@@ -236,6 +292,18 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
         "never silently substituted",
     );
   }
+  if (named["auxiliaryModel"] !== undefined) {
+    writePreferences({
+      role: ROLE_AUXILIARY_REVIEWER,
+      selected: named["auxiliaryModel"],
+    });
+    preferenceLines.push(
+      `the Auxiliary Reviewer is '${named["auxiliaryModel"]}'; an ` +
+        "adjudication still excludes every provider that has already " +
+        "reviewed a round, and a selection it excludes stops the round " +
+        "rather than being substituted",
+    );
+  }
   if (engine !== undefined) {
     writePreferences({ engine });
     preferenceLines.push(
@@ -274,7 +342,14 @@ export async function configureVerb(argv: string[]): Promise<number> {
     return EXIT_OK;
   }
   const values = new Map<string, string>();
-  const flags = ["--engine", "--transport", "--reviewer-transport", "--reviewer-model", "--repo-root"];
+  const flags = [
+    "--engine",
+    "--transport",
+    "--reviewer-transport",
+    "--reviewer-model",
+    "--auxiliary-model",
+    "--repo-root",
+  ];
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index] as string;
     if (!flags.includes(flag)) {
@@ -302,6 +377,9 @@ export async function configureVerb(argv: string[]): Promise<number> {
       : {}),
     ...(values.has("--reviewer-model")
       ? { reviewerModel: values.get("--reviewer-model") as string }
+      : {}),
+    ...(values.has("--auxiliary-model")
+      ? { auxiliaryModel: values.get("--auxiliary-model") as string }
       : {}),
   };
   let outcome: ConfigureOutcome;

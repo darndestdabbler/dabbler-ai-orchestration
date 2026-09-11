@@ -73,15 +73,19 @@ export class SolutionTreeProvider
     for (const glob of PROJECTION_SOURCE_GLOBS) {
       this.watch(glob, () => this.rederive());
     }
-    // A fresh clone of a repository that is already set up has every
-    // declaration on disk but no projection yet -- nothing has touched a
-    // manifest or a build file since the clone, so none of the watchers
-    // above will ever fire. Derive once, now, rather than leaving the
-    // welcome text standing over a repository the operator can already work
-    // in.
-    if (!fs.existsSync(path.join(workspaceRoot, PROJECTION_RELPATH))) {
-      this.rederive();
-    }
+    // Derive once at activation, WHATEVER is on disk.
+    //
+    // A watcher can only watch this workspace, and not one of the six paths
+    // above is a configuration input: the model catalog and this operator's
+    // preferences live at the user level, outside any `RelativePattern`'s
+    // reach, so nothing in this window can ever be told they moved. Deriving
+    // only over a MISSING file left a projection that exists and is wrong
+    // standing until a manifest happened to move -- which is how the pane
+    // spent a session rendering a file eight minutes old against a router
+    // that had shipped both, and came right only when an operator typed a
+    // configure command by hand. It is a disk read the router already does,
+    // and it is what makes an extension upgrade show its own work.
+    this.rederive();
   }
 
   private watch(glob: string, onEvent: () => void): void {

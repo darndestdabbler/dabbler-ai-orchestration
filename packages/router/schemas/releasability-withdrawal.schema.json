@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "releasability-withdrawals.jsonl row (one operator withdrawal of a session's releasability)",
+  "description": "One row per operator withdrawal of a session's declared releasability, in .dabbler/runs/s<N>/releasability-withdrawals.jsonl. Releasability is declared at step (a), before the work, and the 'published_when_releasable' gate is EVIDENCE -- so 'close --force' cannot answer it, and a session that declared itself releasable and then must not ship had no exit but 'cancel', which throws away verified work that landed. This row is that exit. It does not make the session not-releasable in retrospect: the declaration stands on the record and this stands beside it, so the close reports that a session which was supposed to ship did not, and on whose word. Written only by the CLI (dabbler session withdraw-release). One per session, ever, and immutable: a withdrawal that could be rewritten would say nothing about who decided what.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "session_number",
+    "reason",
+    "approver",
+    "recorded_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "session_number": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Why the artifact this session was declared to ship must not ship. Permanent, and read beside the declaration it withdraws."
+    },
+    "approver": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Who withdrew it. Not a verdict and never read as one: this says a person decided nothing would be published, never that anything passed."
+    },
+    "tree_at_withdrawal": {
+      "type": "string",
+      "minLength": 7,
+      "description": "The worktree snapshot when the withdrawal was made, so a reader can see which tree the decision was taken against. Absent when the snapshot could not be taken."
+    },
+    "recorded_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "framework_version": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

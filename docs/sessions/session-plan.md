@@ -8410,7 +8410,7 @@ walk is what says whether it is clear.
 carries its own release if it has.
 
 
-### Session 149 of 149: The flake that refused a release, and the gate that cannot pass
+### Session 148 of 149: The flake that refused a release, and the gate that cannot pass
 
 **Three things were left standing at the end of session 148, and two of them
 have already cost a release each.** They are not related in the code and they
@@ -8546,7 +8546,7 @@ proved for half the developers who would use it.
 
 ---
 
-### Session 150 of 152: One catalog, at the user level, that costs nothing to be right
+### Session 149 of 152: One catalog, at the user level, that costs nothing to be right
 
 **The file that says which models exist is a committed snapshot of one
 developer's seat.** `packages/router/copilot-catalog.lock` is tracked in git,
@@ -8645,7 +8645,7 @@ once on the first session of a day and not again that day.
 
 ---
 
-### Session 151 of 152: One reading, one rule, and the model on the screen is the model that runs
+### Session 150 of 152: One reading, one rule, and the model on the screen is the model that runs
 
 **Three rules are deleted and one survives.** The survivor is the only one
 that needs no judgment: the verifying model may not be the authoring model —
@@ -8751,6 +8751,94 @@ verifier list stays the whole transport catalog; a multi-provider seat offers
 its whole catalog for both. A price category is shown for a model whose
 source stated one, and none is shown for a model whose source did not. The tests that assert the deleted rules are
 deleted with them.
+
+**Not releasable.** The block ships from 152.
+
+---
+
+### Session 151 of 152: Two reviewers, a vehicle each, and a selection that is only a selection
+
+**`verifier` becomes `reviewer`, and the roles are named by voice rather than
+by phase.** *Verifier* implies checking work against a specification, which is
+the one thing this role does not do — the framework's own instructions already
+say it "reviews without writing or running" a test. **Primary Reviewer** is
+defined as *not the author*; **Auxiliary Reviewer** as *not the author and not
+the primary*, which makes "a third voice, never a repeat one" the role's
+definition instead of a rule bolted onto adjudication. The verdict vocabulary
+does not soften with the noun: a Primary Reviewer still returns a verdict that
+blocks a close. Archived rows are not rewritten — the reader accepts both
+spellings, `reviewer_provider ?? verifier_provider`, which is one line where a
+migration verb would be a session.
+
+**Each role carries its own vehicle, because the code already behaves that
+way.** `configurationNode` reads one global transport and scopes both roles
+through it, while `config.ts` admits in its own words that verifier selection
+may use the other transport when provider independence requires it — so the
+single reading can already be wrong about the row it matters most for.
+Authoring's vehicle is the engine CLI; each reviewer's is a transport. One
+word in front of a developer, two fields underneath, because the value sets
+and the writability differ: the authoring vehicle sets the *next* session and
+never the one in flight, and the pane says so.
+
+**A vehicle is offered wherever more than one is present, and presence is
+defined per kind.** Engines by PATH, which `installedEngines` already reads —
+and which already declines to choose when two are installed rather than
+picking the first. `api` by any `DABBLER_*_API_KEY`; `copilot-cli` by whether
+the seat answers. A vehicle nothing can reach is not offered.
+
+**The catalog is a reading; the preferences are a choice.** A selection stored
+inside `ai-model-catalog.json` is a selection the next free refresh wipes, and
+that file is defined as rebuildable for nothing. So a preferences file sits
+beside it at the user level, and a choice in it names a catalog id. The engine
+choice moves there out of the VS Code setting it lives in today, because
+`dabbler session start` from a terminal cannot read that setting and so half a
+machine's configuration is invisible to the command that needs it.
+
+**Selection collapses to two fields, neither of which needs a special name.**
+`selected` is what the operator chose, used and never silently substituted.
+`prefer` is the order tried where nobody chose. The pin's exclusion bypass
+goes: it is stated twice — derived inline in `explainRole` while
+`effectiveExclusion` claims to be its only home — and it would let a model
+that reviewed round 1 adjudicate its own disputed finding, which is a reviewer
+marking their own homework at the one point with no appeal. `require_provider_in`
+goes with it, because the catalog already says what this machine reaches and a
+filter listing the three vendors is a second inventory.
+
+**`bootstrap` stops writing `DABBLER_TRANSPORT`.** The variable outranks every
+config layer, so a preferences file that a bootstrap run can shadow is a
+preferences file that does nothing — which is the trap this repository has
+already paid for once. `--no-transport-detect` retires with it. The variable
+stays readable, because a deliberate override typed into a shell is not the
+same thing as a preference written behind the operator's back.
+
+**`planReview.ts` is deleted, on evidence rather than on taste.** It reviews
+`approved-plan.json` against the session plan's goals, and **no
+`approved-plan.json` has ever existed** — zero across ninety-two run
+directories, alongside zero `plan-review.jsonl`. Its subject is an artefact
+this framework stopped producing; the driven plan that replaced it carries
+none of the fields the checks read. Replayed against the eighty-six driven
+plans that do exist, its free checks report every plan dirty — 4,492 schema
+findings and 292 uncovered goals — because `sessionGoals` expects a plan
+written as a list of steps and this repository writes plans as prose. The
+ideas in it are sound and the implementation is bound to a shape that is gone;
+git keeps it for whoever re-derives it against the real artefact. The two
+readers of `approved-plan.json`, in `inProcess.ts` and `verify/steps.ts`, are
+audited as part of the deletion rather than assumed dead.
+
+**Steps.** (1) The rename, in configuration and in the surfaces, with the
+two-spelling read on the record. (2) Vehicle per role, with the presence test
+per kind. (3) The preferences file, and the engine choice moved into it. (4)
+Selection collapsed to `selected` and `prefer`; the exclusion bypass and
+`require_provider_in` deleted. (5) `bootstrap` stops writing the variable. (6)
+`planReview.ts` deleted and its readers audited.
+
+**Tests.** The pane's offer and `configure`'s acceptance stay one set on each
+transport. A vehicle with one option states it; a vehicle with two offers a
+choice and picks nothing on its own. A selection survives a catalog refresh. A
+selected model is the model a round dispatches to. An adjudication never
+resolves to a provider that reviewed a round, selection or no selection. A
+machine with no seat writes no seat block and reads no seat preference. The
+tests that assert the deleted mechanisms are deleted with them.
 
 **Not releasable.** The block ships from 152.
 

@@ -8502,3 +8502,303 @@ behaviour an operator already has, and one of them is the reason the last two
 version numbers did not reach them. 2.1.2 is superseded rather than re-run --
 it does not carry these fixes, and a second attempt at it would ship the
 release that the publish defect is being fixed for.
+
+---
+
+## Why sessions 150–152 exist
+
+**The Configuration pane offers a person a model the framework then refuses.**
+Measured on 2026-09-11 against router 2.1.3 on `DABBLER_TRANSPORT=copilot-cli`:
+of the 18 models the pane offered for the authoring role, `dabbler configure`
+refused 10, and the 8 that passed did so by coincidence — a seat id that
+happens to be spelled exactly like a registry `model_id`. A dated pin in a
+hand-maintained list decides whether `claude-haiku-4.5` can be chosen. The
+full measurement, and the two quieter defects beside it, are in
+`docs/design/model-catalog.md`.
+
+**The operator settled the design on 2026-09-11**, after two rounds of
+consultation with `gpt-5.6-sol` and `gemini-3.1-pro-preview`. The ruling is
+that document's *The ruling* section and it is the contract for these three
+sessions. It is mostly deletion: the shipped catalog, the project-local
+record, the hand-maintained registry, the capability floor, the
+untrusted-verifier list, the configuration-time pair refusal and the runtime
+override of a human's choice all go, and one user-level catalog replaces
+them.
+
+**The measure is the chat panel.** A developer who opens an AI chat in VS Code
+picks any model they like and nothing stops them. This framework keeps exactly
+one refusal that the chat panel does not have — the verifying model may not be
+the authoring model — and everything else becomes a label. Both advisors
+independently named the same thing as the fastest way to lose a developer in
+the first hour: choosing a model and finding the framework used a different
+one. That is a live defect here, not a hypothetical, and session 151 fixes it.
+
+**Nothing in this block touches the 2026-07-06 no-skip mandate.** That mandate
+is about an engine being unable to skip verification mid-session and it stands
+unchanged. What moves is a human's choice at configuration time, from refused
+to labelled.
+
+**The block is walked on both transports before it ships.** Every defect it
+fixes was found on a Copilot seat, and every line of the code it rewrites is
+also on the direct-API path, where the registry it deletes is the only
+inventory that has ever existed. A block proved on one transport is a block
+proved for half the developers who would use it.
+
+---
+
+### Session 150 of 152: One catalog, at the user level, that costs nothing to be right
+
+**The file that says which models exist is a committed snapshot of one
+developer's seat.** `packages/router/copilot-catalog.lock` is tracked in git,
+carries `seat_id = "op-personal"`, and ships inside the VSIX at
+`<extension>/dist/copilot-catalog.lock` — so every staff machine is told about
+that seat's models and not about its own. It is also written *into the install
+directory*: `resolveLockfilePath` resolves the name relative to the bundled
+`router-config.yaml`, which means a refresh writes inside `dist/` and the next
+VSIX update overwrites it. `config.ts` already states the principle this
+violates, one layer over — a choice "written into the packaged
+`router-config.yaml` would not survive an install" is exactly why operator
+settings go to a gitignored overlay. The catalog is the record that never got
+that treatment.
+
+**A baseline was only ever worth shipping because a refresh was thought to
+cost something, and it does not.** Three vendor metadata calls read 195 models
+in 2.4 seconds and bill no tokens; the seat states its own models in the reply
+to opening a conversation. So there is no baseline, no project-local overlay
+and no merge of the two — one `ai-model-catalog.json` per machine, outside
+every repository, at `%LOCALAPPDATA%\dabbler\` on Windows and the XDG
+equivalent elsewhere, with one block per transport and a block written only
+for a transport that machine has. A machine with a seat and no keys leaves the
+`api` block alone; it does not empty it.
+
+**The scope a block was read for is recorded, and it is checked.** `seat_id`
+is in the file today as provenance that nothing has ever compared against the
+machine reading it, which is precisely how one seat's catalog came to be
+authoritative on every other. A block whose recorded scope is not the current
+one — a different seat, a different set of provider keys — is treated as
+unread and refreshed rather than believed.
+
+**The free read states three things about every model and the writer keeps
+two.** The seat's own reply carries `copilotUsage`, `copilotEnablement` and
+`copilotPriceCategory` for every model it lists (measured 2026-09-11: 28 of
+28). `adoptSeatEnumeration` keeps the usage as `seat_usage` and the
+enablement as 148's `ENABLEMENT_LISTED`, and **drops the price category on
+the floor** —
+so the one ordinal a recommendation could honestly be built from is read for
+free and thrown away on every refresh. It is kept, and it is stored and shown
+under the seat's own name for it — a **price category**, verbatim: `low`,
+`medium`, `high`, `very_high`. Calling a price a capability would be this
+framework grading a model it cannot judge, which is the one thing the labels
+are forbidden to do. It is independent of the multiplier besides: all three
+5.6 models bill `1x` and sit in three different categories, so a cost-derived
+grade would have called them equal.
+
+**And the cost field that survives is the stated one, not the sampled one.**
+The lock carries both and they disagree: `seat_usage` is on all 26 listed
+models and is what the seat says, while `premium_request_weight` is a probe
+sample on 8 of them — `claude-fable-5` sampled at `1` against a stated
+`15x`, `gpt-5.4` at `0` against a stated `1x`. The stated one is carried
+with its unit and platform beside it, because a bare number has now been read
+as premium requests by four engines in a row; the sampled one goes. Where the
+free read states nothing — every vendor model on the API path — nothing is
+recorded and nothing is guessed. **No refresh in this session dispatches to a
+model.**
+
+`docs/design/ai-model-catalog.sample.json` is the file this session produces,
+built from this machine's two records, and it is the shape to hold to.
+
+**The old records are deleted, not migrated.** Both are derived and free to
+rebuild.
+
+**Steps.** (1) One catalog module: the user-level path, the per-transport
+block, the scope stamp and its check, and the two arrays — `models`, which
+holds only what is currently listed, and `retired`, which holds an id and a
+date and nothing else. (2) Both enumerations write through it — the vendor endpoints and the
+seat's free ACP list — and cost and price category land only from a free
+source. (3) Delete
+`transports.copilot-cli.lockfile` and `discovery.record` from config, the
+tracked `copilot-catalog.lock` from git and from the VSIX, and the
+`.dabbler/api-models.lock` writer. (4) **Delete the prompting probe and
+everything that dated it** — `echoed_model`, `confirmed_at`,
+`confirmed_on_cli_version`, `probed_at`, `premium_request_weight`,
+`probe_premium_requests`, `last_probe_at`, `last_probe_error`, the
+`confirmed`/`listed` enablement split, `echoObservations`, and the 720-hour
+clock. The pane's fidelity row survives on `roundObservations` alone, which is
+evidence a verification round already produces for nothing;
+`confirmedCatalogEntries` becomes every entry, because there is no longer a
+second kind. (5) `checkFreshness` returns one row and `REFRESH_COST` says the
+refresh is free, with no second cost left to name. (6) The daily refresh
+covers whichever transports the machine has, on the first session of the day,
+and still never blocks and never throws. (7) One `ai-model-catalog` row in the
+Solution Explorer with *Update the catalog* and *View the JSON* on its menu.
+
+**Tests.** Seven. A refresh on a machine with one transport writes that block
+and leaves the other untouched. A block whose recorded scope is not the
+current one reads as unread. The cost and the price category are recorded from
+the free read. A model that stops being listed leaves `models` and appears in
+`retired` as an id and a date. A model's fidelity still reads from a round's
+own requested/served pair with no catalog echo to draw on. The freshness
+reading is one row, whichever transports are present. The daily refresh runs
+once on the first session of a day and not again that day.
+
+**Not releasable.** The block ships from 152.
+
+---
+
+### Session 151 of 152: One reading, one rule, and the model on the screen is the model that runs
+
+**Three rules are deleted and one survives.** The survivor is the only one
+that needs no judgment: the verifying model may not be the authoring model —
+two strings compared, no capability data, no provider inference. It is stated
+with its limit, in the code and in the pane: it stops a model reviewing its
+own literal output and it does not stop correlated review, because
+`gpt-5.6-sol` and `gpt-5.6-terra` are different ids and very likely the same
+base model. That judgment is the developer's.
+
+**Cross-provider becomes a label.** `verifierRefusal` and the
+`is_enabled_as_verifier` deny list and the `capability_tier` floor all go. The
+floor could not have worked as written anyway — `tierRank` keys strictly by
+registry *alias*, so on a seat, where a candidate is a plain id, it returns
+null and no floor has ever applied. The verifying dropdown tags each option
+**different provider** / **same provider** / **provider unknown**, with one
+line of help saying a different provider reduces the chance the reviewer
+shares the author's blind spots. Capability grading is deferred: the data to
+do it honestly does not exist, and a *not recommended* tag on a new frontier
+model because a price has not landed is how a tool teaches a developer it is
+brittle.
+
+**The registry goes with them.** The `models:` block — aliases, dated
+`model_id` pins, `is_enabled` — has nothing left to do once the catalog is the
+inventory, because the catalog's ids are what go on the wire. What is
+load-bearing in it is read only on the direct-API path (on the seat,
+`route.ts` already returns `{}` for both model config and generation params)
+and it becomes per-provider defaults with **no model names in them**:
+`max_output_tokens`, the generation params, and the one `system_prompt_file`
+that all 13 entries already name. A block with no model names in it cannot go
+stale. Identity resolution already falls back to the catalog and loses
+nothing. The 196 direct-API ids include embeddings, transcription, image and
+speech models, and those are excluded by a rule over the ids where the list is
+rendered — not by a curated list, which is a second inventory to maintain.
+
+**The offer and the check become one reading**, which is the whole of defect
+1. `cli/configure.ts`'s `aliasFor` — which walks `config["models"]` on every
+transport, including the one whose models are not in there — is deleted rather
+than repaired.
+
+**The two roles do not draw from the same list, and the pane's authoring row
+is not wired to the thing that authors.** `ROLE_GENERATOR` — what the pane
+sets and what `configure --authoring-model` writes — is dispatched by
+**nothing**: it survives as `route()`'s fallback role and every one of the
+four live callers names a role explicitly, and none of them names that one.
+The model that actually authors is the **engine's**, declared at `session
+start` and kept in the orchestrator block, and it is that provider the
+verifier excludes at run time. So the pane has two authors, one of which
+changes nothing, and it filters the verifier list against the wrong one.
+
+**Which models may author is a provider-specific CLI constraint.** Claude
+Code runs Anthropic models and nothing else; the Gemini CLI runs Google's;
+the Copilot CLI fronts whatever its seat lists. The verifier is dispatched by
+the router rather than by the CLI, so it draws from the catalog for the
+transport in force and the engine does not narrow it. Both constraints
+already have a home in the code — `identity.MULTI_PROVIDER_ENGINES`, which
+has called a seat `asserted` and a single-vendor CLI `direct` since identity
+was written — and nothing in the pane has ever read it. The authoring row
+becomes the orchestrator's model, filtered by the engine; `roles.generator`
+is deleted rather than re-pointed.
+
+**And the pane stops promising what the session will not do.**
+`writeConfigurationChoice` writes the operator's choice to the *front of a
+preference order*, while `verify/rounds.ts` excludes the authoring model's
+provider when it resolves that same role — so a deliberately chosen
+same-provider verifier is dropped at run time and something else is used, with
+nothing said. A chosen model becomes a **pin**: the runtime uses it, and a pin
+that cannot be dispatched fails visibly and names the model and the reason
+rather than substituting. Where nobody chose, the engine resolving a role on
+its own still prefers a different provider — a default is not an override of a
+person — and the dispute adjudicator keeps its third-provider rule, because
+that role is engine-selected by definition.
+
+**Steps, and the order is load-bearing: every consumer moves onto the catalog
+and is proved there BEFORE anything is deleted, with no dual-source period
+kept.** (1) One reading of the catalog, used by the pane and by `configure`;
+delete `aliasFor`. (2) Move the remaining consumers onto it and add the
+per-provider dispatch defaults. (3) Only then, as the last edit, delete the
+`models:` registry, `registryEnumeration`, `untrustedAsVerifier`, `tierRank`
+and `verifierRefusal`; keep `providerReachable`, which is reachability and
+not policy. (4) The one rule,
+applied in that one reading so the pane and `configure` refuse identically.
+(5) The pin: `configure` writes one, the verify pipeline honours it, an
+undispatchable pin is a visible stop. (6) The authoring row becomes the
+orchestrator's model and is filtered by the engine's own provider set;
+`roles.generator` is deleted; the verifier's list is filtered against that
+same identity, so the pane and the runtime stop having two authors. (7) The
+provider labels, the price category where the source states one, and the
+help line. (8) Retire the "entitlement, not
+existence" sentence in all four places
+it survives — `AGENTS.md`, `docs/model-and-pricing-sources.md`,
+`discovery.ts`'s `REFRESH_COST`, and `router-config.yaml`'s claim that the
+seat cannot enumerate, which session 146 disproved.
+
+**Tests.** Eleven. The pane's offer and `configure`'s acceptance are the same
+set, on each transport. A seat id the deleted registry never declared is
+accepted. A same-provider pair is accepted. The same model for both roles is
+refused, on both transports. A pinned verifier is the model the round
+dispatches to, with the author's provider not excluded. A pin that cannot be
+dispatched stops visibly and names the reason. A role nobody pinned still
+prefers a different provider. A non-chat vendor id is not offered. A
+single-vendor engine offers only that vendor's models for authoring while its
+verifier list stays the whole transport catalog; a multi-provider seat offers
+its whole catalog for both. A price category is shown for a model whose
+source stated one, and none is shown for a model whose source did not. The tests that assert the deleted rules are
+deleted with them.
+
+**Not releasable.** The block ships from 152.
+
+---
+
+### Session 152 of 152: The walk on both transports, and the release that carries the block
+
+**Every defect in this block was found on a Copilot seat, and every line it
+rewrites is also on the direct-API path** — where the registry it deletes was
+the only inventory that ever existed, and where deleting it changes what the
+pane offers from 14 curated aliases to what the vendors actually list. A block
+proved on one transport is proved for half the developers who would use it.
+
+**The engine is walked as well as the transport, because they constrain
+different roles.** Under Claude Code the authoring list must be Anthropic
+models and nothing else, while the verifying list stays everything the keys
+reach; on the Copilot seat the same full catalog must serve both roles. Those
+are four combinations of engine and transport and the walk covers the two
+that staff will actually run, plus the one the framework has never been
+walked on — Claude Code authoring while the seat verifies.
+
+**The walk is driven by a person, in both registers, on a machine that has
+both a seat and provider keys.** On the seat: refresh the catalog, confirm it
+lists what the seat lists and nothing from anybody else's seat, choose an
+authoring model the old registry never declared, confirm `configure` accepts
+it, run a real session, and confirm from the round's own record that the
+verifier that answered is the one that was pinned. On direct API with Claude
+Code as the engine: the same walk, plus the pair the framework used to refuse
+— same provider, different model — accepted, labelled, and honoured to the
+end of a round. On both: the same model for both roles, refused.
+
+**The two single-transport machines are walked too**, by making the machine
+look like each in turn: a seat with no provider keys must not read "nothing
+resolves" while its catalog holds eighteen models, which is the defect session
+145 shipped and 146 fixed in the projection only; and keys with no seat must
+leave the seat block alone rather than emptying it.
+
+**Steps.** (1) The seat walk, end to end, recorded. (2) The direct-API walk
+with Claude Code, end to end, recorded. (3) The two single-transport
+readings. (4) Whatever the walk finds is fixed here if it is small and raised
+as owed if it is not — a walk that files everything it finds has not been
+walked. (5) The walkthrough documents carry the new catalog in all three
+registers, and `check-uat-registers.mjs` holds them to it.
+
+**Tests.** Whatever the walk's findings need, and no test of the walk itself.
+
+**Releasable.** It carries **2.2.0**, a minor: what an operator may choose
+changes, a refusal they have today is gone, and a file that used to arrive
+with the extension now belongs to their machine. The three sessions land as
+one published version because none of them is usable alone — 150 writes a
+record nothing reads yet, and 151 reads a record that only 150 writes.

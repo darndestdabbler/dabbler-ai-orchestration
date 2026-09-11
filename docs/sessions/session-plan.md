@@ -8410,7 +8410,7 @@ walk is what says whether it is clear.
 carries its own release if it has.
 
 
-### Session 148 of 149: The flake that refused a release, and the gate that cannot pass
+### Session 149 of 149: The flake that refused a release, and the gate that cannot pass
 
 **Three things were left standing at the end of session 148, and two of them
 have already cost a release each.** They are not related in the code and they
@@ -8546,7 +8546,7 @@ proved for half the developers who would use it.
 
 ---
 
-### Session 149 of 152: One catalog, at the user level, that costs nothing to be right
+### Session 150 of 152: One catalog, at the user level, that costs nothing to be right
 
 **The file that says which models exist is a committed snapshot of one
 developer's seat.** `packages/router/copilot-catalog.lock` is tracked in git,
@@ -8641,11 +8641,11 @@ own requested/served pair with no catalog echo to draw on. The freshness
 reading is one row, whichever transports are present. The daily refresh runs
 once on the first session of a day and not again that day.
 
-**Not releasable.** The block ships from 152.
+**Not releasable.** The block ships from 153.
 
 ---
 
-### Session 150 of 152: One reading, one rule, and the model on the screen is the model that runs
+### Session 151 of 152: One reading, one rule, and the model on the screen is the model that runs
 
 **Three rules are deleted and one survives.** The survivor is the only one
 that needs no judgment: the verifying model may not be the authoring model —
@@ -8752,11 +8752,11 @@ its whole catalog for both. A price category is shown for a model whose
 source stated one, and none is shown for a model whose source did not. The tests that assert the deleted rules are
 deleted with them.
 
-**Not releasable.** The block ships from 152.
+**Not releasable.** The block ships from 153.
 
 ---
 
-### Session 151 of 152: Two reviewers, a vehicle each, and a selection that is only a selection
+### Session 152 of 153: Two reviewers, a vehicle each, and a selection that is only a selection
 
 **`verifier` becomes `reviewer`, and the roles are named by voice rather than
 by phase.** *Verifier* implies checking work against a specification, which is
@@ -8840,11 +8840,11 @@ resolves to a provider that reviewed a round, selection or no selection. A
 machine with no seat writes no seat block and reads no seat preference. The
 tests that assert the deleted mechanisms are deleted with them.
 
-**Not releasable.** The block ships from 152.
+**Not releasable.** The block ships from 153.
 
 ---
 
-### Session 152 of 152: The walk on both transports, and the release that carries the block
+### Session 153 of 153: The walk on both transports, and the release that carries the block
 
 **Every defect in this block was found on a Copilot seat, and every line it
 rewrites is also on the direct-API path** — where the registry it deletes was

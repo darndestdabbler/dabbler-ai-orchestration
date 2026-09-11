@@ -8546,7 +8546,7 @@ proved for half the developers who would use it.
 
 ---
 
-### Session 150 of 152: One catalog, at the user level, that costs nothing to be right
+### Session 150 of 154: One catalog, at the user level, that costs nothing to be right
 
 **The file that says which models exist is a committed snapshot of one
 developer's seat.** `packages/router/copilot-catalog.lock` is tracked in git,
@@ -8645,7 +8645,7 @@ once on the first session of a day and not again that day.
 
 ---
 
-### Session 151 of 152: One reading, one rule, and the model on the screen is the model that runs
+### Session 151 of 154: One reading, one rule, and the model on the screen is the model that runs
 
 **Three rules are deleted and one survives.** The survivor is the only one
 that needs no judgment: the verifying model may not be the authoring model —
@@ -8756,7 +8756,7 @@ deleted with them.
 
 ---
 
-### Session 152 of 153: Two reviewers, a vehicle each, and a selection that is only a selection
+### Session 152 of 154: Two reviewers, a vehicle each, and a selection that is only a selection
 
 **`verifier` becomes `reviewer`, and the roles are named by voice rather than
 by phase.** *Verifier* implies checking work against a specification, which is
@@ -8844,7 +8844,81 @@ tests that assert the deleted mechanisms are deleted with them.
 
 ---
 
-### Session 153 of 153: The walk on both transports, and the release that carries the block
+### Session 153 of 154: The Configuration section a person reads, and a projection that is never stale
+
+**The Configuration section is organised by the thing being configured, not
+by the mechanism that configures it.** It grew five rows named after
+implementation — *Engine*, *Transport*, *Authoring model*, *Primary
+Reviewer*, and a row for the model catalog — and a developer opening it has
+to already know that *Engine* is what the authoring AI runs inside and
+*Transport* is how a reviewer is reached before any of it means anything.
+Two nodes replace them, each naming a participant:
+
+    Authoring AI
+      Vehicle          the engine CLI the work is authored in
+      Model            the orchestrator's own, declared at `session start`
+    Reviewing AI
+      Vehicle          the transport a review is dispatched over
+      Primary Model    the reviewer of record; not the author
+      Auxiliary Model  the third voice at a disputed impasse
+
+**Nothing is invented for the tree to show.** Every leaf is a field the
+projection already carries after session 152 — `authoring.vehicle`,
+`authoring.chosen`, `primaryReviewer.vehicle`, `primaryReviewer.chosen` —
+save one: the Auxiliary Reviewer has been a dispatchable role since 152 and
+has never had a surface, so the projection gains its role node and
+`configure` gains `--auxiliary-model` beside `--reviewer-model`. The word
+stays **Auxiliary**, as 152 named it, in the pane and in the code alike: a
+label that disagreed with `roles.auxiliary-reviewer` would be the second
+copy of a vocabulary that sessions 143 and 147 each paid to discover.
+
+**The catalog row goes, and its two actions part company.** *Refresh* is
+kept and moves to the Configuration node, where it reads as what it is —
+bring this machine's readings up to date, free. *View the file* is deleted
+rather than moved: it opened a machine-written record in an editor, which
+invites a hand-edit that survives until the next refresh replaces the block
+whole. The row itself was never load-bearing — `session start` refreshes
+any record past `discovery.max_age_hours` before the session exists, so a
+catalog stale enough to matter is a catalog on a machine that has not
+started a session today.
+
+**The projection is derived when it is read, because nothing can watch what
+it is derived from.** This is the defect the section actually had, and it is
+not the catalog's. `SolutionTreeProvider` re-derives on a watcher over six
+paths — `docs/modules.yaml`, `solution-dependencies.json`, `**/*.csproj`,
+`**/pom.xml`, `docs/sessions/sessions.json`, `.dabbler/module-session.json`
+— and **not one of them is a configuration input**. The catalog and the
+preferences live at the user level, outside the workspace, where a
+`RelativePattern` watcher cannot reach them at all; and the constructor
+re-derives only when the projection file is *absent*, so a projection that
+exists and is wrong stands until a manifest happens to move. Session 152
+ended with the pane rendering `verifying` and no vehicle from a file eight
+minutes old, against a router that had shipped both — and the only reason it
+came right was an operator typing a configure command by hand.
+
+Two changes, and the cheap one is the important one. The provider re-derives
+**on activation, unconditionally** rather than only over a missing file: it
+is a disk read the router already does, and it is what makes an extension
+upgrade show its own work. And `dabbler discovery refresh` re-derives after
+it writes, because a refresh that changed what this machine can reach and
+left the pane saying otherwise is the same defect one layer down.
+
+**Steps.** (1) The Auxiliary Reviewer's role node in the projection, and
+`configure --auxiliary-model` to select for it. (2) The two nodes and their
+five leaves, replacing the five rows; the catalog row and its view action
+deleted, its refresh moved to the Configuration node. (3) The projection
+re-derived on activation and after a discovery refresh.
+
+**Tests.** The section renders two parents and exactly five leaves, each
+reading from a field the projection carries. A selection for the auxiliary
+role is offered, accepted, and dispatched to — and an adjudication still
+refuses a provider that reviewed a round, selection or no selection. An
+activation over a projection written by an older router renders the current
+shape. A discovery refresh leaves a projection that reads the new catalog.
+
+**Not releasable.** The block ships from 154.
+
+### Session 154 of 154: The walk on both transports, and the release that carries the block
 
 **Every defect in this block was found on a Copilot seat, and every line it
 rewrites is also on the direct-API path** — where the registry it deletes was

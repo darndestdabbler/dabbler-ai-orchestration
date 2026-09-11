@@ -1,0 +1,1240 @@
+// The projection the Solution Explorer reads: the module manifest, joined
+// to what the tree and the sibling repositories say.
+//
+// The extension renders; the router decides. The extension never reads the
+// manifest or the sibling repositories itself, because two implementations
+// of one rule disagree eventually and the disagreement shows up as a wrong
+// row nobody can explain. Everything here is DERIVED: dependency order and
+// `usedBy` from `dependsOn`, the contract folder from the disk, the drift
+// rows from build files read on every projection.
+//
+// A single-module solution -- an absent manifest, or one entry -- projects
+// one module row and nothing module-shaped beyond it, which is the shape of
+// every repository that predates the manifest.
+
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+
+import { readModuleSessionMarker } from "./checkout.ts";
+import { normalizeModelToken } from "./contracts/models.ts";
+import {
+  TRANSPORT_COPILOT_CLI,
+  explainRoleTransport,
+  explainTransport,
+  loadConfig,
+  type RouterConfig,
+} from "./config.ts";
+import {
+  REFRESH_COST,
+  apiBlock,
+  apiSelectableModels,
+  checkFreshness,
+  isStale,
+  transportPresence,
+  type FreshnessRow,
+  type RetiredModel,
+} from "./discovery.ts";
+import { installedEngines } from "./engines.ts";
+import { sessionsDirFor } from "./evidence.ts";
+import { readExposure } from "./exposure.ts";
+import { platformNewlines } from "./journal.ts";
+import { PREFERENCES_FILENAME, chosenEngine } from "./preferences.ts";
+import { dumps } from "./pythonJson.ts";
+import { readBundleRecords } from "./land.ts";
+import { type ModuleEntry, type SolutionShape, consumersOf, ManifestError, solutionShape } from "./modules.ts";
+import { readRawSessionState } from "./sessionState.ts";
+import {
+  OUTCOME_PASSED,
+  STAGE_FINAL_FULL,
+  type SuiteSpec,
+  type TestRunRecord,
+  loadSuitesChecked,
+  readRecords,
+} from "./testEvidence.ts";
+import {
+  assembleSolution,
+  locateProducer,
+  type Edge,
+  type SolutionMember,
+} from "./solutionDeps.ts";
+import {
+  comparePins,
+  configuredFeeds,
+  publishedVersions,
+  reconcileResolution,
+} from "./resolution.ts";
+import {
+  ROLE_AUXILIARY_REVIEWER,
+  ROLE_PRIMARY_REVIEWER,
+  modelFidelity,
+  type ResolveOptions,
+  roundObservations,
+  reviewerRefusal,
+  type RoleResolution,
+  type Fidelity,
+  type ModelObservation,
+} from "./selection.ts";
+import { archivedRounds } from "./ledger.ts";
+import { REFRESH_COMMAND, explainRoleCandidates, seatBlock } from "./transports/copilot.ts";
+
+type Node = Record<string, unknown>;
+
+export const PROJECTION_RELPATH = join(".dabbler", "solution", "projection.json");
+
+export function projectionPath(root: string): string {
+  return join(root, PROJECTION_RELPATH);
+}
+
+/** Where a module's contract bundle lives, relative to the root. */
+export function contractDirFor(slug: string): string {
+  return `modules/${slug}/contract`;
+}
+
+/** What the Explorer reads: the manifest, joined to the tree. */
+/**
+ * The siblings a grant has widened the in-flight session's checkout to, from
+ * that session's exposure manifest in this root. Empty where nothing is in
+ * flight, or the session is not a module session, or this is not a clone.
+ */
+function grantedSiblings(root: string): Set<string> {
+  try {
+    const raw = readRawSessionState(sessionsDirFor(root));
+    const sessions = Array.isArray(raw?.["sessions"]) ? (raw?.["sessions"] as Record<string, unknown>[]) : [];
+    const current = sessions.find((row) => row["status"] === "in-progress");
+    if (current === undefined || typeof current["number"] !== "number") return new Set();
+    return new Set((readExposure(root, current["number"])?.grants ?? []).map((grant) => grant.sibling));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * The modules the in-flight session names, and which session: from this
+ * root's ledger row (`checkout.module` in a module's folder, the declared
+ * `modules` in a global session), or -- in the repository while a focused
+ * session runs in its module's folder -- from the module-session marker,
+ * which is the only record the repository holds of it. Null when nothing
+ * is in flight here.
+ */
+function modulesInSession(root: string): { readonly session: number; readonly modules: ReadonlySet<string> } | null {
+  try {
+    const raw = readRawSessionState(sessionsDirFor(root));
+    const sessions = Array.isArray(raw?.["sessions"]) ? (raw?.["sessions"] as Record<string, unknown>[]) : [];
+    const current = sessions.find((row) => row["status"] === "in-progress");
+    if (current !== undefined && typeof current["number"] === "number") {
+      const checkout = current["checkout"];
+      const checkoutModule =
+        typeof checkout === "object" && checkout !== null && !Array.isArray(checkout)
+          ? (checkout as Record<string, unknown>)["module"]
+          : null;
+      const named =
+        typeof checkoutModule === "string" && checkoutModule.trim() !== ""
+          ? [checkoutModule.trim()]
+          : Array.isArray(current["modules"])
+            ? (current["modules"] as unknown[]).map(String)
+            : [];
+      return { session: current["number"], modules: new Set(named) };
+    }
+  } catch {
+    // An unreadable ledger marks nothing; the marker below may still.
+  }
+  const marker = readModuleSessionMarker(root);
+  return marker === null ? null : { session: marker.session, modules: new Set([marker.module]) };
+}
+
+export type RunOfRecordState = "green" | "red" | "none";
+
+/**
+ * Each module's run of record and who it blocks, from the latest final-full
+ * record of every suite the module declares. Green when every expensive
+ * suite of the module has a passed latest record; red when any latest is
+ * not passed; none where a suite has no record, or the module declares no
+ * suite. A consumer is blocked by a producer when its consumer-contract
+ * suite against that producer is red. Nothing here is declared: it is a
+ * reading of the records beside the run.
+ */
+function runsOfRecord(
+  root: string,
+  shape: SolutionShape,
+): Map<string, { readonly state: RunOfRecordState; readonly blocking: string[] }> {
+  const out = new Map<string, { state: RunOfRecordState; blocking: string[] }>();
+  for (const entry of shape.modules) out.set(entry.slug, { state: "none", blocking: [] });
+  if (!shape.multi) return out;
+  let suites: readonly SuiteSpec[];
+  let records: readonly TestRunRecord[];
+  try {
+    suites = loadSuitesChecked(loadConfig(undefined, root), { shape }).suites;
+    records = readRecords(root);
+  } catch {
+    return out;
+  }
+  const latest = (suite: string): TestRunRecord | null =>
+    records.filter((row) => row.suite === suite && row.stage === STAGE_FINAL_FULL).at(-1) ?? null;
+  for (const entry of shape.modules) {
+    const own = suites.filter((suite) => suite.expensive && suite.module === entry.slug);
+    if (own.length === 0) continue;
+    const latests = own.map((suite) => latest(suite.name));
+    const state: RunOfRecordState = latests.some((row) => row !== null && row.outcome !== OUTCOME_PASSED)
+      ? "red"
+      : latests.every((row) => row !== null && row.outcome === OUTCOME_PASSED)
+        ? "green"
+        : "none";
+    out.get(entry.slug)!.state = state;
+  }
+  for (const suite of suites) {
+    if (suite.role !== "consumer-contract" || !suite.against || !suite.module) continue;
+    const row = latest(suite.name);
+    if (row !== null && row.outcome !== OUTCOME_PASSED) out.get(suite.against)?.blocking.push(suite.module);
+  }
+  for (const value of out.values()) value.blocking.sort();
+  return out;
+}
+
+// --- What a session is run with ---------------------------------------------
+//
+// Every decision below is already made somewhere in this router; not one of
+// them is reachable from the window an operator has open all day. So the
+// reading is assembled here and rendered there, exactly as the module rows
+// are: the extension re-derives none of it, because two implementations of
+// one rule disagree eventually and the disagreement arrives as a row nobody
+// can explain.
+//
+// **Nothing here reaches a network or spawns a process.** The registry is a
+// dated record; freshness is read from it and refreshing it is something the
+// operator asks for. A pane that enumerated a vendor when it opened would
+// charge a window for being open, and would do it on a sparse clone that
+// only wants to draw a tree.
+
+/**
+ * What the record says about each model on ONE transport: honoured,
+ * substituted, or not known.
+ *
+ * Per transport, because the two kinds of evidence are not interchangeable
+ * and neither are the paths that produce them. A round on the direct-API
+ * path carries the provider's own statement of what answered; the seat's
+ * catalog carries the CLI's echo of what it was asked for, which is a label,
+ * and this framework has never trusted a seat label. `modelFidelity` weighs
+ * them; this only hands it the observations that belong to the transport the
+ * operator is actually on, so evidence about the seat never reads as
+ * evidence about the API.
+ *
+ * Nothing is gathered that was not already recorded. `docs/model-fidelity.md`
+ * is the measurement and states its own bounds.
+ */
+function fidelityOn(root: string, config: RouterConfig, transport: string): (model: string) => Fidelity {
+  const observations: ModelObservation[] = [];
+  try {
+    observations.push(
+      ...roundObservations(
+        archivedRounds(root).filter((row) => row["transport"] === transport),
+      ),
+    );
+  } catch {
+    // No run record here yet, which is most repositories. Not knowing is an
+    // answer this reading is built to give.
+  }
+  // A round's own requested/served pair is the whole of the evidence. The
+  // catalog carries no echo to draw on, because the turn that bought one was
+  // deleted: fidelity reads from work that was happening anyway, and nothing
+  // is spent pre-emptively to answer a question no round has asked yet.
+  return (model) => modelFidelity(model, observations);
+}
+
+// --- Which enumeration a role resolves over --------------------------------
+//
+// **The enumeration belongs to the transport.** `selection.ts` has said so in
+// its own header since the day it was written -- the model registry on the
+// direct-API path, the confirmed seat catalog on the Copilot path, both handed
+// to the same `resolveRole` so the rule has one implementation. This pane
+// asked the registry on every transport, so a machine with a seat and no
+// `DABBLER_*_API_KEY` read "nothing resolves" while its catalog held eighteen
+// working models. It shipped in 2.1.0's held build, and it is what held it.
+//
+// Nothing here enumerates anything: the seat catalog is a dated file, exactly
+// as the registry is, and reading a file is all a pane may do.
+
+export const ENUMERATION_API_CATALOG = "api-catalog";
+export const ENUMERATION_SEAT_CATALOG = "seat-catalog";
+
+/** Nothing resolved, said as a resolution rather than as an absence. */
+const NOTHING_RESOLVES: RoleResolution<readonly [string, string, string]> = {
+  candidates: [],
+  preferenceDeclared: false,
+  rank: null,
+  fellThrough: false,
+  removed: [],
+  selected: null,
+  selectedUnmet: null,
+};
+
+/**
+ * How a role is resolved on the transport in force, and over what.
+ *
+ * This is THE reading, and it is exported because the pane is not its only
+ * caller: `dabbler configure` checks an operator's choice against the same
+ * list the pane offered them. A surface that offers from one enumeration
+ * while the verb that accepts the choice reads another is the whole of
+ * defect 1 -- `configure` walked the model registry on every transport,
+ * including the seat, whose models were never in there, so on a seat it
+ * refused every model the pane had just listed.
+ */
+export interface RoleReading {
+  readonly enumeration: string;
+  /**
+   * How a role resolves here.
+   *
+   * `options.applySelection` is false for a SURFACE: a pane asks what could
+   * answer, so it must see the whole list and merely report the selection --
+   * a pane narrowed to the one model already chosen would offer the
+   * operator their own choice and no way back out of it.
+   */
+  readonly resolve: (
+    role: string,
+    exclude: readonly string[] | null,
+    options?: ResolveOptions,
+  ) => RoleResolution<readonly [string, string, string]>;
+  readonly retired: ReadonlyMap<string, RetiredModel>;
+  /**
+   * The price category a model's own source stated, for the models whose
+   * source stated one.
+   *
+   * The seat's own token, verbatim, kept by session 150 after years of being
+   * read free and thrown away. It is a PRICE and is labelled as one: a
+   * framework that rendered it as capability would be grading models on data
+   * it does not have, and a *not recommended* tag on a new frontier model
+   * because a price has not landed is how a tool teaches a developer it is
+   * brittle. A source that stated none contributes no entry, and the surface
+   * shows nothing rather than a guess.
+   */
+  readonly priceCategory: ReadonlyMap<string, string>;
+  /** Why this transport can offer nothing, or null when it can. */
+  readonly unavailable: string | null;
+}
+
+/** How a candidate's provider stands to the authoring model's. */
+export const PROVIDER_DIFFERENT = "different-provider";
+export const PROVIDER_SAME = "same-provider";
+export const PROVIDER_UNKNOWN = "provider-unknown";
+
+/**
+ * Where the deleted cross-provider rule went.
+ *
+ * It is a label because it was never a fact this framework could establish.
+ * A different provider REDUCES the chance the reviewer shares the author's
+ * blind spots; it does not eliminate it, and the same provider does not
+ * guarantee it -- `gpt-5.6-sol` and `gpt-5.6-terra` are different ids and
+ * very likely the same base model, which the old rule would have waved
+ * through. Told to the person choosing, who can weigh it; not enforced as a
+ * judgement over data nobody has.
+ */
+export function providerRelation(author: string | null, provider: string): string {
+  if (author === null || author === "" || provider === "") return PROVIDER_UNKNOWN;
+  return author === provider ? PROVIDER_SAME : PROVIDER_DIFFERENT;
+}
+
+export function roleReading(config: RouterConfig, transport: string): RoleReading {
+  const seat = transport === TRANSPORT_COPILOT_CLI;
+  const enumeration = seat ? ENUMERATION_SEAT_CATALOG : ENUMERATION_API_CATALOG;
+  // Both transports read the same record and differ only in which block of
+  // it is theirs, and each block is fetched through its own scoped reading
+  // -- `seatBlock` against this machine's seat, `apiBlock` against the set
+  // of provider keys present. A block recorded for another seat or another
+  // key set comes back null from both, so it reads as UNREAD rather than
+  // believed: that is session 150's round-1 finding, and it is the reason
+  // neither reading takes an unscoped shortcut to `readCatalog`.
+  const block = seat ? seatBlock() : apiBlock(config);
+  // What the direct-API path could actually dispatch to, which is what the
+  // pane may offer: a provider whose key this machine does not hold is not
+  // a candidate, and the seat is not filtered this way because it has none.
+  const models = block === null ? [] : seat ? block.models : apiSelectableModels(config, block);
+  if (block === null) {
+    return {
+      enumeration,
+      resolve: () => NOTHING_RESOLVES,
+      retired: new Map(),
+      priceCategory: new Map(),
+      // The reason, not a blank list: "no models" and "this machine has not
+      // read its seat yet" are different problems with different remedies,
+      // and this one's remedy is free.
+      unavailable: seat
+        ? "this machine has not read its seat's model list yet " +
+          `(\`${REFRESH_COMMAND}\` reads it, free)`
+        : "this machine has not read its providers' model lists yet, or it " +
+          "holds a reading taken for a different set of keys " +
+          `(\`${REFRESH_COMMAND}\` reads them, free)`,
+    };
+  }
+  // An id and a date and nothing else, which is all the archive holds: the
+  // provider a retired model had is not a claim worth keeping about a model
+  // nobody can select.
+  const retired = new Map<string, RetiredModel>();
+  for (const entry of block.retired) {
+    retired.set(entry.id, {
+      id: entry.id,
+      provider: "",
+      lastSeenAt: null,
+      retiredAt: entry.retired_at,
+    });
+  }
+  return {
+    enumeration,
+    resolve: (role, exclude, options) => {
+      const resolution = explainRoleCandidates(config, models, role, exclude, options);
+      // The catalog has no aliases on either transport: an id is both what a
+      // registry would have called the model and what goes on the wire, so
+      // the third element carries the id rather than a second name for it.
+      return {
+        ...resolution,
+        candidates: resolution.candidates.map(
+          ([modelId, provider]) => [modelId, provider, modelId] as const,
+        ),
+      };
+    },
+    retired,
+    // The source's own token for what a model costs, for the models whose
+    // source stated one. Read free on every refresh and, until 150, thrown
+    // away; kept verbatim rather than translated, because the seat's word
+    // for its own prices is the only word there is for them.
+    priceCategory: new Map(
+      models
+        .filter((entry) => entry.price_category !== null)
+        .map((entry) => [entry.id, entry.price_category as string]),
+    ),
+    unavailable: null,
+  };
+}
+
+/** One model a role could resolve to, as this machine's catalog lists it. */
+function candidateNode(
+  candidate: readonly [string, string, string],
+  fidelity: (model: string) => Fidelity,
+  retired: ReadonlyMap<string, RetiredModel>,
+  priceCategory: ReadonlyMap<string, string> = new Map(),
+  /** The authoring model's provider, on a row that is choosing a reviewer. */
+  authorProvider: string | null = null,
+): Node {
+  const [modelId, provider, alias] = candidate;
+  const withdrawn = retired.get(modelId);
+  // Three answers and never two. A model nobody has asked for and one that
+  // answered as something else are different facts, and a surface that
+  // rendered them alike would be making the promise session 144 exists to
+  // stop it making.
+  return {
+    alias,
+    model: modelId,
+    provider,
+    fidelity: fidelity(modelId),
+    // What the source said this costs, in the source's own word for it, and
+    // null where the source said nothing. Never inferred.
+    priceCategory: priceCategory.get(modelId) ?? null,
+    // Where the cross-provider rule went: a label the person weighs, not a
+    // refusal the framework makes. Only meaningful on a row that is
+    // choosing a reviewer, so it is null on every other.
+    providerRelation:
+      authorProvider === null ? null : providerRelation(authorProvider, provider),
+    // Present only on a model the dated record says stopped being served,
+    // and it carries when the vendor last had it -- a row that withheld a
+    // model without saying since when would read as a bug in the pane.
+    retired:
+      withdrawn === undefined
+        ? null
+        : { since: withdrawn.retiredAt, lastSeenAt: withdrawn.lastSeenAt },
+  };
+}
+
+/**
+ * A role's resolution: what it would pick, and what else it could.
+ *
+ * `excludes` carries the providers the role was resolved AGAINST, which is
+ * where the cross-provider invariant becomes visible rather than restated --
+ * the reviewing role is resolved with the authoring model's provider
+ * excluded, by the same rule that excludes it immediately before the wire.
+ */
+function roleNode(
+  reading: RoleReading,
+  role: string,
+  exclude: readonly string[] | null,
+  fidelity: (model: string) => Fidelity,
+  /**
+   * The authoring model, on a reviewing role: the one model this role may
+   * not be, and the whole of what it may not be.
+   *
+   * It is a MODEL and no longer a provider. Excluding the author's provider
+   * withheld every model that vendor serves from the list, which asserted
+   * something this framework cannot know -- that two models of one family
+   * share a blind spot -- while failing to stop the thing it was named for,
+   * since `gpt-5.6-sol` reviewing `gpt-5.6-terra` is very likely one model
+   * reviewing itself and passes a provider test only because the two ids
+   * differ. What remains is the rule that needs no judgement.
+   */
+  notThisModel: string | null = null,
+  /** The authoring model provider, so each option can be LABELLED against it. */
+  authorProvider: string | null = null,
+): Node {
+  const retired = reading.retired;
+  // Everything this role COULD be, not the one thing it will be: a pane
+  // narrowed to the operator's own selection would offer them the choice
+  // they already made and no way back out of it. The selection is reported
+  // instead, and the row marks it.
+  const resolution = reading.resolve(role, exclude, { applySelection: false });
+  // A model the catalog has stopped listing is not a candidate at all: it
+  // left the active list for the archive when its source stopped naming it.
+  // It is still SHOWN, from the archive, because an operator whose usual
+  // reviewer vanished from a list needs to know it was withdrawn rather than
+  // wonder what they broke -- and the archive holds an id and a date, which
+  // is exactly what that question needs and nothing more.
+  // The one rule, applied in the one reading, so what the pane OFFERS and
+  // what `configure` ACCEPTS are the same set: the pane cannot show a choice
+  // the verb would refuse, and the verb cannot refuse one the pane showed.
+  const served = resolution.candidates.filter(
+    ([modelId]) =>
+      !retired.has(modelId) &&
+      (notThisModel === null || reviewerRefusal(notThisModel, modelId) === null),
+  );
+  // What will actually answer: the operator's selection where they made one
+  // and it survives this call, and the head of the preference order where
+  // they did not. A row that showed the preference order's pick while a
+  // selection stood would be reporting something that does not happen --
+  // which is the defect this whole block of work exists to end.
+  const chosen =
+    resolution.selected === null
+      ? served[0]
+      : served.find(
+          ([modelId]) =>
+            normalizeModelToken(modelId) === normalizeModelToken(resolution.selected as string),
+        );
+  return {
+    role,
+    chosen: chosen === undefined ? null : candidateNode(chosen, fidelity, retired, reading.priceCategory, authorProvider),
+    candidates: served.map((candidate) =>
+      candidateNode(candidate, fidelity, retired, reading.priceCategory, authorProvider),
+    ),
+    withheld: [...retired.values()].map((entry) =>
+      candidateNode([entry.id, entry.provider, entry.id], fidelity, retired, reading.priceCategory),
+    ),
+    excludes: [...(exclude ?? [])],
+    // What the operator chose, or null where nobody chose. Reported rather
+    // than applied here, and the two are different facts: a role with no
+    // selection resolves by preference, and one with a selection dispatches
+    // to it or stops.
+    selected: resolution.selected,
+    // A role that fell past its own preference order picked a model nobody
+    // named. The 364-request session is why that is worth a row.
+    fellThrough: resolution.fellThrough,
+    // Which record this list came from, and why it is empty when it is. A
+    // pane that said "nothing resolves" without saying what it had read is
+    // the defect this carries the answer to.
+    enumeration: reading.enumeration,
+    unavailable: reading.unavailable,
+  };
+}
+
+/**
+ * Which vendors this engine's CLI can actually author with.
+ *
+ * A provider-specific CLI constraint, and one the code has known since
+ * identity was written without a single surface reading it: Claude Code runs
+ * Anthropic models and nothing else, the Gemini CLI runs Google's, and a
+ * Copilot seat fronts whatever its seat lists. Null means "every provider
+ * this transport lists", which is the seat's answer.
+ *
+ * The VERIFIER is not narrowed by any of this: it is dispatched by the
+ * router over its own transport rather than by the engine's CLI, so the
+ * engine has no say in what may review the work.
+ */
+const ENGINE_PROVIDERS: Readonly<Record<string, string>> = {
+  "claude-code": "anthropic",
+  gemini: "google",
+};
+
+/**
+ * A role name nothing declares, which resolves to the whole enumeration.
+ *
+ * An undeclared role has no preference order, no provider set and no pin, so
+ * `explainRole` returns every candidate in the order the transport listed
+ * them -- and that is exactly what "every model this machine could author
+ * with" means. Naming it rather than borrowing a reviewing role is the
+ * difference between asking a question and asking somebody else's.
+ */
+const ROLE_EVERY_MODEL = "every-model";
+
+/**
+ * The orchestrator as the ledger records it: the engine that is running this
+ * session and the model it declared at `session start`.
+ *
+ * Read rather than resolved. Nothing here picks an authoring model, because
+ * nothing in this framework does: a person names it when they register the
+ * session, and every surface that appeared to choose one was offering
+ * something the ledger would not honour.
+ */
+export function orchestratorOf(root: string): { engine: string | null; model: string | null } {
+  try {
+    const raw = readRawSessionState(sessionsDirFor(root));
+    const sessions = Array.isArray(raw?.["sessions"]) ? (raw?.["sessions"] as Node[]) : [];
+    const row = sessions.find((entry) => entry["status"] === "in-progress") ?? sessions.at(-1);
+    const block: Node =
+      row !== undefined && typeof row["orchestrator"] === "object" && row["orchestrator"] !== null
+        ? (row["orchestrator"] as Node)
+        : {};
+    const text = (value: unknown): string | null =>
+      typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+    return { engine: text(block["engine"]), model: text(block["model"]) };
+  } catch {
+    return { engine: null, model: null };
+  }
+}
+
+/**
+ * The authoring row: what is authoring, and what this engine could author
+ * with instead.
+ *
+ * `chosen` is the orchestrator's own model and is therefore a REPORT. The
+ * candidates are the transport's catalog narrowed to the providers this
+ * engine's CLI can run, which is the only filtering an engine does.
+ */
+function authoringNode(
+  root: string,
+  reading: RoleReading,
+  fidelity: (model: string) => Fidelity,
+): Node {
+  const { engine, model } = orchestratorOf(root);
+  const vendor = engine === null ? undefined : ENGINE_PROVIDERS[engine];
+  const retired = reading.retired;
+  // Resolved through a role NOBODY declares, which is every model the
+  // transport lists in the order it listed them. It used to borrow the
+  // reviewer's role to mean "the whole catalog", and a role is not a synonym
+  // for that: a reviewer pin collapsed this list to one model, and the
+  // reviewer's own preferences and provider set reordered and filtered a
+  // list they have nothing to do with.
+  const listed = reading
+    .resolve(ROLE_EVERY_MODEL, null)
+    .candidates.filter(
+      ([modelId, provider]) =>
+        !retired.has(modelId) && (vendor === undefined || provider === vendor),
+    );
+  const chosen =
+    model === null ? null : (listed.find(([id]) => id === model) ?? [model, "", model] as const);
+  return {
+    role: "authoring",
+    engine,
+    // The model is declared at `session start`, so this row reports rather
+    // than sets. A surface that offered to change it would be offering
+    // something the ledger will not honour.
+    declaredAtStart: true,
+    chosen: chosen === null ? null : candidateNode(chosen, fidelity, retired, reading.priceCategory),
+    candidates: listed.map((candidate) =>
+      candidateNode(candidate, fidelity, retired, reading.priceCategory),
+    ),
+    // The archive, rendered rather than re-derived: an operator whose usual
+    // model vanished from a list needs to know it was withdrawn.
+    withheld: [...retired.values()].map((entry) =>
+      candidateNode([entry.id, entry.provider, entry.id], fidelity, retired, reading.priceCategory),
+    ),
+    excludes: [],
+    fellThrough: false,
+    enumeration: reading.enumeration,
+    unavailable: reading.unavailable,
+  };
+}
+
+// --- The vehicle a role is reached through ----------------------------------
+//
+// **One word in front of a developer, two fields underneath.** A role is
+// dispatched through something, and that something is not the same KIND of
+// thing for every role: the authoring model runs inside the engine's own
+// CLI, and each reviewer is dispatched by the router over a transport. One
+// word, *vehicle*, because it is one question -- what carries this role --
+// and two fields, because the value sets and the writability differ.
+//
+// The authoring vehicle is a REPORT for the session in flight. Engine
+// identity is recorded at `session start`, so a control that appeared to
+// change it would be offering something the ledger will not honour; what a
+// person sets here is what the NEXT session is offered, and the row says so.
+//
+// **A vehicle nothing can reach is not offered.** Presence is read per kind,
+// because the three kinds are present for different reasons -- see
+// `discovery.transportPresence` and `engines.installedEngines`, each of
+// which already answers its own half and neither of which guesses.
+
+export const VEHICLE_ENGINE = "engine";
+export const VEHICLE_TRANSPORT = "transport";
+
+/** One option a vehicle row may offer, with what reaching it means. */
+function vehicleOption(id: string, means: string): Node {
+  return { id, means };
+}
+
+/**
+ * Why the engine is the engine, when a person chose it.
+ *
+ * Said once, because a pane and a terminal disagreeing about the same
+ * machine is the defect the preferences file exists to end: the choice used
+ * to live in a VS Code setting, where `dabbler session start` from a
+ * terminal could not read it.
+ */
+function enginePreferenceReason(engine: string): string {
+  return (
+    `${engine} is what this machine's ${PREFERENCES_FILENAME} chose. It is ` +
+    "read by `dabbler session start` from any terminal, which is why it is a " +
+    "file beside the catalog rather than an editor setting."
+  );
+}
+
+/**
+ * The authoring role's vehicle: the engine CLI, as this machine has it.
+ *
+ * `chosen` is the orchestrator's engine while a session is in flight and the
+ * machine's own default otherwise, and `settable` is false either way for
+ * the session on the record -- which is the sentence the pane needs, not a
+ * control it has to disable for reasons it invents.
+ */
+function engineVehicleNode(root: string): Node {
+  const reading = installedEngines();
+  const present = reading.engines.filter((entry) => entry.path !== null);
+  const inFlight = orchestratorOf(root).engine;
+  const preferred = chosenEngine();
+  return {
+    kind: VEHICLE_ENGINE,
+    // Only what this machine has: an engine with no CLI on PATH is a way to
+    // fail rather than a choice, and the engines row beside this one still
+    // reports the whole list with what is missing from it.
+    options: present.map((entry) => vehicleOption(entry.engine, entry.program)),
+    chosen: inFlight ?? preferred ?? reading.chosen,
+    // Which of the three the `chosen` above is. A row that could not say
+    // would leave a developer unable to tell a report from a choice from a
+    // default -- and the whole point of a preferences file is that a choice
+    // is a different thing from a machine's default.
+    decidedBy:
+      inFlight !== null
+        ? "session start"
+        : preferred !== null
+          ? PREFERENCES_FILENAME
+          : "installed on PATH",
+    // A choice here reaches the NEXT session and never the one on the
+    // record: engine identity is stamped when the session is registered.
+    appliesTo: "next-session",
+    reason: preferred === null ? reading.reason : enginePreferenceReason(preferred),
+  };
+}
+
+/**
+ * A reviewing role's vehicle: the transport it is dispatched over, and the
+ * transports this machine could put it on instead.
+ *
+ * Read PER ROLE. `config.explainRoleTransport` is what makes that true, and
+ * it is the repair of a thing this repository has stated and not done since
+ * the transport reading was written: reviewer selection may use the other
+ * transport when provider independence requires it, while one global reading
+ * scoped every role.
+ */
+function transportVehicleNode(config: RouterConfig, role: string): Node {
+  const reading = explainRoleTransport(config, role);
+  const presence = transportPresence(config);
+  return {
+    kind: VEHICLE_TRANSPORT,
+    options: presence
+      .filter((entry) => entry.present)
+      .map((entry) => vehicleOption(entry.transport, entry.means)),
+    // Why an absent one is absent. "Not offered" with no reason is how an
+    // operator comes to believe the pane is broken rather than honest.
+    withheld: presence
+      .filter((entry) => !entry.present)
+      .map((entry) => ({ id: entry.transport, means: entry.means, note: entry.note })),
+    chosen: reading.transport,
+    decidedBy: reading.decidedBy,
+    appliesTo: "next-session",
+    layers: reading.layers.map((layer) => ({ ...layer })),
+  };
+}
+
+/** One dated record, in the words the freshness reading already uses. */
+function recordNode(row: FreshnessRow): Node {
+  return {
+    record: row.record,
+    path: row.path,
+    present: row.present,
+    datedAt: row.dated_at,
+    ageHours: row.age_hours,
+    thresholdHours: row.threshold_hours,
+    command: row.command,
+    // What asking for a refresh buys, from where the thresholds are decided.
+    cost: REFRESH_COST[row.record] ?? "",
+    stale: isStale(row),
+    notes: [...row.notes],
+  };
+}
+
+/**
+ * What this session would be run with, and what decided each part of it.
+ *
+ * Never throws. A configuration this router cannot load is a real state --
+ * an unknown key in an overlay, a transport spelled wrong -- and a pane that
+ * went blank over it would hide the one sentence that says how to fix it.
+ */
+export function configurationNode(root: string): Node {
+  let config: RouterConfig;
+  try {
+    config = loadConfig(undefined, root);
+  } catch (error) {
+    return { unavailable: error instanceof Error ? error.message : String(error) };
+  }
+  const engines = installedEngines();
+  try {
+    const transport = explainTransport(config);
+    // The authoring model runs inside the engine's CLI, so the list it is
+    // read from is the one the transport in force enumerates; the reviewing
+    // roles are read through their OWN vehicles, which is the whole of this
+    // step. One reading per transport, so two roles on one transport share
+    // the one file read rather than repeating it.
+    const readings = new Map<string, RoleReading>();
+    const readingFor = (name: string): RoleReading => {
+      const held = readings.get(name);
+      if (held !== undefined) return held;
+      const made = roleReading(config, name);
+      readings.set(name, made);
+      return made;
+    };
+    // A model's fidelity is not one fact: the same model on the seat and on
+    // the direct-API path is two different questions with two different
+    // kinds of answer, so it is read for the transport the ROLE is on.
+    const fidelityFor = (name: string): ((model: string) => Fidelity) =>
+      fidelityOn(root, config, name);
+    // The authoring model is the ENGINE's, declared at `session start` and
+    // kept on the record from that moment. It was resolved as a role until
+    // now, and that role was dispatched by nothing -- `route()`'s fallback,
+    // named by none of its four callers -- so the pane had two authors, one
+    // of which changed nothing, and it filtered the reviewer list against
+    // the wrong one.
+    const authoring = authoringNode(
+      root,
+      readingFor(transport.transport),
+      fidelityFor(transport.transport),
+    );
+    const author = authoring["chosen"] as Node | null;
+    const authorModel = author === null ? null : String(author["model"]);
+    const authorProvider = author === null ? null : String(author["provider"]);
+    const primaryTransport = explainRoleTransport(config, ROLE_PRIMARY_REVIEWER).transport;
+    const auxiliaryTransport = explainRoleTransport(config, ROLE_AUXILIARY_REVIEWER).transport;
+    /** A reviewing role as this machine would resolve it, on its own vehicle. */
+    const reviewingNode = (role: string, roleTransport: string): Node => ({
+      ...roleNode(
+        readingFor(roleTransport),
+        role,
+        null,
+        fidelityFor(roleTransport),
+        authorModel,
+        authorProvider,
+      ),
+      vehicle: transportVehicleNode(config, role),
+    });
+    return {
+      transport: {
+        effective: transport.transport,
+        decidedBy: transport.decidedBy,
+        layers: transport.layers.map((layer) => ({ ...layer })),
+      },
+      // Which transport the fidelity below was read for, said rather than
+      // implied: a row that carried an answer without saying what it was an
+      // answer about is how the seat's evidence would come to be read as the
+      // API's.
+      fidelityTransport: transport.transport,
+      engines: {
+        // The preference where there is one, the machine's default where
+        // there is not. Two answers to "which engine" is how a pane and a
+        // terminal come to disagree about the same machine.
+        chosen: chosenEngine() ?? engines.chosen,
+        reason: chosenEngine() === null ? engines.reason : enginePreferenceReason(chosenEngine() as string),
+        installed: engines.engines.map((entry) => ({ ...entry })),
+      },
+      authoring: { ...authoring, vehicle: engineVehicleNode(root) },
+      // Not the author's PROVIDER: the author's own model, and nothing else.
+      // Whether a second model from one vendor is far enough from the first
+      // is the developer's judgement, and the label on each option is what
+      // lets them make it.
+      primaryReviewer: reviewingNode(ROLE_PRIMARY_REVIEWER, primaryTransport),
+      // The third voice, which has been dispatchable since the roles were
+      // named and has never had a surface. It is resolved here against the
+      // one rule that can be known now -- not the author -- because the rest
+      // of its definition is the providers that have already reviewed a
+      // round, and there is no round at the time a pane is drawn. The list
+      // is therefore what this role COULD be, and the sentence below says
+      // what narrows it at the adjudication rather than letting a final-
+      // looking list imply that nothing does.
+      auxiliaryReviewer: {
+        ...reviewingNode(ROLE_AUXILIARY_REVIEWER, auxiliaryTransport),
+        narrowedAtDispatch:
+          "At an adjudication, every provider that has already reviewed a " +
+          "round is excluded as well -- read from the session's own record " +
+          "at that moment. A selection narrows and never widens, so a model " +
+          "chosen here that the round excludes is a stop that names it, " +
+          "never a fall to the next candidate.",
+      },
+      records: checkFreshness(config, Date.now()).map(recordNode),
+    };
+  } catch (error) {
+    return {
+      engines: {
+        chosen: engines.chosen,
+        reason: engines.reason,
+        installed: engines.engines.map((entry) => ({ ...entry })),
+      },
+      unavailable: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export function project(root: string): Record<string, unknown> {
+  const shape = solutionShape(root);
+  const name = basename(resolve(root)) || "solution";
+  const granted = grantedSiblings(root);
+  const inPlay = modulesInSession(root);
+  const runs = runsOfRecord(root, shape);
+  // What ships: every bundle record under release/, and per module the
+  // bundles that pin its package or are its own.
+  const bundles = readBundleRecords(root);
+  const shippedIn = (entry: ModuleEntry): string[] =>
+    bundles
+      .filter(
+        (bundle) =>
+          bundle.bundle === entry.slug ||
+          bundle.from.includes(entry.slug) ||
+          (entry.package !== null && bundle.dependencies.some((dependency) => dependency.package === entry.package)),
+      )
+      .map((bundle) => bundle.bundle);
+  const modules: Node[] = shape.modules.map((entry) => {
+    const contractDir = contractDirFor(entry.slug);
+    return {
+      slug: entry.slug,
+      title: entry.title,
+      kind: entry.kind,
+      package: entry.package,
+      contract: entry.contract,
+      codeRoots: [...entry.codeRoots],
+      dependsOn: [...entry.dependsOn],
+      // Derived on every projection, declared nowhere.
+      usedBy: consumersOf(shape.modules, entry.slug),
+      // The folder, when the tree has it; the Explorer opens it and says
+      // "not written yet" otherwise. Never claimed for a module that has
+      // not declared a seam.
+      contractDir:
+        entry.contract !== null && existsSync(join(root, contractDir)) ? contractDir : null,
+      // A grant in force for this module in the in-flight session: the
+      // Explorer badges the row, and offers to end it.
+      granted: granted.has(entry.slug),
+      // The session working in this module right now, or null: the Explorer
+      // marks the row in both windows, the module's and the repository's.
+      inSession: inPlay !== null && inPlay.modules.has(entry.slug) ? inPlay.session : null,
+      // The latest run of record of the module's suites, and the consumers
+      // whose contract suite against it is red.
+      runOfRecord: runs.get(entry.slug)?.state ?? "none",
+      blocking: [...(runs.get(entry.slug)?.blocking ?? [])],
+      shippedIn: shippedIn(entry),
+    } satisfies Node;
+  });
+  const doc: Node = {
+    solution: {
+      name,
+      title: name,
+      multi: shape.multi,
+      implicit: shape.implicit,
+      moduleCount: modules.length,
+    },
+    modules,
+    // What the solution says it ships, from the manifest: a declared
+    // deployable no module feeds yet is here with an empty `from`, because
+    // that is a true statement about the shape of the solution during
+    // decomposition and not a gap in it.
+    deployables: shape.deployables.map((deployable) => ({
+      slug: deployable.slug,
+      title: deployable.title,
+      kind: deployable.kind,
+      from: [...deployable.from],
+      runtime: deployable.runtime,
+      publish: deployable.publish,
+      declared: deployable.declared,
+    })),
+    // What ships, as the bundle records under release/ say it; recorded,
+    // never executed, and read here rather than restated.
+    bundles: bundles.map((bundle) => ({
+      bundle: bundle.bundle,
+      from: [...bundle.from],
+      version: bundle.version,
+      baseCommit: bundle.baseCommit,
+      date: bundle.date,
+      session: bundle.session,
+      dependencies: bundle.dependencies.map((dependency) => ({ ...dependency })),
+    })),
+  };
+  // One assembly for both halves of the cross-repository graph. It reads
+  // sibling directories and every member's build files, and the projection
+  // is written on every recorded event -- doing it twice to answer two
+  // questions about the same reading is a cost with nothing bought.
+  const members = assembleSolution(root);
+  doc.external = externalComponents(root, members);
+  doc.members = solutionMembers(members);
+  // What a session is run with: read from files, never probed.
+  doc.configuration = configurationNode(root);
+  return doc;
+}
+
+/** Publish the projection the extension renders. */
+export function writeProjection(root: string): string {
+  const path = projectionPath(root);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(
+    path,
+    platformNewlines(`${dumps(project(root), { indent: 2 })}\n`),
+    { encoding: "utf8" },
+  );
+  return path;
+}
+
+/**
+ * Write the projection, or leave the event that was just recorded standing.
+ *
+ * A manifest problem must not swallow an event that is already on the log;
+ * `dabbler modules show` surfaces the manifest error plainly when someone
+ * asks for it.
+ */
+export function tryWriteProjection(root: string): void {
+  try {
+    writeProjection(root);
+  } catch (error) {
+    if (error instanceof ManifestError) return;
+    throw error;
+  }
+}
+
+/**
+ * The components this solution consumes from OTHER repositories.
+ *
+ * Derived from `solution-dependencies.json` and from nowhere else. The draft
+ * had `solution.yaml` gaining vocabulary for external components too, and two
+ * tracked homes for one edge is the drift this codebase already refuses for
+ * `usedBy`: the manifest says what this repository builds, the dependency
+ * file says what it takes, and neither restates the other.
+ *
+ * The union spans every repository the declarations reach, each owning only
+ * its own edges. A→B declared in A and B→C declared in B are two facts in two
+ * files, and both are projected -- reading only this repository's edges would
+ * show A→B and lose C, which is the cross-repository half of the point.
+ *
+ * The graph is the UNION of the dependency files across the repositories they
+ * name, so a row can say things one repository cannot know alone -- that the
+ * pin is behind a release, or that the producer is not on this machine.
+ * Nothing here is authored; every field is read.
+ */
+export function externalComponents(
+  root: string,
+  members: SolutionMember[] = assembleSolution(root),
+): Node[] {
+  const self = members[0];
+  // Every member's OWN edges, and only its own. A→B declared in A and B→C
+  // declared in B are two owner-specific facts, and the graph is the union of
+  // them: projecting only this repository's edges shows A→B and discards C,
+  // which is the cross-repository half of the feature missing entirely.
+  // Nothing is copied between declarations to make this work -- the union is
+  // computed on every projection, so there is still one home per edge.
+  const owned: Array<{ owner: string; edge: Edge; from: SolutionMember }> = [];
+  for (const member of members) {
+    if (member.duplicateOf !== null) continue;
+    const owner =
+      member === self ? (self.deps?.repositoryId ?? "(this repository)") : member.id;
+    for (const edge of member.deps?.consumes ?? []) {
+      owned.push({ owner, edge, from: member });
+    }
+  }
+  if (owned.length === 0) return [];
+
+  const feeds = configuredFeeds(root);
+  const findings = reconcileResolution(members, feeds);
+  const consumed = [...new Set(owned.map((entry) => entry.edge.id))];
+
+  // Pins per repository, read from build files on every projection rather
+  // than copied into any declaration.
+  const pins = new Map<string, Map<string, string>>();
+  for (const member of members) {
+    if (member.duplicateOf !== null) continue;
+    const owner =
+      member === self ? (self.deps?.repositoryId ?? "(this repository)") : member.id;
+    for (const ref of member.refs) {
+      const byRepo = pins.get(ref.id) ?? new Map<string, string>();
+      if (ref.version !== null && !byRepo.has(owner)) byRepo.set(owner, ref.version);
+      pins.set(ref.id, byRepo);
+    }
+  }
+
+  const published = new Map<string, string>();
+  for (const member of members.slice(1)) {
+    if (member.root === null || member.duplicateOf !== null) continue;
+    for (const artifact of publishedVersions(member.root, consumed)) {
+      const seen = published.get(artifact.packageId);
+      if (seen === undefined || (comparePins(seen, artifact.version) ?? 0) < 0) {
+        published.set(artifact.packageId, artifact.version);
+      }
+    }
+  }
+
+  const rows: Node[] = [];
+  const me = self.deps?.repositoryId ?? "(this repository)";
+  for (const id of consumed) {
+    const entries = owned.filter((entry) => entry.edge.id === id);
+    const edge = entries[0].edge;
+    const where = locateProducer(root, edge.producedBy, self.deps?.solution ?? null);
+    const release = published.get(id) ?? null;
+    const byRepo = pins.get(id) ?? new Map<string, string>();
+
+    // Pin AND drift live on the consumer that owns them. A sibling's pin
+    // rendered beside this repository's name, or a sibling's upgrade shown
+    // as this repository's, is worse than no row: it is upgrade guidance
+    // pointing at the wrong repository.
+    const consumers = entries.map((entry) => {
+      const version = byRepo.get(entry.owner) ?? null;
+      const behind =
+        version !== null && release !== null && (comparePins(version, release) ?? 0) < 0;
+      return {
+        repository: entry.owner,
+        version,
+        drift: behind
+          ? `${entry.owner} pins ${id} at ${version}, and ${release} is published.`
+          : null,
+        driftKind: behind ? "behind" : null,
+      };
+    });
+
+    // Only this repository's declaration can be checked against this
+    // machine's feeds, so a feed finding is attributed to it and to nothing
+    // else.
+    const mine = findings.filter((finding) => finding.id === id);
+    const feed = entries.some((entry) => entry.owner === me)
+      ? mine.find((finding) => finding.kind === "feed-not-configured")
+      : undefined;
+    const ahead = mine.find((finding) => finding.kind === "producer-source-ahead");
+
+    // The row states a pin only when every consumer agrees on it. Where they
+    // disagree, the row says so and the consumer rows carry the versions --
+    // collapsing two pins into one number is how a reader is told to upgrade
+    // a repository that is already there.
+    const versions = new Set(consumers.map((c) => c.version).filter((v) => v !== null));
+    const agreed = versions.size === 1 ? [...versions][0] : null;
+    const shared = agreed !== null && consumers.every((c) => c.driftKind === "behind");
+
+    rows.push({
+      id,
+      producedBy: edge.producedBy.id,
+      // DERIVED, never declared. `usedBy` has one implementation in this
+      // codebase and it is a reading of who consumes what, which is exactly
+      // why no declaration is allowed to state it.
+      usedBy: entries.map((entry) => entry.owner),
+      pins: consumers,
+      pinned: agreed,
+      published: release,
+      resolve: edge.resolve,
+      feed: edge.feed ?? null,
+      // Where it is on THIS machine, which is what makes the row navigable.
+      // Null is a reported state and not a defect in the declaration.
+      root: where.path,
+      // The two ways the declaration names the same repository, published
+      // beside `root` because "not here" is not one state. A known remote
+      // nobody has cloned is a command away; a producer nobody has said
+      // anything about needs a person to answer where it lives. Collapsing
+      // them into one word asks the person in both cases.
+      remote: edge.producedBy.remote ?? null,
+      declaredPath: edge.producedBy.path ?? null,
+      reason: where.path === null ? where.reason : where.warning,
+      // At most one, ordered by what it costs the reader: a pin behind a
+      // release is an upgrade to do, a producer ahead of its releases is not
+      // one yet, and a feed nobody registered is why a restore is about to
+      // fail. Stated at row level only when it is true of every consumer.
+      drift: shared
+        ? (consumers[0].drift ?? null)
+        : versions.size > 1
+          ? `${id} is pinned ${[...versions].sort().join(" and ")} across ` +
+            `${consumers.length} repositories in this solution.`
+          : (ahead?.detail ?? feed?.detail ?? null),
+      driftKind: shared
+        ? "behind"
+        : versions.size > 1
+          ? "split"
+          : ahead
+            ? "ahead"
+            : feed
+              ? "feed"
+              : null,
+    } satisfies Node);
+  }
+  return rows;
+}
+
+/**
+ * Every repository in this solution, including the ones nothing depends on.
+ *
+ * This is the upstream direction, and it arrives without a second declared
+ * one. The operator asked for placemarkers both ways -- "this depends on
+ * these" and "these depend on this" -- and the obvious way to get the second
+ * is a `usedBy` somebody writes down, which is exactly what this codebase
+ * refuses: two hand-kept directions disagree eventually and the disagreement
+ * is silent.
+ *
+ * So a repository appears here because it declares ITSELF a member: its own
+ * `solution-dependencies.json` names this solution. That is one home for one
+ * fact, owned by the repository the fact is about, and it needs no
+ * permission from anybody -- which is why a repository nothing consumes can
+ * appear at all, and why `dabbler deps scaffold` can put the next one in
+ * front of the operator before it has any content.
+ *
+ * Both dependency directions stay DERIVED from the same declarations:
+ * `provides` is what this repository's own edges take from that member, and
+ * `consumes` is what that member's own edges take from this one. Neither is
+ * stated anywhere; each is read from the repository that owns it.
+ */
+export function solutionMembers(members: SolutionMember[]): Node[] {
+  const self = members[0];
+  const me = self.deps?.repositoryId ?? null;
+  // A remote is declared by whoever names the repository as a producer, so
+  // it is read across every member's edges rather than off the member
+  // itself: a repository does not declare its own remote anywhere.
+  const remotes = new Map<string, string>();
+  for (const member of members) {
+    for (const edge of member.deps?.consumes ?? []) {
+      const remote = edge.producedBy.remote;
+      if (remote && !remotes.has(edge.producedBy.id)) remotes.set(edge.producedBy.id, remote);
+    }
+  }
+
+  const rows: Node[] = [];
+  for (const member of members) {
+    // A second checkout is one member on two branches, and counting it twice
+    // is how a stale clone invents a disagreement nobody has.
+    if (member.duplicateOf !== null) continue;
+    const id = member === self ? (me ?? "(this repository)") : member.id;
+    const theirs = member.deps?.consumes ?? [];
+    rows.push({
+      id,
+      self: member === self,
+      root: member.root,
+      remote: remotes.get(id) ?? null,
+      // What this repository takes from that member, off this repository's
+      // own declaration.
+      provides:
+        member === self
+          ? []
+          : (self.deps?.consumes ?? [])
+              .filter((edge) => edge.producedBy.id === id)
+              .map((edge) => edge.id),
+      // What that member takes from this repository, off ITS declaration.
+      // Empty when this repository states no `repositoryId`: nothing can
+      // name a repository that has not said what it is called.
+      consumes:
+        me === null || member === self
+          ? []
+          : theirs.filter((edge) => edge.producedBy.id === me).map((edge) => edge.id),
+      // A placemarker: it says which solution it is in and nothing else yet.
+      // The state `deps scaffold` leaves behind, and the state a repository
+      // is in for as long as the plan has not reached it.
+      shell: member.deps !== null && theirs.length === 0 && member.refs.length === 0,
+      reason: member.reason,
+    } satisfies Node);
+  }
+  return rows;
+}

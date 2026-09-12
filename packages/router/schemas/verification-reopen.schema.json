@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "verification-reopens.jsonl row (one operator grant of further rounds)",
+  "description": "One row per operator grant that reopens a verification loop the round cap ended, in .dabbler/runs/s<N>/verification-reopens.jsonl. The cap terminals are evidence of a BUDGET, not of a judgment: 'remediated_at_cap' says the last round's blocking findings were fixed and the cap left the fix unreviewed, and 'cap-clean' says the cap was reached with nothing blocking outstanding. Neither is anyone's opinion that the work is right, so an operator may buy the review the budget refused. Adjudication is the opposite -- a third provider's judgment of the disputes -- and is never reopened; nor is a cap reached with findings still disputed, which is routed to adjudication rather than re-reviewed. Written only by the CLI (dabbler verify reopen). The reason and the approver are mandatory and permanent: a cap moved past by nobody, for no stated reason, is the bare override this row exists to replace.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "session_number",
+    "after_round",
+    "terminal",
+    "cap",
+    "reason",
+    "approver",
+    "recorded_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "session_number": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "after_round": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The round this grant reopens past. Every terminal row at or before it is neutralised; a terminal row recorded AFTER it stands again, so a session that reaches the cap a second time is stopped a second time and needs a second grant. That is the point: a grant buys named rounds, never a mode in which the cap no longer applies."
+    },
+    "terminal": {
+      "type": "string",
+      "enum": [
+        "remediated_at_cap",
+        "cap-clean"
+      ],
+      "description": "Which cap terminal stood when the grant was made, as the record read it. 'adjudication' and 'cap-disputed' are absent by design and refused by the verb."
+    },
+    "cap": {
+      "type": "integer",
+      "minimum": 2,
+      "description": "The absolute round cap this grant sets, which must exceed after_round -- a grant that buys no round is refused rather than recorded. It wins over the configured cap and over --max-rounds for as long as it stands, because it is the more recent and more explicit act, and because a grant whose number could be silently overridden by a config file is not a grant."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Why the review the cap refused is worth buying. Permanent, and read beside the rounds it authorised."
+    },
+    "approver": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Who authorised it. Not a verdict and never read as one: this says a person bought a round, never that anything passed."
+    },
+    "tree_at_grant": {
+      "type": "string",
+      "minLength": 7,
+      "description": "The worktree snapshot when the grant was made, so a reader can see whether the rounds it bought reviewed the tree the operator was looking at. Absent when the snapshot could not be taken."
+    },
+    "recorded_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "framework_version": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

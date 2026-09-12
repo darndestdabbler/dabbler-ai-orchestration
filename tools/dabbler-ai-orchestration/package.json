@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: modules, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -190,10 +190,28 @@
         "icon": "$(edit)"
       },
       {
-        "command": "dabblerSolution.setRoleModel",
-        "title": "Set the Model",
+        "command": "dabblerSolution.setAuthoringModel",
+        "title": "Set the Authoring Model",
         "category": "Dabbler",
         "icon": "$(edit)"
+      },
+      {
+        "command": "dabblerSolution.setPrimaryReviewerModel",
+        "title": "Set the Primary Reviewer's Model",
+        "category": "Dabbler",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "dabblerSolution.setAuxiliaryReviewerModel",
+        "title": "Set the Auxiliary Reviewer's Model",
+        "category": "Dabbler",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "dabblerSolution.setAsMyDefault",
+        "title": "Keep as My Default",
+        "category": "Dabbler",
+        "icon": "$(person)"
       },
       {
         "command": "dabblerSolution.refreshRecord",
@@ -308,7 +326,19 @@
           "when": "false"
         },
         {
-          "command": "dabblerSolution.setRoleModel",
+          "command": "dabblerSolution.setAuthoringModel",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.setPrimaryReviewerModel",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.setAuxiliaryReviewerModel",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.setAsMyDefault",
           "when": "false"
         },
         {
@@ -420,18 +450,33 @@
         },
         {
           "command": "dabblerSolution.setEngine",
-          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfigVehicle;authoring$/",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfig(Vehicle|Participant);authoring$/",
           "group": "1_set@1"
+        },
+        {
+          "command": "dabblerSolution.setAuthoringModel",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfig(Role|Participant);authoring$/",
+          "group": "1_set@2"
         },
         {
           "command": "dabblerSolution.setTransport",
-          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfigVehicle;reviewing$/",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfig(Vehicle|Participant);reviewing$/",
           "group": "1_set@1"
         },
         {
-          "command": "dabblerSolution.setRoleModel",
-          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfigRole;/",
-          "group": "1_set@1"
+          "command": "dabblerSolution.setPrimaryReviewerModel",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfig(Role;primaryReviewer|Participant;reviewing)$/",
+          "group": "1_set@2"
+        },
+        {
+          "command": "dabblerSolution.setAuxiliaryReviewerModel",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfig(Role;auxiliaryReviewer|Participant;reviewing)$/",
+          "group": "1_set@3"
+        },
+        {
+          "command": "dabblerSolution.setAsMyDefault",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfig(Vehicle;(authoring|reviewing)|Role;authoring)$/",
+          "group": "2_mine@1"
         },
         {
           "command": "dabblerSolution.refreshRecord",
@@ -619,7 +664,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.9",
-    "dabbler-ai-router": "2.2.0",
+    "dabbler-ai-router": "2.3.0",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",

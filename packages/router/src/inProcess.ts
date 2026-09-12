@@ -32,6 +32,7 @@ import { latestRound, sessionRunDir } from "./ledger.ts";
 import { buildProjection } from "./progress.ts";
 import { standIn } from "./workdir.ts";
 import { HANDLERS } from "./cli/registry.ts";
+import { MINE_FLAG } from "./cli/configure.ts";
 import { capture } from "./output.ts";
 import {
   EXIT_OK,
@@ -599,8 +600,10 @@ export class InProcessRouter implements Router {
     optional(args, "--engine", o.engine);
     optional(args, "--transport", o.transport);
     optional(args, "--reviewer-transport", o.reviewerTransport);
+    optional(args, "--authoring-model", o.authoringModel);
     optional(args, "--reviewer-model", o.reviewerModel);
     optional(args, "--auxiliary-model", o.auxiliaryModel);
+    if (o.mine === true) args.push(MINE_FLAG);
     return this.text("configure", args, o.repoRoot);
   }
 

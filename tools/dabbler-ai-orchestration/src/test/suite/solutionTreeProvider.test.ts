@@ -208,4 +208,46 @@ suite("SolutionTreeProvider: derives at startup", () => {
     assert.strictEqual(after, "codex", `was ${String(before)}, then ${String(after)}`);
     fs.rmSync(preferences, { force: true });
   });
+
+  test("a picker reads the configuration again, without waiting out the reuse window", async () => {
+    // What a machine can reach decides which vehicles and which models a
+    // list may offer, and a list is the one place an operator acts on that
+    // answer -- so it is taken when the list opens rather than out of the
+    // window the rows are painted from. A TTL is a reuse window for
+    // painting; it is not a repaint, and it is not freshness anybody may
+    // choose from.
+    writeFileTree(root, {
+      "docs/modules.yaml": "modules:\n  - slug: model\n    title: Model\n",
+    });
+    provider = new SolutionTreeProvider(root);
+    await sleep(PAST_SETTLE_MS);
+    // Paint once, which takes the reading into the reuse window.
+    provider.currentProjection();
+
+    const preferences = process.env.DABBLER_PREFERENCES_PATH as string;
+    fs.mkdirSync(path.dirname(preferences), { recursive: true });
+    fs.writeFileSync(
+      preferences,
+      JSON.stringify({
+        schema_version: 1,
+        written_by: "test",
+        written_at: "2026-09-12T00:00:00Z",
+        engine: "codex",
+      }),
+      "utf8",
+    );
+
+    // Painting still reuses -- that is what the window is for, and is why
+    // availability is not recomputed on every render.
+    assert.notStrictEqual(
+      provider.currentProjection()?.configuration?.engines?.chosen,
+      "codex",
+    );
+    // Opening a picker does not.
+    assert.strictEqual(
+      provider.freshProjection()?.configuration?.engines?.chosen,
+      "codex",
+    );
+    fs.rmSync(preferences, { force: true });
+  });
 });

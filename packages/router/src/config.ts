@@ -778,6 +778,18 @@ export const CHOSEN_VEHICLE_LAYERS: readonly string[] = [
 ];
 export const TRANSPORT_SOURCE_CONFIG = "transport.profile";
 
+/** The layers that may name an authoring model, in precedence order. */
+export const AUTHORING_MODEL_SOURCE_FLAG = "--model on this call";
+export const AUTHORING_MODEL_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_AUTHORING_MODEL})`;
+export const AUTHORING_MODEL_SOURCE_PREFERENCES = `preferences.json (authoring_model)`;
+
+/** The layers an authoring model a PERSON chose can come from. */
+export const CHOSEN_AUTHORING_MODEL_LAYERS: readonly string[] = [
+  AUTHORING_MODEL_SOURCE_FLAG,
+  AUTHORING_MODEL_SOURCE_SETTINGS,
+  AUTHORING_MODEL_SOURCE_PREFERENCES,
+];
+
 /** One layer that named a transport: where it was set, and to what. */
 export interface TransportLayer {
   readonly source: string;
@@ -945,6 +957,51 @@ function checkoutSettings(root: string | null): Readonly<Partial<Record<SettingK
 function personalTransport(key: "transport" | "reviewer_transport" = "transport"): string | null {
   try {
     return readPreferences()[key] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The authoring model in force, and every layer that named one.
+ *
+ * The same four-layer order a vehicle is decided by, applied to the other
+ * thing a person chooses: a flag, then this checkout's committed setting,
+ * then this person's own default. There is no distribution layer -- nothing
+ * ships an authoring model, because a model name in a package is a claim
+ * about somebody else's machine.
+ *
+ * `decidedBy` is null when nobody named one, which is a different fact from
+ * any default and stays distinguishable: the engine's own is then what runs,
+ * and no `--model` is passed at all.
+ */
+export function explainAuthoringModel(
+  cliFlag?: string | null,
+  root?: string | null,
+): TransportReading {
+  const checkout = root ?? projectRoot();
+  const candidates: ReadonlyArray<readonly [string, unknown]> = [
+    [AUTHORING_MODEL_SOURCE_FLAG, cliFlag ?? null],
+    [AUTHORING_MODEL_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_AUTHORING_MODEL] ?? null],
+    [AUTHORING_MODEL_SOURCE_PREFERENCES, personalAuthoringModel()],
+  ];
+  const layers: TransportLayer[] = candidates
+    .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+    .map(([source, value]) => ({ source, value: String(value) }));
+  const decided = layers[0];
+  // A model id goes through unnormalised: the date suffix is what makes a
+  // pin a pin, and the CLI is the authority on whether it knows the id.
+  return {
+    transport: decided === undefined ? "" : decided.value.trim(),
+    decidedBy: decided === undefined ? null : decided.source,
+    layers,
+  };
+}
+
+/** What this person chose on this machine, or null. Total, like every read of that file. */
+function personalAuthoringModel(): string | null {
+  try {
+    return readPreferences().authoring_model ?? null;
   } catch {
     return null;
   }

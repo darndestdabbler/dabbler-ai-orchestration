@@ -251,6 +251,24 @@ export class SolutionTreeProvider
     return this.projection() ?? null;
   }
 
+  /**
+   * The same document with the configuration read again, now.
+   *
+   * **For a PICKER, and for nothing that merely renders.** What a machine
+   * can reach decides which vehicles and which models a list may offer, and
+   * a list is the one place an operator acts on that answer -- so it is
+   * taken at the moment the list opens rather than out of the reuse window
+   * the rows are painted from. A TTL is a reuse window for painting; it is
+   * not a repaint, and it is not freshness anybody may choose from.
+   *
+   * Recomputing on every render instead would put three transport probes
+   * and a catalog read behind every expand of every row.
+   */
+  public freshProjection(): Projection | null {
+    this.configuration = undefined;
+    return this.projection() ?? null;
+  }
+
   public getChildren(element?: SolutionNode): SolutionNode[] {
     const p = this.projection();
     if (!p) return [];

@@ -97,8 +97,13 @@ import {
 import { readRecords as readCorrespondence } from "./packages.ts";
 import { ExposureError, raiseGrantDecision, settleAnsweredGrants } from "./exposure.ts";
 import { readPolicy } from "./policy.ts";
-import { BUILT_IN_ENGINES, builtInEngine } from "./engines.ts";
-import type { Engine, EngineOutput } from "./engines.ts";
+import { BUILT_IN_ENGINES, builtInEngine, engineAliases } from "./engines.ts";
+import type { Engine, EngineOutcome, EngineOutput } from "./engines.ts";
+import {
+  EVIDENCE_SERVED,
+  FIDELITY_UNKNOWN,
+  observedFidelity,
+} from "./selection.ts";
 import { clip, stripEscapes } from "./engines.ts";
 import { SESSION_PLAN_FILENAME } from "./evidence.ts";
 import {
@@ -541,6 +546,8 @@ const SENT_PREFIX = "sent: ";
  * and no more: this is state, and the history of a run is its transcripts.
  */
 const STOP_HISTORY_CAP = 8;
+/** How many engine executions' model evidence the run keeps; the recent end. */
+const MODEL_EVIDENCE_CAP = 32;
 
 /**
  * How many rewinds a run remembers, and the reason it is the same number as
@@ -1840,11 +1847,95 @@ ${this.stopArtifacts()}`,
     if (outcome.error) {
       throw new Stop("engine", `the engine could not be run: ${outcome.error}`);
     }
+    // **What actually answered, once per engine execution.**
+    //
+    // Recorded whatever it says, including that it said nothing: "the engine
+    // did not say" and "it served what was asked" are different facts, and a
+    // record that only kept the interesting case would leave a reader unable
+    // to tell the two apart. The GRADE is selection's one rule, asked here
+    // rather than restated -- including the alias case, where `--model
+    // haiku` resolving to `claude-haiku-4-5-20251001` is the CLI resolving
+    // its own name and not a substitution.
+    this.recordModelEvidence(invocation, outcome);
+    // **A refusal of the model is a refusal, whatever the exit code says.**
+    //
+    // `claude` prints its `unrecognized_model` marker, answers with an
+    // ordinary message explaining the problem, and exits 0 -- its own
+    // `result` event carries `subtype: "success"` beside `is_error: true`.
+    // Every status a caller could read therefore says the run went fine,
+    // and carrying on would begin a session authored by whatever the CLI
+    // fell back to: a model the operator did not choose, on a ledger that
+    // names the one they did.
+    if (outcome.refusedModel) {
+      throw new Stop(
+        "engine",
+        `${this.run.engine} refused the model this session was registered ` +
+          `with: it does not recognise '${outcome.refusedModel}'. It validates ` +
+          "against its own bundled catalog rather than against a provider's " +
+          "list, so a model a vendor serves can still be one this installation " +
+          "does not know -- update the CLI, or choose another. `dabbler " +
+          "configuration options` lists what this machine may choose, and " +
+          "`dabbler configure --authoring-model <id>` sets it. Nothing was " +
+          "authored: the invocation exited 0 and did no work.",
+      );
+    }
     if (stopRequested) throw new Stop("interrupted", String(reason));
     // Taken by the poll, but the engine returned on its own before the
     // abort reached it: the request still travels with the next instruction.
     if (reason !== null && !interrupted) this.defer(reason);
     return interrupted ? reason : null;
+  }
+
+  /**
+   * What answered this invocation, on the run's own record.
+   *
+   * On `run.json` and not in a structure of its own: an engine execution
+   * already has a record, and a second home for one fact is a second place
+   * for it to be wrong. Capped like `stop_history`, oldest dropped, because
+   * what a reader wants is the recent end.
+   */
+  private recordModelEvidence(invocation: number, outcome: EngineOutcome): void {
+    const requested = this.options.model ?? null;
+    const served = outcome.servedModel ?? null;
+    const alias = engineAliases(this.run.engine).includes(requested ?? "");
+    // The engine's own statement of what ran is a SERVED fact. A transport
+    // that only echoes what it was told never reaches here with an id at
+    // all, so an echo is recorded as the absence it is.
+    const observation = {
+      requested: requested ?? "",
+      served: served?.id ?? null,
+      evidence: EVIDENCE_SERVED,
+      requestedIsAlias: alias,
+    } as const;
+    const note =
+      served === null
+        ? `${this.run.engine} states no model for an execution, so what ran ` +
+          "cannot be established from this invocation; nothing here reads that " +
+          "as agreement."
+        : served.id === null
+          ? `the execution named ${served.named.length} models ` +
+            `(${served.named.join(", ")}), so 'the model that ran' has no single answer.`
+          : null;
+    const entry = {
+      invocation,
+      requested,
+      served: served?.id ?? null,
+      canonical: served?.canonical ?? null,
+      ...(served === null ? {} : { named: [...served.named] }),
+      ...(served === null ? {} : { evidence: EVIDENCE_SERVED as "served" }),
+      fidelity:
+        requested === null || served?.id === null || served === null
+          ? FIDELITY_UNKNOWN
+          : observedFidelity(observation),
+      ...(note === null ? {} : { note }),
+      at: nowIso(),
+    };
+    const held = this.run.model_evidence ?? [];
+    this.run = {
+      ...this.run,
+      model_evidence: [...held, entry].slice(-MODEL_EVIDENCE_CAP),
+    };
+    this.save();
   }
 
   /**

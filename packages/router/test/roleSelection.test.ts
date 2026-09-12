@@ -23,6 +23,7 @@ import {
   reviewerExclusions,
   explainRole,
   modelFidelity,
+  observedFidelity,
   roundObservations,
   reviewerRefusal,
   resolveRole,
@@ -329,6 +330,31 @@ describe("whether the model asked for is the model that answered", () => {
     // But a suffix that is not a date is another model. A bare prefix test
     // would call this one honoured, and it is the case that costs money.
     assert.equal(modelFidelity("gpt-5.4", [seen("gpt-5.4", "gpt-5.4-mini")]), FIDELITY_SUBSTITUTED);
+  });
+
+  it("reads an alias resolving to a dated canonical id as a resolution, not a substitution", () => {
+    // Measured on Claude Code 2.1.269, 2026-09-12: `--model haiku` came back
+    // `claude-haiku-4-5-20251001`. A string comparison calls that a
+    // substitution and puts the one warning that matters in front of an
+    // operator on the most routine thing a CLI does.
+    const alias = {
+      requested: "haiku",
+      served: "claude-haiku-4-5-20251001",
+      evidence: EVIDENCE_SERVED,
+      requestedIsAlias: true,
+    } as const;
+    assert.notEqual(observedFidelity(alias), FIDELITY_SUBSTITUTED);
+    // And it is not `honoured` either, which is the honest half: an alias
+    // names no specific model, so there is nothing for a substitution to
+    // have happened TO and nothing to have been honoured. Claiming fidelity
+    // here would claim evidence nobody has.
+    assert.equal(observedFidelity(alias), FIDELITY_UNKNOWN);
+    // The same string WITHOUT the alias fact is a substitution, which is
+    // what makes the fact load-bearing rather than decorative.
+    assert.equal(
+      observedFidelity({ ...alias, requestedIsAlias: false }),
+      FIDELITY_SUBSTITUTED,
+    );
   });
 
   it("lets one substitution outweigh any number of matches", () => {

@@ -11,6 +11,17 @@ import {
   actionToken,
   tokenMatcher,
 } from "../../providers/workExplorerTreeModel";
+import {
+  childrenOf,
+  descriptorFor,
+  rootNodes,
+} from "../../providers/solutionTreeModel";
+import type {
+  Projection,
+  RowDescriptor,
+  SolutionContext,
+  SolutionNode,
+} from "../../providers/solutionTreeModel";
 import { makeRepository, makeSession, makeVerification } from "./helpers";
 
 const finished = makeRepository({
@@ -258,5 +269,287 @@ suite("ActionRegistry: package.json menu registry", () => {
       (e) => ((e as { group?: string }).group ?? "").startsWith("inline"),
     );
     assert.ok(inline.length <= 2, `found ${inline.length} inline actions`);
+  });
+});
+
+// --- Every actionable Solution Explorer row has a menu ----------------------
+//
+// The suite above asserts that every menu command is DECLARED and that every
+// registry token maps back to an action. It never asserted the other
+// direction for the Solution Explorer: that a row an operator can act on has
+// something to open when they right-click it. So *Authoring AI* and
+// *Reviewing AI* shipped with no `view/item/context` entry matching
+// `dabblerConfigParticipant;*` at all, a context menu with no items does not
+// open, and right-clicking either did nothing -- green, through a release.
+//
+// It is a TEST over the tree model's own row kinds and not a second typed
+// registry. The Work Explorer has one because it earned one, and copying the
+// abstraction to prevent one missing menu is this project's documented
+// failure mode: what is needed is the pair of statements held to each other,
+// which is what a test is for.
+
+/** One `when` clause, evaluated against a row's `viewItem` in one view. */
+function whenHolds(when: string, view: string, viewItem: string): boolean {
+  // The manifest's own forms and no others: `view == X`, `viewItem == Y`,
+  // `viewItem =~ /re/`, ANDed. A clause shape this does not know fails the
+  // test rather than passing silently, because a `when` nothing here can read
+  // is a `when` this test is not actually checking.
+  return when
+    .split("&&")
+    .map((part) => part.trim())
+    .filter((part) => part !== "")
+    .every((clause) => {
+      const equals = /^(view|viewItem)\s*==\s*(.+)$/.exec(clause);
+      if (equals) {
+        const actual = equals[1] === "view" ? view : viewItem;
+        return actual === equals[2].trim();
+      }
+      const matches = /^(view|viewItem)\s*=~\s*\/(.+)\/$/.exec(clause);
+      if (matches) {
+        const actual = matches[1] === "view" ? view : viewItem;
+        return new RegExp(matches[2]).test(actual);
+      }
+      throw new Error(`this test cannot read the when clause '${clause}'`);
+    });
+}
+
+/**
+ * The states a Solution Explorer row can be in, as projections.
+ *
+ * Rich deliberately: the reverse assertion below is only as strong as the
+ * rows these draw, so every `contextValue` the manifest gates on has to be
+ * producible here -- a focused module, a granted one, the module the next
+ * session names, and a producer in each of its three locations.
+ */
+const FIXTURES: Array<{
+  from: string;
+  projection: Projection;
+  context: SolutionContext;
+}> = (() => {
+  const configuration: Projection["configuration"] = {
+    engines: {
+      chosen: "claude-code",
+      reason: "`claude` is the only engine CLI on PATH.",
+      installed: [{ engine: "claude-code", program: "claude", path: "C:/bin/claude.cmd" }],
+    },
+    authoring: {
+      role: "authoring",
+      provider: "anthropic",
+      vehicle: {
+        kind: "engine",
+        options: [{ id: "claude-code", means: "claude" }],
+        chosen: "claude-code",
+      },
+      chosen: { model: "claude-opus-5", provider: "anthropic" },
+      candidates: [{ model: "claude-opus-5", provider: "anthropic" }],
+      excludes: [],
+      fellThrough: false,
+    },
+    primaryReviewer: {
+      role: "reviewer",
+      vehicle: {
+        kind: "transport",
+        options: [{ id: "api", means: "the provider's own endpoint" }],
+        chosen: "api",
+      },
+      chosen: { model: "gpt-5.6-terra", provider: "openai" },
+      candidates: [{ model: "gpt-5.6-terra", provider: "openai" }],
+      excludes: [],
+      fellThrough: false,
+    },
+    auxiliaryReviewer: {
+      role: "auxiliary-reviewer",
+      chosen: { model: "gemini-3.1-pro-preview", provider: "google" },
+      candidates: [{ model: "gemini-3.1-pro-preview", provider: "google" }],
+      excludes: [],
+      fellThrough: false,
+    },
+    records: [
+      {
+        record: "ai-model-catalog",
+        path: "C:/catalog.json",
+        present: true,
+        datedAt: "2026-09-01T10:00:00Z",
+        ageHours: 2,
+        thresholdHours: 24,
+        command: "dabbler discovery refresh",
+        stale: false,
+        notes: [],
+      },
+    ],
+  };
+  const multi: Projection = {
+    solution: { name: "s", title: "s", multi: true, implicit: false, moduleCount: 2 },
+    modules: [
+      {
+        slug: "model",
+        title: "The model",
+        kind: "shared-types",
+        package: "Model",
+        contract: "package",
+        codeRoots: ["modules/model"],
+        dependsOn: [],
+        usedBy: ["app"],
+        contractDir: "modules/model/contract",
+        granted: true,
+      },
+      {
+        slug: "app",
+        title: "The app",
+        kind: "application",
+        package: null,
+        contract: null,
+        codeRoots: ["modules/app"],
+        dependsOn: ["model"],
+        usedBy: [],
+        contractDir: null,
+      },
+    ],
+    external: [
+      {
+        id: "here",
+        producedBy: "sibling",
+        resolve: "package",
+        root: "D:/sibling",
+        usedBy: ["app"],
+      },
+      { id: "away", producedBy: "other", resolve: "package", remote: "git@x/other.git" },
+      { id: "nowhere", producedBy: "third", resolve: "package" },
+    ],
+    members: [
+      { id: "s", self: true, provides: [], consumes: [], shell: false },
+      { id: "sibling", self: false, provides: ["here"], consumes: [], shell: false },
+    ],
+    bundles: [
+      {
+        bundle: "app",
+        version: "1.0.0",
+        date: "2026-09-01",
+        dependencies: [{ module: "model", package: "Model", version: "1.0.0" }],
+      },
+    ],
+    configuration,
+  };
+  const single: Projection = {
+    solution: { name: "one", title: "one", multi: false, implicit: true, moduleCount: 1 },
+    modules: [
+      {
+        slug: "one",
+        title: "one",
+        kind: "application",
+        package: null,
+        contract: null,
+        codeRoots: ["."],
+        dependsOn: [],
+        usedBy: [],
+        contractDir: null,
+      },
+    ],
+    configuration,
+  };
+  return [
+    { from: "a solution of two modules", projection: multi, context: { nextSessionModule: "app" } },
+    { from: "the repository as its module", projection: single, context: {} },
+  ];
+})();
+
+suite("the Solution Explorer: every row that acts has a menu", () => {
+  const manifest = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, "..", "..", "..", "package.json"), "utf8"),
+  ) as {
+    contributes: { menus: Record<string, Array<{ command?: string; when?: string }>> };
+  };
+  const VIEW = "dabblerSolutionTree";
+  const entries = (manifest.contributes.menus["view/item/context"] ?? []).filter((entry) =>
+    (entry.when ?? "").includes(VIEW),
+  );
+
+  /** Every row the model can draw from these projections, descriptor and all. */
+  function everyRow(): Array<{
+    node: SolutionNode;
+    row: RowDescriptor;
+    projection: Projection;
+    context: SolutionContext;
+    from: string;
+  }> {
+    const out: Array<{
+      node: SolutionNode;
+      row: RowDescriptor;
+      projection: Projection;
+      context: SolutionContext;
+      from: string;
+    }> = [];
+    for (const { from, projection, context } of FIXTURES) {
+      const walk = (node: SolutionNode): void => {
+        out.push({ node, row: descriptorFor(node, projection, context), projection, context, from });
+        for (const child of childrenOf(node, projection)) walk(child);
+      };
+      for (const root of rootNodes()) walk(root);
+    }
+    return out;
+  }
+
+  test("every Solution Explorer row carrying a command has a context menu entry that matches it", () => {
+    for (const { row, from } of everyRow()) {
+      if (!row.command) continue;
+      const context = row.contextValue ?? "";
+      const hit = entries.some(
+        (entry) => entry.command === row.command && whenHolds(entry.when ?? "", VIEW, context),
+      );
+      assert.ok(
+        hit,
+        `${from}: the row '${row.label}' (${context || "no contextValue"}) clicks ` +
+          `${row.command} and no view/item/context entry matches it`,
+      );
+    }
+  });
+
+  test("every Configuration row offers, on right-click, the actions its children carry", () => {
+    // The defect, stated as the rule it broke: a parent row in this section
+    // is a summary of the leaves beneath it, so the actions an operator can
+    // take on those leaves are the actions the parent must offer. Right-
+    // clicking *Authoring AI* did nothing at all.
+    const rows = everyRow();
+    const offered = (contextValue: string): string[] =>
+      entries
+        .filter((entry) => whenHolds(entry.when ?? "", VIEW, contextValue))
+        .map((entry) => entry.command ?? "")
+        .sort();
+    for (const participant of ["authoring", "reviewing"]) {
+      const parent = rows.find(
+        (row) => row.row.contextValue === `dabblerConfigParticipant;${participant}`,
+      );
+      assert.ok(parent, `no ${participant} participant row was drawn`);
+      const children = childrenOf(parent.node, parent.projection)
+        .map((node) => descriptorFor(node, parent.projection, parent.context))
+        .map((row) => row.command)
+        .filter((command): command is string => typeof command === "string");
+      assert.ok(children.length > 0, `${participant} has no actionable leaves`);
+      const menu = offered(parent.row.contextValue ?? "");
+      for (const command of children) {
+        assert.ok(
+          menu.includes(command),
+          `right-clicking ${parent.row.label} offers ${menu.join(", ") || "nothing"}, ` +
+            `and the leaves beneath it carry ${command}`,
+        );
+      }
+    }
+  });
+
+  test("every Solution Explorer menu entry is reachable from a row the model can draw", () => {
+    // The other direction, and it is what keeps the first one honest: a menu
+    // gated on a `contextValue` no row produces is a command nobody can ever
+    // reach, and it would otherwise sit in the manifest looking like coverage.
+    const drawn = new Set(
+      everyRow()
+        .map(({ row }) => row.contextValue)
+        .filter((value): value is string => typeof value === "string"),
+    );
+    for (const entry of entries) {
+      const hit = [...drawn].some((contextValue) =>
+        whenHolds(entry.when ?? "", VIEW, contextValue),
+      );
+      assert.ok(hit, `${entry.command} is gated on '${entry.when}', which no row satisfies`);
+    }
   });
 });

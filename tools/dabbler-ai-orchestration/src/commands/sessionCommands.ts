@@ -28,9 +28,13 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import type { Router } from "dabbler-ai-router";
+import {
+  ENUMERATION_CLI_ALIASES,
+  preflightRefusedModel,
+  type Router,
+} from "dabbler-ai-router";
 import { SESSIONS_REL, type SessionsRepository } from "../utils/fileSystem";
-import { productionRouter } from "../router/host";
+import { productionRouter, solutionConfiguration } from "../router/host";
 import { routerOutputChannel } from "../router/commandLog";
 import { type DriveHandle, launchDriver } from "../router/driveProcess";
 import { resolveRouterCli } from "../router/terminalShim";
@@ -127,11 +131,27 @@ export function engineOrder(preferred: string | null): readonly EngineChoice[] {
  *   entry stays because a session already registered under the name is
  *   still resumable; ENGINES no longer offers it, which is the difference
  *   between resuming what exists and proposing it to someone new.
+ *
+ * **`modelFlag` is how the chosen model reaches the engine**, and it was
+ * missing entirely. `args` was `carriesPrompt ? [sentence] : []`, so the
+ * `--model` an operator typed was an argument to `dabbler session start` --
+ * which records identity on the ledger -- and never reached the CLI: a seat
+ * was RECORDED on one model while `copilot` ran on `auto`, and under Claude
+ * Code no model was asked for, recorded or passed at all. The router's own
+ * unattended driver has always done this correctly (`engineShape`); only the
+ * interactive launch was missing it. Both flags were measured on 2026-09-12:
+ * `claude --model` accepted 14 of 14 ids offered, and `copilot --model`
+ * refuses an unknown id with exit 1 before any billed call. `codex` carries
+ * null for the same reason its prompt slot is null -- its help has never been
+ * read here, and a flag a CLI may not take is a launch that fails in front of
+ * the person.
  */
-const ENGINE_CLI: Readonly<Record<string, { program: string; carriesPrompt: boolean }>> = {
-  "claude-code": { program: "claude", carriesPrompt: true },
-  copilot: { program: "copilot", carriesPrompt: false },
-  codex: { program: "codex", carriesPrompt: false },
+const ENGINE_CLI: Readonly<
+  Record<string, { program: string; carriesPrompt: boolean; modelFlag: string | null }>
+> = {
+  "claude-code": { program: "claude", carriesPrompt: true, modelFlag: "--model" },
+  copilot: { program: "copilot", carriesPrompt: false, modelFlag: "--model" },
+  codex: { program: "codex", carriesPrompt: false, modelFlag: null },
 };
 
 /** What Start asks the editor to open: one CLI, interactively, in one repository. */
@@ -171,6 +191,111 @@ export function openingSentence(choice: EngineChoice, model: string): string {
   );
 }
 
+/**
+ * What this checkout already chose for the authoring model, or "".
+ *
+ * Read through the router at the moment it is asked for, exactly as the pane
+ * reads it: the answer is derived from a setting in this checkout and from
+ * this operator's own preferences, and a copy held anywhere in this window
+ * would be the stale one. A reading that cannot be taken is "" -- nobody
+ * chose -- because a Start box that refused to open over an unreadable
+ * preference would be refusing the one command that starts the work.
+ */
+export function chosenAuthoringModel(repoRoot: string): string {
+  const configuration = solutionConfiguration(repoRoot) as {
+    authoring?: {
+      declaredAtStart?: boolean;
+      chosen?: { model?: string } | null;
+    };
+  } | null;
+  const authoring = configuration?.authoring;
+  // A session in flight REPORTS its own model here; offering it back as the
+  // value for the next one would put a finished session's identity into a
+  // box that starts another.
+  if (!authoring || authoring.declaredAtStart) return "";
+  return authoring.chosen?.model ?? "";
+}
+
+/**
+ * Why this engine will not run on this model, or null.
+ *
+ * **The launch is the other door, and it was open.** `session start`
+ * revalidates a configured model before anything is billed, but the Start box
+ * takes free text and the terminal it opens belongs to the PERSON -- nothing
+ * here can read what their CLI prints, by design. So an operator who typed a
+ * stale id, a seat id under Claude Code, or a simple typo got a CLI that
+ * printed one warning line and carried on with a model nobody chose, while
+ * the ledger recorded the one they named.
+ *
+ * The check is the same rule at the same list: what the ENGINE's own record
+ * names, which is what the pane offers and what `dabbler configure` accepts.
+ *
+ * **It refuses on knowledge and never on the absence of it.** An empty list
+ * is a machine that has not read its catalog, and the alias floor is a
+ * reading that says in as many words that it does not know what the CLI
+ * accepts. Neither may stop an operator who is otherwise ready to work.
+ *
+ * **What it cannot close, and the record says so:** Claude Code validates
+ * against its own BUNDLED catalog, so a model a vendor serves and this
+ * machine has read can still be one the installed CLI does not know. Only
+ * the launch can find that out, and only by spending a turn.
+ */
+export async function engineRefusesModel(
+  ui: Pick<SessionRunUi, "engineKnowsModel">,
+  choice: EngineChoice,
+  model: string,
+): Promise<string | null> {
+  const refused = await Promise.resolve(ui.engineKnowsModel(choice, model)).catch(() => null);
+  if (refused === null) return null;
+  return (
+    `${choice.label} does not know '${refused}'. Its own bundled catalog is ` +
+    "what decides that, so a model your machine has read about can still be " +
+    "one this build of the CLI has never heard of -- and it exits 0 when it " +
+    "refuses one, prints a line and carries on with something else. Nothing " +
+    "was launched. `dabbler configuration options` lists what may be chosen, " +
+    "and updating the CLI is the other way this changes."
+  );
+}
+
+export function engineModelRefusal(
+  repository: SessionsRepository,
+  choice: EngineChoice,
+  model: string,
+): string | null {
+  const wanted = model.trim();
+  if (wanted === "") return null;
+  // Read for the engine ABOUT to be launched, not for whatever the ledger or
+  // the preference names: an operator starting a Copilot session from a
+  // window whose last session ran Claude Code would otherwise be held to the
+  // wrong CLI's list.
+  const configuration = solutionConfiguration(repository.root, {
+    engine: choice.engine,
+  }) as {
+    authoring?: {
+      enumeration?: string;
+      candidates?: Array<{ model?: string }>;
+    };
+  } | null;
+  const authoring = configuration?.authoring;
+  // The floor is the CLI's own always-accepted names on a machine that could
+  // enumerate nothing. Holding a choice to three names there would refuse
+  // every operator whose machine has no key for their engine's vendor.
+  if (authoring?.enumeration === ENUMERATION_CLI_ALIASES) return null;
+  const offered = (authoring?.candidates ?? [])
+    .map((row) => String(row.model ?? ""))
+    .filter((id) => id !== "");
+  if (offered.length === 0 || offered.includes(wanted)) return null;
+  return (
+    `${choice.label} has no '${wanted}' in the list this machine has read for ` +
+    `it. It offers ${offered.length}: ${offered.slice(0, 8).join(", ")}` +
+    `${offered.length > 8 ? ", and more" : ""}. Nothing was launched. The CLI ` +
+    "validates against its own bundled catalog and is the final authority, " +
+    "so a model it refuses is a session that starts on something nobody " +
+    "chose -- which is why this is checked before the terminal opens rather " +
+    "than read out of it afterwards."
+  );
+}
+
 /** The terminal Start opens for a choice, or the refusal when a seat has no model. */
 export function engineTerminalFor(
   repository: SessionsRepository,
@@ -183,19 +308,38 @@ export function engineTerminalFor(
     return `${choice.label} is a seat and needs a model; nothing was launched.`;
   }
   const sentence = openingSentence(choice, model);
+  // The value the operator chose, spelled as they chose it. NOT normalised:
+  // `normalizeModelToken` drops the date suffix, and the date suffix is what
+  // makes a pin a pin -- a launch that quietly generalised `claude-opus-5-
+  // 20260901` to `claude-opus-5` would be answering with a model nobody
+  // named. The CLI is the authority on whether it knows the id, and it says
+  // so plainly when it does not.
+  const wanted = model.trim();
+  const modelArgs = cli.modelFlag !== null && wanted !== "" ? [cli.modelFlag, wanted] : [];
   return {
     name: choice.label,
     cwd: repository.root,
     program: cli.program,
-    args: cli.carriesPrompt ? [sentence] : [],
+    // The flag first and the prompt last: `claude`'s prompt is a POSITIONAL,
+    // so anything after it is read as part of it.
+    args: [...modelArgs, ...(cli.carriesPrompt ? [sentence] : [])],
     typed: cli.carriesPrompt ? null : sentence,
   };
 }
 
 export interface SessionRunUi {
   pickEngine: () => Thenable<EngineChoice | undefined>;
-  /** The model to drive with; empty for the engine's default; undefined when the box was dismissed. */
-  askModel: (choice: EngineChoice) => Thenable<string | undefined>;
+  /**
+   * The model to drive with; empty for the engine's default; undefined when
+   * the box was dismissed.
+   *
+   * `chosen` is what this checkout already chose -- what the Configuration
+   * section's *Set the Authoring Model* wrote -- offered as the value
+   * already in the box. An operator who set one in the pane and was then
+   * asked to retype it here would have two places saying what the next
+   * session authors with and no reason to believe either.
+   */
+  askModel: (choice: EngineChoice, chosen: string) => Thenable<string | undefined>;
   /** One line of text from the person; undefined when the box was dismissed. */
   askText: (title: string, prompt: string, value?: string) => Thenable<string | undefined>;
   /** Which of several running drives; undefined when dismissed. */
@@ -207,6 +351,18 @@ export interface SessionRunUi {
   engineLine: (line: string) => void;
   /** Open the person's own CLI, interactively, and show it. */
   openTerminal: (terminal: EngineTerminal) => unknown;
+  /**
+   * Ask the installed CLI whether it knows this model. Answers the model it
+   * refused, or null for "it did not refuse" -- which covers no CLI, no
+   * answer, and an engine with no pre-flight.
+   *
+   * It is on this interface for the same reason `openTerminal` is: it runs a
+   * process on the machine, and a suite must be able to stand in for every
+   * one of those. Without the seam this suite would spawn the developer's
+   * own `claude` on every flow test, which is the one thing a test must
+   * never do -- it would pass here and mean nothing anywhere else.
+   */
+  engineKnowsModel: (choice: EngineChoice, model: string) => Thenable<string | null>;
   /** Show an open terminal carrying one of these names; false when none is. */
   showTerminalNamed: (names: readonly string[]) => boolean;
   /** Open `path` in a new window, keeping this one. */
@@ -316,6 +472,10 @@ export function defaultSessionRunUi(
   chosen: () => string | null = () => null,
 ): SessionRunUi {
   return {
+    // The one editor-side effect here that is a PROCESS: it asks the
+    // installed CLI, which is the only thing that actually knows whether it
+    // will run on a model, and it bills nothing doing it.
+    engineKnowsModel: (choice, model) => preflightRefusedModel(choice.engine, model),
     pickEngine: () =>
       vscode.window
         .showQuickPick(
@@ -339,13 +499,16 @@ export function defaultSessionRunUi(
           },
         )
         .then((picked) => picked?.entry),
-    askModel: (choice) =>
+    askModel: (choice, chosen) =>
       vscode.window.showInputBox({
         title: `Start session — model for ${choice.label}`,
         prompt: choice.modelRequired
-          ? "Required: the seat's model (identity resolves through the model registry)."
-          : "Optional: leave empty for the engine's default.",
+          ? "Required: the seat's model. It is passed to the CLI and recorded on the ledger."
+          : "Optional: leave empty for the engine's default. It is passed to the CLI as `--model`.",
         placeHolder: choice.modelRequired ? "e.g. gpt-5-6-luna" : "e.g. haiku",
+        // What the Configuration section already chose, so the pane and this
+        // box are one answer rather than two.
+        value: chosen,
         ignoreFocusOut: true,
       }),
     askText: (title, prompt, value) =>
@@ -539,10 +702,20 @@ export async function runStartFocusedSession(
 ): Promise<boolean> {
   const picked = await ui.pickEngine();
   if (!picked) return false;
-  const model = await ui.askModel(picked);
+  const model = await ui.askModel(picked, chosenAuthoringModel(repository.root));
   if (model === undefined) return false;
   if (picked.modelRequired && model.trim() === "") {
     ui.showErrorMessage(`${picked.label} is a seat and needs a model; nothing was opened.`);
+    return false;
+  }
+  // The same check the repository's own window makes: this path writes the
+  // choice into a module's folder for another window to launch from, so a
+  // model refused there would be refused one window later, after a clone.
+  const impossible =
+    engineModelRefusal(repository, picked, model) ??
+    (await engineRefusesModel(ui, picked, model));
+  if (impossible !== null) {
+    ui.showErrorMessage(impossible);
     return false;
   }
   const result = await router.module.open({ workspaceRoot: repository.root, slug });
@@ -634,8 +807,18 @@ export async function runStartSession(
   if (focused !== null) return runStartFocusedSession(repository, focused, ui, router ?? productionRouter());
   const picked = await ui.pickEngine();
   if (!picked) return false;
-  const model = await ui.askModel(picked);
+  const model = await ui.askModel(picked, chosenAuthoringModel(repository.root));
   if (model === undefined) return false;
+  // Two questions, and they are different questions. One asks what this
+  // machine has READ for this engine; the other asks the INSTALLED CLI, which
+  // is the only thing that actually knows and says so when it refuses.
+  const impossible =
+    engineModelRefusal(repository, picked, model) ??
+    (await engineRefusesModel(ui, picked, model));
+  if (impossible !== null) {
+    ui.showErrorMessage(impossible);
+    return false;
+  }
   const terminal = engineTerminalFor(repository, picked, model);
   if (typeof terminal === "string") {
     ui.showErrorMessage(terminal);
@@ -674,7 +857,7 @@ export async function runStartUnattendedSession(
   if (focused !== null) return runStartFocusedSession(repository, focused, ui, router ?? productionRouter(), true);
   const picked = await ui.pickEngine();
   if (!picked) return false;
-  const model = await ui.askModel(picked);
+  const model = await ui.askModel(picked, chosenAuthoringModel(repository.root));
   if (model === undefined) return false;
   const args = driveArguments(picked, model);
   if (typeof args === "string") {

@@ -10,6 +10,103 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.3.0] — 2026-09-12
+
+### Read this first if you set `DABBLER_TRANSPORT`
+
+**Dabbler ignores that variable from this version.** If you work on one
+vehicle — your Copilot seat, or your own API keys, and not both — nothing
+changes for you and there is nothing else to read.
+
+If you switch between them by exporting `DABBLER_TRANSPORT`, exporting it now
+does nothing. The correction is one command:
+
+- `dabbler configure --transport <vehicle>` sets it for this machine.
+- The `dabbler.transport` key in a repository's `.vscode/settings.json` sets
+  it for that solution, for everyone who clones it. `dabbler configure
+  --transport` from inside the repository writes that key.
+
+**What decides now, in order:** a `--transport` flag on the call, then the
+repository's own `.vscode/settings.json`, then your personal defaults, then
+what Dabbler ships. `dabbler configuration explain` prints the value in force
+and names the layer that decided it, with the ones it is shadowing underneath
+— so next time you can see the answer rather than look for it.
+
+The variable was removed rather than deprecated because it outranked every
+one of those layers and nothing wrote it. That combination is how a setting
+you saved in the pane came to be ignored by the very next session.
+
+### The model you pick is the model that runs
+
+Until this release the model you chose was recorded and never passed on. On a
+Copilot seat the ledger said one model while `copilot` ran on `auto`; under
+Claude Code no model was asked for at all. Both CLIs are now launched with
+`--model` carrying the id you chose, exactly as you spelled it — a dated id
+stays a dated id, because that is what makes a pin a pin.
+
+**And an engine that refuses your model now stops the session.** Claude Code
+exits 0 when it rejects a `--model`: it prints a message and carries on with
+something else. Dabbler reads that refusal as a refusal, says which model was
+turned down and that the CLI validates against its own bundled catalog, and
+starts nothing.
+
+### You can choose the model your AI writes with
+
+*Set the Authoring Model* used to answer with a sentence telling you to go and
+type a command that did not exist. It sets it now, and what it offers is read
+for your **engine** rather than for your machine: Claude Code is offered the
+Anthropic models your catalog holds, a seat is offered its own. Where nothing
+can be read — Claude Code signed in with no Anthropic API key, which is an
+ordinary machine — you get `opus`, `sonnet` and `haiku`, marked as the CLI's
+own always-accepted names rather than as a reading.
+
+The list is a suggestion and your CLI is the authority, and every place the
+list appears now says so.
+
+### Right-clicking a row does something
+
+Right-clicking **Authoring AI** or **Reviewing AI** did nothing at all. Both
+now offer the actions of the rows beneath them. Every row you can act on is
+held to having a menu, in both directions, so a control cannot go missing
+quietly again.
+
+### Update the Catalog finishes, and you can see that it did
+
+It refreshed your catalog and the pane went on showing the reading from
+before. It now waits for the refresh, recomputes what your machine can reach,
+repaints, and tells you once — including when the refresh failed, because a
+refresh that stopped halfway still changed the file.
+
+### Keep a choice as yours, instead of committing it
+
+**Keep as My Default** on a Vehicle or Model row saves it on your machine
+rather than in the repository's `.vscode/settings.json`, which is committed
+and reaches everyone who clones. A repository that names its own still wins;
+yours applies everywhere it does not.
+
+### A configuration that cannot work is refused before anything is billed
+
+`dabbler session start` now checks the models you chose against what your
+engine and your reviewing vehicle actually list, and refuses with what it
+offers instead, which file chose the value, and the command that changes it.
+It refuses only on knowledge: a machine that has not read its catalog yet is
+not blocked, because that is a setup step and not a mistake.
+
+### Also
+
+- Which model actually answered is recorded once per engine execution, with
+  how good that evidence is. An alias resolving to a dated id — `haiku`
+  becoming `claude-haiku-4-5-20251001` — is a resolution and is no longer
+  read as a substitution.
+- `dabbler configuration explain` reports the right repository. It was
+  reading whichever one your terminal happened to be standing in.
+- The authoring row said "nothing resolves" when it meant "nobody has chosen
+  one", and went on narrowing its list by a session that had already
+  finished.
+
+This is a minor release rather than a patch because what you may choose has
+changed and a documented input has stopped being read.
+
 ## [2.2.0] — 2026-09-11
 
 **The list of models you can choose from is now read from your machine, and

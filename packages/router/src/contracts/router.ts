@@ -342,6 +342,12 @@ export interface ConfigureOptions extends RepositoryTarget {
   readonly transport?: string;
   /** The Primary Reviewer's own vehicle, where it differs from the machine's. */
   readonly reviewerTransport?: string;
+  /**
+   * The model the engine's own CLI is launched on, by the id the engine's
+   * own list spells it with. `session start` offers it and the launch passes
+   * it as `--model`; an empty value clears it.
+   */
+  readonly authoringModel?: string;
   /** By the id the catalog lists, which is the id that goes on the wire. */
   readonly reviewerModel?: string;
   /**
@@ -351,6 +357,13 @@ export interface ConfigureOptions extends RepositoryTarget {
    * selection it excludes stops that round rather than being substituted.
    */
   readonly auxiliaryModel?: string;
+  /**
+   * Keep the vehicle and the authoring model as THIS PERSON's default,
+   * in the user-level preferences, rather than in this checkout's committed
+   * settings. The checks and the refusals are identical either way; only
+   * where the value lands changes.
+   */
+  readonly mine?: boolean;
 }
 
 export interface VerifyReanchorOptions extends RepositoryTarget {

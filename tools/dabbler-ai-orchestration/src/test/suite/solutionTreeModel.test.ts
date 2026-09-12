@@ -4,6 +4,7 @@ import * as path from "path";
 import { createRequire } from "module";
 import { configurationNode, spawnProgram, tryWriteProjection } from "dabbler-ai-router";
 import {
+  ConfigurationRole,
   NO_MODULES_YET,
   PROJECTION_RELPATH,
   PROJECTION_SOURCE_GLOBS,
@@ -21,6 +22,12 @@ import {
   repositoryTarget,
   workspaceFileIn,
 } from "../../commands/openRepository";
+import {
+  ENGINES,
+  engineModelRefusal,
+  type EngineChoice,
+} from "../../commands/sessionCommands";
+import type { SessionsRepository } from "../../utils/fileSystem";
 import { makeTempDir, rmrf, writeFileTree } from "./helpers";
 
 /** The CSV pipeline's four modules, as the router projects them: dependency order, usedBy derived. */
@@ -771,13 +778,85 @@ suite("solutionTreeModel: what a session is run with", () => {
       assert.ok(section.tooltip?.includes("Nothing."));
       assert.strictEqual(section.icon?.tone, "attention");
 
-      // The authoring AI: what it runs inside, and the model it declared at
-      // `session start` -- reported here and set there.
+      // The authoring AI: what it runs inside, and the model the engine's own
+      // CLI is launched on -- set here, for the NEXT session.
       const [authoringVehicle, authoringModel] = rendered;
       assert.strictEqual(authoringVehicle?.description, "claude-code");
       assert.ok(authoringVehicle?.tooltip?.includes("the engine CLI the work is authored in"));
       assert.ok(authoringModel?.description?.includes("claude-opus-5"));
-      assert.ok(authoringModel?.tooltip?.includes("declared when the session was registered"));
+      assert.ok(authoringModel?.tooltip?.includes("launched on"), authoringModel?.tooltip);
+      // Set here and REPORTED while a session is in flight, which the row has
+      // to distinguish: only one of the two can be changed.
+      assert.strictEqual(authoringModel?.command, "dabblerSolution.setAuthoringModel");
+      assert.ok(
+        !authoringModel?.tooltip?.includes("`session start`, so the row reports it"),
+        authoringModel?.tooltip,
+      );
+      const inFlight = descriptorFor(
+        { kind: "configRole", role: "authoring" },
+        configured({
+          authoring: {
+            ...(configured().configuration?.authoring as ConfigurationRole),
+            declaredAtStart: true,
+          },
+        }),
+      );
+      assert.ok(
+        inFlight.tooltip?.includes("`session start`, so the row reports it"),
+        inFlight.tooltip,
+      );
+      // What a list IS -- a reading, against a CLI that is the authority --
+      // is the ROUTER's sentence, rendered here and not restated. A second
+      // copy is a second thing to go stale.
+      const noted = descriptorFor(
+        { kind: "configRole", role: "authoring" },
+        configured({
+          authoring: {
+            ...(configured().configuration?.authoring as ConfigurationRole),
+            note: "the router's own sentence about this list",
+          },
+        }),
+      );
+      assert.ok(
+        noted.tooltip?.includes("the router's own sentence about this list"),
+        noted.tooltip,
+      );
+      // **"Nobody has chosen" is not "nothing resolves".** Only one of them
+      // is a fault, and the pane read the wrong one on a machine holding
+      // four models it could author with -- found by driving the pane.
+      const unchosen = descriptorFor(
+        { kind: "configRole", role: "authoring" },
+        configured({
+          authoring: {
+            ...(configured().configuration?.authoring as ConfigurationRole),
+            chosen: null,
+          },
+        }),
+      );
+      assert.strictEqual(unchosen.description, "not chosen");
+      const nothing = descriptorFor(
+        { kind: "configRole", role: "authoring" },
+        configured({
+          authoring: {
+            ...(configured().configuration?.authoring as ConfigurationRole),
+            chosen: null,
+            candidates: [],
+          },
+        }),
+      );
+      assert.strictEqual(nothing.description, "nothing resolves");
+      // A reviewing role has a preference order, so a null chosen there IS
+      // nothing resolving and the word does not change.
+      const reviewing = descriptorFor(
+        { kind: "configRole", role: "primaryReviewer" },
+        configured({
+          primaryReviewer: {
+            ...(configured().configuration?.primaryReviewer as ConfigurationRole),
+            chosen: null,
+          },
+        }),
+      );
+      assert.ok(reviewing.description?.startsWith("nothing resolves"), reviewing.description);
 
       // A vehicle a layer above is overriding says so; the value alone would
       // look exactly like one that is in force.
@@ -966,6 +1045,38 @@ suite("solutionTreeModel: what a configuration reading costs", () => {
       else process.env[name] = value;
     }
     rmrf(root);
+  });
+
+  test("refuses to LAUNCH a model the engine's own list does not name", () => {
+    // Round 1's first blocking finding. `session start` revalidates a
+    // configured model before anything is billed, but the Start box takes
+    // free text and the terminal it opens belongs to the person -- nothing in
+    // this window can read what their CLI prints. So a stale id, a seat id
+    // under Claude Code or a plain typo produced a CLI that printed one
+    // warning line and carried on with a model nobody chose, while the ledger
+    // recorded the one they named.
+    //
+    // The fixture's session is in flight under `copilot`, so the engine's own
+    // record here is the seat's -- which this machine has never read, so the
+    // list is empty and NOTHING may be refused. That is the other half of the
+    // rule and is asserted first.
+    const repository = { root, label: "r" } as unknown as SessionsRepository;
+    const seat = ENGINES.find((entry) => entry.engine === "copilot") as EngineChoice;
+    assert.strictEqual(engineModelRefusal(repository, seat, "anything-at-all"), null);
+
+    // Under Claude Code the record IS readable -- the catalog's Anthropic
+    // block -- so a model it does not name is refused before the terminal
+    // opens, with what it offers instead.
+    const claude = ENGINES.find((entry) => entry.engine === "claude-code") as EngineChoice;
+    const refusal = engineModelRefusal(repository, claude, "not-a-model-anywhere");
+    assert.ok(refusal, "a model no list names was launched anyway");
+    assert.ok(refusal?.includes("not-a-model-anywhere"), refusal);
+    assert.ok(refusal?.includes("a-author"), refusal);
+    assert.ok(refusal?.includes("Nothing was launched"), refusal);
+    // A model it DOES name goes through, and so does an empty one, which
+    // means the engine's own default.
+    assert.strictEqual(engineModelRefusal(repository, claude, "a-author"), null);
+    assert.strictEqual(engineModelRefusal(repository, claude, ""), null);
   });
 
   test("reaches no vendor and no CLI, and renders the dated record it read", () => {

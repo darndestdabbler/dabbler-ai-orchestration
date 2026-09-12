@@ -39,6 +39,7 @@ import {
 } from "./identity.ts";
 import {
   CHOSEN_VEHICLE_LAYERS,
+  explainAuthoringModel,
   explainReviewingTransport,
   explainTransport,
   loadConfig,
@@ -82,7 +83,11 @@ import {
 } from "./driver.ts";
 import { ManifestError, type SolutionShape, solutionShape } from "./modules.ts";
 import { moduleScope } from "./agency.ts";
-import { tryWriteProjection } from "./projection.ts";
+import {
+  ENUMERATION_CLI_ALIASES,
+  configurationNode,
+  tryWriteProjection,
+} from "./projection.ts";
 import { CheckoutError, openModule, readCloneMarker, writeModuleSessionMarker } from "./checkout.ts";
 import { writeExposure } from "./exposure.ts";
 import { readPolicy, sharedFilesOf, writePolicy } from "./policy.ts";
@@ -99,7 +104,6 @@ import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { removeStopGate } from "./bootstrap/index.ts";
 import { PROJECT_CONFIG_FILENAME } from "./config.ts";
-import { SETTING_AUTHORING_MODEL, settingValue } from "./settings.ts";
 import {
   CLASS_ACCOUNTABILITY_SIGNOFF,
   raiseOwed,
@@ -1073,6 +1077,144 @@ export function judgeStartBoundary(
   return { requested, refusal: null, exitCode: EXIT_OK };
 }
 
+/** How many names a refusal spells before it stops being readable. */
+const NAMES_IN_A_START_REFUSAL = 12;
+
+function offeredNames(candidates: readonly string[]): string {
+  if (candidates.length === 0) return "It offers none.";
+  const shown = [...candidates].sort().slice(0, NAMES_IN_A_START_REFUSAL);
+  const rest = candidates.length - shown.length;
+  return `It offers ${candidates.length}: ${shown.join(", ")}${rest > 0 ? `, and ${rest} more` : ""}.`;
+}
+
+/**
+ * Why a model somebody CHOSE cannot fill the role they chose it for, or null.
+ *
+ * **`options` filters a list and enforces nothing.** Both files a choice
+ * lives in -- this checkout's `.vscode/settings.json` and the user-level
+ * `preferences.json` -- are text an operator can type into, and a pane is
+ * not in the loop when `dabbler session start` is typed in a terminal. So
+ * the boundary before anything is billed asks once more.
+ *
+ * It asks through `configurationNode`, which is the reading every other
+ * surface uses: which models an engine's CLI can be launched on, which a
+ * reviewing vehicle lists, and the one rule that a reviewer may not be the
+ * author are all applied there, once. Restating any of them here would be
+ * the second copy this block of sessions exists to delete -- and a second
+ * copy that disagreed would refuse at the start a choice the pane had just
+ * offered.
+ *
+ * **Only a value somebody chose is held to this.** A first-run machine with
+ * no seat, no keys and nothing selected is not refused: refusing it would
+ * refuse the setup that fixes it. A role with no selection resolves by
+ * preference order, and a preference order that resolves to nothing is a
+ * machine that is not set up yet rather than a configuration that is wrong.
+ */
+export function configuredModelRefusal(
+  checkout: string,
+  /** The authoring model this call resolved: typed, or this checkout's setting. */
+  authoringModel: string | null,
+  /**
+   * The engine being registered.
+   *
+   * Named, because nothing on disk says so until this call has written it --
+   * and the authoring list is the ENGINE's. Reading the machine's vehicle
+   * instead refused a good model on a machine whose seat had never been read.
+   */
+  engine: string | null = null,
+): string | null {
+  const configuration = configurationNode(checkout, {
+    engine,
+    // The model THIS CALL names, so the reviewing roles are measured against
+    // the author of the session about to begin rather than against whatever
+    // the checkout had configured. Without it, naming the Primary Reviewer's
+    // own model on `session start --model` went through.
+    authoringModel,
+  }) as Record<string, unknown>;
+  if (typeof configuration["unavailable"] === "string") return null;
+  const roleOf = (key: string): Record<string, unknown> | null => {
+    const value = configuration[key];
+    return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
+  };
+  const modelsOf = (role: Record<string, unknown> | null): string[] =>
+    Array.isArray(role?.["candidates"])
+      ? (role?.["candidates"] as Record<string, unknown>[]).map((row) => String(row["model"]))
+      : [];
+  /**
+   * One chosen model against what its role can be.
+   *
+   * **It refuses on knowledge and never on the absence of it.** An empty
+   * list is a reading that says "I do not know what this machine offers" --
+   * a seat that has never answered, a provider with no key, a CLI whose
+   * catalog cannot be enumerated -- and every one of those is an ordinary
+   * machine that has not been set up yet rather than a configuration that is
+   * wrong. Refusing there would refuse the operator who typed the right
+   * model on a machine that simply has not run a free refresh, and the CLI
+   * itself refuses an id it does not know before anything is billed anyway.
+   *
+   * The alias FLOOR is the same case wearing a list: three names offered so
+   * a pane is not empty, on a machine that by definition does not know what
+   * its CLI accepts.
+   */
+  const held = (
+    role: Record<string, unknown> | null,
+    chosen: string | null,
+    what: string,
+    where: string,
+    fix: string,
+  ): string | null => {
+    if (chosen === null || chosen.trim() === "" || role === null) return null;
+    if (role["enumeration"] === ENUMERATION_CLI_ALIASES) return null;
+    const candidates = modelsOf(role);
+    if (candidates.length === 0 || candidates.includes(chosen)) return null;
+    return (
+      `${what} is set to '${chosen}', which is not one it can be. ` +
+      `${offeredNames(candidates)} It was chosen in ${where}; ${fix} changes ` +
+      "it, and `dabbler configuration options` lists what this machine may " +
+      "choose. Nothing was started and nothing was billed."
+    );
+  };
+  const authoring = roleOf("authoring");
+  // The authoring model only where it is a CHOICE. A session in flight
+  // declared its own at `session start` and the ledger has carried it since;
+  // re-judging a recorded identity here would refuse a continuation over a
+  // catalog that moved after the session began.
+  const authoringRefusal =
+    authoring?.["declaredAtStart"] === true
+      ? null
+      : held(
+          authoring,
+          authoringModel,
+          "The authoring model",
+          "this checkout's `.vscode/settings.json` (`dabbler.authoringModel`), or on this call",
+          "`dabbler configure --authoring-model <id>`",
+        );
+  if (authoringRefusal !== null) return authoringRefusal;
+  // Each reviewing role against ITS OWN list, on the shared reviewing
+  // vehicle. `selected` is what a person chose and is the only thing held to
+  // this: a role resolving by preference order is not a choice anybody made.
+  //
+  // The one rule -- a reviewer may not be the author -- is applied inside
+  // that reading, so a selection equal to the author is simply not among
+  // the candidates and lands here with the rest.
+  for (const [key, what, flag] of [
+    ["primaryReviewer", "The Primary Reviewer's model", "--reviewer-model"],
+    ["auxiliaryReviewer", "The Auxiliary Reviewer's model", "--auxiliary-model"],
+  ] as const) {
+    const role = roleOf(key);
+    const selected = role?.["selected"];
+    const refusal = held(
+      role,
+      typeof selected === "string" ? selected : null,
+      what,
+      "this machine's own `preferences.json`",
+      `\`dabbler configure ${flag} <id>\``,
+    );
+    if (refusal !== null) return refusal;
+  }
+  return null;
+}
+
 export async function start(sessionsDir: string, options: StartOptions): Promise<number> {
   if (!isDirectory(sessionsDir)) {
     writeErr(`start: not a directory: ${sessionsDir}\n`);
@@ -1134,7 +1276,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     let identity: OrchestratorIdentity = {
       engine: options.engine,
       provider: options.provider ?? null,
-      model: options.model ?? settingValue(checkout, SETTING_AUTHORING_MODEL),
+      model: options.model ?? (explainAuthoringModel(null, checkout).transport || null),
       effort: options.effort ?? null,
     };
     // **A vehicle a PERSON put in force and this machine cannot reach is a
@@ -1157,6 +1299,18 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
         );
       if (unreachable !== null) {
         writeErr(`start: refused -- ${unreachable}\n`);
+        return EXIT_USAGE;
+      }
+      // **And a MODEL somebody chose that its role cannot actually be.**
+      //
+      // `dabbler configuration options` filters a list; it enforces nothing,
+      // and both files a choice lives in can be typed into. So the choices
+      // are read once more here, at the boundary before anything is billed,
+      // through the same reading every surface uses -- a second copy of any
+      // of these rules is the thing this block of sessions exists to delete.
+      const impossible = configuredModelRefusal(checkout, identity.model, identity.engine);
+      if (impossible !== null) {
+        writeErr(`start: refused -- ${impossible}\n`);
         return EXIT_USAGE;
       }
     } catch (error) {

@@ -14,7 +14,12 @@ import { describe, it } from "node:test";
 import { spawnProgram } from "../src/checks.ts";
 import { sessionVerb } from "../src/cli/session.ts";
 import {
+  REFUSED_MODEL_UNNAMED,
   builtInEngine,
+  claudeCodeRefusedModel,
+  claudeCodeServedModel,
+  engineAliases,
+  preflightRefusedModel,
   commandEngine,
   enginePrompt,
   engineShape,
@@ -101,6 +106,16 @@ process.stdin.on("data", (chunk) => {
     const m = JSON.parse(line);
     if (m.type === "user") {
       fs.writeFileSync(process.env.FAKE_SEEN, JSON.stringify({ argv: process.argv.slice(2), prompt: m.message.content }));
+      // What the installed CLI actually does with an unknown --model,
+      // measured on Claude Code 2.1.269 (2026-09-12): the marker on STDERR,
+      // an ordinary message explaining it, a result carrying
+      // subtype "success" beside is_error, and EXIT 0.
+      if (process.env.FAKE_REFUSE) {
+        process.stderr.write('[claude-code:unrecognized_model] {"model":"' + process.env.FAKE_REFUSE + '","query_source":"sdk"}\\n');
+        out({ type: "system", subtype: "init", model: process.env.FAKE_REFUSE, session_id: "conv-refused" });
+        out({ type: "result", subtype: "success", is_error: true, api_error_status: 404 });
+        return;
+      }
       out({ type: "system", subtype: "init", model: "fake-model", session_id: process.env.FAKE_SESSION_ID || "conv-first" });
       timer = setInterval(() => {
         ticks += 1;
@@ -118,6 +133,21 @@ process.stdin.on("data", (chunk) => {
 process.stdin.on("end", () => process.exit(0));
 `;
 
+// What `claude -p --model <id>` with NO prompt was measured to do on
+// 2026-09-12 (Claude Code 2.1.269): it validates the id against its own
+// bundled catalog, complains on stderr if it does not know it, and then
+// stops because it was given nothing to do. Nothing is sent either way.
+const FAKE_CLAUDE_PREFLIGHT = `
+const m = process.argv[process.argv.indexOf("--model") + 1];
+if (m === "unknown-to-this-build") {
+  process.stderr.write(
+    '"' + m + '" isn\\'t described by this version\\'s model catalog; update Claude Code.\\n',
+  );
+}
+process.stderr.write("Error: Input must be provided\\n");
+process.exit(1);
+`;
+
 /** A fake Claude Code on disk, and where it records what it was asked. */
 function fakeClaude(): { engine: ReturnType<typeof builtInEngine>; seenPath: string } {
   const dir = tempDir("engine-");
@@ -127,6 +157,7 @@ function fakeClaude(): { engine: ReturnType<typeof builtInEngine>; seenPath: str
   process.env["FAKE_SEEN"] = seenPath;
   delete process.env["FAKE_TICKS"];
   delete process.env["FAKE_SESSION_ID"];
+  delete process.env["FAKE_REFUSE"];
   return {
     engine: builtInEngine("claude-code", "fake-model", { program: NODE, leadingArgs: [script] }),
     seenPath,
@@ -134,7 +165,9 @@ function fakeClaude(): { engine: ReturnType<typeof builtInEngine>; seenPath: str
 }
 
 function clearFakeEnv(): void {
-  for (const name of ["FAKE_SEEN", "FAKE_TICKS", "FAKE_SESSION_ID"]) delete process.env[name];
+  for (const name of ["FAKE_SEEN", "FAKE_TICKS", "FAKE_SESSION_ID", "FAKE_REFUSE"]) {
+    delete process.env[name];
+  }
 }
 
 describe("spawning an engine", () => {
@@ -296,7 +329,16 @@ describe("driving a built-in engine", () => {
     try {
       const first: Emitted[] = [];
       const outcome = await engine.invoke(invocation({ first: true }, first));
-      assert.deepEqual(outcome, { exitCode: 0, interrupted: false, sessionId: "conv-first" });
+      assert.deepEqual(outcome, {
+        exitCode: 0,
+        interrupted: false,
+        sessionId: "conv-first",
+        refusedModel: null,
+        // The fake's result event carries no `modelUsage`, so the engine
+        // said nothing about what ran -- which is recorded as nothing, and
+        // never read as agreement.
+        servedModel: null,
+      });
       const seen = JSON.parse(readFileSync(seenPath, "utf8")) as { argv: string[]; prompt: string };
       assert.ok(!seen.argv.includes("--resume"));
       assert.match(seen.prompt, /^Read .*instruction\.json and do exactly/);
@@ -329,6 +371,145 @@ describe("driving a built-in engine", () => {
     } finally {
       clearFakeEnv();
     }
+  });
+
+  it("reads a refused model off stderr, where the CLI exits 0 and says it went fine", async () => {
+    // The whole of the defect, in one invocation. `claude` prints its marker
+    // on STDERR, answers with an ordinary message, and exits 0 -- and its
+    // own `result` event carries `subtype: "success"` beside `is_error`. A
+    // driver reading exit status, or the protocol on stdout alone, sees a
+    // run that went fine and carries on into a session authored by whatever
+    // the CLI fell back to.
+    process.env["FAKE_REFUSE"] = "claude-not-a-model";
+    const { engine } = fakeClaude();
+    process.env["FAKE_REFUSE"] = "claude-not-a-model";
+    if (typeof engine === "string") throw new Error(engine);
+    try {
+      const lines: Emitted[] = [];
+      const outcome = await engine.invoke(invocation({ first: true }, lines));
+      assert.equal(outcome.exitCode, 0);
+      assert.equal(outcome.refusedModel, "claude-not-a-model");
+      // On the transcript as the engine's own words, prefixed as stderr.
+      assert.ok(lines.some((entry) => entry.line.includes("[claude-code:unrecognized_model]")));
+    } finally {
+      clearFakeEnv();
+    }
+  });
+
+  it("reads no refusal out of an ordinary run", () => {
+    assert.equal(claudeCodeRefusedModel('{"type":"result","subtype":"success"}'), null);
+    assert.equal(claudeCodeRefusedModel("stderr: something else entirely"), null);
+    assert.equal(
+      claudeCodeRefusedModel('[claude-code:unrecognized_model] {"model":"o-9","query_source":"sdk"}'),
+      "o-9",
+    );
+    // The marker fired, so the refusal is real even where the id cannot be
+    // read: answering null here would read "no model was named" as "nothing
+    // was refused", which is the failure this reading exists to stop.
+    assert.equal(
+      claudeCodeRefusedModel("[claude-code:unrecognized_model] not json at all"),
+      REFUSED_MODEL_UNNAMED,
+    );
+  });
+
+  it("reads what answered off the result event, and the alias it resolved", () => {
+    // Measured on Claude Code 2.1.269, 2026-09-12: asking for the alias
+    // `haiku` came back keyed `claude-haiku-4-5-20251001` with
+    // `canonicalModel: "claude-haiku-4-5"`. Both halves are recorded,
+    // because the dated key is what ran and the canonical is what the CLI
+    // resolved the alias TO.
+    const answered = claudeCodeServedModel(
+      JSON.stringify({
+        type: "result",
+        subtype: "success",
+        modelUsage: {
+          "claude-haiku-4-5-20251001": {
+            outputTokens: 51,
+            canonicalModel: "claude-haiku-4-5",
+          },
+        },
+      }),
+    );
+    assert.equal(answered?.id, "claude-haiku-4-5-20251001");
+    assert.equal(answered?.canonical, "claude-haiku-4-5");
+    assert.deepEqual(answered?.named, ["claude-haiku-4-5-20251001"]);
+
+    // A REFUSED model leaves modelUsage empty, and an empty one says nothing
+    // -- there is no id there to read as agreement.
+    assert.equal(
+      claudeCodeServedModel('{"type":"result","subtype":"success","modelUsage":{}}'),
+      null,
+    );
+    // Anything that is not the closing statement says nothing either.
+    assert.equal(claudeCodeServedModel('{"type":"assistant"}'), null);
+
+    // Several models -- a subagent adds a key -- and 'the model that ran'
+    // has no single answer, so picking one would invent it out of a tie.
+    const several = claudeCodeServedModel(
+      JSON.stringify({
+        type: "result",
+        modelUsage: { "claude-opus-5": {}, "claude-haiku-4-5-20251001": {} },
+      }),
+    );
+    assert.equal(several?.id, null);
+    assert.equal(several?.named.length, 2);
+  });
+
+  it("asks the installed CLI whether it knows a model, and bills nothing doing it", async () => {
+    // Measured 2026-09-12 on Claude Code 2.1.269: `claude -p --model <id>`
+    // with no prompt validates the id against its own BUNDLED catalog,
+    // complains on stderr, and then stops because it was given nothing to
+    // do. Nothing is sent either way, so the known-model case is free -- and
+    // this is the only moment a launch can still be stopped, because the CLI
+    // exits 0 when it rejects a model and carries on with something else.
+    const dir = tempDir("preflight-");
+    const script = join(dir, "fake-claude.cjs");
+    // A stand-in that behaves the way the real CLI was measured to:
+    // complains on stderr about a model its catalog does not describe,
+    // then stops because it was given nothing to do.
+    writeFileSync(script, FAKE_CLAUDE_PREFLIGHT, "utf8");
+    const asFake = (argv: readonly string[], options: Parameters<typeof spawnProgram>[1]) =>
+      spawnProgram([NODE, script, ...argv.slice(1)], options);
+
+    assert.equal(
+      await preflightRefusedModel("claude-code", "unknown-to-this-build", asFake),
+      "unknown-to-this-build",
+    );
+    // A model it knows says nothing, and saying nothing is not a refusal.
+    assert.equal(await preflightRefusedModel("claude-code", "claude-opus-5", asFake), null);
+
+    // **Null is "it did not refuse", and every way of not knowing is null.**
+    // A CLI that is not installed, an engine with no pre-flight, an empty
+    // model: none of them may stop an operator, because the launch is still
+    // the authority and will say so itself.
+    assert.equal(await preflightRefusedModel("copilot", "gpt-5-6-luna", asFake), null);
+    assert.equal(await preflightRefusedModel("claude-code", "", asFake), null);
+    assert.equal(
+      await preflightRefusedModel("claude-code", "anything", () => {
+        throw new Error("no such program");
+      }),
+      null,
+    );
+  });
+
+  it("names the aliases its CLI always accepts, once, for both the floor and the grade", () => {
+    // One statement of "what does `claude` always take". It is the floor a
+    // pane offers where nothing can be enumerated AND the reason an alias
+    // resolving to a dated canonical id is not a substitution, and two
+    // copies of it is one copy too many.
+    assert.deepEqual(engineAliases("claude-code"), ["opus", "sonnet", "haiku"]);
+    assert.deepEqual(engineAliases("copilot"), []);
+    assert.deepEqual(engineAliases(null), []);
+  });
+
+  it("gives the seat no second mechanism, because its exit code already says", () => {
+    // An unknown `--model` is refused with exit 1, before any billed call.
+    const seat = engineShape("copilot", "gpt-5-6-luna");
+    if (typeof seat === "string") throw new Error(seat);
+    assert.equal(
+      seat.refusedModel('[claude-code:unrecognized_model] {"model":"o-9"}'),
+      null,
+    );
   });
 
   it("resumes the conversation the engine reported, not the newest in the directory", async () => {

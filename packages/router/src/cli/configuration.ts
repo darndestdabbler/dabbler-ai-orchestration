@@ -159,12 +159,21 @@ function renderExplain(configuration: Node): string {
     lines.push(...layerLines(`${label} vehicle`, node(participant["vehicle"])));
     const selected = text(participant["selected"]);
     const chosen = text(node(participant["chosen"])["model"]);
-    lines.push(
-      `${label} model: ${chosen ?? "nothing resolves"}` +
-        (selected === null
-          ? " (nobody chose one, so the preference order decides)"
-          : ` (you chose '${selected}'; it is used and never silently substituted)`),
-    );
+    // **The authoring role has no preference order and no `selected`.** A
+    // model there is chosen or it is not: the choice is this checkout's
+    // setting or this person's default, and `chosen` reports it. Reading
+    // the reviewing roles' fields for it printed two false sentences on one
+    // line -- "nobody chose one" beside the model they had just chosen, and
+    // "the preference order decides" about an order that does not exist.
+    const authoring = key === "authoring";
+    const why = authoring
+      ? chosen === null
+        ? " (nobody has chosen one, so the engine's own default runs and no --model is passed)"
+        : " (you chose it; it is what the engine's CLI is launched on)"
+      : selected === null
+        ? " (nobody chose one, so the preference order decides)"
+        : ` (you chose '${selected}'; it is used and never silently substituted)`;
+    lines.push(`${label} model: ${chosen ?? "nothing resolves"}${why}`);
   }
   for (const record of rows(configuration["records"])) {
     lines.push(

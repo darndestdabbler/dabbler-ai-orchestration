@@ -93,7 +93,55 @@
       },
       "description": "Null while the loop runs or after it completed. Set when it halted short of the close, with the reason in words; the session stays in flight and this is what the operator reads."
     },
-    "stop_history": {
+    "model_evidence": {
+    "type": "array",
+    "maxItems": 32,
+    "description": "What actually answered, once per engine execution, oldest first and capped. The question is whether the model an operator picked is the model that ran, and it is recorded HERE rather than in a structure of its own because an engine execution already has a record: this one. Each entry is a reading of what the engine said about itself, never of what this framework asked for and hoped.",
+    "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["invocation", "requested", "fidelity", "at"],
+      "properties": {
+        "invocation": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Which execution of the engine this is, matching `invocations` at the time it ran."
+        },
+        "requested": {
+          "type": ["string", "null"],
+          "description": "The model id this invocation asked the CLI for, spelled as the operator chose it. Null where none was named and the engine's own default ran."
+        },
+        "served": {
+          "type": ["string", "null"],
+          "description": "The id the ENGINE says answered. Null is 'the engine did not say', which is a different fact from 'it served what was asked' and never collapses into it: a Copilot seat reports no conversation id, so its own events file cannot be tied to this invocation, and the newest file on disk is the wrong one whenever two sessions run."
+        },
+        "canonical": {
+          "type": ["string", "null"],
+          "description": "The undated canonical the engine resolved to, where it named one. Claude Code's `modelUsage` carries `canonicalModel` beside a dated key."
+        },
+        "named": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Every model the engine named for this execution. More than one means a run that used several -- a subagent adds one -- and `served` is then null, because 'the model that ran' has no single answer and picking one would invent it."
+        },
+        "evidence": {
+          "enum": ["served", "echo"],
+          "description": "How this was learned. 'served' is the engine's own statement of what ran; 'echo' is a repeat of what it was told, which can establish a substitution and can never establish fidelity."
+        },
+        "fidelity": {
+          "enum": ["honoured", "substituted", "not-known"],
+          "description": "What this execution establishes, by the one rule in selection.ts. An ALIAS request grades 'not-known' rather than 'substituted': `--model haiku` came back `claude-haiku-4-5-20251001`, which is the CLI resolving its own alias, and an alias names no specific model for a substitution to have happened to."
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why the evidence is what it is, where that is not obvious from the fields -- a transport that cannot be correlated, or a run that named several models."
+        },
+        "at": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "stop_history": {
       "type": "array",
       "maxItems": 8,
       "items": {

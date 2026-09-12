@@ -733,3 +733,162 @@ describe("a second driver taking the lease mid-run", () => {
     assert.equal(refused?.["disk_epoch"], (stolenFrom as unknown as number) + 5);
   });
 });
+
+describe("what actually answered, on the run's own record", () => {
+  it("records the model the engine named, and records an alias as a resolution", async () => {
+    // The question is whether the model an operator picked is the model that
+    // ran, and it is answered from what the ENGINE said about itself. The
+    // alias case is the trap: `--model haiku` comes back
+    // `claude-haiku-4-5-20251001`, and a string comparison calls the most
+    // routine thing a CLI does a substitution.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+
+    const answered: Engine = {
+      name: "claude-code",
+      invoke: (invocation) => {
+        invocation.emit("scripted: answered");
+        return Promise.resolve({
+          exitCode: 0,
+          servedModel: {
+            id: "claude-haiku-4-5-20251001",
+            canonical: "claude-haiku-4-5",
+            named: ["claude-haiku-4-5-20251001"],
+          },
+        });
+      },
+    };
+
+    await capture(() =>
+      driveSession(sessionsDir, {
+        engine: "claude-code",
+        provider: "anthropic",
+        model: "haiku",
+        adapter: answered,
+        maxInvocations: 1,
+      }),
+    );
+
+    const evidence = (readRun(repo, 1) as unknown as {
+      model_evidence?: Array<Record<string, unknown>>;
+    } | null)?.model_evidence;
+    assert.ok(evidence && evidence.length > 0, "no model evidence was recorded");
+    const first = evidence[0] as Record<string, unknown>;
+    assert.equal(first["invocation"], 1);
+    assert.equal(first["requested"], "haiku");
+    assert.equal(first["served"], "claude-haiku-4-5-20251001");
+    assert.equal(first["canonical"], "claude-haiku-4-5");
+    // Not a substitution: the CLI resolved its own name. Not honoured
+    // either: an alias names no specific model to have been honoured.
+    assert.equal(first["fidelity"], "not-known");
+  });
+
+  it("records an engine that said nothing as having said nothing, never as agreement", async () => {
+    // The Copilot seat is the live case: it reports no conversation id, so
+    // its own events file cannot be tied to the invocation this process just
+    // made -- and the newest file on disk is the wrong one whenever two
+    // sessions run. Its shape therefore states nothing, which is what is
+    // driven here. (The seat itself is not driven: a seat identity resolves
+    // through this machine's catalog, and seeding one would be arranging a
+    // seat to prove a rule that is not about seats.)
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+
+    const silent: Engine = {
+      name: "claude-code",
+      invoke: () => Promise.resolve({ exitCode: 0 }),
+    };
+
+    const run = await capture(() =>
+      driveSession(sessionsDir, {
+        engine: "claude-code",
+        provider: "anthropic",
+        model: "claude-opus-5",
+        adapter: silent,
+        maxInvocations: 1,
+      }),
+    );
+
+    const evidence = (readRun(repo, 1) as unknown as {
+      model_evidence?: Array<Record<string, unknown>>;
+    } | null)?.model_evidence;
+    assert.ok(evidence && evidence.length > 0, `no model evidence: ${run.stderr}${run.stdout}`);
+    const first = evidence[0] as Record<string, unknown>;
+    assert.equal(first["requested"], "claude-opus-5");
+    assert.equal(first["served"], null);
+    assert.equal(first["fidelity"], "not-known");
+    assert.match(String(first["note"]), /states no model/);
+    // And nothing claims it was an echo that agreed: `evidence` is absent
+    // rather than "served", because there was no statement to grade.
+    assert.equal(first["evidence"], undefined);
+  });
+});
+
+describe("an engine that refuses the model it was given", () => {
+  it("stops the run on the refusal, whatever the exit code said", async () => {
+    // `claude` prints `[claude-code:unrecognized_model]` on stderr, answers
+    // with an ordinary message explaining the problem, and EXITS 0 -- its
+    // own `result` event even carries `subtype: "success"` beside
+    // `is_error: true`. So every status a driver could read says the run
+    // went fine, and a driver that read one would carry on into a session
+    // authored by whatever the CLI fell back to: a model the operator did
+    // not choose, on a ledger naming the one they did.
+    //
+    // The adapter here is the measured outcome and nothing more -- exit 0,
+    // a refusal reported. What is under test is what the LOOP does with it.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+
+    let invoked = 0;
+    const refuses: Engine = {
+      // Named as the engine, because `builtInEngine` names an adapter after
+      // the engine it is: the stop says what refused, in the words a person
+      // would read in production.
+      name: "claude-code",
+      invoke: (invocation) => {
+        invoked += 1;
+        invocation.emit("stderr: [claude-code:unrecognized_model] {\"model\":\"claude-not-a-model\"}");
+        return Promise.resolve({ exitCode: 0, refusedModel: "claude-not-a-model" });
+      },
+    };
+
+    const driven = await capture(() =>
+      driveSession(sessionsDir, {
+        engine: "claude-code",
+        provider: "anthropic",
+        adapter: refuses,
+        maxInvocations: 3,
+      }),
+    );
+
+    // Once, and then stopped. A loop that read exit 0 as an answer would
+    // have spent the whole invocation budget on a CLI doing no work.
+    assert.equal(invoked, 1);
+    assert.notEqual(driven.value, 0);
+    const stop = (readRun(repo, 1) as unknown as {
+      stop?: { kind?: string; reason?: string };
+    } | null)?.stop;
+    assert.ok(stop, "the run recorded no stop");
+    assert.equal(stop?.kind, "engine");
+    // The three things a stop has to say to be actionable: what refused,
+    // which model, and the command that changes it.
+    assert.match(String(stop?.reason), /claude-code refused the model/);
+    assert.match(String(stop?.reason), /claude-not-a-model/);
+    assert.match(String(stop?.reason), /dabbler configure --authoring-model/);
+    // And why an exit code was not enough, so the next reader does not go
+    // looking for a failure the status never reported.
+    assert.match(String(stop?.reason), /its own bundled catalog/);
+  });
+});

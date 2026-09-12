@@ -32,6 +32,7 @@ import {
   type SessionRunUi,
   defaultSessionRunUi,
   engineOutputChannel,
+  engineTerminalFor,
   repositoryOf,
   runResumeSession,
   runSendToEngine,
@@ -47,6 +48,7 @@ import { ROUTER_VERSION } from "dabbler-ai-router";
 import { prerequisiteReport, type ToolProbe } from "../../commands/troubleshoot";
 import {
   refreshRecord,
+  setAsMyDefault,
   setRoleModel,
   type ConfigurationUi,
 } from "../../commands/configurationCommands";
@@ -463,6 +465,10 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
   const opened: string[] = [];
   const terminals: EngineTerminal[] = [];
   const ui: SessionRunUi = {
+    // Answers "it did not refuse" unless a test says otherwise. A suite that
+    // let this reach the real `claude` would spawn the developer's own CLI
+    // on every flow test -- passing here and meaning nothing anywhere else.
+    engineKnowsModel: async () => null,
     showTerminalNamed: () => false,
     openFolder: async (folder) => {
       opened.push(folder);
@@ -525,6 +531,111 @@ suite("Start opens the person's own CLI", () => {
     settings.__clearConfig();
   });
 
+  test("a model the engine's own list does not name stops both launches, before anything opens", async () => {
+    // Round 2's blocking finding, and the reason it is asserted at the FLOW
+    // rather than only at the helper: a check that is written and not wired
+    // is the shape this whole session exists to delete. The repository's own
+    // Start must open no terminal, and the focused one must not clone a
+    // module, which is the more expensive half.
+    //
+    // The catalog this suite runs against is a throwaway with no block in
+    // it, so the engine's list is EMPTY here and nothing may be refused --
+    // which is the other half of the rule, and is why the refusal is driven
+    // through a stubbed reading rather than through an absent one.
+    // Driven through the CLI's OWN answer rather than through a catalog:
+    // that is the half round 1's fix did not reach, and the half that
+    // matters, because Claude Code validates against its own bundled
+    // catalog and a list this machine read cannot stand in for it.
+    const root = makeTempDir("launch-refusal-");
+    const repository = makeRepository({ root });
+    const row = driveUi({
+      askModel: async () => "a-model-nothing-lists",
+      engineKnowsModel: async (_choice, model) => model,
+    });
+    try {
+      assert.strictEqual(await runStartSession(repository, row.ui), false);
+      // Nothing opened, and the operator was told why.
+      assert.deepStrictEqual(row.terminals, []);
+      assert.ok(
+        row.errors.some((line) => line.includes("a-model-nothing-lists")),
+        row.errors.join(" | "),
+      );
+
+      // The focused flow stops before the module is cloned, which is the
+      // half that costs a checkout.
+      const focused = makeRepository({
+        root,
+        currentSession: null,
+        nextSession: 2,
+        checkoutModule: null,
+        sessions: [
+          makeSession({ number: 1, status: "complete" }),
+          makeSession({ number: 2, status: "not-started", kind: "focused", module: "persister" }),
+        ],
+      });
+      const second = driveUi({
+        askModel: async () => "a-model-nothing-lists",
+        engineKnowsModel: async (_choice, model) => model,
+      });
+      const answered = fakeRouter(0, JSON.stringify({ slug: "persister", path: "D:/clone" }));
+      assert.strictEqual(
+        await runStartFocusedSession(focused, "persister", second.ui, answered.router),
+        false,
+      );
+      assert.deepStrictEqual(answered.asked, [], "a module was opened for a refused model");
+      assert.deepStrictEqual(second.opened, []);
+
+      // And a CLI that says nothing does not stop anybody: "it did not
+      // refuse" covers no CLI, no answer and an engine with no pre-flight,
+      // and none of those may stand between an operator and their work.
+      const silent = driveUi({ askModel: async () => "a-model-nothing-lists" });
+      assert.strictEqual(await runStartSession(makeRepository({ root }), silent.ui), true);
+      assert.strictEqual(silent.terminals.length, 1);
+    } finally {
+      rmrf(root);
+    }
+  });
+
+  test("the chosen model reaches both engines' argv, and an empty one adds no flag", () => {
+    // The defect this replaces: `args` was `carriesPrompt ? [sentence] : []`,
+    // so the model an operator typed reached `dabbler session start` -- which
+    // records identity -- and never reached the CLI at all. The router's own
+    // unattended `engineShape` has always passed it; only the launch a person
+    // presses did not.
+    const repository = makeRepository();
+    const copilot = ENGINES.find((e) => e.engine === "copilot")!;
+
+    const claude = engineTerminalFor(repository, ENGINES[0], "claude-opus-5");
+    assert.notStrictEqual(typeof claude, "string");
+    const claudeArgs = (claude as EngineTerminal).args;
+    // The flag FIRST: `claude`'s prompt is a positional, so anything after it
+    // is read as part of the prompt.
+    assert.deepStrictEqual(claudeArgs.slice(0, 2), ["--model", "claude-opus-5"]);
+    assert.strictEqual(claudeArgs.length, 3);
+    assert.match(claudeArgs[2], /dabbler session start/);
+
+    const seat = engineTerminalFor(repository, copilot, "gpt-5-6-luna");
+    assert.deepStrictEqual((seat as EngineTerminal).args, ["--model", "gpt-5-6-luna"]);
+
+    // Empty means the engine's own default, and a flag with nothing after it
+    // is a launch that fails in front of the person.
+    const bare = engineTerminalFor(repository, ENGINES[0], "");
+    assert.strictEqual((bare as EngineTerminal).args.length, 1);
+    assert.match((bare as EngineTerminal).args[0], /dabbler session start/);
+  });
+
+  test("passes a dated model id exactly as it was chosen", () => {
+    // `normalizeModelToken` drops the date suffix, and the date suffix is
+    // what makes a pin a pin: generalising `claude-opus-5-20260901` here
+    // would answer with a model nobody named. The CLI is the authority on
+    // whether it knows an id.
+    const pinned = engineTerminalFor(makeRepository(), ENGINES[0], "claude-opus-5-20260901");
+    assert.deepStrictEqual(
+      (pinned as EngineTerminal).args.slice(0, 2),
+      ["--model", "claude-opus-5-20260901"],
+    );
+  });
+
   test("opens the picked engine's CLI at the repository root, with the sentence, and launches no driver", async () => {
     // The panel arrangement, asked for by name. It is no longer the default
     // -- `dabbler.terminalLocation` is `editor` now -- but it is still the
@@ -584,7 +695,10 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(await runStartSession(repository, seat), true);
     assert.strictEqual(terminals.length, 4);
     assert.strictEqual(terminals[2].options.shellPath, "copilot");
-    assert.deepStrictEqual(terminals[2].options.shellArgs, []);
+    // The model REACHES the CLI now. It was an argument to `dabbler session
+    // start` alone, so a seat was recorded on one model while `copilot` ran
+    // on `auto`.
+    assert.deepStrictEqual(terminals[2].options.shellArgs, ["--model", "gpt-5-6-luna"]);
     assert.strictEqual(terminals[2].sent.length, 1);
     assert.strictEqual(terminals[2].sent[0].addNewLine, false);
     assert.match(terminals[2].sent[0].text, /--model gpt-5-6-luna/);
@@ -1238,30 +1352,37 @@ suite("Troubleshoot's prerequisite report", () => {
 
 suite("the Configuration section's model pick", () => {
   /** A pick that records what it was offered and takes the first item. */
-  function capturingUi(): {
+  function capturingUi(
+    /** Take the first offer, for a flow whose WRITE is what is being asked about. */
+    takesFirst = false,
+  ): {
     ui: ConfigurationUi;
     offered: vscode.QuickPickItem[];
     /** The options the list was offered WITH, which is where the help line rides. */
     options: vscode.QuickPickOptions[];
     informed: string[];
+    /** A refusal is a sentence a person reads, so it is captured like one. */
+    warned: string[];
   } {
     const offered: vscode.QuickPickItem[] = [];
     const options: vscode.QuickPickOptions[] = [];
     const informed: string[] = [];
+    const warned: string[] = [];
     return {
       offered,
       options,
       informed,
+      warned,
       ui: {
         confirm: () => Promise.resolve(false),
-        runVerb: () => undefined,
+        runVerb: () => Promise.resolve(0),
         pick: (items, pickOptions) => {
           offered.push(...items);
           options.push(pickOptions);
-          return Promise.resolve(undefined);
+          return Promise.resolve(takesFirst ? items[0] : undefined);
         },
         showInformationMessage: (message) => informed.push(message),
-        showWarningMessage: () => undefined,
+        showWarningMessage: (message) => warned.push(message),
         workspaceRoot: () => "D:/ws",
       },
     };
@@ -1311,6 +1432,7 @@ suite("the Configuration section's model pick", () => {
     await setRoleModel(
       router,
       { node: { kind: "configRole", role: "primaryReviewer" }, projection },
+      "primaryReviewer",
       () => undefined,
       ui,
     );
@@ -1323,26 +1445,110 @@ suite("the Configuration section's model pick", () => {
     assert.ok(options[0]?.placeHolder?.includes("blind spots"), options[0]?.placeHolder);
   });
 
-  test("does not offer to set the authoring model, because the ledger would not honour it", async () => {
-    // It is the engine's, declared when the session is registered. The pane used to
-    // write a role that nothing dispatched, so the control appeared to work
-    // and changed nothing about which model authored anything.
+  test("sets the authoring model from the engine's own list, and writes it as the authoring model", async () => {
+    // It answered with a sentence telling the operator to go and type a
+    // command, because `dabbler configure` had no `--authoring-model`. The
+    // verb exists now, and the row that offers the choice is the row that
+    // makes it.
     const projection = {
       solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
       modules: [],
-      configuration: { authoring: { role: "authoring", chosen: null, candidates: [], excludes: [], fellThrough: false } },
+      configuration: {
+        authoring: {
+          role: "authoring",
+          provider: "anthropic",
+          chosen: null,
+          candidates: [
+            model({ model: "claude-opus-5", provider: "anthropic" }),
+            model({ model: "claude-sonnet-5", provider: "anthropic" }),
+          ],
+          excludes: [],
+          fellThrough: false,
+        },
+      },
     } as unknown as Projection;
-    const { ui, offered, informed } = capturingUi();
+    const { ui, offered } = capturingUi(true);
+    const { router, configureOptions } = fakeRouter(0, "written");
+    await setRoleModel(
+      router,
+      { node: { kind: "configRole", role: "authoring" }, projection },
+      "authoring",
+      () => undefined,
+      ui,
+    );
+    assert.deepStrictEqual(
+      offered.map((item) => item.label),
+      ["claude-opus-5", "claude-sonnet-5"],
+    );
+    assert.deepStrictEqual(configureOptions, [
+      { repoRoot: "D:/ws", authoringModel: "claude-opus-5" },
+    ]);
+  });
+
+  test("reports the authoring model of a session in flight instead of offering to change it", async () => {
+    // `session start` records the identity and the ledger carries it from
+    // that moment, so this one row IS a report. The refusal says so; a
+    // control that silently declined is the shape this section shipped in.
+    const projection = {
+      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+      modules: [],
+      configuration: {
+        authoring: {
+          role: "authoring",
+          provider: "anthropic",
+          declaredAtStart: true,
+          chosen: model({ model: "claude-opus-5", provider: "anthropic" }),
+          candidates: [model({ model: "claude-opus-5", provider: "anthropic" })],
+          excludes: [],
+          fellThrough: false,
+        },
+      },
+    } as unknown as Projection;
+    const { ui, offered, warned } = capturingUi();
     const { router, configureOptions } = fakeRouter(0, "");
     await setRoleModel(
       router,
       { node: { kind: "configRole", role: "authoring" }, projection },
+      "authoring",
       () => undefined,
       ui,
     );
     assert.strictEqual(offered.length, 0);
     assert.strictEqual(configureOptions.length, 0);
-    assert.ok(informed.some((line) => line.includes("session start")), informed.join(" | "));
+    assert.ok(warned.some((line) => line.includes("claude-opus-5")), warned.join(" | "));
+  });
+
+  test("says which record was read when the engine's own list offers nothing", async () => {
+    // "No model qualifies" alone is what a seat with eighteen working models
+    // was once told. The answer names the record and the reason.
+    const projection = {
+      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+      modules: [],
+      configuration: {
+        authoring: {
+          role: "authoring",
+          provider: "anthropic",
+          enumeration: "api",
+          unavailable: "no provider key resolves in this environment",
+          chosen: null,
+          candidates: [],
+          excludes: [],
+          fellThrough: false,
+        },
+      },
+    } as unknown as Projection;
+    const { ui, offered, warned } = capturingUi();
+    const { router, configureOptions } = fakeRouter(0, "");
+    await setRoleModel(
+      router,
+      { node: { kind: "configRole", role: "authoring" }, projection },
+      "authoring",
+      () => undefined,
+      ui,
+    );
+    assert.strictEqual(offered.length, 0);
+    assert.strictEqual(configureOptions.length, 0);
+    assert.ok(warned.some((line) => line.includes("no provider key")), warned.join(" | "));
   });
 
   test("states a vehicle with one option and asks about one with two, picking neither on its own", async () => {
@@ -1375,6 +1581,7 @@ suite("the Configuration section's model pick", () => {
         node: { kind: "configRole", role: "primaryReviewer" },
         projection: withVehicle([{ id: "api", means: "the provider's own endpoint" }]),
       },
+      "primaryReviewer",
       () => undefined,
       single.ui,
     );
@@ -1394,6 +1601,7 @@ suite("the Configuration section's model pick", () => {
           { id: "copilot-cli", means: "a Copilot seat" },
         ]),
       },
+      "primaryReviewer",
       () => undefined,
       pair.ui,
     );
@@ -1448,7 +1656,7 @@ suite("the Configuration section's model pick", () => {
     const options: vscode.QuickPickOptions[] = [];
     const ui: ConfigurationUi = {
       confirm: () => Promise.resolve(false),
-      runVerb: () => undefined,
+      runVerb: () => Promise.resolve(0),
       pick: (items, pickOptions) => {
         picked.push(...items);
         options.push(pickOptions);
@@ -1462,6 +1670,7 @@ suite("the Configuration section's model pick", () => {
     await setRoleModel(
       router,
       { node: { kind: "configRole", role: "auxiliaryReviewer" }, projection },
+      "auxiliaryReviewer",
       () => undefined,
       ui,
     );
@@ -1506,21 +1715,40 @@ suite("the Configuration node's refresh", () => {
     // question, because this repository has answered "what does a refresh
     // cost" wrongly four times.
     const ran: Array<readonly string[]> = [];
+    const said: string[] = [];
     let asked = "";
     const ui: ConfigurationUi = {
       confirm: (message) => {
         asked = message;
         return Promise.resolve(true);
       },
-      runVerb: (_title, _cwd, args) => ran.push(args),
+      runVerb: (_title, _cwd, args) => {
+        ran.push(args);
+        return Promise.resolve(0);
+      },
       pick: () => Promise.resolve(undefined),
-      showInformationMessage: () => undefined,
-      showWarningMessage: () => undefined,
+      showInformationMessage: (message) => said.push(message),
+      showWarningMessage: (message) => said.push(message),
       workspaceRoot: () => "D:/ws",
     };
 
-    await refreshRecord({ node: { kind: "configuration" }, projection: PROJECTION }, ui);
+    let repainted = 0;
+    await refreshRecord(
+      { node: { kind: "configuration" }, projection: PROJECTION },
+      () => (repainted += 1),
+      ui,
+    );
     assert.deepStrictEqual(ran, [["discovery", "refresh"]]);
+    // **It finishes.** This was the one command in the section given no
+    // callback, and it is the one that needed it most: what it rewrites is
+    // the model catalog at the USER level, outside every glob a workspace
+    // watcher can be built from. The operator refreshed and the pane went on
+    // showing the old reading.
+    assert.strictEqual(repainted, 1);
+    assert.ok(
+      said.some((line) => line.includes("re-read")),
+      said.join(" | "),
+    );
     assert.ok(asked.includes("Nothing."), asked);
     assert.ok(asked.includes(ROW.command), asked);
     // And the one condition under which the answer is no, said BEFORE the
@@ -1530,5 +1758,135 @@ suite("the Configuration node's refresh", () => {
     // offer, and the operator found out in the terminal afterwards.
     assert.ok(asked.includes("While a session is in flight"), asked);
     assert.ok(asked.includes("verifier pool"), asked);
+  });
+
+  test("keeps a vehicle as this person's default, and says which file and what outranks it", async () => {
+    // A right-click that wrote the committed settings file would publish a
+    // personal preference to everyone who clones the repository, which is a
+    // control doing more than it said.
+    const projection = {
+      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+      modules: [],
+      configuration: {
+        primaryReviewer: {
+          role: "reviewer",
+          vehicle: {
+            kind: "transport",
+            options: [{ id: "api", means: "the provider's own endpoint" }],
+            chosen: "api",
+            layers: [{ source: ".vscode/settings.json", value: "copilot-cli" }],
+          },
+          chosen: null,
+          candidates: [],
+          excludes: [],
+          fellThrough: false,
+        },
+      },
+    } as unknown as Projection;
+    const asked: string[] = [];
+    const ui: ConfigurationUi = {
+      confirm: (message) => {
+        asked.push(message);
+        return Promise.resolve(true);
+      },
+      runVerb: () => Promise.resolve(0),
+      pick: () => Promise.resolve(undefined),
+      showInformationMessage: () => undefined,
+      showWarningMessage: () => undefined,
+      workspaceRoot: () => "D:/ws",
+    };
+    const { router, configureOptions } = fakeRouter(0, "written");
+    await setAsMyDefault(
+      router,
+      { node: { kind: "configVehicle", who: "reviewing" }, projection },
+      () => undefined,
+      ui,
+    );
+    assert.deepStrictEqual(configureOptions, [
+      { repoRoot: "D:/ws", reviewerTransport: "api", mine: true },
+    ]);
+    // Which file it is about to write, and what already outranks it: a
+    // personal default under a committed setting is a value the operator can
+    // see and the framework will not use.
+    assert.ok(asked[0]?.includes("not committed"), asked[0]);
+    assert.ok(asked[0]?.includes(".vscode/settings.json"), asked[0]);
+  });
+
+  test("refuses to keep a row that has nothing on it", async () => {
+    const projection = {
+      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+      modules: [],
+      configuration: {
+        authoring: { role: "authoring", chosen: null, candidates: [], excludes: [], fellThrough: false },
+      },
+    } as unknown as Projection;
+    const warned: string[] = [];
+    const ui: ConfigurationUi = {
+      confirm: () => {
+        throw new Error("nothing to keep must not be confirmed");
+      },
+      runVerb: () => Promise.resolve(0),
+      pick: () => Promise.resolve(undefined),
+      showInformationMessage: () => undefined,
+      showWarningMessage: (message) => warned.push(message),
+      workspaceRoot: () => "D:/ws",
+    };
+    const { router, configureOptions } = fakeRouter(0, "");
+    await setAsMyDefault(
+      router,
+      { node: { kind: "configRole", role: "authoring" }, projection },
+      () => undefined,
+      ui,
+    );
+    assert.deepStrictEqual(configureOptions, []);
+    assert.ok(
+      warned.some((line) => line.includes("nothing on this row")),
+      warned.join(" | "),
+    );
+  });
+
+  test("repaints even when the refresh did not finish, and says so", async () => {
+    // A refresh that failed halfway still MOVED the file, so a pane left
+    // showing the state before it would be wrong in the one direction an
+    // operator has no way to check. The router already said why in the
+    // terminal they were watching; repeating its words here would be a
+    // second rendering of one refusal.
+    const said: string[] = [];
+    const ui: ConfigurationUi = {
+      confirm: () => Promise.resolve(true),
+      runVerb: () => Promise.resolve(2),
+      pick: () => Promise.resolve(undefined),
+      showInformationMessage: (message) => said.push(message),
+      showWarningMessage: (message) => said.push(message),
+      workspaceRoot: () => "D:/ws",
+    };
+    let repainted = 0;
+    await refreshRecord(
+      { node: { kind: "configuration" }, projection: PROJECTION },
+      () => (repainted += 1),
+      ui,
+    );
+    assert.strictEqual(repainted, 1);
+    assert.ok(said.some((line) => line.includes("exit 2")), said.join(" | "));
+  });
+
+  test("does nothing at all when the operator declines", async () => {
+    const ui: ConfigurationUi = {
+      confirm: () => Promise.resolve(false),
+      runVerb: () => {
+        throw new Error("a declined refresh must not run anything");
+      },
+      pick: () => Promise.resolve(undefined),
+      showInformationMessage: () => undefined,
+      showWarningMessage: () => undefined,
+      workspaceRoot: () => "D:/ws",
+    };
+    let repainted = 0;
+    await refreshRecord(
+      { node: { kind: "configuration" }, projection: PROJECTION },
+      () => (repainted += 1),
+      ui,
+    );
+    assert.strictEqual(repainted, 0);
   });
 });

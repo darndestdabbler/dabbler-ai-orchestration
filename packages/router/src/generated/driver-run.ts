@@ -85,6 +85,44 @@ export type DriverRun = {
     class?: "first" | "deadlock";
   } | null;
   /**
+   * What actually answered, once per engine execution, oldest first and capped. The question is whether the model an operator picked is the model that ran, and it is recorded HERE rather than in a structure of its own because an engine execution already has a record: this one. Each entry is a reading of what the engine said about itself, never of what this framework asked for and hoped.
+   */
+  model_evidence?: Array<{
+    /**
+     * Which execution of the engine this is, matching `invocations` at the time it ran.
+     */
+    invocation: number;
+    /**
+     * The model id this invocation asked the CLI for, spelled as the operator chose it. Null where none was named and the engine's own default ran.
+     */
+    requested: string | null;
+    /**
+     * The id the ENGINE says answered. Null is 'the engine did not say', which is a different fact from 'it served what was asked' and never collapses into it: a Copilot seat reports no conversation id, so its own events file cannot be tied to this invocation, and the newest file on disk is the wrong one whenever two sessions run.
+     */
+    served?: string | null;
+    /**
+     * The undated canonical the engine resolved to, where it named one. Claude Code's `modelUsage` carries `canonicalModel` beside a dated key.
+     */
+    canonical?: string | null;
+    /**
+     * Every model the engine named for this execution. More than one means a run that used several -- a subagent adds one -- and `served` is then null, because 'the model that ran' has no single answer and picking one would invent it.
+     */
+    named?: string[];
+    /**
+     * How this was learned. 'served' is the engine's own statement of what ran; 'echo' is a repeat of what it was told, which can establish a substitution and can never establish fidelity.
+     */
+    evidence?: "served" | "echo";
+    /**
+     * What this execution establishes, by the one rule in selection.ts. An ALIAS request grades 'not-known' rather than 'substituted': `--model haiku` came back `claude-haiku-4-5-20251001`, which is the CLI resolving its own alias, and an alias names no specific model for a substitution to have happened to.
+     */
+    fidelity: "honoured" | "substituted" | "not-known";
+    /**
+     * Why the evidence is what it is, where that is not obvious from the fields -- a transport that cannot be correlated, or a run that named several models.
+     */
+    note?: string;
+    at: string;
+  }>;
+  /**
    * The stops this run has already met, oldest first and capped -- the oldest is dropped rather than the newest, because what a deadlock is read from is the recent end. It is here, and short, because `run.json` is state: the history of a run is its transcripts, and this is only enough of it to see the loop going nowhere.
    */
   stop_history?: {

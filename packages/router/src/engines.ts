@@ -85,6 +85,27 @@ export interface EngineOutcome {
   readonly sessionId?: string | null;
   /** Set when the engine could not be run at all, as opposed to ran and failed. */
   readonly error?: string | null;
+  /**
+   * The model the engine REFUSED, where it said so, or null.
+   *
+   * A separate field from `error`, and from the exit code, because it is a
+   * separate fact: the CLI ran, answered, and did no work. `claude` exits 0
+   * when it rejects a `--model` (measured on Claude Code 2.1.269,
+   * 2026-09-12), so an invocation that read the exit status alone would
+   * carry on into a session authored by whatever the CLI fell back to --
+   * which is a session running on a model the operator did not choose and
+   * the record does not name.
+   */
+  readonly refusedModel?: string | null;
+  /**
+   * What the engine said actually answered, or null where it said nothing.
+   *
+   * Null is *the engine did not say*, and is never read as agreement: a seat
+   * that reports no conversation id leaves its own echo in a file nothing
+   * here can tie to this invocation, and an absent statement and a statement
+   * that the model was honoured are different facts.
+   */
+  readonly servedModel?: ServedModel | null;
   /** The driver ended the invocation through `signal`. */
   readonly interrupted?: boolean;
 }
@@ -266,6 +287,60 @@ export interface EngineShape {
    * next invocation can name it.
    */
   sessionId(line: string): string | null;
+  /**
+   * The model this line says the CLI REFUSED, or null.
+   *
+   * A shape's own reading, because only the shape knows what its CLI's
+   * refusal looks like -- and because for one of them the exit code does
+   * not say. Measured on 2026-09-12: `claude --model <unknown>` prints
+   *
+   *   [claude-code:unrecognized_model] {"model":"<id>","query_source":"sdk"}
+   *
+   * on stderr, answers with an ordinary assistant message explaining the
+   * problem, and EXITS 0 -- its `result` event even carries
+   * `subtype: "success"` beside `is_error: true`. Every reading a caller
+   * could take from status alone therefore says the run went fine.
+   *
+   * It is the marker and not the prose: the marker is the CLI's own
+   * machine-readable statement and it names the model in its own JSON,
+   * while the sentence beside it is English that a release may reword.
+   */
+  refusedModel(line: string): string | null;
+  /**
+   * What this line says actually ANSWERED, or null.
+   *
+   * Measured on Claude Code 2.1.269, 2026-09-12: the `result` event carries
+   * `modelUsage`, keyed by the model that ran, each entry naming its
+   * `canonicalModel`. Asking for the alias `haiku` came back keyed
+   * `claude-haiku-4-5-20251001` with `canonicalModel: "claude-haiku-4-5"` --
+   * which is a resolution and not a substitution, and is why the alias case
+   * is handled here rather than discovered at a round.
+   *
+   * The Copilot seat has none: it writes the id it was given into its own
+   * `events.jsonl`, which is an echo, and it reports no conversation id at
+   * all -- so there is nothing to tie that file to the invocation this
+   * process just made. The newest file on disk is the wrong one whenever two
+   * sessions run, so the seat answers null and the record says the evidence
+   * was not available, which is a different fact from agreement.
+   */
+  servedModel(line: string): ServedModel | null;
+}
+
+/** What answered, as the engine reported it. */
+export interface ServedModel {
+  /**
+   * The id the engine says ran, or null where it named more than one.
+   *
+   * Null on a run that used several models -- a subagent adds a key to
+   * `modelUsage` -- because "the model that ran" then has no single answer,
+   * and picking one would be inventing an answer out of a tie. `named`
+   * carries them all so a reader can see why.
+   */
+  readonly id: string | null;
+  /** The undated canonical the engine resolved to, where it said one. */
+  readonly canonical: string | null;
+  /** Every id the engine named, in the order it named them. */
+  readonly named: readonly string[];
 }
 
 /**
@@ -304,6 +379,8 @@ export function engineShape(engine: string, model: string | null): EngineShape |
         ],
         render: renderClaudeCodeEvent,
         sessionId: claudeCodeSessionId,
+        refusedModel: claudeCodeRefusedModel,
+        servedModel: claudeCodeServedModel,
       };
     case "copilot":
       // Measured on the Copilot CLI: `-p` runs one prompt and exits. The
@@ -334,6 +411,17 @@ export function engineShape(engine: string, model: string | null): EngineShape |
         ],
         render: (line) => line,
         sessionId: () => null,
+        // The seat needs no reading: an unknown `--model` is refused with
+        // exit 1, before any billed call, and an exit code needs no
+        // interpretation. A second mechanism for a fact the status already
+        // states is a second place for it to be stated wrongly.
+        refusedModel: () => null,
+        // The seat reports no conversation id, so its own `events.jsonl`
+        // cannot be tied to the invocation this process just made -- and the
+        // newest file on disk is the wrong one whenever two sessions run. It
+        // is an echo besides. Null, and the record says the evidence was not
+        // available, which is not agreement.
+        servedModel: () => null,
       };
     case "codex":
       // Measured on Codex 0.151.0 (`codex exec --help`): the prompt is
@@ -354,6 +442,11 @@ export function engineShape(engine: string, model: string | null): EngineShape |
         ],
         render: renderCodexEvent,
         sessionId: codexThreadId,
+        // Nothing has been measured here, and a guess at another CLI's
+        // refusal is worse than none: a pattern that never fires reads as
+        // proof there was no refusal.
+        refusedModel: () => null,
+        servedModel: () => null,
       };
     default:
       return `no built-in command for '${engine}'; pass --engine-argv`;
@@ -522,6 +615,175 @@ export function claudeCodeSessionId(line: string): string | null {
   return typeof id === "string" && id !== "" ? id : null;
 }
 
+/**
+ * The marker Claude Code prints when it will not run on the model it was
+ * given, and the id it carries.
+ *
+ * Exported so one statement of the shape serves the reading and its test.
+ * The id is the marker's own JSON where it parses; where it does not, the
+ * marker still fired and the refusal is still real, so the answer is the
+ * sentinel rather than null -- reading "no model was named" as "no refusal
+ * happened" is the failure this whole reading exists to stop.
+ */
+export const UNRECOGNIZED_MODEL_MARKER = "[claude-code:unrecognized_model]";
+
+/** What a refusal that named no parsable model is recorded as. */
+export const REFUSED_MODEL_UNNAMED = "(the model this call named)";
+
+export function claudeCodeRefusedModel(line: string): string | null {
+  const at = line.indexOf(UNRECOGNIZED_MODEL_MARKER);
+  if (at >= 0) {
+    const json = parseJson(line.slice(at + UNRECOGNIZED_MODEL_MARKER.length).trim());
+    const model = json?.["model"];
+    return typeof model === "string" && model.trim() !== "" ? model.trim() : REFUSED_MODEL_UNNAMED;
+  }
+  // **The CLI's prose, for the one moment the marker has not been reached.**
+  //
+  // Measured 2026-09-12 on Claude Code 2.1.269: asked for an unknown model
+  // with NO prompt, `claude` prints this sentence on stderr and stops before
+  // it ever emits the marker. That moment is the only free one -- nothing has
+  // been sent, so nothing is billed -- and it is the moment a launch can be
+  // stopped. English a release may reword, which is exactly why the marker is
+  // tried first and why a rewording degrades to the catalog check beside this
+  // rather than to nothing.
+  const quoted = CATALOG_REFUSAL.exec(line);
+  return quoted === null ? null : (quoted[1] ?? REFUSED_MODEL_UNNAMED);
+}
+
+/** The CLI's own sentence for a model its bundled catalog does not describe. */
+const CATALOG_REFUSAL = /"([^"]+)" isn't described by this version's model catalog/;
+
+/**
+ * A spawn that asks a CLI whether it knows a model, and bills nothing.
+ *
+ * **Only Claude Code has one, and only Claude Code needs one.** It exits 0
+ * when it rejects a `--model`, prints one line and carries on -- so an
+ * interactive launch starts a session on whatever it fell back to, and the
+ * person may never see the line scroll past. The Copilot seat refuses an
+ * unknown model with exit 1 before any billed call, which their own terminal
+ * shows them immediately; a probe would add nothing it does not already say.
+ *
+ * `-p` with no prompt and stdin closed is the whole trick: the CLI validates
+ * the model against its own bundled catalog, complains, and then stops
+ * because it was given nothing to do. No prompt is sent either way, so the
+ * known-model case costs nothing at all.
+ *
+ * **It asks the installed CLI, which is the only thing that actually knows.**
+ * A catalog this machine read cannot prove what this build of Claude Code
+ * supports -- its refusal says so in as many words -- so a list check and
+ * this are two different questions, and both are asked.
+ */
+export function modelPreflight(engine: string, model: string): readonly string[] | null {
+  if (engine !== "claude-code" || model.trim() === "") return null;
+  return [ENGINE_PROGRAM["claude-code"], "-p", "--model", model.trim()];
+}
+
+/**
+ * What Claude Code says ran, off the `result` event's `modelUsage`.
+ *
+ * Measured on 2026-09-12 against Claude Code 2.1.269: asking for `haiku`
+ * came back keyed `claude-haiku-4-5-20251001` with `canonicalModel:
+ * "claude-haiku-4-5"`. A refused model leaves `modelUsage` EMPTY, which is
+ * why an empty one answers null rather than an id -- there is nothing there
+ * to read as agreement.
+ */
+export function claudeCodeServedModel(line: string): ServedModel | null {
+  const event = parseJson(line);
+  if (event === null || event["type"] !== "result") return null;
+  const usage = event["modelUsage"];
+  if (typeof usage !== "object" || usage === null || Array.isArray(usage)) return null;
+  const named = Object.keys(usage as Record<string, unknown>);
+  if (named.length === 0) return null;
+  // One key is one model. More than one is a run that used several -- a
+  // subagent adds a key -- and "the model that ran" then has no single
+  // answer; picking one would be inventing one out of a tie.
+  const only = named.length === 1 ? (named[0] as string) : null;
+  const entry = only === null ? null : (usage as Record<string, unknown>)[only];
+  const canonical =
+    entry !== null && typeof entry === "object" && !Array.isArray(entry)
+      ? (entry as Record<string, unknown>)["canonicalModel"]
+      : null;
+  return {
+    id: only,
+    canonical: typeof canonical === "string" && canonical !== "" ? canonical : null,
+    named,
+  };
+}
+
+/** Either line ending, because a CLI's own output is not this platform's. */
+const NEWLINES = new RegExp(String.raw`?
+`);
+
+/** How long a free pre-flight may take before it is abandoned as no answer. */
+const PREFLIGHT_TIMEOUT_MS = 20_000;
+
+/**
+ * Ask the installed CLI whether it knows this model. Free, and decisive.
+ *
+ * Answers the model it REFUSED, or null -- and null means *it did not
+ * refuse*, which covers the CLI not being installed, the probe timing out
+ * and the engine having no pre-flight. Every one of those is "this cannot be
+ * established here", and none of them may stop an operator: the launch is
+ * still the authority and will say so itself.
+ */
+export async function preflightRefusedModel(
+  engine: string,
+  model: string,
+  spawn: typeof spawnProgram = spawnProgram,
+): Promise<string | null> {
+  const argv = modelPreflight(engine, model);
+  if (argv === null) return null;
+  const shape = engineShape(engine, model);
+  if (typeof shape === "string") return null;
+  let child: ChildProcess;
+  try {
+    child = spawn(argv, { stdio: ["ignore", "pipe", "pipe"] });
+  } catch {
+    // No CLI here to ask. The launch will find out in front of the person,
+    // which is where it was found out before this existed.
+    return null;
+  }
+  return new Promise<string | null>((settle) => {
+    let refused: string | null = null;
+    let done = false;
+    const finish = (): void => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      settle(refused);
+    };
+    const timer = setTimeout(() => {
+      terminateTree(child);
+      finish();
+    }, PREFLIGHT_TIMEOUT_MS);
+    const read = (chunk: Buffer): void => {
+      for (const line of chunk.toString("utf8").split(NEWLINES)) {
+        if (refused === null) refused = shape.refusedModel(line);
+      }
+    };
+    child.stdout?.on("data", read);
+    child.stderr?.on("data", read);
+    child.on("error", finish);
+    child.on("close", finish);
+  });
+}
+
+/**
+ * The names an engine's CLI always accepts, whatever its catalog holds.
+ *
+ * The engine's own fact, so it lives with the engine's shape: it is both the
+ * floor a pane offers where nothing can be enumerated and the reason an
+ * alias resolving to a dated canonical id is not a substitution. Two copies
+ * of "what does `claude` always take" is one copy too many.
+ */
+const ENGINE_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  "claude-code": ["opus", "sonnet", "haiku"],
+};
+
+export function engineAliases(engine: string | null): readonly string[] {
+  return engine === null ? [] : (ENGINE_ALIASES[engine] ?? []);
+}
+
 /** Codex's thread id, off `thread.started` and nowhere else. */
 export function codexThreadId(line: string): string | null {
   const event = parseJson(line);
@@ -540,6 +802,16 @@ interface ChildRun {
   readonly interrupt: (child: ChildProcess) => void;
   /** Seen on every stdout line, for an adapter that watches the protocol. */
   readonly onLine?: (line: string) => void;
+  /**
+   * Seen on every line of BOTH streams.
+   *
+   * `onLine` is stdout's, because that is where a protocol lives. A CLI's
+   * refusal of its own arguments does not: `claude` prints
+   * `[claude-code:unrecognized_model]` on stderr and exits 0, so a watcher
+   * that read stdout alone could not see the one line that says the run is
+   * worthless.
+   */
+  readonly onAnyLine?: (line: string) => void;
 }
 
 const INTERRUPT_GRACE_MS = 10_000;
@@ -559,6 +831,7 @@ function runChild(run: ChildRun): Promise<EngineOutcome> {
       while ((newline = pending[key].indexOf("\n")) >= 0) {
         const line = pending[key].slice(0, newline).replace(/\r$/, "");
         pending[key] = pending[key].slice(newline + 1);
+        run.onAnyLine?.(line);
         if (key === "err") {
           invocation.emit(`stderr: ${line}`);
           continue;
@@ -644,10 +917,28 @@ export function builtInEngine(
       // is read once -- the first line that carries one -- so a later event
       // repeating it cannot move the run onto a different conversation.
       let sessionId: string | null = null;
+      // The CLI's refusal of its own `--model`, from whichever stream it
+      // arrives on. First one wins, like the session id: a later line
+      // repeating it must not move the answer onto a different model.
+      let refusedModel: string | null = null;
+      // What answered, off the engine's own closing statement. LAST wins
+      // rather than first, unlike the session id: the result event comes at
+      // the end and an invocation that somehow produced two has the later
+      // one as its answer.
+      let servedModel: ServedModel | null = null;
       const watch = (line: string): void => {
         if (sessionId === null) sessionId = shape.sessionId(line);
+        servedModel = shape.servedModel(line) ?? servedModel;
       };
-      const reported = (outcome: EngineOutcome): EngineOutcome => ({ ...outcome, sessionId });
+      const watchBoth = (line: string): void => {
+        if (refusedModel === null) refusedModel = shape.refusedModel(line);
+      };
+      const reported = (outcome: EngineOutcome): EngineOutcome => ({
+        ...outcome,
+        sessionId,
+        refusedModel,
+        servedModel,
+      });
       if (shape.input === "argv") {
         return runChild({
           child: spawned,
@@ -655,6 +946,7 @@ export function builtInEngine(
           render: shape.render,
           interrupt: terminateTree,
           onLine: watch,
+          onAnyLine: watchBoth,
         }).then(reported);
       }
       // The stream-json conversation: the prompt is a user message, the
@@ -679,6 +971,7 @@ export function builtInEngine(
           watch(line);
           if (parseJson(line)?.["type"] === "result") spawned.stdin?.end();
         },
+        onAnyLine: watchBoth,
       }).then(reported);
     },
   };

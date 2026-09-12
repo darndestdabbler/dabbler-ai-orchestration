@@ -451,6 +451,41 @@ export interface ModelObservation {
   readonly requested: string;
   readonly served: string | null;
   readonly evidence: EvidenceKind;
+  /**
+   * The request was an ALIAS -- a name the engine's own CLI always accepts
+   * and resolves for itself -- rather than a model id.
+   *
+   * It changes the question. `--model haiku` came back
+   * `claude-haiku-4-5-20251001` (measured 2026-09-12), and a reading that
+   * compared the two strings would call that a substitution and put the one
+   * warning that matters in front of an operator on the most routine thing a
+   * CLI does. But it is not `honoured` either: an alias names no specific
+   * model, so there is nothing for a substitution to have happened TO, and
+   * claiming fidelity would be claiming evidence nobody has. It is
+   * `not-known`, which is exactly what the third value is for.
+   */
+  readonly requestedIsAlias?: boolean;
+}
+
+/**
+ * What ONE observation establishes.
+ *
+ * Split out so the aggregate below and every single-execution record share
+ * one rule rather than two that can come apart.
+ */
+export function observedFidelity(seen: ModelObservation): Fidelity {
+  if (seen.served === null || seen.served === "") return FIDELITY_UNKNOWN;
+  // An alias resolves; it does not name a model to be substituted for.
+  if (seen.requestedIsAlias === true) {
+    return seen.served === seen.requested ? FIDELITY_HONOURED : FIDELITY_UNKNOWN;
+  }
+  if (seen.served !== seen.requested && !datedPinOf(seen.requested, seen.served)) {
+    return FIDELITY_SUBSTITUTED;
+  }
+  // A match is worth something only if a PROVIDER said it. A seat naming the
+  // model it was asked for would print exactly that whether it honoured the
+  // flag or ignored it.
+  return seen.evidence === EVIDENCE_SERVED ? FIDELITY_HONOURED : FIDELITY_UNKNOWN;
 }
 
 /**
@@ -513,16 +548,12 @@ export function modelFidelity(
   observations: readonly ModelObservation[],
 ): Fidelity {
   const mine = observations.filter((seen) => seen.requested === model);
-  const said = mine.filter((seen) => seen.served !== null && seen.served !== "");
-  if (said.length === 0) return FIDELITY_UNKNOWN;
-  const substituted = said.some(
-    (seen) => seen.served !== model && !datedPinOf(model, seen.served as string),
-  );
-  if (substituted) return FIDELITY_SUBSTITUTED;
-  // Matches only. They are worth something only if a provider said them.
-  return said.some((seen) => seen.evidence === EVIDENCE_SERVED)
-    ? FIDELITY_HONOURED
-    : FIDELITY_UNKNOWN;
+  const graded = mine.map(observedFidelity);
+  if (graded.length === 0) return FIDELITY_UNKNOWN;
+  // One substitution outweighs any number of matches: a model that has once
+  // answered as another is a model that can.
+  if (graded.includes(FIDELITY_SUBSTITUTED)) return FIDELITY_SUBSTITUTED;
+  return graded.includes(FIDELITY_HONOURED) ? FIDELITY_HONOURED : FIDELITY_UNKNOWN;
 }
 
 /**

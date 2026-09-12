@@ -137,9 +137,18 @@ export function userConfigurationDirs(): string[] {
   }
 }
 
-export function solutionConfiguration(repoRoot: string): unknown {
+export function solutionConfiguration(
+  repoRoot: string,
+  /**
+   * What the caller knows that the record does not say yet -- the engine a
+   * launch is ABOUT to use, most often. Without it the reading answers for
+   * whatever the ledger or the preference names, which is the wrong engine
+   * whenever an operator is starting a session on the other one.
+   */
+  options: { engine?: string | null } = {},
+): unknown {
   try {
-    return configurationNode(repoRoot);
+    return configurationNode(repoRoot, options);
   } catch (error) {
     return { unavailable: error instanceof Error ? error.message : String(error) };
   }

@@ -77,6 +77,9 @@ import {
 import { normalizeModelToken } from "../contracts/models.ts";
 import { writeErr, writeOut } from "./output.ts";
 
+/** What says a choice is this PERSON's rather than this checkout's. */
+export const MINE_FLAG = "--mine";
+
 const EXIT_OK = 0;
 const EXIT_REFUSED = 1;
 const EXIT_USAGE = 2;
@@ -86,7 +89,7 @@ function usage(): string {
     "usage: dabbler configure [-h] [--engine E] [--transport T]",
     "                         [--reviewer-transport T] [--authoring-model M]",
     "                         [--reviewer-model M] [--auxiliary-model M]",
-    "                         [--repo-root PATH]",
+    `                         [${MINE_FLAG}] [--repo-root PATH]`,
     "",
     "  what the NEXT session is run with",
     "",
@@ -121,6 +124,15 @@ function usage(): string {
     "                          every provider that has already reviewed it, and a",
     "                          selection it excludes is a stop and never a",
     "                          substitution",
+    `  ${MINE_FLAG}                  keep this as YOUR default rather than this`,
+    `                          checkout's: --transport, --reviewer-transport and`,
+    "                          --authoring-model go to the user-level",
+    `                          ${PREFERENCES_FILENAME} instead of`,
+    `                          ${SETTINGS_RELPATH}, which is committed and`,
+    "                          travels to everyone who clones. The same checks",
+    "                          run and the same refusals come back; only where",
+    "                          it lands changes. --engine and the two reviewing",
+    "                          models are already yours and are unaffected",
     "  --repo-root PATH        the repository; derived from the cwd when absent",
     "  -h, --help              show this message",
     "",
@@ -166,6 +178,13 @@ function offeredId(reading: RoleReading, role: string, named: string): string | 
   return match === undefined ? null : match[0];
 }
 
+/** What each personal default is called in the sentence that reports it. */
+const WORDS: Record<string, string> = {
+  transport: "vehicle",
+  reviewerTransport: "reviewing vehicle",
+  authoringModel: "authoring model",
+};
+
 /** How many names to spell before a refusal stops being readable. */
 const NAMES_IN_A_REFUSAL = 12;
 
@@ -200,6 +219,16 @@ export interface ConfigureOptions {
   readonly reviewerModel?: string;
   /** The Auxiliary Reviewer's model: the third voice at a disputed impasse. */
   readonly auxiliaryModel?: string;
+  /**
+   * Keep the vehicle and the authoring model as THIS PERSON's default.
+   *
+   * The difference is who else gets it. `.vscode/settings.json` is committed
+   * and reaches everyone who clones -- which is right for a solution's
+   * policy and wrong for a preference, and a right-click that published one
+   * into somebody else's repository would be a control doing more than it
+   * said. The checks are identical either way; only the file changes.
+   */
+  readonly mine?: boolean;
 }
 
 export interface ConfigureOutcome {
@@ -386,15 +415,16 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   if (options.authoringModel !== undefined) {
     const wanted = options.authoringModel.trim();
     if (wanted !== "") {
-      const transport = transportFor();
       // **The list the PANE offers, so the offer and the acceptance cannot
-      // disagree.** `authoringNode` narrows the transport's enumeration to
-      // the providers this engine's CLI can run -- Claude Code runs Anthropic
-      // models and nothing else -- and a verb that checked the whole
-      // transport instead would accept a model the launch then refuses.
-      // Session 156's first defect was this shape the other way round.
+      // disagree.** `authoringNode` reads the ENGINE's own record and narrows
+      // it to the providers that CLI can run, and a verb that checked some
+      // other transport instead would accept a model the launch then refuses.
+      // Session 156's first defect was this shape the other way round; the
+      // reading is handed in as a factory for the same reason it is there --
+      // which record the engine's list comes from is the engine's answer and
+      // not this caller's.
       const listed = (
-        authoringNode(options.repoRoot, readingFor(transport))["candidates"] as Array<
+        authoringNode(options.repoRoot, readingFor)["candidates"] as Array<
           Record<string, unknown>
         >
       ).map((candidate) => String(candidate["model"]));
@@ -403,8 +433,10 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
         return {
           ...empty,
           refusal:
-            `'${wanted}' is not a model this engine could author with on the ` +
-            `${transport} transport. ${namesOffered(listed)}`,
+            `'${wanted}' is not a model this engine's own list names. ` +
+            `${namesOffered(listed)} The list is what this machine has read ` +
+            "and the CLI is the authority: it validates against its own " +
+            "bundled catalog and refuses what it does not know.",
         };
       }
       named["authoringModel"] = modelId;
@@ -412,14 +444,21 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
       named["authoringModel"] = "";
     }
   }
-  if (options.transport !== undefined) {
-    Object.assign(choice, { transport: options.transport });
-  }
-  if (named["authoringModel"] !== undefined) {
-    Object.assign(choice, { authoringModel: named["authoringModel"] });
-  }
+  // **Where the three checkout-level settings land.**
+  //
+  // The same value, the same checks, the same refusals -- one file or the
+  // other. `--mine` keeps it on this machine; without it the choice is this
+  // checkout's and is committed, which is what a solution's policy has to
+  // be and what a personal preference must never become.
+  const personal: Record<string, string> = {};
+  const settle = (key: "transport" | "reviewerTransport" | "authoringModel", value: string): void => {
+    if (options.mine === true) personal[key] = value;
+    else Object.assign(choice, { [key]: value });
+  };
+  if (options.transport !== undefined) settle("transport", options.transport);
+  if (named["authoringModel"] !== undefined) settle("authoringModel", named["authoringModel"]);
   if (options.reviewerTransport !== undefined) {
-    Object.assign(choice, { reviewerTransport: options.reviewerTransport });
+    settle("reviewerTransport", options.reviewerTransport);
   }
   // The engine and the SELECTION go to the USER-level preferences beside the
   // catalog, not to the repository's overlay and not to an editor setting.
@@ -448,6 +487,20 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     };
   }
   const preferenceLines: string[] = [];
+  // The personal half of a `--mine` call, written as the one preferences
+  // write it is: one file, one read-modify-write, so a call setting two of
+  // them cannot leave the file holding half of them.
+  if (Object.keys(personal).length > 0) {
+    writePreferences(personal);
+    for (const [key, value] of Object.entries(personal)) {
+      preferenceLines.push(
+        value === ""
+          ? `${PREFERENCES_FILENAME} no longer carries your own ${WORDS[key]}`
+          : `${PREFERENCES_FILENAME} keeps '${value}' as your own ${WORDS[key]}, ` +
+            `which applies wherever a checkout names none`,
+      );
+    }
+  }
   // The id the catalog lists is what was checked and is what is written:
   // there is no second name for a model to be translated into on the way to
   // the file, which is the round trip `aliasFor` and `modelIdOf` existed for.
@@ -525,6 +578,17 @@ export async function configureVerb(argv: string[]): Promise<number> {
     "--auxiliary-model",
     "--repo-root",
   ];
+  // A choice can be this CHECKOUT's or this PERSON's, and the difference is
+  // who else gets it: `.vscode/settings.json` is committed and travels to
+  // everyone who clones, `preferences.json` is on this machine and travels
+  // nowhere. It takes no value, so it is read before the pairs are.
+  let mine = false;
+  const argvWithoutScope = argv.filter((entry) => {
+    if (entry !== MINE_FLAG) return true;
+    mine = true;
+    return false;
+  });
+  argv = argvWithoutScope;
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index] as string;
     if (!flags.includes(flag)) {
@@ -559,6 +623,7 @@ export async function configureVerb(argv: string[]): Promise<number> {
     ...(values.has("--auxiliary-model")
       ? { auxiliaryModel: values.get("--auxiliary-model") as string }
       : {}),
+    ...(mine ? { mine: true } : {}),
   };
   let outcome: ConfigureOutcome;
   try {

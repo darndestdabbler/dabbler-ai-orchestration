@@ -109,6 +109,17 @@ export { tryWriteProjection } from "./projection.ts";
 // demand is also a reading this router made, so a pane cannot render an
 // older router's shape of it.
 export { configurationNode } from "./projection.ts";
+// The marker an authoring list carries when it is the CLI's own always-
+// accepted names rather than anything this machine read. Exported because
+// the extension has to know not to REFUSE against it -- a reading that says
+// it does not know must not stop an operator -- and a second spelling of the
+// word in the extension is a vocabulary with two homes.
+export { ENUMERATION_CLI_ALIASES } from "./projection.ts";
+// Ask the INSTALLED CLI whether it knows a model, free. Exported because the
+// launch an operator presses lives in the extension, and that launch is the
+// one Claude Code's exit code cannot protect: it exits 0 when it rejects a
+// --model and carries on with something else.
+export { preflightRefusedModel } from "./engines.ts";
 // WHERE that reading comes from, so a host can watch it.
 //
 // The catalog and this operator's preferences sit side by side in one

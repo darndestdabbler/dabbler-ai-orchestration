@@ -35,6 +35,7 @@ import {
   REVIEWER_HELP,
 } from "../providers/solutionTreeModel";
 import type {
+  ConfigRoleName,
   ConfigurationModel,
   Projection,
   SolutionNode,
@@ -58,8 +59,21 @@ export function chosenEngineIn(projection: Projection | null | undefined): strin
 export interface ConfigurationUi {
   /** The one confirmation this section asks for. */
   confirm: (message: string, action: string) => Thenable<boolean>;
-  /** Run one router verb where the operator can watch it. */
-  runVerb: (title: string, cwd: string, args: readonly string[]) => void;
+  /**
+   * Run one router verb where the operator can watch it, and answer when it
+   * ends with the code it ended on -- undefined where that cannot be known.
+   *
+   * Awaitable, because the caller's job is not done when the verb starts. A
+   * refresh rewrites a file at the USER level, outside every glob this
+   * window can watch, so the repaint after it has to be CAUSED; a command
+   * that returned at the spawn left the operator watching a terminal say it
+   * had re-read their catalog beside a pane still showing the old reading.
+   */
+  runVerb: (
+    title: string,
+    cwd: string,
+    args: readonly string[],
+  ) => Thenable<number | undefined>;
   pick: (
     items: readonly vscode.QuickPickItem[],
     options: vscode.QuickPickOptions,
@@ -86,7 +100,7 @@ export function defaultConfigurationUi(): ConfigurationUi {
         void vscode.window.showWarningMessage(
           "The bundled router could not be found beside this extension, so there is nothing to run.",
         );
-        return;
+        return Promise.resolve(undefined);
       }
       const terminal = vscode.window.createTerminal({
         name: title,
@@ -96,6 +110,16 @@ export function defaultConfigurationUi(): ConfigurationUi {
         env: { ELECTRON_RUN_AS_NODE: "1" },
       });
       terminal.show();
+      // The router IS this terminal's shell, so the terminal closes when the
+      // verb exits and `exitStatus` carries the code. That is the one signal
+      // this window gets that a user-level file has finished moving.
+      return new Promise<number | undefined>((settle) => {
+        const closed = vscode.window.onDidCloseTerminal((ended) => {
+          if (ended !== terminal) return;
+          closed.dispose();
+          settle(ended.exitStatus?.code ?? undefined);
+        });
+      });
     },
     pick: (items, options) => vscode.window.showQuickPick(items, options),
     showInformationMessage: (m) => vscode.window.showInformationMessage(m),
@@ -230,8 +254,11 @@ async function write(
     engine?: string;
     transport?: string;
     reviewerTransport?: string;
+    authoringModel?: string;
     reviewerModel?: string;
     auxiliaryModel?: string;
+    /** Keep it as this person's default rather than this checkout's. */
+    mine?: boolean;
   },
   ui: ConfigurationUi,
   refreshed: () => void,
@@ -289,6 +316,17 @@ export async function setTransport(
  */
 export async function refreshRecord(
   target: ConfigurationTarget,
+  /**
+   * Invalidate the capability reading and repaint.
+   *
+   * This command was the ONE in this section given no callback, and it is
+   * the one that needed it most: what it rewrites is the model catalog, at
+   * the user level, outside every glob a workspace watcher can be built
+   * from. The operator refreshed at 07:30:38Z and the pane went on showing
+   * the old reading. The user-level watcher session 157 added is a second
+   * chance; the repaint is caused here.
+   */
+  refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
   const root = ui.workspaceRoot();
@@ -323,22 +361,42 @@ export async function refreshRecord(
     "Refresh",
   );
   if (!agreed) return;
-  ui.runVerb(`Dabbler: ${row.record}`, root, args);
+  const code = await ui.runVerb(`Dabbler: ${row.record}`, root, args);
+  // Whatever it ended on, the reading is re-taken and the tree repainted: a
+  // refresh that failed halfway still moved the file, and a pane left
+  // showing the state before it would be wrong in the one direction an
+  // operator cannot check.
+  refreshed();
+  if (code === 0 || code === undefined) {
+    ui.showInformationMessage(
+      `${row.record} re-read. What this machine can reach has been recomputed ` +
+        "and the Configuration section is showing it.",
+    );
+    return;
+  }
+  // The router already said why, in the terminal the operator was watching.
+  // Repeating its words here would be a second rendering of one refusal.
+  ui.showWarningMessage(
+    `${row.record} did not finish (exit ${code}). The terminal it ran in says ` +
+      "why; the Configuration section is showing whatever it did manage to write.",
+  );
 }
 
 /**
- * Which model verifies the next session.
+ * Keep this row's choice as YOUR default rather than this checkout's.
  *
- * The candidates offered are the ones the router already resolved, and the
- * refusals still come from the router: a list is an offer, and the rule is
- * what decides.
+ * **Offered only where the ordinary control writes the checkout**, which is
+ * the two Vehicle rows and the authoring Model row. A reviewing model's
+ * selection already lives in `preferences.json` and has since it existed, so
+ * a second entry beside it would be two controls performing one write -- the
+ * shape this section is being repaired of. Those rows say where their choice
+ * is kept instead.
  *
- * **The authoring model is not set here and cannot be.** It is the engine's,
- * declared at `session start` and on the ledger from that moment, so this
- * says so rather than offering a choice the record will not honour -- which
- * is what it used to do, writing a role that nothing dispatched.
+ * The confirmation names the file about to be written and anything that
+ * already outranks it, because a personal default under a committed setting
+ * is a value the operator can see and the framework will not use.
  */
-export async function setRoleModel(
+export async function setAsMyDefault(
   router: Pick<Router, "configure">,
   target: ConfigurationTarget,
   refreshed: () => void,
@@ -346,15 +404,152 @@ export async function setRoleModel(
 ): Promise<void> {
   const root = ui.workspaceRoot();
   if (!root) return;
-  if (!target.node || target.node.kind !== "configRole") return;
-  const which = target.node.role;
-  if (which === "authoring") {
-    ui.showInformationMessage(
-      "The authoring model is the engine's own, declared when the session is " +
-        "registered: run `dabbler session start` with `--model`, or use Start " +
-        "Session, which asks for it. Its vehicle is the engine CLI, set on the " +
-        "Vehicle row above it. Changing either here would not reach the run.",
+  const node = target.node;
+  if (!node) return;
+  const configuration = target.projection?.configuration;
+  const [what, value, shadow] =
+    node.kind === "configVehicle"
+      ? node.who === "authoring"
+        ? ["the engine", configuration?.engines?.chosen ?? null, null]
+        : [
+            "the reviewing vehicle",
+            configuration?.primaryReviewer?.vehicle?.chosen ?? null,
+            (configuration?.primaryReviewer?.vehicle?.layers ?? [])[0] ?? null,
+          ]
+      : node.kind === "configRole" && node.role === "authoring"
+        ? [
+            "the authoring model",
+            configuration?.authoring?.chosen?.model ?? null,
+            null,
+          ]
+        : [null, null, null];
+  if (what === null || value === null || value === "") {
+    ui.showWarningMessage(
+      "There is nothing on this row to keep: choose a value first, and then " +
+        "keep it as your own default.",
     );
+    return;
+  }
+  const agreed = await ui.confirm(
+    [
+      `Keep '${value}' as your own ${what}?`,
+      "",
+      "It is written to this machine's own preferences, beside your model " +
+        "catalog, and applies in every repository that does not name one of " +
+        "its own. It is not committed and reaches nobody else.",
+      ...(shadow
+        ? [
+            "",
+            `${shadow.source} names '${shadow.value}' and outranks it here, so ` +
+              "this repository will go on using that one. Your default applies " +
+              "wherever that setting is absent.",
+          ]
+        : []),
+    ].join("\n"),
+    "Keep as my default",
+  );
+  if (!agreed) return;
+  // The engine is ALREADY a personal default -- it has never been anything
+  // else -- so keeping it is a write of the same value to the same file, and
+  // the flag is harmless there. A branch that skipped it would be a second
+  // statement of where an engine lives.
+  const choice =
+    node.kind === "configVehicle"
+      ? node.who === "authoring"
+        ? { engine: value }
+        : { reviewerTransport: value, mine: true }
+      : { authoringModel: value, mine: true };
+  await write(router, root, choice, ui, refreshed);
+}
+
+/**
+ * The model the engine's own CLI is launched on.
+ *
+ * It answered with a sentence telling the operator to go and type a command,
+ * because `dabbler configure` had no `--authoring-model` and never had --
+ * a control that reports nothing and changes nothing, on the one row an
+ * operator most expects to be able to set. The verb exists now and this
+ * calls it.
+ *
+ * **A session in flight is REPORTED, never offered.** `session start`
+ * records the identity and the ledger carries it from that moment, so
+ * offering to change it would be offering something the record will not
+ * honour. The refusal says which session declared it and that a change
+ * reaches the next one.
+ */
+export async function setAuthoringModel(
+  router: Pick<Router, "configure">,
+  target: ConfigurationTarget,
+  refreshed: () => void,
+  ui: ConfigurationUi = defaultConfigurationUi(),
+): Promise<void> {
+  const root = ui.workspaceRoot();
+  if (!root) return;
+  const role = target.projection?.configuration?.authoring;
+  if (role?.declaredAtStart) {
+    ui.showWarningMessage(
+      `The session in flight declared '${role.chosen?.model ?? "its model"}' at ` +
+        "`session start`, and the ledger has carried it since. This row reports " +
+        "that. Close the session to choose what the next one authors with.",
+    );
+    return;
+  }
+  const items = modelItems(
+    role?.candidates ?? [],
+    role?.provider,
+    role?.chosen?.model,
+  );
+  if (items.length === 0) {
+    // The same three-part answer the reviewing rows give: which record was
+    // read, and why it offered nothing. "No model qualifies" alone is what a
+    // seat with eighteen working models was once told.
+    const read = role?.enumeration
+      ? `The list was read from the ${ENUMERATION_WORDS[role.enumeration] ?? role.enumeration}. `
+      : "";
+    ui.showWarningMessage(
+      `No model is offered for the authoring AI here. ${read}${
+        role?.unavailable
+          ? `${role.unavailable}.`
+          : "The engine's own list could not be read on this machine."
+      }`,
+    );
+    return;
+  }
+  const picked = await ui.pick(items, {
+    title: "Which model authors the next session?",
+    // The router's own sentence about the list, not a second one written
+    // here: what a list IS -- a reading, against a CLI that is the authority
+    // -- is the reading's fact, and two statements of it drift.
+    placeHolder: `${role?.note ? `${role.note} ` : ""}${NEXT_SESSION}`,
+  });
+  if (!picked) return;
+  await write(router, root, { authoringModel: picked.label }, ui, refreshed);
+}
+
+/**
+ * Which model fills one role in the next session.
+ *
+ * The candidates offered are the ones the router already resolved, and the
+ * refusals still come from the router: a list is an offer, and the rule is
+ * what decides.
+ *
+ * **The role is an argument and is never read off the clicked row.** A
+ * `view/item/context` entry carries no arguments, so the participant rows --
+ * *Authoring AI*, *Reviewing AI* -- offer one command per model beneath
+ * them; a single command asked to serve all three would have to guess which
+ * model a right-click on the parent meant.
+ */
+export async function setRoleModel(
+  router: Pick<Router, "configure">,
+  target: ConfigurationTarget,
+  which: ConfigRoleName,
+  refreshed: () => void,
+  ui: ConfigurationUi = defaultConfigurationUi(),
+): Promise<void> {
+  const root = ui.workspaceRoot();
+  if (!root) return;
+  if (which === "authoring") {
+    await setAuthoringModel(router, target, refreshed, ui);
     return;
   }
   const primary = which === "primaryReviewer";

@@ -37,7 +37,19 @@ import {
 import { SESSIONS_REL, type SessionsRepository, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
 import { RUNS_REL } from "./utils/projection";
 import { SolutionTreeProvider } from "./providers/SolutionTreeProvider";
-import type { SolutionNode } from "./providers/solutionTreeModel";
+import type { ConfigRoleName, SolutionNode } from "./providers/solutionTreeModel";
+import { ROLE_COMMANDS } from "./providers/solutionTreeModel";
+
+/**
+ * The three model rows, each with the command id its row carries.
+ *
+ * Read off `ROLE_COMMANDS` rather than spelled again here: the row's `command`
+ * and the registration are the same fact, and two statements of it is how a
+ * menu comes to name a command nothing registered.
+ */
+const ROLE_COMMAND_ENTRIES = Object.entries(ROLE_COMMANDS) as Array<
+  [ConfigRoleName, string]
+>;
 import {
   cloneRepository,
   createRepository,
@@ -53,6 +65,7 @@ import { endGrant } from "./commands/moduleGrant";
 import {
   refreshRecord,
   chosenEngineIn,
+  setAsMyDefault,
   setEngine,
   setRoleModel,
   setTransport,
@@ -370,7 +383,12 @@ export function activate(context: vscode.ExtensionContext): void {
       // close the loop between the two.
       await setEngine(
         productionRouter(),
-        { node, projection: solutionProvider.currentProjection() },
+        // `freshProjection` and not the painted one: what a machine can
+        // reach decides what a list may offer, and a list is where an
+        // operator acts on that answer. The rows are painted from a short
+        // reuse window, which is a reuse window and not freshness anybody
+        // may choose from.
+        { node, projection: solutionProvider.freshProjection() },
         ENGINES.map((entry) => entry.engine),
         () => solutionProvider.refresh(),
       );
@@ -379,7 +397,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("dabblerSolution.setTransport", (node?: SolutionNode) =>
       setTransport(
         productionRouter(),
-        { node, projection: solutionProvider.currentProjection() },
+        { node, projection: solutionProvider.freshProjection() },
         () => solutionProvider.refresh(),
       ),
     ),
@@ -387,14 +405,35 @@ export function activate(context: vscode.ExtensionContext): void {
     // seat. It asks first, with the cost in the question -- which is nothing
     // -- and runs in a terminal rather than in-process, because it is work an
     // operator should watch happen.
-    vscode.commands.registerCommand("dabblerSolution.refreshRecord", (node?: SolutionNode) =>
-      refreshRecord({ node, projection: solutionProvider.currentProjection() }),
-    ),
-    vscode.commands.registerCommand("dabblerSolution.setRoleModel", (node?: SolutionNode) =>
-      setRoleModel(
+    // Keep this row's value as THIS PERSON's default rather than this
+    // checkout's. Offered only where the ordinary control writes the
+    // checkout; a reviewing model's selection already lives in the
+    // preferences, and a second entry beside it would be two controls
+    // performing one write.
+    vscode.commands.registerCommand("dabblerSolution.setAsMyDefault", (node?: SolutionNode) =>
+      setAsMyDefault(
         productionRouter(),
-        { node, projection: solutionProvider.currentProjection() },
+        { node, projection: solutionProvider.freshProjection() },
         () => solutionProvider.refresh(),
+      ),
+    ),
+    vscode.commands.registerCommand("dabblerSolution.refreshRecord", (node?: SolutionNode) =>
+      refreshRecord({ node, projection: solutionProvider.freshProjection() }, () =>
+        solutionProvider.refresh(),
+      ),
+    ),
+    // One command per model row, and the role is the ARGUMENT rather than
+    // something read off whichever row was clicked: a `view/item/context`
+    // entry carries no arguments, so the participant rows offer one command
+    // per model beneath them and none of the three has to guess.
+    ...ROLE_COMMAND_ENTRIES.map(([role, command]) =>
+      vscode.commands.registerCommand(command, (node?: SolutionNode) =>
+        setRoleModel(
+          productionRouter(),
+          { node, projection: solutionProvider.freshProjection() },
+          role,
+          () => solutionProvider.refresh(),
+        ),
       ),
     ),
     // What a change under the module would reach: the router's impact plan

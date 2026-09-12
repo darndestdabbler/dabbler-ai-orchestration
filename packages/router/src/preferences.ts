@@ -78,6 +78,17 @@ export interface Preferences {
   /** The same, for the vehicle the reviewing roles are dispatched over. */
   readonly reviewer_transport?: string;
   /**
+   * This person's own authoring model, where a checkout does not name one.
+   *
+   * The checkout's `.vscode/settings.json` outranks it, exactly as it does
+   * for a vehicle: a committed setting is the solution's policy, and this is
+   * what applies where the solution said nothing. It is here so *Set as my
+   * default* has somewhere to write that is not a file somebody else clones
+   * -- a personal preference committed into a repository is a preference
+   * published to everyone who opens it.
+   */
+  readonly authoring_model?: string;
+  /**
    * The model a person chose for a role, by role, as a catalog id.
    *
    * **A selection is not a preference order.** `prefer` ships in the config
@@ -162,6 +173,7 @@ export function readPreferences(path: string = currentPreferencesPath()): Prefer
   const engine = optionalString(parsed["engine"]);
   const transport = optionalString(parsed["transport"]);
   const reviewerTransport = optionalString(parsed["reviewer_transport"]);
+  const authoringModel = optionalString(parsed["authoring_model"]);
   // One torn entry is one role unchosen, not the whole file lost: the
   // choices beside it are still choices this person made.
   const selected: Record<string, string> = {};
@@ -178,6 +190,7 @@ export function readPreferences(path: string = currentPreferencesPath()): Prefer
     ...(engine === undefined ? {} : { engine }),
     ...(transport === undefined ? {} : { transport }),
     ...(reviewerTransport === undefined ? {} : { reviewer_transport: reviewerTransport }),
+    ...(authoringModel === undefined ? {} : { authoring_model: authoringModel }),
     ...(Object.keys(selected).length === 0 ? {} : { selected }),
   };
 }
@@ -190,6 +203,8 @@ export interface PreferenceChoice {
   readonly transport?: string;
   /** The same for the reviewing vehicle; "" clears it. */
   readonly reviewerTransport?: string;
+  /** This person's own authoring model; "" clears it. */
+  readonly authoringModel?: string;
   /** The role whose model is being chosen, with `""` clearing the choice. */
   readonly role?: string;
   readonly selected?: string;
@@ -216,6 +231,10 @@ export function writePreferences(
     choice.reviewerTransport === undefined
       ? held.reviewer_transport
       : optionalString(choice.reviewerTransport);
+  const authoringModel =
+    choice.authoringModel === undefined
+      ? held.authoring_model
+      : optionalString(choice.authoringModel);
   const selected: Record<string, string> = { ...(held.selected ?? {}) };
   if (choice.role !== undefined && choice.selected !== undefined) {
     const model = optionalString(choice.selected);
@@ -229,6 +248,7 @@ export function writePreferences(
     ...(engine === undefined ? {} : { engine }),
     ...(transport === undefined ? {} : { transport }),
     ...(reviewerTransport === undefined ? {} : { reviewer_transport: reviewerTransport }),
+    ...(authoringModel === undefined ? {} : { authoring_model: authoringModel }),
     ...(Object.keys(selected).length === 0 ? {} : { selected }),
   };
   mkdirSync(dirname(path), { recursive: true });

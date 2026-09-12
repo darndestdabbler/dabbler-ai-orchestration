@@ -2,7 +2,7 @@
 // in dependency order, with who-uses-whom derived and never declared.
 
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -15,7 +15,12 @@ import {
   type CatalogModel,
 } from "../src/catalog.ts";
 import { configure } from "../src/cli/configure.ts";
-import { configurationNode, project, writeProjection } from "../src/projection.ts";
+import {
+  ENUMERATION_CLI_ALIASES,
+  configurationNode,
+  project,
+  writeProjection,
+} from "../src/projection.ts";
 import { chosenEngine, writePreferences } from "../src/preferences.ts";
 import {
   ROLE_AUXILIARY_REVIEWER,
@@ -1110,12 +1115,27 @@ describe("what a session would be run with", () => {
       withoutOverlay(root);
 
       const node = configurationNode(root);
-      const authoring = node["authoring"] as Role & { engine: string | null };
+      const authoring = node["authoring"] as Role & {
+        engine: string | null;
+        enumeration?: string;
+        note?: string;
+      };
       assert.equal(authoring.engine, "claude-code");
+      // **The engine's own record, not the machine's vehicle.** This machine
+      // is on its seat, and the seat lists two Anthropic ids -- but the
+      // authoring model is spent at `claude`, which refuses five of the eight
+      // Anthropic ids a seat lists. Nothing can be enumerated for Claude Code
+      // here (no Anthropic key), so what stands is the CLI's own always-
+      // accepted aliases, marked as the floor rather than as a reading.
       assert.deepEqual(
         authoring.candidates.map((candidate) => candidate.model).sort(),
-        ["claude-haiku-4.5", "claude-opus-5"],
+        ["haiku", "opus", "sonnet"],
       );
+      assert.equal(authoring.enumeration, ENUMERATION_CLI_ALIASES);
+      assert.match(String(authoring.note), /always-accepted aliases/);
+      // And the list says what it is: a suggestion, with the CLI the
+      // authority. An enumeration cannot prove what the installed CLI knows.
+      assert.match(String(authoring.note), /suggestion/);
 
       // And what the label the deleted rules were replaced BY is derived
       // from is on the row. Claude Code's `session start` takes no `--model`,
@@ -1136,6 +1156,131 @@ describe("what a session would be run with", () => {
     } finally {
       // The engine is a preference and `withoutOverlay` clears selections
       // only, so it is cleared here rather than left to narrow a later run.
+      writePreferences({ engine: "" });
+      withoutOverlay(root);
+      ungit();
+      restore();
+    }
+  });
+
+  it("narrows by the engine in flight, and by the preference once that session is over", () => {
+    // Found by driving the pane. `orchestratorOf` fell back to the LAST
+    // session's orchestrator, so a COMPLETED session's engine went on
+    // narrowing the list for the next one -- and where that engine was one
+    // nothing could narrow by, every model in the catalog was offered to
+    // Claude Code while the Vehicle leaf directly above read `claude-code`.
+    const root = tempDir("configuration-");
+    const restore = onApi(root);
+    const ungit = inRepository(root);
+    try {
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic", "google", "openai"] },
+        models: [
+          catalogModelRow("claude-opus-5", "anthropic"),
+          catalogModelRow("gpt-5.6-terra", "openai"),
+        ],
+        retired: [],
+      });
+      writePreferences({ engine: "claude-code" });
+      withoutOverlay(root);
+      // A ledger whose only session is OVER, run by an engine this framework
+      // cannot narrow a vendor by.
+      mkdirSync(join(root, "docs", "sessions"), { recursive: true });
+      writeFileSync(
+        join(root, "docs", "sessions", "sessions.json"),
+        JSON.stringify({
+          schemaVersion: 5,
+          sessions: [
+            {
+              number: 1,
+              title: "Done",
+              status: "complete",
+              orchestrator: { engine: "human", provider: "anthropic" },
+            },
+          ],
+        }),
+        "utf8",
+      );
+
+      const authoring = configurationNode(root)["authoring"] as Role & {
+        engine: string | null;
+      };
+      // The preference decides, because nothing is in flight.
+      assert.equal(authoring.engine, "claude-code");
+      assert.deepEqual(
+        authoring.candidates.map((candidate) => candidate.model).sort(),
+        ["claude-opus-5"],
+      );
+    } finally {
+      writePreferences({ engine: "" });
+      withoutOverlay(root);
+      ungit();
+      restore();
+    }
+  });
+
+  it("reads the authoring list from the engine's own record, whatever the machine's vehicle is", () => {
+    // The divergence, at its source. The list was read from whatever
+    // transport the machine was set to and then SPENT at the engine's CLI,
+    // and the two spell models differently: of the eight Anthropic ids a
+    // Copilot seat lists, `claude` refuses five. Here the machine is on its
+    // seat and both records hold Anthropic models under different spellings
+    // -- the authoring row takes the one its CLI is spelled by, and the
+    // reviewing row keeps taking the machine's, because a reviewer is
+    // dispatched by the router and not by the engine.
+    const root = tempDir("configuration-");
+    const restore = onVehicle(root, TRANSPORT_COPILOT_CLI, withKeys());
+    const ungit = inRepository(root);
+    try {
+      setSeatIdentity(SEAT);
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        // The seat's spellings, five of eight of which `claude` refuses.
+        models: [
+          catalogModelRow("claude-haiku-4.5", "anthropic"),
+          catalogModelRow("claude-opus-4.8", "anthropic"),
+          catalogModelRow("gpt-5.6-sol", "openai"),
+        ],
+        retired: [],
+      });
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic", "google", "openai"] },
+        models: [
+          catalogModelRow("claude-opus-5", "anthropic"),
+          catalogModelRow("claude-sonnet-5", "anthropic"),
+          catalogModelRow("gpt-5.6-terra", "openai"),
+        ],
+        retired: [],
+      });
+      writePreferences({ engine: "claude-code" });
+      withoutOverlay(root);
+
+      const node = configurationNode(root);
+      const authoring = node["authoring"] as Role & { enumeration?: string };
+      assert.deepEqual(
+        authoring.candidates.map((candidate) => candidate.model).sort(),
+        ["claude-opus-5", "claude-sonnet-5"],
+      );
+      // Not the floor: something was enumerated, so the aliases stay out of
+      // the way. A floor that fired beside a real reading would be three
+      // rows nobody's machine actually offered.
+      assert.notEqual(authoring.enumeration, ENUMERATION_CLI_ALIASES);
+
+      // The reviewing role is unmoved: it is dispatched over the machine's
+      // reviewing vehicle, which is the seat, and the engine has no say in
+      // what may review the work.
+      const primary = node["primaryReviewer"] as Role;
+      assert.ok(
+        primary.candidates.some((candidate) => candidate.model === "gpt-5.6-sol"),
+        primary.candidates.map((candidate) => candidate.model).join(", "),
+      );
+    } finally {
       writePreferences({ engine: "" });
       withoutOverlay(root);
       ungit();

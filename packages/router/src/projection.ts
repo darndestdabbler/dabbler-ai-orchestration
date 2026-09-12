@@ -18,7 +18,9 @@ import { basename, dirname, join, resolve } from "node:path";
 import { readModuleSessionMarker } from "./checkout.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
 import {
+  TRANSPORT_API,
   TRANSPORT_COPILOT_CLI,
+  explainAuthoringModel,
   explainReviewingTransport,
   explainTransport,
   loadConfig,
@@ -35,12 +37,11 @@ import {
   type FreshnessRow,
   type RetiredModel,
 } from "./discovery.ts";
-import { installedEngines } from "./engines.ts";
+import { engineAliases, installedEngines } from "./engines.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { readExposure } from "./exposure.ts";
 import { platformNewlines } from "./journal.ts";
 import { PREFERENCES_FILENAME, chosenEngine } from "./preferences.ts";
-import { SETTING_AUTHORING_MODEL, settingValue } from "./settings.ts";
 import { dumps } from "./pythonJson.ts";
 import { readBundleRecords } from "./land.ts";
 import { type ModuleEntry, type SolutionShape, consumersOf, ManifestError, solutionShape } from "./modules.ts";
@@ -513,6 +514,46 @@ const ENGINE_PROVIDERS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * Which record an engine's own list is read from.
+ *
+ * **The engine's, not the machine's.** The list was read from whatever
+ * transport the machine was set to and then spent at the engine's CLI, and
+ * the two spell models differently: of the eight Anthropic ids a Copilot
+ * seat lists, Claude Code refuses five (`claude-fable-5.1`,
+ * `claude-opus-4.8`, `claude-opus-4.8-fast`, `claude-opus-4.7`,
+ * `claude-haiku-4.5`, measured 2026-09-12). Reading for the engine removes
+ * that divergence at its source rather than translating between the two
+ * spellings, which is a table that goes stale the week a vendor ships
+ * anything.
+ *
+ * A seat's own block is what `copilot --model` accepts by construction --
+ * the seat stated it. An engine not named here reads the machine's own
+ * vehicle, which is the old behaviour and the honest one for a CLI nobody
+ * has measured.
+ */
+const ENGINE_ENUMERATION: Readonly<Record<string, string>> = {
+  "claude-code": TRANSPORT_API,
+  codex: TRANSPORT_API,
+  copilot: TRANSPORT_COPILOT_CLI,
+};
+
+/** The enumeration marker for a list that is the CLI's aliases and no reading. */
+export const ENUMERATION_CLI_ALIASES = "cli-aliases";
+
+/**
+ * Said once, wherever an authoring list is offered.
+ *
+ * Claude Code validates against its own bundled catalog and says so when it
+ * refuses -- *"isn't described by this version's model catalog"* -- so no
+ * enumeration this framework can take proves what the installed CLI
+ * supports. The list is a suggestion; the launch is the authority.
+ */
+export const AUTHORING_LIST_IS_A_SUGGESTION =
+  "This list is read from this machine's catalog and is a suggestion: the " +
+  "engine's CLI validates against its own bundled catalog and refuses what " +
+  "it does not know, which no reading here can predict.";
+
+/**
  * A role name nothing declares, which resolves to the whole enumeration.
  *
  * An undeclared role has no preference order, no provider set and no pin, so
@@ -532,20 +573,47 @@ export const ROLE_EVERY_MODEL = "every-model";
  * session, and every surface that appeared to choose one was offering
  * something the ledger would not honour.
  */
-export function orchestratorOf(root: string): { engine: string | null; model: string | null } {
+export function orchestratorOf(root: string): {
+  engine: string | null;
+  model: string | null;
+  /**
+   * The provider the session in flight declared at `session start`.
+   *
+   * Read because a SEAT fronts many providers, so the engine cannot supply
+   * it and the catalog cannot either until the seat has answered -- and
+   * without it the cross-provider label, the whole replacement for three
+   * rules session 151 deleted, renders on no row at all. The ledger has
+   * carried it since the session was registered.
+   */
+  provider: string | null;
+} {
   try {
     const raw = readRawSessionState(sessionsDirFor(root));
     const sessions = Array.isArray(raw?.["sessions"]) ? (raw?.["sessions"] as Node[]) : [];
-    const row = sessions.find((entry) => entry["status"] === "in-progress") ?? sessions.at(-1);
+    // **The session IN FLIGHT, and no other.** It fell back to the last row,
+    // and a completed session's identity is a fact about THAT session rather
+    // than about the next one -- so after a close the pane narrowed the
+    // authoring list by an engine that had finished running, while the
+    // Vehicle leaf directly above it read the operator's own preference.
+    // Two leaves of one node, from two places, disagreeing: the exact shape
+    // sessions 131 and 132 were about, coming back through another door.
+    // Found by driving the pane, where a fixture's finished session named
+    // an engine nothing could narrow by and every model was offered to
+    // Claude Code.
+    const row = sessions.find((entry) => entry["status"] === "in-progress");
     const block: Node =
       row !== undefined && typeof row["orchestrator"] === "object" && row["orchestrator"] !== null
         ? (row["orchestrator"] as Node)
         : {};
     const text = (value: unknown): string | null =>
       typeof value === "string" && value.trim() !== "" ? value.trim() : null;
-    return { engine: text(block["engine"]), model: text(block["model"]) };
+    return {
+      engine: text(block["engine"]),
+      model: text(block["model"]),
+      provider: text(block["provider"]),
+    };
   } catch {
-    return { engine: null, model: null };
+    return { engine: null, model: null, provider: null };
   }
 }
 
@@ -553,12 +621,39 @@ export function orchestratorOf(root: string): { engine: string | null; model: st
  * The authoring row: what is authoring, and what this engine could author
  * with instead.
  *
- * `chosen` is the orchestrator's own model and is therefore a REPORT. The
- * candidates are the transport's catalog narrowed to the providers this
- * engine's CLI can run, which is the only filtering an engine does.
+ * `chosen` is the orchestrator's own model and is therefore a REPORT where a
+ * session in flight declared one. The candidates are the ENGINE's own list:
+ * the record its CLI is spelled by, narrowed to the providers that CLI can
+ * run.
+ *
+ * `readingFor` rather than one reading, because which record is read is the
+ * engine's answer and not the caller's. Reading the machine's transport and
+ * spending the result at the engine's CLI is the divergence this replaces at
+ * its source: a Copilot seat lists eight Anthropic ids and Claude Code
+ * refuses five of them.
  */
-export function authoringNode(root: string, reading: RoleReading): Node {
-  const { engine: inFlight, model } = orchestratorOf(root);
+export function authoringNode(
+  root: string,
+  readingFor: (transport: string) => RoleReading,
+  /**
+   * The engine this reading is FOR, where the caller knows it and the record
+   * does not yet.
+   *
+   * `session start` is the case: it is being told which engine to register,
+   * and nothing on disk says so until it has written it. Without this the
+   * boundary check read the machine's vehicle instead of the engine's own
+   * list and refused a perfectly good model on a machine whose seat had
+   * simply never been read.
+   */
+  forEngine: string | null = null,
+  /**
+   * The authoring model this call names, where the caller knows it and the
+   * record does not yet. `session start` is the case, and the model it is
+   * given is the author every reviewing role is then measured against.
+   */
+  forModel: string | null = null,
+): Node {
+  const { engine: inFlight, model, provider: declaredProvider } = orchestratorOf(root);
   // **The ledger, and where the ledger is silent, the preference.**
   //
   // The ledger names an engine once a session has started here, so a
@@ -570,8 +665,15 @@ export function authoringNode(root: string, reading: RoleReading): Node {
   // disagreeing on exactly the machine sessions 131 and 132 were about.
   // `engineVehicleNode` already reads `inFlight ?? preferred`; this is the
   // same reading, so the two leaves cannot come apart again.
-  const engine = inFlight ?? chosenEngine();
+  const engine = forEngine ?? inFlight ?? chosenEngine();
   const vendor = engine === null ? undefined : ENGINE_PROVIDERS[engine];
+  // The record THIS engine's CLI is spelled by. An engine nobody has mapped
+  // reads the machine's own vehicle, which is where this started and is the
+  // honest answer for a CLI whose list has never been measured.
+  const reading = readingFor(
+    (engine === null ? undefined : ENGINE_ENUMERATION[engine]) ??
+      explainTransport(loadConfig(undefined, root), null, root).transport,
+  );
   const retired = reading.retired;
   // Resolved through a role NOBODY declares, which is every model the
   // transport lists in the order it listed them. It used to borrow the
@@ -579,12 +681,30 @@ export function authoringNode(root: string, reading: RoleReading): Node {
   // for that: a reviewer pin collapsed this list to one model, and the
   // reviewer's own preferences and provider set reordered and filtered a
   // list they have nothing to do with.
-  const listed = reading
+  const enumerated = reading
     .resolve(ROLE_EVERY_MODEL, null)
     .candidates.filter(
       ([modelId, provider]) =>
         !retired.has(modelId) && (vendor === undefined || provider === vendor),
     );
+  // **The floor, where nothing could be enumerated for this engine.**
+  //
+  // A Claude Code login with no Anthropic API key is an ordinary machine:
+  // the CLI is signed in and the catalog's Anthropic block cannot be read,
+  // because reading it needs a key the operator has no reason to hold. The
+  // CLI's own documented aliases are always accepted, and three rows are a
+  // choice where an empty list reads as a broken pane. It is marked as the
+  // FLOOR and never as an enumeration -- a short list presented as what this
+  // machine offers would be a worse claim than an empty one.
+  // The engine's own always-accepted names, from the engine's own module: a
+  // second copy of "what does `claude` always take" would be one copy too
+  // many, and it is the same fact that makes an alias resolving to a dated
+  // canonical id a resolution rather than a substitution.
+  const floor = engineAliases(engine);
+  const onFloor = enumerated.length === 0 && floor.length > 0;
+  const listed: Array<readonly [string, string]> = onFloor
+    ? floor.map((id) => [id, vendor ?? ""] as const)
+    : enumerated;
   // **The ledger for the session in flight; this checkout's own setting for
   // the NEXT one.**
   //
@@ -595,8 +715,10 @@ export function authoringNode(root: string, reading: RoleReading): Node {
   // a control that wrote a value no reader consumed would be a control that
   // reports success and changes nothing. `declaredAtStart` below says which
   // of the two this is, so a report is never read as a choice.
-  const configured = settingValue(root, SETTING_AUTHORING_MODEL);
-  const declared = model ?? configured;
+  // The four-layer order, not one file: this checkout's committed setting
+  // outranks this person's own default, exactly as it does for a vehicle.
+  const configured = explainAuthoringModel(forModel, root).transport;
+  const declared = model ?? (configured === "" ? null : configured);
   const chosen =
     declared === null
       ? null
@@ -621,12 +743,15 @@ export function authoringNode(root: string, reading: RoleReading): Node {
     // compares it with the candidate's own `provider`. What it is NOT enough
     // for is the same-model refusal, which needs a model identifier Claude
     // Code does not report -- that stays asserted at the wire.
+    // The catalog's word for the chosen model, then the ledger's own -- a
+    // SEAT fronts many providers, so the engine below cannot answer for one
+    // and the catalog cannot either until the seat has been read -- then the
+    // engine's, for a CLI that runs one vendor and nothing else.
     provider:
       chosen !== null && chosen[1] !== ""
         ? chosen[1]
-        : engine === null
-          ? null
-          : (ENGINE_PROVIDERS[engine] ?? null),
+        : (declaredProvider ??
+          (engine === null ? null : (ENGINE_PROVIDERS[engine] ?? null))),
     // True while a session is in flight and its engine declared a model:
     // that row REPORTS and cannot be changed, because the ledger already
     // carries it. False means the row shows what this checkout chose for the
@@ -643,8 +768,17 @@ export function authoringNode(root: string, reading: RoleReading): Node {
     ),
     excludes: [],
     fellThrough: false,
-    enumeration: reading.enumeration,
-    unavailable: reading.unavailable,
+    enumeration: onFloor ? ENUMERATION_CLI_ALIASES : reading.enumeration,
+    // Said once, wherever an authoring list is offered: what is here is a
+    // suggestion, and the CLI is the authority. On the floor the reading's
+    // own "this machine has read nothing" sentence goes with it -- the list
+    // is no longer empty and that sentence would read as a contradiction --
+    // and what replaces it says where these three came from.
+    unavailable: onFloor ? null : reading.unavailable,
+    note: onFloor
+      ? "Nothing could be enumerated for this engine here, so these are the " +
+        `CLI's own always-accepted aliases. ${AUTHORING_LIST_IS_A_SUGGESTION}`
+      : AUTHORING_LIST_IS_A_SUGGESTION,
   };
 }
 
@@ -738,8 +872,15 @@ function engineVehicleNode(root: string): Node {
  * work and changed nothing. What the two roles differ in is what they may
  * not BE; how they are reached is one question.
  */
-function reviewingVehicleNode(config: RouterConfig): Node {
-  const reading = explainReviewingTransport(config);
+function reviewingVehicleNode(config: RouterConfig, root: string): Node {
+  // The ROOT this reading was asked about, not wherever this process is
+  // standing. `explainTransport` and its reviewing twin fall back to
+  // `projectRoot()`, which is the cwd's repository -- so a reading taken for
+  // repository B reported repository A's vehicle and named A's layer as the
+  // one that decided. Session 157 fixed exactly this shape in the round's
+  // ladder; it survived here, in the reading the pane and `dabbler
+  // configuration explain` both render.
+  const reading = explainReviewingTransport(config, null, root);
   const presence = transportPresence(config);
   return {
     kind: VEHICLE_TRANSPORT,
@@ -782,7 +923,34 @@ function recordNode(row: FreshnessRow): Node {
  * an unknown key in an overlay, a transport spelled wrong -- and a pane that
  * went blank over it would hide the one sentence that says how to fix it.
  */
-export function configurationNode(root: string): Node {
+/** What a caller knows that the record does not say yet. */
+export interface ConfigurationReadingOptions {
+  /**
+   * The engine this reading is for.
+   *
+   * `session start` knows which engine it is registering and nothing on disk
+   * says so until it has written it, so the boundary check would otherwise
+   * read the machine's vehicle in place of the engine's own list. Absent
+   * everywhere else, where the ledger and the preference answer it.
+   */
+  readonly engine?: string | null;
+  /**
+   * The authoring model this call names.
+   *
+   * A `--model` typed at `session start` is the author of the session about
+   * to begin, and nothing on disk says so until it has been registered. So
+   * the reviewing roles were being resolved against the model the CHECKOUT
+   * had configured instead -- and the one rule a reviewer is held to, that
+   * it may not be the author, was applied against the wrong author. Naming a
+   * reviewer's own model on that call went through.
+   */
+  readonly authoringModel?: string | null;
+}
+
+export function configurationNode(
+  root: string,
+  options: ConfigurationReadingOptions = {},
+): Node {
   let config: RouterConfig;
   try {
     config = loadConfig(undefined, root);
@@ -791,12 +959,12 @@ export function configurationNode(root: string): Node {
   }
   const engines = installedEngines();
   try {
-    const transport = explainTransport(config);
-    // The authoring model runs inside the engine's CLI, so the list it is
-    // read from is the one the transport in force enumerates; the reviewing
-    // roles are read through their OWN vehicles, which is the whole of this
-    // step. One reading per transport, so two roles on one transport share
-    // the one file read rather than repeating it.
+    const transport = explainTransport(config, null, root);
+    // The authoring model runs inside the ENGINE's CLI, so the list it is
+    // read from is the engine's own rather than the machine's; the reviewing
+    // roles are read through their OWN vehicle. One reading per transport,
+    // so two roles on one transport share the one file read rather than
+    // repeating it.
     const readings = new Map<string, RoleReading>();
     const readingFor = (name: string): RoleReading => {
       const held = readings.get(name);
@@ -811,13 +979,18 @@ export function configurationNode(root: string): Node {
     // named by none of its four callers -- so the pane had two authors, one
     // of which changed nothing, and it filtered the reviewer list against
     // the wrong one.
-    const authoring = authoringNode(root, readingFor(transport.transport));
+    const authoring = authoringNode(
+      root,
+      readingFor,
+      options.engine ?? null,
+      options.authoringModel ?? null,
+    );
     const author = authoring["chosen"] as Node | null;
     const authorModel = author === null ? null : String(author["model"]);
     // ONE reviewing vehicle, read once and carried by both reviewing rows.
     // Two readings put two controls in front of an operator for one value,
     // and only one of them could be set.
-    const reviewingVehicle = reviewingVehicleNode(config);
+    const reviewingVehicle = reviewingVehicleNode(config, root);
     const reviewingTransport = String(reviewingVehicle["chosen"]);
     /** A reviewing role as this machine would resolve it, on the reviewing vehicle. */
     const reviewingNode = (role: string): Node => ({

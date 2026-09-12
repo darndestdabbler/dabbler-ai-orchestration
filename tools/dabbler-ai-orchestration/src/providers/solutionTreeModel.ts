@@ -216,6 +216,17 @@ export interface ConfigurationRole {
    * used and never silently substituted.
    */
   selected?: string | null;
+  /**
+   * The AUTHORING row only: true while a session in flight declared this
+   * model at `session start`.
+   *
+   * It marks the row a REPORT rather than a choice. The ledger carries the
+   * identity from the moment a session is registered, so offering to change
+   * it would be offering something the record will not honour -- and the
+   * refusal has to name that, because a control that silently declines is
+   * the shape this section shipped broken in.
+   */
+  declaredAtStart?: boolean;
   chosen: ConfigurationModel | null;
   candidates: ConfigurationModel[];
   /** Models the record says are no longer served: offered to nobody. */
@@ -232,6 +243,17 @@ export interface ConfigurationRole {
   enumeration?: string;
   /** Why this transport can offer nothing, when it cannot. */
   unavailable?: string | null;
+  /**
+   * What the reading itself says about this list, in the router's words.
+   *
+   * The authoring row's carries the one sentence that has to travel with
+   * every authoring list: it is a suggestion, and the engine's CLI is the
+   * authority -- Claude Code validates against its own bundled catalog and
+   * says so when it refuses, which no reading here can predict. Rendered
+   * rather than restated, so the row and the pick cannot come to say
+   * different things about the same list.
+   */
+  note?: string;
   /**
    * What narrows this role at the dispatch, in the router's words.
    *
@@ -461,10 +483,24 @@ export const ROLE_LABELS: Record<ConfigRoleName, string> = {
   auxiliaryReviewer: "Auxiliary Model",
 };
 
+/**
+ * The command each model row is, one per role.
+ *
+ * Three ids and not one, because a `view/item/context` entry carries no
+ * arguments: a single command would have to guess which of the three models
+ * a right-click on *Reviewing AI* meant, and guessing on the operator's
+ * behalf is how a control comes to do something other than what it says.
+ */
+export const ROLE_COMMANDS: Record<ConfigRoleName, string> = {
+  authoring: "dabblerSolution.setAuthoringModel",
+  primaryReviewer: "dabblerSolution.setPrimaryReviewerModel",
+  auxiliaryReviewer: "dabblerSolution.setAuxiliaryReviewerModel",
+};
+
 /** What each role IS, in one sentence, on the row that sets it. */
 export const ROLE_HELP: Record<ConfigRoleName, string> = {
   authoring:
-    "The engine's own model, declared when the session was registered. It is reported here and set there: changing it in this pane would not reach the run.",
+    "The model the engine's own CLI is launched on. It is set here for the NEXT session; while a session is in flight this row reports what that session declared, because the ledger carries its identity from the moment it was registered.",
   primaryReviewer:
     "The reviewer of record, defined as NOT THE AUTHOR: the only model refused is the authoring model itself, and every other is offered and labelled. Its verdict blocks a close.",
   auxiliaryReviewer:
@@ -483,9 +519,23 @@ export const REVIEWER_HELP =
   "A different provider reduces the chance the reviewer shares the author's blind spots.";
 
 /** One model as a row reads it: the id that is dispatched, and whose it is. */
-function modelText(model: ConfigurationModel | null | undefined): string {
-  if (!model) return "nothing resolves";
-  return `${model.model} (${model.provider})`;
+/**
+ * What a model row says it is, or why it says nothing.
+ *
+ * **"Nothing resolves" and "nobody has chosen" are different facts**, and
+ * only one of them is a problem. A reviewing role with no chosen model
+ * really has nothing: its preference order ran and picked none. The
+ * AUTHORING row has no preference order -- a model there is chosen or it is
+ * not -- so a machine holding four models it could author with read
+ * "nothing resolves" until this told the two apart, which is the pane
+ * reporting a fault where there is a choice waiting to be made.
+ */
+function modelText(
+  model: ConfigurationModel | null | undefined,
+  offered = 0,
+): string {
+  if (model) return `${model.model} (${model.provider})`;
+  return offered > 0 ? "not chosen" : "nothing resolves";
 }
 
 /** What the word "vehicle" is for, on the kind of vehicle this role has. */
@@ -1179,7 +1229,11 @@ export function descriptorFor(
           .filter((line) => line !== "")
           .join("\n\n"),
         icon: {
-          id: authoring ? "person" : "plug",
+          // ONE icon on both Vehicle rows. They answer one question -- what
+          // carries this participant -- and two glyphs made them read as two
+          // different kinds of setting, which is exactly the reading this
+          // section was reorganised to stop.
+          id: "plug",
           ...(shadowed.length > 0
             ? { tone: "attention" as const }
             : chosen
@@ -1197,7 +1251,13 @@ export function descriptorFor(
       return {
         id: `config:role:${node.role}`,
         label: ROLE_LABELS[node.role],
-        description: `${modelText(role?.chosen)}${role?.fellThrough ? " ⚠" : ""}`,
+        description: `${modelText(
+          role?.chosen,
+          // Only the authoring row: a reviewing role resolves its own head
+          // from the preference order, so a null chosen there really is
+          // nothing resolving rather than nobody having picked.
+          authoring ? (role?.candidates.length ?? 0) : 0,
+        )}${role?.fellThrough ? " ⚠" : ""}`,
         tooltip: [
           ROLE_HELP[node.role],
           // What narrows this role at the round, in the router's own words
@@ -1221,9 +1281,13 @@ export function descriptorFor(
           // call cannot reach is a stop that names it, not a fall to the
           // next model.
           role?.selected
-            ? `You chose ${role.selected}. It is what the round dispatches to, and nothing is substituted for it: if this call cannot reach it, the round stops and says so.`
+            ? `You chose ${role.selected}. It is kept on this machine rather than in this repository, so it is already your own default and travels to no clone. It is what the round dispatches to, and nothing is substituted for it: if this call cannot reach it, the round stops and says so.`
             : authoring
-              ? ""
+              ? // A REPORT and a CHOICE look identical on a row that does not
+                // say which it is, and only one of the two can be changed.
+                role?.declaredAtStart
+                  ? "This session declared it at `session start`, so the row reports it. Setting one here reaches the NEXT session."
+                  : ""
               : "Nobody has chosen a model here, so the preference order decides and a stale entry in it costs a slightly newer model, never a candidate.",
           role?.fellThrough
             ? "It fell past its own preference order, so what answers is a model nobody named. That is what billed one session 364 premium requests."
@@ -1241,6 +1305,12 @@ export function descriptorFor(
                 )
                 .join(", ")}. The entry is kept, so a model that comes back is offered again.`
             : "",
+          // What the reading says about its own list, in the router's words.
+          // The authoring row's is the sentence that has to travel with every
+          // authoring list -- a suggestion, with the CLI the authority --
+          // and it is RENDERED rather than restated here, because a second
+          // copy of it is a second thing to go stale.
+          role?.note ?? "",
           // What carries this role is the Vehicle row's to say, and saying
           // it here too is the second copy of a vocabulary that drifts.
           role?.unavailable ? `Nothing can be offered here: ${role.unavailable}.` : "",
@@ -1256,7 +1326,7 @@ export function descriptorFor(
         },
         expandable: false,
         contextValue: `dabblerConfigRole;${node.role}`,
-        command: "dabblerSolution.setRoleModel",
+        command: ROLE_COMMANDS[node.role],
       };
     }
     case "memberGroup": {

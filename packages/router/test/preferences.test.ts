@@ -76,6 +76,26 @@ describe("what this machine has chosen", () => {
     assert.equal(readPreferences().engine, undefined);
   });
 
+  it("holds an authoring model beside the vehicles, and keeps the rest when one moves", () => {
+    // *Keep as my default* has to write somewhere that is not a file
+    // somebody else clones. It is the same shape as the two vehicles beside
+    // it: a personal default that applies wherever a checkout names none.
+    inTemp();
+    writePreferences({ engine: "claude-code", transport: "api" });
+    writePreferences({ authoringModel: "claude-opus-5" });
+    const held = readPreferences();
+    assert.equal(held.authoring_model, "claude-opus-5");
+    assert.equal(held.engine, "claude-code");
+    assert.equal(held.transport, "api");
+    // A model id goes in as it was given: the date suffix is what makes a
+    // pin a pin, and nothing here may generalise it away.
+    writePreferences({ authoringModel: "claude-opus-5-20260901" });
+    assert.equal(readPreferences().authoring_model, "claude-opus-5-20260901");
+    writePreferences({ authoringModel: "" });
+    assert.equal(readPreferences().authoring_model, undefined);
+    assert.equal(readPreferences().engine, "claude-code");
+  });
+
   it("survives a catalog refresh, which is the whole reason it is not in the catalog", () => {
     // A selection stored inside `ai-model-catalog.json` is a selection the
     // next free refresh wipes: that file is defined as rebuildable for

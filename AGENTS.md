@@ -82,8 +82,19 @@ refresh would spend:
   RPC `models.list`) carries per-token prices instead of a legacy multiplier.
 - **The direct-API list costs nothing**: `dabbler discovery refresh` read
   three vendors and 195 models in 2.4 seconds, billing no tokens.
-- **The Claude CLI cannot be enumerated** — no list command. Its reachable
-  set IS the Anthropic key's API enumeration. Do not maintain a third list.
+- **The Claude CLI cannot be enumerated** — no list command. Use the
+  Anthropic key's API enumeration as its list, and **do not maintain a third
+  list**: that rule stands, and the reason to keep it is that the alternative
+  is a hand-written set nobody can keep current. But the two are not the same
+  set, and the sentence here used to say they were. `claude` validates
+  against its own bundled catalog and says so when it refuses — *"isn't
+  described by this version's model catalog"* — so the API enumeration is a
+  **suggestion, and the launch is the authority**. Measured 2026-09-12: all
+  11 Anthropic ids the API lists were accepted, dated ones included, so the
+  two coincide today; a model a vendor ships before Claude Code supports it
+  would be offered and refused. Where no Anthropic key makes the enumeration
+  readable at all, `opus`, `sonnet` and `haiku` are always accepted and are
+  the floor — an empty list reads as a broken pane.
 
 **There is nothing left in this path that can bill a token.** Session 151
 deleted the prompting probe with the model registry it fed, so the question

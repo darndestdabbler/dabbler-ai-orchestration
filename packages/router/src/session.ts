@@ -45,6 +45,7 @@ import {
   loadConfig,
 } from "./config.ts";
 import {
+  configuredCredentialRefusal,
   configuredVehicleRefusal,
   freshnessWarnings,
   refreshStaleRecords,
@@ -1299,6 +1300,16 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
         );
       if (unreachable !== null) {
         writeErr(`start: refused -- ${unreachable}\n`);
+        return EXIT_USAGE;
+      }
+      // **And a CREDENTIAL somebody named that this machine does not hold.**
+      //
+      // A reference is an explicit act with a layer behind it, so a dangling
+      // one is a stop rather than a quiet fall back to the environment:
+      // which key answers decides which account is billed.
+      const danglingKey = configuredCredentialRefusal(config);
+      if (danglingKey !== null) {
+        writeErr(`start: refused -- ${danglingKey}\n`);
         return EXIT_USAGE;
       }
       // **And a MODEL somebody chose that its role cannot actually be.**

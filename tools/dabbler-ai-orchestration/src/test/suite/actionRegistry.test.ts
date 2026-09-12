@@ -364,6 +364,32 @@ const FIXTURES: Array<{
       excludes: [],
       fellThrough: false,
     },
+    credentials: [
+      {
+        provider: "anthropic",
+        displayLabel: "Anthropic",
+        variable: "DABBLER_ANTHROPIC_API_KEY",
+        fromEnvironment: true,
+        reference: null,
+        decidedBy: null,
+        held: false,
+        stop: null,
+        store: "dabbler auth set anthropic",
+        choose: "dabbler configure --credential anthropic=<name>",
+      },
+      {
+        provider: "openai",
+        displayLabel: "OpenAI",
+        variable: "DABBLER_OPENAI_API_KEY",
+        fromEnvironment: false,
+        reference: "client-a",
+        decidedBy: ".vscode/settings.json",
+        held: false,
+        stop: "openai is configured to use the credential 'client-a', and this machine holds no credential of that name.",
+        store: "dabbler auth set openai",
+        choose: "dabbler configure --credential openai=<name>",
+      },
+    ],
     records: [
       {
         record: "ai-model-catalog",

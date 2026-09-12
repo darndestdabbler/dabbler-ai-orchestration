@@ -8856,3 +8856,65 @@ The deriver at activation is the EXTENSION's own bundled router, not the CLI. Me
 One inference is marked as such in the walk record: VS Code was not watched doing it. What is measured is that the file was last written by a build that cannot emit the node, that the only other writer on this machine is the extension, and that 155 made that writer run unconditionally at activation.
 
 It is raised rather than fixed because the repair is a design question and not a patch. A projection carries no version, so a reader cannot tell an older writer's output from a newer writer's; deciding whether the extension should derive at all, or derive only through a router at least as new as the one that last wrote, is the decision owed. Publishing 2.2.0 does not make it worse -- afterwards the installed extension and the tree agree again -- which is precisely why it is recorded now, while it is still visible. Walk finding 17. FRAMEWORK, lifecycle-timed and constant.
+
+## Session 159 — The keys an operator can change without editing their environment
+
+### D277 · 2026-09-12 · Operator · A stored API key is DPAPI-encrypted in a file this application owns, not in Windows Credential Manager
+
+The operator was offered both mechanisms on 2026-09-12, with the cost of
+each stated, and chose the DPAPI-encrypted file.
+
+What is stored: an API key, encrypted by PowerShell's
+`ConvertFrom-SecureString` with no `-Key`, which is DPAPI under the current
+user's master key, in a file this application owns in the same per-user data
+directory as the model catalog and the preferences (`%LOCALAPPDATA%\dabbler\`
+on Windows).
+
+What it is not: Windows Credential Manager. The protection underneath is the
+same user-scoped DPAPI, so the security claim is unchanged; the visibility is
+not. One of these credentials does not appear in the Windows control panel,
+and nothing outside this framework will list, audit or remove it. That is the
+whole of what was traded away, and it is written down rather than implied.
+
+Why the alternative was declined: retrieval from Credential Manager needs
+`CredRead` P/Invoked through an embedded C# type compiled by `Add-Type` in a
+spawned `powershell.exe` on every read — `cmdkey /list` shows entries and
+never returns a password. It adds no npm dependency and a real failure
+surface, on exactly the locked-down machines where it matters, and it buys a
+control-panel entry. Ground rule (c), prefer the simpler and more reliable
+option for this repository.
+
+Scope, and what it costs an operator: the file is decryptable only by this
+user on this machine. It is not a backup and it is not portable — a new
+profile or a rebuilt machine means storing the keys again.
+
+Measured on this machine the same day: the round trip recovers the plaintext
+exactly under both PowerShell 7.6.5 and Windows PowerShell 5.1.26100.9168,
+producing an identical 492-character blob, at about 300 ms per spawn. Two
+constraints fell out of that and are binding on the implementation: the
+spawn must not inherit this machine's `PSModulePath`, because with
+PowerShell 7's module directories ahead of 5.1's the Security module fails to
+autoload and `ConvertFrom-SecureString` is not a command at all; and the
+store is decrypted once per process rather than once per read, because
+`providerReachable` is called in loops.
+
+macOS uses `security` and Linux uses `secret-tool`. A platform with neither
+has no store: `dabbler auth set` refuses and names the provider's environment
+variable, and never writes a plain file, because a store that silently
+degrades to plaintext is worse than no store at all. Neither path was
+measured — this project has one machine and it runs Windows — and the release
+notes say so.
+
+The full page is `docs/design/credential-store.md`.
+
+### D278 · 2026-09-12 · Orchestrator · A session-60 run log holds all three provider keys in plaintext; it is gitignored, bounded to one file, and the keys should be rotated
+
+Found by session 159's credential-store walk, whose last reading greps the run's own record for the secret it had just stored. The fake key was absent everywhere. The REAL keys were not: `.dabbler/runs/s60/driver/engine-07.log`, written 2026-08-31, carries a block headed '== keys present' that prints each DABBLER_*_API_KEY variable's VALUE rather than whether it is set, for all three providers.
+
+The exposure was measured rather than assumed. It is one file: every other file under .dabbler/ was scanned for each of the three key literals and none holds one. It is not committed and never has been -- .dabbler/ is gitignored whole, and 'git log --all -S' over each literal returns no commit. The code that wrote it is gone: nothing under packages/ or tools/ prints that block today, and no run after session 60 produced one. So this is a historical artefact and not a live leak path.
+
+What it still is: a plaintext credential in the working tree of a repository that AI engines are given read access to, and it was read during this walk, which means the Anthropic key has also passed through this session's own transcript.
+
+Session 159 did not delete it. The machine owns that record, and deleting a session's log to tidy away a finding is the wrong instinct even when the content is wrong. Two things are put to the operator: remove or redact that one file, and rotate the three keys, which is the only action that makes the exposure stop mattering regardless of what else is on disk.
+
+Reproduced by searching .dabbler/ for the value of each DABBLER_*_API_KEY.

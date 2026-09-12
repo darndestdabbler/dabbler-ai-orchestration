@@ -10,6 +10,94 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.4.0] — 2026-09-12
+
+### Keep a provider key on this machine instead of in every shell
+
+Until now the only way to give Dabbler an API key was an environment
+variable, which means exporting it in every shell you work from and putting
+it somewhere your shell reads at startup. From this version a key can live in
+your machine's own credential store under a name you choose, and a repository
+names the credential it uses rather than holding a key.
+
+Three verbs, and no fourth:
+
+- `dabbler auth set <provider>` asks for the key with the echo off and stores
+  it. `--name <label>` gives it a name when you keep more than one for a
+  vendor; `--from-env` takes the key already in your environment instead of
+  making you paste it again.
+- `dabbler auth list` shows what this machine holds: the name, the provider
+  and when it was stored. Never a value, and never part of one.
+- `dabbler auth remove <name>` forgets it.
+
+**The key is never an argument.** It is typed at a prompt that does not echo
+it, or piped in on stdin. A key on a command line is in your shell's history
+and in every process listing on the machine for as long as the command runs.
+
+Which credential a repository uses is a setting like any other, and it holds
+a NAME:
+
+    dabbler configure --credential openai=client-a
+
+That writes `dabbler.credentials.openai` into the repository's
+`.vscode/settings.json`, which is safe to commit — it says which credential,
+not what it is. Add `--mine` to make it your own default instead, for every
+repository that does not name one. In the Solution Explorer, the
+Configuration section now has a row per provider saying which credential is
+in force, which layer chose it, and whether this machine holds it; clicking
+one opens a terminal that asks for the key.
+
+### Nothing you do today stops working
+
+**The environment still wins.** The order is: the environment variable, then
+the repository's credential, then your own default. If your machine or your
+CI supplies `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY` or
+`DABBLER_GEMINI_API_KEY`, that is what is used and nothing about this release
+reaches you. It is first deliberately: that is how CI injects a key, and a
+precedence you can state in one sentence is the only kind worth having.
+
+A credential named by a setting that this machine does not hold is a **stop**
+that names the layer that chose it and the command that repairs it — not a
+quiet fall back to whatever else is lying around, because which key answers
+decides which account is billed.
+
+### What the store actually is, on each platform
+
+Said plainly, because it is easy to describe wrongly and a reader who is
+wrong about it is wrong about who can read their key:
+
+- **Windows** — a file Dabbler owns, encrypted with DPAPI under your account,
+  beside its other per-user data. **This is not Windows Credential Manager.**
+  The protection underneath is the same user-scoped DPAPI, so the security is
+  what you would expect; the difference is visibility. These credentials do
+  not appear in the Windows control panel, and nothing outside Dabbler will
+  list or remove them. They are also not portable: another account cannot
+  decrypt them, and neither can the same account on another machine, so a
+  rebuilt profile means storing the keys again.
+- **macOS** — the system keychain, through `security`. A credential stored
+  this way is visible in Keychain Access.
+- **Linux** — the Secret Service keyring, through `secret-tool`.
+- **A machine with none of them** — `dabbler auth set` refuses and points you
+  back at the environment variable. It does not write a plain file. A store
+  that quietly degrades to plaintext is worse than no store, because you
+  would believe something was protecting you.
+
+macOS and Linux ship on their code and on that refusal: this project has one
+machine and it runs Windows, so the Windows path is the one that has been
+driven end to end.
+
+### Also
+
+- A key pasted where a credential's NAME belongs is refused rather than
+  written, and the refusal does not echo it back. The same goes for a key
+  typed into `api_key_env`, which reads as nothing at all and used to look
+  like "no key" over a file you could plainly see the key in.
+- `dabbler configuration options` now names a provider whose models it is
+  not offering, and why, instead of dropping them from the list in silence.
+- The refusal you get when a Copilot seat's model cannot be resolved used to
+  send you to a model registry that no longer exists. It names the model
+  catalog, and `dabbler discovery refresh`, which costs nothing.
+
 ## [2.3.0] — 2026-09-12
 
 ### Read this first if you set `DABBLER_TRANSPORT`

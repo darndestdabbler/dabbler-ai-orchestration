@@ -19,7 +19,7 @@
 import { truthy, type RouterConfig } from "./config.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
 import { selectedModel } from "./preferences.ts";
-import { resolveSecret } from "./secretResolver.ts";
+import { providerSecret } from "./credentials.ts";
 
 // --- The reviewing roles, named by voice ------------------------------------
 //
@@ -119,8 +119,11 @@ export function providerReachable(
 ): boolean {
   const provider = record(config["providers"])[providerName];
   if (!isRecord(provider) || !flagOn(provider, "enabled")) return false;
+  // A provider that needs a key is reachable only with one, and where that
+  // key comes from -- the environment, or a credential this solution names
+  // -- is `providerSecret`'s to decide and not this function's.
   const envVar = provider["api_key_env"];
-  if (envVar && !resolveSecret(String(envVar))) return false;
+  if (envVar && !providerSecret(provider)) return false;
   return true;
 }
 

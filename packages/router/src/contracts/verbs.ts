@@ -181,6 +181,15 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "this repository at its remote: set which branch is the trunk",
   },
   {
+    // Engine-facing, and it has to stay that way: a secret is read from a
+    // hidden prompt or from stdin, and neither of those is a thing a pane
+    // can offer without the value passing through the editor's own buffers.
+    // The pane's row opens a terminal on this verb instead of running it.
+    verb: "auth",
+    extensionFacing: false,
+    summary: "the keys this machine holds, by name: set, list, remove",
+  },
+  {
     // The pane's Configuration section is what calls it, which is why it is
     // extension-facing: an operator choosing a model clicks a row, and the
     // row's command is this verb. It stays typeable because the same choice

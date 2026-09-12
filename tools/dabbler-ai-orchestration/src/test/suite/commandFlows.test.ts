@@ -48,6 +48,7 @@ import { ROUTER_VERSION } from "dabbler-ai-router";
 import { prerequisiteReport, type ToolProbe } from "../../commands/troubleshoot";
 import {
   refreshRecord,
+  storeCredential,
   setAsMyDefault,
   setRoleModel,
   type ConfigurationUi,
@@ -1758,6 +1759,75 @@ suite("the Configuration node's refresh", () => {
     // offer, and the operator found out in the terminal afterwards.
     assert.ok(asked.includes("While a session is in flight"), asked);
     assert.ok(asked.includes("verifier pool"), asked);
+  });
+
+  test("asks for a key in a terminal and never in this window", async () => {
+    // The whole design of the row: an input box's contents live in the
+    // editor's own buffers and its undo history, and none of that is
+    // somewhere this framework can reach in to clear afterwards. What the
+    // command does is open a terminal on the verb that asks.
+    const projection = {
+      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+      modules: [],
+      configuration: {
+        credentials: [
+          {
+            provider: "openai",
+            displayLabel: "OpenAI",
+            variable: "DABBLER_OPENAI_API_KEY",
+            fromEnvironment: false,
+            reference: "client-a",
+            decidedBy: ".vscode/settings.json",
+            held: false,
+            stop: "openai is configured to use the credential 'client-a'.",
+            store: "dabbler auth set openai",
+            choose: "dabbler configure --credential openai=<name>",
+          },
+        ],
+      },
+    } as unknown as Projection;
+
+    const ran: Array<readonly string[]> = [];
+    let asked = 0;
+    let picked = 0;
+    const ui: ConfigurationUi = {
+      // Nothing is confirmed and nothing is picked: this command writes
+      // nothing until a person types into the terminal it opens, and
+      // closing that terminal is the no. A modal in front of it would be
+      // two questions for one answer -- and the walk found the practical
+      // half of the same point, where the modal blocked the window.
+      confirm: () => {
+        asked += 1;
+        return Promise.resolve(true);
+      },
+      runVerb: (_title, _cwd, args) => {
+        ran.push(args);
+        return Promise.resolve(0);
+      },
+      // A pick would be a value collected in this window, which is the one
+      // thing this command may not do.
+      pick: () => {
+        picked += 1;
+        return Promise.resolve(undefined);
+      },
+      showInformationMessage: () => undefined,
+      showWarningMessage: () => undefined,
+      workspaceRoot: () => "D:/ws",
+    };
+
+    let repainted = 0;
+    await storeCredential(
+      { node: { kind: "configCredential", provider: "openai" }, projection },
+      () => (repainted += 1),
+      ui,
+    );
+    // The credential's own name goes with it, so the key lands where the
+    // committed setting is already pointing rather than under the
+    // provider's name and out of reach of the reference.
+    assert.deepStrictEqual(ran, [["auth", "set", "openai", "--name", "client-a"]]);
+    assert.strictEqual(picked, 0);
+    assert.strictEqual(asked, 0);
+    assert.strictEqual(repainted, 1);
   });
 
   test("keeps a vehicle as this person's default, and says which file and what outranks it", async () => {

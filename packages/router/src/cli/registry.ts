@@ -7,6 +7,7 @@
 
 import { affectedVerb } from "./affected.ts";
 import { agentVerb } from "./agent.ts";
+import { authVerb } from "./auth.ts";
 import { bootstrapVerb } from "./bootstrap.ts";
 import { configurationVerb } from "./configuration.ts";
 import { configureVerb } from "./configure.ts";
@@ -37,6 +38,7 @@ export type VerbHandler = (argv: string[]) => Promise<number>;
 export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   affected: affectedVerb,
   agent: agentVerb,
+  auth: authVerb,
   bootstrap: bootstrapVerb,
   configuration: configurationVerb,
   configure: configureVerb,

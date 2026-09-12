@@ -59,8 +59,9 @@ import {
 import { BUILT_IN_ENGINES } from "../engines.ts";
 import { repoRootFor } from "../journal.ts";
 import { PREFERENCES_FILENAME, selectedModel, writePreferences } from "../preferences.ts";
+import { credentialProvider, holdsCredential, looksLikeASecret } from "../credentials.ts";
 import { vehicleRefusal } from "../discovery.ts";
-import { SETTINGS_RELPATH } from "../settings.ts";
+import { CREDENTIAL_SETTING_BY_PROVIDER, SETTINGS_RELPATH } from "../settings.ts";
 import { workingDirectory } from "../workdir.ts";
 import {
   authoringNode,
@@ -89,6 +90,7 @@ function usage(): string {
     "usage: dabbler configure [-h] [--engine E] [--transport T]",
     "                         [--reviewer-transport T] [--authoring-model M]",
     "                         [--reviewer-model M] [--auxiliary-model M]",
+    "                         [--credential PROVIDER=NAME]",
     `                         [${MINE_FLAG}] [--repo-root PATH]`,
     "",
     "  what the NEXT session is run with",
@@ -124,6 +126,10 @@ function usage(): string {
     "                          every provider that has already reviewed it, and a",
     "                          selection it excludes is a stop and never a",
     "                          substitution",
+    "  --credential P=N        which stored credential this solution uses for",
+    "                          provider P. A NAME and never a key: the value is",
+    "                          in this machine's own store, put there by `dabbler",
+    "                          auth set`. An empty name clears the reference",
     `  ${MINE_FLAG}                  keep this as YOUR default rather than this`,
     `                          checkout's: --transport, --reviewer-transport and`,
     "                          --authoring-model go to the user-level",
@@ -229,6 +235,13 @@ export interface ConfigureOptions {
    * said. The checks are identical either way; only the file changes.
    */
   readonly mine?: boolean;
+  /**
+   * `provider=name`: which stored credential this solution uses.
+   *
+   * A name, never a key. An empty name clears the reference, which sends
+   * the provider back to its environment variable.
+   */
+  readonly credential?: string;
 }
 
 export interface ConfigureOutcome {
@@ -450,6 +463,94 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   // other. `--mine` keeps it on this machine; without it the choice is this
   // checkout's and is committed, which is what a solution's policy has to
   // be and what a personal preference must never become.
+  // **A credential reference: a provider and a NAME, checked as a pair.**
+  //
+  // It is not refused for naming a credential this machine does not hold.
+  // A committed setting is the solution's policy and the people it is
+  // committed for are the ones who hold the key -- refusing here would make
+  // it impossible to configure a repository for a team from a machine that
+  // is not one of theirs. The enforcement is at use: `session start` stops
+  // and the dispatch stops, both naming the layer.
+  let credentialNote: string | null = null;
+  if (options.credential !== undefined) {
+    const [rawProvider, ...rest] = options.credential.split("=");
+    const provider = (rawProvider ?? "").trim().toLowerCase();
+    const reference = rest.join("=").trim();
+    if (provider === "" || rest.length === 0) {
+      return {
+        ...empty,
+        refusal:
+          "--credential takes PROVIDER=NAME, for example " +
+          "`--credential openai=client-a`. An empty name clears the reference.",
+      };
+    }
+    const providers = config["providers"];
+    const known =
+      typeof providers === "object" && providers !== null && !Array.isArray(providers)
+        ? Object.keys(providers as Record<string, unknown>).sort()
+        : [];
+    if (!known.includes(provider)) {
+      return {
+        ...empty,
+        refusal:
+          `'${provider}' is not a provider this distribution reaches. ` +
+          `It knows ${known.join(", ")}.`,
+      };
+    }
+    if (
+      (CREDENTIAL_SETTING_BY_PROVIDER as Record<string, string | undefined>)[provider] ===
+      undefined
+    ) {
+      return {
+        ...empty,
+        refusal:
+          `there is no settings key for '${provider}', so a credential ` +
+          "cannot be named for it in this checkout. Supply its key through " +
+          "its environment variable instead.",
+      };
+    }
+    // **A key pasted where a name goes is refused, not stored.** The
+    // settings file is committed, so writing it would publish the key to
+    // everyone who clones; and the refusal does not echo it back, because
+    // a refusal that quotes the value puts it in a scrollback and a
+    // terminal's buffer.
+    if (looksLikeASecret(reference)) {
+      return {
+        ...empty,
+        refusal:
+          "that looks like a KEY rather than the name of one, and it was " +
+          "not written -- the file it would go in is committed. Store the " +
+          `key with \`dabbler auth set ${provider} --name <name>\`, which ` +
+          "asks for it without echoing it, and then name it here with " +
+          `\`dabbler configure --credential ${provider}=<name>\`.`,
+      };
+    }
+    // **A credential belongs to the vendor that issued it.** Naming one
+    // stored for another provider would send that vendor's key to this
+    // one's endpoint -- an authentication failure three layers from the
+    // setting that caused it, on an account nobody chose.
+    const storedFor = reference === "" ? null : credentialProvider(reference);
+    if (storedFor !== null && storedFor !== provider) {
+      return {
+        ...empty,
+        refusal:
+          `'${reference}' is a credential stored for ${storedFor}, so it is ` +
+          `not ${provider}'s to use and nothing was written. Store ` +
+          `${provider}'s own with \`dabbler auth set ${provider} --name ` +
+          "<name>`, or name one that was stored for it; `dabbler auth " +
+          "list` says which provider each credential here belongs to.",
+      };
+    }
+    named["credentialProvider"] = provider;
+    named["credential"] = reference;
+    if (reference !== "" && !holdsCredential(reference)) {
+      credentialNote =
+        `this machine holds no credential called '${reference}' -- the ` +
+        "setting is written and the next session that needs " +
+        `${provider} will stop until \`dabbler auth set ${provider} --name ` +
+        `${reference}\` has been run here.`;
+    }
+  }
   const personal: Record<string, string> = {};
   const settle = (key: "transport" | "reviewerTransport" | "authoringModel", value: string): void => {
     if (options.mine === true) personal[key] = value;
@@ -526,6 +627,21 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
         "rather than being substituted",
     );
   }
+  if (named["credentialProvider"] !== undefined) {
+    const provider = named["credentialProvider"] as string;
+    const reference = named["credential"] as string;
+    if (options.mine === true) {
+      writePreferences({ credentialProvider: provider, credential: reference });
+      preferenceLines.push(
+        reference === ""
+          ? `${PREFERENCES_FILENAME} no longer names your own credential for ${provider}`
+          : `${PREFERENCES_FILENAME} keeps '${reference}' as your own credential ` +
+            `for ${provider}, which applies wherever a checkout names none`,
+      );
+    } else {
+      Object.assign(choice, { credentialProvider: provider, credential: reference });
+    }
+  }
   if (engine !== undefined) {
     writePreferences({ engine });
     preferenceLines.push(
@@ -547,7 +663,11 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   tryWriteProjection(options.repoRoot);
   return {
     refusal: null,
-    changed: [...written.changed, ...preferenceLines],
+    changed: [
+      ...written.changed,
+      ...preferenceLines,
+      ...(credentialNote === null ? [] : [credentialNote]),
+    ],
     path: written.path,
     // Not a shadow any more: the variable decides nothing. An operator who
     // exported it is told so anyway, with the one command that replaces it,
@@ -576,6 +696,7 @@ export async function configureVerb(argv: string[]): Promise<number> {
     "--authoring-model",
     "--reviewer-model",
     "--auxiliary-model",
+    "--credential",
     "--repo-root",
   ];
   // A choice can be this CHECKOUT's or this PERSON's, and the difference is
@@ -622,6 +743,9 @@ export async function configureVerb(argv: string[]): Promise<number> {
       : {}),
     ...(values.has("--auxiliary-model")
       ? { auxiliaryModel: values.get("--auxiliary-model") as string }
+      : {}),
+    ...(values.has("--credential")
+      ? { credential: values.get("--credential") as string }
       : {}),
     ...(mine ? { mine: true } : {}),
   };

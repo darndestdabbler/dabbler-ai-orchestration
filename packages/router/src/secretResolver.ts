@@ -1,9 +1,13 @@
 // The single call site for looking up secret values.
 //
-// The env-var backend is the only built-in backend; additional backends
-// (keyring, secretStorage) can be registered via `registerBackend` without
-// touching callers. An empty-string value is normalized to null so callers
-// can use a simple truthiness check.
+// Two backends are built in and they are the two layers a key can come from:
+// `env` reads the process environment, and `store` reads what this machine
+// has stored under a name. Which of them answers for a given provider is
+// `providerSecret`'s to decide and not a caller's; more backends can still
+// be registered here without touching one. An empty-string value is
+// normalized to null so callers can use a simple truthiness check.
+
+import { credentialValue } from "./credentials.ts";
 
 export type SecretBackend = (name: string) => string | null;
 
@@ -43,3 +47,12 @@ function envBackend(name: string): string | null {
 }
 
 registerBackend("env", envBackend);
+
+/**
+ * What this machine has stored under that name.
+ *
+ * A name and not an environment variable: the store is keyed by the
+ * reference an operator chose, which is what a setting carries and what a
+ * pane shows.
+ */
+registerBackend("store", (name) => credentialValue(name));

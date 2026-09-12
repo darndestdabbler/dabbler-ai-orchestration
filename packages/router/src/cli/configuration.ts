@@ -121,6 +121,40 @@ function renderOptions(configuration: Node): string {
       const since = text(node(held["retired"])["since"]) ?? "unknown";
       lines.push(`    x ${text(held["model"]) ?? ""} — withdrawn by its vendor, gone since ${since}`);
     }
+    // **A provider whose key does not resolve drops out of the list, and a
+    // list that hid the reason reads as a broken pane.** Found by walking
+    // it: a reference naming a credential this machine does not hold took
+    // every one of that vendor's models off the list with nothing saying
+    // so, which is the same defect the vehicle rows carry `withheld` for.
+    for (const credential of rows(configuration["credentials"])) {
+      const stop = text(credential["stop"]);
+      if (stop === null) continue;
+      lines.push(`    ! no ${text(credential["provider"]) ?? ""} model is listed: ${stop}`);
+    }
+    lines.push("");
+  }
+  // What a key could come from, per provider. It is one list and not one
+  // per participant: a credential belongs to a vendor, and whichever
+  // participant is on that vendor uses it.
+  const credentials = rows(configuration["credentials"]);
+  if (credentials.length > 0) {
+    lines.push("Provider keys");
+    for (const credential of credentials) {
+      const provider = text(credential["provider"]) ?? "";
+      const reference = text(credential["reference"]);
+      lines.push(
+        `  ${provider}: ${
+          credential["fromEnvironment"] === true
+            ? `${text(credential["variable"]) ?? ""} is set in this environment`
+            : reference === null
+              ? "nothing resolves"
+              : `the credential '${reference}'${credential["held"] === true ? "" : ", which this machine does not hold"}`
+        }`,
+      );
+      lines.push(`    - ${text(credential["variable"]) ?? ""} in the environment`);
+      lines.push(`    - a stored credential: ${text(credential["choose"]) ?? ""}`);
+      lines.push(`      store one first with ${text(credential["store"]) ?? ""}`);
+    }
     lines.push("");
   }
   return `${lines.join("\n")}\n`;
@@ -174,6 +208,36 @@ function renderExplain(configuration: Node): string {
         ? " (nobody chose one, so the preference order decides)"
         : ` (you chose '${selected}'; it is used and never silently substituted)`;
     lines.push(`${label} model: ${chosen ?? "nothing resolves"}${why}`);
+  }
+  for (const credential of rows(configuration["credentials"])) {
+    const provider = text(credential["provider"]) ?? "";
+    const reference = text(credential["reference"]);
+    const variable = text(credential["variable"]) ?? "";
+    // The environment first, because that is the order, and because an
+    // operator running on variables today must be told nothing changed.
+    if (credential["fromEnvironment"] === true) {
+      lines.push(
+        `${provider} key: ${variable} in this environment` +
+          (reference === null
+            ? " (no credential is named, and none is needed)"
+            : ` (it outranks the credential '${reference}', which stays named)`),
+      );
+      continue;
+    }
+    if (reference === null) {
+      lines.push(
+        `${provider} key: nothing resolves (set ${variable}, or name a stored ` +
+          `credential with \`${text(credential["choose"]) ?? ""}\`)`,
+      );
+      continue;
+    }
+    lines.push(
+      `${provider} key: the credential '${reference}'` +
+        ` (decided by ${text(credential["decidedBy"]) ?? "a configured layer"})` +
+        (credential["held"] === true
+          ? " — this machine holds it"
+          : " — THIS MACHINE DOES NOT HOLD IT"),
+    );
   }
   for (const record of rows(configuration["records"])) {
     lines.push(

@@ -6,24 +6,32 @@
 // terminal prints cannot come apart.
 
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { SOURCE_API, TRANSPORT_API, writeBlock, type CatalogModel } from "../src/catalog.ts";
 import { configurationVerb } from "../src/cli/configuration.ts";
 import { configure } from "../src/cli/configure.ts";
+import { currentCredentialsPath, setCredentialsPath } from "../src/credentials.ts";
 import { configurationNode } from "../src/projection.ts";
-import { explainAuthoringModel, resetProjectRootCache } from "../src/config.ts";
+import { explainAuthoringModel, loadConfig, resetProjectRootCache } from "../src/config.ts";
+import { configuredCredentialRefusal } from "../src/discovery.ts";
 import { readPreferences, writePreferences } from "../src/preferences.ts";
 import {
   SETTING_AUTHORING_MODEL,
+  SETTING_CREDENTIAL_OPENAI,
   SETTING_TRANSPORT,
+  settingValue,
   writeSettings,
 } from "../src/settings.ts";
 import { configuredModelRefusal, start } from "../src/session.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 import { capture } from "../src/output.ts";
+
+// Back to the path the suite armed at load, never to null: the arming is
+// what keeps every test in this worker off the operator's own store.
+const ARMED_CREDENTIALS = currentCredentialsPath();
 
 function node(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -458,6 +466,168 @@ describe("a choice kept as this person's rather than this checkout's", () => {
     } finally {
       writeSettings(root, { [SETTING_AUTHORING_MODEL]: "" });
       writePreferences({ authoringModel: "" });
+      restore();
+    }
+  });
+});
+
+describe("which credential a solution uses", () => {
+  // A NAME in the committed settings and the value in this machine's own
+  // store. The write does not ask whether this machine holds one, because a
+  // repository is configured for the people who will clone it; the stop is
+  // at use, where the key is actually needed.
+
+  it("writes a name to the checkout, says the machine has none, and refuses an unknown provider", () => {
+    const { root, restore } = machine();
+    try {
+      const outcome = configure({ repoRoot: root, credential: "openai=client-a" });
+      assert.equal(outcome.refusal, null);
+      assert.equal(settingValue(root, SETTING_CREDENTIAL_OPENAI), "client-a");
+      // Written, and said plainly: the setting is right and this machine is
+      // not ready, which are two different facts.
+      assert.ok(
+        outcome.changed.some((line) => /holds no credential called 'client-a'/.test(line)),
+        outcome.changed.join(" | "),
+      );
+
+      // A key pasted where a name goes is refused, not written: the file it
+      // would land in is committed, and the refusal does not echo it back
+      // into a scrollback either.
+      const key = "sk-ant-api03-159-DoNotEcho-7f3a9c2e";
+      const pasted = configure({ repoRoot: root, credential: `openai=${key}` });
+      assert.match(String(pasted.refusal), /looks like a KEY/);
+      assert.ok(!String(pasted.refusal).includes(key), String(pasted.refusal));
+      assert.equal(settingValue(root, SETTING_CREDENTIAL_OPENAI), "client-a");
+
+      const unknown = configure({ repoRoot: root, credential: "acme=client-a" });
+      assert.match(String(unknown.refusal), /not a provider this distribution reaches/);
+      const malformed = configure({ repoRoot: root, credential: "openai" });
+      assert.match(String(malformed.refusal), /PROVIDER=NAME/);
+    } finally {
+      writeSettings(root, { [SETTING_CREDENTIAL_OPENAI]: "" });
+      restore();
+    }
+  });
+
+  it("says which credential, from which layer, and never anything that could be a key", async () => {
+    const { root, restore } = machine();
+    const held = process.env["DABBLER_OPENAI_API_KEY"];
+    try {
+      writeSettings(root, { [SETTING_CREDENTIAL_OPENAI]: "client-a" });
+      delete process.env["DABBLER_OPENAI_API_KEY"];
+      resetProjectRootCache();
+      const explained = await capture(() => configurationVerb(["explain", "--repo-root", root]));
+      assert.match(explained.stdout, /openai key: the credential 'client-a'/);
+      assert.match(explained.stdout, /settings\.json/);
+      assert.match(explained.stdout, /DOES NOT HOLD IT/);
+      // The environment is the layer above it, and a provider running on one
+      // says so rather than being told to change anything.
+      assert.match(explained.stdout, /anthropic key: DABBLER_ANTHROPIC_API_KEY in this environment/);
+      // Nothing in the rendering is the value or any part of one. The keys
+      // this fixture sets are the single character 'k'; what must not appear
+      // is any field that could carry a secret.
+      assert.ok(!/\bk\b/.test(explained.stdout), explained.stdout);
+    } finally {
+      if (held === undefined) delete process.env["DABBLER_OPENAI_API_KEY"];
+      else process.env["DABBLER_OPENAI_API_KEY"] = held;
+      writeSettings(root, { [SETTING_CREDENTIAL_OPENAI]: "" });
+      restore();
+    }
+  });
+
+  it("reads the reference out of the checkout it was given, not out of git's answer", () => {
+    // The walk found this one on its first reading: the stamp resolved the
+    // checkout through `projectRoot`, which answers the GIT TOPLEVEL and
+    // null outside a repository -- so a `dabbler.credentials.*` setting was
+    // invisible in a directory git does not know, while the vehicle two
+    // rows above was being rendered from the same file. Reading a settings
+    // file has nothing to do with whether git knows about the directory.
+    const root = tempDir("credential-root-");
+    const elsewhere = tempDir("credential-elsewhere-");
+    writeSettings(root, { [SETTING_CREDENTIAL_OPENAI]: "client-a" });
+    // Git answers a DIFFERENT directory, which is the same shape as it
+    // answering none at all.
+    const ungit = gitAnswers([
+      [["rev-parse", "--show-toplevel"], { stdout: elsewhere.split("\\").join("/") }],
+    ]);
+    resetProjectRootCache();
+    try {
+      const providers = node(loadConfig(undefined, root)["providers"]);
+      assert.equal(node(providers["openai"])["credential_reference"], "client-a");
+    } finally {
+      ungit();
+      resetProjectRootCache();
+    }
+  });
+
+  it("names the provider it is not offering, instead of dropping its models silently", async () => {
+    // A dangling reference took every one of that vendor's models off both
+    // reviewing lists with nothing saying so -- the same defect the vehicle
+    // rows carry `withheld` for, met again one layer along.
+    const { root, restore } = machine();
+    const held = process.env["DABBLER_OPENAI_API_KEY"];
+    try {
+      writeSettings(root, { [SETTING_CREDENTIAL_OPENAI]: "not-on-this-machine" });
+      delete process.env["DABBLER_OPENAI_API_KEY"];
+      resetProjectRootCache();
+      const offered = await capture(() => configurationVerb(["options", "--repo-root", root]));
+      assert.match(offered.stdout, /no openai model is listed/);
+      assert.match(offered.stdout, /not-on-this-machine/);
+    } finally {
+      if (held === undefined) delete process.env["DABBLER_OPENAI_API_KEY"];
+      else process.env["DABBLER_OPENAI_API_KEY"] = held;
+      writeSettings(root, { [SETTING_CREDENTIAL_OPENAI]: "" });
+      restore();
+    }
+  });
+
+  it("refuses to name a credential that was stored for a different provider", () => {
+    const { root, restore } = machine();
+    const store = join(tempDir("credential-cross-"), "credentials.json");
+    setCredentialsPath(store);
+    writeFileSync(
+      store,
+      `${JSON.stringify({
+        schema_version: 1,
+        written_by: "a previous run",
+        entries: {
+          "the-anthropic-one": {
+            provider: "anthropic",
+            stored_at: "2026-09-12T00:00:00.000Z",
+            sealed: "01000000d0",
+          },
+        },
+      })}\n`,
+      "utf8",
+    );
+    try {
+      const outcome = configure({ repoRoot: root, credential: "openai=the-anthropic-one" });
+      assert.match(String(outcome.refusal), /stored for anthropic/);
+      assert.equal(settingValue(root, SETTING_CREDENTIAL_OPENAI), null);
+    } finally {
+      setCredentialsPath(ARMED_CREDENTIALS);
+      restore();
+    }
+  });
+
+  it("stops `session start` on a reference this machine cannot answer", () => {
+    // The environment is above the reference, so the stop only appears once
+    // the variable is gone -- which is the whole point of the order: nobody
+    // running on environment variables today is affected by any of this.
+    const { root, restore } = machine();
+    const held = process.env["DABBLER_OPENAI_API_KEY"];
+    try {
+      writeSettings(root, { [SETTING_CREDENTIAL_OPENAI]: "client-a" });
+      delete process.env["DABBLER_OPENAI_API_KEY"];
+      resetProjectRootCache();
+      const stop = configuredCredentialRefusal(loadConfig(undefined, root));
+      assert.match(String(stop), /'client-a'/);
+      assert.match(String(stop), /dabbler auth set openai/);
+      assert.match(String(stop), /nothing was billed/);
+    } finally {
+      if (held === undefined) delete process.env["DABBLER_OPENAI_API_KEY"];
+      else process.env["DABBLER_OPENAI_API_KEY"] = held;
+      writeSettings(root, { [SETTING_CREDENTIAL_OPENAI]: "" });
       restore();
     }
   });

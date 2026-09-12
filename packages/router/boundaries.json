@@ -17,6 +17,7 @@
         "sessionState",
         "catalog",
         "preferences",
+        "credentials",
         "settings",
         "resolution",
         "version"

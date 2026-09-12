@@ -68,7 +68,7 @@ import {
   HttpTimeoutError,
   httpGetJson,
 } from "./transports/api.ts";
-import { resolveSecret } from "./secretResolver.ts";
+import { providerKeyStop, providerSecret } from "./credentials.ts";
 import { resolveResponsesDir } from "./transports/offline.ts";
 import { providerReachable } from "./selection.ts";
 import {
@@ -500,7 +500,7 @@ export async function enumerateProvider(
   if (adapter === undefined) {
     return { provider: name, entries: [], error: ERROR_PROVIDER_UNSUPPORTED };
   }
-  const apiKey = resolveSecret(String(cfg["api_key_env"] ?? ""));
+  const apiKey = providerSecret(cfg);
   if (!apiKey) return { provider: name, entries: [], error: ERROR_NO_API_KEY };
   try {
     const entries = await adapter(
@@ -996,7 +996,7 @@ export interface TransportPresence {
  */
 export function transportPresence(config: RouterConfig): TransportPresence[] {
   const keyed = Object.entries(record(config["providers"])).some(
-    ([, cfg]) => isRecord(cfg) && enabledFlag(cfg) && Boolean(resolveSecret(String(cfg["api_key_env"] ?? ""))),
+    ([, cfg]) => isRecord(cfg) && enabledFlag(cfg) && Boolean(providerSecret(cfg)),
   );
   const seat = seatBlock() !== null;
   let offline = false;
@@ -1087,12 +1087,32 @@ export function configuredVehicleRefusal(
   return vehicleRefusal(config, reading);
 }
 
+/**
+ * A credential reference somebody configured that names nothing here.
+ *
+ * Only a REFERENCE is held to this. A provider with no key at all is a
+ * machine that is not set up yet, and refusing to start a session on it
+ * would refuse the setup that fixes it -- exactly as for a vehicle. A
+ * reference is different: it is an explicit act, and the layer that carries
+ * it can be named. A session that silently ran on another provider's key
+ * would change which account is billed and leave every later account of
+ * what ran untrue.
+ */
+export function configuredCredentialRefusal(config: RouterConfig): string | null {
+  for (const [name, cfg] of Object.entries(record(config["providers"]))) {
+    if (!isRecord(cfg) || !enabledFlag(cfg)) continue;
+    const stop = providerKeyStop(name, cfg);
+    if (stop !== null) return `${stop} Nothing was started and nothing was billed.`;
+  }
+  return null;
+}
+
 export function currentApiScope(config: RouterConfig): CatalogScope {
   const providers = Object.entries(record(config["providers"]))
     .filter(([name, cfg]) => {
       if (!isRecord(cfg) || !enabledFlag(cfg)) return false;
       if (ADAPTERS[name] === undefined) return false;
-      return Boolean(resolveSecret(String(cfg["api_key_env"] ?? "")));
+      return Boolean(providerSecret(cfg));
     })
     .map(([name]) => name)
     .sort();

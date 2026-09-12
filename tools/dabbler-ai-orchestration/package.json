@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: modules, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -220,6 +220,12 @@
         "icon": "$(sync)"
       },
       {
+        "command": "dabblerSolution.storeCredential",
+        "title": "Store a Key on This Machine",
+        "category": "Dabbler",
+        "icon": "$(key)"
+      },
+      {
         "command": "dabblerSolution.showImpact",
         "title": "Show Impact",
         "category": "Dabbler",
@@ -343,6 +349,10 @@
         },
         {
           "command": "dabblerSolution.refreshRecord",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.storeCredential",
           "when": "false"
         },
         {
@@ -481,6 +491,11 @@
         {
           "command": "dabblerSolution.refreshRecord",
           "when": "view == dabblerSolutionTree && viewItem == dabblerConfiguration",
+          "group": "1_set@1"
+        },
+        {
+          "command": "dabblerSolution.storeCredential",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfigCredential;/",
           "group": "1_set@1"
         },
         {
@@ -664,7 +679,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.9",
-    "dabbler-ai-router": "2.3.0",
+    "dabbler-ai-router": "2.4.0",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",

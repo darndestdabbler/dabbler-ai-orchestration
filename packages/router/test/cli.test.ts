@@ -18,6 +18,7 @@ import { moduleVerb } from "../src/cli/module.ts";
 import { modulesVerb } from "../src/cli/modules.ts";
 import { packagingVerb } from "../src/cli/packaging.ts";
 import { HANDLERS } from "../src/cli/registry.ts";
+import { authVerb } from "../src/cli/auth.ts";
 import { sessionVerb } from "../src/cli/session.ts";
 import { statusVerb } from "../src/cli/status.ts";
 import { extensionAbove, versionVerb } from "../src/cli/version.ts";
@@ -27,6 +28,7 @@ import { VERSION } from "../src/version.ts";
 import { readCandidateRecord } from "../src/impact.ts";
 import { readBundleRecord } from "../src/land.ts";
 import { capture } from "../src/output.ts";
+import { CREDENTIALS_FILENAME, setCredentialsPath, storeKind } from "../src/credentials.ts";
 import { writePreferences } from "../src/preferences.ts";
 import { readRawSessionState } from "../src/progress.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
@@ -610,6 +612,61 @@ describe("dabbler module", () => {
     assert.equal(result.code, 0, result.err);
     assert.match(result.out, /pinned JsonModel in Directory\.Packages\.props/);
     assert.ok(readCandidateRecord(repo, 1).paths.some((entry) => entry.path === "Directory.Packages.props"));
+  });
+});
+
+describe("dabbler auth", () => {
+  it("names what it holds and never a value, and refuses a provider it cannot reach", async () => {
+    setCredentialsPath(join(tempDir("auth-"), CREDENTIALS_FILENAME));
+    const empty = await run(() => authVerb(["list"]));
+    assert.equal(empty.code, 0, empty.err);
+    assert.match(empty.out, /holds no credentials/);
+
+    // A provider the distribution does not reach is a refusal before a
+    // prompt, because asking someone for a key and then discarding it is
+    // worse than not asking.
+    const unknown = await run(() => authVerb(["set", "acme"]));
+    assert.equal(unknown.code, 1);
+    assert.match(unknown.err, /not a provider this distribution reaches/);
+
+    const absent = await run(() => authVerb(["remove", "nothing-of-that-name"]));
+    assert.equal(absent.code, 1);
+    assert.match(absent.err, /holds no credential called/);
+  });
+
+  it("refuses a key typed as a name, and --from-env with nothing in the environment", async () => {
+    setCredentialsPath(join(tempDir("auth-"), CREDENTIALS_FILENAME));
+    // A key given as the NAME would be a key in the shell's history, which
+    // is the one place this verb exists to keep it out of. It is refused
+    // and it is not printed back.
+    const key = "sk-ant-api03-159-DoNotEcho-7f3a9c2e";
+    const pasted = await run(() => authVerb(["set", "anthropic", "--name", key]));
+    assert.equal(pasted.code, 1);
+    assert.match(pasted.err, /takes a NAME for the credential/);
+    assert.ok(!pasted.err.includes(key), pasted.err);
+
+    // And the convenience for a machine that has been working: take what is
+    // already in the variable. With nothing there, it says which one.
+    const held = process.env["DABBLER_ANTHROPIC_API_KEY"];
+    delete process.env["DABBLER_ANTHROPIC_API_KEY"];
+    try {
+      const empty = await run(() => authVerb(["set", "anthropic", "--from-env"]));
+      assert.equal(empty.code, 1);
+      assert.match(empty.err, /DABBLER_ANTHROPIC_API_KEY is not set/);
+
+      // And where there is no store at all, the refusal names the variable
+      // BY NAME. "the provider's environment variable" makes somebody run a
+      // second command to find out what to set, which is a refusal that has
+      // not finished.
+      const held = storeKind();
+      if (held === null) {
+        const refused = await run(() => authVerb(["set", "anthropic"]));
+        assert.equal(refused.code, 1);
+        assert.match(refused.err, /DABBLER_ANTHROPIC_API_KEY/);
+      }
+    } finally {
+      if (held !== undefined) process.env["DABBLER_ANTHROPIC_API_KEY"] = held;
+    }
   });
 });
 

@@ -1154,3 +1154,78 @@ suite("solutionTreeModel: what a configuration reading costs", () => {
     assert.ok(primaryReviewer.tooltip?.includes("different provider"));
   });
 });
+
+suite("solutionTreeModel: which key a provider is reached with", () => {
+  /** A projection carrying the three states a credential row can be in. */
+  function withCredentials(): Projection {
+    return {
+      ...single(),
+      configuration: {
+        credentials: [
+          {
+            provider: "anthropic",
+            displayLabel: "Anthropic",
+            variable: "DABBLER_ANTHROPIC_API_KEY",
+            fromEnvironment: true,
+            reference: null,
+            held: false,
+            stop: null,
+            store: "dabbler auth set anthropic",
+            choose: "dabbler configure --credential anthropic=<name>",
+          },
+          {
+            provider: "google",
+            displayLabel: "Google",
+            variable: "DABBLER_GEMINI_API_KEY",
+            fromEnvironment: false,
+            reference: null,
+            held: false,
+            stop: null,
+            store: "dabbler auth set google",
+            choose: "dabbler configure --credential google=<name>",
+          },
+          {
+            provider: "openai",
+            displayLabel: "OpenAI",
+            variable: "DABBLER_OPENAI_API_KEY",
+            fromEnvironment: false,
+            reference: "client-a",
+            decidedBy: ".vscode/settings.json",
+            held: false,
+            stop: "openai is configured to use the credential 'client-a', and this machine holds no credential of that name.",
+            store: "dabbler auth set openai",
+            choose: "dabbler configure --credential openai=<name>",
+          },
+        ],
+      },
+    };
+  }
+
+  test("draws one row per provider, saying what is in force and never a value", () => {
+    const p = withCredentials();
+    const rows = childrenOf({ kind: "configuration" }, p)
+      .filter((node) => node.kind === "configCredential")
+      .map((node) => descriptorFor(node, p));
+    assert.deepStrictEqual(
+      rows.map((row) => row.label),
+      ["Anthropic key", "Google key", "OpenAI key"],
+    );
+    // The environment is the layer above both references, so a provider
+    // whose variable is set says so and carries no attention tone: nobody
+    // running on environment variables is being told to change anything.
+    assert.ok(rows[0]?.description?.includes("DABBLER_ANTHROPIC_API_KEY"));
+    assert.strictEqual(rows[0]?.icon?.tone, undefined);
+    assert.strictEqual(rows[1]?.description, "nothing resolves");
+    // A reference this machine cannot answer is the one row that asks for
+    // attention, and it says which credential rather than only that one is
+    // missing.
+    assert.ok(rows[2]?.description?.includes("client-a"));
+    assert.ok(rows[2]?.description?.includes("not on this machine"));
+    assert.strictEqual(rows[2]?.icon?.tone, "attention");
+    // And every one of them clicks through to the terminal that asks.
+    for (const row of rows) {
+      assert.strictEqual(row.command, "dabblerSolution.storeCredential");
+      assert.ok(row.tooltip?.includes("never typed into this window"));
+    }
+  });
+});

@@ -16,6 +16,12 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
 import { readModuleSessionMarker } from "./checkout.ts";
+import {
+  CREDENTIAL_LAYER_KEY,
+  CREDENTIAL_REFERENCE_KEY,
+  holdsCredential,
+  providerKeyStop,
+} from "./credentials.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
 import {
   TRANSPORT_API,
@@ -917,6 +923,60 @@ function recordNode(row: FreshnessRow): Node {
 }
 
 /**
+ * Which credential each provider uses, as everything except the key.
+ *
+ * **A name, a layer and whether this machine holds one. Never the value,
+ * never a prefix of it, never its length.** A masked key is a key: the
+ * leading characters of an API key identify the account it belongs to, and
+ * a length distinguishes one vendor's key from another's. What a person
+ * needs from this row is which credential is in force, who chose it, and
+ * whether it will work here -- and all three are answerable without
+ * touching the secret.
+ *
+ * The environment is the layer above both references, so a provider whose
+ * variable is set says so and carries no stop: an operator running on
+ * environment variables today is not being told to change anything.
+ */
+function credentialNodes(config: RouterConfig): Node[] {
+  const providers = config["providers"];
+  if (typeof providers !== "object" || providers === null || Array.isArray(providers)) return [];
+  const rows: Node[] = [];
+  for (const [name, block] of Object.entries(providers as Record<string, unknown>)) {
+    if (typeof block !== "object" || block === null || Array.isArray(block)) continue;
+    const provider = block as Record<string, unknown>;
+    if (provider["enabled"] !== true) continue;
+    const variable = typeof provider["api_key_env"] === "string" ? provider["api_key_env"] : "";
+    const reference =
+      typeof provider[CREDENTIAL_REFERENCE_KEY] === "string"
+        ? (provider[CREDENTIAL_REFERENCE_KEY] as string)
+        : null;
+    const fromEnvironment = variable !== "" && (process.env[variable] ?? "") !== "";
+    rows.push({
+      provider: name,
+      displayLabel:
+        typeof provider["display_label"] === "string" ? provider["display_label"] : name,
+      variable,
+      fromEnvironment,
+      reference,
+      decidedBy:
+        reference === null
+          ? null
+          : typeof provider[CREDENTIAL_LAYER_KEY] === "string"
+            ? (provider[CREDENTIAL_LAYER_KEY] as string)
+            : null,
+      held: reference === null ? false : holdsCredential(reference),
+      stop: providerKeyStop(name, provider),
+      // The command, ready to run, because a row that says what is wrong
+      // and not what to type is a row an operator reads twice.
+      store: `dabbler auth set ${name}`,
+      choose: `dabbler configure --credential ${name}=<name>`,
+    });
+  }
+  // Stable, so the pane's rows do not reorder when a config key does.
+  return rows.sort((left, right) => String(left["provider"]).localeCompare(String(right["provider"])));
+}
+
+/**
  * What this session would be run with, and what decided each part of it.
  *
  * Never throws. A configuration this router cannot load is a real state --
@@ -1034,6 +1094,11 @@ export function configurationNode(
           "chosen here that the round excludes is a stop that names it, " +
           "never a fall to the next candidate.",
       },
+      // Which key each provider is reached with. Under the participants
+      // rather than inside one of them: a credential belongs to a provider
+      // and is used by whichever participant happens to be on that vendor,
+      // so hanging it off a role would draw the same fact twice.
+      credentials: credentialNodes(config),
       records: checkFreshness(config, Date.now()).map(recordNode),
     };
   } catch (error) {

@@ -292,6 +292,11 @@ have to find them somewhere else.
 
 ## Raised, not fixed here
 
+> **Answered in session 159.** Both refusals in `identity.ts` now name this
+> machine's model CATALOG, print `dabbler discovery refresh` — which costs
+> nothing — and `dabbler configuration options`, and the word *registry* is
+> gone from them. `identity.test.ts` holds them to it.
+
 **`resolveOrchestratorIdentity` still sends an operator to a registry that was
 deleted.** A Copilot seat whose model this machine's catalog does not list is
 refused with *"does not resolve in the model registry ... Re-run start_session

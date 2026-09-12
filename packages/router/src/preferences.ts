@@ -98,6 +98,16 @@ export interface Preferences {
    * file a free refresh may replace whole.
    */
   readonly selected?: Readonly<Record<string, string>>;
+  /**
+   * The credential this person uses for a provider, by provider, as a NAME.
+   *
+   * A name and never a value: what is stored here travels no further than
+   * the checkout's own reference does, and the key itself is in the
+   * platform's store. This is the layer that applies where a solution names
+   * no credential of its own, which is every repository an operator opens
+   * that was not configured for them.
+   */
+  readonly credentials?: Readonly<Record<string, string>>;
 }
 
 export function preferencesPath(): string {
@@ -183,6 +193,13 @@ export function readPreferences(path: string = currentPreferencesPath()): Prefer
       if (model !== undefined) selected[role] = model;
     }
   }
+  const credentials: Record<string, string> = {};
+  if (isRecord(parsed["credentials"])) {
+    for (const [provider, value] of Object.entries(parsed["credentials"])) {
+      const reference = optionalString(value);
+      if (reference !== undefined) credentials[provider] = reference;
+    }
+  }
   return {
     schema_version: PREFERENCES_SCHEMA_VERSION,
     written_by: optionalString(parsed["written_by"]) ?? "",
@@ -192,6 +209,7 @@ export function readPreferences(path: string = currentPreferencesPath()): Prefer
     ...(reviewerTransport === undefined ? {} : { reviewer_transport: reviewerTransport }),
     ...(authoringModel === undefined ? {} : { authoring_model: authoringModel }),
     ...(Object.keys(selected).length === 0 ? {} : { selected }),
+    ...(Object.keys(credentials).length === 0 ? {} : { credentials }),
   };
 }
 
@@ -208,6 +226,9 @@ export interface PreferenceChoice {
   /** The role whose model is being chosen, with `""` clearing the choice. */
   readonly role?: string;
   readonly selected?: string;
+  /** The provider whose credential is being named, with `""` clearing it. */
+  readonly credentialProvider?: string;
+  readonly credential?: string;
 }
 
 /**
@@ -241,6 +262,12 @@ export function writePreferences(
     if (model === undefined) delete selected[choice.role];
     else selected[choice.role] = model;
   }
+  const credentials: Record<string, string> = { ...(held.credentials ?? {}) };
+  if (choice.credentialProvider !== undefined && choice.credential !== undefined) {
+    const reference = optionalString(choice.credential);
+    if (reference === undefined) delete credentials[choice.credentialProvider];
+    else credentials[choice.credentialProvider] = reference;
+  }
   const written: Preferences = {
     schema_version: PREFERENCES_SCHEMA_VERSION,
     written_by: `dabbler-ai-router ${VERSION}`,
@@ -250,6 +277,7 @@ export function writePreferences(
     ...(reviewerTransport === undefined ? {} : { reviewer_transport: reviewerTransport }),
     ...(authoringModel === undefined ? {} : { authoring_model: authoringModel }),
     ...(Object.keys(selected).length === 0 ? {} : { selected }),
+    ...(Object.keys(credentials).length === 0 ? {} : { credentials }),
   };
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(written, null, 2)}\n`, "utf8");
@@ -295,4 +323,18 @@ export function selectedModel(
   path: string = currentPreferencesPath(),
 ): string | null {
   return readPreferences(path).selected?.[role] ?? null;
+}
+
+/**
+ * The credential name this person uses for `provider`, or null.
+ *
+ * Null is *nobody chose*, which is a different fact from a credential this
+ * machine does not hold: the first resolves to the environment variable and
+ * the second is a stop.
+ */
+export function preferredCredential(
+  provider: string,
+  path: string = currentPreferencesPath(),
+): string | null {
+  return readPreferences(path).credentials?.[provider] ?? null;
 }

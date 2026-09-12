@@ -15,7 +15,7 @@
 // and every field read off a response body are the same.
 
 import { writeErr } from "../output.ts";
-import { resolveSecret } from "../secretResolver.ts";
+import { providerKeyStop, providerSecret } from "../credentials.ts";
 import type { APIResult, DispatchRequest } from "./base.ts";
 
 type Json = Record<string, unknown>;
@@ -248,9 +248,18 @@ function requiredNumber(value: unknown, field: string): number {
   return value;
 }
 
+/**
+ * No key, in the words of whichever layer was supposed to supply it.
+ *
+ * A dangling reference and an unset variable are two different problems
+ * with two different repairs, and an operator who has named a credential
+ * needs to be told that the NAME is the thing that resolves to nothing --
+ * not sent to an environment variable they deliberately stopped using.
+ */
 function missingKey(config: ProviderConfig, vendor: string): Error {
+  const stop = providerKeyStop(vendor.toLowerCase(), config);
   return new Error(
-    `Missing environment variable ${String(config["api_key_env"])} for ${vendor}`,
+    stop ?? `Missing environment variable ${String(config["api_key_env"])} for ${vendor}`,
   );
 }
 
@@ -262,7 +271,7 @@ async function callAnthropic(
   config: ProviderConfig,
   genParams: Json,
 ): Promise<APIResult> {
-  const apiKey = resolveSecret(String(config["api_key_env"] ?? ""));
+  const apiKey = providerSecret(config);
   if (!apiKey) throw missingKey(config, "Anthropic");
 
   const body: Json = {
@@ -322,7 +331,7 @@ async function callGoogle(
   config: ProviderConfig,
   genParams: Json,
 ): Promise<APIResult> {
-  const apiKey = resolveSecret(String(config["api_key_env"] ?? ""));
+  const apiKey = providerSecret(config);
   if (!apiKey) throw missingKey(config, "Google");
 
   const base = String(
@@ -410,7 +419,7 @@ async function callOpenai(
   config: ProviderConfig,
   genParams: Json,
 ): Promise<APIResult> {
-  const apiKey = resolveSecret(String(config["api_key_env"] ?? ""));
+  const apiKey = providerSecret(config);
   if (!apiKey) throw missingKey(config, "OpenAI");
 
   const base = String(config["base_url"] ?? "https://api.openai.com/v1");

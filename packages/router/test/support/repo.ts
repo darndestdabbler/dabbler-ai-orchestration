@@ -16,6 +16,7 @@ import { dirname, join } from "node:path";
 
 import { CATALOG_FILENAME, SOURCE_SEAT, catalogNow, setCatalogPath } from "../../src/catalog.ts";
 import { PREFERENCES_FILENAME, setPreferencesPath } from "../../src/preferences.ts";
+import { CREDENTIALS_FILENAME, setCredentialsPath } from "../../src/credentials.ts";
 import { setSeatSource } from "../../src/discovery.ts";
 import { canonicalPath } from "../../src/journal.ts";
 
@@ -132,6 +133,13 @@ setCatalogPath(join(scratchDir("catalog-"), CATALOG_FILENAME));
 // fail on the next, and one that wrote it would change their choice as a
 // side effect of proving something else.
 setPreferencesPath(join(scratchDir("preferences-"), PREFERENCES_FILENAME));
+
+// And the credential index, which is the one file of the three that holds a
+// SECRET. A worker that read the operator's store would be reading their API
+// keys to prove something about a resolution order; `currentCredentialsPath`
+// refuses the machine's path under the test runner, and this is what every
+// worker gets instead.
+setCredentialsPath(join(scratchDir("credentials-"), CREDENTIALS_FILENAME));
 
 // And no worker opens the real seat. A session start refreshes the catalog
 // for itself, through a path with no argument to pass a stand-in down, so a

@@ -46,8 +46,15 @@ import { repoRootFor } from "./journal.ts";
 import { schemaFailure } from "./schema/validate.ts";
 import { readText } from "./textfile.ts";
 import { validateTransportTimeouts } from "./contracts/transports.ts";
+import {
+  CREDENTIAL_LAYER_KEY,
+  CREDENTIAL_PROVIDER_KEY,
+  CREDENTIAL_REFERENCE_KEY,
+  credentialReferenceFor,
+} from "./credentials.ts";
 import { readPreferences } from "./preferences.ts";
 import {
+  CREDENTIAL_SETTING_BY_PROVIDER,
   SETTINGS_RELPATH,
   SETTING_AUTHORING_MODEL,
   SETTING_REVIEWER_TRANSPORT,
@@ -431,7 +438,59 @@ function rejectUnknownOverlayKeys(
 // --- Loading ------------------------------------------------------------------
 
 export function loadConfig(path?: string, projectDir?: string): RouterConfig {
-  return loadConfigFrom(resolveConfigSources(path, projectDir));
+  // **The checkout the caller NAMED, not its git toplevel.** `projectRoot`
+  // answers null outside a repository, and a settings file is a file --
+  // reading it has nothing to do with whether git knows about the directory
+  // it is in. Resolving through git here made every `dabbler.credentials.*`
+  // setting invisible in a checkout that is not a repository, which the
+  // walk found on its first reading: the pane said "nothing resolves" over
+  // a setting it was rendering the vehicle from two rows above.
+  return withCredentialReferences(
+    loadConfigFrom(resolveConfigSources(path, projectDir)),
+    projectDir ?? projectRoot(),
+  );
+}
+
+/**
+ * Stamp each provider with the credential REFERENCE that applies to it.
+ *
+ * It happens here and not in `loadConfigFrom` because this is the one
+ * function that knows where the repository is: the reference is decided by
+ * this checkout's settings first and this person's preferences second, and
+ * a load driven by named files has no checkout to ask. A caller reaching
+ * `loadConfigFrom` directly therefore gets provider blocks with no
+ * reference, which is exactly right -- it named its own files and no layer
+ * spoke.
+ *
+ * A NAME is stamped and never a value. Nothing in a loaded config has ever
+ * held a secret and nothing here starts: `providerSecret` is what turns the
+ * reference into a key, at the moment one is needed.
+ */
+function withCredentialReferences(config: RouterConfig, root: string | null): RouterConfig {
+  const providers = config["providers"];
+  if (!isRecord(providers)) return config;
+  const stamped: Record<string, unknown> = {};
+  for (const [name, block] of Object.entries(providers)) {
+    if (!isRecord(block)) {
+      stamped[name] = block;
+      continue;
+    }
+    const reference = credentialReferenceFor(name, root);
+    // The provider's own name travels with it: a block handed to
+    // `providerSecret` has to say which vendor it is, so a credential
+    // stored for another one can be refused rather than sent.
+    stamped[name] = {
+      ...block,
+      [CREDENTIAL_PROVIDER_KEY]: name,
+      ...(reference === null
+        ? {}
+        : {
+            [CREDENTIAL_REFERENCE_KEY]: reference.name,
+            [CREDENTIAL_LAYER_KEY]: reference.layer,
+          }),
+    };
+  }
+  return { ...config, providers: stamped };
 }
 
 /**
@@ -1200,6 +1259,10 @@ export interface ConfigurationChoice {
   readonly reviewerTransport?: string;
   /** The model the engine's own CLI is launched on; "" clears it. */
   readonly authoringModel?: string;
+  /** The provider whose credential this solution is naming. */
+  readonly credentialProvider?: string;
+  /** The credential's NAME, never its value; "" clears the reference. */
+  readonly credential?: string;
 }
 
 /** What was written, and where. */
@@ -1240,6 +1303,20 @@ export function writeConfigurationChoice(
   // would drop the date suffix that makes a pin a pin.
   if (choice.authoringModel !== undefined) {
     values[SETTING_AUTHORING_MODEL] = choice.authoringModel.trim();
+  }
+  // A NAME, and the writer never looks at whether this machine holds one:
+  // whether a credential exists here is a question about this machine, and
+  // a committed setting is a statement about the solution.
+  if (choice.credentialProvider !== undefined && choice.credential !== undefined) {
+    const key = (CREDENTIAL_SETTING_BY_PROVIDER as Record<string, SettingKey | undefined>)[
+      choice.credentialProvider
+    ];
+    if (key === undefined) {
+      throw new ConfigError(
+        `no credential setting exists for provider '${choice.credentialProvider}'`,
+      );
+    }
+    values[key] = choice.credential.trim();
   }
   return writeSettings(root, values);
 }

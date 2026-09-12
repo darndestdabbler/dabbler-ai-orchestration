@@ -50,6 +50,25 @@ export const SETTING_AUTHORING_MODEL = "dabbler.authoringModel";
 export const SETTING_REVIEWER_MODEL = "dabbler.reviewerModel";
 export const SETTING_AUXILIARY_MODEL = "dabbler.auxiliaryModel";
 
+/**
+ * Which credential this solution uses for a provider -- a NAME, never a key.
+ *
+ * One key per provider, spelled out rather than derived, because this table
+ * is the whole statement of what `dabbler.*` means and a key built from a
+ * string at runtime is a key nothing here can enumerate. A provider the
+ * distribution gains later gains a line here; a provider with no line simply
+ * has no solution-level reference, which resolves to this person's default.
+ */
+export const SETTING_CREDENTIAL_ANTHROPIC = "dabbler.credentials.anthropic";
+export const SETTING_CREDENTIAL_OPENAI = "dabbler.credentials.openai";
+export const SETTING_CREDENTIAL_GOOGLE = "dabbler.credentials.google";
+
+export const CREDENTIAL_SETTING_BY_PROVIDER = {
+  anthropic: SETTING_CREDENTIAL_ANTHROPIC,
+  openai: SETTING_CREDENTIAL_OPENAI,
+  google: SETTING_CREDENTIAL_GOOGLE,
+} as const;
+
 export const SETTING_KEYS = [
   SETTING_TRANSPORT,
   SETTING_REVIEWER_TRANSPORT,
@@ -57,6 +76,9 @@ export const SETTING_KEYS = [
   SETTING_AUTHORING_MODEL,
   SETTING_REVIEWER_MODEL,
   SETTING_AUXILIARY_MODEL,
+  SETTING_CREDENTIAL_ANTHROPIC,
+  SETTING_CREDENTIAL_OPENAI,
+  SETTING_CREDENTIAL_GOOGLE,
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];

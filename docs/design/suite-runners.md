@@ -168,10 +168,10 @@ the shipped framework changes, and a product fix made in passing would have
 ridden in on a session that was measuring, not reviewing. The tests stay on
 the host because that is where they are true today.
 
-## The five that skip in the container, and are proved only by CI
+## The seven that skip in the container, and are proved only by CI
 
 A file can be container-owned and still hold a test that will not run there.
-Five do, and — unlike `copilot.test.ts` — every one of them **skips, saying so
+Seven do, and — unlike `copilot.test.ts` — every one of them **skips, saying so
 in its own words**, which is the well-behaved version of the same fact:
 
 | test | why it skips on Linux |
@@ -181,13 +181,23 @@ in its own words**, which is the well-behaved version of the same fact:
 | *reaches a shim whose path holds a space* | the same |
 | *says when the tree kill could not be run, instead of answering as though it had* | `# SKIP the tree kill is taskkill` |
 | *runs the command below normal, and leaves it where it found it under CI* | `# SKIP this worker could not be raised out of below normal (it reports 10)` |
+| *round-trips a credential through the real store, and writes no plaintext* | `# SKIP this platform has no credential store` |
+| *keeps a real stored value out of every rendering there is* | the same |
 
 The first four are Windows by nature. The fifth is not: it skips because the
 container's worker cannot raise its own priority, so a job that applied no
 policy would look exactly like one that did — the test refuses to be read
 either way, which is right.
 
-**These five are the local loop's residual gap.** Their files stay in the
+The last two are the credential store, which is the platform's own —
+PowerShell's DPAPI on Windows, `security` on macOS, `secret-tool` on Linux —
+and the image has none of the three. Only a test that must STORE something
+needs one: the other nine in that file are arranged from a seeded index and
+run everywhere, and one of them, *a platform with no store refuses and names
+the environment variable*, is exactly what the container is.
+`docs/design/credential-store.md` says what the store is on each platform.
+
+**These are the local loop's residual gap.** Their files stay in the
 container because each holds many tests that are not platform-coupled, and
 moving a whole file for five tests would take hundreds out of the fast door.
 Nothing local proves them, and **CI on `windows-latest` is what does** — which

@@ -288,6 +288,37 @@ export interface ConfigurationRecord {
  * out: the registry is a dated record, and a pane that enumerated a vendor
  * when it opened would charge a window for being open.
  */
+/**
+ * Which credential a provider is reached with, as everything but the key.
+ *
+ * **No field here can carry a secret, and that is deliberate rather than
+ * incidental.** A name, a layer, whether this machine holds one -- not the
+ * value, not a prefix of it, not its length: the leading characters of an
+ * API key identify the account, and a length distinguishes one vendor's key
+ * from another's. The row answers which credential is in force, who chose
+ * it, and whether it will work here, and all three are answerable without
+ * the secret.
+ */
+export interface ConfigurationCredential {
+  provider: string;
+  displayLabel?: string;
+  /** The environment variable this provider reads, which outranks everything. */
+  variable?: string;
+  /** True where that variable is set in the environment this router ran in. */
+  fromEnvironment?: boolean;
+  /** The credential's NAME, or null where no layer named one. */
+  reference?: string | null;
+  decidedBy?: string | null;
+  /** True where this machine actually holds a credential of that name. */
+  held?: boolean;
+  /** Why it cannot be used, in the router's own words, or null. */
+  stop?: string | null;
+  /** The command that stores one here. */
+  store?: string;
+  /** The command that names one for this checkout. */
+  choose?: string;
+}
+
 export interface ProjectionConfiguration {
   transport?: ConfigurationTransport;
   engines?: ConfigurationEngines;
@@ -297,6 +328,8 @@ export interface ProjectionConfiguration {
   /** The Auxiliary Reviewer: the third voice at a disputed impasse. */
   auxiliaryReviewer?: ConfigurationRole;
   records?: ConfigurationRecord[];
+  /** One per enabled provider: which key it is reached with. */
+  credentials?: ConfigurationCredential[];
   /** Why there is nothing to show: a config this router could not load. */
   unavailable?: string;
 }
@@ -356,7 +389,11 @@ export type SolutionNode =
   // anything; these say who, and their leaves say what about them.
   | { kind: "configParticipant"; who: ConfigParticipant }
   | { kind: "configVehicle"; who: ConfigParticipant }
-  | { kind: "configRole"; role: ConfigRoleName };
+  | { kind: "configRole"; role: ConfigRoleName }
+  // Beside the participants rather than under one of them: a credential
+  // belongs to a PROVIDER, and whichever participant happens to be on that
+  // vendor uses it, so hanging it off a role would draw one fact twice.
+  | { kind: "configCredential"; provider: string };
 
 export interface RowDescriptor {
   id: string;
@@ -707,6 +744,9 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
       if (config.primaryReviewer || config.auxiliaryReviewer) {
         own.push({ kind: "configParticipant", who: "reviewing" });
       }
+      for (const credential of config.credentials ?? []) {
+        own.push({ kind: "configCredential", provider: credential.provider });
+      }
       return own;
     }
     case "configParticipant": {
@@ -723,6 +763,7 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
     }
     case "configVehicle":
     case "configRole":
+    case "configCredential":
       return [];
     case "externalGroup":
       return externals(p).map((e) => ({ kind: "external" as const, id: e.id }));
@@ -1327,6 +1368,46 @@ export function descriptorFor(
         expandable: false,
         contextValue: `dabblerConfigRole;${node.role}`,
         command: ROLE_COMMANDS[node.role],
+      };
+    }
+    case "configCredential": {
+      const credential = (configuration(p).credentials ?? []).find(
+        (row) => row.provider === node.provider,
+      );
+      const label = `${credential?.displayLabel ?? node.provider} key`;
+      // What is in force, in the order the router resolves it. The
+      // environment first, because that is the order and because an
+      // operator running on variables is being told nothing changed.
+      const description = !credential
+        ? "not read"
+        : credential.fromEnvironment
+          ? `${credential.variable ?? "the environment"} is set`
+          : !credential.reference
+            ? "nothing resolves"
+            : credential.held
+              ? credential.reference
+              : `${credential.reference} — not on this machine`;
+      return {
+        id: `config:credential:${node.provider}`,
+        label,
+        description,
+        tooltip: [
+          "Which credential this provider is reached with. The value is in this machine's own store; what travels in a setting is the NAME.",
+          credential?.stop ??
+            (credential?.fromEnvironment
+              ? `${credential.variable} is set in the environment, which outranks any credential named here.`
+              : credential?.reference
+                ? `'${credential.reference}' was named by ${credential.decidedBy ?? "a configured layer"}.`
+                : `Nothing names a credential, so ${credential?.variable ?? "the provider's environment variable"} is what supplies the key.`),
+          `Clicking opens a terminal on \`${credential?.store ?? "dabbler auth set"}\`, which asks for the key with the echo off. It is never typed into this window: what goes into an input box lives in the editor's own buffers.`,
+        ].join("\n\n"),
+        icon: {
+          id: "key",
+          ...(credential?.stop ? { tone: "attention" as const } : {}),
+        },
+        expandable: false,
+        contextValue: `dabblerConfigCredential;${node.provider}`,
+        command: "dabblerSolution.storeCredential",
       };
     }
     case "memberGroup": {

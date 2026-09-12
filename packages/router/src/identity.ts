@@ -193,11 +193,16 @@ export function resolveOrchestratorIdentity(
       };
     }
     if (multi) {
+      // The registry this used to name was deleted in session 151 and the
+      // resolution has read the CATALOG ever since, so the words sent an
+      // operator looking for a file that is not there. They say what is
+      // actually read, and the command that re-reads it -- which is free.
       throw new IdentityResolutionError(
-        `orchestrator model '${model}' does not resolve in the model ` +
-          "registry and the engine is a multi-provider seat, so the " +
-          "provider label cannot be trusted. Re-run start_session " +
-          "with a registry-known --model, then retry.",
+        `orchestrator model '${model}' is not in this machine's model ` +
+          "catalog and the engine is a multi-provider seat, so the provider " +
+          "label cannot be trusted. Run `dabbler discovery refresh`, which " +
+          "costs nothing, and start the session again with a --model the " +
+          "catalog lists; `dabbler configuration options` prints them.",
       );
     }
   } else if (multi) {
@@ -219,8 +224,11 @@ export function resolveOrchestratorIdentity(
     };
   }
   throw new IdentityResolutionError(
-    "orchestrator block resolves no provider (no registry-known model, " +
-      "no provider label). Re-run start_session with --model, then retry.",
+    "orchestrator block resolves no provider: its model is not in this " +
+      "machine's model catalog and it carries no provider label. Start the " +
+      "session again with --model; `dabbler configuration options` prints " +
+      "what this machine may choose, and `dabbler discovery refresh` " +
+      "re-reads the catalog for nothing.",
   );
 }
 

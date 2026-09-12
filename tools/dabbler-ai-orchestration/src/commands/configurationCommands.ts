@@ -631,3 +631,59 @@ export async function setRoleModel(
     refreshed,
   );
 }
+
+/**
+ * Store a key for this provider, in a terminal and never in this window.
+ *
+ * **The secret is not collected here, and this is the whole design of the
+ * row.** An input box's contents live in the editor's own buffers, in its
+ * undo history and in whatever a window's telemetry happens to carry, and
+ * none of that is somewhere this framework can reach in to clear. `dabbler
+ * auth set` asks in a terminal with the echo off, reads the answer on a
+ * pipe, and hands it straight to the platform's store.
+ *
+ * What this command does is open that terminal with the right verb typed,
+ * wait for it to end, and repaint -- because the file it writes is at the
+ * USER level, outside every glob this window can watch, which is the same
+ * reason the catalog refresh causes its own repaint rather than awaiting
+ * one.
+ */
+export async function storeCredential(
+  target: ConfigurationTarget,
+  refreshed: () => void,
+  ui: ConfigurationUi = defaultConfigurationUi(),
+): Promise<void> {
+  const root = ui.workspaceRoot();
+  if (!root) return;
+  const node = target.node;
+  if (!node || node.kind !== "configCredential") return;
+  const credential = (target.projection?.configuration?.credentials ?? []).find(
+    (row) => row.provider === node.provider,
+  );
+  if (!credential) return;
+  const label = credential.displayLabel ?? credential.provider;
+  // **No confirmation, and that is the decision rather than an omission.**
+  // Every other control in this section confirms because it WRITES
+  // something the moment it is answered -- a committed setting, a refresh
+  // of a user-level record. This one writes nothing: it opens a terminal
+  // that asks, with its own question in its own words, and closing that
+  // terminal is the no. A modal in front of it is two questions for one
+  // answer, and the walk found the practical half of the same point -- the
+  // modal blocked the window it was drawn over.
+  const code = await ui.runVerb(`Dabbler: ${label} key`, root, [
+    "auth",
+    "set",
+    credential.provider,
+    ...(credential.reference ? ["--name", credential.reference] : []),
+  ]);
+  // Whatever it ended on: the store is at the user level, outside every
+  // glob this window can watch, so the row's reading is stale either way
+  // and the repaint is CAUSED rather than awaited.
+  refreshed();
+  if (code === 0 || code === undefined) return;
+  // The router said why in the terminal the operator was watching; a second
+  // rendering of one refusal is how two accounts of it come to disagree.
+  ui.showWarningMessage(
+    `No ${label} key was stored (exit ${code}). The terminal it ran in says why.`,
+  );
+}

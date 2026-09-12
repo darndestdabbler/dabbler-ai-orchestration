@@ -61,10 +61,18 @@ describe("resolving the orchestrator's identity", () => {
     assert.equal(resolved.source, "model-catalog");
   });
 
-  it("never trusts a Copilot seat's label", () => {
+  it("never trusts a Copilot seat's label, and sends the operator to the catalog", () => {
+    // The words used to name a model REGISTRY, which session 151 deleted --
+    // the resolution has read the catalog ever since, so an operator was
+    // being sent to look for a file that is not there.
     assert.throws(
       () => identity({ engine: "github-copilot", provider: "openai", model: "mystery-9000" }),
-      /multi-provider/,
+      (error: unknown) =>
+        error instanceof IdentityResolutionError &&
+        /multi-provider/.test(error.message) &&
+        /model catalog/.test(error.message) &&
+        /dabbler discovery refresh/.test(error.message) &&
+        !/registry/.test(error.message),
     );
   });
 

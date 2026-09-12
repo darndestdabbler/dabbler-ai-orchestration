@@ -64,6 +64,7 @@ import { openModule } from "./commands/openModule";
 import { endGrant } from "./commands/moduleGrant";
 import {
   refreshRecord,
+  storeCredential,
   chosenEngineIn,
   setAsMyDefault,
   setEngine,
@@ -419,6 +420,15 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand("dabblerSolution.refreshRecord", (node?: SolutionNode) =>
       refreshRecord({ node, projection: solutionProvider.freshProjection() }, () =>
+        solutionProvider.refresh(),
+      ),
+    ),
+    // Store a provider key on this machine. The secret is asked for in a
+    // terminal and never in this window: what goes into an input box lives
+    // in the editor's own buffers, and none of that is somewhere this
+    // framework can reach in to clear afterwards.
+    vscode.commands.registerCommand("dabblerSolution.storeCredential", (node?: SolutionNode) =>
+      storeCredential({ node, projection: solutionProvider.freshProjection() }, () =>
         solutionProvider.refresh(),
       ),
     ),

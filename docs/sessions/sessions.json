@@ -3091,9 +3091,9 @@
     {
       "number": 157,
       "title": "One place a choice is kept, and four things deleted",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-12T06:15:34.233000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-12T07:59:34.016000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

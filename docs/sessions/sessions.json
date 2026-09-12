@@ -3111,9 +3111,9 @@
     {
       "number": 158,
       "title": "The model an operator picks is the model that runs",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-12T09:25:36.704000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-12T11:31:07.132000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

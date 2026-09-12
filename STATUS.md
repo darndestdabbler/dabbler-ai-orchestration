@@ -1,6 +1,73 @@
-# STATUS — sessions 113–156 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.3 IS PUBLISHED to the Marketplace, carrying 148 and 149. 2.1.0 and 2.1.2 never shipped** — 2.1.0 refused over a walk-jobs timeout on the runner and 2.1.2 died on a Marketplace request timeout, so both tags stand on origin unpublished and 2.1.3 supersedes them; session 152 naming the two reviewing roles by voice and giving each its own vehicle, and session 153 taking the run of record off the host scheduler into a Podman container — 324 s to 26.4 s — with the one file that cannot follow it declared and the reason it cannot owed forward, and a guard that will not read a cancelled test as a pass, and session 154 closing the dark gate behind the extension suite's second door — CI had been red for eleven consecutive runs while three sessions closed VERIFIED through the other one — by arming the seam once where both doors read it, making the refusal cover mocha as well as node:test, and holding every gate to the suite it stands for with a divergence that is declared rather than forbidden, session 155 organising the Configuration section by the thing being configured rather than by the mechanism that configures it — two participants, five leaves, the Auxiliary Reviewer given the surface it has never had, and a projection re-derived whenever it is read, because nothing in a workspace can watch a user-level catalog — and session 156 walking the whole model-catalog block on both transports and both engines BEFORE publishing it, which is the entire argument for the order: twenty-one numbered readings, eleven defects fixed and four raised, five of them stopping an operator and every one of those five sitting in the block that was about to ship, **and 2.2.0 IS PUBLISHED**
+# STATUS — sessions 113–156 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, session 138 repairing all four, session 139 preparing 2.0.19 and putting its publication to the operator, who held it, and session 140 making the two surfaces that say where a session is agree with each other and with the record, and shipping it, session 141 taking the answer to "which branch is the trunk" from the repository rather than the host and refusing a checkout that carries no record, session 142 turning that refusal into a choice the operator is offered and a verb that carries it out, session 143 holding the Dabbler Terminal to one rule -- every phase in one tone, one gate row for both screens, and marks painted in a job's bytes -- and session 144 answering whether the model asked for is the model that answered, where three verification rounds found three real things and two of them were defects that would have shipped, session 145 giving the operator one place to see and set what a session is run with -- which uncovered that the model list was still the direct-API registry on a Copilot seat -- session 146 making the code agree with what a model list actually costs to obtain, which is nothing on all three surfaces: the seat states its own models over its protocol, a free record refreshes itself at session start, a model that stopped being served is marked rather than dropped, every cost names its billing platform, and the pane offers a seat's own catalog on a seat, and session 147 making a stop something a developer can act on: what refused in the words of the thing that refused, who acts, what each way on costs and the command for it; **2.1.3 IS PUBLISHED to the Marketplace, carrying 148 and 149. 2.1.0 and 2.1.2 never shipped** — 2.1.0 refused over a walk-jobs timeout on the runner and 2.1.2 died on a Marketplace request timeout, so both tags stand on origin unpublished and 2.1.3 supersedes them; session 152 naming the two reviewing roles by voice and giving each its own vehicle, and session 153 taking the run of record off the host scheduler into a Podman container — 324 s to 26.4 s — with the one file that cannot follow it declared and the reason it cannot owed forward, and a guard that will not read a cancelled test as a pass, and session 154 closing the dark gate behind the extension suite's second door — CI had been red for eleven consecutive runs while three sessions closed VERIFIED through the other one — by arming the seam once where both doors read it, making the refusal cover mocha as well as node:test, and holding every gate to the suite it stands for with a divergence that is declared rather than forbidden, session 155 organising the Configuration section by the thing being configured rather than by the mechanism that configures it — two participants, five leaves, the Auxiliary Reviewer given the surface it has never had, and a projection re-derived whenever it is read, because nothing in a workspace can watch a user-level catalog — and session 156 walking the whole model-catalog block on both transports and both engines BEFORE publishing it, which is the entire argument for the order: twenty-one numbered readings, eleven defects fixed and four raised, five of them stopping an operator and every one of those five sitting in the block that was about to ship, **and 2.2.0 IS PUBLISHED**, and session 157 giving a configured choice one place to live -- four layers deciding a vehicle and no fifth, `DABBLER_TRANSPORT` read by nothing that decides, the `configuration` block out of the projection and three vestigial fields out of the catalog, one reviewing vehicle for both reviewers, and `dabbler configuration options`/`explain` beside a `--authoring-model` that has never existed while the pane offered to set one -- through four rounds of blocking findings and one dispute the reviewer upheld
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 157 CLOSED, 2026-09-12 — one place a choice is kept, and four things deleted
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 157 | one resolution order for a vehicle, `DABBLER_TRANSPORT` out of it, four deletions, one reviewing vehicle, and two verbs | CLOSED VERIFIED at round 5 (four rounds of blocking findings, all fixed bar one dispute the reviewer upheld), landed `58738775`, closed `1e96a077`. NOT releasable: 158 is the half an operator can see |
+>
+> **A vehicle is decided by four layers and no fifth: a `--transport` flag,
+> then `<repo>/.vscode/settings.json` under `dabbler.*`, then the user-level
+> `preferences.json`, then the configuration the distribution ships.**
+> `DABBLER_TRANSPORT` is read by nothing that decides anything — `configure`
+> and `bootstrap` report it as obsolete and name the command that replaces it
+> — and `local-overrides.yaml`'s `transport.profile` is a STOP naming the key
+> and the command, because the replaced verbs wrote exactly that key and it
+> now sits below a personal default, where it would have been shadowed
+> silently. **This repository's own vehicle moved: `.vscode/settings.json`
+> carries `dabbler.transport: api`, committed.**
+>
+> **Four deletions.** `.dabbler/api-models.lock` (orphaned by 150, referenced
+> by nothing that runs). The `configuration` block out of the projection —
+> 50,198 of 51,002 bytes against 804 of module graph — with the file renamed
+> `.dabbler/solution/solution.json`; the extension joins a FRESH reading on at
+> read, so it can never render an older router's bytes (D276 for this half).
+> `alias`, `fidelity` and `providerRelation` out of the catalog and projection
+> types: `alias === model` for 261 of 261, per-model `fidelity` was
+> `not-known` for 259 of 261 and is derived at the round anyway, and the
+> cross-provider WORD is now derived at render from the author's provider,
+> stated once, against each candidate's own. `price_category` and `cost` stay.
+>
+> **One reviewing vehicle for both reviewers.** An auxiliary key that agrees
+> is ignored; one that differs is a stop naming both keys, because choosing
+> between two live values on the operator's behalf is how state stops matching
+> the record. A non-reviewing role keeps its own config-tier vehicle.
+>
+> **Two verbs added and no more.** `dabbler configure --authoring-model`,
+> checked against the list the PANE offers (the engine's own, not the
+> transport's) so the offer and the acceptance are one list; `dabbler
+> configuration options` (every choice with local availability on it) and
+> `dabbler configuration explain` (each resolved value with the layer that
+> decided it, and the layers it shadows).
+>
+> **FOUR ROUNDS OF BLOCKING FINDINGS, and the reviewer was right about all
+> but one.** Round 1 found that `--authoring-model` wrote a setting no reader
+> consumed — a control reporting success and changing nothing, which is the
+> exact failure this block exists to delete. Round 2 found that the start
+> gate's layer list was missing the two REVIEWING layers, so the rule it
+> asserted did not apply to the case it was written for; and that a TTL is not
+> a repaint, because VS Code has no reason to ask again. Round 3 found that
+> `repoRoot` scoped the settings read but not the config the ladder was built
+> from, so a round for repository B could bill A's vehicle. **Session 155's
+> claim that nothing in a workspace can watch a user-level file is retired: a
+> `RelativePattern` over an absolute base reaches it, and the Solution
+> Explorer now watches the catalog and preferences directly.**
+>
+> **The dispute that was upheld, and why it was worth filing anyway.** I
+> argued `local-overrides.yaml` was a config SOURCE in the bottom tier rather
+> than a fifth input. Round 2 answered the argument I had not made: every
+> checkout created before this session carries that key because the replaced
+> verbs wrote it, so it is an upgrade population and not a hypothetical. The
+> refusal is the fix, and it is the same shape as the auxiliary-key stop.
+>
+> **The close needed `verify reopen --rounds 1`.** Round 4 VERIFIED the tree;
+> the run of record then failed (the overlay reading spawned git for a
+> checkout the caller had already named, which the container's no-git preload
+> refuses) and the framework asked for the fix — which moved the verified
+> tree. Putting it back was not an answer, so the round was bought and
+> recorded. Round 5: VERIFIED.
 
 > ## SESSION 156 CLOSED, 2026-09-11 — the block walked on both transports, and 2.2.0 published
 >

@@ -1,0 +1,587 @@
+// Setting a consumer project up: the instruction fence, the ignore rule, the
+// commit guard, the scaffolded declaration, and the transport preference.
+//
+// Which branch runs, what is left alone, and what a second run does. The
+// scope decision takes its writer as a parameter, so it is asserted from
+// literals; the rest reads and writes files in a directory, and the two that
+// commit ask git, which answers from a table.
+import assert from "node:assert/strict";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { afterEach, describe, it } from "node:test";
+
+import { bootstrapVerb } from "../src/cli/bootstrap.ts";
+import { owedVerb } from "../src/cli/owed.ts";
+import {
+  MANAGED_END,
+  MANAGED_START,
+  appendSuitesToProjectConfig,
+  detectEcosystems,
+  ensureCommitGuard,
+  ensureGitignore,
+  renderProjectConfig,
+  scaffoldBootstrapSessions,
+  scaffoldProjectConfig,
+  scaffoldModuleManifest,
+  writeInstructionFiles,
+} from "../src/bootstrap/index.ts";
+import {
+  TRANSPORT_COPILOT_CLI,
+  TRANSPORT_ENV_VAR,
+} from "../src/config.ts";
+import { SETTINGS_RELPATH } from "../src/settings.ts";
+import {
+  ID_GIT_REMOTE,
+  ID_TESTING_SUITES,
+  blockingDecisions,
+  openDecisions,
+  raiseRemoteDecision,
+  refreshOwedDecisions,
+} from "../src/owedDecisions.ts";
+import { capture } from "../src/output.ts";
+import { solutionShape } from "../src/modules.ts";
+import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
+import { makeAnsweredRepo, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
+
+const savedTransport = process.env[TRANSPORT_ENV_VAR];
+afterEach(() => {
+  if (savedTransport === undefined) delete process.env[TRANSPORT_ENV_VAR];
+  else process.env[TRANSPORT_ENV_VAR] = savedTransport;
+});
+
+/** A directory answering as a repository with nothing in it, and no remote: a project the moment before setup. */
+function emptyRepo(): string {
+  return makeAnsweredRepo({}).repo;
+}
+
+/**
+ * The transport a bootstrap run names is written to the CHECKOUT's own
+ * settings file and nothing outside it.
+ *
+ * `bootstrap` used to persist `DABBLER_TRANSPORT` at user scope. That
+ * variable outranked every config layer, so the one thing it reliably did
+ * was shadow whatever a later `dabbler configure` set -- for every
+ * repository on the machine, from a per-project action. It is not written,
+ * and it is not read.
+ */
+describe("where a bootstrap run's transport lands", () => {
+  it("writes the checkout's own settings and never the operator's environment", async () => {
+    const repo = emptyRepo();
+    const before = process.env[TRANSPORT_ENV_VAR];
+    const run = await capture(() =>
+      bootstrapVerb(["--project-dir", repo, "--transport", TRANSPORT_COPILOT_CLI]),
+    );
+    assert.equal(run.value, 0, run.stderr);
+    assert.match(
+      readFileSync(join(repo, SETTINGS_RELPATH), "utf8"),
+      new RegExp(TRANSPORT_COPILOT_CLI),
+    );
+    // The account is untouched, whatever it held before.
+    assert.equal(process.env[TRANSPORT_ENV_VAR], before);
+  });
+
+  it("changes nothing at all when no transport is named", async () => {
+    const repo = emptyRepo();
+    const run = await capture(() => bootstrapVerb(["--project-dir", repo]));
+    assert.equal(run.value, 0, run.stderr);
+    assert.ok(!existsSync(join(repo, SETTINGS_RELPATH)));
+  });
+});
+
+describe("the ignore rule", () => {
+  it("creates the file with the rule when there is none", () => {
+    const project = tempDir("bootstrap-");
+    assert.equal(ensureGitignore(project), true);
+    assert.match(readFileSync(join(project, ".gitignore"), "utf8"), /\.dabbler\//);
+  });
+
+  it("appends without disturbing what is already there", () => {
+    const project = tempDir("bootstrap-");
+    seed(project, { ".gitignore": "node_modules/\n" });
+    assert.equal(ensureGitignore(project), true);
+    const text = readFileSync(join(project, ".gitignore"), "utf8");
+    assert.match(text, /node_modules\//);
+    assert.match(text, /\.dabbler\//);
+  });
+
+  it("adds the rule once however many times it runs", () => {
+    const project = tempDir("bootstrap-");
+    ensureGitignore(project);
+    assert.equal(ensureGitignore(project), false);
+    const text = readFileSync(join(project, ".gitignore"), "utf8");
+    assert.equal(text.split(".dabbler/").length - 1, 1);
+  });
+
+  it("leaves an equivalent rule someone already wrote alone", () => {
+    const project = tempDir("bootstrap-");
+    seed(project, { ".gitignore": ".dabbler\n" });
+    assert.equal(ensureGitignore(project), false);
+  });
+
+  it("does not blunt a rule written to re-include something underneath", () => {
+    // `.dabbler/*` governs the same directory but leaves the parent
+    // traversable. Adding `.dabbler/` after it would exclude the parent
+    // outright, and git cannot re-include through an excluded parent -- so a
+    // ledger the project deliberately tracks would silently stop being added.
+    const project = tempDir("bootstrap-");
+    seed(project, { ".gitignore": ".dabbler/*\n!.dabbler/runs/\n" });
+    assert.equal(ensureGitignore(project), false);
+    assert.ok(!readFileSync(join(project, ".gitignore"), "utf8").includes("\n.dabbler/\n"));
+  });
+});
+
+describe("the instruction files", () => {
+  it("writes three files, each with a managed section inside its budget", () => {
+    const project = tempDir("bootstrap-");
+    const written = writeInstructionFiles(project, "acme-app");
+    assert.deepEqual(
+      written.map((path) => path.split(/[\\/]/).pop()),
+      ["AGENTS.md", "CLAUDE.md", "GEMINI.md"],
+    );
+    for (const path of written) {
+      const text = readFileSync(path, "utf8");
+      assert.match(text, new RegExp(MANAGED_START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+      assert.match(text, new RegExp(MANAGED_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+      // A fence an orchestrator loads every session is a budget, not just a
+      // document.
+      assert.ok(text.replace(/\n$/, "").split("\n").length <= 150, path);
+    }
+  });
+
+  it("puts the body in AGENTS.md alone and imports it from the others", () => {
+    // Copilot loads all three at once and de-duplicates nothing, so exactly
+    // one file may hold the body.
+    const project = tempDir("bootstrap-");
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
+    assert.match(agents, /`acme-app`/);
+    assert.match(agents, /dabbler session next/);
+    for (const name of ["CLAUDE.md", "GEMINI.md"]) {
+      const text = readFileSync(join(project, name), "utf8");
+      assert.match(text, /@AGENTS\.md/);
+      assert.ok(!text.includes("dabbler session next"));
+    }
+  });
+
+  it("tells the engine to call the framework rather than typing the lifecycle out", () => {
+    // The engine used to read nine numbered steps and execute them. It now
+    // reads one verb, because a list an engine can follow is a list it will
+    // follow whether or not the framework is already doing the work.
+    const project = tempDir("bootstrap-");
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
+    assert.match(agents, /dabbler session next/);
+    for (const verb of [
+      "session declare",
+      "dabbler affected",
+      "test-evidence record",
+      "dabbler verify",
+      "dabbler packaging",
+      "session close",
+    ]) {
+      assert.ok(!agents.includes(verb), verb);
+    }
+    // What stays is what is still the engine's to honour.
+    assert.match(agents, /DABBLER_ANTHROPIC_API_KEY/);
+    assert.match(agents, /never by hand/);
+  });
+
+  it("says publishing is the framework's, and says which sessions it is true of", () => {
+    // The sentence claimed publishing happened inside the framework's own
+    // calls while nothing in the driven lifecycle called packaging, so a
+    // csv-model orchestrator following it exactly waited for a step that
+    // never came and the session shipped nothing.
+    const project = tempDir("bootstrap-");
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
+    assert.match(agents, /releasable/);
+    assert.match(agents, /not-releasable/);
+    assert.match(agents.toLowerCase(), /the close refuses/);
+  });
+
+  it("tells every project the two things that corrupt work silently", () => {
+    // Both were learned here and neither reached the body a project gets: a
+    // csv-model session lost JSON backslash escapes to a Git Bash heredoc,
+    // and a report was refused for a tree that moved under its own check.
+    // Asserted by meaning rather than by wording.
+    const project = tempDir("bootstrap-");
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
+    assert.match(agents, /heredoc/);
+    assert.match(agents.toLowerCase(), /backslash/);
+    assert.match(agents, /editing tools/);
+    assert.match(agents.toLowerCase(), /working tree/);
+  });
+
+  it("tells the engine the clock is the framework's, not a thing to re-engineer", () => {
+    // The body said "a call you make later, never a sleep you hold", and a
+    // capable model read it and built a background poll on `run.json`'s job
+    // field -- which only `next` clears, so the callback was its own
+    // precondition and a finished verification sat uncollected for three
+    // hours. The sentence ruled out a sleep and left a mechanism open; the
+    // rule now names the mechanism. Asserted by meaning, not by wording.
+    const project = tempDir("bootstrap-");
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8").toLowerCase();
+    assert.match(agents, /owns the clock/);
+    assert.match(agents, /your own next call/);
+    assert.match(agents, /waits\s+forever/);
+  });
+
+  it("gives each engine its own tail", () => {
+    const project = tempDir("bootstrap-");
+    writeInstructionFiles(project, "x");
+    assert.match(readFileSync(join(project, "CLAUDE.md"), "utf8"), /Claude Code/);
+    assert.match(readFileSync(join(project, "AGENTS.md"), "utf8"), /Copilot/);
+    assert.match(readFileSync(join(project, "GEMINI.md"), "utf8"), /Gemini CLI/);
+  });
+
+  it("never touches user content outside the fence, and replaces only the fence", () => {
+    const project = tempDir("bootstrap-");
+    const mine = join(project, "CLAUDE.md");
+    seed(project, { "CLAUDE.md": "# My own rules\nNever delete this line.\n" });
+    writeInstructionFiles(project, "x");
+    assert.match(readFileSync(mine, "utf8"), /Never delete this line\./);
+
+    const target = join(project, "AGENTS.md");
+    const first = readFileSync(target, "utf8");
+    writeFileSync(target, `above\n\n${first}\nbelow\n`, "utf8");
+    writeInstructionFiles(project, "x");
+    const text = readFileSync(target, "utf8");
+    assert.ok(text.startsWith("above\n"));
+    assert.ok(text.trimEnd().endsWith("below"));
+    assert.equal(text.split(MANAGED_START).length - 1, 1);
+  });
+
+  it("names the project after its directory when nothing else does", () => {
+    const project = tempDir("bootstrap-");
+    writeInstructionFiles(project);
+    assert.match(
+      readFileSync(join(project, "AGENTS.md"), "utf8"),
+      new RegExp(project.split(/[\\/]/).pop() as string),
+    );
+  });
+});
+
+describe("the Stop hook, at bootstrap", () => {
+  it("removes the entry the framework installed under Claude Code, keeps the operator's, and writes none", async () => {
+    // Bootstrap knows only the host it runs under: the CLAUDECODE marker.
+    // The start path has the same removal and its own case.
+    const { repo } = makeAnsweredSandbox({
+      ".claude/settings.json": JSON.stringify({
+        hooks: {
+          Stop: [
+            { hooks: [{ type: "command", command: "dabbler session hook-stop --sessions-dir docs/sessions" }] },
+            { hooks: [{ type: "command", command: "echo the operator's own" }] },
+          ],
+        },
+        theme: "dark",
+      }),
+    });
+    const saved = process.env["CLAUDECODE"];
+    process.env["CLAUDECODE"] = "1";
+    try {
+      const run = await capture(() => bootstrapVerb(["--project-dir", repo]));
+      assert.equal(run.value, 0, run.stderr);
+      assert.match(run.stdout, /removed the stop gate from/);
+      assert.deepEqual(JSON.parse(readFileSync(join(repo, ".claude", "settings.json"), "utf8")), {
+        hooks: { Stop: [{ hooks: [{ type: "command", command: "echo the operator's own" }] }] },
+        theme: "dark",
+      });
+      // Nothing left to remove: the second run says nothing of it.
+      const again = await capture(() => bootstrapVerb(["--project-dir", repo]));
+      assert.doesNotMatch(again.stdout, /stop gate/);
+    } finally {
+      if (saved === undefined) delete process.env["CLAUDECODE"];
+      else process.env["CLAUDECODE"] = saved;
+    }
+  });
+});
+
+describe("the commit guard", () => {
+  it("installs a hook that invokes the router by name, once", () => {
+    // There is no interpreter to bake in: a consumer repository is not
+    // required to contain the thing that guards it.
+    const project = emptyRepo();
+    const hook = ensureCommitGuard(project);
+    assert.notEqual(hook, null);
+    const text = readFileSync(hook as string, "utf8");
+    assert.match(text, /dabbler verify step guard-commit/);
+    assert.ok(!text.includes("python"));
+    assert.equal(ensureCommitGuard(project), null);
+  });
+
+  it("never clobbers a hook it did not write", () => {
+    // A project's own pre-commit checks are not ours to delete, and a guard
+    // that silently ate them would be worse than no guard.
+    const project = emptyRepo();
+    const path = join(project, ".git", "hooks", "pre-commit");
+    mkdirSync(join(project, ".git", "hooks"), { recursive: true });
+    writeFileSync(path, "#!/bin/sh\nmake lint\n", "utf8");
+    assert.equal(ensureCommitGuard(project), null);
+    assert.match(readFileSync(path, "utf8"), /make lint/);
+  });
+
+  it("declines a directory that is not a repository", () => {
+    assert.equal(ensureCommitGuard(tempDir("bootstrap-")), null);
+  });
+});
+
+describe("the scaffolded setup sessions", () => {
+  it("writes two numbered sessions into a project with no plan", () => {
+    const project = tempDir("bootstrap-");
+    const written = scaffoldBootstrapSessions(project);
+    assert.equal(written.length, 1);
+    const text = readFileSync(written[0] as string, "utf8");
+    assert.match(text, /### Session 1:/);
+    assert.match(text, /### Session 2:/);
+    assert.match(text, /Do NOT hand-author `sessions\.json`/);
+  });
+
+  it("never overwrites a plan the repository already has", () => {
+    // A repository that already has a plan has its own numbering and its own
+    // history.
+    const project = tempDir("bootstrap-");
+    seed(project, { "docs/sessions/session-plan.md": "# Ours\n" });
+    assert.deepEqual(scaffoldBootstrapSessions(project), []);
+    assert.equal(
+      readFileSync(join(project, "docs", "sessions", "session-plan.md"), "utf8"),
+      "# Ours\n",
+    );
+  });
+});
+
+describe("what a repository declares about its tests", () => {
+  it("answers the suite decision in a repository with no config, and never declares the same suite twice", () => {
+    // Both states the Java walk met. The recommended answer refused in a
+    // fresh Maven repository because there was no dabbler.yaml to write
+    // into; then, once bootstrap had written one WITH a maven suite,
+    // answering again appended a second, identical suite.
+    const project = tempDir("suite-answer-");
+    seed(project, { "pom.xml": "<project/>\n" });
+    const ecosystems = detectEcosystems(project);
+    const created = appendSuitesToProjectConfig(project, ecosystems);
+    assert.deepEqual([created?.created, [...(created?.added ?? [])]], [true, ["maven"]]);
+    const written = readFileSync(join(project, "dabbler.yaml"), "utf8");
+    assert.match(written, /name: maven/);
+
+    const again = appendSuitesToProjectConfig(project, ecosystems);
+    assert.deepEqual([again?.created, [...(again?.added ?? [])], [...(again?.alreadyDeclared ?? [])]], [
+      false,
+      [],
+      ["maven"],
+    ]);
+    // The file is byte-for-byte what it was: one suite, not two.
+    assert.equal(readFileSync(join(project, "dabbler.yaml"), "utf8"), written);
+    assert.equal((written.match(/name: maven/g) ?? []).length, 1);
+  });
+
+  it("gives each detected ecosystem its own suite", () => {
+    const project = tempDir("bootstrap-");
+    seed(project, { "pytest.ini": "[pytest]\n", "pom.xml": "<project/>\n" });
+    const config = renderProjectConfig(detectEcosystems(project));
+    assert.match(config, /name: python/);
+    assert.match(config, /name: maven/);
+    assert.match(config, /runs_whole: true/);
+  });
+
+  it("declares nothing from a build file that declares no test command", () => {
+    // `pyproject.toml` says this is a Python project; it says nothing about
+    // how the tests run, and plenty of them use unittest or nox.
+    const project = tempDir("bootstrap-");
+    seed(project, { "pyproject.toml": "[project]\nname='x'\n" });
+    assert.deepEqual(detectEcosystems(project), []);
+  });
+
+  it("declares nothing from a script that exists in order to fail", () => {
+    // `npm init` writes the placeholder, and a repository that has not
+    // replaced it has said the opposite of "my tests run this way".
+    const project = tempDir("bootstrap-");
+    seed(project, {
+      "package.json": JSON.stringify({
+        scripts: { test: 'echo "Error: no test specified" && exit 1' },
+      }),
+    });
+    assert.deepEqual(detectEcosystems(project), []);
+  });
+
+  it("survives a manifest that parses but does not conform", () => {
+    // A shape error must leave node undetected rather than end the whole
+    // bootstrap.
+    const project = tempDir("bootstrap-");
+    seed(project, { "package.json": '{"scripts": "not a map"}' });
+    assert.deepEqual(detectEcosystems(project), []);
+  });
+
+  it("declares nothing for a build file below the root", () => {
+    // A suite declares a command and no working directory, so
+    // `service/pom.xml` has no runnable line to become.
+    const project = tempDir("bootstrap-");
+    seed(project, { "service/pom.xml": "<project/>\n" });
+    assert.deepEqual(detectEcosystems(project), []);
+  });
+
+  it("uses the committed wrapper as the entry point it was committed to be", () => {
+    // `gradle test` on a machine that has only `gradlew` fails for a reason
+    // the repository already solved.
+    const project = tempDir("bootstrap-");
+    seed(project, { "build.gradle": "" });
+    assert.equal(detectEcosystems(project)[0]?.command, "gradle test");
+    seed(project, { gradlew: "#!/bin/sh\n" });
+    assert.equal(detectEcosystems(project)[0]?.command, "./gradlew test");
+  });
+
+  it("maps every path rather than none", () => {
+    // A path no rule covers is `selection_unknown`, and pre-verification
+    // fails closed. The only honest starting mapping is repository-wide.
+    const project = tempDir("bootstrap-");
+    seed(project, { "pytest.ini": "[pytest]\n" });
+    assert.match(renderProjectConfig(detectEcosystems(project)), /repo_wide/);
+  });
+
+  it("declares no suite for a repository that says nothing", () => {
+    // That is a declaration, not an omission. The block it shows is an
+    // example, and every line of it is commented: a scaffold that emitted a
+    // live `testing:` key would hand the repository a suite it never
+    // declared.
+    const config = renderProjectConfig([]);
+    assert.match(config, /No suite is declared/);
+    assert.deepEqual(
+      config.split("\n").filter((line) => line.startsWith("testing:")),
+      [],
+    );
+  });
+
+  it("never overwrites a declaration the repository already made", () => {
+    const project = tempDir("bootstrap-");
+    seed(project, { "dabbler.yaml": "schema_version: 1\n" });
+    assert.equal(scaffoldProjectConfig(project), null);
+    assert.equal(readFileSync(join(project, "dabbler.yaml"), "utf8"), "schema_version: 1\n");
+  });
+
+  it("declares .NET from a solution or project file at the root", () => {
+    const project = tempDir("bootstrap-");
+    seed(project, { "Acme.csproj": "<Project/>\n" });
+    assert.equal(detectEcosystems(project)[0]?.key, "dotnet");
+  });
+});
+
+describe("what setup does about the operator's typing", () => {
+  // That setup commits its own files and only those, and leaves the
+  // operator's work in progress alone, is walk-bootstrap's: it is a claim
+  // about what git holds afterwards, and it is made against a real one.
+
+  it("leaves its files uncommitted while a session is in flight, and says so", async () => {
+    // Session 94 re-ran bootstrap mid-session to regenerate the managed
+    // body, and the fresh-project guard committed AGENTS.md by itself as
+    // "Set up Dabbler" -- a commit outside the framework's own land phase.
+    // With a session in flight, the land's `git add -A` is what commits
+    // the files, so bootstrap writes them and leaves them.
+    const { repo, sessionsDir, calls } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const run = await capture(() =>
+      bootstrapVerb(["--project-dir", repo]),
+    );
+    assert.equal(run.value, 0, run.stderr);
+    assert.ok(existsSync(join(repo, "AGENTS.md")));
+    assert.ok(!calls.some((argv) => argv[0] === "commit" || argv[0] === "add"), "git was asked to commit");
+    // Before the declaration, the land is NOT what commits them: the
+    // declaration refuses a tree carrying changes, and refuses it again,
+    // which is a deadlock. The Java walk sat in exactly that.
+    assert.match(run.stdout, /has not declared its task yet/);
+    assert.match(run.stdout, /git add -A && git commit/);
+    assert.doesNotMatch(run.stdout, /committed \d+ file/);
+
+    // Once it has declared, the land is what commits them, and the message
+    // says so again.
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "the work", releasable: false });
+    const after = await capture(() =>
+      bootstrapVerb(["--project-dir", repo]),
+    );
+    assert.match(after.stdout, /its land is what commits them/);
+  });
+
+  it("asks where the repository pushes rather than printing a push command", async () => {
+    // The close used to print `git push --set-upstream <remote> main` for a
+    // remote nobody had created.
+    const repo = emptyRepo();
+    await bootstrapVerb(["--project-dir", repo]);
+    assert.ok(openDecisions(repo).map((row) => String(row["id"])).includes(ID_GIT_REMOTE));
+  });
+
+  it("does not ask a repository that already has a remote, and never holds the close", () => {
+    // Staying local is a real answer, so the question is advisory.
+    const { repo } = makeAnsweredSandbox();
+    assert.equal(raiseRemoteDecision(repo, { hasRemote: true }), null);
+    const local = emptyRepo();
+    assert.equal(raiseRemoteDecision(local, { hasRemote: false })?.["severity"], "advisory");
+    assert.equal(blockingDecisions(local).length, 0);
+  });
+});
+
+describe("what the Solution Explorer has to render", () => {
+  it("scaffolds a one-module manifest the framework reads as single-module, and a plan that names the solution plan", () => {
+    // A fresh repository IS one module, and one module is the shape in
+    // which nothing module-shaped switches on -- the requirement every
+    // session of the modules block is held to.
+    const repo = emptyRepo();
+    assert.equal(scaffoldModuleManifest(repo), join(repo, "docs", "modules.yaml"));
+    const shape = solutionShape(repo);
+    assert.equal(shape.multi, false);
+    assert.equal(shape.implicit, false);
+    assert.equal(shape.modules.length, 1);
+    assert.equal(shape.modules[0]?.kind, "application");
+    assert.deepEqual(shape.modules[0]?.codeRoots, ["."]);
+    for (const path of scaffoldBootstrapSessions(repo)) {
+      if (!path.endsWith("session-plan.md")) continue;
+      const plan = readFileSync(path, "utf8");
+      assert.match(plan, /docs\/planning\/solution-plan\.md/);
+      assert.match(plan, /one module\s+is a fine answer/i);
+    }
+  });
+
+  it("leaves a manifest the project already wrote alone", () => {
+    const repo = emptyRepo();
+    mkdirSync(join(repo, "docs"), { recursive: true });
+    writeFileSync(join(repo, "docs", "modules.yaml"), "# mine\n", "utf8");
+    assert.equal(scaffoldModuleManifest(repo), null);
+    assert.equal(readFileSync(join(repo, "docs", "modules.yaml"), "utf8"), "# mine\n");
+  });
+
+  it("writes the first projection, so the tree has content before any verb", async () => {
+    const repo = emptyRepo();
+    await bootstrapVerb(["--project-dir", repo]);
+    assert.ok(existsSync(join(repo, ".dabbler", "solution", "solution.json")));
+  });
+});
+
+describe("answering a decision that writes the project config", () => {
+  it("names the commit while the session has not declared, and says nothing once it has", async () => {
+    // `session start` raises testing-suites, and the recommended answer
+    // writes the tracked dabbler.yaml -- inside the window where the
+    // declaration refuses a tree carrying changes. The Java walk of
+    // 2026-09-07 met exactly that, one verb over from the bootstrap case
+    // session 116 fixed.
+    const { repo, sessionsDir } = makeAnsweredSandbox({ "pom.xml": "<project/>\n" });
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    refreshOwedDecisions(repo, { ecosystems: ["maven"], hasExpensiveSuite: false, configFilename: "dabbler.yaml" });
+    const undeclared = await capture(() =>
+      owedVerb(["answer", "--sessions-dir", sessionsDir, "--id", ID_TESTING_SUITES, "--choice", "declare"]),
+    );
+    assert.equal(undeclared.value, 0, undeclared.stderr);
+    assert.match(undeclared.stdout, /has not declared its task yet/);
+    assert.match(undeclared.stdout, /git add -A && git commit/);
+
+    // Declared: the land commits what the session touched, and there is
+    // nothing to warn about.
+    const second = makeAnsweredSandbox({ "pom.xml": "<project/>\n" });
+    registerSessionStart(second.sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(second.sessionsDir, { sessionNumber: 1, task: "the work", releasable: false });
+    refreshOwedDecisions(second.repo, { ecosystems: ["maven"], hasExpensiveSuite: false, configFilename: "dabbler.yaml" });
+    const declared = await capture(() =>
+      owedVerb(["answer", "--sessions-dir", second.sessionsDir, "--id", ID_TESTING_SUITES, "--choice", "declare"]),
+    );
+    assert.equal(declared.value, 0, declared.stderr);
+    assert.doesNotMatch(declared.stdout, /has not declared its task yet/);
+  });
+});

@@ -36,6 +36,16 @@ const shared = {
   sourcemap: true,
   external: ["yaml", "ajv", "smol-toml"],
   define: { "import.meta.url": MODULE_URL },
+  // **The ES module build of a dependency, where it ships one.**
+  //
+  // esbuild resolves `main` before `module` for a node target, and
+  // `jsonc-parser`'s `main` is a UMD file whose own `require("./impl/format")`
+  // survives bundling as an unresolvable relative path -- so the bundle
+  // loaded and then died on its first use, in the extension, where nothing
+  // else would have caught it. Its `module` entry is plain ESM and bundles
+  // whole. Every other dependency here is either external or already ESM, so
+  // this changes only the file that was broken.
+  mainFields: ["module", "main"],
 };
 
 await Promise.all([

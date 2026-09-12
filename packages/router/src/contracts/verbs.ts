@@ -187,7 +187,16 @@ export const VERBS: readonly VerbSpec[] = [
     // has to be makeable on a machine with no editor open.
     verb: "configure",
     extensionFacing: true,
-    summary: "what the next session is run with: the transport, and the two models",
+    summary: "what the next session is run with: the vehicles, and the three models",
+  },
+  {
+    // The reading half of the pair `configure` writes. It is engine-facing
+    // because the pane renders the same reading from the projection rather
+    // than shelling out for it -- what this verb is for is the machine with
+    // no editor open, where "why is it on the seat" has no other answer.
+    verb: "configuration",
+    extensionFacing: false,
+    summary: "what may be chosen, and which layer decided each value that is",
   },
   {
     verb: "contractdoc",

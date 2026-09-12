@@ -419,7 +419,7 @@ describe("dabbler modules", () => {
     // The verb that moved the manifest rewrote the projection the Solution
     // Explorer reads, so a terminal `create` shows up in the tree.
     const projected = JSON.parse(
-      readFileSync(join(root, ".dabbler", "solution", "projection.json"), "utf8"),
+      readFileSync(join(root, ".dabbler", "solution", "solution.json"), "utf8"),
     ) as { modules: { slug: string }[] };
     assert.deepEqual(projected.modules.map((m) => m.slug), ["model", "persister"]);
     // A dependency the manifest does not declare is refused at write time.

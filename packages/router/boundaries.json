@@ -17,6 +17,7 @@
         "sessionState",
         "catalog",
         "preferences",
+        "settings",
         "resolution",
         "version"
       ]

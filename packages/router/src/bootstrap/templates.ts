@@ -196,9 +196,9 @@ export const AGENTS_TAIL =
   "\n" +
   "Copilot seats: declare `--model` on the first call, the one that\n" +
   "registers, and set the vehicle with `dabbler configure --transport\n" +
-  "copilot-cli` when routing through the seat -- nothing persists\n" +
-  "`DABBLER_TRANSPORT` for you any more, because a variable that outranks\n" +
-  "every config layer shadowed the very preference a later run set. Review\n" +
+  "copilot-cli` when routing through the seat. `DABBLER_TRANSPORT` is not\n" +
+  "read at all any more: a variable that outranked every file and was\n" +
+  "written by nothing shadowed the very preference a later run set. Review\n" +
   "stays cross-provider on every transport.\n";
 
 /**

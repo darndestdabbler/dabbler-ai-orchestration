@@ -148,25 +148,11 @@ export interface ConfigurationEngines {
   installed: { engine: string; program: string; path: string | null }[];
 }
 
-/**
- * What the record says about whether a model answers as itself.
- *
- * THREE answers and never two, which is the whole reason this field exists.
- * A model nobody has ever asked for and a model that once answered as
- * something else are different facts, and a surface that rendered them alike
- * would be claiming a confidence nothing earned. `not-known` is the common
- * case: only a provider's own statement of what answered can make a model
- * read `honoured`, and a seat's echo can never.
- */
-export type ModelFidelity = "honoured" | "substituted" | "not-known";
-
-/** One model, as the registry declares it and the record reads it. */
+/** One model, as this machine's catalog lists it. */
 export interface ConfigurationModel {
-  alias: string;
+  /** The id the source listed, which is the id that goes on the wire. */
   model: string;
   provider: string;
-  /** Absent in a projection written before the record was read. */
-  fidelity?: ModelFidelity;
   /**
    * Present only on a model the dated record says stopped being served,
    * with when it went and when it was last seen. Such a model is in
@@ -180,8 +166,6 @@ export interface ConfigurationModel {
    * a developer to distrust the pane.
    */
   priceCategory?: string | null;
-  /** How this model's provider stands to the authoring model's. */
-  providerRelation?: string | null;
 }
 
 /**
@@ -211,6 +195,16 @@ export interface ConfigurationVehicle {
 /** How a role resolves: what it would pick, and what it was resolved against. */
 export interface ConfigurationRole {
   role: string;
+  /**
+   * The AUTHORING row only: the provider the work is authored by.
+   *
+   * One fact about the author rather than a label stamped onto every
+   * candidate. It survives an engine that declares no model -- Claude Code's
+   * `session start` takes none -- because the router reads it from the
+   * engine, so the cross-provider word can be said on a row where there is
+   * no authoring model at all to compare against.
+   */
+  provider?: string | null;
   /** What carries this role: the engine's CLI, or the reviewer's transport. */
   vehicle?: ConfigurationVehicle;
   /**
@@ -274,8 +268,6 @@ export interface ConfigurationRecord {
  */
 export interface ProjectionConfiguration {
   transport?: ConfigurationTransport;
-  /** Which transport every `fidelity` below was read for. */
-  fidelityTransport?: string;
   engines?: ConfigurationEngines;
   authoring?: ConfigurationRole;
   /** The Primary Reviewer: the model that reviews the work, and is not its author. */
@@ -389,9 +381,10 @@ function configVehicle(
   p: Projection,
   who: ConfigParticipant,
 ): ConfigurationVehicle | undefined {
-  // The reviewing vehicle is the PRIMARY's, which is the reviewer of record;
-  // the auxiliary follows the same machine unless a role in the config says
-  // otherwise, and the row says so where one does.
+  // ONE reviewing vehicle, carried identically on both reviewing rows: the
+  // auxiliary's own was state that reached dispatch and that no surface
+  // could show or set, so the row for it was a control that appeared to work
+  // and changed nothing.
   return who === "authoring"
     ? configuration(p).authoring?.vehicle
     : configuration(p).primaryReviewer?.vehicle;
@@ -425,7 +418,13 @@ export const ENUMERATION_WORDS: Record<string, string> = {
 };
 
 /**
- * How a candidate's provider stands to the authoring model's, in words.
+ * How a candidate's provider stands to the author's, in words.
+ *
+ * DERIVED from two providers the reading already carries -- the authoring
+ * row's own, and this candidate's -- rather than read from a field. It was a
+ * field on every one of 261 candidates, computed and never stored, which is
+ * 261 copies of one comparison; the authoring row states its provider once
+ * and the comparison is made where the word is needed.
  *
  * This is the whole of what cross-provider review is now: a LABEL the person
  * choosing can weigh, where there used to be a refusal. A different provider
@@ -434,14 +433,16 @@ export const ENUMERATION_WORDS: Record<string, string> = {
  * why the framework states the fact and leaves the judgement where the data
  * to make it actually is.
  *
- * One vocabulary, read by the row AND by the pick. Two copies of a
- * vocabulary drift, and sessions 143 and 147 each paid for finding that out.
+ * One function, read by the row AND by the pick. Two copies of a vocabulary
+ * drift, and sessions 143 and 147 each paid for finding that out.
  */
-export const PROVIDER_RELATION_WORDS: Record<string, string> = {
-  "different-provider": "different provider",
-  "same-provider": "same provider",
-  "provider-unknown": "provider unknown",
-};
+export function providerRelationWord(
+  author: string | null | undefined,
+  provider: string | null | undefined,
+): string {
+  if (!author || !provider) return "provider unknown";
+  return author === provider ? "same provider" : "different provider";
+}
 
 /**
  * What each model row is called, under the participant it belongs to.
@@ -481,27 +482,10 @@ const ROLE_ICONS: Record<ConfigRoleName, string> = {
 export const REVIEWER_HELP =
   "A different provider reduces the chance the reviewer shares the author's blind spots.";
 
-export const FIDELITY_WORDS: Record<ModelFidelity, string> = {
-  honoured: "answers as itself",
-  substituted: "has answered as another model",
-  "not-known": "not known",
-};
-
-const FIDELITY_TOLD: Record<ModelFidelity, string> = {
-  honoured:
-    "The provider's own statement of what answered, from a round on this transport, names this model.",
-  substituted:
-    "A record of this model answering as a DIFFERENT one. One substitution outweighs any number of matches: a model that has once answered as another is a model that can.",
-  "not-known":
-    "Nothing on this transport establishes it either way, which is the ordinary case. A seat's echo can never establish fidelity — a CLI that ignored the flag and echoed the request back would print exactly what an honoured one prints — so only a provider's own served id can.",
-};
-
 /** One model as a row reads it: the id that is dispatched, and whose it is. */
 function modelText(model: ConfigurationModel | null | undefined): string {
   if (!model) return "nothing resolves";
-  const fidelity = model.fidelity;
-  const said = fidelity === undefined ? "" : ` · ${FIDELITY_WORDS[fidelity]}`;
-  return `${model.model} (${model.provider})${said}`;
+  return `${model.model} (${model.provider})`;
 }
 
 /** What the word "vehicle" is for, on the kind of vehicle this role has. */
@@ -545,8 +529,15 @@ function members(p: Projection): ProjectionMember[] {
 /** What the solution row says under its title when it has no module rows to show. */
 export const NO_MODULES_YET = "no modules yet — session 1 writes the solution plan";
 
-/** The document the tree renders, relative to a repository root. */
-export const PROJECTION_RELPATH = ".dabbler/solution/projection.json";
+/**
+ * The document the tree renders, relative to a repository root.
+ *
+ * It carries the module graph and what that is joined to. Configuration is
+ * NOT in it: it is asked for from the router at the moment a row is drawn,
+ * because every input it derives from lives at the user level where no
+ * workspace watcher reaches.
+ */
+export const PROJECTION_RELPATH = ".dabbler/solution/solution.json";
 
 /**
  * Every file whose change can change what this tree shows.
@@ -1203,7 +1194,6 @@ export function descriptorFor(
     case "configRole": {
       const role = configRole(p, node.role);
       const authoring = node.role === "authoring";
-      const chosenFidelity = role?.chosen?.fidelity;
       return {
         id: `config:role:${node.role}`,
         label: ROLE_LABELS[node.role],
@@ -1216,9 +1206,11 @@ export function descriptorFor(
           // the session's record at the adjudication, so a list drawn
           // between sessions cannot be narrowed by it.
           role?.narrowedAtDispatch ?? "",
-          // The label, in the row, in the same words the pick uses.
-          !authoring && role?.chosen?.providerRelation
-            ? `This one is on a ${PROVIDER_RELATION_WORDS[role.chosen.providerRelation] ?? role.chosen.providerRelation}.`
+          // The label, in the row, in the same words the pick uses --
+          // DERIVED here from two providers the reading already carries,
+          // because a comparison of two fields is not a third field.
+          !authoring && role?.chosen
+            ? `This one is on a ${providerRelationWord(configuration(p).authoring?.provider, role.chosen.provider)}.`
             : "",
           role?.chosen?.priceCategory
             ? `Its source states a '${role.chosen.priceCategory}' price category. That is a PRICE and not a capability: this framework does not grade models.`
@@ -1236,16 +1228,6 @@ export function descriptorFor(
           role?.fellThrough
             ? "It fell past its own preference order, so what answers is a model nobody named. That is what billed one session 364 premium requests."
             : "",
-          // What the record says about this model answering as itself, on
-          // the transport it was read for. Said in full, because "not
-          // known" is the answer that needs the sentence.
-          chosenFidelity === undefined
-            ? ""
-            : `Is it the model that answers? ${FIDELITY_WORDS[chosenFidelity]}${
-                configuration(p).fidelityTransport
-                  ? ` on \`${configuration(p).fidelityTransport}\``
-                  : ""
-              }. ${FIDELITY_TOLD[chosenFidelity]}`,
           // Which record was read, said plainly: the seat's catalog is the
           // enumeration on a seat, and the vendors' own lists on the API path.
           `${role?.candidates.length ?? 0} model(s) qualify${
@@ -1267,11 +1249,10 @@ export function descriptorFor(
           .join("\n\n"),
         icon: {
           id: ROLE_ICONS[node.role],
-          // A model that has answered as another is the one thing here worth
-          // a colour. Not-known is not a fault -- it is most of the list.
-          ...(role?.fellThrough || chosenFidelity === "substituted"
-            ? { tone: "attention" as const }
-            : {}),
+          // Falling past the preference order is the one thing here worth a
+          // colour: what answers is then a model nobody named, which is what
+          // billed one session 364 premium requests.
+          ...(role?.fellThrough ? { tone: "attention" as const } : {}),
         },
         expandable: false,
         contextValue: `dabblerConfigRole;${node.role}`,

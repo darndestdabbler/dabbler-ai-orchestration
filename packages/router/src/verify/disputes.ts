@@ -460,6 +460,7 @@ export async function runAdjudication(
       role: ROLE_AUXILIARY_REVIEWER,
       sessionNumber: current,
       transport: options.transport ?? null,
+      repoRoot,
     });
   } catch (error) {
     if (error instanceof NoCandidateError) {

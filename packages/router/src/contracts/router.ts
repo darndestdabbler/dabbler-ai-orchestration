@@ -392,11 +392,11 @@ export interface BootstrapOptions {
   /**
    * How a provider is reached from this checkout.
    *
-   * Written to the project's own machine-local overlay and nowhere else.
+   * Written to the checkout's own `.vscode/settings.json` and nowhere else.
    * `bootstrap` used to persist `DABBLER_TRANSPORT` at USER scope, and that
-   * variable outranks every config layer -- so a per-project action changed
+   * variable outranked every config layer -- so a per-project action changed
    * how every other project on the machine routed, and shadowed the
-   * preference any later run tried to set.
+   * preference any later run tried to set. It is not read at all now.
    */
   readonly transport?: string;
   /**

@@ -398,7 +398,7 @@ never half-stored.
 
 - **The Solution Explorer says "It fills in once the repository is set up" but
   you have a `docs/modules.yaml`.** The projection under
-  `.dabbler/solution/projection.json` has not been derived. Touch the manifest
+  `.dabbler/solution/solution.json` has not been derived. Touch the manifest
   or a `.csproj`, or run the explicit refresh, and it fills in.
 - **The module context menu items are missing.** `Open Module`, `Widen for
   Debugging`, `End Grant` and `Show Impact` are right-click only, and they are

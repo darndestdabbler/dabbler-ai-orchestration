@@ -7,7 +7,7 @@
 // tests that use the network use LOOPBACK only -- because what they assert
 // is what Node itself throws, which a hand-built error cannot prove.
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { createServer, type AddressInfo } from "node:net";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -58,6 +58,7 @@ import { gitAnswers, makeConfig, seed, setProviderKeys, tempDir } from "./suppor
 import { resetProjectRootCache } from "../src/config.ts";
 import { discoveryVerb } from "../src/cli/discovery.ts";
 import { standIn } from "../src/workdir.ts";
+import { configurationNode } from "../src/projection.ts";
 
 /**
  * What a block holds on disk, whatever scope it was written for.
@@ -299,7 +300,7 @@ describe("judging a freshness row", () => {
   function row(overrides: Partial<FreshnessRow> = {}): FreshnessRow {
     return {
       record: RECORD_CATALOG,
-      path: "/repo/.dabbler/api-models.lock",
+      path: "/repo/ai-model-catalog.json",
       threshold_hours: 24,
       command: CATALOG_REFRESH_COMMAND,
       present: true,
@@ -897,12 +898,19 @@ describe("what a refresh leaves behind", () => {
       { path },
     );
     setCatalogPath(path);
-    const projectionFile = join(root, ".dabbler", "solution", "projection.json");
+    const projectionFile = join(root, ".dabbler", "solution", "solution.json");
     assert.equal(existsSync(projectionFile), false, "precondition: nothing derived yet");
 
     let code: number;
+    // The reading is taken inside the arranged environment, the way the pane
+    // takes it: `configurationNode` loads this repository's config, and the
+    // arrangement -- no provider keys, a seat that is a seam, git answered
+    // from a table -- is what keeps the assertion about the refresh rather
+    // than about the machine the suite is running on.
+    let configuration: { records: { record: string; path: string; datedAt: string | null }[] };
     try {
       code = await standIn(root, () => discoveryVerb(["refresh"]));
+      configuration = configurationNode(root) as typeof configuration;
     } finally {
       setSeatSource(null);
       ungit();
@@ -915,10 +923,12 @@ describe("what a refresh leaves behind", () => {
     assert.equal(code, 0);
 
     assert.ok(existsSync(projectionFile), "the refresh left the pane reading nothing");
-    const projection = JSON.parse(readFileSync(projectionFile, "utf8")) as {
-      configuration: { records: { record: string; path: string; datedAt: string | null }[] };
-    };
-    const [record] = projection.configuration.records;
+    // The solution document is what the refresh re-derives; the CONFIGURATION
+    // half is asked for at the moment a row is drawn, because its inputs sit
+    // at the user level where nothing in a workspace can watch them -- so the
+    // file is asked only whether it exists at all, and the reading above is
+    // what the pane would show.
+    const [record] = configuration.records;
     assert.equal(record?.record, RECORD_CATALOG);
     // The catalog THIS machine reads, as it stands after the refresh. No
     // vendor could answer, so the block stands as it was -- and the pane

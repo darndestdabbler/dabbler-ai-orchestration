@@ -1254,3 +1254,17 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: none — this round's verifier could not look at the tree
 - Raw round output: `.dabbler/runs/s156/`
+
+## Session 157 verification — REMEDIATED AT THE CAP after 3 round(s)
+
+- Every blocking finding of round 3 was fixed; the cap left the fix unreviewed.
+- Fixed, unreviewed: [major] `repoRoot` scopes settings but not the configuration used to resolve role vehicles or build the route**
+- Fixed, unreviewed: [major] The added watcher regression test crashes under the normal VS Code extension test harness**
+- This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.
+
+## Session 157 verification — VERIFIED after 5 round(s)
+
+- Verifier: gpt-5.6-terra (openai) over api
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: none — this round's verifier could not look at the tree
+- Raw round output: `.dabbler/runs/s157/`

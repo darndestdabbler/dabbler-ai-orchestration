@@ -18,6 +18,9 @@ const Module = require("module");
 /** Everything listening for a theme change, so `__setColorTheme` can fire. */
 const themeListeners = [];
 
+/** Every file-system watcher a provider asked for, so a test can fire one. */
+const watchers = [];
+
 const vscodeStub = {
   Uri: {
     file: (p) => ({ fsPath: p, scheme: "file", path: p }),
@@ -155,18 +158,38 @@ const vscodeStub = {
         });
         return true;
       },
-      createFileSystemWatcher: () => ({
-        onDidCreate: () => ({ dispose: () => {} }),
-        onDidDelete: () => ({ dispose: () => {} }),
-        onDidChange: () => ({ dispose: () => {} }),
-        dispose: () => {},
-      }),
+      // Records what was asked for, and hands the handlers back, so a test
+      // can prove a watcher is WIRED over the right base and then fire it.
+      // Before this it silently swallowed both, which made "the provider
+      // watches X" unassertable -- and session 154's lesson is that a
+      // control nobody can see run is a control that quietly stops running.
+      createFileSystemWatcher: (pattern) => {
+        const entry = {
+          base: pattern && pattern.base ? (pattern.base.fsPath ?? pattern.base) : null,
+          pattern: pattern && pattern.pattern ? pattern.pattern : String(pattern ?? ""),
+          onChange: [],
+        };
+        watchers.push(entry);
+        const register = (list) => (handler) => {
+          list.push(handler);
+          return { dispose: () => {} };
+        };
+        return {
+          onDidCreate: register(entry.onChange),
+          onDidDelete: register(entry.onChange),
+          onDidChange: register(entry.onChange),
+          dispose: () => {},
+        };
+      },
       // Set 122 S2: test-only hooks for the override map above. Not part
       // of the VS Code API — named with the stub's `__` prefix convention
       // so a production import of one is obvious on sight.
       __setConfig: (section, key, value) =>
         configOverrides.set(`${section}.${key}`, value),
       __clearConfig: () => configOverrides.clear(),
+      /** Every watcher created since the last clear, with its base and glob. */
+      __watchers: () => watchers.slice(),
+      __clearWatchers: () => watchers.splice(0, watchers.length),
     };
     return ws;
   })(),

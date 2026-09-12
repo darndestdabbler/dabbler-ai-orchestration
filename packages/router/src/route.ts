@@ -25,6 +25,7 @@
 import {
   TRANSPORT_COPILOT_CLI,
   TRANSPORT_OFFLINE,
+  explainReviewingTransport,
   explainRoleTransport,
   loadConfig,
   providerDefaults,
@@ -36,6 +37,7 @@ import { apiBlock, apiSelectableModels } from "./discovery.ts";
 import { recordCall, type CallRecord } from "./metrics.ts";
 import { isNoRouterMode } from "./runtimeMode.ts";
 import {
+  REVIEWING_ROLES,
   fellThroughWarning,
   reviewerRefusal,
   type Candidate as RoleCandidate,
@@ -182,7 +184,12 @@ export function buildPrompt(
 
 export interface RouteResult {
   content: string;
-  /** Registry alias (API) or catalog id (Copilot). */
+  /**
+   * What the model was known by, which is the id the source listed: there is
+   * no alias on either transport. Kept beside `model_id` because it is the
+   * name the record carries into `reviewer_model` and every sentence a
+   * reader sees.
+   */
   model_name: string;
   /** The id put on the wire. */
   model_id: string;
@@ -450,6 +457,42 @@ function getCopilot(config: RouterConfig): [CopilotCliTransport, readonly Catalo
   return [state.copilotTransport, catalog];
 }
 
+/**
+ * The configuration this dispatch is decided by.
+ *
+ * **A named repository is loaded for that repository, and not cached.** The
+ * process cache is keyed on nothing, so it holds whichever checkout was
+ * asked about first -- and a verification round for repository B would then
+ * resolve B's vehicle from B's settings while taking the role's preference
+ * order, its provider set and its ladder from A. The two halves of one
+ * answer would come from two repositories, and the round would bill a
+ * vehicle nobody chose.
+ *
+ * With no repository named the cache stands: that is the command-line case,
+ * where the checkout is the working directory and does not change inside a
+ * process.
+ */
+function configFor(repoRoot: string | null): RouterConfig {
+  if (repoRoot !== null) {
+    const config = loadConfig(undefined, repoRoot);
+    ensureRateLimiters(config);
+    return config;
+  }
+  return getConfig();
+}
+
+/** One limiter per provider, for whichever configuration is in hand. */
+function ensureRateLimiters(config: RouterConfig): void {
+  for (const [name, providerConfig] of Object.entries(record(config["providers"]))) {
+    if (state.rateLimiters[name] !== undefined) continue;
+    const limits = record(record(providerConfig)["rate_limit"]);
+    state.rateLimiters[name] = new RateLimiter(
+      Number(limits["requests_per_minute"]),
+      Number(limits["tokens_per_minute"]),
+    );
+  }
+}
+
 function getConfig(): RouterConfig {
   if (state.config === null) {
     const config = loadConfig();
@@ -469,8 +512,15 @@ function getConfig(): RouterConfig {
 // --- The one dispatch body --------------------------------------------------
 
 export interface Candidate {
-  /** Registry alias (API) or catalog id (Copilot). */
-  readonly alias: string;
+  /**
+   * The id that goes on the wire, which is the id the source listed.
+   *
+   * There is no second name for it. This carried an `alias` beside it while
+   * a registry sat in front of the vendors' own lists; the registry is gone,
+   * both ladders set the two from the same string, and a field that is
+   * always equal to its neighbour is a field two readers will eventually
+   * disagree about.
+   */
   readonly model_id: string;
   readonly provider: string;
 }
@@ -508,7 +558,7 @@ export function assertNotExcluded(
 ): void {
   if (!exclude.includes(candidate.provider)) return;
   throw new ExcludedProviderError(
-    `'${candidate.alias}' resolved to provider ` +
+    `'${candidate.model_id}' resolved to provider ` +
       `'${candidate.provider}', which this call excludes ` +
       `(${renderList(exclude)}). Refusing to dispatch.`,
   );
@@ -561,7 +611,6 @@ export function apiLadder(
   const resolution = explainRoleCandidates(config, apiSelectableModels(config, block), role, exclude);
   warnIfFellThrough(resolution, role);
   const ladder: Candidate[] = resolution.candidates.map(([modelId, provider]) => ({
-    alias: modelId,
     model_id: modelId,
     provider,
   }));
@@ -640,7 +689,7 @@ export function seatLadder(
   const resolution = explainRoleCandidates(config, catalog, role, exclude);
   warnIfFellThrough(resolution, role);
   const ladder: Candidate[] = resolution.candidates.map(
-    ([modelId, provider]) => ({ alias: modelId, model_id: modelId, provider }),
+    ([modelId, provider]) => ({ model_id: modelId, provider }),
   );
   if (ladder.length === 0) {
     throw new NoCandidateError(
@@ -721,7 +770,7 @@ export function routeResultOf(outcome: DispatchOutcome): RouteResult {
   const { candidate, result } = outcome;
   return {
     content: result.content,
-    model_name: candidate.alias,
+    model_name: candidate.model_id,
     model_id: candidate.model_id,
     provider: candidate.provider,
     input_tokens: result.input_tokens,
@@ -743,7 +792,7 @@ export function routeCallRecordOf(outcome: DispatchOutcome): CallRecord {
   return {
     callType: "route",
     taskType: outcome.taskType,
-    model: outcome.candidate.alias,
+    model: outcome.candidate.model_id,
     provider: outcome.candidate.provider,
     generationParams: outcome.generationParams,
     inputTokens: outcome.result.input_tokens,
@@ -797,6 +846,17 @@ export interface RouteOptions {
    */
   readonly authorModel?: string | null;
   readonly transport?: string | null;
+  /**
+   * Which checkout's configuration decides the vehicle.
+   *
+   * A vehicle is a property of a REPOSITORY -- one may need the seat while
+   * another runs on keys -- so a call about a named repository must read
+   * that one. Omitted, it is the project the router is standing in, which is
+   * right for a command line and wrong for anything acting on a repository
+   * it was handed: a verification round for repository X read whatever
+   * checkout the process happened to be in.
+   */
+  readonly repoRoot?: string | null;
   /**
    * One further turn, decided from the first answer. Return the text to send
    * back, or null to send nothing and let the first answer stand.
@@ -869,7 +929,7 @@ async function routeLive(
 
   if (isNoRouterMode()) return buildNoRouterStub();
 
-  const config = getConfig();
+  const config = configFor(options.repoRoot ?? null);
   // **The ROLE's vehicle, not the machine's.** Every role is dispatched
   // through something, and it is not always the same something: this module
   // has said since the transport reading was written that reviewer selection
@@ -877,7 +937,15 @@ async function routeLive(
   // a dispatch that read one global transport was the half of that sentence
   // nothing did. A role that declares none resolves exactly as the machine
   // does, so a repository that never wanted two vehicles has one.
-  const transportName = explainRoleTransport(config, role, options.transport ?? null).transport;
+  // **The REVIEWING pair share one vehicle; every other role keeps its own.**
+  // The two reviewers differ in what they may not BE and not in how they are
+  // reached, and the auxiliary's separate vehicle was state no surface could
+  // show or set. A generator that declares its own is still dispatched over
+  // it, which is the config-tier answer `explainRoleTransport` gives.
+  const vehicle = REVIEWING_ROLES.has(role)
+    ? explainReviewingTransport(config, options.transport ?? null, options.repoRoot ?? null)
+    : explainRoleTransport(config, role, options.transport ?? null, options.repoRoot ?? null);
+  const transportName = vehicle.transport;
   // The caller's exclusion, used both to build the ladder and to re-assert
   // immediately before the wire. It ALWAYS applies: a selection narrows the
   // candidates and never widens them past it, because a selection that
@@ -925,7 +993,7 @@ async function routeLive(
           `failed: ${String(result.metadata["error_class"])} ` +
           `(${stderrTail.slice(-300)})`,
         current.provider,
-        current.alias,
+        current.model_id,
       );
     }
 
@@ -937,7 +1005,7 @@ async function routeLive(
       maxEscalations,
     });
     if (step.escalate) {
-      escalationHistory.push([current.alias, step.reason as string]);
+      escalationHistory.push([current.model_id, step.reason as string]);
       index += 1;
       current = path.ladder[index] as Candidate;
       continue;
@@ -971,7 +1039,7 @@ async function routeLive(
           `failed: ${String(second.metadata["error_class"])} ` +
           `(${stderrTail.slice(-300)})`,
         current.provider,
-        current.alias,
+        current.model_id,
       );
     }
     // What the call cost is both turns; what it said is the second one.
@@ -1026,7 +1094,6 @@ function buildPath(
       // purpose.
       ladder: [
         {
-          alias: OFFLINE_PROVIDER,
           model_id: OFFLINE_PROVIDER,
           provider: OFFLINE_PROVIDER,
         },

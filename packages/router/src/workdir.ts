@@ -1,9 +1,8 @@
 // Where the router is standing.
 //
 // Every path a caller does not name is resolved from here: the sessions
-// root when no `--sessions-dir` is given, the project root the config
-// overlay is discovered against, the record path a relative
-// `discovery.record` points at. On a command line the answer is
+// root when no `--sessions-dir` is given, and the project root the config
+// overlay is discovered against. On a command line the answer is
 // `process.cwd()` and nothing else is needed.
 //
 // In-process it cannot be. The extension host is one Node process shared

@@ -2,7 +2,7 @@ import * as assert from "assert";
 import * as fs from "fs";
 import * as path from "path";
 import { createRequire } from "module";
-import { spawnProgram, tryWriteProjection } from "dabbler-ai-router";
+import { configurationNode, spawnProgram, tryWriteProjection } from "dabbler-ai-router";
 import {
   NO_MODULES_YET,
   PROJECTION_RELPATH,
@@ -640,6 +640,9 @@ suite("solutionTreeModel: what a session is run with", () => {
         },
         authoring: {
           role: "authoring",
+          // The author's provider, stated once: every "same provider" /
+          // "different provider" word below is derived from it.
+          provider: "anthropic",
           vehicle: {
             kind: "engine",
             options: [{ id: "claude-code", means: "claude" }],
@@ -648,8 +651,8 @@ suite("solutionTreeModel: what a session is run with", () => {
             decidedBy: "installed on PATH",
             appliesTo: "next-session",
           },
-          chosen: { alias: "opus", model: "claude-opus-5", provider: "anthropic" },
-          candidates: [{ alias: "opus", model: "claude-opus-5", provider: "anthropic" }],
+          chosen: { model: "claude-opus-5", provider: "anthropic" },
+          candidates: [{ model: "claude-opus-5", provider: "anthropic" }],
           excludes: [],
           fellThrough: false,
         },
@@ -673,18 +676,14 @@ suite("solutionTreeModel: what a session is run with", () => {
             appliesTo: "next-session",
           },
           chosen: {
-            alias: "gpt-5-6-terra",
             model: "gpt-5.6-terra",
             provider: "openai",
-            providerRelation: "different-provider",
             priceCategory: "high",
           },
           candidates: [
             {
-              alias: "gpt-5-6-terra",
               model: "gpt-5.6-terra",
               provider: "openai",
-              providerRelation: "different-provider",
               priceCategory: "high",
             },
           ],
@@ -694,17 +693,13 @@ suite("solutionTreeModel: what a session is run with", () => {
         auxiliaryReviewer: {
           role: "auxiliary-reviewer",
           chosen: {
-            alias: "gemini",
             model: "gemini-3.1-pro-preview",
             provider: "google",
-            providerRelation: "different-provider",
           },
           candidates: [
             {
-              alias: "gemini",
               model: "gemini-3.1-pro-preview",
               provider: "google",
-              providerRelation: "different-provider",
             },
           ],
           excludes: [],
@@ -829,10 +824,11 @@ suite("solutionTreeModel: what a session is run with", () => {
   });
 });
 
-suite("solutionTreeModel: is the model we asked for the model that answered", () => {
-  // The whole path, from the rows on disk to the row on the screen. Session
-  // 144 measured this and left the reading; what fails here is the day the
-  // three answers become two.
+suite("solutionTreeModel: what a configuration reading costs", () => {
+  // The whole path, from the rows on disk to the row on the screen. The pane
+  // now derives this on EVERY read, so what it may touch matters more than
+  // it did when the answer sat in a file: a reading that enumerated a vendor
+  // would charge a window for being open, once per repaint.
   const ROUND = {
     round: 1,
     verdict: "VERIFIED",
@@ -972,9 +968,9 @@ suite("solutionTreeModel: is the model we asked for the model that answered", ()
     rmrf(root);
   });
 
-  test("an exact seat echo reads not known, and does not render as one a round records as honoured", () => {
+  test("reaches no vendor and no CLI, and renders the dated record it read", () => {
     // The router's own reading runs here, over records on disk, with the
-    // network trapped: if assembling the projection enumerated a vendor
+    // network trapped: if assembling the configuration enumerated a vendor
     // this throws, and if it probed the seat the dates below would be
     // today's rather than the fixture's.
     const fetched = (globalThis as { fetch?: unknown }).fetch;
@@ -1004,6 +1000,7 @@ suite("solutionTreeModel: is the model we asked for the model that answered", ()
         reached(`a CLI (${program})`)();
       };
     }
+    let configuration: Projection["configuration"];
     try {
       assert.throws(
         () => spawnProgram(["definitely-not-a-real-program"], { stdio: "ignore" }),
@@ -1011,13 +1008,20 @@ suite("solutionTreeModel: is the model we asked for the model that answered", ()
         "the process trap did not install, so this test proves nothing about spawning",
       );
       tryWriteProjection(root);
+      // The configuration half is NOT in the file. The pane asks the router
+      // for it at the moment it renders a row, so the trap has to be armed
+      // around this reading too -- it is the one that could reach a vendor.
+      configuration = configurationNode(root) as Projection["configuration"];
     } finally {
       for (const [name, value] of original) childProcess[name] = value;
       (globalThis as { fetch?: unknown }).fetch = fetched;
     }
-    const p = JSON.parse(
-      fs.readFileSync(path.join(root, ".dabbler", "solution", "projection.json"), "utf8"),
-    ) as Projection;
+    const p = {
+      ...(JSON.parse(
+        fs.readFileSync(path.join(root, ".dabbler", "solution", "solution.json"), "utf8"),
+      ) as Projection),
+      configuration,
+    } as Projection;
 
     // One record now, not three, and it carries the date the fixture wrote
     // rather than the one a refresh would have stamped.
@@ -1028,23 +1032,14 @@ suite("solutionTreeModel: is the model we asked for the model that answered", ()
     );
     assert.strictEqual(records[0]?.datedAt, "2026-08-01T09:00:00Z");
 
-    // Both models answered as themselves. Only one of them was said so by a
-    // provider; the other was said so by the seat, about itself.
-    assert.strictEqual(p.configuration?.fidelityTransport, "api");
-    assert.strictEqual(p.configuration?.authoring?.chosen?.fidelity, "honoured");
-    assert.strictEqual(p.configuration?.primaryReviewer?.chosen?.fidelity, "not-known");
-
+    // And the rows render off that record: each names the model it read and
+    // whose it is, and the reviewer is labelled against the AUTHOR's
+    // provider -- derived from two fields, because the comparison is not a
+    // field of its own on 261 candidates.
     const authoring = descriptorFor({ kind: "configRole", role: "authoring" }, p);
     const primaryReviewer = descriptorFor({ kind: "configRole", role: "primaryReviewer" }, p);
-    // Three answers read as three: what the rows SAY differs, and the one
-    // with no evidence does not read as the one with a provider's word.
-    assert.notStrictEqual(authoring.description, primaryReviewer.description);
-    assert.ok(authoring.description?.includes("answers as itself"));
-    assert.ok(primaryReviewer.description?.includes("not known"));
-    assert.ok(!primaryReviewer.description?.includes("answers as itself"));
-    // And the row says what the answer is an answer ABOUT, so the seat's
-    // evidence can never be read as the API's.
-    assert.ok(primaryReviewer.tooltip?.includes("api"));
-    assert.ok(primaryReviewer.tooltip?.includes("echo"));
+    assert.ok(authoring.description?.includes("a-author"));
+    assert.ok(primaryReviewer.description?.includes("o-reviewer"));
+    assert.ok(primaryReviewer.tooltip?.includes("different provider"));
   });
 });

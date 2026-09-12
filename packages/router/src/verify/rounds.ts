@@ -42,12 +42,11 @@ import { writeErr, writeOut } from "../output.ts";
 import {
   EVIDENCE_SERVED,
   FIDELITY_SUBSTITUTED,
-  ROLE_PRIMARY_REVIEWER,
   modelFidelity,
 } from "../selection.ts";
 import {
   loadConfig,
-  explainRoleTransport,
+  explainReviewingTransport,
   verificationRoundCap,
   type RouterConfig,
 } from "../config.ts";
@@ -133,6 +132,8 @@ export async function dispatchVerification(
     role?: string;
     sessionNumber: number | null;
     transport?: string | null;
+    /** The repository under review, whose configuration decides the vehicle. */
+    repoRoot?: string | null;
     followUp?: ((answer: string) => string | null) | null;
   },
 ): Promise<RouteResult> {
@@ -151,6 +152,7 @@ export async function dispatchVerification(
         excludeProviders: excluded,
         authorModel: options.authorModel ?? null,
         transport: options.transport ?? null,
+        repoRoot: options.repoRoot ?? null,
         followUp: options.followUp ?? null,
       });
     } catch (error) {
@@ -798,8 +800,11 @@ export async function runRound(
   // dispatched on and the grant is a property of the transport: a seat round
   // holds three tools and a direct-API round holds none, so a grant resolved
   // from the machine's transport would describe a round that is not this one.
+  // THIS repository's, named rather than left to the working directory: a
+  // round reviews the repository it was asked about, and a vehicle read from
+  // wherever the process happens to stand is a reading of another checkout.
   const grant = grantFor(
-    explainRoleTransport(config, ROLE_PRIMARY_REVIEWER, options.transport ?? null).transport,
+    explainReviewingTransport(config, options.transport ?? null, repoRoot).transport,
   );
 
   // The reads happen exactly once, inside the dispatch, and what they
@@ -842,6 +847,7 @@ export async function runRound(
       authorModel: orchestrator.model,
       sessionNumber: current,
       transport: options.transport ?? null,
+      repoRoot,
       followUp,
     });
   } catch (error) {

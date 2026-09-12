@@ -36,16 +36,26 @@
 // config that means one thing to each router is the drift the port exists to
 // remove.
 
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
 
-import { parseDocument, parse as parseYaml } from "yaml";
+import { parse as parseYaml } from "yaml";
 
 import { ASSET_DIR, SCHEMA_DIR } from "./paths.ts";
 import { repoRootFor } from "./journal.ts";
 import { schemaFailure } from "./schema/validate.ts";
 import { readText } from "./textfile.ts";
 import { validateTransportTimeouts } from "./contracts/transports.ts";
+import { readPreferences } from "./preferences.ts";
+import {
+  SETTINGS_RELPATH,
+  SETTING_AUTHORING_MODEL,
+  SETTING_REVIEWER_TRANSPORT,
+  SETTING_TRANSPORT,
+  type SettingKey,
+  readSettings,
+  writeSettings,
+} from "./settings.ts";
 import { workingDirectory } from "./workdir.ts";
 
 /** The loaded config: schema-shaped data plus the `_`-prefixed provenance. */
@@ -92,6 +102,18 @@ export const VALID_TRANSPORTS = [
   TRANSPORT_OFFLINE,
 ] as const;
 
+/**
+ * The variable that used to decide this, kept only so a surface can say it
+ * no longer does.
+ *
+ * **It is not in the resolution order.** A layer that outranked every other
+ * and was written by nothing is how the pane came to save a preference the
+ * next session ignored: `bootstrap` persisted it at USER scope, so one
+ * repository's detection shadowed every repository on the machine, for
+ * every later run, invisibly. Read by `configure`, to tell an operator who
+ * still exports it that it is ignored and what replaces it; read by nothing
+ * that decides anything.
+ */
 export const TRANSPORT_ENV_VAR = "DABBLER_TRANSPORT";
 export const CONFIG_ENV_VAR = "AI_ROUTER_CONFIG";
 
@@ -727,7 +749,33 @@ export function driverEngineOutput(config: RouterConfig): EngineOutput {
 
 /** The names of the three layers a transport can be set at, in precedence order. */
 export const TRANSPORT_SOURCE_FLAG = "--transport flag";
-export const TRANSPORT_SOURCE_ENV = `${TRANSPORT_ENV_VAR} env var`;
+/** This CHECKOUT's own answer: committed, shared, and the solution's policy. */
+export const TRANSPORT_SOURCE_SETTINGS = SETTINGS_RELPATH;
+/** This PERSON's answer, where the checkout does not give one. */
+export const TRANSPORT_SOURCE_PREFERENCES = "preferences.json";
+/** The same two layers, for the vehicle the reviewing roles share. */
+export const REVIEWING_SOURCE_SETTINGS = SETTING_REVIEWER_TRANSPORT;
+export const REVIEWING_SOURCE_PREFERENCES = `preferences.json ${SETTING_REVIEWER_TRANSPORT.slice(
+  "dabbler.".length,
+)}`;
+
+/**
+ * Every layer a PERSON puts a vehicle in force at.
+ *
+ * Stated once, as one list, because it is read by the gate that refuses an
+ * unreachable vehicle at a session's start -- and a gate whose list was
+ * missing the two reviewing layers checked a rule it did not apply, which
+ * is worse than not having it. What is deliberately NOT here is the
+ * shipped configuration: a machine with no seat and no keys yet is a
+ * first-run machine, and refusing it would refuse the setup that fixes it.
+ */
+export const CHOSEN_VEHICLE_LAYERS: readonly string[] = [
+  TRANSPORT_SOURCE_FLAG,
+  TRANSPORT_SOURCE_SETTINGS,
+  TRANSPORT_SOURCE_PREFERENCES,
+  REVIEWING_SOURCE_SETTINGS,
+  REVIEWING_SOURCE_PREFERENCES,
+];
 export const TRANSPORT_SOURCE_CONFIG = "transport.profile";
 
 /** One layer that named a transport: where it was set, and to what. */
@@ -758,27 +806,161 @@ export interface TransportReading {
  * The effective transport for routine dispatch, with the layers that named
  * one.
  *
- * Precedence: CLI flag > `DABBLER_TRANSPORT` env var (the operator's standing
- * preference) > `transport.profile` in the loaded config > default `api`. The
- * config value may come from the bundled `router-config.yaml` or from a
- * project-local `local-overrides.yaml` merged over it -- the overlay is a
- * config source, not a precedence tier, so nothing above it changes its
- * answer. An unknown value fails loud at whichever level supplied it. This
- * selects the transport for routine dispatch; reviewer selection may still use
- * the other transport when provider independence requires it.
+ * **Precedence: a typed flag, then this CHECKOUT, then this PERSON, then
+ * what the distribution ships.** A `--transport` flag is what the operator
+ * said at this call; `<repo>/.vscode/settings.json` is the solution's own
+ * policy, committed and shared, and outranks a personal default because a
+ * repository that needs the seat needs it for everyone who opens it; the
+ * user-level `preferences.json` is what this person chose where the
+ * solution said nothing; and `transport.profile` in the loaded config is
+ * the distribution's answer, which may come from the bundled
+ * `router-config.yaml` or from a project-local `local-overrides.yaml`
+ * merged over it -- the overlay is a config SOURCE, not a precedence tier,
+ * so nothing above it changes its answer. Nothing named at all is `api`.
  *
- * Only the DECIDING layer is validated, which is what `resolveTransport` has
- * always done: a layer nothing reads has never been able to fail a call, and
- * a reading that started refusing over a shadowed value would refuse calls
+ * **`DABBLER_TRANSPORT` is not one of these layers and cannot become one.**
+ * Every layer above is something a surface can show and a verb can write;
+ * an environment variable is neither, and this one was persisted at user
+ * scope by `bootstrap` -- so it outranked every file, for every repository
+ * on the machine, while the only thing that could change it was a shell
+ * nobody was looking at.
+ *
+ * `root` is which checkout's settings file is read. It defaults to the
+ * project the router is standing in, so a caller that does not care does
+ * not have to say; a caller drawing a pane for a named repository does.
+ *
+ * An unknown value fails loud at whichever level supplied it. Only the
+ * DECIDING layer is validated, which is what `resolveTransport` has always
+ * done: a layer nothing reads has never been able to fail a call, and a
+ * reading that started refusing over a shadowed value would refuse calls
  * that work today.
  */
+/**
+ * The overlay's own `transport.profile`, which no longer decides anything.
+ *
+ * **It was a fifth input, and the fifth input is the whole problem.** The
+ * replaced `bootstrap --transport` and `dabbler configure --transport` wrote
+ * exactly this key, so every checkout made before this session carries one --
+ * and it now sits BELOW the user-level preferences, which means a personal
+ * default would silently override the checkout file an operator deliberately
+ * wrote. That is the same shadowing `DABBLER_TRANSPORT` was deleted for,
+ * pointing the other way.
+ *
+ * So it is a stop, in the same shape as the stale auxiliary key: the
+ * document says something that does not happen, and nothing may choose on
+ * the operator's behalf which of the two readings is real. One command
+ * clears it, and the refusal names that command.
+ *
+ * Only the OVERLAY is read here. `transport.profile` in the distribution's
+ * own `router-config.yaml` is the built-in default and is untouched: that is
+ * the bottom tier of the order, not a fifth input.
+ */
+function overlayTransport(config: RouterConfig, projectDir: string | undefined): string | null {
+  // **The overlay THIS config was loaded from, before the one the working
+  // directory happens to have.** A loaded config records where its layers
+  // came from, and a caller that hands over a config for another checkout --
+  // a verification round for a named repository, the pane drawing a sibling
+  // -- must be judged on that checkout's file, not on whichever one the
+  // process is standing in. The root is the fallback for a config that
+  // records no overlay, which is every config assembled in memory.
+  const recorded = config["_local_overrides_path"];
+  const path =
+    typeof recorded === "string" && recorded.trim() !== ""
+      ? recorded
+      : overlayBeside(projectDir);
+  if (path === null) return null;
+  try {
+    const parsed: unknown = parseYaml(readText(path));
+    const transport = record(record(parsed as Record<string, unknown>)["transport"])["profile"];
+    return typeof transport === "string" && transport.trim() !== "" ? transport.trim() : null;
+  } catch {
+    // An unreadable overlay is refused by the loader with its own sentence;
+    // this reading is not the place to say it a second way.
+    return null;
+  }
+}
+
+/**
+ * The overlay in a NAMED checkout, or -- where none was named -- the one the
+ * project this router is standing in has.
+ *
+ * A caller that named a checkout has already answered "which project": going
+ * back to git for the toplevel of a directory we were handed would be asking
+ * a question that is already answered, and it would spawn a process on every
+ * transport reading.
+ */
+function overlayBeside(projectDir: string | undefined): string | null {
+  if (projectDir === undefined) return localOverridesPath(undefined);
+  const beside = join(projectDir, LOCAL_OVERRIDES_FILENAME);
+  return existsSync(beside) ? beside : null;
+}
+
+function refuseObsoleteOverlayTransport(config: RouterConfig, projectDir: string | null): void {
+  const declared = overlayTransport(config, projectDir ?? undefined);
+  if (declared === null) return;
+  throw new ConfigError(
+    `${LOCAL_OVERRIDES_FILENAME} still says transport.profile: '${declared}', and ` +
+      "that key no longer decides anything -- a vehicle is chosen by a " +
+      `--transport flag, then ${SETTINGS_RELPATH}, then the user-level ` +
+      "preferences.json. Leaving it readable would let a personal default " +
+      "silently override the checkout file you wrote. Run `dabbler configure " +
+      `--transport ${declared}` +
+      "` to put it where it is read, then delete transport.profile from " +
+      `${LOCAL_OVERRIDES_FILENAME}.`,
+  );
+}
+
+/**
+ * This checkout's own settings, or a refusal naming the file.
+ *
+ * **A settings file this parser cannot read is a stop, not silence.** A
+ * half-typed `dabbler.transport` an operator can plainly see, ignored while
+ * a lower layer decides, is the same invisibility `DABBLER_TRANSPORT` was
+ * deleted for -- with the value and the behaviour differing and nothing
+ * saying so. The refusal names the file, so the fix is where the operator
+ * is already looking.
+ */
+function checkoutSettings(root: string | null): Readonly<Partial<Record<SettingKey, string>>> {
+  if (root === null) return {};
+  const reading = readSettings(root);
+  if (reading.malformed !== null) {
+    throw new ConfigError(
+      `${SETTINGS_RELPATH} could not be read (${reading.malformed}), so nothing ` +
+        "in it decides anything. Fix the file: a setting you can see being " +
+        "ignored is worse than one that is not there.",
+    );
+  }
+  return reading.values;
+}
+
+/**
+ * What this person chose on this machine, or null.
+ *
+ * Total, like every other reading of the preferences file: a missing file, a
+ * torn one, or a suite that has not pointed the reader anywhere is *nobody
+ * chose*, which is exactly what a layer that did not speak means here. A
+ * config load that threw because a preference could not be read would take
+ * out every verb over a file that is defined as optional.
+ */
+function personalTransport(key: "transport" | "reviewer_transport" = "transport"): string | null {
+  try {
+    return readPreferences()[key] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function explainTransport(
   config: RouterConfig,
   cliFlag?: string | null,
+  root?: string | null,
 ): TransportReading {
+  const checkout = root ?? projectRoot();
+  refuseObsoleteOverlayTransport(config, checkout);
   const candidates: ReadonlyArray<readonly [string, unknown]> = [
     [TRANSPORT_SOURCE_FLAG, cliFlag ?? null],
-    [TRANSPORT_SOURCE_ENV, process.env[TRANSPORT_ENV_VAR] || null],
+    [TRANSPORT_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_TRANSPORT] ?? null],
+    [TRANSPORT_SOURCE_PREFERENCES, personalTransport()],
     [TRANSPORT_SOURCE_CONFIG, record(config["transport"])["profile"] ?? null],
   ];
   const layers: TransportLayer[] = candidates
@@ -802,49 +984,56 @@ export function explainTransport(
 export function resolveTransport(
   config: RouterConfig,
   cliFlag?: string | null,
+  root?: string | null,
 ): string {
-  return explainTransport(config, cliFlag).transport;
+  return explainTransport(config, cliFlag, root).transport;
 }
 
-/** The layer name a role's own transport is set at. */
-export const TRANSPORT_SOURCE_ROLE = "roles.<role>.transport";
+/**
+ * Where the reviewing vehicle is stated in a configuration document, and
+ * where it USED to be stated for the third voice.
+ *
+ * These are config PATHS, not role identities -- `selection.ts` owns what a
+ * role is, and this module owns the shape of the file. `reviewer` is the one
+ * reviewing vehicle; `auxiliary-reviewer` is the key that is now stale, kept
+ * only so a document that still carries it can be recognised and named.
+ */
+export const REVIEWING_TRANSPORT_KEY = "roles.reviewer.transport";
+export const STALE_AUXILIARY_TRANSPORT_KEY = "roles.auxiliary-reviewer.transport";
+
+/** The layer name the reviewing vehicle is set at in the loaded config. */
+export const TRANSPORT_SOURCE_ROLE = REVIEWING_TRANSPORT_KEY;
+
+function declaredTransport(config: RouterConfig, role: string): string | null {
+  const declared = record(record(config["roles"])[role])["transport"];
+  if (declared === undefined || declared === null || String(declared).trim() === "") return null;
+  return String(declared);
+}
 
 /**
- * The transport one ROLE is reached through, and which layer decided it.
+ * The vehicle one NON-reviewing role is dispatched over.
  *
- * **A vehicle belongs to a role, not to a machine.** This module has said in
- * its own words since the transport reading was written that reviewer
- * selection may use the other transport when provider independence requires
- * it, while every surface read one global transport and scoped both roles
- * through it -- so the single reading could already be wrong about the row
- * it matters most for. A role's own `transport` sits between the flag and
- * the environment variable in nothing: it is a CONFIG-layer value, so it
- * outranks the global `transport.profile` and is outranked by everything
- * above that, which is the same shape `explainTransport` already has.
- *
- * A role that declares none resolves exactly as before, which is what keeps
- * a repository that never wanted two vehicles from acquiring one.
+ * The reviewing pair does not come through here -- they share one vehicle,
+ * read by `explainReviewingTransport`, which is the whole of this step. What
+ * is left is the generic config-tier answer: a role that declares its own
+ * `transport` is dispatched over it, and a role that declares none resolves
+ * exactly as the machine does. That is a CONFIG-layer value, so it outranks
+ * the global `transport.profile` and is outranked by everything above it.
  */
 export function explainRoleTransport(
   config: RouterConfig,
   role: string,
   cliFlag?: string | null,
+  root?: string | null,
 ): TransportReading {
-  const declared = record(record(config["roles"])[role])["transport"];
-  if (declared === undefined || declared === null || String(declared).trim() === "") {
-    return explainTransport(config, cliFlag);
-  }
-  const global = explainTransport(config, cliFlag);
+  const declared = declaredTransport(config, role);
+  const global = explainTransport(config, cliFlag, root);
+  if (declared === null) return global;
   const own: TransportLayer = {
-    source: TRANSPORT_SOURCE_ROLE.replace("<role>", role),
-    value: String(declared),
+    source: `roles.${role}.transport`,
+    value: declared,
   };
-  // The flag and the environment variable are still above a config value:
-  // a role's transport is a configured default, not an override of what the
-  // operator typed at this call.
-  const above = global.layers.filter(
-    (layer) => layer.source === TRANSPORT_SOURCE_FLAG || layer.source === TRANSPORT_SOURCE_ENV,
-  );
+  const above = global.layers.filter((layer) => layer.source === TRANSPORT_SOURCE_FLAG);
   const layers = [...above, own, ...global.layers.filter((layer) => !above.includes(layer))];
   const decided = layers[0] as TransportLayer;
   const normalized = decided.value.trim().toLowerCase();
@@ -857,25 +1046,103 @@ export function explainRoleTransport(
   return { transport: normalized, decidedBy: decided.source, layers };
 }
 
-// --- Writing the machine's own choice ---------------------------------------
+/**
+ * The vehicle BOTH reviewing roles are dispatched over, and which layer
+ * decided it.
+ *
+ * **One reviewing vehicle, not one per reviewing role.** The auxiliary had
+ * its own from the day the roles were named: state that existed, reached
+ * dispatch, and that no surface could show or set -- so the one thing it
+ * could reliably do was differ from what an operator believed without any
+ * way for them to find out. The two reviewers differ in what they may not
+ * BE, which is the whole of their definition; how they are reached is one
+ * question with one answer.
+ *
+ * The layers are the machine's, one tier in: this CHECKOUT's committed
+ * setting, then this PERSON's default, then `roles.reviewer.transport` in
+ * the loaded config -- a CONFIG-layer value, so it outranks the global
+ * `transport.profile` and is outranked by everything above it. Nothing
+ * naming a reviewing vehicle resolves exactly as the machine does, which is
+ * what keeps a repository that never wanted two vehicles from acquiring one.
+ *
+ * **A stale auxiliary key with a DIFFERENT value is a stop.** Collapsing two
+ * live values by picking one is how state stops matching the record: the
+ * round would be dispatched over a vehicle the document does not say, and
+ * nothing would ever say which. Where the two agree there is nothing to
+ * decide and the old key is simply ignored.
+ */
+export function explainReviewingTransport(
+  config: RouterConfig,
+  cliFlag?: string | null,
+  root?: string | null,
+): TransportReading {
+  const reviewing = declaredTransport(config, "reviewer");
+  const auxiliary = declaredTransport(config, "auxiliary-reviewer");
+  if (
+    auxiliary !== null &&
+    auxiliary.trim().toLowerCase() !== (reviewing ?? "").trim().toLowerCase()
+  ) {
+    throw new ConfigError(
+      `${STALE_AUXILIARY_TRANSPORT_KEY} says '${auxiliary}' and ` +
+        (reviewing === null
+          ? `${REVIEWING_TRANSPORT_KEY} says nothing`
+          : `${REVIEWING_TRANSPORT_KEY} says '${reviewing}'`) +
+        ". There is one reviewing vehicle now, and nothing may choose between " +
+        "two live values on your behalf. Delete " +
+        `${STALE_AUXILIARY_TRANSPORT_KEY}, or set both to the same value.`,
+    );
+  }
+  const checkout = root ?? projectRoot();
+  const named: Array<readonly [string, string | null]> = [
+    [REVIEWING_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_REVIEWER_TRANSPORT] ?? null],
+    [REVIEWING_SOURCE_PREFERENCES, personalTransport("reviewer_transport")],
+    [REVIEWING_TRANSPORT_KEY, reviewing],
+  ];
+  const own = named
+    .filter(([, value]) => value !== null)
+    .map(([source, value]) => ({ source, value: value as string }));
+  const global = explainTransport(config, cliFlag, root);
+  if (own.length === 0) return global;
+  // The flag is still above every one of them: a reviewing vehicle is a
+  // configured default, not an override of what the operator typed at this
+  // call.
+  const above = global.layers.filter((layer) => layer.source === TRANSPORT_SOURCE_FLAG);
+  const layers = [...above, ...own, ...global.layers.filter((layer) => !above.includes(layer))];
+  const decided = layers[0] as TransportLayer;
+  const normalized = decided.value.trim().toLowerCase();
+  if (!(VALID_TRANSPORTS as readonly string[]).includes(normalized)) {
+    throw new ConfigError(
+      `${decided.source} must be one of ${renderList(VALID_TRANSPORTS)}, ` +
+        `got '${decided.value}'`,
+    );
+  }
+  return { transport: normalized, decidedBy: decided.source, layers };
+}
+
+// --- Writing what the operator chose ----------------------------------------
 //
 // One writer, and it is here because this module is what decides what a
-// config MEANS -- a second writer somewhere else would eventually write a
-// key this loader refuses, or write it at a layer that something above
+// choice MEANS -- a second writer somewhere else would eventually write a
+// key this reader refuses, or write it at a layer that something above
 // silently overrides.
 //
-// The overlay is the layer a machine's choice belongs at: gitignored, merged
-// last over the distribution, and refused the blocks the repository owns. A
-// choice written into the tracked `dabbler.yaml` would be one machine
-// deciding for every machine, and one written into the packaged
-// `router-config.yaml` would not survive an install.
+// **It writes the CHECKOUT's settings file, at the top of the file layers.**
+// It used to write `local-overrides.yaml`, which is where a machine's choice
+// belonged while that was the only file below a flag. It is not any more:
+// a personal default in `preferences.json` now sits above the overlay, so a
+// verb that kept writing the overlay would report success and change
+// nothing -- which is the exact shape of the shadowing this session exists
+// to delete. The overlay stays a config SOURCE and is still read; it is no
+// longer what a control writes.
 
 /** What the operator chose; an absent member is a thing they did not touch. */
 export interface ConfigurationChoice {
-  /** The machine's own vehicle: `transport.profile`. */
+  /** The machine's own vehicle. */
   readonly transport?: string;
-  /** The Primary Reviewer's own vehicle: `roles.reviewer.transport`. */
+  /** The vehicle the reviewing roles are dispatched over. */
   readonly reviewerTransport?: string;
+  /** The model the engine's own CLI is launched on; "" clears it. */
+  readonly authoringModel?: string;
 }
 
 /** What was written, and where. */
@@ -885,18 +1152,15 @@ export interface ConfigurationWrite {
   readonly changed: readonly string[];
 }
 
-const OVERLAY_HEADER =
-  " Machine-local overrides for this checkout. Gitignored and never" +
-  " published: it states a fact about this machine, not about the project.";
-
 /**
- * Write the operator's choice into the machine-local overlay, keeping
- * whatever else the file says.
+ * Write the operator's choice into this checkout's own settings file,
+ * keeping whatever else that file says.
  *
- * The document is EDITED rather than re-serialised from a parse: the overlay
- * in a working checkout carries the operator's own comments about why this
- * machine is set up the way it is, and a writer that dropped them would be
- * charging them their notes for using a control.
+ * The document is EDITED rather than re-serialised from a parse: it is
+ * shared with every other extension the operator has configured, and a
+ * writer that dropped their comments and their unrelated settings would be
+ * charging them for using a control. `settings.ts` owns that, and refuses a
+ * file it cannot read rather than replacing it.
  *
  * This validates shape and nothing else. Whether a chosen reviewer may
  * review a chosen author is a question about selection, and it is asked
@@ -907,38 +1171,31 @@ export function writeConfigurationChoice(
   root: string,
   choice: ConfigurationChoice,
 ): ConfigurationWrite {
-  const path = join(root, LOCAL_OVERRIDES_FILENAME);
-  const document = existsSync(path)
-    ? parseDocument(readText(path))
-    : parseDocument(`# ${OVERLAY_HEADER.trim()}\n`);
-  const changed: string[] = [];
+  const values: Partial<Record<SettingKey, string>> = {};
   if (choice.transport !== undefined) {
-    const transport = choice.transport.trim().toLowerCase();
-    if (!(VALID_TRANSPORTS as readonly string[]).includes(transport)) {
-      throw new ConfigError(
-        `transport must be one of ${renderList(VALID_TRANSPORTS)}, ` +
-          `got '${choice.transport}'`,
-      );
-    }
-    document.setIn(["transport", "profile"], transport);
-    changed.push(`transport.profile is now '${transport}'`);
+    values[SETTING_TRANSPORT] = normalizedTransport(choice.transport);
   }
   if (choice.reviewerTransport !== undefined) {
-    const transport = choice.reviewerTransport.trim().toLowerCase();
-    if (!(VALID_TRANSPORTS as readonly string[]).includes(transport)) {
-      throw new ConfigError(
-        `transport must be one of ${renderList(VALID_TRANSPORTS)}, ` +
-          `got '${choice.reviewerTransport}'`,
-      );
-    }
-    // The ROLE's own vehicle, not the machine's: a configured default that a
-    // typed flag and the environment variable still outrank, which is what
-    // keeps it a preference rather than a second global.
-    document.setIn(["roles", "reviewer", "transport"], transport);
-    changed.push(`the Primary Reviewer's vehicle is now '${transport}'`);
+    values[SETTING_REVIEWER_TRANSPORT] = normalizedTransport(choice.reviewerTransport);
   }
-  writeFileSync(path, document.toString(), "utf8");
-  return { path, changed };
+  // A model id goes in as it was given: the catalog's id is what the caller
+  // checked it against and what goes on the wire, and normalising it here
+  // would drop the date suffix that makes a pin a pin.
+  if (choice.authoringModel !== undefined) {
+    values[SETTING_AUTHORING_MODEL] = choice.authoringModel.trim();
+  }
+  return writeSettings(root, values);
+}
+
+/** One transport name, as this framework spells it, or a refusal naming both. */
+function normalizedTransport(value: string): string {
+  const transport = value.trim().toLowerCase();
+  if (transport !== "" && !(VALID_TRANSPORTS as readonly string[]).includes(transport)) {
+    throw new ConfigError(
+      `transport must be one of ${renderList(VALID_TRANSPORTS)}, got '${value}'`,
+    );
+  }
+  return transport;
 }
 
 /**

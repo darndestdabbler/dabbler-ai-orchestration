@@ -31,8 +31,7 @@ import { resolveRouterCli } from "../router/terminalShim";
 
 import {
   ENUMERATION_WORDS,
-  FIDELITY_WORDS,
-  PROVIDER_RELATION_WORDS,
+  providerRelationWord,
   REVIEWER_HELP,
 } from "../providers/solutionTreeModel";
 import type {
@@ -157,7 +156,8 @@ function engineItems(
  */
 function modelItems(
   models: readonly ConfigurationModel[],
-  transport: string | undefined,
+  /** The provider the work is authored by, so each option can be labelled against it. */
+  authorProvider: string | null | undefined,
   selected: string | null | undefined = null,
 ): vscode.QuickPickItem[] {
   return models.map((model) => ({
@@ -166,10 +166,9 @@ function modelItems(
     // and the row cannot come to say different things about one model.
     description: [
       model.provider,
-      model.providerRelation ? PROVIDER_RELATION_WORDS[model.providerRelation] : null,
-      model.fidelity === undefined
-        ? null
-        : `${FIDELITY_WORDS[model.fidelity]}${transport ? ` on ${transport}` : ""}`,
+      // Derived from the author's provider and this one, which is what the
+      // row does too -- the comparison is not a field on the model.
+      authorProvider ? providerRelationWord(authorProvider, model.provider) : null,
       // What the source said it costs, in the source's own word, and
       // nothing at all where the source said nothing.
       model.priceCategory ? `${model.priceCategory} price` : null,
@@ -178,7 +177,7 @@ function modelItems(
       .join(" · "),
     // Which one they already chose, so the list is a place to CHANGE a
     // choice rather than a place to make one over again.
-    detail: model.model === selected ? "what you chose" : model.alias,
+    detail: model.model === selected ? "what you chose" : undefined,
   }));
 }
 
@@ -398,7 +397,7 @@ export async function setRoleModel(
   }
   const items = modelItems(
     role?.candidates ?? [],
-    target.projection?.configuration?.fidelityTransport,
+    target.projection?.configuration?.authoring?.provider,
     role?.selected,
   );
   if (items.length === 0) {

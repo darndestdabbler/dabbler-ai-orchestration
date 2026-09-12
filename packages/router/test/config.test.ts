@@ -7,7 +7,8 @@
 // loader then decides is reachable from named files (`loadConfigFrom`), so
 // only one test here needs a project root at all, and none needs a checkout.
 import assert from "node:assert/strict";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
 import { stringify } from "yaml";
@@ -23,6 +24,7 @@ import {
   loadConfigFrom,
   resetProjectRootCache,
   resolveGenerationParams,
+  explainReviewingTransport,
   resolveTransport,
   runRoundCap,
   splitSections,
@@ -40,6 +42,13 @@ import {
 } from "../src/runtimeMode.ts";
 import { registerBackend, resolveSecret } from "../src/secretResolver.ts";
 import { gitAnswers, makeConfig, seed, tempDir } from "./support/answers.ts";
+import { writePreferences } from "../src/preferences.ts";
+import {
+  SETTINGS_RELPATH,
+  SETTING_REVIEWER_TRANSPORT,
+  SETTING_TRANSPORT,
+  writeSettings,
+} from "../src/settings.ts";
 
 /** The published default: package data, and the base every layer merges over. */
 const BUNDLED = join(ASSET_DIR, "router-config.yaml");
@@ -89,20 +98,15 @@ function refusal(run: () => unknown): string {
 }
 
 /**
- * The transport environment variable, out of the way for a whole describe.
+ * The retired transport variable, out of the way for a whole describe.
  *
- * `resolveTransport` answers the WHOLE precedence chain -- flag, then env,
- * then `transport.profile` -- so a test that asserts what a LAYER says by
- * reading it through that function is asking a question about the machine it
- * is running on. Three did, and they passed everywhere until the operator's
- * own machine persisted `DABBLER_TRANSPORT=api`, at which point the complete
- * suite failed on the one host that runs it while every targeted check
- * stayed green. The run of record inherits the shell by design, which is why
- * a suite may not read one.
- *
- * The precedence describe below uses the same helper and then sets the
- * variable itself: cleared before each test is exactly what a test about
- * precedence needs too.
+ * It decides nothing now, and that is what one test below proves -- so it
+ * has to be able to SET it, and every other test in the describe has to
+ * start from a machine that is not carrying the operator's own. A suite that
+ * read the shell passed everywhere until this machine persisted
+ * `DABBLER_TRANSPORT=api`, at which point the complete run failed on the one
+ * host that runs it while every targeted check stayed green. The run of
+ * record inherits the shell by design, which is why a suite may not read one.
  */
 function withoutTransportEnv(): void {
   const saved = process.env[TRANSPORT_ENV_VAR];
@@ -169,8 +173,10 @@ describe("where the three layers come from", () => {
     // The one test that needs a project root: git says where it is, the
     // reader says what is there, and the loader merges what that names.
     const root = tempDir("project-");
+    // Not `transport.profile`: that key in an overlay is refused now, and
+    // what this test is about is which FILES a root resolves to.
     seed(root, {
-      [LOCAL_OVERRIDES_FILENAME]: stringify({ transport: { profile: "copilot-cli" } }),
+      [LOCAL_OVERRIDES_FILENAME]: stringify({ escalation: { max_escalations: 1 } }),
     });
     const restore = gitAnswers([
       [["rev-parse", "--show-toplevel"], { stdout: root.split("\\").join("/") }],
@@ -178,7 +184,7 @@ describe("where the three layers come from", () => {
     resetProjectRootCache();
     try {
       const config = loadConfig(undefined, root);
-      assert.equal(resolveTransport(config), "copilot-cli");
+      assert.equal(block(config, "escalation")["max_escalations"], 1);
       assert.match(String(config["_local_overrides_path"]), /local-overrides\.yaml$/);
       assert.equal(config["_project_config_path"], null);
     } finally {
@@ -279,9 +285,9 @@ describe("the machine-local overlay", () => {
 
   it("merges over the base, partially", () => {
     const config = loadConfigFrom(
-      sources({ overrides: { transport: { profile: "copilot-cli" } } }),
+      sources({ overrides: { escalation: { max_escalations: 1 } } }),
     );
-    assert.equal(resolveTransport(config), "copilot-cli");
+    assert.equal(block(config, "escalation")["max_escalations"], 1);
     assert.ok(config["provider_defaults"]);
     assert.match(String(config["_local_overrides_path"]), /local-overrides\.yaml$/);
   });
@@ -351,11 +357,11 @@ describe("the tracked project config", () => {
     const config = loadConfigFrom(
       sources({
         project: { schema_version: 1, paths: { sensitive_paths: ["infra/"] } },
-        overrides: { transport: { profile: "copilot-cli" } },
+        overrides: { escalation: { max_escalations: 1 } },
       }),
     );
     assert.deepEqual(block(config, "paths")["sensitive_paths"], ["infra/"]);
-    assert.equal(resolveTransport(config), "copilot-cli");
+    assert.equal(block(config, "escalation")["max_escalations"], 1);
   });
 
   it("refuses a file that states no schema_version", () => {
@@ -378,33 +384,167 @@ describe("the tracked project config", () => {
 describe("resolving the transport", () => {
   withoutTransportEnv();
 
+  /**
+   * A checkout with no settings file, named explicitly.
+   *
+   * Every call below passes a root rather than letting the reading fall back
+   * to the working directory: the settings layer is per-CHECKOUT, so a test
+   * that did not name one would be asking what this repository is configured
+   * with -- which is a reading of the machine the suite runs on, and the one
+   * thing a suite may never do.
+   */
+  const bare = (): string => tempDir("transport-");
+
   it("defaults to the API", () => {
-    assert.equal(resolveTransport(makeConfig()), "api");
+    assert.equal(resolveTransport(makeConfig(), null, bare()), "api");
   });
 
   it("takes the config profile over the default", () => {
     assert.equal(
-      resolveTransport(makeConfig({ transport: { profile: "copilot-cli" } })),
+      resolveTransport(makeConfig({ transport: { profile: "copilot-cli" } }), null, bare()),
       "copilot-cli",
     );
   });
 
-  it("takes the env var over the config", () => {
-    process.env[TRANSPORT_ENV_VAR] = "api";
-    assert.equal(
-      resolveTransport(makeConfig({ transport: { profile: "copilot-cli" } })),
-      "api",
-    );
+  it("takes this person's default over the config, and the checkout over both", () => {
+    // The order the operator settled: what the solution COMMITTED outranks
+    // what one person prefers, because a repository that needs the seat
+    // needs it for everyone who opens it; and a personal default still
+    // outranks what the distribution ships, because that is the answer
+    // nobody on this machine chose.
+    const config = makeConfig({ transport: { profile: "offline" } });
+    writePreferences({ transport: "api" });
+    const root = bare();
+    assert.equal(resolveTransport(config, null, root), "api");
+    writeSettings(root, { [SETTING_TRANSPORT]: "copilot-cli" });
+    assert.equal(resolveTransport(config, null, root), "copilot-cli");
+    // And a checkout that says nothing leaves the personal default standing:
+    // silence in the higher layer is not a value in it.
+    assert.equal(resolveTransport(config, null, bare()), "api");
+    writePreferences({ transport: "" });
   });
 
-  it("takes the flag over the env var", () => {
-    process.env[TRANSPORT_ENV_VAR] = "api";
-    assert.equal(resolveTransport(makeConfig(), "copilot-cli"), "copilot-cli");
+  it("stops on the overlay's retired transport key, and names the command", () => {
+    // The fifth input, and a fifth input is the whole problem: the replaced
+    // `bootstrap --transport` and `configure --transport` wrote exactly this
+    // key, so every checkout made before this session carries one -- now
+    // sitting BELOW the user-level preferences, where a personal default
+    // would silently override the checkout file somebody deliberately wrote.
+    // Nothing may choose between two readings on their behalf.
+    const root = tempDir("overlay-");
+    seed(root, {
+      "local-overrides.yaml": stringify({ transport: { profile: "copilot-cli" } }),
+    });
+    const ungit = gitAnswers([
+      [["rev-parse", "--show-toplevel"], { stdout: root.split("\\").join("/") }],
+    ]);
+    resetProjectRootCache();
+    try {
+      const message = refusal(() => resolveTransport(makeConfig(), null, root));
+      assert.match(message, /local-overrides\.yaml/);
+      assert.match(message, /dabbler configure --transport copilot-cli/);
+      // And through the other door: a config that RECORDS where its overlay
+      // was, handed to a resolver standing somewhere else entirely. The
+      // refusal follows the configuration, not the working directory --
+      // otherwise a round reviewing a named repository would be judged on
+      // whichever checkout the process happened to be in.
+      const carried = { ...makeConfig(), _local_overrides_path: join(root, "local-overrides.yaml") };
+      assert.match(refusal(() => resolveTransport(carried, null, bare())), /local-overrides\.yaml/);
+    } finally {
+      ungit();
+      resetProjectRootCache();
+    }
+  });
+
+  it("ignores the environment variable entirely, whatever it says", () => {
+    // It is not a layer and cannot become one. `bootstrap` persisted it at
+    // USER scope, so one repository's detection decided how every repository
+    // on the machine routed, for every later run, with nothing able to show
+    // it -- and the pane came to save a preference the next session ignored.
+    // Every layer that remains is a file a surface can show and a verb can
+    // write.
+    process.env[TRANSPORT_ENV_VAR] = "copilot-cli";
+    const config = makeConfig({ transport: { profile: "offline" } });
+    assert.equal(resolveTransport(config, null, bare()), "offline");
+    // Including a value that is not even a transport: a layer nothing reads
+    // cannot fail a call either.
+    process.env[TRANSPORT_ENV_VAR] = "carrier-pigeon";
+    assert.equal(resolveTransport(config, null, bare()), "offline");
+  });
+
+  it("takes the flag over every file", () => {
+    const root = bare();
+    writeSettings(root, { [SETTING_TRANSPORT]: "api" });
+    assert.equal(resolveTransport(makeConfig(), "copilot-cli", root), "copilot-cli");
   });
 
   it("names the level an unknown value came from", () => {
-    process.env[TRANSPORT_ENV_VAR] = "carrier-pigeon";
-    assert.match(refusal(() => resolveTransport(makeConfig())), new RegExp(TRANSPORT_ENV_VAR));
+    const root = bare();
+    writeSettings(root, { [SETTING_TRANSPORT]: "carrier-pigeon" });
+    assert.match(refusal(() => resolveTransport(makeConfig(), null, root)), /settings\.json/);
+  });
+
+  it("stops on a settings file it cannot read, and leaves the bytes alone", () => {
+    // A half-typed file is a file somebody is in the middle of editing, and
+    // a recovered parse of it would resolve a session onto whatever survived
+    // the syntax error. Falling THROUGH it is no better: a setting the
+    // operator can plainly see, ignored while a lower layer decides, is the
+    // same invisibility the environment variable was deleted for.
+    const root = bare();
+    const path = join(root, SETTINGS_RELPATH);
+    mkdirSync(dirname(path), { recursive: true });
+    const text = '{ "dabbler.transport": "copilot-cli"  "x": 1 }';
+    writeFileSync(path, text, "utf8");
+    assert.match(
+      refusal(() => resolveTransport(makeConfig(), null, root)),
+      /settings\.json could not be read/,
+    );
+    assert.equal(readFileSync(path, "utf8"), text);
+  });
+});
+
+describe("the one reviewing vehicle", () => {
+  withoutTransportEnv();
+  const bare = (): string => tempDir("reviewing-");
+
+  it("carries both reviewers, and an auxiliary key that agrees is simply ignored", () => {
+    // They differ in what they may not BE, and not in how they are reached.
+    // An auxiliary key repeating the same value is a document that has not
+    // been tidied yet, which is not a reason to stop anybody's session.
+    const config = makeConfig({
+      transport: { profile: "offline" },
+      roles: {
+        reviewer: { transport: "api" },
+        "auxiliary-reviewer": { transport: "api" },
+      },
+    });
+    const reading = explainReviewingTransport(config, null, bare());
+    assert.equal(reading.transport, "api");
+    assert.equal(reading.decidedBy, "roles.reviewer.transport");
+  });
+
+  it("refuses to choose between two live values, and names both keys", () => {
+    // Collapsing by picking one is how state stops matching the record: the
+    // round would be dispatched over a vehicle the document does not say,
+    // and nothing would ever say which.
+    const config = makeConfig({
+      roles: {
+        reviewer: { transport: "api" },
+        "auxiliary-reviewer": { transport: "copilot-cli" },
+      },
+    });
+    const message = refusal(() => explainReviewingTransport(config, null, bare()));
+    assert.match(message, /roles\.auxiliary-reviewer\.transport/);
+    assert.match(message, /roles\.reviewer\.transport/);
+  });
+
+  it("takes this checkout's setting over the configured reviewing vehicle", () => {
+    const root = bare();
+    writeSettings(root, { [SETTING_REVIEWER_TRANSPORT]: "copilot-cli" });
+    const config = makeConfig({ roles: { reviewer: { transport: "api" } } });
+    const reading = explainReviewingTransport(config, null, root);
+    assert.equal(reading.transport, "copilot-cli");
+    assert.equal(reading.decidedBy, SETTING_REVIEWER_TRANSPORT);
   });
 });
 

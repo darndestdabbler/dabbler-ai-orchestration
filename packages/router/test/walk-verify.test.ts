@@ -182,7 +182,6 @@ describe("a repository walked through the verification loop", () => {
     script(ISSUE, "VERIFIED\n\nThe fix is right and the rebuttal was answered.\n", ISSUE, ISSUE, ASKS, ASKS);
     process.env[CONFIG_ENV_VAR] = join(tempDir("config-"), "router-config.yaml");
     writeFileSync(process.env[CONFIG_ENV_VAR], stringifyYaml(config), "utf8");
-    delete process.env["DABBLER_TRANSPORT"];
     setProviderKeys();
     resetForTests();
     resetRuntimeMode();

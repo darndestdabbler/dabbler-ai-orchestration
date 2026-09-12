@@ -37,8 +37,17 @@ import {
   IdentityResolutionError,
   resolveOrchestratorIdentity,
 } from "./identity.ts";
-import { loadConfig } from "./config.ts";
-import { freshnessWarnings, refreshStaleRecords } from "./discovery.ts";
+import {
+  CHOSEN_VEHICLE_LAYERS,
+  explainReviewingTransport,
+  explainTransport,
+  loadConfig,
+} from "./config.ts";
+import {
+  configuredVehicleRefusal,
+  freshnessWarnings,
+  refreshStaleRecords,
+} from "./discovery.ts";
 import {
   ROUND_REF_NAMESPACE,
   SESSION_PLAN_FILENAME,
@@ -90,6 +99,7 @@ import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { removeStopGate } from "./bootstrap/index.ts";
 import { PROJECT_CONFIG_FILENAME } from "./config.ts";
+import { SETTING_AUTHORING_MODEL, settingValue } from "./settings.ts";
 import {
   CLASS_ACCOUNTABILITY_SIGNOFF,
   raiseOwed,
@@ -1113,12 +1123,49 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     // so a second Start under another engine would leave the record saying
     // this session was run by an engine that ran only part of it. Nobody
     // reading the ledger afterwards could tell which half.
+    // **What this checkout chose, where the call named nothing.**
+    //
+    // `dabbler configure --authoring-model` writes a setting, and a setting
+    // no reader consumes is a control that reports success and changes
+    // nothing -- the exact failure this block of sessions exists to delete.
+    // A `--model` typed at this call still wins: it is what the person said
+    // now, about this session.
+    const checkout = repoRootFor(sessionsDir) ?? dirname(sessionsDir);
     let identity: OrchestratorIdentity = {
       engine: options.engine,
       provider: options.provider ?? null,
-      model: options.model ?? null,
+      model: options.model ?? settingValue(checkout, SETTING_AUTHORING_MODEL),
       effort: options.effort ?? null,
     };
+    // **A vehicle a PERSON put in force and this machine cannot reach is a
+    // stop, here, before the session exists and before anything is billed.**
+    //
+    // Only one somebody chose -- typed, committed in this checkout, or set
+    // as their own default. A first-run machine with no seat and no keys is
+    // not refused: refusing it would refuse the setup that fixes it. The
+    // refusal names the LAYER, because a committed setting and a personal
+    // default are fixed in different files by different people.
+    const chosenLayers = CHOSEN_VEHICLE_LAYERS;
+    try {
+      const config = loadConfig(undefined, checkout);
+      const unreachable =
+        configuredVehicleRefusal(config, explainTransport(config, null, checkout), chosenLayers) ??
+        configuredVehicleRefusal(
+          config,
+          explainReviewingTransport(config, null, checkout),
+          chosenLayers,
+        );
+      if (unreachable !== null) {
+        writeErr(`start: refused -- ${unreachable}\n`);
+        return EXIT_USAGE;
+      }
+    } catch (error) {
+      // A configuration this router cannot load is refused by every other
+      // reader too, and with its own sentence. Starting a session over it
+      // would put the refusal at the first round instead of here.
+      writeErr(`start: refused -- ${error instanceof Error ? error.message : String(error)}\n`);
+      return EXIT_USAGE;
+    }
     if (current !== null && requested === current && normalized !== null) {
       const recorded = sessionRecord(normalized, current);
       const clash = identityClash(recorded, identity);

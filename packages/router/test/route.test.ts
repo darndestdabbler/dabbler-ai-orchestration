@@ -105,8 +105,6 @@ beforeEach(() => {
   // say what the machine was told it could dispatch to.
   seedApiCatalog(makeConfig());
   // `bootstrap` persists this at user scope on a seat machine, and it
-  // outranks the config a test writes.
-  delete process.env["DABBLER_TRANSPORT"];
   delete process.env["DABBLER_NO_ROUTER"];
   resetForTests();
   resetRuntimeMode();
@@ -119,7 +117,6 @@ afterEach(() => {
   writePreferences({ role: "reviewer", selected: "" });
   delete process.env[CONFIG_ENV_VAR];
   delete process.env["DABBLER_NO_ROUTER"];
-  delete process.env["DABBLER_TRANSPORT"];
   resetForTests();
   resetRuntimeMode();
 });
@@ -162,11 +159,7 @@ describe("the ladder a call may take", () => {
     // There is no alias on either transport now: the catalog's id is what the
     // surface shows, what a choice is checked against, and what is dispatched.
     const [first] = apiLadder(makeConfig(), "generator", "general", []);
-    assert.deepEqual([first?.alias, first?.model_id, first?.provider], [
-      "g-flash",
-      "g-flash",
-      "google",
-    ]);
+    assert.deepEqual([first?.model_id, first?.provider], ["g-flash", "google"]);
   });
 
   it("is not read at all when it was taken for a different set of keys", () => {
@@ -222,11 +215,11 @@ describe("the ladder a call may take", () => {
     // pinned verifier is the author. The rule is asserted again here,
     // against the author this call actually has, because a rule the surface
     // keeps and the runtime does not is not a rule.
-    const candidate = { alias: "a-opus", model_id: "a-opus", provider: "anthropic" };
+    const candidate = { model_id: "a-opus", provider: "anthropic" };
     assert.throws(() => assertNotTheAuthor(candidate, "a-opus"), /they are the same model/);
     // Under the framework's one spelling, so a dated pin of the same model
     // is caught rather than read as a second one.
-    const dated = { alias: "c", model_id: "claude-opus-5", provider: "anthropic" };
+    const dated = { model_id: "claude-opus-5", provider: "anthropic" };
     assert.throws(
       () => assertNotTheAuthor(dated, "claude-opus-5-20260101"),
       ExcludedProviderError,
@@ -301,7 +294,7 @@ describe("the ladder a call may take", () => {
       const warning = written.join("");
       assert.match(warning, /fell past its preference order/);
       // What answered, and why the named ones did not.
-      assert.match(warning, new RegExp(ladder[0]!.alias));
+      assert.match(warning, new RegExp(ladder[0]!.model_id));
       assert.match(warning, /excluded-provider/);
 
       // Silence on an ordinary round: the order's own first choice answers.
@@ -326,14 +319,14 @@ describe("the seat's ladder", () => {
     // it offers one, and dispatching to one it withheld would make its own
     // statement mean nothing.
     assert.deepEqual(
-      seatLadder(makeConfig(), CATALOG, "generator", []).map((entry) => entry.alias),
+      seatLadder(makeConfig(), CATALOG, "generator", []).map((entry) => entry.model_id),
       ["claude-x", "gpt-x"],
     );
   });
 
   it("walks past the preferred provider when it is excluded", () => {
     assert.deepEqual(
-      seatLadder(makeConfig(), CATALOG, "generator", ["anthropic"]).map((entry) => entry.alias),
+      seatLadder(makeConfig(), CATALOG, "generator", ["anthropic"]).map((entry) => entry.model_id),
       ["gpt-x"],
     );
   });
@@ -351,7 +344,7 @@ describe("the exclusion at the call site", () => {
     // Asserted again immediately before the wire, because cross-provider
     // review is the one invariant a later preference path must not be able
     // to undo. No current path reaches it, which is the point.
-    const candidate: Candidate = { alias: "flash", model_id: "g-flash", provider: "google" };
+    const candidate: Candidate = { model_id: "g-flash", provider: "google" };
     assert.throws(() => assertNotExcluded(candidate, ["google"]), ExcludedProviderError);
     assert.doesNotThrow(() => assertNotExcluded(candidate, ["openai"]));
   });
@@ -485,7 +478,7 @@ describe("detecting a truncated response", () => {
 });
 
 describe("what one dispatch becomes", () => {
-  const CANDIDATE: Candidate = { alias: "claude-x", model_id: "claude-x", provider: "anthropic" };
+  const CANDIDATE: Candidate = { model_id: "claude-x", provider: "anthropic" };
 
   function outcome(overrides: Partial<DispatchOutcome> = {}): DispatchOutcome {
     return {

@@ -46,7 +46,7 @@ export type RouterConfig = {
   roles?: Record<string, {
     prefer?: string[];
     /**
-     * This role's own vehicle: the transport it is dispatched over, where it differs from the machine's. A configured default, so a --transport flag and DABBLER_TRANSPORT still outrank it; a role that names none resolves exactly as the machine does. It exists because reviewer selection may need the other transport when provider independence requires it, which this framework stated long before any surface could act on it.
+     * This role's own vehicle: the transport it is dispatched over, where it differs from the machine's. The lowest of the layers that can name one, so a --transport flag, this checkout's .vscode/settings.json and the user-level preferences.json all outrank it; a role that names none resolves exactly as the machine does. It exists because reviewer selection may need the other transport when provider independence requires it, which this framework stated long before any surface could act on it.
      */
     transport?: "api" | "copilot-cli" | "offline";
   }>;

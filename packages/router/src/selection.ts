@@ -44,6 +44,19 @@ export const ROLE_PRIMARY_REVIEWER = "reviewer";
 export const ROLE_AUXILIARY_REVIEWER = "auxiliary-reviewer";
 
 /**
+ * The roles that REVIEW, which is the set that shares one vehicle.
+ *
+ * They differ in what they may not BE -- that is the whole of their
+ * definition above -- and not in how they are reached. The auxiliary had its
+ * own vehicle from the day the roles were named: state that existed, reached
+ * dispatch, and that no surface could show or set.
+ */
+export const REVIEWING_ROLES: ReadonlySet<string> = new Set([
+  ROLE_PRIMARY_REVIEWER,
+  ROLE_AUXILIARY_REVIEWER,
+]);
+
+/**
  * The providers a reviewing role may not draw from, from the role itself.
  *
  * `reviewedProviders` is every provider that has already reviewed this

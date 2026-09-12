@@ -369,14 +369,14 @@ async function captureWorkExplorer() {
 async function captureSolutionExplorer() {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "deck-csv-solution-"));
   fs.writeFileSync(path.join(workspace, "solution.yaml"), CSV_SOLUTION, "utf8");
-  // The Explorer renders `.dabbler/solution/projection.json`, which the
+  // The Explorer renders `.dabbler/solution/solution.json`, which the
   // router writes and nothing else may: entering the first step is the move
   // that publishes it, and it is the move a real solution starts with.
   const entered = spawnSync(process.execPath, [DABBLER_CLI, "workflow", "enter", "plan"], {
     cwd: workspace,
     encoding: "utf8",
   });
-  if (!fs.existsSync(path.join(workspace, ".dabbler", "solution", "projection.json"))) {
+  if (!fs.existsSync(path.join(workspace, ".dabbler", "solution", "solution.json"))) {
     throw new Error(
       `the router wrote no solution projection: ${entered.stdout || ""}${entered.stderr || ""}`,
     );

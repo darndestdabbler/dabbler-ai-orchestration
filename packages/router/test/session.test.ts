@@ -33,6 +33,12 @@ import { readOwed } from "../src/owedDecisions.ts";
 import { checkPublishedWhenReleasable, runGates } from "../src/gates.ts";
 import { appendPackaging, appendWithdrawal, standingWithdrawal } from "../src/ledger.ts";
 import { readPolicy } from "../src/policy.ts";
+import { TRANSPORT_COPILOT_CLI, resetProjectRootCache } from "../src/config.ts";
+import {
+  SETTING_AUTHORING_MODEL,
+  SETTING_TRANSPORT,
+  writeSettings,
+} from "../src/settings.ts";
 import { readRawSessionState } from "../src/progress.ts";
 import {
   EXIT_BOUNDARY,
@@ -227,6 +233,60 @@ describe("the identity a session in flight was registered under", () => {
       asking({ engine: "copilot", model: "new" }),
     );
     assert.equal(stated.model, "new");
+  });
+});
+
+describe("what a start refuses before a session exists", () => {
+  it("stops on a vehicle THIS CHECKOUT chose and cannot reach, naming the layer", async () => {
+    // Before anything is billed and before the session is on the record.
+    // Only a vehicle somebody CHOSE: a first-run machine with no seat and no
+    // keys is not refused, because refusing it would refuse the setup that
+    // fixes it -- see the same test's second half.
+    const state = stateDir();
+    try {
+      writeSettings(state.repo, { [SETTING_TRANSPORT]: TRANSPORT_COPILOT_CLI });
+      resetProjectRootCache();
+      const refused = await run(() =>
+        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
+      );
+      assert.notEqual(refused.code, EXIT_OK);
+      assert.match(refused.err, /copilot-cli/);
+      assert.match(refused.err, /settings\.json/);
+      assert.equal(readRawSessionState(state.sessionsDir), null);
+
+      // And with nothing chosen, the same machine starts: the shipped
+      // default is not somebody's expectation to be held to.
+      writeSettings(state.repo, { [SETTING_TRANSPORT]: "" });
+      resetProjectRootCache();
+      const started = await run(() =>
+        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
+      );
+      assert.equal(started.code, EXIT_OK, started.err);
+    } finally {
+      resetProjectRootCache();
+      state.restore();
+    }
+  });
+
+  it("takes the authoring model this checkout chose when the call names none", async () => {
+    // The other half of the same rule: a setting no reader consumes is a
+    // control that reports success and changes nothing.
+    const state = stateDir();
+    try {
+      writeSettings(state.repo, { [SETTING_AUTHORING_MODEL]: "claude-opus-5" });
+      resetProjectRootCache();
+      const started = await run(() =>
+        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
+      );
+      assert.equal(started.code, EXIT_OK, started.err);
+      assert.equal(
+        (sessionOf(state.sessionsDir)["orchestrator"] as Record<string, unknown>)["model"],
+        "claude-opus-5",
+      );
+    } finally {
+      resetProjectRootCache();
+      state.restore();
+    }
   });
 });
 

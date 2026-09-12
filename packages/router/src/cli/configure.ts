@@ -49,7 +49,8 @@
 import {
   ConfigError,
   VALID_TRANSPORTS,
-  explainRoleTransport,
+  TRANSPORT_ENV_VAR,
+  explainReviewingTransport,
   explainTransport,
   loadConfig,
   writeConfigurationChoice,
@@ -58,8 +59,16 @@ import {
 import { BUILT_IN_ENGINES } from "../engines.ts";
 import { repoRootFor } from "../journal.ts";
 import { PREFERENCES_FILENAME, selectedModel, writePreferences } from "../preferences.ts";
+import { vehicleRefusal } from "../discovery.ts";
+import { SETTINGS_RELPATH } from "../settings.ts";
 import { workingDirectory } from "../workdir.ts";
-import { orchestratorOf, roleReading, tryWriteProjection, type RoleReading } from "../projection.ts";
+import {
+  authoringNode,
+  orchestratorOf,
+  roleReading,
+  tryWriteProjection,
+  type RoleReading,
+} from "../projection.ts";
 import {
   ROLE_AUXILIARY_REVIEWER,
   ROLE_PRIMARY_REVIEWER,
@@ -75,8 +84,9 @@ const EXIT_USAGE = 2;
 function usage(): string {
   return [
     "usage: dabbler configure [-h] [--engine E] [--transport T]",
-    "                         [--reviewer-transport T] [--reviewer-model M]",
-    "                         [--auxiliary-model M] [--repo-root PATH]",
+    "                         [--reviewer-transport T] [--authoring-model M]",
+    "                         [--reviewer-model M] [--auxiliary-model M]",
+    "                         [--repo-root PATH]",
     "",
     "  what the NEXT session is run with",
     "",
@@ -88,12 +98,18 @@ function usage(): string {
     "                          a pane read one answer. An empty value clears it",
     `  --transport T           ${VALID_TRANSPORTS.join(" | ")}; the machine's own`,
     "                          vehicle -- how a provider is reached where no role",
-    "                          says otherwise. An environment variable outranks",
-    "                          this file, and the answer says so when one does",
-    `  --reviewer-transport T  ${VALID_TRANSPORTS.join(" | ")}; the Primary`,
-    "                          Reviewer's OWN vehicle, where it differs from the",
-    "                          machine's. A review may need the other transport",
-    "                          when provider independence requires it",
+    `                          says otherwise. Written to ${SETTINGS_RELPATH}`,
+    "                          in this checkout, which a --transport flag is the",
+    "                          only thing above",
+    `  --reviewer-transport T  ${VALID_TRANSPORTS.join(" | ")}; the vehicle BOTH`,
+    "                          reviewing roles are dispatched over, where it",
+    "                          differs from the machine's. A review may need the",
+    "                          other transport when provider independence",
+    "                          requires it",
+    "  --authoring-model M     the model the engine's CLI is launched on, named",
+    "                          as the transport in force lists it. It is what",
+    "                          `session start` offers and what the engine is",
+    "                          asked for; an empty value clears it",
     "  --reviewer-model M      the model that reviews the next session, named as",
     "                          the reviewer's own transport lists it. The one",
     "                          refusal is the AUTHORING model itself -- which is",
@@ -130,7 +146,7 @@ function usage(): string {
  * and is documented as "a place to CHANGE a choice" -- so before this, the
  * pane offered the change and the router refused it.
  */
-function offered(reading: RoleReading, role: string): Array<readonly [string, string, string]> {
+function offered(reading: RoleReading, role: string): Array<readonly [string, string]> {
   return reading.resolve(role, null, { applySelection: false }).candidates;
 }
 
@@ -177,8 +193,10 @@ export interface ConfigureOptions {
   /** The engine the next session is offered; an empty value clears it. */
   readonly engine?: string;
   readonly transport?: string;
-  /** The Primary Reviewer's own vehicle, where it differs from the machine's. */
+  /** The vehicle both reviewing roles are dispatched over. */
   readonly reviewerTransport?: string;
+  /** The model the engine's own CLI is launched on. */
+  readonly authoringModel?: string;
   readonly reviewerModel?: string;
   /** The Auxiliary Reviewer's model: the third voice at a disputed impasse. */
   readonly auxiliaryModel?: string;
@@ -212,20 +230,39 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
         `It is one of: ${VALID_TRANSPORTS.join(", ")}.`,
     };
   }
+  // **A vehicle this machine cannot reach is a stop, at the moment it is
+  // chosen.** Writing it and discovering it at the round would spend a
+  // session's setup to learn something knowable now -- and silently using a
+  // different one would change which account is billed and make every later
+  // account of what ran untrue, which is the shadowing this framework
+  // deleted `DABBLER_TRANSPORT` for. The reading is named so the operator
+  // knows which file to fix.
+  for (const [flag, wanted] of [
+    ["--transport", options.transport],
+    ["--reviewer-transport", options.reviewerTransport],
+  ] as const) {
+    if (wanted === undefined) continue;
+    const refusal = vehicleRefusal(config, {
+      transport: wanted.trim().toLowerCase(),
+      decidedBy: `${flag} on this call`,
+      layers: [],
+    });
+    if (refusal !== null) return { ...empty, refusal };
+  }
   // Each reviewing role is checked against ITS OWN vehicle, because that is
-  // the transport its round will be dispatched over. The machine's own
-  // stands in where no role vehicle is named, and where this same call is
-  // SETTING a vehicle it is the one being set that decides -- checking the
-  // outgoing vehicle would refuse `--reviewer-transport copilot-cli
-  // --reviewer-model <a seat model>` for naming a model the transport it is
-  // leaving does not list, which is the one pair of flags a person switching
-  // machines would type together. A repository that never wanted two
-  // vehicles keeps the behaviour it had.
-  const transportFor = (role: string, roleOverride?: string): string =>
+  // the transport its round will be dispatched over -- ONE reviewing
+  // vehicle, shared by both reviewing roles. The machine's own stands in
+  // where none is named, and where this same call is SETTING a vehicle it is
+  // the one being set that decides: checking the outgoing vehicle would
+  // refuse `--reviewer-transport copilot-cli --reviewer-model <a seat
+  // model>` for naming a model the transport it is leaving does not list,
+  // which is the one pair of flags a person switching machines would type
+  // together.
+  const transportFor = (roleOverride?: string): string =>
     roleOverride ??
     (options.transport !== undefined
       ? explainTransport(config, options.transport).transport
-      : explainRoleTransport(config, role).transport);
+      : explainReviewingTransport(config).transport);
   const readings = new Map<string, RoleReading>();
   const readingFor = (name: string): RoleReading => {
     const held = readings.get(name);
@@ -295,7 +332,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   if (options.reviewerModel !== undefined) {
     const checked = checkedModel(
       ROLE_PRIMARY_REVIEWER,
-      transportFor(ROLE_PRIMARY_REVIEWER, options.reviewerTransport),
+      transportFor(options.reviewerTransport),
       options.reviewerModel,
     );
     if ("refusal" in checked) return { ...empty, refusal: checked.refusal };
@@ -304,7 +341,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   if (options.auxiliaryModel !== undefined) {
     const checked = checkedModel(
       ROLE_AUXILIARY_REVIEWER,
-      transportFor(ROLE_AUXILIARY_REVIEWER),
+      transportFor(options.reviewerTransport),
       options.auxiliaryModel,
     );
     if ("refusal" in checked) return { ...empty, refusal: checked.refusal };
@@ -339,8 +376,47 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     }
     named["auxiliaryModel"] = checked.modelId;
   }
+  // **The authoring model: checked against what the transport LISTS.**
+  //
+  // Not against a reviewing role's candidates -- those are narrowed by a
+  // reviewing role's preference order, its provider set and its pin, none of
+  // which has anything to do with what the engine may be launched on. The
+  // undeclared role is the whole enumeration in the order the transport
+  // listed it, which is what "a model this machine could author with" means.
+  if (options.authoringModel !== undefined) {
+    const wanted = options.authoringModel.trim();
+    if (wanted !== "") {
+      const transport = transportFor();
+      // **The list the PANE offers, so the offer and the acceptance cannot
+      // disagree.** `authoringNode` narrows the transport's enumeration to
+      // the providers this engine's CLI can run -- Claude Code runs Anthropic
+      // models and nothing else -- and a verb that checked the whole
+      // transport instead would accept a model the launch then refuses.
+      // Session 156's first defect was this shape the other way round.
+      const listed = (
+        authoringNode(options.repoRoot, readingFor(transport))["candidates"] as Array<
+          Record<string, unknown>
+        >
+      ).map((candidate) => String(candidate["model"]));
+      const modelId = listed.find((id) => id === wanted) ?? null;
+      if (modelId === null) {
+        return {
+          ...empty,
+          refusal:
+            `'${wanted}' is not a model this engine could author with on the ` +
+            `${transport} transport. ${namesOffered(listed)}`,
+        };
+      }
+      named["authoringModel"] = modelId;
+    } else {
+      named["authoringModel"] = "";
+    }
+  }
   if (options.transport !== undefined) {
     Object.assign(choice, { transport: options.transport });
+  }
+  if (named["authoringModel"] !== undefined) {
+    Object.assign(choice, { authoringModel: named["authoringModel"] });
   }
   if (options.reviewerTransport !== undefined) {
     Object.assign(choice, { reviewerTransport: options.reviewerTransport });
@@ -420,11 +496,16 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     refusal: null,
     changed: [...written.changed, ...preferenceLines],
     path: written.path,
+    // Not a shadow any more: the variable decides nothing. An operator who
+    // exported it is told so anyway, with the one command that replaces it,
+    // because someone who believes their shell is choosing the vehicle will
+    // otherwise read every later session as having ignored them.
     shadowed:
-      choice.transport !== undefined && process.env["DABBLER_TRANSPORT"]
-        ? `DABBLER_TRANSPORT is set to '${process.env["DABBLER_TRANSPORT"]}' in ` +
-          "this environment and outranks the file, so it is what a session " +
-          "started from here will use."
+      process.env[TRANSPORT_ENV_VAR]
+        ? `${TRANSPORT_ENV_VAR} is set to '${process.env[TRANSPORT_ENV_VAR]}' in ` +
+          "this environment and is OBSOLETE: it is no longer part of how a " +
+          "vehicle is resolved. What decides is this checkout's " +
+          `${SETTINGS_RELPATH}, which \`dabbler configure --transport\` writes.`
         : null,
   };
 }
@@ -439,6 +520,7 @@ export async function configureVerb(argv: string[]): Promise<number> {
     "--engine",
     "--transport",
     "--reviewer-transport",
+    "--authoring-model",
     "--reviewer-model",
     "--auxiliary-model",
     "--repo-root",
@@ -467,6 +549,9 @@ export async function configureVerb(argv: string[]): Promise<number> {
     ...(values.has("--transport") ? { transport: values.get("--transport") as string } : {}),
     ...(values.has("--reviewer-transport")
       ? { reviewerTransport: values.get("--reviewer-transport") as string }
+      : {}),
+    ...(values.has("--authoring-model")
+      ? { authoringModel: values.get("--authoring-model") as string }
       : {}),
     ...(values.has("--reviewer-model")
       ? { reviewerModel: values.get("--reviewer-model") as string }

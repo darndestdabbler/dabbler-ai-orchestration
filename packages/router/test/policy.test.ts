@@ -92,7 +92,6 @@ describe("the module policy", () => {
 
   it("hands the first step instruction of a module session its scope, and the scope verb prints the same list", async () => {
     setProviderKeys();
-    delete process.env["DABBLER_TRANSPORT"];
     const { repo, sessionsDir, restore } = makeAnsweredSandbox({
       "docs/modules.yaml": MANIFEST,
       "modules/model/contract/README.md": "# model\n",

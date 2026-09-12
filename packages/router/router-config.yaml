@@ -52,7 +52,10 @@ providers:
       backoff_base_seconds: 2
 
 # Transport for routine dispatch. Resolution precedence: --transport CLI
-# flag > DABBLER_TRANSPORT env var > this value > default "api". The seat is
+# flag > <repo>/.vscode/settings.json "dabbler.transport" > the user-level
+# preferences.json > this value > default "api". DABBLER_TRANSPORT is NOT in
+# that order: a layer that outranked every file and was written by nothing is
+# how a pane came to save a preference the next session ignored. The seat is
 # the default because it is the surface staff receive; the direct-API path
 # stays fully supported and merely stops being what you get by not choosing.
 # A machine without a seat says so in a project-local local-overrides.yaml.

@@ -5,21 +5,20 @@
 // the `.gitignore` rewrite, because a tracked run ledger makes verified work
 // look like it changed after verification.
 //
-// **Nothing here writes the operator's environment.** It used to persist
-// `DABBLER_TRANSPORT` at user scope, and that variable outranks every config
-// layer -- so a preference a bootstrap run could shadow was a preference that
-// did nothing, which is a trap this repository has already paid for once. The
-// variable is still READ, because a deliberate override typed into a shell is
-// not the same thing as one written behind the operator's back, and
-// `explainTransport` names the layer that decided so the shadowing is
-// visible. `--transport` now writes the project's own machine-local overlay,
-// which is the layer a machine's choice about a checkout belongs at.
+// **Nothing here touches the operator's environment, and nothing reads it.**
+// It used to persist `DABBLER_TRANSPORT` at user scope, and that variable
+// outranked every config layer -- so a preference a bootstrap run could
+// shadow was a preference that did nothing, for every repository on the
+// machine. Writing it stopped when that was found; READING it stopped too,
+// because a layer nothing can show and no verb can write is a layer an
+// operator cannot reason about, whoever set it. `--transport` writes this
+// checkout's own `.vscode/settings.json`, which is where a choice about a
+// checkout belongs: committed, visible, and one command from changed.
 
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import {
-  LOCAL_OVERRIDES_FILENAME,
   TRANSPORT_ENV_VAR,
   VALID_TRANSPORTS,
   loadConfig,
@@ -49,6 +48,7 @@ import {
   writeInstructionFiles,
   removeStopGate,
 } from "../bootstrap/index.ts";
+import { SETTINGS_RELPATH } from "../settings.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;
@@ -76,12 +76,11 @@ function usage(): string {
     "                        remote is left exactly as it is.",
     "  --transport {" + CHOICES.join(",") + "}",
     `                        how a provider is reached from this checkout,`,
-    `                        written to ${LOCAL_OVERRIDES_FILENAME}. Nothing`,
-    "                        outside the project is touched: this used to be",
-    `                        persisted as ${TRANSPORT_ENV_VAR}, which outranks`,
-    "                        every config layer and so shadowed the very",
-    "                        preference a later run tried to set. Omitted:",
-    "                        the project's own configuration decides.",
+    `                        written to ${SETTINGS_RELPATH}. Nothing outside`,
+    "                        the project is touched: this used to be persisted",
+    `                        as ${TRANSPORT_ENV_VAR}, which is no longer read`,
+    "                        at all. Omitted: the project's own configuration",
+    "                        decides.",
     "",
   ].join("\n");
 }
@@ -139,14 +138,14 @@ function isDirectory(path: string): boolean {
 }
 
 /**
- * The transport an operator named, written where a machine's choice about a
- * CHECKOUT belongs: the project's own gitignored overlay.
+ * The transport an operator named, written where a choice about a CHECKOUT
+ * belongs: the project's own `.vscode/settings.json`.
  *
  * It used to be persisted as an environment variable at user scope, which
- * outranks every config layer -- so the one thing it reliably did was shadow
- * whatever a later `dabbler configure` set, silently, for every repository
- * on the machine. Nothing here touches the host now, and a run that names no
- * transport changes nothing at all.
+ * outranked every config layer -- so the one thing it reliably did was
+ * shadow whatever a later `dabbler configure` set, silently, for every
+ * repository on the machine. Nothing here touches the host now, nothing
+ * reads the variable, and a run that names no transport changes nothing.
  */
 function applyTransportPreference(parsed: Parsed): void {
   if (parsed.transport === null) return;
@@ -155,12 +154,15 @@ function applyTransportPreference(parsed: Parsed): void {
   });
   for (const line of written.changed) writeOut(`bootstrap: ${line}\n`);
   writeOut(`bootstrap: written to ${written.path}\n`);
-  const shadow = process.env[TRANSPORT_ENV_VAR];
-  if (shadow) {
+  const stale = process.env[TRANSPORT_ENV_VAR];
+  if (stale) {
+    // Not a shadow any more: it decides nothing. Said anyway, because an
+    // operator who exported it once is entitled to know it stopped
+    // mattering -- silence would leave them believing a session is on a
+    // vehicle it is not.
     writeOut(
-      `bootstrap: ${TRANSPORT_ENV_VAR} is set to '${shadow}' in this ` +
-        "environment and outranks the file, so it is what a session started " +
-        "from here will use.\n",
+      `bootstrap: ${TRANSPORT_ENV_VAR} is set to '${stale}' in this ` +
+        "environment and is IGNORED -- the file just written is what decides.\n",
     );
   }
 }

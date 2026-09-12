@@ -26,10 +26,10 @@ import {
   writeInstructionFiles,
 } from "../src/bootstrap/index.ts";
 import {
-  LOCAL_OVERRIDES_FILENAME,
   TRANSPORT_COPILOT_CLI,
   TRANSPORT_ENV_VAR,
 } from "../src/config.ts";
+import { SETTINGS_RELPATH } from "../src/settings.ts";
 import {
   ID_GIT_REMOTE,
   ID_TESTING_SUITES,
@@ -55,16 +55,17 @@ function emptyRepo(): string {
 }
 
 /**
- * The transport a bootstrap run names is written to the PROJECT's overlay
- * and nothing outside it.
+ * The transport a bootstrap run names is written to the CHECKOUT's own
+ * settings file and nothing outside it.
  *
  * `bootstrap` used to persist `DABBLER_TRANSPORT` at user scope. That
- * variable outranks every config layer, so the one thing it reliably did was
- * shadow whatever a later `dabbler configure` set -- for every repository on
- * the machine, from a per-project action.
+ * variable outranked every config layer, so the one thing it reliably did
+ * was shadow whatever a later `dabbler configure` set -- for every
+ * repository on the machine, from a per-project action. It is not written,
+ * and it is not read.
  */
 describe("where a bootstrap run's transport lands", () => {
-  it("writes the project's own overlay and never the operator's environment", async () => {
+  it("writes the checkout's own settings and never the operator's environment", async () => {
     const repo = emptyRepo();
     const before = process.env[TRANSPORT_ENV_VAR];
     const run = await capture(() =>
@@ -72,7 +73,7 @@ describe("where a bootstrap run's transport lands", () => {
     );
     assert.equal(run.value, 0, run.stderr);
     assert.match(
-      readFileSync(join(repo, LOCAL_OVERRIDES_FILENAME), "utf8"),
+      readFileSync(join(repo, SETTINGS_RELPATH), "utf8"),
       new RegExp(TRANSPORT_COPILOT_CLI),
     );
     // The account is untouched, whatever it held before.
@@ -83,7 +84,7 @@ describe("where a bootstrap run's transport lands", () => {
     const repo = emptyRepo();
     const run = await capture(() => bootstrapVerb(["--project-dir", repo]));
     assert.equal(run.value, 0, run.stderr);
-    assert.ok(!existsSync(join(repo, LOCAL_OVERRIDES_FILENAME)));
+    assert.ok(!existsSync(join(repo, SETTINGS_RELPATH)));
   });
 });
 
@@ -550,7 +551,7 @@ describe("what the Solution Explorer has to render", () => {
   it("writes the first projection, so the tree has content before any verb", async () => {
     const repo = emptyRepo();
     await bootstrapVerb(["--project-dir", repo]);
-    assert.ok(existsSync(join(repo, ".dabbler", "solution", "projection.json")));
+    assert.ok(existsSync(join(repo, ".dabbler", "solution", "solution.json")));
   });
 });
 

@@ -14,6 +14,8 @@
 // host is a Node process, so a verb is a function call.
 
 import {
+  configurationNode,
+  configurationSourceDirs,
   createInProcessRouter,
   commandLineFor,
   tryWriteProjection,
@@ -98,5 +100,47 @@ export function reprojectSolution(repoRoot: string): void {
   } catch {
     // `dabbler status` surfaces a manifest problem plainly when someone
     // asks. A background refresh is not where a person learns of one.
+  }
+}
+
+/**
+ * What this repository's next session would be run with, right now.
+ *
+ * Not from the projection: configuration left that file because every
+ * input it is derived from -- the model catalog, this operator's
+ * preferences -- sits at the USER level, outside any `RelativePattern` a
+ * workspace watcher can be built from, so a stored copy is stale the
+ * moment either moves and nothing in this window can be told it happened.
+ * Asking the router at the moment of rendering is a disk read it already
+ * does, and it is what makes the reading THIS extension's router's rather
+ * than whichever one last wrote a file.
+ *
+ * It never throws: `configurationNode` returns a reading carrying its own
+ * `unavailable` sentence for a configuration it cannot load, which is the
+ * one sentence that says how to fix it, and a pane that went blank would
+ * hide it.
+ */
+/**
+ * The directories the model catalog and this operator's preferences are in.
+ *
+ * Exported so the Solution Explorer can WATCH it. Everything a configuration
+ * reading derives from lives there, outside every repository -- and a view
+ * that only watched its own workspace had no way to be told any of it moved,
+ * so a `dabbler configure` or a catalog refresh typed in a terminal reached
+ * the pane only when something unrelated happened to fire.
+ */
+export function userConfigurationDirs(): string[] {
+  try {
+    return configurationSourceDirs();
+  } catch {
+    return [];
+  }
+}
+
+export function solutionConfiguration(repoRoot: string): unknown {
+  try {
+    return configurationNode(repoRoot);
+  } catch (error) {
+    return { unavailable: error instanceof Error ? error.message : String(error) };
   }
 }

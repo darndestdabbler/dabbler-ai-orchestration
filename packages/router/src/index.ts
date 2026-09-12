@@ -100,3 +100,21 @@ export { stalledAfterSeconds } from "./progress.ts";
 // problem, so a broken declaration leaves the last good projection standing
 // rather than emptying the view.
 export { tryWriteProjection } from "./projection.ts";
+// What a session would be run with, asked for at the moment it is rendered
+// rather than read out of a file somebody else wrote. It is not in the
+// projection any more, for two reasons that point the same way: it was
+// 98.4% of that document, and every input it depends on -- the model
+// catalog, this operator's preferences -- lives at the USER level, where no
+// workspace watcher can ever be told they moved. A reading derived on
+// demand is also a reading this router made, so a pane cannot render an
+// older router's shape of it.
+export { configurationNode } from "./projection.ts";
+// WHERE that reading comes from, so a host can watch it.
+//
+// The catalog and this operator's preferences sit side by side in one
+// per-user directory, outside every repository -- which is why no
+// workspace-relative glob reaches them, and why a pane that only watched
+// the workspace showed a reading nothing could ever invalidate. A watcher
+// built on an absolute base can, so the directory is exported rather than
+// the conclusion that it is unwatchable.
+export { configurationSourceDirs } from "./preferences.ts";

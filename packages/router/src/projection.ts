@@ -19,7 +19,7 @@ import { readModuleSessionMarker } from "./checkout.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
 import {
   TRANSPORT_COPILOT_CLI,
-  explainRoleTransport,
+  explainReviewingTransport,
   explainTransport,
   loadConfig,
   type RouterConfig,
@@ -40,6 +40,7 @@ import { sessionsDirFor } from "./evidence.ts";
 import { readExposure } from "./exposure.ts";
 import { platformNewlines } from "./journal.ts";
 import { PREFERENCES_FILENAME, chosenEngine } from "./preferences.ts";
+import { SETTING_AUTHORING_MODEL, settingValue } from "./settings.ts";
 import { dumps } from "./pythonJson.ts";
 import { readBundleRecords } from "./land.ts";
 import { type ModuleEntry, type SolutionShape, consumersOf, ManifestError, solutionShape } from "./modules.ts";
@@ -67,20 +68,27 @@ import {
 import {
   ROLE_AUXILIARY_REVIEWER,
   ROLE_PRIMARY_REVIEWER,
-  modelFidelity,
   type ResolveOptions,
-  roundObservations,
   reviewerRefusal,
   type RoleResolution,
-  type Fidelity,
-  type ModelObservation,
 } from "./selection.ts";
-import { archivedRounds } from "./ledger.ts";
 import { REFRESH_COMMAND, explainRoleCandidates, seatBlock } from "./transports/copilot.ts";
 
 type Node = Record<string, unknown>;
 
-export const PROJECTION_RELPATH = join(".dabbler", "solution", "projection.json");
+/**
+ * The document the Solution Explorer renders: the module graph and what it
+ * is joined to, and nothing about configuration.
+ *
+ * It was `projection.json`, and 98.4% of it was the configuration block --
+ * 50,198 bytes of what a session would be run with, against 804 bytes of
+ * the module graph the file exists for. Configuration is now asked for
+ * directly, by `configurationNode`, at the moment it is rendered: a reading
+ * derived when it is read cannot be an older router's output, and nothing
+ * in a workspace can watch the user-level catalog and preferences it
+ * depends on anyway. The name follows the contents.
+ */
+export const PROJECTION_RELPATH = join(".dabbler", "solution", "solution.json");
 
 export function projectionPath(root: string): string {
   return join(root, PROJECTION_RELPATH);
@@ -206,41 +214,6 @@ function runsOfRecord(
 // charge a window for being open, and would do it on a sparse clone that
 // only wants to draw a tree.
 
-/**
- * What the record says about each model on ONE transport: honoured,
- * substituted, or not known.
- *
- * Per transport, because the two kinds of evidence are not interchangeable
- * and neither are the paths that produce them. A round on the direct-API
- * path carries the provider's own statement of what answered; the seat's
- * catalog carries the CLI's echo of what it was asked for, which is a label,
- * and this framework has never trusted a seat label. `modelFidelity` weighs
- * them; this only hands it the observations that belong to the transport the
- * operator is actually on, so evidence about the seat never reads as
- * evidence about the API.
- *
- * Nothing is gathered that was not already recorded. `docs/model-fidelity.md`
- * is the measurement and states its own bounds.
- */
-function fidelityOn(root: string, config: RouterConfig, transport: string): (model: string) => Fidelity {
-  const observations: ModelObservation[] = [];
-  try {
-    observations.push(
-      ...roundObservations(
-        archivedRounds(root).filter((row) => row["transport"] === transport),
-      ),
-    );
-  } catch {
-    // No run record here yet, which is most repositories. Not knowing is an
-    // answer this reading is built to give.
-  }
-  // A round's own requested/served pair is the whole of the evidence. The
-  // catalog carries no echo to draw on, because the turn that bought one was
-  // deleted: fidelity reads from work that was happening anyway, and nothing
-  // is spent pre-emptively to answer a question no round has asked yet.
-  return (model) => modelFidelity(model, observations);
-}
-
 // --- Which enumeration a role resolves over --------------------------------
 //
 // **The enumeration belongs to the transport.** `selection.ts` has said so in
@@ -258,7 +231,7 @@ export const ENUMERATION_API_CATALOG = "api-catalog";
 export const ENUMERATION_SEAT_CATALOG = "seat-catalog";
 
 /** Nothing resolved, said as a resolution rather than as an absence. */
-const NOTHING_RESOLVES: RoleResolution<readonly [string, string, string]> = {
+const NOTHING_RESOLVES: RoleResolution<readonly [string, string]> = {
   candidates: [],
   preferenceDeclared: false,
   rank: null,
@@ -293,7 +266,7 @@ export interface RoleReading {
     role: string,
     exclude: readonly string[] | null,
     options?: ResolveOptions,
-  ) => RoleResolution<readonly [string, string, string]>;
+  ) => RoleResolution<readonly [string, string]>;
   readonly retired: ReadonlyMap<string, RetiredModel>;
   /**
    * The price category a model's own source stated, for the models whose
@@ -322,27 +295,6 @@ export interface RoleReading {
   readonly listed: ReadonlySet<string>;
   /** Why this transport can offer nothing, or null when it can. */
   readonly unavailable: string | null;
-}
-
-/** How a candidate's provider stands to the authoring model's. */
-export const PROVIDER_DIFFERENT = "different-provider";
-export const PROVIDER_SAME = "same-provider";
-export const PROVIDER_UNKNOWN = "provider-unknown";
-
-/**
- * Where the deleted cross-provider rule went.
- *
- * It is a label because it was never a fact this framework could establish.
- * A different provider REDUCES the chance the reviewer shares the author's
- * blind spots; it does not eliminate it, and the same provider does not
- * guarantee it -- `gpt-5.6-sol` and `gpt-5.6-terra` are different ids and
- * very likely the same base model, which the old rule would have waved
- * through. Told to the person choosing, who can weigh it; not enforced as a
- * judgement over data nobody has.
- */
-export function providerRelation(author: string | null, provider: string): string {
-  if (author === null || author === "" || provider === "") return PROVIDER_UNKNOWN;
-  return author === provider ? PROVIDER_SAME : PROVIDER_DIFFERENT;
 }
 
 export function roleReading(config: RouterConfig, transport: string): RoleReading {
@@ -399,16 +351,10 @@ export function roleReading(config: RouterConfig, transport: string): RoleReadin
   return {
     enumeration,
     resolve: (role, exclude, options) => {
-      const resolution = explainRoleCandidates(config, models, role, exclude, options);
-      // The catalog has no aliases on either transport: an id is both what a
-      // registry would have called the model and what goes on the wire, so
-      // the third element carries the id rather than a second name for it.
-      return {
-        ...resolution,
-        candidates: resolution.candidates.map(
-          ([modelId, provider]) => [modelId, provider, modelId] as const,
-        ),
-      };
+      // The catalog has no aliases on either transport: the id a source
+      // lists is the id that goes on the wire, so a candidate is that id and
+      // its provider and there is no third thing to carry.
+      return explainRoleCandidates(config, models, role, exclude, options);
     },
     retired,
     // The source's own token for what a model costs, for the models whose
@@ -428,34 +374,32 @@ export function roleReading(config: RouterConfig, transport: string): RoleReadin
   };
 }
 
-/** One model a role could resolve to, as this machine's catalog lists it. */
+/**
+ * One model a role could resolve to, as this machine's catalog lists it.
+ *
+ * Three things it carried and no longer does. `alias` was the id a second
+ * time -- equal to `model` for every one of 261 entries, because neither
+ * source has an alias. `fidelity` was a per-model verdict derived from the
+ * rounds already on the record, `not-known` for 259 of 261 and derivable at
+ * any time from a round's own `requested_model` against `served_model`,
+ * which is where the question is actually asked. `providerRelation` was a
+ * label computed from two things the reader already has: this row's
+ * `provider` and the authoring participant's, which the authoring node now
+ * states once instead of stamping onto every candidate.
+ */
 function candidateNode(
-  candidate: readonly [string, string, string],
-  fidelity: (model: string) => Fidelity,
+  candidate: readonly [string, string],
   retired: ReadonlyMap<string, RetiredModel>,
   priceCategory: ReadonlyMap<string, string> = new Map(),
-  /** The authoring model's provider, on a row that is choosing a reviewer. */
-  authorProvider: string | null = null,
 ): Node {
-  const [modelId, provider, alias] = candidate;
+  const [modelId, provider] = candidate;
   const withdrawn = retired.get(modelId);
-  // Three answers and never two. A model nobody has asked for and one that
-  // answered as something else are different facts, and a surface that
-  // rendered them alike would be making the promise session 144 exists to
-  // stop it making.
   return {
-    alias,
     model: modelId,
     provider,
-    fidelity: fidelity(modelId),
     // What the source said this costs, in the source's own word for it, and
     // null where the source said nothing. Never inferred.
     priceCategory: priceCategory.get(modelId) ?? null,
-    // Where the cross-provider rule went: a label the person weighs, not a
-    // refusal the framework makes. Only meaningful on a row that is
-    // choosing a reviewer, so it is null on every other.
-    providerRelation:
-      authorProvider === null ? null : providerRelation(authorProvider, provider),
     // Present only on a model the dated record says stopped being served,
     // and it carries when the vendor last had it -- a row that withheld a
     // model without saying since when would read as a bug in the pane.
@@ -478,7 +422,6 @@ function roleNode(
   reading: RoleReading,
   role: string,
   exclude: readonly string[] | null,
-  fidelity: (model: string) => Fidelity,
   /**
    * The authoring model, on a reviewing role: the one model this role may
    * not be, and the whole of what it may not be.
@@ -492,8 +435,6 @@ function roleNode(
    * differ. What remains is the rule that needs no judgement.
    */
   notThisModel: string | null = null,
-  /** The authoring model provider, so each option can be LABELLED against it. */
-  authorProvider: string | null = null,
 ): Node {
   const retired = reading.retired;
   // Everything this role COULD be, not the one thing it will be: a pane
@@ -529,12 +470,12 @@ function roleNode(
         );
   return {
     role,
-    chosen: chosen === undefined ? null : candidateNode(chosen, fidelity, retired, reading.priceCategory, authorProvider),
+    chosen: chosen === undefined ? null : candidateNode(chosen, retired, reading.priceCategory),
     candidates: served.map((candidate) =>
-      candidateNode(candidate, fidelity, retired, reading.priceCategory, authorProvider),
+      candidateNode(candidate, retired, reading.priceCategory),
     ),
     withheld: [...retired.values()].map((entry) =>
-      candidateNode([entry.id, entry.provider, entry.id], fidelity, retired, reading.priceCategory),
+      candidateNode([entry.id, entry.provider], retired, reading.priceCategory),
     ),
     excludes: [...(exclude ?? [])],
     // What the operator chose, or null where nobody chose. Reported rather
@@ -580,7 +521,7 @@ const ENGINE_PROVIDERS: Readonly<Record<string, string>> = {
  * with" means. Naming it rather than borrowing a reviewing role is the
  * difference between asking a question and asking somebody else's.
  */
-const ROLE_EVERY_MODEL = "every-model";
+export const ROLE_EVERY_MODEL = "every-model";
 
 /**
  * The orchestrator as the ledger records it: the engine that is running this
@@ -616,11 +557,7 @@ export function orchestratorOf(root: string): { engine: string | null; model: st
  * candidates are the transport's catalog narrowed to the providers this
  * engine's CLI can run, which is the only filtering an engine does.
  */
-function authoringNode(
-  root: string,
-  reading: RoleReading,
-  fidelity: (model: string) => Fidelity,
-): Node {
+export function authoringNode(root: string, reading: RoleReading): Node {
   const { engine: inFlight, model } = orchestratorOf(root);
   // **The ledger, and where the ledger is silent, the preference.**
   //
@@ -648,23 +585,61 @@ function authoringNode(
       ([modelId, provider]) =>
         !retired.has(modelId) && (vendor === undefined || provider === vendor),
     );
+  // **The ledger for the session in flight; this checkout's own setting for
+  // the NEXT one.**
+  //
+  // `session start` records the model a session actually declared, and that
+  // is a REPORT nothing may override. Where no session is in flight -- or
+  // where the engine declared none, which is every Claude Code session --
+  // the row shows what `dabbler configure --authoring-model` wrote, because
+  // a control that wrote a value no reader consumed would be a control that
+  // reports success and changes nothing. `declaredAtStart` below says which
+  // of the two this is, so a report is never read as a choice.
+  const configured = settingValue(root, SETTING_AUTHORING_MODEL);
+  const declared = model ?? configured;
   const chosen =
-    model === null ? null : (listed.find(([id]) => id === model) ?? [model, "", model] as const);
+    declared === null
+      ? null
+      : (listed.find(([id]) => id === declared) ?? ([declared, ""] as const));
   return {
     role: "authoring",
     engine,
-    // The model is declared at `session start`, so this row reports rather
-    // than sets. A surface that offered to change it would be offering
-    // something the ledger will not honour.
-    declaredAtStart: true,
-    chosen: chosen === null ? null : candidateNode(chosen, fidelity, retired, reading.priceCategory),
+    // **The author's PROVIDER, stated once and surviving an engine that
+    // declares no model.**
+    //
+    // Claude Code's `session start` takes no `--model` and the seat's does,
+    // so a Claude Code session records `{engine, provider}` and no model at
+    // all. A reader taking the provider off `chosen` alone therefore had
+    // null for the whole life of every Claude Code session -- and the
+    // cross-provider label, the entire replacement for three rules session
+    // 151 deleted, rendered on NO row at all on the engine this repository
+    // itself runs on. The engine's provider is enough to label every option
+    // and is on the ledger from `session start`.
+    //
+    // It is here and not on each candidate because it is one fact about the
+    // author, not 261 facts about the models: a reader that wants the label
+    // compares it with the candidate's own `provider`. What it is NOT enough
+    // for is the same-model refusal, which needs a model identifier Claude
+    // Code does not report -- that stays asserted at the wire.
+    provider:
+      chosen !== null && chosen[1] !== ""
+        ? chosen[1]
+        : engine === null
+          ? null
+          : (ENGINE_PROVIDERS[engine] ?? null),
+    // True while a session is in flight and its engine declared a model:
+    // that row REPORTS and cannot be changed, because the ledger already
+    // carries it. False means the row shows what this checkout chose for the
+    // NEXT session, which is a choice and is settable.
+    declaredAtStart: model !== null,
+    chosen: chosen === null ? null : candidateNode(chosen, retired, reading.priceCategory),
     candidates: listed.map((candidate) =>
-      candidateNode(candidate, fidelity, retired, reading.priceCategory),
+      candidateNode(candidate, retired, reading.priceCategory),
     ),
     // The archive, rendered rather than re-derived: an operator whose usual
     // model vanished from a list needs to know it was withdrawn.
     withheld: [...retired.values()].map((entry) =>
-      candidateNode([entry.id, entry.provider, entry.id], fidelity, retired, reading.priceCategory),
+      candidateNode([entry.id, entry.provider], retired, reading.priceCategory),
     ),
     excludes: [],
     fellThrough: false,
@@ -754,17 +729,17 @@ function engineVehicleNode(root: string): Node {
 }
 
 /**
- * A reviewing role's vehicle: the transport it is dispatched over, and the
- * transports this machine could put it on instead.
+ * The reviewing vehicle: the transport BOTH reviewers are dispatched over,
+ * and the transports this machine could put them on instead.
  *
- * Read PER ROLE. `config.explainRoleTransport` is what makes that true, and
- * it is the repair of a thing this repository has stated and not done since
- * the transport reading was written: reviewer selection may use the other
- * transport when provider independence requires it, while one global reading
- * scoped every role.
+ * One node, read once and rendered on each reviewing row. It was read per
+ * role, which put two controls in front of an operator for one value -- and
+ * only one of them could be set, so the other was a control that appeared to
+ * work and changed nothing. What the two roles differ in is what they may
+ * not BE; how they are reached is one question.
  */
-function transportVehicleNode(config: RouterConfig, role: string): Node {
-  const reading = explainRoleTransport(config, role);
+function reviewingVehicleNode(config: RouterConfig): Node {
+  const reading = explainReviewingTransport(config);
   const presence = transportPresence(config);
   return {
     kind: VEHICLE_TRANSPORT,
@@ -830,60 +805,24 @@ export function configurationNode(root: string): Node {
       readings.set(name, made);
       return made;
     };
-    // A model's fidelity is not one fact: the same model on the seat and on
-    // the direct-API path is two different questions with two different
-    // kinds of answer, so it is read for the transport the ROLE is on.
-    const fidelityFor = (name: string): ((model: string) => Fidelity) =>
-      fidelityOn(root, config, name);
     // The authoring model is the ENGINE's, declared at `session start` and
     // kept on the record from that moment. It was resolved as a role until
     // now, and that role was dispatched by nothing -- `route()`'s fallback,
     // named by none of its four callers -- so the pane had two authors, one
     // of which changed nothing, and it filtered the reviewer list against
     // the wrong one.
-    const authoring = authoringNode(
-      root,
-      readingFor(transport.transport),
-      fidelityFor(transport.transport),
-    );
+    const authoring = authoringNode(root, readingFor(transport.transport));
     const author = authoring["chosen"] as Node | null;
     const authorModel = author === null ? null : String(author["model"]);
-    // **The author's PROVIDER survives an engine that declares no model.**
-    //
-    // Claude Code's `session start` takes no `--model` and the seat's does, so
-    // a Claude Code session records `{engine, provider}` and no model at all.
-    // Reading the provider off `chosen` alone therefore left it null for the
-    // whole life of every Claude Code session -- and `candidateNode` computes
-    // `providerRelation` only when it has one, so `different provider` /
-    // `same provider` appeared on NO row, on either transport, on the engine
-    // this repository itself runs on. The label was the entire replacement
-    // for three rules session 151 deleted, and it was invisible.
-    //
-    // The engine's provider is enough to label every option and is on the
-    // ledger from `session start`. What it is NOT enough for is the
-    // same-model refusal below, which genuinely needs a model identifier
-    // Claude Code does not report -- so `authorModel` stays null there and
-    // the assertion at the wire remains the only place that rule can be made.
-    const authoringEngine = authoring["engine"] as string | null;
-    const authorProvider =
-      author !== null
-        ? String(author["provider"])
-        : authoringEngine === null
-          ? null
-          : (ENGINE_PROVIDERS[authoringEngine] ?? null);
-    const primaryTransport = explainRoleTransport(config, ROLE_PRIMARY_REVIEWER).transport;
-    const auxiliaryTransport = explainRoleTransport(config, ROLE_AUXILIARY_REVIEWER).transport;
-    /** A reviewing role as this machine would resolve it, on its own vehicle. */
-    const reviewingNode = (role: string, roleTransport: string): Node => ({
-      ...roleNode(
-        readingFor(roleTransport),
-        role,
-        null,
-        fidelityFor(roleTransport),
-        authorModel,
-        authorProvider,
-      ),
-      vehicle: transportVehicleNode(config, role),
+    // ONE reviewing vehicle, read once and carried by both reviewing rows.
+    // Two readings put two controls in front of an operator for one value,
+    // and only one of them could be set.
+    const reviewingVehicle = reviewingVehicleNode(config);
+    const reviewingTransport = String(reviewingVehicle["chosen"]);
+    /** A reviewing role as this machine would resolve it, on the reviewing vehicle. */
+    const reviewingNode = (role: string): Node => ({
+      ...roleNode(readingFor(reviewingTransport), role, null, authorModel),
+      vehicle: reviewingVehicle,
     });
     return {
       transport: {
@@ -891,11 +830,6 @@ export function configurationNode(root: string): Node {
         decidedBy: transport.decidedBy,
         layers: transport.layers.map((layer) => ({ ...layer })),
       },
-      // Which transport the fidelity below was read for, said rather than
-      // implied: a row that carried an answer without saying what it was an
-      // answer about is how the seat's evidence would come to be read as the
-      // API's.
-      fidelityTransport: transport.transport,
       engines: {
         // The preference where there is one, the machine's default where
         // there is not. Two answers to "which engine" is how a pane and a
@@ -905,11 +839,11 @@ export function configurationNode(root: string): Node {
         installed: engines.engines.map((entry) => ({ ...entry })),
       },
       authoring: { ...authoring, vehicle: engineVehicleNode(root) },
-      // Not the author's PROVIDER: the author's own model, and nothing else.
-      // Whether a second model from one vendor is far enough from the first
-      // is the developer's judgement, and the label on each option is what
-      // lets them make it.
-      primaryReviewer: reviewingNode(ROLE_PRIMARY_REVIEWER, primaryTransport),
+      // Excluded by the author's own MODEL and nothing else. Whether a second
+      // model from one vendor is far enough from the first is the developer's
+      // judgement, and `authoring.provider` against each option's `provider`
+      // is what lets them make it.
+      primaryReviewer: reviewingNode(ROLE_PRIMARY_REVIEWER),
       // The third voice, which has been dispatchable since the roles were
       // named and has never had a surface. It is resolved here against the
       // one rule that can be known now -- not the author -- because the rest
@@ -919,7 +853,7 @@ export function configurationNode(root: string): Node {
       // what narrows it at the adjudication rather than letting a final-
       // looking list imply that nothing does.
       auxiliaryReviewer: {
-        ...reviewingNode(ROLE_AUXILIARY_REVIEWER, auxiliaryTransport),
+        ...reviewingNode(ROLE_AUXILIARY_REVIEWER),
         narrowedAtDispatch:
           "At an adjudication, every provider that has already reviewed a " +
           "round is excluded as well -- read from the session's own record " +
@@ -1030,8 +964,8 @@ export function project(root: string): Record<string, unknown> {
   const members = assembleSolution(root);
   doc.external = externalComponents(root, members);
   doc.members = solutionMembers(members);
-  // What a session is run with: read from files, never probed.
-  doc.configuration = configurationNode(root);
+  // Configuration is NOT here. `configurationNode` is asked for it directly,
+  // by the surface about to render it -- see PROJECTION_RELPATH.
   return doc;
 }
 

@@ -22,10 +22,14 @@ import {
   descriptorFor,
   rootNodes,
 } from "./solutionTreeModel";
-import { reprojectSolution } from "../router/host";
+import {
+  reprojectSolution,
+  solutionConfiguration,
+  userConfigurationDirs,
+} from "../router/host";
 import { chosenEngineIn } from "../commands/configurationCommands";
 
-const PROJECTION_RELPATH = path.join(".dabbler", "solution", "projection.json");
+const PROJECTION_RELPATH = path.join(".dabbler", "solution", "solution.json");
 
 /**
  * How long a burst of source events is allowed to settle.
@@ -37,6 +41,22 @@ const PROJECTION_RELPATH = path.join(".dabbler", "solution", "projection.json");
  * one derivation.
  */
 const SETTLE_MS = 300;
+
+/**
+ * How long one configuration reading is reused.
+ *
+ * Its inputs -- the model catalog and this operator's preferences -- sit at
+ * the USER level, outside every repository. They ARE watched, over an
+ * absolute base, and that watcher is what causes a repaint; this window is
+ * the second half, so a reading is current whenever a row asks for it even
+ * where the event was missed. Re-reading is a few file reads with no network
+ * and no process.
+ *
+ * Not zero: one repaint asks for many rows, and they must all describe the
+ * same machine. Short enough that the next repaint after a command is a
+ * fresh reading.
+ */
+export const CONFIGURATION_TTL_MS = 1_000;
 
 const TONE: Record<string, string> = {
   attention: "charts.yellow",
@@ -59,6 +79,9 @@ export class SolutionTreeProvider
   private readonly watchers: vscode.FileSystemWatcher[] = [];
   private cached: Projection | undefined;
 
+  /** The last configuration reading and when it was taken; see CONFIGURATION_TTL_MS. */
+  private configuration: { value: Projection["configuration"]; at: number } | undefined;
+
   private settling: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly workspaceRoot: string | undefined) {
@@ -73,12 +96,24 @@ export class SolutionTreeProvider
     for (const glob of PROJECTION_SOURCE_GLOBS) {
       this.watch(glob, () => this.rederive());
     }
+    // **And the user-level files a configuration is derived from.**
+    //
+    // The model catalog and this operator's preferences sit outside every
+    // repository, so no workspace-relative glob reaches them -- which is
+    // why a pane that watched only this workspace showed a configuration
+    // nothing could ever invalidate: a `dabbler configure` or a catalog
+    // refresh typed in a terminal reached it only when something unrelated
+    // fired. A `RelativePattern` over an ABSOLUTE base does reach them, so
+    // the answer is to watch them rather than to declare them unwatchable.
+    //
+    // `refresh` and not `rederive`: nothing about the module graph changed,
+    // and the configuration is joined on at read.
+    this.watchUserConfiguration();
     // Derive once at activation, WHATEVER is on disk.
     //
-    // A watcher can only watch this workspace, and not one of the six paths
-    // above is a configuration input: the model catalog and this operator's
-    // preferences live at the user level, outside any `RelativePattern`'s
-    // reach, so nothing in this window can ever be told they moved. Deriving
+    // Not one of the six paths above is a configuration input: the model
+    // catalog and this operator's preferences live at the user level, and
+    // are watched separately, over an absolute base. Deriving
     // only over a MISSING file left a projection that exists and is wrong
     // standing until a manifest happened to move -- which is how the pane
     // spent a session rendering a file eight minutes old against a router
@@ -90,13 +125,36 @@ export class SolutionTreeProvider
 
   private watch(glob: string, onEvent: () => void): void {
     if (!this.workspaceRoot) return;
-    const watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(this.workspaceRoot, glob),
-    );
-    watcher.onDidChange(onEvent);
-    watcher.onDidCreate(onEvent);
-    watcher.onDidDelete(onEvent);
-    this.watchers.push(watcher);
+    this.watchAt(this.workspaceRoot, glob, onEvent);
+  }
+
+  /**
+   * A watcher over any base, which is what a user-level file needs.
+   *
+   * Wrapped in a try: a host that cannot build a watcher outside the
+   * workspace must leave the tree working rather than fail activation, and
+   * the pane then behaves exactly as it did before -- stale until something
+   * else fires, which is a worse pane and not a broken one.
+   */
+  private watchAt(base: string, glob: string, onEvent: () => void): void {
+    try {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(vscode.Uri.file(base), glob),
+      );
+      watcher.onDidChange(onEvent);
+      watcher.onDidCreate(onEvent);
+      watcher.onDidDelete(onEvent);
+      this.watchers.push(watcher);
+    } catch {
+      // Nothing to recover: the view still renders, and every other watcher
+      // it has is unaffected.
+    }
+  }
+
+  private watchUserConfiguration(): void {
+    for (const dir of userConfigurationDirs()) {
+      this.watchAt(dir, "*.json", () => this.refresh());
+    }
   }
 
   /**
@@ -118,6 +176,9 @@ export class SolutionTreeProvider
 
   public refresh(): void {
     this.cached = undefined;
+    // A refresh is a caller saying something moved. The configuration's own
+    // inputs are unwatchable, so this is the one moment it can be told.
+    this.configuration = undefined;
     this.onDidChangeEmitter.fire(undefined);
   }
 
@@ -129,19 +190,53 @@ export class SolutionTreeProvider
     this.onDidChangeEmitter.dispose();
   }
 
-  /** Read lazily; a missing or unreadable projection is an empty tree. */
+  /**
+   * Read lazily; a missing or unreadable projection is an empty tree.
+   *
+   * **Two caches, because only one of them can be invalidated.** The module
+   * graph comes off the disk and is invalidated by watchers over files in
+   * this workspace. The configuration cannot be: its inputs -- the model
+   * catalog, this operator's preferences -- live at the USER level, outside
+   * every `RelativePattern` this window could build, so nothing here can
+   * ever be told they moved. It is therefore joined on at read, inside a
+   * short reuse window, rather than frozen into the document beside the
+   * graph -- which made the freshness this split exists for last exactly
+   * until the first read.
+   */
   private projection(): Projection | undefined {
-    if (this.cached) return this.cached;
     if (!this.workspaceRoot) return undefined;
-    const file = path.join(this.workspaceRoot, PROJECTION_RELPATH);
-    try {
-      this.cached = JSON.parse(fs.readFileSync(file, "utf8")) as Projection;
-    } catch {
-      // No solution here yet, or it is mid-write. Either way the tree is
-      // simply empty rather than an error the reader cannot act on.
-      return undefined;
+    if (!this.cached) {
+      const file = path.join(this.workspaceRoot, PROJECTION_RELPATH);
+      try {
+        this.cached = JSON.parse(fs.readFileSync(file, "utf8")) as Projection;
+      } catch {
+        // No solution here yet, or it is mid-write. Either way the tree is
+        // simply empty rather than an error the reader cannot act on.
+        return undefined;
+      }
     }
-    return this.cached;
+    return { ...this.cached, configuration: this.currentConfiguration() };
+  }
+
+  /**
+   * The configuration as it is NOW, within a short reuse window.
+   *
+   * Held apart from `cached` deliberately. The module graph is invalidated
+   * by watchers over files in this workspace; the configuration cannot be,
+   * because the catalog and the preferences it derives from are at the user
+   * level. Sharing one cache made the freshness this split exists for last
+   * exactly until the first read.
+   */
+  private currentConfiguration(): Projection["configuration"] {
+    const now = Date.now();
+    if (this.configuration !== undefined && now - this.configuration.at < CONFIGURATION_TTL_MS) {
+      return this.configuration.value;
+    }
+    const value = solutionConfiguration(
+      this.workspaceRoot as string,
+    ) as Projection["configuration"];
+    this.configuration = { value, at: now };
+    return value;
   }
 
   /**

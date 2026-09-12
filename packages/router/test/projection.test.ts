@@ -2,7 +2,7 @@
 // in dependency order, with who-uses-whom derived and never declared.
 
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -25,7 +25,8 @@ import {
 import { seatLadder } from "../src/route.ts";
 import { setSeatIdentity } from "../src/transports/copilot.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
-import { loadConfig, resetProjectRootCache } from "../src/config.ts";
+import { TRANSPORT_COPILOT_CLI, loadConfig, resetProjectRootCache } from "../src/config.ts";
+import { SETTING_REVIEWER_TRANSPORT, SETTING_TRANSPORT, writeSettings } from "../src/settings.ts";
 
 type Module = {
   slug: string;
@@ -171,8 +172,23 @@ describe("the module projection", () => {
     assert.equal(modules[0]?.kind, "application");
     assert.deepEqual(modules[0]?.usedBy, []);
     const path = writeProjection(root);
-    assert.equal(path, join(root, ".dabbler", "solution", "projection.json"));
+    assert.equal(path, join(root, ".dabbler", "solution", "solution.json"));
     assert.ok(existsSync(path));
+  });
+
+  it("carries no configuration block, on disk or in the document", () => {
+    // Configuration was 98.4% of this file and every input it derives from
+    // lives at the USER level, where nothing in a workspace can watch it --
+    // so a stored copy is stale with no event able to say so. It is asked
+    // for at the moment it is rendered instead, and this is what holds the
+    // two apart: a reader that found it here would go on reading whatever
+    // was written last.
+    const root = tempDir("projection-");
+    const doc = project(root);
+    assert.equal("configuration" in doc, false);
+    const written = JSON.parse(readFileSync(writeProjection(root), "utf8")) as Record<string, unknown>;
+    assert.equal("configuration" in written, false);
+    assert.ok(Array.isArray(written["modules"]));
   });
 });
 
@@ -222,15 +238,17 @@ describe("what a session would be run with", () => {
   /**
    * The environment these readings are taken in, stated in full.
    *
-   * **A suite may not read the operator's environment.** The transport is
-   * resolved from `DABBLER_TRANSPORT` where one is set, and a machine that
-   * has one persisted would run these against a transport the test never
-   * chose -- which is exactly what happened: the run of record read a seat
-   * where the developer's shell read the API. Every variable either reading
-   * depends on is set here, including the ones set to nothing.
+   * **A suite may not read the operator's environment.** Which providers
+   * resolve decides what the direct-API path can offer, and a machine with
+   * keys in its shell would run these against a reachability the test never
+   * chose. Every variable either reading depends on is set here, including
+   * the ones set to nothing.
+   *
+   * The VEHICLE is not among them any more: it is a file, not a variable --
+   * see `onSeat`.
    */
   function withEnv(values: Readonly<Record<string, string | null>>): () => void {
-    const names = ["DABBLER_TRANSPORT", ...KEYS];
+    const names = [...KEYS];
     const held = names.map((name) => [name, process.env[name]] as const);
     for (const name of names) {
       const wanted = values[name] ?? null;
@@ -248,11 +266,42 @@ describe("what a session would be run with", () => {
   /** Every provider reachable, on the direct-API path, and nothing inherited. */
   function withKeys(): () => void {
     return withEnv({
-      DABBLER_TRANSPORT: "api",
       DABBLER_ANTHROPIC_API_KEY: "k",
       DABBLER_OPENAI_API_KEY: "k",
       DABBLER_GEMINI_API_KEY: "k",
     });
+  }
+
+  /**
+   * This machine on its seat: a CHECKOUT setting, never a variable.
+   *
+   * It was `DABBLER_TRANSPORT=copilot-cli`, which is not how a vehicle is
+   * chosen any more -- a layer that outranked every file and was written by
+   * nothing is the trap this session deleted. A test that still set it would
+   * be arranging a state no operator can now reach.
+   */
+  function onSeat(root: string): () => void {
+    return onVehicle(root, TRANSPORT_COPILOT_CLI, withEnv({}));
+  }
+
+  /** The same, for the direct-API path: every provider keyed, vehicle stated. */
+  function onApi(root: string): () => void {
+    return onVehicle(root, TRANSPORT_API, withKeys());
+  }
+
+  /**
+   * The vehicle these readings are taken on, written where a vehicle is now
+   * decided.
+   *
+   * Stated rather than left to fall through, because what the distribution
+   * ships is `copilot-cli` -- so a test that named none would be asserting
+   * against whichever vehicle the bundled config happens to prefer, which is
+   * a reading of the package rather than of the test.
+   */
+  function onVehicle(root: string, transport: string, restore: () => void): () => void {
+    writeSettings(root, { [SETTING_TRANSPORT]: transport });
+    resetProjectRootCache();
+    return restore;
   }
 
   type Role = {
@@ -266,8 +315,8 @@ describe("what a session would be run with", () => {
     // direct-API registry on every transport, so a machine with a seat and
     // no `DABBLER_*_API_KEY` read "nothing resolves" while its catalog held
     // eighteen working models. The enumeration belongs to the transport.
-    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
     const root = tempDir("configuration-");
+    const restore = onSeat(root);
     const ungit = inRepository(root);
     try {
       // What this machine read from its own seat. Nothing ships a catalog
@@ -345,6 +394,10 @@ describe("what a session would be run with", () => {
    */
   function withoutOverlay(root: string): void {
     rmSync(join(root, "local-overrides.yaml"), { force: true });
+    // The REVIEWER's vehicle only: the machine's is what `onSeat` / `onApi`
+    // arranged, and clearing it would drop each reading back onto whatever
+    // vehicle the bundled configuration happens to prefer.
+    writeSettings(root, { [SETTING_REVIEWER_TRANSPORT]: "" });
     for (const role of [ROLE_PRIMARY_REVIEWER, ROLE_AUXILIARY_REVIEWER]) {
       writePreferences({ role, selected: "" });
     }
@@ -360,8 +413,8 @@ describe("what a session would be run with", () => {
     // only way to prove that is to offer a list and then accept all of it.
     for (const transport of ["copilot-cli", "api"] as const) {
       const seat = transport === "copilot-cli";
-      const restore = seat ? withEnv({ DABBLER_TRANSPORT: "copilot-cli" }) : withKeys();
       const root = tempDir("configuration-");
+      const restore = seat ? onSeat(root) : onApi(root);
       const ungit = inRepository(root);
       try {
         if (seat) {
@@ -429,8 +482,8 @@ describe("what a session would be run with", () => {
     // is the model that authors. It used to be a role's resolution, and that
     // role was dispatched by nothing, so the rule was being applied to a
     // model no call would ever use.
-    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
     const root = tempDir("configuration-");
+    const restore = onSeat(root);
     const ungit = inRepository(root);
     try {
       setSeatIdentity(SEAT);
@@ -483,8 +536,8 @@ describe("what a session would be run with", () => {
     // and the ladder has to narrow to it. It NARROWS: a selection that
     // overruled the caller's exclusion let a model that reviewed round 1
     // adjudicate its own disputed finding.
-    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
     const root = tempDir("configuration-");
+    const restore = onSeat(root);
     const ungit = inRepository(root);
     try {
       setSeatIdentity(SEAT);
@@ -528,8 +581,8 @@ describe("what a session would be run with", () => {
     // the acceptable half before refusing the rest would leave the
     // operator's own preferences half-changed by a command that reported
     // failure.
-    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
     const root = tempDir("configuration-");
+    const restore = onSeat(root);
     const ungit = inRepository(root);
     try {
       setSeatIdentity(SEAT);
@@ -562,8 +615,8 @@ describe("what a session would be run with", () => {
     // Round one nit. Switching machines is one command -- set the transport
     // and name a model on it -- and the check read the transport being LEFT,
     // so it refused a seat model for being absent from the API list.
-    const restore = withKeys();
     const root = tempDir("configuration-");
+    const restore = onApi(root);
     const ungit = inRepository(root);
     try {
       setSeatIdentity(SEAT);
@@ -591,8 +644,8 @@ describe("what a session would be run with", () => {
     // for that -- with a reviewer SELECTION set, the authoring list
     // collapsed to the one selected model, and the reviewer own preference
     // order reordered a list it has nothing to do with.
-    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
     const root = tempDir("configuration-");
+    const restore = onSeat(root);
     const ungit = inRepository(root);
     try {
       setSeatIdentity(SEAT);
@@ -639,8 +692,8 @@ describe("what a session would be run with", () => {
     // left that account's models selectable. Re-login and profile migration
     // are ordinary operations, and this is the wrong-seat authority the whole
     // catalog exists to end.
-    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
     const root = tempDir("configuration-");
+    const restore = onSeat(root);
     const ungit = inRepository(root);
     try {
       setSeatIdentity({ host: SEAT.host, login: "somebody-else" });
@@ -668,8 +721,8 @@ describe("what a session would be run with", () => {
   });
 
   it("withholds a model the catalog says is no longer served, and says since when", () => {
-    const restore = withKeys();
     const root = tempDir("configuration-");
+    const restore = onApi(root);
     const ungit = inRepository(root);
     try {
       // What this machine read from its own vendors. Scoped to the keys this
@@ -727,8 +780,8 @@ describe("what a session would be run with", () => {
     // machine holds provider keys and no seat block, so `api` is offered,
     // `copilot-cli` is named with the free remedy, and `offline` is named
     // with the reason it can never be reached by accident.
-    const restore = withKeys();
     const root = tempDir("configuration-");
+    const restore = onApi(root);
     const ungit = inRepository(root);
     try {
       writeBlock(TRANSPORT_API, {
@@ -788,13 +841,16 @@ describe("what a session would be run with", () => {
     // its own words since the transport reading was written -- reviewer
     // selection may use the other transport when provider independence
     // requires it -- while one global reading scoped every role.
-    const restore = withEnv({
-      DABBLER_TRANSPORT: null,
-      DABBLER_ANTHROPIC_API_KEY: "k",
-      DABBLER_OPENAI_API_KEY: "k",
-      DABBLER_GEMINI_API_KEY: "k",
-    });
     const root = tempDir("configuration-");
+    // The machine on the seat, the reviewer on the direct API. The machine's
+    // vehicle is the checkout's settings file -- `transport.profile` in an
+    // overlay is refused now, because it was a fifth resolution input -- and
+    // the ROLE's is the overlay, which is still where a role vehicle is
+    // declared.
+    // The machine is on the seat AND every provider key resolves: the
+    // reviewer's own vehicle is the direct API, and a reviewer list read
+    // from a machine with no keys would be empty for the wrong reason.
+    const restore = onVehicle(root, TRANSPORT_COPILOT_CLI, withKeys());
     const ungit = inRepository(root);
     try {
       setSeatIdentity(SEAT);
@@ -814,8 +870,6 @@ describe("what a session would be run with", () => {
       });
       seed(root, {
         "local-overrides.yaml": [
-          "transport:",
-          "  profile: copilot-cli",
           "roles:",
           "  reviewer:",
           "    transport: api",
@@ -850,8 +904,8 @@ describe("what a session would be run with", () => {
     // and the rest of its definition, every provider that has already
     // reviewed a round, is read from the session's own record at the
     // adjudication, which is why the list is not narrowed by it now.
-    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
     const root = tempDir("configuration-");
+    const restore = onSeat(root);
     const ungit = inRepository(root);
     const author = "claude-opus-5";
     try {
@@ -942,8 +996,8 @@ describe("what a session would be run with", () => {
     // model stops every adjudication it is ever asked to settle. "Not the
     // primary" is the one part of the role's definition that IS knowable
     // between sessions, and the primary's pin is in the file being written.
-    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
     const root = tempDir("configuration-");
+    const restore = onSeat(root);
     const ungit = inRepository(root);
     try {
       setSeatIdentity(SEAT);
@@ -998,6 +1052,34 @@ describe("what a session would be run with", () => {
     }
   });
 
+  it("refuses a vehicle this machine cannot reach, naming the layer and the way out", () => {
+    // Before anything is billed, and at the moment the choice is made rather
+    // than at the round that spends it. Falling to another vehicle would
+    // change which account pays and make every later account of what ran
+    // untrue -- which is the shadowing `DABBLER_TRANSPORT` was deleted for.
+    const root = tempDir("configuration-");
+    const restore = withEnv({});
+    const ungit = inRepository(root);
+    try {
+      // A machine with no seat at all, said rather than assumed: the catalog
+      // is shared across this file, so a seat another test wrote a block for
+      // would make this one pass for the wrong reason.
+      setSeatIdentity(null);
+      // No provider key resolves and the seat has never answered, so neither
+      // vehicle is reachable. The refusal has to say WHICH is wrong and what
+      // reaching it would take.
+      const outcome = configure({ repoRoot: root, transport: "copilot-cli" });
+      assert.notEqual(outcome.refusal, null);
+      assert.match(String(outcome.refusal), /copilot-cli/);
+      assert.match(String(outcome.refusal), /--transport/);
+      assert.deepEqual(outcome.changed, []);
+    } finally {
+      withoutOverlay(root);
+      ungit();
+      restore();
+    }
+  });
+
   it("narrows the authoring list by the engine a preference names, before any session has run", () => {
     // The authoring filter read the engine from the LEDGER alone, so a
     // repository on its first day named none and the list was not filtered at
@@ -1006,8 +1088,8 @@ describe("what a session would be run with", () => {
     // `claude-code` from the same preferences this ignored. Two leaves of one
     // node, read from two places, disagreeing on exactly the machine the
     // first-run sessions were about.
-    const restore = withEnv({ DABBLER_TRANSPORT: "copilot-cli" });
     const root = tempDir("configuration-");
+    const restore = onSeat(root);
     const ungit = inRepository(root);
     try {
       setSeatIdentity(SEAT);
@@ -1035,20 +1117,22 @@ describe("what a session would be run with", () => {
         ["claude-haiku-4.5", "claude-opus-5"],
       );
 
-      // And the label the deleted rules were replaced BY is finally on the
-      // rows. Claude Code's `session start` takes no `--model`, so there is
-      // no authoring model to compare against and every candidate carried
-      // `providerRelation: null` -- on the engine this repository itself runs
-      // on. The engine's PROVIDER is enough to label with and is on the
-      // record from the moment a session starts.
+      // And what the label the deleted rules were replaced BY is derived
+      // from is on the row. Claude Code's `session start` takes no `--model`,
+      // so there is no authoring model at all -- which is why the author's
+      // PROVIDER is stated here rather than computed per candidate from a
+      // model that does not exist. A reader compares it with each option's
+      // own `provider`; the projection carries neither the comparison nor a
+      // per-candidate copy of this string.
+      assert.equal((authoring as unknown as { provider: string | null }).provider, "anthropic");
       const primary = node["primaryReviewer"] as {
-        candidates: { model: string; providerRelation: string | null }[];
+        candidates: { model: string; provider: string }[];
       };
-      const relations = new Map(
-        primary.candidates.map((candidate) => [candidate.model, candidate.providerRelation]),
+      const providers = new Map(
+        primary.candidates.map((candidate) => [candidate.model, candidate.provider]),
       );
-      assert.equal(relations.get("claude-opus-5"), "same-provider");
-      assert.equal(relations.get("gpt-5.6-sol"), "different-provider");
+      assert.equal(providers.get("claude-opus-5"), "anthropic");
+      assert.equal(providers.get("gpt-5.6-sol"), "openai");
     } finally {
       // The engine is a preference and `withoutOverlay` clears selections
       // only, so it is cleared here rather than left to narrow a later run.

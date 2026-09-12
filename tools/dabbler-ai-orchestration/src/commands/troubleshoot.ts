@@ -214,8 +214,11 @@ const PREREQUISITES: readonly Prerequisite[] = [
 /**
  * The environment the walkthroughs' parts A and B split on.
  *
- * The transport is reported BY VALUE, because which one is set is the whole
- * question and a persisted `copilot-cli` is what silently bills a seat. The
+ * The transport variable is reported BY VALUE and as OBSOLETE. It decides
+ * nothing now -- a layer that outranked every file and was written by
+ * nothing is how a pane came to save a preference the next session ignored
+ * -- but a machine that still exports it is exactly the machine whose
+ * operator believes it is choosing the vehicle, so the report says both. The
  * three keys are reported PRESENT or ABSENT and never by value: this channel
  * is the one an operator pastes into an issue, and a diagnostic that prints
  * a credential has created the problem it was opened to solve.
@@ -307,8 +310,8 @@ export async function prerequisiteReport(
   const transport = env[TRANSPORT_VAR];
   lines.push(
     transport === undefined || transport === ""
-      ? `  ${TRANSPORT_VAR} is unset — the API transport, unless a config or a --transport flag says otherwise`
-      : `  ${TRANSPORT_VAR}=${transport}`,
+      ? `  ${TRANSPORT_VAR} is unset — which changes nothing: it is no longer read`
+      : `  ${TRANSPORT_VAR}=${transport} — OBSOLETE and ignored; the vehicle is decided by .vscode/settings.json, then preferences.json, then the config`,
   );
   for (const key of KEY_VARS) {
     const value = env[key];

@@ -60,6 +60,7 @@ import {
   TRANSPORT_OFFLINE,
   truthy,
   type RouterConfig,
+  type TransportReading,
 } from "./config.ts";
 import { STATE_FILENAME, resolveSessionsDir } from "./evidence.ts";
 import {
@@ -1028,6 +1029,62 @@ export function transportPresence(config: RouterConfig): TransportPresence[] {
         : "no response directory is named, or the one named does not exist",
     },
   ];
+}
+
+/**
+ * Why a CONFIGURED vehicle cannot be used on this machine, or null.
+ *
+ * **A vehicle nobody can reach is a stop, not a fall to another one.** The
+ * alternative looks kinder and is not: silently using a different transport
+ * changes which account is billed, makes every later explanation of what ran
+ * a lie, and rebuilds in the resolution order the exact shadowing that
+ * `DABBLER_TRANSPORT` was deleted for -- a value the operator can see and a
+ * value the framework acts on, differing, with nothing saying so.
+ *
+ * The sentence names three things, because a stop that names fewer is a stop
+ * a developer cannot act on: what cannot be reached, WHICH LAYER chose it --
+ * a committed setting and a personal default are fixed in different places
+ * by different people -- and what reaching it would take.
+ */
+export function vehicleRefusal(
+  config: RouterConfig,
+  reading: TransportReading,
+): string | null {
+  const entry = transportPresence(config).find(
+    (candidate) => candidate.transport === reading.transport,
+  );
+  if (entry === undefined || entry.present) return null;
+  const chose =
+    reading.decidedBy === null
+      ? "it is the built-in default"
+      : `it was chosen by ${reading.decidedBy}`;
+  return (
+    `the vehicle '${reading.transport}' cannot be reached from this machine: ` +
+    `${entry.note ?? "it is not available here"}. Nothing was dispatched. ` +
+    `It is in force because ${chose}; ` +
+    "`dabbler configure --transport <vehicle>` writes this checkout's own " +
+    "choice, and `dabbler configuration explain` lists every layer that named one."
+  );
+}
+
+/**
+ * The same refusal, but only for a vehicle a PERSON put in force.
+ *
+ * A machine that simply has no seat and no keys yet is a first-run machine,
+ * and refusing to start a session on it would be refusing the setup that
+ * fixes it. What must not pass is a vehicle somebody CHOSE -- typed at this
+ * call, committed in this checkout, or set as their own default -- that
+ * cannot be reached: there the operator has an expectation, and a session
+ * that quietly ran on something else would make every later account of what
+ * ran untrue.
+ */
+export function configuredVehicleRefusal(
+  config: RouterConfig,
+  reading: TransportReading,
+  chosenLayers: readonly string[],
+): string | null {
+  if (reading.decidedBy === null || !chosenLayers.includes(reading.decidedBy)) return null;
+  return vehicleRefusal(config, reading);
 }
 
 export function currentApiScope(config: RouterConfig): CatalogScope {

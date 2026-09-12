@@ -124,7 +124,7 @@ describe("the exposure manifest", () => {
         scope,
         changedPaths: [
           "packages/com/example/json-store/0.1.0-dev.20260907.1.gabc1234/json-store-0.1.0-dev.20260907.1.gabc1234.jar.sha1",
-          ".dabbler/solution/projection.json",
+          ".dabbler/solution/solution.json",
           "modules/persister/src/CsvPersister/Store.cs",
           "modules/model/src/CsvModel/Person.cs",
         ],

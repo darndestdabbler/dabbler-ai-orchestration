@@ -3080,13 +3080,51 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.1.3",
       "verification": {
         "rounds": 1,
         "verifierModel": "gpt-5.6-terra",
         "verifierProvider": "openai",
         "transport": "api"
+      },
+      "frameworkVersion": "2.1.3"
+    },
+    {
+      "number": 157,
+      "title": "One place a choice is kept, and four things deleted",
+      "status": "in-progress",
+      "startedAt": "2026-09-12T06:15:34.233000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.2.0",
+      "verification": {
+        "rounds": 5,
+        "verifierModel": "gpt-5.6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
       }
+    },
+    {
+      "number": 158,
+      "title": "The model an operator picks is the model that runs",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 159,
+      "title": "The keys an operator can change without editing their environment",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
     }
   ]
 }

@@ -1267,45 +1267,7 @@ suite("the Configuration section's model pick", () => {
     };
   }
 
-  const model = (over: Partial<ConfigurationModel>): ConfigurationModel => ({
-    alias: "a", model: "a-model", provider: "anthropic", ...over,
-  });
-
-  test("offers each model with what the record says about it, so the choice is not made blind", async () => {
-    // The row already said it; the LIST is where the choice is actually
-    // made, and a model nothing vouches for sitting beside one a provider
-    // has vouched for, with nothing to tell them apart, is the promise
-    // session 144 exists to stop this surface making.
-    const projection = {
-      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
-      modules: [],
-      configuration: {
-        fidelityTransport: "api",
-        primaryReviewer: {
-          role: "verifier",
-          chosen: null,
-          candidates: [
-            model({ alias: "vouched", model: "o-vouched", provider: "openai", fidelity: "honoured" }),
-            model({ alias: "silent", model: "o-silent", provider: "openai", fidelity: "not-known" }),
-          ],
-          excludes: ["anthropic"],
-          fellThrough: false,
-        },
-      },
-    } as unknown as Projection;
-    const { ui, offered } = capturingUi();
-    const { router } = fakeRouter(0, "");
-    await setRoleModel(
-      router,
-      { node: { kind: "configRole", role: "primaryReviewer" }, projection },
-      () => undefined,
-      ui,
-    );
-    assert.strictEqual(offered.length, 2);
-    assert.ok(offered[0].description?.includes("answers as itself"), offered[0].description);
-    assert.ok(offered[1].description?.includes("not known"), offered[1].description);
-    // And what the answer is an answer ABOUT travels with it.
-    assert.ok(offered[0].description?.includes("api"));
+  const model = (over: Partial<ConfigurationModel>): ConfigurationModel => ({ model: "a-model", provider: "anthropic", ...over,
   });
 
   test("labels each option's provider against the author, and prices only what a source priced", async () => {
@@ -1320,23 +1282,23 @@ suite("the Configuration section's model pick", () => {
       solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
       modules: [],
       configuration: {
-        fidelityTransport: "copilot-cli",
+        // The author's provider, stated once on the authoring row: the label
+        // below is DERIVED from it against each option's own provider, so a
+        // reading with no authoring row labels nothing rather than labelling
+        // wrongly.
+        authoring: { role: "authoring", provider: "anthropic", chosen: null, candidates: [], excludes: [], fellThrough: false },
         primaryReviewer: {
           role: "verifier",
           chosen: null,
           candidates: [
             model({
-              alias: "mate",
               model: "claude-opus-5",
               provider: "anthropic",
-              providerRelation: "same-provider",
               priceCategory: "high",
             }),
             model({
-              alias: "other",
               model: "gpt-5.6-terra",
               provider: "openai",
-              providerRelation: "different-provider",
             }),
           ],
           excludes: [],
@@ -1398,7 +1360,7 @@ suite("the Configuration section's model pick", () => {
             role: "reviewer",
             vehicle: { kind: "transport", options, chosen: "api", withheld: [] },
             chosen: null,
-            candidates: [model({ alias: "one", model: "o-one", provider: "openai" })],
+            candidates: [model({ model: "o-one", provider: "openai" })],
             excludes: [],
             fellThrough: false,
           },
@@ -1456,8 +1418,8 @@ suite("the Configuration section's model pick", () => {
         fidelityTransport: "api",
         primaryReviewer: {
           role: "reviewer",
-          chosen: model({ alias: "p", model: "gpt-5.6-terra", provider: "openai" }),
-          candidates: [model({ alias: "p", model: "gpt-5.6-terra", provider: "openai" })],
+          chosen: model({ model: "gpt-5.6-terra", provider: "openai" }),
+          candidates: [model({ model: "gpt-5.6-terra", provider: "openai" })],
           excludes: [],
           fellThrough: false,
         },
@@ -1476,7 +1438,7 @@ suite("the Configuration section's model pick", () => {
             withheld: [],
           },
           chosen: null,
-          candidates: [model({ alias: "aux", model: "gemini-3.1-pro-preview", provider: "google" })],
+          candidates: [model({ model: "gemini-3.1-pro-preview", provider: "google" })],
           excludes: [],
           fellThrough: false,
         },

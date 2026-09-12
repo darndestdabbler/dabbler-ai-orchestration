@@ -197,7 +197,6 @@ after(() => {
 describe("one session, walked from next to done", () => {
   it("goes through every phase once, in order, and leaves the record each one owns", async () => {
     setProviderKeys();
-    delete process.env["DABBLER_TRANSPORT"];
     resetRouter();
     resetRuntimeMode();
     const repo = makeRepo(SEED, { origin: true });
@@ -454,7 +453,6 @@ describe("one session, walked from next to done", () => {
 describe("a red run of record, fixed, verified again, then run again", () => {
   it("judges the fix before the suite runs again, and in that order: checks, a second round, the suite", async () => {
     setProviderKeys();
-    delete process.env["DABBLER_TRANSPORT"];
     resetRouter();
     resetRuntimeMode();
     const repo = makeRepo(SEED, { origin: true });
@@ -581,7 +579,6 @@ describe("a red run of record, fixed, verified again, then run again", () => {
 describe("a session paused, then moving again", () => {
   it("says progress resumed once, and only once the phase has moved past the pause", async () => {
     setProviderKeys();
-    delete process.env["DABBLER_TRANSPORT"];
     resetRouter();
     resetRuntimeMode();
     const repo = makeRepo(SEED, { origin: true });
@@ -646,7 +643,6 @@ describe("a second driver taking the lease mid-run", () => {
     // the second driver, taking the lease through the sanctioned writer
     // while the first is mid-invocation. Nothing here hand-edits the record.
     setProviderKeys();
-    delete process.env["DABBLER_TRANSPORT"];
     resetRouter();
     resetRuntimeMode();
     const repo = makeRepo(SEED, { origin: true });

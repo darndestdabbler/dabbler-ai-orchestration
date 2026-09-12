@@ -149,7 +149,7 @@ describe("a project on its first day", () => {
     assert.equal(shape.multi, false);
     assert.equal(shape.modules.length, 1);
     assert.equal(shape.modules[0]?.kind, "application");
-    assert.ok(existsSync(join(repo, ".dabbler", "solution", "projection.json")));
+    assert.ok(existsSync(join(repo, ".dabbler", "solution", "solution.json")));
     milestones.push("the Explorer has something to render");
 
     // --- what the framework is waiting on a person for ---------------------

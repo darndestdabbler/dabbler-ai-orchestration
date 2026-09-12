@@ -26,7 +26,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { catalogDir, underTestRunner } from "./catalog.ts";
+import { catalogDir, currentCatalogPath, underTestRunner } from "./catalog.ts";
 import { VERSION } from "./version.ts";
 
 /** The shape this router writes and the only one it reads. */
@@ -65,6 +65,18 @@ export interface Preferences {
    * it writes it here.
    */
   readonly engine?: string;
+  /**
+   * This person's own vehicle, where a checkout does not name one.
+   *
+   * A vehicle is a fact about what this machine can reach and what this
+   * person is willing to spend, which is why a DEFAULT for it belongs here.
+   * A checkout that states one outranks it: a committed setting is the
+   * solution's policy, and a personal default is what applies where the
+   * solution said nothing.
+   */
+  readonly transport?: string;
+  /** The same, for the vehicle the reviewing roles are dispatched over. */
+  readonly reviewer_transport?: string;
   /**
    * The model a person chose for a role, by role, as a catalog id.
    *
@@ -148,6 +160,8 @@ export function readPreferences(path: string = currentPreferencesPath()): Prefer
   if (!isRecord(parsed)) return empty;
   if (parsed["schema_version"] !== PREFERENCES_SCHEMA_VERSION) return empty;
   const engine = optionalString(parsed["engine"]);
+  const transport = optionalString(parsed["transport"]);
+  const reviewerTransport = optionalString(parsed["reviewer_transport"]);
   // One torn entry is one role unchosen, not the whole file lost: the
   // choices beside it are still choices this person made.
   const selected: Record<string, string> = {};
@@ -162,6 +176,8 @@ export function readPreferences(path: string = currentPreferencesPath()): Prefer
     written_by: optionalString(parsed["written_by"]) ?? "",
     written_at: optionalString(parsed["written_at"]) ?? "",
     ...(engine === undefined ? {} : { engine }),
+    ...(transport === undefined ? {} : { transport }),
+    ...(reviewerTransport === undefined ? {} : { reviewer_transport: reviewerTransport }),
     ...(Object.keys(selected).length === 0 ? {} : { selected }),
   };
 }
@@ -170,6 +186,10 @@ export function readPreferences(path: string = currentPreferencesPath()): Prefer
 export interface PreferenceChoice {
   /** The engine the next session is offered; "" clears the choice. */
   readonly engine?: string;
+  /** This person's own vehicle where a checkout names none; "" clears it. */
+  readonly transport?: string;
+  /** The same for the reviewing vehicle; "" clears it. */
+  readonly reviewerTransport?: string;
   /** The role whose model is being chosen, with `""` clearing the choice. */
   readonly role?: string;
   readonly selected?: string;
@@ -190,6 +210,12 @@ export function writePreferences(
   const held = readPreferences(path);
   const engine =
     choice.engine === undefined ? held.engine : optionalString(choice.engine);
+  const transport =
+    choice.transport === undefined ? held.transport : optionalString(choice.transport);
+  const reviewerTransport =
+    choice.reviewerTransport === undefined
+      ? held.reviewer_transport
+      : optionalString(choice.reviewerTransport);
   const selected: Record<string, string> = { ...(held.selected ?? {}) };
   if (choice.role !== undefined && choice.selected !== undefined) {
     const model = optionalString(choice.selected);
@@ -201,11 +227,35 @@ export function writePreferences(
     written_by: `dabbler-ai-router ${VERSION}`,
     written_at: options.at ?? new Date().toISOString(),
     ...(engine === undefined ? {} : { engine }),
+    ...(transport === undefined ? {} : { transport }),
+    ...(reviewerTransport === undefined ? {} : { reviewer_transport: reviewerTransport }),
     ...(Object.keys(selected).length === 0 ? {} : { selected }),
   };
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(written, null, 2)}\n`, "utf8");
   return written;
+}
+
+/**
+ * The directories a configuration reading is derived FROM, deduplicated.
+ *
+ * The catalog and the preferences normally share one per-user directory;
+ * they do not have to, and under a test runner they deliberately do not.
+ * Whoever wants to WATCH them has to be told where they actually are rather
+ * than where they usually are -- a watcher over the usual place would miss
+ * every change on a machine that moved either, and would watch the
+ * operator's own files from inside a suite.
+ */
+export function configurationSourceDirs(): string[] {
+  const dirs = new Set<string>();
+  for (const read of [currentCatalogPath, currentPreferencesPath]) {
+    try {
+      dirs.add(dirname(read()));
+    } catch {
+      // Not readable here, so there is nothing at it to watch either.
+    }
+  }
+  return [...dirs];
 }
 
 /** The engine this machine has chosen, or null where nobody has. */

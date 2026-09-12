@@ -218,7 +218,6 @@ const cloneSessions = join(clone, "docs", "sessions");
 describe("a module session's run of record", () => {
   it("packs the changed module's candidate before any suite, runs the suites the plan reached and no other", async () => {
     setProviderKeys();
-    delete process.env["DABBLER_TRANSPORT"];
     resetRouter();
     resetRuntimeMode();
     configure([VERIFIED]);

@@ -192,17 +192,29 @@ it was restored from the later commit and re-rendered with
   Code terminal once the extension has installed its shim.
 - Provider keys via env vars: `DABBLER_ANTHROPIC_API_KEY`,
   `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`. Never in config or logs.
-- **Vehicle** is what a role is dispatched through, and each role carries
-  its own. Authoring's is the engine CLI; each reviewer's is a transport,
-  read per role: CLI flag `--transport` > `DABBLER_TRANSPORT` env >
-  `roles.<role>.transport` > `transport.profile` in router-config.yaml >
-  default `api`. A vehicle nothing on this machine can reach is not offered.
-- **Nothing writes `DABBLER_TRANSPORT` for you.** `bootstrap` used to
-  persist it at user scope, and the variable outranks every config layer —
-  so it shadowed the very preference a later run tried to set, for every
-  repository on the machine. It is read and never written now, and
-  `--no-transport-detect` retired with the writing; `dabbler configure
-  --transport` writes the checkout's own overlay instead.
+- **Vehicle** is what a role is dispatched through. Authoring's is the engine
+  CLI; the two REVIEWING roles share one, because they differ in what they
+  may not *be* and not in how they are reached. Four layers decide it and
+  there is no fifth: CLI flag `--transport` > `<repo>/.vscode/settings.json`
+  (`dabbler.transport`, `dabbler.reviewerTransport`) > the user-level
+  `preferences.json` > the configuration the distribution ships
+  (`transport.profile`, and `roles.reviewer.transport` for the reviewing
+  pair) > default `api`. A vehicle nothing on this machine can reach is not
+  offered — and one a PERSON chose that cannot be reached is a stop at
+  `session start` naming the layer that chose it.
+- **`DABBLER_TRANSPORT` is retired: nothing writes it and nothing reads it.**
+  `bootstrap` used to persist it at user scope, and the variable outranked
+  every config layer — so it shadowed the very preference a later run tried
+  to set, for every repository on the machine, with no surface able to show
+  it. `configure` and `bootstrap` report one found in the environment as
+  obsolete and name what replaces it. `transport.profile` in a project's
+  `local-overrides.yaml` is retired the same way and refuses with the one
+  command that moves it: `dabbler configure --transport <vehicle>` writes
+  this checkout's own `.vscode/settings.json`.
+- **`dabbler configuration explain` answers "why is it this"**, naming the
+  layer that decided each value and the ones it shadows; `dabbler
+  configuration options` answers "what could I choose", with whether this
+  machine can reach each one.
 - **What the operator CHOSE lives beside the model catalog**, in
   `preferences.json` under this platform's per-user data directory: the
   engine, and the model selected for a role. The catalog is a reading and is

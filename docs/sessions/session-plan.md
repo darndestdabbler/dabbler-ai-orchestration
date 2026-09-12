@@ -9107,3 +9107,348 @@ changes, a refusal they have today is gone, and a file that used to arrive
 with the extension now belongs to their machine. The three sessions land as
 one published version because none of them is usable alone — 150 writes a
 record nothing reads yet, and 151 reads a record that only 150 writes.
+
+---
+
+## Why sessions 157–159 exist
+
+**The Configuration section is worse than having none, and the operator said
+so.** Three symptoms on 2026-09-12 against the published 2.2.0, each traced to
+its line: right-clicking *Authoring AI* or *Reviewing AI* does nothing,
+because no `view/item/context` entry matches `dabblerConfigParticipant;*` and a
+context menu with no items does not open; *Update the Catalog* refreshed the
+catalog at 07:30:38Z and the pane went on showing the old reading, because
+`refreshRecord` is the one Configuration command given no `refreshed` callback
+and the catalog lives at the user level, outside every glob
+`SolutionTreeProvider` watches; and *Set the Model* on the authoring row
+answers with a sentence telling the operator to go and type a command, because
+`dabbler configure` has no `--authoring-model` and never has.
+
+**Two gaps let all three ship green.** The suite asserts that every menu
+command is declared and never that every row which should be actionable has a
+menu, so a row with no context menu passes. And session 156's walk of this
+same area read the projection, the verbs and the wire — its own scope line
+says so — and never opened the pane, so the entire interaction layer has never
+been walked by a person.
+
+### What was measured, 2026-09-12
+
+Each of these is reproducible on the operator's machine and each changed the
+shape of the work.
+
+- **Both engine CLIs accept `--model`, and every id the pane offers works on
+  the matching transport.** `claude --model` accepted 14 of 14 — all eleven
+  Anthropic ids the pane lists, dated ones included, plus the `opus`,
+  `sonnet` and `haiku` aliases. `copilot --model` accepted a seat id and ran;
+  an invalid id is refused with exit 1 *before* any billed call.
+- **The extension never passes it.** `engineTerminalFor` builds
+  `args: cli.carriesPrompt ? [sentence] : []`. The `--model` an operator sees
+  is an argument to `dabbler session start`, which records identity on the
+  ledger; it never reaches the engine. On a seat a model is therefore
+  *recorded* while `copilot` runs on `auto`, and under Claude Code no model is
+  asked for, recorded or passed at all. **The router's own unattended driver
+  already does this correctly** — `engineShape` puts `--model` in the argv of
+  both engines. Only the interactive launch is missing it.
+- **The authoring list is read from the machine's transport and spent at the
+  engine's CLI, and the two spell models differently.** Of the eight Anthropic
+  ids the seat lists, Claude Code refuses five: `claude-fable-5.1`,
+  `claude-opus-4.8`, `claude-opus-4.8-fast`, `claude-opus-4.7` and
+  `claude-haiku-4.5`.
+- **`claude` exits 0 when it refuses a model**, printing
+  `[claude-code:unrecognized_model]` and carrying on. Exit status is not a
+  signal there.
+- **Claude Code validates against its own bundled catalog**, not the Anthropic
+  key's enumeration — its refusal says "isn't described by *this version's
+  model catalog*". The two sets coincide today and are not the same set;
+  `AGENTS.md` currently states them as identical, which is an assumption.
+- **Both engines report the model that ran, free.** Claude Code's
+  `--output-format json` carries `modelUsage`, keyed by the model that
+  actually ran, with `canonicalModel` and `costUSD` — a served-model fact. The
+  seat writes `"model":"<id>"` into its own `events.jsonl`, which is an echo,
+  and this repository has always declined to read an echo as fidelity.
+- **The projection is 98.4% configuration.** The `configuration` block is
+  50,198 of 51,002 bytes; the module graph the file exists for is 804.
+- **Three fields are vestigial and one is not.** `alias === model` for 261 of
+  261, and `route.ts` says so itself: *"There is no alias."* `fidelity` is
+  `not-known` for 259 of 261 and is already derived free from
+  `requested_model` against `served_model`. `providerRelation` is computed,
+  never stored, and session 156's walk found it renders on no row at all.
+  `price_category` is the exception: absent from all 196 API models, present
+  on all 26 seat models at multipliers from 0x to 30x — the signal whose
+  absence cost this project 364 premium requests in one session.
+- **`.dabbler/api-models.lock` is dead.** 42 KB, zero references in source,
+  orphaned when session 150 moved to the user-level catalog.
+
+### What the operator settled, 2026-09-12
+
+After two rounds with `gpt-5.6-sol` and `gemini-3.1-pro-preview`:
+
+Solution values live in `<repo>/.vscode/settings.json` under `dabbler.*`,
+read and written by the router with `jsonc-parser`. User defaults stay in the
+router's own `preferences.json`: neither advisor could find a way for a bare
+terminal to locate VS Code *user* settings across editors, profiles and
+remotes, so the right-click *Set as my default* is that surface instead. The
+auxiliary reviewer's separate vehicle — state that exists, reaches dispatch,
+and no surface can show or set — is replaced by one shared reviewing vehicle.
+`DABBLER_TRANSPORT` leaves the resolution order.
+
+**A committed setting is enforced, not softened.** The advisors disagreed
+here and the stronger argument won: a workspace that names a vehicle this
+machine cannot reach **stops, names the layer that chose it, and says how to
+override it**. Silently falling to another vehicle would change which provider
+is billed, make any explanation of what ran a lie, and rebuild in the
+resolution order the exact shadowing that `DABBLER_TRANSPORT` is being deleted
+for. The real correction is upstream: a personal preference is not solution
+policy and does not belong in a committed file.
+
+**The block ships as a minor, and the break is stated rather than absent.**
+Everyone running this extension today is the operator or their staff: staff
+are on the Copilot seat exclusively, where detection resolves the vehicle
+without the variable, and the operator is more often on the Claude CLI and
+the direct API and reaches the seat deliberately. So dropping
+`DABBLER_TRANSPORT` from resolution inconveniences nobody here — which is
+why it is a minor, and not because nothing breaks. The release notes name it
+for the reader who does switch vehicles by exporting it, with the one command
+that replaces it.
+
+**The engineering is minimal by instruction.** Both advisors were asked to
+cut and both cut hard. There is no model pre-validation, no cached support
+list, no new typed registry, no migration verb, and no third enumeration of
+what an engine accepts. Two verbs are added, not five. The list is corrected
+at its source rather than translated at its destination, because
+`normalizeModelToken` **drops Claude date suffixes** — and the measurement
+above proved those exact dated ids are accepted, so normalising every launch
+token would turn a deliberate pin into a floating alias.
+
+---
+
+### Session 157 of 159: One place a choice is kept, and four things deleted
+
+**The deletions come first, inside this session rather than after it.**
+Building the resolver on the old shape means writing types and tests for data
+that goes a week later; closing a session with the pane knowingly broken
+means a numbered session that is not releasable on its own. Both are avoided
+by doing the cut and the rewrite together and updating every consumer before
+the close.
+
+**Four deletions.** `.dabbler/api-models.lock` and any writer of it. The
+`configuration` block out of the projection — 98.4% of a file whose purpose is
+804 bytes of module graph — and the file renamed `solution.json`, which is
+churn nowhere else would justify but costs nothing here: it is derived,
+gitignored, re-derived at activation, and ships in lockstep with the one
+extension that reads it. `alias`, `fidelity` and `providerRelation` out of the
+catalog and projection types. `price_category` and `cost` **stay in the
+catalog**, for the reason above.
+
+**One resolution order, and `DABBLER_TRANSPORT` is not in it.** A CLI flag,
+then `<repo>/.vscode/settings.json` under `dabbler.*`, then the user-level
+`preferences.json`, then the built-in default. The variable is removed rather
+than deprecated in place: a layer that outranks every other and is written by
+nothing is how the pane came to save a file the next session ignored.
+`bootstrap` stops creating it; `configure` says it is obsolete when it finds
+one.
+
+**The compatibility question was settled by the operator on 2026-09-12: a
+minor, with the break stated in the release notes.** Removing a documented
+environment variable from resolution is a breaking change for anything that
+sets it, and every machine running this extension today is the operator's or
+their staff's. Staff use the Copilot seat exclusively, so seat detection
+resolves their vehicle without the variable and ignoring it costs them
+nothing; the operator uses the Claude CLI and the direct API more often than
+the seat, and reaches the seat deliberately rather than by a standing
+variable. **Nobody here is inconvenienced, and that is the reason it is a
+minor rather than the absence of a break.** The release notes say plainly
+that an operator who switches between vehicles by exporting
+`DABBLER_TRANSPORT` will find it ignored, and that the correction is one
+`dabbler configure --transport` or one setting in `.vscode/settings.json`.
+A break that is named and one command from repaired is not the same as one
+that is discovered.
+
+**The settings file is standard, and the router reads it directly.**
+`jsonc-parser` — MIT, no dependencies, the parser VS Code itself uses — reads
+and writes it with the operator's comments and unrelated settings intact. The
+extension writes through `ConfigurationTarget.WorkspaceFolder` and never
+`.Workspace`, which in this project's generated multi-root workspace would
+land in `.dabbler/solution.code-workspace`: gitignored, and rewritten by the
+next `dabbler workspace`. Malformed JSONC is refused and left alone rather
+than replaced by a freshly generated file.
+
+**A configured value that this machine cannot reach is a stop.** It names the
+layer that chose it and the way to override it, before anything is billed.
+The same rule covers a model the selected vehicle does not list. The pane
+shows such a value as unavailable rather than as a working choice.
+
+**The auxiliary reviewer's vehicle is collapsed, and a conflict refuses.**
+Where the two reviewing vehicles already agree the collapse is automatic;
+where they differ the migration stops and asks, because silently choosing one
+of two live values is how state stops matching the record. Stale auxiliary
+keys are detected wherever they are written.
+
+**`local-overrides.yaml` is not bulk-copied.** Each key is either solution
+policy or a personal default, and moving a personal default into a committed
+file publishes it. The session names the destination per key and prints the
+`configure` commands rather than building a migration verb for a handful of
+owner-controlled values.
+
+**Steps.** (1) The four deletions, with every consumer updated. (2) The
+settings reader and writer, and the resolution order. (3) `DABBLER_TRANSPORT`
+out, with the obsolescence note and the compatibility audit. (4) The
+auxiliary vehicle collapsed, conflicts refused. (5) `dabbler configure` gains
+`--authoring-model`; `dabbler configuration options` and `dabbler
+configuration explain` are added and nothing else — `options` carries local
+availability with each choice so there is no second command asking the same
+question, and `explain` reports each resolved value with the layer that
+decided it, read off `explainTransport`'s existing layer list.
+
+**Tests.** A value set in `.vscode/settings.json` is what the router
+resolves, and the operator's comments and unrelated settings survive the
+write. Malformed JSONC is refused without overwriting. A user default applies
+where the settings file is silent and never where it speaks. A configured
+vehicle this machine cannot reach stops and names its layer. `DABBLER_TRANSPORT`
+in the environment changes nothing. Two differing reviewing vehicles refuse to
+collapse. The projection carries no configuration block.
+
+**Releasable.** Held for 158, which is the half an operator can see.
+
+### Session 158 of 159: The model an operator picks is the model that runs
+
+**Every row that should be actionable proves it has a menu** — by a test over
+the tree model's own row kinds against package.json's `when` clauses, not by a
+second typed registry. The Work Explorer has a registry because it earned one;
+copying the abstraction to prevent one missing menu is this project's
+documented failure mode. The participant rows gain the action their children
+carry.
+
+**The model reaches the engine.** `engineTerminalFor` passes `--model` in the
+argv of both CLIs, which is what the router's own unattended `engineShape` has
+always done. The value passed is the value chosen: no normalisation at launch,
+because `normalizeModelToken` drops the date suffix that makes a pin a pin.
+
+**An engine's refusal is the framework's refusal.** `[claude-code:unrecognized_model]`
+is read as a failure regardless of the exit code, so a session cannot begin on
+a fallback model after the operator's choice was rejected. Copilot's exit 1
+needs no interpretation.
+
+**The authoring list is read for the engine, not for the machine.** That one
+change removes the spelling divergence at its source rather than translating
+it: under Claude Code the list is the Anthropic block, whose eleven ids were
+all accepted, and on a seat it is the seat's own, which `copilot --model`
+accepts by construction. Where the engine's list cannot be enumerated — a
+Claude Code login with no Anthropic key, which is an ordinary machine — the
+CLI's own documented aliases are the floor, because three rows are a choice
+and an empty list reads as a broken pane. The list remains a suggestion and
+the launch remains the authority: an API catalog cannot prove what the
+installed Claude Code supports.
+
+**A hand-edited file is revalidated at the start boundary.** `options` filters
+a list; it does not enforce anything, because the settings file can be typed
+into. Before a billed invocation `session start` revalidates the model against
+the engine and vehicle, both reviewing models against the shared vehicle, the
+credential the vehicle needs, and the author/reviewer provider separation.
+
+**Update the Catalog finishes visibly.** Refresh, invalidate the capability
+reading, recompute the options, repaint, and say so once. The catalog is at
+the user level and outside every glob a workspace watcher can reach, so the
+repaint is caused rather than awaited. Availability is recomputed when its
+inputs move and immediately before a picker opens — never on every render, and
+never written to settings.
+
+**Set as my default** on each Vehicle and Model row writes `preferences.json`.
+
+**The walk is this session's acceptance, not a later session's.** A person
+drives the pane in a running editor on both engines and both transports:
+every row right- and left-clicked; a vehicle changed on each participant and
+surviving a reload; a model chosen for each of the three roles; the catalog
+refreshed with the pane watched; *Set as my default* inherited by a fresh
+repository; a committed setting naming an unreachable vehicle, which must stop
+and say so; and a session started on each engine whose launch argv carries the
+chosen model. Deferring this to a later session is the exact mistake that let
+the pane ship broken.
+
+**The model that ran is recorded once per engine execution**, into the
+existing session and round ledger rather than a new structure: what was
+requested, what was reported, and the grade of that evidence. Claude Code's
+`modelUsage` is a served-model fact; the seat's `events.jsonl` is an echo and
+is labelled one. Two traps are handled rather than discovered: an alias is
+expected to resolve to a dated canonical id and is not a substitution, and a
+seat record is used only where it can be tied to the launched session — the
+newest file on disk is the wrong one whenever two sessions run.
+
+**Steps.** (1) The menu coverage test and the missing menus. (2) `--model`
+into both launches; the refusal read as a refusal; the authoring list read for
+the engine, with the alias floor. (3) Revalidation at `session start`. (4) The
+catalog refresh's completion and repaint. (5) *Set as my default*; both
+vehicle rows on one monochrome icon. (6) The evidence record. (7) The walk,
+and whatever it finds — fixed here if small, raised as owed if not.
+
+**Tests.** Every row kind the model marks actionable is matched by a `when`
+clause, and the reverse. A chosen model appears in the argv the extension
+builds, on both engines. A rejection marker on exit 0 fails the launch. The
+authoring list under `claude-code` contains no id that engine refuses, and is
+the alias floor when the Anthropic block is unreachable. A hand-edited
+incompatible pair is refused at `session start`. A catalog refresh repaints
+without a second command. Fixtures for the alias-to-canonical case and for an
+uncorrelatable seat record.
+
+**Releasable.** It carries a **minor**, and it is the release because it is
+the half an operator can see: a control that did nothing now does something,
+and a model can be chosen for the authoring AI for the first time.
+
+**Its release notes carry the break, at the top and in an operator's
+words.** `DABBLER_TRANSPORT` is ignored from this version. Anyone who works
+on one vehicle is unaffected and needs to read no further. Anyone who
+switches between vehicles by exporting the variable will find it does
+nothing, and the correction is one command — `dabbler configure --transport
+<vehicle>` for the machine, or the `dabbler.reviewing.vehicle` key in the
+repository's `.vscode/settings.json` for a solution. The note says which
+layer now decides, so a reader knows where to look next time rather than
+where to look once. A break that is named and one command from repaired is
+worth a line in a changelog; one that is discovered is worth a session.
+
+### Session 159 of 159: The keys an operator can change without editing their environment
+
+**This session is separable and is deliberately last.** Requirement 12 is a
+convenience; the Configuration section works without it on environment
+variables, which is what CI uses and what this machine uses today. It is
+carried alone because cross-platform secret handling is the one piece of this
+block whose risk is materially different from the rest.
+
+**What is stored, and where, is named honestly before it is built.** The
+Windows mechanism measured on 2026-09-12 — `ConvertFrom-SecureString` /
+`ConvertTo-SecureString`, a verified round trip with no native dependency — is
+**DPAPI encryption of a file this application owns. It is not Windows
+Credential Manager.** The session either implements Credential Manager or
+records the operator's approval of a DPAPI-encrypted application file, with
+its location and its scope written down. macOS uses `security`; on Linux, the
+absence of `secret-tool` is a refusal that names the environment variable, not
+a silent fall to plaintext.
+
+**Settings hold a reference and never a value.**
+`"dabbler.credentials.openai": "client-a"` is set through `configuration set`,
+because choosing which credential a solution uses is configuration and not
+secret-store management. The store itself takes three verbs — `auth set`,
+`auth list`, `auth remove` — and a secret is entered through a hidden prompt
+or stdin, never an argument, and appears in no list, log, error or
+explanation. A reference that names a credential this machine does not hold is
+a stop, by the same rule that governs an unreachable vehicle.
+
+**Resolution is process environment, then the solution's reference, then the
+user's default.** The environment stays first because that is how CI injects a
+key and because the precedence is explicit rather than hidden.
+
+**Copilot bring-your-own-key is not implemented and is not designed for.** A
+credential reference that is independent of transport is its only
+prerequisite, and this session produces one as a by-product.
+
+**Steps.** (1) The backend decision, recorded. (2) The three `auth` verbs
+against the existing `registerBackend` seam, which has only ever had `env`
+registered. (3) The reference keys in settings and preferences, set through
+`configuration set`. (4) The pane's per-provider row: which credential, from
+which layer, never the value. (5) Pre-existing plaintext credentials handled.
+
+**Tests.** A stored credential round-trips on this platform and is absent from
+every rendering. A reference naming a missing credential stops and says so. An
+environment variable outranks a reference. A platform with no store refuses
+`auth set` and names the variable.
+
+**Releasable.** Separately from 158, once its platform behaviour is settled.

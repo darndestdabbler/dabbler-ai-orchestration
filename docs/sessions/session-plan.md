@@ -9761,3 +9761,318 @@ line that makes a session global, `sharedFiles`, that the Configuration
 pane no longer says "none installed" on a machine that has engines, and
 that 2.4.1 already carried the shim.
 
+---
+
+## Why sessions 163–165 exist: humans at the edges, and what the sample found in 2.5.0
+
+**The operator drove the sample through 2.5.0 and it came back with
+twenty-three entries.** Sessions 001 to 003 of `csv-parser` closed VERIFIED
+on 2026-09-13 against the published 2.5.0; `docs/notes/dabbler-issues.md`
+is the log, numbered here in its own order. Every entry was checked against
+this tree before it was planned against; where the log's guess at a
+mechanism and the source disagree, the source is what is written here, and
+two entries turned out not to be defects at all.
+
+**Two positions the operator stated on 2026-09-13 govern this block.** On
+governance: *"as we identify issues, we will again over-engineer the
+solution. We may need to remove some governance powers that the framework
+has in order to allow AI to get the job done with only a little amount of
+friction."* On sign-off: *"it is ridiculous to ask the human operator for a
+sign off. The more that you bother a human developer, the less likely that
+he or she will use the extension."* And on this plan: *"do not overengineer.
+Keep it simple."*
+
+**The rule this block is held to: humans at the edges, never in the
+loop.** A person's input arrives at `session start` — the brief, and
+releasability, which is declared there already — and a person reads the
+close. Between the two, no question is raised to a person unless the answer
+changes what the framework does next; everything else is a row on the
+record and a line in the close. Two tests follow for any gate: it may
+refuse only what the engine could have done differently, so a file the
+framework wrote is never the step's to account for; and no fix here adds a
+verb, an instruction kind, a state, or a special case in a gate — a fix
+that cannot fit is a gate deleted, not a gate grown. The reviewers are
+models and stay. The three hard rules stay: state files are the router's,
+verdicts are a reviewer's, the run of record is the framework's run.
+
+### What was measured, 2026-09-13
+
+- **Only one owed-decision class blocks a close.** `owedDecisions.ts`
+  `BLOCKING_CLASSES` holds `verification-reduction` alone. The
+  `accountability-signoff` that `rebaseline` raises (`session.ts`,
+  `repair-outside-a-step-<n>`) stalled nothing in the sample; it put a
+  question on `dabbler owed list` whose answer changes nothing the
+  framework does, and `owedDecisions.ts` re-asks it after every close with
+  corrected wording because one of its two options became impossible once
+  the work landed. The durable fact is already in `repairs.jsonl`.
+- **`--approver` proves nothing and is required.** `plan amend`, `verify
+  reopen` and `withdraw-release` all demand it; the help in
+  `cli/session.ts` says *"No gate reads the approver -- this records a
+  claim, it does not prove an authorisation."* The sample's engine typed
+  its own name and was accepted. Who is working is on the record from
+  `start`.
+- **The stop's question is a surface, not a gate.** `drive.ts` raises a
+  `value-tradeoff` row on every stop (*"Run it again, or cancel it?"*);
+  `session next` re-runs from the stop whether or not it is answered. The
+  extension's stop toast reads that row (session 161 put the reason in its
+  body), so the row stays; what it carries is what changes.
+- **Session 1 is told to ask a person with no way to.**
+  `bootstrap/templates.ts` line 341: *"Ask the operator what the solution
+  is … unless the repository or your prompt already says."* The protocol
+  has nothing between `step` and `report`; the sample got past it because
+  a person was in the chat.
+- **A spent report is judged again and costs a refusal.** `drive.ts`
+  `judgeReportShape` refuses any report whose `seq` is not the outstanding
+  one under `report-seq`; the sample's engine called `next` with the
+  previous, already-accepted report still on disk and was charged one of
+  the step's three.
+- **The framework's own job writes files the step is then refused for.**
+  `drive.ts` `stepChangedPaths` subtracts only the lifecycle's bookkeeping
+  basenames under the sessions directory (`gates.ts`
+  `SET_BOOKKEEPING_COMMIT_BASENAMES`); what the candidate job packed under
+  `packages/` is not subtracted, though `candidatePathsAsWritten` already
+  reads exactly those paths at land. The refusal's advice — `rebaseline` —
+  was wrong too: nothing was repaired while the run was stopped.
+- **The candidate job turns on Central Package Management after the
+  projects exist.** `ecosystem.ts` `writeCentralPin` creates
+  `Directory.Packages.props` with `ManagePackageVersionsCentrally=true`
+  when the file is absent; every versioned `PackageReference` then fails
+  restore with NU1008. The same file is written where absent by the
+  scaffold seam a few hundred lines below it, which runs at module
+  creation, before any project.
+- **A package contract needs a notes page that nothing writes.** The
+  candidate job refuses without `modules/<slug>/contract/README.md` and
+  names `dabbler module contract <slug>`, which `cli/module.ts` refuses
+  for `contract: package`. The template (`contractNotesPage`) exists.
+- **By-hand advice is printed inside a session that runs the suite
+  itself.** `affected.ts` `recordCommand` and the `test_run_fresh` gate in
+  `testEvidence.ts` tell the reader to run the suite and `test-evidence
+  record --outcome passed`; read by an engine mid-session that is an
+  invitation to record a claim.
+- **An amend leaves no trace in the pushed history.** `amendments.jsonl`
+  lives under `.dabbler/runs/`, which `bootstrap` ignores; the landed
+  commit, the change log and the work plan say nothing.
+- **The landed commit's subject is the task paragraph.** `drive.ts` line
+  3201: `commit -m "Session N: ${task}"`, one line, 770 characters in the
+  sample.
+- **Two entries are not defects.** Entry 4 (no `dabbler.cmd`, so a
+  shell-less check cannot spawn the router): `terminalShim.ts` writes
+  `dabbler.cmd` beside `dabbler` and it is there on this machine, and
+  `checks.ts` `spawnProgram` resolves a batch shim through `PATHEXT`; the
+  sample assumed the failure and never ran the check. Entry 11
+  (`invocations=0`): accurate in pull mode, where the framework invokes
+  nothing.
+
+### What the advisor said, 2026-09-13
+
+One round with `gpt-5.6-sol` only, on the operator's instruction
+(`docs/design/consults/round13-brief.md`, `round13-sol.md`).
+
+**Where it agreed, and this plan follows:** humans at the edges is sound;
+of the four owed classes only `verification-reduction` survives the test
+"an answer changes what the framework does next"; `rebaseline`'s question
+and `--approver` are deleted, not softened; the adviser's proposal on a
+stop is printed, not asked; the missing brief is a template sentence and
+an honest `blocked` report, not a check at `start`, because `start` cannot
+tell an adequate prompt from an inadequate one without machinery; CPM is
+established at module creation before any project exists, since migrating
+versioned references afterwards is repair machinery; the candidate job's
+files are subtracted from the step's changed paths by their provenance,
+never by another exemption list; the in-session test advice is deleted,
+not reworded; a repository-wide `.gitattributes` is disproportionate to
+a warning about line endings.
+
+**Cut on its advice:** entries 8 and 14 (help duplication), 11
+(`invocations=0`), 15 (line endings).
+
+**Where this plan differs:** entry 4, which Sol kept on the brief's
+premise, is cut on the measurement above and becomes one sentence in the
+plan step's ask. The stop's owed row stays, because the extension's toast
+is built on it; Sol's "no owed row" is honoured in what the row asks, not
+in whether it exists.
+
+### Where each entry of the log lands
+
+| entry | what | session |
+| --- | --- | --- |
+| 3, 12, 13, 17 | the brief, the spent report, `plan amend` and `--approver`, the amend on the record; `rebaseline`'s question; the close's summary | 163 |
+| 5, 16, 20, 21, 22, 23 | the tree check at `start`, the folder feed, the by-hand advice, the notes page, CPM, the candidate's files | 164 |
+| 1, 2, 4, 6, 7, 9, 10, 18, 19 | the small things; the walk and the release | 165 |
+| 8, 11, 14, 15 | cut | — |
+
+---
+
+### Session 163 of 165: The questions nobody needs to answer
+
+Scope: whole repository
+
+**`rebaseline` records and does not ask.** The row in `repairs.jsonl` and
+the moved baseline are the whole of it; no owed decision is raised, and
+the re-ask after close in `owedDecisions.ts` goes with it, since there is
+nothing left for it to re-ask. A standing `repair-outside-a-step-*` row in
+a repository that already has one is superseded once, as a settled row,
+so `owed list` stops offering it.
+
+**`--approver` is gone.** `plan amend`, `verify reopen` and
+`withdraw-release` take `--reason` and nothing else about who: the engine
+and session on the record from `start` are written into the row where
+the approver was. A typed `--approver` is refused as an unknown flag with
+the one sentence that says why.
+
+**A spent report is not a report.** In `judgeReportShape`, a report whose
+`seq` is below the outstanding instruction's is treated as none written:
+`next` reprints the outstanding instruction and spends no refusal. A
+report whose `seq` is ahead, or whose step is another's, is still refused
+as now.
+
+**The amend reaches the pushed history.** Every `plan amend` and `verify
+reopen` is folded into `activity-log.json` beside the events it already
+records, with the reason, so `project-work-plan.md` and the landed commit
+carry it. `amendments.jsonl` stays as the driver's own journal.
+
+**The plan step's ask names the way to change a step.** One sentence in
+the ask: a step's files or checks are changed after acceptance with
+`dabbler session plan amend --step <id> … --reason "<why>"`, which is on
+the record.
+
+**Session 1 does not ask a person mid-session.** The template's line 341
+becomes: the brief is the prompt this session was started with, or
+`docs/planning/brief.md`; with neither, report the step `blocked` naming
+that path, so the framework stops at the first step before any work and
+a person supplies the brief where it will be read. The "do not draft one
+from the folder name" sentence stays.
+
+**The stop carries the proposal.** When triage produced an `Amend step`
+proposal, the stop's own text prints it with the `plan amend` command
+that applies it, so an engine reading the stop can act; the owed row is
+unchanged.
+
+**The close says what was stepped over.** The close's output gains, from
+`repairs.jsonl` and the activity log and from nothing new, one line per
+rebaseline and per amend of this session with its reason. A session with
+none prints nothing extra.
+
+**Steps.** (1) `rebaseline` without the decision, and the re-ask removed.
+(2) `--approver` removed from the three verbs; identity from the record.
+(3) The spent report. (4) Amends into the activity log. (5) The ask's
+sentence and the template's brief sentence. (6) The stop text carries the
+proposal. (7) The close's lines.
+
+**Tests.** A `rebaseline` leaves a row in `repairs.jsonl` and no owed row.
+`plan amend` with `--reason` alone is accepted and its row names the
+session's engine; with `--approver` it is refused. `next` after an
+accepted report, with no new one, reprints the instruction and the
+rejection count is unchanged. An amend appears in `activity-log.json`. A
+close after one amend and one rebaseline prints both lines; a close after
+neither prints nothing extra. The template's session 1 text contains the
+brief path and no question to a person.
+
+**Releasable.** No: 164 changes what the same session's tree is measured
+against, and the walk in 165 proves the two together.
+
+### Session 164 of 165: What the framework wrote is not the step's
+
+Scope: whole repository
+
+**The candidate's files are subtracted by provenance.** `stepChangedPaths`
+takes what `candidatePathsAsWritten` reports for this session and
+subtracts it as it subtracts the bookkeeping — one more source of paths
+to the same filter, no basename list. Land already commits them; the
+step never accounts for them. The `files-changed-omits` refusal keeps its
+`rebaseline` advice only for paths no framework job wrote.
+
+**CPM is born with the first package module.** `modules create --contract
+package` writes `Directory.Packages.props` through the scaffold seam that
+already exists for it, before any project, and the README's module
+section says in one sentence that a solution with a package-contract
+module manages package versions centrally from its first project.
+`writeCentralPin` pins into the file and no longer creates it; absent the
+file it refuses, naming `modules create`. A repository whose modules were
+created before this version meets that refusal once and adds the file by
+hand, which the refusal says.
+
+**The notes page is written when the module is.** `modules create
+--contract package` writes `modules/<slug>/contract/README.md` from
+`contractNotesPage` where absent, as the designed seam is written today.
+`module contract <slug>` still refuses for `package`, and its refusal no
+longer names itself as the way on.
+
+**A folder feed is made when it is needed.** `packaging` and the candidate
+job create a declared feed that is a folder on disk and does not exist,
+and say so in one line. A feed with a host is untouched.
+
+**No by-hand advice inside a session.** While a session is in flight,
+`recordCommand`'s sentence and the `test_run_fresh` gate's advice are not
+printed; the gate row says what it measures and nothing about how to
+satisfy it. Outside a session the advice is unchanged.
+
+**The tree is checked when the session starts.** The declaration's
+clean-tree rule in `writers.ts` runs at `session start` too, for a global
+session as it already does for a focused one, so the condition is met
+before any work and never mid-`next`; and a tree-state refusal inside
+`next` is logged as `tree`, not `engine`, so the pause says what stopped
+it.
+
+**Steps.** (1) Provenance subtraction. (2) CPM at module creation, and
+`writeCentralPin` that creates nothing. (3) The notes page at creation.
+(4) The folder feed. (5) The advice not printed in flight. (6) The tree
+check at `start` and the pause's word.
+
+**Tests.** A step reported after a candidate job packed is accepted
+naming only its own files. `modules create --contract package` in a
+repository with no project leaves `Directory.Packages.props` with CPM on
+and the notes page present; `writeCentralPin` against a repository
+without the file refuses and names the command. A declared folder feed
+that does not exist is created before the push. The gate row inside a
+session carries no `test-evidence record` text. `session start` with a
+material change in the tree refuses with the same words the declaration
+used.
+
+**Releasable.** No: 165 carries the walk that shows both.
+
+### Session 165 of 165: The small things, and the walk
+
+Scope: whole repository
+
+**Each of these is a line, and it is here because it is.** A stored model
+preference the registry no longer lists is reported by `bootstrap` and
+`configure` with the layer and the fix, generically, with no alias for any
+one id (entry 1). The `DABBLER_TRANSPORT` warning in `configure` is
+deleted and `AGENTS.md` says in one sentence to unset it (2). `modules
+create` regenerates the manifest's comment header on every write, takes
+`--package none`, and the bootstrap template says the placeholder module
+is removed by hand when several are declared (6). `AGENTS.md` says the
+router commits `docs/sessions/*` itself and a step's report never names
+them (7). The landed commit's subject is `Session N: <title from
+sessions.json>` and the task paragraph is its body after a blank line (9).
+The run-of-record phase logs `no suite declared; nothing to run` when
+that is why it ran nothing (10). The docs and the `impact-plan` line say
+what an unowned change selects (18). `packaging --dry-run` says `dry run:
+the declaration loads; N gate(s) would refuse a real publish now` instead
+of `refused`, and `no credential: the feed is a folder` instead of an
+empty name (19). The plan step's ask says a check may name `dabbler` bare,
+because the shim folder is on `PATH` wherever a session runs (4).
+
+**The walk, against the built VSIX, in the sample.** Session 4 of
+`csv-parser`, focused on `csv-deserializer`, driven to `done` through the
+shim: a `rebaseline` seen leaving no question on `owed list`; an amend
+seen in `activity-log.json` after the push; a step reported after the
+candidate job packed and accepted first time; the close's summary lines
+read; and the log's remaining entries checked off against what the walk
+shows. Whatever the walk finds is fixed here if small and raised as owed
+if not.
+
+**Steps.** (1) Entries 1, 2, 6, 7, 9, 10, 18, 19, 4, in that order. (2)
+The walk in the sample, and what it finds. (3) The release.
+
+**Tests.** A `preferences.json` naming an unlisted model is reported by
+`configure` and `bootstrap`. `modules create --package none` writes no
+package line and keeps the header. A landed commit's subject is under 72
+characters and its body is the task. A dry run's output contains neither
+`refused` nor an empty credential name.
+
+**Releasable.** Yes, as a **minor**: `--approver` is removed from three
+verbs and a template line changes meaning. The notes name the removed
+flag, that `rebaseline` no longer raises a decision, that a package-contract
+module now scaffolds CPM and its notes page at creation, and the two
+sample entries found not to be defects.

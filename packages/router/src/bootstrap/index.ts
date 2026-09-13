@@ -137,8 +137,9 @@ function splitLines(text: string): string[] {
  * The guard invokes the router by name and lets PATH resolve it. There is no
  * interpreter to bake in: the router ships as one command, and a consumer
  * repository is not required to contain the thing that guards it. A machine
- * where the name does not resolve exits non-blocking, which is the same
- * direction every other non-verdict failure takes.
+ * where the name does not resolve is let through; a router that resolves,
+ * runs and fails blocks the commit and names the two ways on, because the
+ * one failure that must not pass silently is the router itself.
  */
 export function ensureCommitGuard(projectDir: string): string | null {
   const hooks = join(projectDir, ".git", "hooks");

@@ -10,6 +10,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.4.1] — 2026-09-13
+
+**The `dabbler` command shipped inside the extension has crashed on every
+verb since 2.3.0.** If you installed 2.3.0 or 2.4.0 and typed `dabbler
+version` in a VS Code terminal, you got a stack trace ending in `Cannot find
+module './impl/format'`; so did everything the extension runs through that
+same file — *Start Unattended Session*, the Configuration section's catalog
+refresh and its `auth set`. The extension's own commands were unaffected,
+because they run the router in-process from a different bundle. This release
+is that one file fixed, and the two things that let it ship without being
+noticed.
+
+### Fixed
+
+- **The bundled command runs.** The extension builds its `dabbler` command
+  from the router's source with its own bundler settings, and those settings
+  lacked the one option the router's own build gained in 2.3.0 — so a
+  dependency was bundled from its wrong entry point and left a relative
+  `require` nothing could resolve. The option is now in both places, with the
+  reason beside it.
+- **The build runs what it built before packaging it.** The extension's
+  build now runs `dabbler version` on the bundle it just wrote and fails if
+  that exits non-zero, before `vsce package` ever sees the file. Two releases
+  went out with a bundle that loaded and died on its first use because
+  nothing between the bundler and the packager had run it.
+- **The pre-commit hook no longer lets a crashed router through.** The hook
+  `dabbler bootstrap` installs used to block a commit only on the guard's own
+  verdict — "a step is open" — and let every other failure through, so a
+  router that crashed exited 1 with its stack trace and every commit landed,
+  mid-step or not. From this version a router that is not on `PATH` at all
+  is still let through, and a router that ran and failed blocks the commit
+  and prints the two ways on: `dabbler version` to see what is wrong with the
+  router, or `git commit --no-verify` for a commit that must land.
+
+### After updating
+
+**Run `dabbler bootstrap` once in each repository that has it.** Bootstrap
+rewrites the hook it wrote and leaves any other alone, and the hook is a file
+in your repository's `.git/hooks`, so a new extension version does not change
+it by itself. Until you do, the hook you have is the 2.4.0 one.
+
 ## [2.4.0] — 2026-09-12
 
 ### Keep a provider key on this machine instead of in every shell

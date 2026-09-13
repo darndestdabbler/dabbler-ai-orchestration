@@ -34,6 +34,7 @@
 const esbuild = require("esbuild");
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
 
 const watch = process.argv.includes("--watch");
 
@@ -74,6 +75,19 @@ const shared = {
   minify: false,
   define: { "import.meta.url": MODULE_URL },
   banner: { js: MODULE_URL_BANNER },
+  // Entry points and outfiles are read against this file's own directory,
+  // so the build is the same build from the extension root, the repository
+  // root, or a check the framework spawns.
+  absWorkingDir: __dirname,
+  // **The ES module build of a dependency, where it ships one.** The same
+  // option the router's own `build.mjs` carries, for the same reason: esbuild
+  // resolves `main` before `module` for a node target, and `jsonc-parser`'s
+  // `main` is a UMD file whose own `require("./impl/format")` survives
+  // bundling as a relative path nothing resolves. `dabbler.cjs` is bundled
+  // here from the router's SOURCE, not from its prebuilt `dist/index.cjs`
+  // the way `extension.js` is -- so the router's build fixing this fixed
+  // the extension and left the command broken, from 2.3.0 until 2.4.1.
+  mainFields: ["module", "main"],
 };
 
 /** @type {import('esbuild').BuildOptions[]} */
@@ -108,6 +122,27 @@ function copyRouterRuntime() {
   );
 }
 
+/**
+ * The build runs the command it just wrote. A bundle that loads and dies on
+ * its first require is what the VSIX shipped twice, and nothing between
+ * `esbuild.build` and `vsce package` had run the file; a check after the
+ * artifact is published is not a check. `version` is the cheapest verb that
+ * loads the whole module graph and touches no state.
+ */
+function runBuiltCommand() {
+  const command = path.join(outDir, "dabbler.cjs");
+  const result = spawnSync(process.execPath, [command, "version"], {
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `the bundle ${command} does not run (exit ${result.status}):\n` +
+        `${result.stdout}${result.stderr}`,
+    );
+  }
+  process.stdout.write(`built ${command}: ${result.stdout}`);
+}
+
 if (watch) {
   copyRouterRuntime();
   Promise.all(builds.map((options) => esbuild.context(options)))
@@ -116,6 +151,7 @@ if (watch) {
 } else {
   Promise.all(builds.map((options) => esbuild.build(options)))
     .then(copyRouterRuntime)
+    .then(runBuiltCommand)
     .catch((error) => {
       console.error(error);
       process.exit(1);

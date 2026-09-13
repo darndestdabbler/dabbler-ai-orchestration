@@ -526,14 +526,23 @@ export const PRE_COMMIT_HOOK =
   "# satisfied. A commit landed mid-step leaves the step with no diff of its\n" +
   "# own to be judged by, so this refuses rather than advises.\n" +
   "#\n" +
-  "# Only exit {blocking} -- the guard saying \"a step is open\" -- blocks the commit.\n" +
-  "# A router that is not on PATH, or an unreadable ledger, exit differently\n" +
-  "# and are let through: neither is the guard's verdict, and a repository\n" +
-  "# nobody can commit to is a worse failure than an unguarded one. The\n" +
-  "# binding check is `verify step close`, which refuses outright when HEAD\n" +
-  "# has moved off the commit the step opened on.\n" +
+  "# Exit {blocking} is the guard's verdict -- \"a step is open\" -- and blocks the\n" +
+  "# commit in the guard's own words. A router that is not on PATH at all\n" +
+  "# (exit 127) is let through: a repository nobody can commit to is a worse\n" +
+  "# failure than an unguarded one, and the binding check is `verify step\n" +
+  "# close`, which refuses outright when HEAD has moved off the commit the\n" +
+  "# step opened on. Every other failure is a router that RAN and could not\n" +
+  "# judge -- a crash, an unreadable ledger -- and that blocks too, naming the\n" +
+  "# two ways on: a guard that let a crashed router through is how a broken\n" +
+  "# router shipped twice with every commit landing.\n" +
   "dabbler verify step guard-commit\n" +
-  "if [ $? -eq {blocking} ]; then\n" +
-  "  exit 1\n" +
+  "status=$?\n" +
+  "if [ $status -eq 0 ] || [ $status -eq 127 ]; then\n" +
+  "  exit 0\n" +
   "fi\n" +
-  "exit 0\n";
+  "if [ $status -ne {blocking} ]; then\n" +
+  "  echo \"dabbler: the router ran and could not judge this commit (exit $status).\" >&2\n" +
+  "  echo \"  dabbler version         to see what is wrong with the router\" >&2\n" +
+  "  echo \"  git commit --no-verify  for a commit that must land\" >&2\n" +
+  "fi\n" +
+  "exit 1\n";

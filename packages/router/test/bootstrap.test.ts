@@ -6,8 +6,9 @@
 // literals; the rest reads and writes files in a directory, and the two that
 // commit ask git, which answers from a table.
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { delimiter, join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
 import { bootstrapVerb } from "../src/cli/bootstrap.ts";
@@ -29,6 +30,7 @@ import {
   TRANSPORT_COPILOT_CLI,
   TRANSPORT_ENV_VAR,
 } from "../src/config.ts";
+import { EXIT_BLOCKING } from "../src/contracts/exitCodes.ts";
 import { SETTINGS_RELPATH } from "../src/settings.ts";
 import {
   ID_GIT_REMOTE,
@@ -325,7 +327,51 @@ describe("the commit guard", () => {
   it("declines a directory that is not a repository", () => {
     assert.equal(ensureCommitGuard(tempDir("bootstrap-")), null);
   });
+
+  it("blocks on the guard's verdict, blocks a router that ran and failed, and lets an absent one through", () => {
+    // The hook is run under sh with a fake `dabbler` first on PATH, because
+    // the verdicts are the shell's arithmetic and nothing else. A router that
+    // crashed used to be let through with its stack trace, which is how a
+    // bundle that died on every verb shipped with every commit landing.
+    const hook = ensureCommitGuard(emptyRepo()) as string;
+    const shell = shellDir();
+    const runHook = (fake: string | null): { status: number | null; stderr: string } => {
+      const bin = tempDir("bootstrap-hook-bin-");
+      if (fake !== null) {
+        const path = join(bin, "dabbler");
+        writeFileSync(path, `#!/bin/sh\n${fake}\n`, "utf8");
+        chmodSync(path, 0o755);
+      }
+      const result = spawnSync("sh", [hook], {
+        encoding: "utf8",
+        env: { PATH: [bin, shell].join(delimiter) },
+      });
+      return { status: result.status, stderr: result.stderr };
+    };
+
+    const verdict = runHook(`exit ${EXIT_BLOCKING}`);
+    assert.equal(verdict.status, 1);
+    assert.ok(!verdict.stderr.includes("could not judge"));
+
+    const crashed = runHook("exit 1");
+    assert.equal(crashed.status, 1);
+    assert.match(crashed.stderr, /could not judge this commit \(exit 1\)/);
+    assert.match(crashed.stderr, /dabbler version/);
+    assert.match(crashed.stderr, /git commit --no-verify/);
+
+    assert.equal(runHook("exit 0").status, 0);
+    assert.equal(runHook(null).status, 0);
+  });
 });
+
+/** The directory `sh` lives in, so a PATH of one fake binary can still find the shell. */
+function shellDir(): string {
+  const executable = process.platform === "win32" ? "sh.exe" : "sh";
+  for (const dir of (process.env["PATH"] ?? "").split(delimiter)) {
+    if (dir !== "" && existsSync(join(dir, executable))) return dir;
+  }
+  throw new Error("no sh on PATH: the hook test needs a POSIX shell");
+}
 
 describe("the scaffolded setup sessions", () => {
   it("writes two numbered sessions into a project with no plan", () => {

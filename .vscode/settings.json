@@ -4,5 +4,6 @@
   // charged 364 premium requests, while the direct-API path bills tokens on
   // the DABBLER_*_API_KEY variables, all three of which are present here.
   // The seat stays reachable deliberately, with `--transport copilot-cli`.
-  "dabbler.transport": "api"
+  "dabbler.transport": "api",
+  "dabbler.authoringModel": "claude-fable-5-1"
 }

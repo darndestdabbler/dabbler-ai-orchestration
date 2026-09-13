@@ -3193,9 +3193,9 @@
     {
       "number": 162,
       "title": "What the developer reads and sees, and the walk",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-13T07:57:48.088000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-13T12:18:09.032000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -6,7 +6,7 @@
 >
 > | session | what | state |
 > | --- | --- | --- |
-> | 160 | one bundler option, a build that runs what it built, a hook that blocks a crashed router, and the installed-VSIX walk | CLOSED VERIFIED at round 1 (no blocking findings), landed `70d9d9d6`, closed `56d019ca`. **RELEASED: `vsix-v2.4.1` is on origin; CI's publish job logged "Published DarndestDabbler.dabbler-ai-orchestration v2.4.1" at 10:27Z**; the gallery still served 2.4.0 at 10:35Z, which its own log calls "might take a few minutes" |
+> | 160 | one bundler option, a build that runs what it built, a hook that blocks a crashed router, and the installed-VSIX walk | CLOSED VERIFIED at round 1 (no blocking findings), landed `70d9d9d6`, closed `56d019ca`. **RELEASED: `vsix-v2.4.1` is on origin; CI's publish job logged "Published DarndestDabbler.dabbler-ai-orchestration v2.4.1" at 10:27Z**; the gallery served 2.4.0 until about 10:36Z and `dabbler release --verify-install` read **2.4.1 served** at 10:38Z |
 >
 > **Sessions 161 and 162 are planned and next.** `nextSession` is 161.
 >

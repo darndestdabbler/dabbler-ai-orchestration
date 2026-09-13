@@ -3256,9 +3256,9 @@
     {
       "number": 165,
       "title": "The small things, and the walk",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-13T17:12:17.028000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-13T19:53:04.945000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

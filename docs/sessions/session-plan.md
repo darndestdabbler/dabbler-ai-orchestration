@@ -9452,3 +9452,346 @@ environment variable outranks a reference. A platform with no store refuses
 `auth set` and names the variable.
 
 **Releasable.** Separately from 158, once its platform behaviour is settled.
+
+---
+
+## Why sessions 160–163 exist: what a developer's seat found in 2.4.0
+
+**The operator drove a sample solution through the published extension and
+had the AI keep an issues log.** `csv-parser` is a deliberately unfinished
+four-module .NET solution whose only durable product is
+`docs/notes/dabbler-issues.md` — every friction, defect and surprise met
+while driving its sessions, specific enough to reproduce. Two sessions of it
+closed VERIFIED on 2026-09-13 and came back with thirteen entries. Each was
+checked against this tree before it was planned against; where the log's
+guess at a mechanism and the source disagree, the source is what is written
+here.
+
+### What was measured, 2026-09-13
+
+- **Every VSIX since 2.3.0 ships a `dabbler.cjs` that dies on every verb**,
+  with `Cannot find module './impl/format'`. Reproduced on the installed
+  2.4.0 bundle and on this checkout's own `tools/dabbler-ai-orchestration/dist/dabbler.cjs`;
+  the npm package's `dist/dabbler.cjs` runs. The cause is two build scripts
+  for one bundle: `packages/router/build.mjs` sets
+  `mainFields: ["module", "main"]` — session 157's fix, so `jsonc-parser`'s
+  ESM entry is inlined rather than its UMD one — and
+  `tools/dabbler-ai-orchestration/esbuild.js` builds the CLI from the
+  router's *source* with its own options, which have no `mainFields`.
+  `extension.js` is fine because it bundles the router's prebuilt
+  `dist/index.cjs`. The broken file is what the terminal shim runs, what
+  `driveProcess.ts` spawns for *Start Unattended Session*, and what
+  `configurationCommands.ts` `runVerb` opens a terminal on for the catalog
+  refresh and `auth set`. No test runs the built bundle; the walks of 158
+  and 159 did not reach it.
+- **The pre-commit hook lets a crashed router through.** `PRE_COMMIT_HOOK`
+  blocks only on exit 4; a router that is on `PATH` and crashes exits 1 and
+  is let through with a stack trace, so every commit in the sample went
+  through, mid-step or not.
+- **The driver drops the plan's `reason`.** `drive.ts` `phasePlan` accepts
+  a cross-module plan through `judgeWorkPlanModules`, which reads
+  `plan.reason`, then calls `declare(...)` without it; `session.ts`
+  `declare` runs the same judge with `options.reason ?? null` and refuses.
+  The stored `plan.json` is kept, so every retry repeats the refusal.
+  **Every cross-module session driven through `session next` stops
+  there.** The sample got past it with `session declare --reason` by hand.
+- **A global session is written the policy its help says it never gets.**
+  `declare` calls `writeDeclaredPolicy` whenever modules are named; the
+  driver's `scopeForStep` then reads it and hands the first work step a
+  `scope` with the focused-session sentence — *"the other modules are here
+  as packages and contract folders, not source"* — which is false in the
+  repository itself. Nothing enforced it.
+- **The stop toast says nothing about why.** The owed decision's `question`
+  is *"… paused (engine) in phase 'plan'. Run it again, or cancel it?"*;
+  the reason is in `determined`, which the toast does not show. Its primary
+  button was, that day, a retry that could not succeed.
+- **One exact line decides whether a session runs global, and the guidance
+  never names it.** `progress.ts` reads `Module: <slug>` or `Scope: whole
+  repository`, first line wins; the bootstrap plan template tells the
+  planning session to give every session *"ONE module (`Module: <slug>`
+  under the heading)"* and never mentions the other form. The sample's
+  session 3 wrote `Module: person` and the prose *"Runs: global"*; every
+  launcher would have opened a focused clone of `person`.
+- **A focused clone lacks the file the sample exists to write.**
+  `checkoutCone` holds packages, the record, the module's roots, its
+  dependencies' and consumers' contract folders, and the directory of each
+  per-module `sharedFiles` entry — nothing under `docs/notes/` or
+  `docs/planning/`. `sharedFiles` is the mechanism, it is declared per
+  module, and the only text that names it is the wall's refusal.
+- **The three launchers are one launcher.** *Start Session*, *Start
+  Unattended Session* and *Start Focused Session* all pass through
+  `opensModuleWindow`; for a focused next session each makes a blobless
+  sparse clone of `origin` beside the repository and opens it in a new
+  window. Neither label says so, unpushed commits are absent from the
+  clone, and a repository with no `origin` is refused in a sentence that
+  is not in the stop format.
+- **The extension's own write blocked the sample's first declaration.** The
+  Configuration pane writes `dabbler.authoringModel` and
+  `dabbler.reviewerTransport` into `.vscode/settings.json` — solution
+  policy, meant to be committed, decided in 157 — and the declaration's
+  clean-tree rule refused on it: *"the working tree already carries 1
+  change(s) (.vscode/settings.json)"*. The same uncommitted change sits in
+  this repository today.
+- **A gate that judged nothing renders the pass mark.** `renderGateRow`
+  gives an inapplicable gate `✓ test_run_fresh (N/A)` under 143's one-renderer
+  rule. The sample's `dabbler.yaml` declares no suite, so two sessions
+  closed VERIFIED behind nine ticks with no test run.
+- **Three contract modes, one documented.** `modules create --contract
+  {designed,package,generated}` is defined in `modules.ts` and rendered by
+  `contractdoc.ts`; nothing an operator reads says what `designed` or
+  `generated` mean, how a focused session builds against a sibling whose
+  package was never published, or what a focused session may write outside
+  its code root.
+
+### What the advisors said, 2026-09-13
+
+One round with `gpt-5.6-sol` and `gemini-3.1-pro-preview`, the same brief
+to both, the findings above with their verified mechanisms.
+
+**Where they agreed, and this plan follows:** the shim fix ships alone and
+first, as a patch; the printed commands (the log's entry 4) are named as
+that session's acceptance and not assumed to follow; the hook blocks on a
+crash and lets through only a router that is absent; the N/A mark changes
+at its one renderer rather than gaining a second closing line; no
+confirmation dialog is added to any launcher; no heuristic reads file
+paths out of plan prose to warn about the cone.
+
+**Where they split, and what this plan settles:**
+
+- *The extension's settings write.* Sol: the refusal names the file and the
+  command. Gemini: the pane commits or offers to. **The refusal names it**,
+  and `configure` says on every write that the file is committed policy.
+  `bootstrap` commits what it writes because session 1 cannot start
+  otherwise; a pane action mid-work is a different moment, and a choice an
+  operator may decide belongs in their user defaults instead is not one the
+  extension commits for them.
+- *Which line makes a session global.* Sol: exactly one recognised line,
+  both is an error. Gemini: `Scope: whole repository` wins wherever it
+  appears. **Scope wins wherever it appears, and a `Module:` line beside it
+  attributes.** A global session naming modules for attribution is exactly
+  what `declare --module` already allows a global session to do, and the
+  Work Explorer places a session under its module row by that line; the
+  sample's session 3 is a global session *about* `person`, and Sol's rule
+  would make it choose between running right and being filed right.
+- *The file every focused session must reach.* Sol: document the per-module
+  `sharedFiles` and add nothing. Gemini: a repository-level list.
+  **A repository-level `sharedFiles` in `dabbler.yaml`, merged into every
+  module's list at the one place module configuration is read.** A changelog
+  or a notes file that every module session appends to is the ordinary case
+  in any solution, and four copies of one path under four slugs is a rule
+  stated four times.
+
+**What was cut:** auto-commit from the pane; a plan-prose path check at
+`session start`; a `Runs:` line; a second N/A summary at the close;
+confirmations. **What Gemini raised that is not in this block and is the
+operator's:** the focused clone is made from `origin`, by round 7's ruling
+that the wall is the disk, so a developer's unpushed commits are absent from
+it. This block makes the launcher *say* so before it clones; whether the
+clone should come from the local repository instead is a design question
+this block does not reopen.
+
+### Where each entry of the log lands
+
+| entry | what | session |
+| --- | --- | --- |
+| 1, 3, 4 | the shim, the hook, the printed commands | 160 |
+| 7, 8, 9, 10, 12 | the declaration, the global session, the stop, the plan line | 161 |
+| 5, 13 | the files a focused session may reach, and the page that says so | 162 |
+| 2, 6, 11 | the settings write, the N/A mark, the launcher labels; the walk and the release | 163 |
+
+---
+
+### Session 160 of 163: The shim that ships
+
+Scope: whole repository
+
+**One bundling rule, and a build that runs what it built.** The extension's
+`esbuild.js` builds `dist/dabbler.cjs` from the router's source and has
+its own copy of the bundling options, which is how session 157's fix
+landed in one script and not the other. The options move to one place the
+router owns and both scripts read; neither keeps a copy. Then the build
+runs the bundle it just wrote — `node dist/dabbler.cjs version` — and
+fails on a non-zero exit, *before* `vsce package`, because a check after
+the irreversible act is not a check (session 142). That is a build step,
+not a test: it runs every time the artifact is made, on the machine that
+makes it.
+
+**The hook blocks a router that ran and could not judge.** `PRE_COMMIT_HOOK`
+detects an absent `dabbler` and lets that through as it does now; a router
+that is found and exits anything but 0 blocks the commit and says, in the
+stop's own shape, what happened and the two ways on — repair the router
+(`dabbler version` is the check) or `git commit --no-verify` for a commit
+that must land. `verify step close` stays the binding check. An existing
+hook carries `HOOK_MARKER`, and `bootstrap` rewrites a hook that carries
+it: the session confirms that path and the release notes name it, so a
+repository bootstrapped under 2.3.0 or 2.4.0 knows to run `dabbler bootstrap`
+again.
+
+**The printed commands are the acceptance, not a consequence.** The
+instruction protocol says "running it is the answer"; in the sample, no
+instruction could be run as printed. This session installs the VSIX it
+built, opens a VS Code terminal, runs `dabbler version` through the shim,
+starts a session and runs one `answer_command` exactly as printed, presses
+*Start Unattended Session* far enough to see `driveProcess` spawn the
+bundle, and refreshes the catalog from the pane so `runVerb`'s terminal is
+seen to run. Each of those is a reading in the session's record.
+
+**Steps.** (1) The bundling options in one place, read by both builds.
+(2) The build runs its own bundle before packaging. (3) The hook's verdict
+on a crash, and the refresh path confirmed. (4) The installed-VSIX walk:
+shim, a printed `answer_command` verbatim, the unattended spawn, the pane's
+terminal verb.
+
+**Tests.** The extension suite runs the built `dist/dabbler.cjs` as a
+child of the test's own Node and reads its version line — a test of the
+artifact that ships, and the one exception to "never spawn a CLI from an
+extension test", because this CLI is ours. The hook, run under `sh` with a
+fake `dabbler` on `PATH`: blocks on exit 4, blocks on exit 1 with the
+message, lets through when no `dabbler` is found.
+
+**Releasable.** Yes, alone, as a **patch**: every VSIX user since 2.3.0 is
+affected and nothing else in this block belongs in front of it. The notes
+say what was broken since which version and that the hook needs
+`dabbler bootstrap` run again.
+
+### Session 161 of 163: The declaration, the global session, and the stop
+
+Scope: whole repository
+
+**The reason reaches the declaration.** `phasePlan` passes `plan.reason`
+to `declare`, which is the whole of that fix; the judge is still run in
+both places, because the typed path and the driven path must refuse the
+same things. A cross-module plan accepted by the driver is a cross-module
+declaration accepted by the driver, in the same call.
+
+**A global session is what its help says.** `declare` writes no policy
+for a session with no checkout on its row in a multi-module solution; the
+modules it names are attribution and reach the record as they do now. With
+no policy there is no `scope` member on the first step and no
+focused-session sentence, and `dabbler session scope` says the session is
+global. The exposure gate already runs nothing for one.
+
+**The line that makes a session global is taught, and it wins.**
+`Scope: whole repository` decides the kind wherever it appears in the
+section; a `Module: <slug>` line beside it attributes the session to that
+module and nothing more. The bootstrap plan template that asks the planning
+session for one module per session says both forms and when each is
+right — a session that creates root build files, or writes across modules,
+says `Scope:`, and may still say `Module:` under it. The README's table
+gains the two lines.
+
+**The toast carries the reason.** The owed decision the driver raises
+already holds the stop's own words in `determined`; the extension's toast
+shows the question and three buttons. The toast's body gains the stop's
+first sentence — what refused, in its own words — so an operator who reads
+nothing else knows whether *Run it again* can succeed. The primary button
+stays the stop's own first choice: with the reason forwarded, a retry after
+an `engine` stop is usually right, and the sample's loop was the dropped
+`reason`, not the button.
+
+**Steps.** (1) `reason` forwarded. (2) No policy for a global declaration;
+no scope on its steps. (3) `Scope:` wins anywhere, `Module:` attributes;
+the template and the README say so. (4) The toast body.
+
+**Tests.** A cross-module plan with a reason declares through the driver
+in one call. A global declaration naming modules writes no policy and its
+first step carries no `scope`. A section with `Module:` first and `Scope:`
+after is global and attributed to the module. The toast's body carries the
+stop's own sentence.
+
+**Releasable.** No: 162 and 163 change what the same developer reads and
+clicks, and the walk in 163 is what proves all three together.
+
+### Session 162 of 163: The files a focused session may reach
+
+Scope: whole repository
+
+**A repository-level `sharedFiles`.** `dabbler.yaml` gains one list at the
+top level beside the per-module ones, merged into every module's list
+where module configuration is read, so the cone, the scope, the policy and
+the exposure gate see one list and none of them learns a second key. A
+notes file, a changelog, a solution plan — the files every module session
+appends to — are declared once. The sample declares
+`docs/notes/dabbler-issues.md` there, and its sessions 4 to 9 run focused
+as planned.
+
+**The page a developer reads before their first focused session.** The
+README's module section says, in one table and a few paragraphs: what a
+focused checkout holds and why; what a session on it may change, root
+build files and the solution file included; `sharedFiles` at both levels
+with the one-line rule for which to use; what the three contract modes
+mean — `package` is the sibling's published package, `designed` is a
+contract folder written by hand, `generated` is a surface derived from the
+sibling's build by the argv it declares — and how a focused session builds
+against a sibling whose package has never been published: it cannot, and
+the two ways on are the session that completes the sibling declaring
+itself releasable to a feed (a folder on disk takes no credential), or
+running global. `modules create --help` says the same of the modes in one
+line each.
+
+**Steps.** (1) The repository-level list, merged at one place. (2) The
+README section and the help text. (3) The sample's `dabbler.yaml` carries
+the entry and its session 4 is driven far enough to append to the notes
+from its focused clone — the reading that proves the mechanism.
+
+**Tests.** A path in the repository-level list is in every module's cone,
+scope and policy. A per-module entry stays that module's alone. The
+contract-mode help names all three.
+
+**Releasable.** No; it ships with 163.
+
+### Session 163 of 163: What the developer sees, and the walk that proves the block
+
+Scope: whole repository
+
+**The extension's own write is named when it refuses.** The declaration's
+clean-tree refusal, when the only change is `.vscode/settings.json`, says
+the file holds the extension's solution settings, names the keys, and
+gives the two ways on: commit it, because it is solution policy; or move
+the choice to this person's defaults with the `configure` command that
+does so and let the file go. `configure` prints, on every write to the
+workspace file, that it wrote committed policy. Nothing commits on the
+operator's behalf.
+
+**A gate that judged nothing gets its own mark.** `renderGateRow` gives an
+inapplicable gate a third mark — a dash where the tick was — beside the
+same `(N/A)`. One renderer still, one more mark, and no closing sentence:
+143's ruling that the explanation belongs to whoever is debugging the gate
+stands; what changes is that nine ticks are no longer eight ticks and a
+non-event.
+
+**A launcher that opens a window says so, before it does.** The row
+already knows its session's kind. The Work Explorer's *Start Session* and
+*Start Unattended Session* keep their titles on a global row and read
+*… in a New Window* on a focused one, by a `when` clause on the same row
+fact; the Solution Explorer's *Start Focused Session* becomes *Start
+Focused Session in a New Window*. Before the clone is made the launcher
+reads the local branch against `origin`: commits not on `origin` are named
+and the clone does not proceed until the operator says push or go without,
+because a clone that silently lacks this morning's work is the defect
+Gemini named. A repository with no `origin` is refused in the stop's shape:
+what refused, who acts, the command.
+
+**The walk, against the built VSIX, in the sample.** Session 3 of
+`csv-parser`, global and attributed to `person`, started from the Work
+Explorer without a flag; session 4, focused, appending to the notes from
+its clone; a stop toast read for its reason; the close's gate rows with a
+suite declared and with none. Whatever the walk finds is fixed here if
+small and raised as owed if not — deferring the walk is what let the pane
+ship broken in 155, and the shim ship broken twice.
+
+**Steps.** (1) The refusal that names the settings file, and `configure`'s
+line. (2) The third mark. (3) The launcher titles, the ahead-of-origin
+check, the no-origin refusal. (4) The walk in the sample, and what it
+finds.
+
+**Tests.** A tree whose only change is `.vscode/settings.json` is refused
+with the two ways on. An inapplicable gate renders neither the pass mark
+nor the fail mark. A focused next-session row's start action carries the
+window title and a global one does not. A branch ahead of `origin` stops
+the launcher and names the count; no `origin` refuses in the stop shape.
+
+**Releasable.** Yes, as a **minor**: a configuration key is added and two
+commands are retitled. The notes name the new `sharedFiles` level, the
+retitled launchers, the `Scope:` line that makes a session global, and that
+2.4.1 already carried the shim.

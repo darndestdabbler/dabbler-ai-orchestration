@@ -1,0 +1,20 @@
+{
+  "note": "Which workflow command stands for each declared suite, and where the two deliberately differ. dabbler.yaml says how this repository's run of record is taken; the workflows under .github/workflows say what a gate proves before a release ships. Those are two doors into the same suites, and until session 154 nothing held them to each other -- so the extension suite's CI door ran unarmed and red for eleven consecutive runs while three sessions closed VERIFIED through the other one. A difference here is legal and carries its reason; a difference that is not written down is refused. packages/router/scripts/check-ci-suites.mjs is what acts on this, and scripts/check-ci-divergence.mjs proves that check against canned inputs.",
+  "suites": [
+    {
+      "suite": "extension",
+      "workflow_command": "npm run test:unit",
+      "reason": "CI runs the package's own npm script, which is the door a person copies out of package.json, while dabbler.yaml names scripts/run-unit.mjs because a work plan's check is argv spawned with no shell and `npm` on Windows is a .cmd shim argv cannot reach. The two are one door in every way that matters: both are mocha started from the package directory, and everything that configures the run -- the compiler hook, the vscode stub, the arming that keeps the suite off this machine's own records -- is .mocharc.json, which mocha finds whoever invoked it. That is session 154's repair; before it, the arming lived in the runner alone and the npm door read the operator's real catalog."
+    },
+    {
+      "suite": "typescript",
+      "workflow_command": "npm run test:unit -w dabbler-ai-router",
+      "reason": "Session 153. Locally this suite runs in a CPU-bounded Podman container, because on this Windows host the cost is not the clock but the keyboard -- 360 seconds of relentless process creation against 17.7 seconds there. CI stays on windows-latest and runs the whole router suite through the package's own door, because windows-latest is what proves the platform the router is operated on, and the container is the local loop's speed rather than a substitute for that evidence. docs/design/suite-runners.md carries the measurement and the reason."
+    },
+    {
+      "suite": "typescript-windows",
+      "workflow_command": "npm run test:unit -w dabbler-ai-router",
+      "reason": "The other half of session 153's split, and the same CI command: the host suite is the tests that prove something about Windows, and CI runs the router suite whole on windows-latest, so they are covered there rather than run as a suite of their own. scripts/suite-membership.json names which tests these are and why each is on the host."
+    }
+  ]
+}

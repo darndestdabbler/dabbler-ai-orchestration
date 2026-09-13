@@ -1,0 +1,179 @@
+// The typecheck and lint controls, over every TypeScript package at once.
+//
+//     node packages/router/scripts/run-ts.mjs \
+//         packages/router/scripts/workspace-check.ts <typecheck|lint>
+//
+// One control per kind is all `facts` admits, and this repository has two
+// TypeScript packages, so one command has to answer for both. It calls the
+// tools by their own entry points rather than through npm: a declared
+// control is run as argv with no shell, and `npm` is a shim script on
+// Windows that argv cannot reach.
+//
+// Every package is checked even after one fails, because a control that
+// stopped at the first red would hide the second.
+
+import { spawnSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO_ROOT = join(PACKAGE_ROOT, "..", "..");
+
+const TSC = join(REPO_ROOT, "node_modules", "typescript", "bin", "tsc");
+const ESLINT = join(REPO_ROOT, "node_modules", "eslint", "bin", "eslint.js");
+
+interface Package {
+  readonly name: string;
+  readonly dir: string;
+  /** What ESLint is pointed at, relative to `dir`. */
+  readonly lintTargets: readonly string[];
+  readonly lintExtensions: string;
+}
+
+const PACKAGES: readonly Package[] = [
+  {
+    name: "packages/router",
+    dir: join(REPO_ROOT, "packages", "router"),
+    lintTargets: ["src", "scripts", "test", "build.mjs"],
+    lintExtensions: ".ts,.mjs",
+  },
+  {
+    name: "tools/dabbler-ai-orchestration",
+    dir: join(REPO_ROOT, "tools", "dabbler-ai-orchestration"),
+    lintTargets: ["src"],
+    lintExtensions: ".ts",
+  },
+];
+
+function run(args: string[], cwd: string): number {
+  const proc = spawnSync(process.execPath, args, { cwd, stdio: "inherit" });
+  if (proc.error) {
+    process.stderr.write(`workspace-check: ${proc.error.message}\n`);
+    return 2;
+  }
+  return proc.status ?? 1;
+}
+
+function typecheck(): number {
+  let worst = 0;
+  for (const pkg of PACKAGES) {
+    const code = run([TSC, "--noEmit", "-p", pkg.dir], REPO_ROOT);
+    if (code !== 0) {
+      process.stderr.write(`workspace-check: tsc failed in ${pkg.name}\n`);
+      worst = Math.max(worst, code);
+    }
+  }
+  return worst;
+}
+
+function lint(): number {
+  let worst = 0;
+  for (const pkg of PACKAGES) {
+    const code = run(
+      [ESLINT, ...pkg.lintTargets, "--ext", pkg.lintExtensions],
+      pkg.dir,
+    );
+    if (code !== 0) {
+      process.stderr.write(`workspace-check: eslint failed in ${pkg.name}\n`);
+      worst = Math.max(worst, code);
+    }
+  }
+  // The module boundary rides in the same control: no import cycle beyond
+  // the frozen baseline (`packages/router/boundary-baseline.json`). A
+  // script rather than a plugin, so the graph rule and its baseline live
+  // in the repository they govern.
+  const boundaries = run(
+    [join(REPO_ROOT, "packages", "router", "scripts", "run-ts.mjs"),
+     join(REPO_ROOT, "packages", "router", "scripts", "check-boundaries.ts")],
+    REPO_ROOT,
+  );
+  if (boundaries !== 0) {
+    process.stderr.write("workspace-check: boundary check failed\n");
+    worst = Math.max(worst, boundaries);
+  }
+  // The selection map rides in the same control: every rule in
+  // dabbler.yaml is held to what the tests it names actually import
+  // (`check-selection-map.ts`), because a map nothing verifies drifts the
+  // moment a file is renamed.
+  const selection = run(
+    [join(REPO_ROOT, "packages", "router", "scripts", "run-ts.mjs"),
+     join(REPO_ROOT, "packages", "router", "scripts", "check-selection-map.ts")],
+    REPO_ROOT,
+  );
+  if (selection !== 0) {
+    process.stderr.write("workspace-check: selection-map check failed\n");
+    worst = Math.max(worst, selection);
+  }
+  // What the suite costs the operator rides here too
+  // (`check-suite-cost.ts`). Two protections that keep `node --test` off
+  // the operator's machine had both lapsed by session 121 -- one deleted
+  // with the runner it was written for, one that widened itself every time
+  // a file was named `walk-*` -- and neither lapse was visible to anything
+  // until somebody measured. A protection with no auditor is a protection
+  // with a date on it.
+  const suiteCost = run(
+    [join(REPO_ROOT, "packages", "router", "scripts", "run-ts.mjs"),
+     join(REPO_ROOT, "packages", "router", "scripts", "check-suite-cost.ts")],
+    REPO_ROOT,
+  );
+  if (suiteCost !== 0) {
+    process.stderr.write("workspace-check: suite-cost check failed\n");
+    worst = Math.max(worst, suiteCost);
+  }
+  // And the pages a stranger reads (`check-shipped-docs.mjs`). The
+  // Marketplace page required Python for a hundred sessions after the
+  // Python was deleted, because prose is the one surface the suite cannot
+  // see: a test asserts on behaviour, and a README that lies still
+  // compiles. It rides here so a stale page fails a session's own facts
+  // rather than waiting for a human to read it.
+  const shippedDocs = run(
+    [join(REPO_ROOT, "packages", "router", "scripts", "check-shipped-docs.mjs")],
+    REPO_ROOT,
+  );
+  if (shippedDocs !== 0) {
+    process.stderr.write("workspace-check: shipped-docs check failed\n");
+    worst = Math.max(worst, shippedDocs);
+  }
+  // And the gates themselves (`check-ci-suites.mjs`). A workflow step is
+  // proved by running and by nothing else, so a gate that never fires
+  // carries whatever it was written with: the candidate gate ran a vitest
+  // retired in session 88 until session 149, and it is the gate that
+  // fast-forwards the trunk. No runner or script a workflow names may be
+  // one this repository does not have.
+  const ciSuites = run(
+    [join(REPO_ROOT, "packages", "router", "scripts", "check-ci-suites.mjs")],
+    REPO_ROOT,
+  );
+  if (ciSuites !== 0) {
+    process.stderr.write("workspace-check: ci-suites check failed\n");
+    worst = Math.max(worst, ciSuites);
+  }
+  // And the three that had no auditor of their own. Session 153 wrote
+  // `check-suite-membership.mjs` and `check-cancelled-guard.mjs` and left
+  // them named in comments: no control declared them, no workflow invoked
+  // them, and both passed by nobody asking. That is the same defect as the
+  // gate this session repaired, one layer down -- a protection nothing runs
+  // is a protection with a date on it -- so the split's manifest, the
+  // cancelled-test guard and the gate-to-suite rule are proved on every
+  // session's own lint run.
+  for (const [what, script] of [
+    ["suite-membership", "check-suite-membership.mjs"],
+    ["cancelled-guard", "check-cancelled-guard.mjs"],
+    ["ci-divergence", "check-ci-divergence.mjs"],
+  ] as const) {
+    const code = run([join(REPO_ROOT, "scripts", script)], REPO_ROOT);
+    if (code !== 0) {
+      process.stderr.write(`workspace-check: ${what} check failed\n`);
+      worst = Math.max(worst, code);
+    }
+  }
+  return worst;
+}
+
+const mode = process.argv[2];
+if (mode === "typecheck") process.exitCode = typecheck();
+else if (mode === "lint") process.exitCode = lint();
+else {
+  process.stderr.write("workspace-check: expected 'typecheck' or 'lint'\n");
+  process.exitCode = 2;
+}

@@ -1,0 +1,281 @@
+# ============================================================
+# AI Router Configuration (v2)
+# ============================================================
+# All model info, roles, thresholds, and behavior in one file.
+# API keys are NEVER stored here — providers name an env var and
+# values resolve through ai_router.secret_resolver at call time.
+# Dollars are not computed anywhere: tokens are recorded, and
+# reconciliation happens against the vendor's own console.
+
+providers:
+  anthropic:
+    display_label: Anthropic
+    enabled: true
+    api_key_env: DABBLER_ANTHROPIC_API_KEY
+    base_url: https://api.anthropic.com/v1/messages
+    api_version: "2023-06-01"
+    rate_limit:
+      requests_per_minute: 50
+      tokens_per_minute: 80000
+    timeout_seconds: 600
+    retry:
+      max_retries: 2
+      backoff_base_seconds: 2
+
+  google:
+    display_label: Google
+    enabled: true
+    api_key_env: DABBLER_GEMINI_API_KEY
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 100000
+    # 900, not 300: a tier-3 model reasoning at high effort over a large
+    # evidence bundle routinely exceeds 300s, and a timeout on a mandatory
+    # verification call is a correctness failure, not a comfort issue.
+    timeout_seconds: 900
+    retry:
+      max_retries: 2
+      backoff_base_seconds: 2
+
+  openai:
+    display_label: OpenAI
+    enabled: true
+    api_key_env: DABBLER_OPENAI_API_KEY
+    base_url: https://api.openai.com/v1
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 100000
+    timeout_seconds: 900
+    retry:
+      max_retries: 2
+      backoff_base_seconds: 2
+
+# Transport for routine dispatch. Resolution precedence: --transport CLI
+# flag > <repo>/.vscode/settings.json "dabbler.transport" > the user-level
+# preferences.json > this value > default "api". DABBLER_TRANSPORT is NOT in
+# that order: a layer that outranked every file and was written by nothing is
+# how a pane came to save a preference the next session ignored. The seat is
+# the default because it is the surface staff receive; the direct-API path
+# stays fully supported and merely stops being what you get by not choosing.
+# A machine without a seat says so in a project-local local-overrides.yaml.
+transport:
+  profile: copilot-cli
+
+# Selection is by role, and one resolver applies it on both transports.
+# A role declares a preference order and, where it needs one, its own
+# vehicle. `prefer` is ORDERING ONLY: a model the order does not name still
+# qualifies and simply sorts after the named ones, which is what keeps a
+# stale list from costing a candidate. Names are model ids as each transport
+# puts them on the wire, so a name that exists on only one path is inert on
+# the other rather than an error.
+#
+# What a person CHOSE is not here. A selection lives in this machine's
+# user-level preferences beside the model catalog, because which model
+# reviews is a fact about who is at this keyboard and what their machine can
+# reach -- one that travelled inside a checkout would tell the next clone
+# about somebody else's seat.
+roles:
+  # The Primary Reviewer: not the author, and the voice whose verdict blocks
+  # a close. A reviewer's job is to be right about whether work ships, which
+  # is the wrong place to economise -- so this order names the models worth
+  # asking first. It is an ORDER and not a permission: nothing is refused for
+  # being absent from it, because which model is fit to review another is a
+  # judgement this framework has no data to make and the developer does.
+  reviewer:
+    prefer: [gpt-5.6-terra, gpt-5.6-sol, gpt-5.4, claude-sonnet-5]
+  # The Auxiliary Reviewer: not the author and not the primary. It is reached
+  # only when the primary's findings are disputed at the cap, and its own
+  # definition is what makes it a third voice rather than a repeat one.
+  auxiliary-reviewer:
+    prefer: [gpt-5.6-terra, gpt-5.6-sol, gpt-5.4, claude-sonnet-5]
+
+# The copilot-cli transport's own settings; inert unless that transport is
+# selected. Which models this seat has is not configured here and never was a
+# property of a repository: it is read from the seat itself, free, into this
+# machine's own ai-model-catalog.json.
+transports:
+  copilot-cli:
+    binary: copilot
+    billed_usage_unavailable: true    # honest non-accounting; seat spend is measured by ai_router.seat_cost
+    max_invocations_per_session: 200  # per-process hard circuit breaker, not a budget
+    # Dispatch ceilings; must satisfy spawn < first_byte < total. total is a
+    # correctness knob: a session-verification evidence bundle is the
+    # largest prompt this system sends and does not fit in 300s.
+    timeouts:
+      spawn_seconds: 10
+      first_byte_seconds: 30
+      total_seconds: 1200
+
+# Model discovery. The direct-API path reads each vendor's models endpoint;
+# the seat states its own list in the reply to opening a conversation. Both
+# are free — a metadata request and a protocol reply, neither billing a token
+# — which is why max_age_hours is a freshness preference and not a budget
+# control, and why it never blocks anything.
+#
+# Where the reading is KEPT is not configurable and is not in any repository:
+# one ai-model-catalog.json per machine, under that platform's own per-user
+# data directory. A catalog is a reading of this machine's seat and this
+# machine's keys, and a copy of it that travels in a package tells every
+# other machine about somebody else's.
+discovery:
+  key_set_id: default
+  max_age_hours: 24
+
+# --- Per-provider dispatch defaults ---
+# What a direct-API dispatch needs to know that the catalog does not state:
+# how much output to ask for, how big a prompt may get, which system prompt to
+# send, and the provider's own generation knobs. There are NO MODEL NAMES in
+# this block, and that is the whole point of it -- a block with no model names
+# in it cannot go stale the week a vendor ships a model nobody has added here.
+#
+# The numbers are this framework's budgets rather than any model's ceiling:
+# every model these providers serve accepts far more output than is asked for
+# here, and `max_context_tokens` is the SMALLEST window that provider serves,
+# because the only thing it does is refuse a prompt early.
+#
+# The seat reads none of this: `route.ts` returns `{}` for both model config
+# and generation params on that transport, because the CLI exposes no knobs.
+provider_defaults:
+  anthropic:
+    max_context_tokens: 200000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    generation_params:
+      effort: medium
+      thinking:
+        enabled: true
+        type: adaptive
+  openai:
+    max_context_tokens: 272000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    generation_params:
+      reasoning_effort: high
+  google:
+    max_context_tokens: 1048576
+    max_output_tokens: 65536
+    system_prompt_file: prompt-templates/system-prompts.md
+    generation_params:
+      thinking_budget: -1
+
+# Per task type, the generation knobs that task wants, keyed by PROVIDER --
+# the same re-keying as provider_defaults and for the same reason. These were
+# always provider-shaped rather than model-shaped: `effort` and `thinking` are
+# Anthropic's vocabulary, `reasoning_effort` is OpenAI's and `thinking_budget`
+# is Google's, and every entry for one provider said very nearly the same
+# thing. Where two models of one provider disagreed, the value that is valid
+# for EVERY model that provider serves wins -- Google's 0 became 128, because
+# Pro rejects 0 ("only works in thinking mode") and 128 is its minimum.
+task_type_params:
+  formatting:
+    anthropic: {effort: low, thinking: {enabled: false}}
+    google: {thinking_budget: 128}
+    openai: {reasoning_effort: none}
+  summarization:
+    anthropic: {effort: low, thinking: {enabled: false}}
+    google: {thinking_budget: 128}
+    openai: {reasoning_effort: low}
+  documentation:
+    anthropic: {effort: low, thinking: {enabled: false}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: low}
+  session-close-out:
+    anthropic: {effort: low, thinking: {enabled: false}}
+    google: {thinking_budget: 128}
+    openai: {reasoning_effort: none}
+  test-generation:
+    anthropic: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: medium}
+  code-review:
+    anthropic: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: medium}
+  analysis:
+    anthropic: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: medium}
+  refactoring:
+    anthropic: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: medium}
+  session-verification:
+    anthropic: {effort: high, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: high}
+  security-review:
+    anthropic: {effort: high, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: high}
+  architecture:
+    anthropic: {effort: max, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: xhigh}
+  planning:
+    anthropic: {effort: high, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: high}
+  verification:
+    anthropic: {effort: high, thinking: {enabled: true, type: adaptive}}
+    google: {thinking_budget: -1}
+    openai: {reasoning_effort: high}
+
+escalation:
+  enabled: true
+  # A retry walks down the role's ordered candidate list; this is how far.
+  max_escalations: 2
+  triggers:
+    empty_response: true
+    max_tokens_hit: true
+    min_output_tokens: 30
+    refusal_detection: true
+  refusal_phrases:
+    - "i can't help with"
+    - "i'm unable to"
+    - "i cannot assist"
+    - "beyond my capabilities"
+    - "i don't have enough context"
+
+# Cross-provider verification. Session 2 wires the loop; the settings here
+# are read by the verifier selection and prompt template resolution.
+verification:
+  enabled: true
+  auto_verify_task_types:
+    - code-review
+    - security-review
+    - architecture
+    - documentation
+  settings:
+    # The session-verification loop suspends at this bound. The closed
+    # severity vocabulary is the primary control; the cap is the backstop.
+    max_rounds: 3
+    # The tests phase runs the authored tests at most this many times before
+    # its loop terminates. Separate from max_rounds because a test round
+    # runs a suite the framework already has, where a review round buys a
+    # vendor's opinion.
+    max_test_rounds: 7
+    on_disagreement: merge     # merge | flag | re-route
+    on_disagreement_by_task_type:
+      code-review: merge
+      security-review: merge
+      test-generation: merge
+      documentation: merge
+      analysis: flag
+      planning: flag
+      architecture: flag
+      refactoring: flag
+    tiebreaker_model: opus
+    prompt_template_file: prompt-templates/verification.md
+    # Whether a verifier on the direct-API path may ask for a file. It holds
+    # no tools there, so it asks by naming paths in its answer; the framework
+    # opens them, confined to the round's scope and counted against
+    # read_budget, and sends ONE further turn carrying their bytes. The
+    # answer to that turn is the verdict, so the cost ceiling is twice the
+    # payload. Off by default: it doubles what a round can cost, and what it
+    # buys is measured by running with it on rather than asserted here.
+    api_file_requests: false
+
+metrics:
+  enabled: true
+  log_filename: router-metrics.jsonl

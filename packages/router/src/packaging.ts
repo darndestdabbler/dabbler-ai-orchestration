@@ -14,7 +14,8 @@
 // reading it wants.
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 
@@ -216,6 +217,13 @@ export interface PackagingRun {
    * releasability alone told a check nothing it could use.
    */
   readonly declared: boolean;
+  /**
+   * What this attempt did beside its commands, one line each -- a folder
+   * feed made because it was declared and not there. Never serialised: the
+   * record is the commands and their outcome, and a line for a reader
+   * beside them is not a fact the ledger answers for.
+   */
+  readonly notes: readonly string[];
 }
 
 export function runIsPublished(run: PackagingRun): boolean {
@@ -402,6 +410,24 @@ export function feedAsPushed(root: string, feed: string): string {
   if (/^file:\/\//i.test(value) || /^[A-Za-z]:/.test(value)) return feed;
   if (value.startsWith("\\\\") || value.startsWith("/")) return feed;
   return resolve(root, value);
+}
+
+/**
+ * A folder feed that is declared and not there is made, by whichever act
+ * first needs it: the push, and the candidate's pack, whose restore reads
+ * the feed as a package source and fails (NU1301) on a folder that does
+ * not exist. The sample's engine made the folder by hand before declaring
+ * its plan, because no step can name a path outside the tree. A feed with
+ * a host is untouched, and so is a folder that exists. Returns the one
+ * line that says what was made, or null.
+ */
+export function ensureFolderFeed(root: string, feed: string): string | null {
+  const value = feed.trim();
+  if (feedTakesCredential(value)) return null;
+  const path = /^file:\/\//i.test(value) ? fileURLToPath(value) : feedAsPushed(root, value);
+  if (existsSync(path)) return null;
+  mkdirSync(path, { recursive: true });
+  return `created the folder feed ${path}`;
 }
 
 /** The `packaging` block under `modules.<slug>`, or null when the slug has none. */
@@ -941,6 +967,7 @@ function refusal(
     recordedAt: nowIso(),
     ready: false,
     declared: false,
+    notes: [],
   };
 }
 
@@ -1314,6 +1341,7 @@ function execute(
   const outputDir = prepareOutputDir(root, sessionNumber);
   const push = declaration.push;
   const steps: StepRun[] = [];
+  const notes: string[] = [];
 
   const outcome = (
     name: string,
@@ -1338,6 +1366,7 @@ function execute(
     recordedAt: nowIso(),
     ready: false,
     declared: true,
+    notes: [...notes],
   });
 
   /**
@@ -1398,6 +1427,8 @@ function execute(
   }
 
   const pushCwd = push.cwd ? join(root, push.cwd) : root;
+  const made = ensureFolderFeed(root, push.feed);
+  if (made !== null) notes.push(made);
   for (const artifact of artifacts) {
     const common = {
       [PLACEHOLDER_ARTIFACT]: join(outputDir, artifact),

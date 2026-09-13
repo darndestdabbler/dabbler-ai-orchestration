@@ -26,7 +26,7 @@ import { LandError, bundleRecord, writeBundleRecord } from "../land.ts";
 import { ManifestError, type ModuleEntry, deployablesOf, moduleConfigs, solutionShape } from "../modules.ts";
 import { readSessionState } from "../progress.ts";
 import { PackagesError, packModule, readRecords } from "../packages.ts";
-import { PackagingConfigError } from "../packaging.ts";
+import { PackagingConfigError, ensureFolderFeed, loadDeclaration } from "../packaging.ts";
 import { sessionIsReleasable } from "../writers.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -248,6 +248,12 @@ function candidateSubcommand(rest: readonly string[]): number {
           writeOut(`kept ${bundle.notesPath}; a ${bundle.mode} contract has no surface page\n`);
         }
       }
+      // A declared folder feed the pack's restore will read as a package
+      // source is made before the pack, where it is declared and not there;
+      // a tag release and an undeclared module have no feed to make.
+      const declared = loadDeclaration(config, slug);
+      const feedMade = declared === null ? null : ensureFolderFeed(workspaceRoot, declared.push.feed);
+      if (feedMade !== null) writeOut(`${feedMade}\n`);
       const packed = packModule(workspaceRoot, shape, slug, { session, config });
       writeOut(`packed ${packed.slug} ${packed.version}\n`);
       for (const artifact of packed.artifacts) {

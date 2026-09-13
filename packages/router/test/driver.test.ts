@@ -672,6 +672,14 @@ describe("a stop, as a person reads it", () => {
     assert.match(renderStop(engineStop, pull).next, /^Next: the engine/);
     assert.equal(renderStop(operatorStop, pull).actor, "operator");
     assert.equal(renderStop(operatorStop, pull).next, "Next: you.");
+    // A tree that carried work when the declaration was made is the tree's
+    // stop: a person commits or reverts, and the pause says so rather than
+    // "the engine could not be run".
+    const treeStop = { kind: "tree", reason: "the declaration was refused: session 7 cannot declare its task list now" };
+    const tree = renderStop(treeStop, pull);
+    assert.equal(tree.actor, "operator");
+    assert.match(tree.happened, /The working tree carried changes the declaration would not accept\./);
+    assert.doesNotMatch(tree.happened, /The engine could not be run/);
     // Under the pull the framework cannot see the engine, so "either" is
     // the honest answer; under the push nothing calls back but a person,
     // and saying otherwise leaves them waiting on a loop that is not running.

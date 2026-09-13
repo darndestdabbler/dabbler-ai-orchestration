@@ -177,6 +177,16 @@ describe("the module form", () => {
       () => renderModuleContract(yamlAlone.root, yamlAlone.shape, "persister"),
       /no notes page at modules\/persister\/contract\/README\.md.*not one/,
     );
+    // A package module's refusal names what writes the page, never the
+    // seam scaffold that refuses `contract: package`.
+    const packaged = solution("package", false);
+    assert.throws(
+      () => renderModuleContract(packaged.root, packaged.shape, "persister"),
+      (error: unknown) =>
+        error instanceof Error &&
+        /no notes page at modules\/persister\/contract\/README\.md; `dabbler modules create` writes it/.test(error.message) &&
+        !/module contract/.test(error.message),
+    );
   });
 
   it("marks a generated surface as shape rather than behaviour, and refuses without a generator", () => {

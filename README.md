@@ -139,8 +139,11 @@ and pins it where the ecosystem keeps pins: for .NET, a root
 puts the whole solution under central package management — so every
 `PackageReference` takes its version from a `PackageVersion` entry there,
 in a group of your own beside the framework's `Modules` group, and not
-from a `Version` attribute. For Maven it is the root `pom.xml`'s
-`dependencyManagement`. A module with `contract: package` also needs its
+from a `Version` attribute. A solution with a package-contract module
+manages package versions centrally from its first project: `dabbler
+modules create` writes the file before any project exists, so no project
+is ever built under the old rule and then moved. For Maven it is the root
+`pom.xml`'s `dependencyManagement`. A module with `contract: package` also needs its
 notes page, `modules/<slug>/contract/README.md`, before its first
 candidate: the page is what a sibling's session reads instead of the code.
 

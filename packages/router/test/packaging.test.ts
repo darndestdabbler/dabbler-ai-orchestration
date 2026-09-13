@@ -23,6 +23,7 @@ import {
   OUTCOME_PUBLISHED,
   OUTCOME_REFUSED,
   PackagingConfigError,
+  ensureFolderFeed,
   feedAsPushed,
   feedTakesCredential,
   loadDeclaration,
@@ -556,6 +557,28 @@ describe("the publication", () => {
     );
     // The tree that was verified stays the tree that was verified.
     assert.equal(run.treeDigest, snapshotWorktreeTree(repo));
+  });
+
+  it("makes a declared folder feed that is not there before the push, and touches a feed with a host not at all", () => {
+    // The sample's engine ran mkdir on the feed by hand before declaring
+    // its plan: NuGet fails restore on a package source that is a missing
+    // folder, and no step can name a path outside the tree.
+    const { repo, sessionsDir, pushLog } = publishable();
+    const folder = join(repo, "..", `feed-${Date.now()}`);
+    const config = packagingConfig(pushLog);
+    const push = half(config, "push");
+    push["feed"] = folder;
+    delete push["secret"];
+    push["argv"] = (push["argv"] as string[]).filter((token) => token !== "{secret}");
+    assert.equal(existsSync(folder), false);
+    const run = packageSession(sessionsDir, { config });
+    assert.equal(run.outcome, OUTCOME_PUBLISHED, String(run.refusal));
+    assert.ok(existsSync(folder), "the folder feed was made");
+    assert.deepEqual(run.notes, [`created the folder feed ${folder}`]);
+    // Made before the push, so the push found it there.
+    assert.equal(pushes(pushLog)[0]?.argv[1], folder);
+    assert.equal(ensureFolderFeed(repo, folder), null);
+    assert.equal(ensureFolderFeed(repo, FEED), null);
   });
 
   it("does not publish a stale artifact from a previous run", () => {

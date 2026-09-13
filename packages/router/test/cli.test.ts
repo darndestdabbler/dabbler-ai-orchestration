@@ -32,7 +32,7 @@ import { CREDENTIALS_FILENAME, setCredentialsPath, storeKind } from "../src/cred
 import { writePreferences } from "../src/preferences.ts";
 import { readRawSessionState } from "../src/progress.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
-import { makeAnsweredSandbox, tempDir } from "./support/answers.ts";
+import { makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
 
 /** A two-module manifest: a library an application depends on, no package of its own. */
 const APPLICATION_MANIFEST = [
@@ -74,6 +74,10 @@ const DOTNET_MANIFEST = [
   "    dependsOn: [model]",
   "",
 ].join("\n");
+
+/** The pin file as `modules create` writes it with the first package module. */
+const CPM_PROPS =
+  "<Project>\n  <PropertyGroup>\n    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>\n  </PropertyGroup>\n</Project>\n";
 
 const MAVEN_PARENT_POM = [
   "<project>",
@@ -469,6 +473,23 @@ describe("dabbler modules", () => {
     // operations a multi-module solution exists for used to refuse what
     // those four answers produced, and the walk met both in its first
     // twenty minutes.
+    // A package module's notes page is written with the module: the
+    // candidate refuses without it, and the command that refusal used to
+    // name could not write it. An existing page is left alone.
+    const born = tempDir("cli-notes-");
+    seed(born, { "modules/kept/contract/README.md": "# mine\n" });
+    const kept = await run(() =>
+      modulesVerb(["create", born, "--slug", "kept", "--title", "Kept", "--contract", "package"]),
+    );
+    assert.equal(kept.code, 0, kept.err);
+    assert.equal(readFileSync(join(born, "modules/kept/contract/README.md"), "utf8"), "# mine\n");
+    const made = await run(() =>
+      modulesVerb(["create", born, "--slug", "person", "--title", "Person", "--contract", "package"]),
+    );
+    assert.equal(made.code, 0, made.err);
+    assert.match(made.out, /wrote modules\/person\/contract\/README\.md/);
+    assert.match(readFileSync(join(born, "modules/person/contract/README.md"), "utf8"), /^# \S+ — what it promises/);
+
     const root = tempDir("cli-");
     for (const [slug, title] of [["model", "Model"], ["reports", "Reports"]]) {
       const made = await run(() =>
@@ -630,6 +651,9 @@ describe("dabbler module", () => {
   it("names Directory.Packages.props for a .NET module, and records that", async () => {
     const { repo, sessionsDir } = makeAnsweredSandbox({
       "docs/modules.yaml": DOTNET_MANIFEST,
+      // Born with the package module, as `modules create` writes it; the
+      // pin writer pins into it and never creates it.
+      "Directory.Packages.props": CPM_PROPS,
       "modules/model/JsonModel/JsonModel.csproj": '<Project Sdk="Microsoft.NET.Sdk" />\n',
       "modules/model/contract/README.md": "# JsonModel\n",
       "modules/app/App/App.csproj": '<Project Sdk="Microsoft.NET.Sdk" />\n',
@@ -657,6 +681,7 @@ describe("dabbler module", () => {
     );
     const { repo, sessionsDir } = makeAnsweredSandbox({
       "docs/modules.yaml": manifest,
+      "Directory.Packages.props": CPM_PROPS,
       "modules/model/JsonModel/JsonModel.csproj": '<Project Sdk="Microsoft.NET.Sdk" />\n',
       "modules/model/contract/README.md": "# JsonModel\n",
       "modules/store/contract/README.md": "# JsonStore\n",

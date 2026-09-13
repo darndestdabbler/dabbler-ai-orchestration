@@ -357,9 +357,17 @@ export function renderModuleContract(
   // page between markers -- the author's prose stays, the block is
   // regenerated.
   if (!existsSync(join(root, notesPath))) {
+    // The way on is the one that works for this mode: `module contract`
+    // scaffolds the designed seam and refuses every other mode, so naming it
+    // for a package module sent the sample to a command that could not do
+    // what it was named for.
+    const wayOn =
+      mode === "designed"
+        ? `write it, or scaffold it with \`dabbler module contract ${slug}\``
+        : "`dabbler modules create` writes it for a package module; for one created " +
+          "before this version, write it by hand at that path";
     throw new ContractError(
-      `module '${slug}' declares contract: ${mode} and has no notes page at ${notesPath}; ` +
-        `write it, or scaffold it with \`dabbler module contract ${slug}\`` +
+      `module '${slug}' declares contract: ${mode} and has no notes page at ${notesPath}; ${wayOn}` +
         (existsSync(yamlPath) ? " (a contract.yaml beside it is rendered into the page, and is not one)" : ""),
     );
   }

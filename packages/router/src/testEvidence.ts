@@ -883,8 +883,9 @@ export function evaluateFreshness(
   sessionsDir: string,
   filesChanged: readonly string[] | null,
   suites: readonly SuiteSpec[],
-  options: { repoRoot?: string | null } = {},
+  options: { repoRoot?: string | null; driven?: boolean } = {},
 ): FreshnessVerdict[] {
+  const driven = options.driven === true;
   const root = options.repoRoot ?? repoRootFor(sessionsDir);
   const sessionsRel = root ? sessionsRelFor(root, sessionsDir) : null;
   const affected =
@@ -926,6 +927,7 @@ export function evaluateFreshness(
         current,
         records,
         currentTree: () => treeDigest(root, { sessionsDir }),
+        driven,
       }),
     );
   }
@@ -942,6 +944,15 @@ export interface FreshnessFacts {
   readonly records: readonly TestRunRecord[];
   /** The whole tree's digest now, read on demand; null when unmeasurable. */
   readonly currentTree: () => string | null;
+  /**
+   * A driven session is in flight: the framework runs the suite itself
+   * after verification, so the row says what it measured and nothing about
+   * how to satisfy it. Advice to run the suite and record `--outcome
+   * passed`, read by an engine mid-session, is an invitation to record a
+   * claim. Outside a session the advice stands, because a person driving by
+   * hand is who it was written for.
+   */
+  readonly driven: boolean;
 }
 
 /**
@@ -982,20 +993,25 @@ export function freshnessVerdict(suite: SuiteSpec, facts: FreshnessFacts): Fresh
     }
     return verdict(
       false,
-      `${preamble}; run \`${suite.command}\` after your last code change, ` +
-        `then \`dabbler test-evidence record --sessions-dir ` +
-        `<dir> --suite ${suite.name} --stage ${STAGE_FINAL_FULL} ` +
-        `--outcome passed --duration-seconds <elapsed>\``,
+      facts.driven
+        ? preamble
+        : `${preamble}; run \`${suite.command}\` after your last code change, ` +
+            `then \`dabbler test-evidence record --sessions-dir ` +
+            `<dir> --suite ${suite.name} --stage ${STAGE_FINAL_FULL} ` +
+            `--outcome passed --duration-seconds <elapsed>\``,
     );
   }
   const latest = mine[mine.length - 1] as TestRunRecord;
   if (latest.surfaceDigest !== current) {
+    const measured =
+      `the ${suite.name} run of record (recorded ` +
+      `${latest.recordedAt || "at an unknown time"}) PREDATES a change to ` +
+      "the surfaces it covers";
     return verdict(
       false,
-      `the ${suite.name} run of record (recorded ` +
-        `${latest.recordedAt || "at an unknown time"}) PREDATES a change to ` +
-        `the surfaces it covers; re-run \`${suite.command}\` after your last ` +
-        "code change and record it again",
+      facts.driven
+        ? measured
+        : `${measured}; re-run \`${suite.command}\` after your last code change and record it again`,
     );
   }
   if (latest.outcome !== OUTCOME_PASSED) {
@@ -1007,12 +1023,13 @@ export function freshnessVerdict(suite: SuiteSpec, facts: FreshnessFacts): Fresh
   }
   const currentTree = latest.treeDigest ? facts.currentTree() : null;
   if (latest.treeDigest && currentTree && latest.treeDigest !== currentTree) {
+    const moved =
+      `the ${suite.name} run of record is green but the tree moved under ` +
+      "it: a final-full run binds to the tree it ran against, and this one " +
+      "does not match";
     return verdict(
       false,
-      `the ${suite.name} run of record is green but the tree moved under ` +
-        "it: a final-full run binds to the tree it ran against, and this one " +
-        `does not match. Re-run \`${suite.command}\` against the final tree ` +
-        "and record it again",
+      facts.driven ? moved : `${moved}. Re-run \`${suite.command}\` against the final tree and record it again`,
     );
   }
   return verdict(true, `fresh, green, recorded ${latest.recordedAt}`);

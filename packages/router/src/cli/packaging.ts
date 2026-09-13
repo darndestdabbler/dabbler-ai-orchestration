@@ -161,6 +161,7 @@ function render(run: PackagingRun): string {
   const width = Math.max(0, ...run.gates.map((gate) => gate.name.length));
   for (const gate of run.gates) lines.push(`  ${renderGateRow(gate, width)}`);
   if (run.refusal) lines.push(`  ${run.refusal}`);
+  for (const note of run.notes) lines.push(`  ${note}`);
   for (const step of run.steps) {
     const code = step.timedOut ? "timed out" : `exit ${step.exitCode}`;
     lines.push(`  ${step.step}: ${code} — ${step.command}`);

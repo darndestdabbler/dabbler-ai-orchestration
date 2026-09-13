@@ -492,7 +492,7 @@ under `max_invocations` (`driver.max_invocations` in `dabbler.yaml`, default
 24; `--max-invocations` overrides); reaching it stops the loop and closes
 nothing. `stop` is null while the loop runs and after it completed, and
 otherwise `{kind, reason, at}` with `kind` one of `budget` \|
-`rejected-thrice` \| `blocked` \| `engine` \| `tests` \| `verification` \|
+`rejected-thrice` \| `blocked` \| `engine` \| `tree` \| `tests` \| `verification` \|
 `land` \| `close` \| `interrupted` — the one field written for a person, and a re-run
 clears it. `engine` names the adapter — `claude-code`, `copilot` or `codex`
 for the built-in command, `command:<program>` for `--engine-argv` — and a

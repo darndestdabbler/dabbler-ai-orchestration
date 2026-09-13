@@ -10,6 +10,7 @@
 
 import { nowIso } from "../journal.ts";
 import { loadConfig } from "../config.ts";
+import { readRun } from "../driver.ts";
 import { SessionsRootNotFoundError, repoRootFor, resolveSessionsDir } from "../evidence.ts";
 import { loadSelectionConfig, selectTests, spawnCommand, targetedCommand } from "../checks.ts";
 import {
@@ -575,10 +576,18 @@ export async function testEvidenceVerb(argv: string[]): Promise<number> {
     // Written, then refused: the wasted run is the evidence, and a refusal
     // that suppressed its own record would hide the ceremony it exists to
     // price.
-    const remedy = sanctioned
-      ? preverifyRecipe(sessionsDir, suite.name, sanctioned)
-      : "Nothing needed to run here; record nothing and go straight to " +
-        "verification.";
+    // Inside a driven session the framework runs the tests itself: a recipe
+    // telling the reader to run the suite and record `--outcome passed` is
+    // an invitation to record a claim, so the sentence says whose the run
+    // is and nothing more.
+    const root = repoRootFor(sessionsDir);
+    const driven = root !== null && record.sessionNumber !== null && readRun(root, record.sessionNumber) !== null;
+    const remedy = driven
+      ? "The run of record is the framework's: it runs after verification, and nothing is recorded by hand."
+      : sanctioned
+        ? preverifyRecipe(sessionsDir, suite.name, sanctioned)
+        : "Nothing needed to run here; record nothing and go straight to " +
+          "verification.";
     writeErr(
       `test_evidence: recorded and REFUSED as ${POLICY_VIOLATION} -- ` +
         `${record.policyReason}\n${remedy}\n`,

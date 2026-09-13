@@ -284,22 +284,37 @@ export function ecosystemNamed(key: EcosystemKey): Ecosystem {
  * by whichever verb first finds the solution in that shape: `modules
  * create` as the second entry lands, `module contract` and `module pack`
  * as they touch a module. The ecosystem is the first module's whose roots
- * hold a project file; a solution whose modules are still empty folders
- * gets nothing yet and is told so, and a single-module solution gets
- * nothing ever.
+ * hold a project file. Before any project exists, a module declaring
+ * `contract: package` under a .NET-shaped package id makes the solution
+ * .NET -- even while it is the manifest's only module, because a module
+ * that declares its contract is the package has declared the siblings that
+ * will consume it: central package management is born with the first
+ * package module, because a solution that turns it on after its projects
+ * carry versioned references breaks every one of them at restore (NU1008),
+ * and migrating them afterwards is repair machinery. A Maven solution keeps
+ * waiting for its first pom, because the parent POM lists the projects. A
+ * multi-module solution whose modules are empty folders and declare no
+ * package gets nothing yet and is told so; a single-module solution that
+ * declares no package gets nothing ever.
  */
 export function ensureRootFiles(root: string, shape: SolutionShape): ScaffoldResult | null {
-  if (!shape.multi) return null;
-  for (const entry of shape.modules) {
-    let ecosystem: Ecosystem;
-    try {
-      ecosystem = ecosystemOf(root, entry);
-    } catch (error) {
-      if (error instanceof EcosystemError) continue;
-      throw error;
+  if (shape.multi) {
+    for (const entry of shape.modules) {
+      let ecosystem: Ecosystem;
+      try {
+        ecosystem = ecosystemOf(root, entry);
+      } catch (error) {
+        if (error instanceof EcosystemError) continue;
+        throw error;
+      }
+      return ecosystem.rootFiles(root, shape);
     }
-    return ecosystem.rootFiles(root, shape);
   }
+  const packaged = shape.modules.find(
+    (entry) => entry.contract === "package" && entry.package !== null && !MAVEN_PACKAGE_ID.test(entry.package),
+  );
+  if (packaged !== undefined) return DOTNET.rootFiles(root, shape);
+  if (!shape.multi) return null;
   return {
     written: [],
     skipped: [],
@@ -358,10 +373,22 @@ const DOTNET: Ecosystem = {
   },
   writeCentralPin(root: string, packageId: string, version: string): string {
     const path = join(root, "Directory.Packages.props");
-    const props = existsSync(path)
-      ? readFileSync(path, "utf8")
-      : "<Project>\n  <PropertyGroup>\n    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>\n  </PropertyGroup>\n</Project>\n";
-    writeFileSync(path, pinPackageVersion(props, packageId, version), "utf8");
+    // Pins into the file and never creates it: a file created here turned
+    // central package management on for a solution whose projects already
+    // carried versioned references, and the run of record failed at restore
+    // on every one of them. The file is born with the first package module.
+    if (!existsSync(path)) {
+      throw new EcosystemError(
+        "no Directory.Packages.props to pin in: `dabbler modules create` writes it, with " +
+          "central package management on, when the first package-contract module is " +
+          "declared and before any project exists. A repository whose modules were created " +
+          "before this version adds the file once by hand -- a <Project> whose PropertyGroup " +
+          "holds <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>, and a " +
+          "<PackageVersion> for every <PackageReference> that carries a Version -- and every " +
+          "pin after that goes into it",
+      );
+    }
+    writeFileSync(path, pinPackageVersion(readFileSync(path, "utf8"), packageId, version), "utf8");
     return "Directory.Packages.props";
   },
   packageReferences(root: string, projectFile: string): PackageReferenceFact[] {
@@ -1131,13 +1158,19 @@ function scaffoldDotnet(root: string, entry: ModuleEntry, against: ModuleEntry |
   return result;
 }
 
-/** The notes page of a module's contract, the same in every ecosystem. */
-function contractNotesPage(slug: string, packageId: string): string {
+/**
+ * The notes page of a module's contract, the same in every ecosystem. The
+ * designed seam writes it as it scaffolds; `modules create` writes it for a
+ * package module, whose contract is the package and needs no seam.
+ */
+export function contractNotesPage(slug: string, packageId: string): string {
   return [
     `# ${packageId} — what it promises`,
     "",
     `The notes page of ${slug}'s contract: everything a signature cannot carry. A`,
-    `consumer reads this and \`${fileStem(packageId)}.api.md\` beside it, never the implementation.`,
+    "consumer reads this, and the surface page beside it where the contract has one",
+    `(\`${fileStem(packageId)}.api.md\`, for a designed or generated seam; a package contract is its own surface),`,
+    "never the implementation.",
     "",
     "## Must be true going in",
     "",
@@ -1257,8 +1290,11 @@ export function readCSharpSurface(root: string, file: string): SurfaceEntry[] {
 // tracked file. A Maven package id is `groupId:artifactId`.
 
 /** The two halves of a Maven package id, or the refusal by name. */
+/** A Maven package id is `groupId:artifactId`; a .NET id carries no colon. */
+const MAVEN_PACKAGE_ID = /^([^:\s]+):([^:\s]+)$/;
+
 export function mavenCoordinates(packageId: string): { groupId: string; artifactId: string } {
-  const match = /^([^:\s]+):([^:\s]+)$/.exec(packageId);
+  const match = MAVEN_PACKAGE_ID.exec(packageId);
   if (match === null) {
     throw new EcosystemError(
       `'${packageId}' is not a Maven package id: a Maven module's package is groupId:artifactId ` +

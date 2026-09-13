@@ -9,11 +9,12 @@
 // delete and reorganization stay manual edits to the manifest.
 
 import { ensureRootFilesWithSuite } from "../bootstrap/detect.ts";
-import { EcosystemError } from "../ecosystem.ts";
+import { EcosystemError, contractNotesPage } from "../ecosystem.ts";
 import { EXIT_OK as CREATED, create, show, solutionShape } from "../modules.ts";
 import { tryWriteProjection } from "../projection.ts";
 import { writeErr, writeOut } from "./output.ts";
-import { statSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 const EXIT_OK = 0;
 const EXIT_USAGE = 2;
@@ -202,14 +203,29 @@ export async function modulesVerb(argv: string[]): Promise<number> {
     // The second entry is what makes the solution multi-module, and the
     // root build files appear with it -- the committed feed, the central
     // pins, the build properties and targets -- where absent.
+    const shape = solutionShape(workspaceRoot);
     try {
-      const files = ensureRootFilesWithSuite(workspaceRoot, solutionShape(workspaceRoot));
+      const files = ensureRootFilesWithSuite(workspaceRoot, shape);
       for (const path of files?.written ?? []) writeOut(`wrote ${path}\n`);
       for (const path of files?.changed ?? []) writeOut(`updated ${path}\n`);
       for (const note of files?.notes ?? []) writeOut(`note: ${note}\n`);
     } catch (error) {
       if (!(error instanceof EcosystemError)) throw error;
       writeErr(`modules create: the root build files were not written -- ${error.message}\n`);
+    }
+    // A package module's contract is the package, and the notes page is
+    // the whole of what a sibling reads beside it; the candidate refuses
+    // without one. Written here, where the module is declared, so nothing
+    // between this and the first run of record has to know to write it.
+    const entry = shape.modules.find((module) => module.slug === single.get("--slug"));
+    if (entry !== undefined && entry.contract === "package") {
+      const rel = `modules/${entry.slug}/contract/README.md`;
+      const page = join(workspaceRoot, rel);
+      if (!existsSync(page)) {
+        mkdirSync(dirname(page), { recursive: true });
+        writeFileSync(page, contractNotesPage(entry.slug, entry.package ?? entry.slug), "utf8");
+        writeOut(`wrote ${rel}\n`);
+      }
     }
   }
   return code;

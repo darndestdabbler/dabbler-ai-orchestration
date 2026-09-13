@@ -245,8 +245,27 @@ function record(overrides: Partial<TestRunRecord>): TestRunRecord {
 }
 
 describe("judging a suite's freshness", () => {
-  const facts = (records: TestRunRecord[], current: string | null = "d1", tree = "t1"): Parameters<typeof freshnessVerdict>[1] => ({
-    changed: ["src/a.ts"], current, records, currentTree: () => tree,
+  const facts = (records: TestRunRecord[], current: string | null = "d1", tree = "t1", driven = false): Parameters<typeof freshnessVerdict>[1] => ({
+    changed: ["src/a.ts"], current, records, currentTree: () => tree, driven,
+  });
+
+  it("says what it measured and nothing about how to satisfy it while a driven session is in flight", () => {
+    // The sample's engine read the gate's advice mid-session -- run the
+    // suite, then record `--outcome passed` -- as an invitation the framework
+    // itself would honour a phase later. The row still fails; only the
+    // by-hand recipe is gone, in each of its three shapes.
+    const none = freshnessVerdict(UNIT, facts([], "d1", "t1", true));
+    assert.equal(none.passed, false);
+    assert.match(none.reason, /no final-full run of record exists$/);
+    const stale = freshnessVerdict(UNIT, facts([record({ surfaceDigest: "d0" })], "d1", "t1", true));
+    assert.equal(stale.passed, false);
+    assert.match(stale.reason, /PREDATES a change to the surfaces it covers$/);
+    const moved = freshnessVerdict(UNIT, facts([record({ treeDigest: "t0" })], "d1", "t1", true));
+    assert.equal(moved.passed, false);
+    assert.match(moved.reason, /does not match$/);
+    for (const verdict of [none, stale, moved]) {
+      assert.doesNotMatch(verdict.reason, /test-evidence record|re-run|Re-run/i);
+    }
   });
 
   it("fails closed when the surfaces could not be digested", () => {

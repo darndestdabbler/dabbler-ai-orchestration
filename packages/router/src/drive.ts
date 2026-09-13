@@ -175,6 +175,7 @@ import {
   start,
   acquireLockWithTimeout,
   releaseLock,
+  type DeclareRefusalCause,
 } from "./session.ts";
 import {
   STAGE_FINAL_FULL,
@@ -317,17 +318,26 @@ export function nextLeaseEpoch(existing: number | null | undefined): number {
  *
  * The ledger's own bookkeeping is not a step's work: it is written by the
  * lifecycle on the way past, and counting it would make every step's report
- * omit a file it never touched. Canonical on both sides, because git answers
- * with its own spelling of the root while the sessions directory is whatever
- * the caller was handed.
+ * omit a file it never touched. Neither is what the candidate job packed:
+ * the packages, their records and the pin file it moved are the framework's
+ * derivation of the verified source, subtracted by provenance -- the paths
+ * the candidate record names whose bytes are still the ones it wrote -- and
+ * never by a list of names. A candidate path edited since has a different
+ * digest, is not in the set, and is a change like any other. Canonical on
+ * both sides, because git answers with its own spelling of the root while
+ * the sessions directory and the record are whatever the caller was handed.
  */
 export function stepChangedPaths(
   diff: readonly string[],
   sessionsRel: string,
+  candidate: ReadonlySet<string> = new Set(),
 ): string[] {
+  const packed = new Set([...candidate].map((path) => path.split("\\").join("/")));
   return diff.filter((path) => {
-    const name = path.split("/").pop() ?? path;
-    return !(path.startsWith(`${sessionsRel}/`) && SET_BOOKKEEPING_COMMIT_BASENAMES.includes(name));
+    const canonical = path.split("\\").join("/");
+    if (packed.has(canonical)) return false;
+    const name = canonical.split("/").pop() ?? canonical;
+    return !(canonical.startsWith(`${sessionsRel}/`) && SET_BOOKKEEPING_COMMIT_BASENAMES.includes(name));
   });
 }
 
@@ -2166,21 +2176,25 @@ ${this.stopArtifacts()}`,
       const shape = solutionShape(this.repoRoot);
       // The refusal's own words travel into the stop: the toast shows the
       // stop's first sentence, and "its reason is above" is not a reason.
-      let refusal = "";
+      const refused: { message: string; cause: DeclareRefusalCause } = { message: "", cause: "other" };
       const code = declare(this.sessionsDir, {
         task: plan.task,
         releasable: plan.releasable,
         sessionNumber: this.sessionNumber,
         modules: shape.multi ? (plan.modules ?? null) : null,
         reason: plan.reason ?? null,
-        onRefusal: (message) => {
-          refusal = message;
+        onRefusal: (message, cause) => {
+          refused.message = message;
+          refused.cause = cause;
         },
       });
       if (code !== EXIT_OK) {
+        // A tree that already carries work is the tree's stop, not the
+        // engine's: `start` asks the same question first, so reaching it
+        // here means the tree moved between the registration and the plan.
         throw new Stop(
-          "engine",
-          `the declaration was refused: ${refusal === "" ? "its reason is above" : refusal}` +
+          refused.cause === "tree" ? "tree" : "engine",
+          `the declaration was refused: ${refused.message === "" ? "its reason is above" : refused.message}` +
             " -- a plan is answered before any file changes",
         );
       }
@@ -2422,7 +2436,11 @@ ${this.stopArtifacts()}`,
     if (current === null) throw new Stop("engine", "could not snapshot the working tree");
     const diff = changedPathsBetween(this.repoRoot, String(this.run.baseline_tree), current);
     if (diff === null) throw new Stop("engine", "could not diff the working tree against the last accepted step");
-    const changed = stepChangedPaths(diff, repoRelativePath(this.repoRoot, this.sessionsDir));
+    const changed = stepChangedPaths(
+      diff,
+      repoRelativePath(this.repoRoot, this.sessionsDir),
+      candidatePathsAsWritten(this.repoRoot, readCandidateRecord(this.repoRoot, this.sessionNumber)),
+    );
     const reasons = judgeReportFiles(answered, changed, (file) =>
       existsSync(join(this.repoRoot, file)),
     );

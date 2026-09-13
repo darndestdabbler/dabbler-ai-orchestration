@@ -47,6 +47,7 @@ import {
 import type { RouterConfig } from "./config.ts";
 import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
 import { EcosystemError, ecosystemOf } from "./ecosystem.ts";
+import { readRun } from "./driver.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
 import { readExposure } from "./exposure.ts";
 import { type PackageReferenceFact, candidatesFromRecord, judgeExposure, judgePins } from "./land.ts";
@@ -761,11 +762,15 @@ export function checkTestRunFresh(
   // required suite, as it always was.
   const root = repoRootFor(sessionsDir);
   const current = currentSession(sessionsDir);
+  const inFlight = root !== null && typeof current === "number";
+  // Driven: the framework runs the suite itself after verification, so the
+  // row inside a session states what it measured and no way to satisfy it.
+  const driven = inFlight && readRun(root, current) !== null;
   return judgeFreshness(
     demandedByPlan(
-      evaluateFreshness(sessionsDir, null, loaded.suites),
+      evaluateFreshness(sessionsDir, null, loaded.suites, { driven }),
       planForGate(sessionsDir),
-      root !== null && typeof current === "number" ? suitesOwedElsewhere(root, current) : new Set(),
+      inFlight ? suitesOwedElsewhere(root, current) : new Set(),
     ),
   );
 }

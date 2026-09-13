@@ -437,7 +437,10 @@ The stop kinds mean what they say: `rejected-thrice`, `blocked` (a step
 was reported as impossible, with its notes), `tests`, `verification`,
 `land` (the commit or push), `close` (a gate refused; its rows are in the
 close's log), `interrupted` (you asked), `budget` (the invocation bound,
-which only `session drive` below can meet), `engine`.
+which only `session drive` below can meet), `tree` (the working tree
+already carried changes when the declaration was made -- commit or revert
+them; `session start` asks the same question first, so this one is met only
+when the tree moved between the registration and the plan), `engine`.
 
 Beside the kind, `stop.class` says whether this has happened before.
 `deadlock` means the same kind, on the same step, for the same reason as

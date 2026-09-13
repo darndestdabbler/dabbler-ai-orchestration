@@ -30,7 +30,7 @@ import {
   type PushFacts,
   type VerificationFacts,
 } from "../src/gates.ts";
-import type { SuiteLoadResult } from "../src/testEvidence.ts";
+import { type SuiteLoadResult, type SuiteSpec, freshnessVerdict } from "../src/testEvidence.ts";
 
 const SESSIONS = "docs/sessions";
 
@@ -231,6 +231,19 @@ describe("test_run_fresh: the declaration, then the verdicts", () => {
     ];
     assert.deepEqual(judgeFreshness(verdicts), [false, "unit: the tree moved"]);
     assert.deepEqual(judgeFreshness([verdicts[2]]), [true, ""]);
+  });
+
+  it("carries no by-hand recipe in the row while a driven session is in flight", () => {
+    // The run of record is the framework's own phase in a driven session;
+    // the row says what it measured, and an engine reading it mid-session
+    // is told nothing to run and nothing to record.
+    const unit: SuiteSpec = { name: "unit", command: "npm test", covers: ["src/"], expensive: true, runsWhole: false };
+    const facts = { changed: ["src/a.ts"], current: "d1", records: [], currentTree: () => "t1" };
+    const row = judgeFreshness([freshnessVerdict(unit, { ...facts, driven: true })]);
+    assert.equal(row[0], false);
+    assert.equal(row[1], "unit: this session changed unit's covered surfaces but no final-full run of record exists");
+    // Outside a session the recipe is what a person driving by hand needs.
+    assert.match(judgeFreshness([freshnessVerdict(unit, { ...facts, driven: false })])[1], /dabbler test-evidence record/);
   });
 });
 

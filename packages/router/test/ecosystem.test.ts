@@ -95,6 +95,31 @@ describe("the Maven side of the seam", () => {
     return { root, shape: { multi: true, implicit: false, modules: dependencyOrder(entries), deployables: impliedDeployables(entries) } };
   }
 
+  it("is born with the first package module, before any project, and the pin writer never creates it", () => {
+    // The sample's candidate job created Directory.Packages.props after the
+    // projects existed, and every versioned PackageReference then failed
+    // restore. So the file is written when the package module is declared,
+    // and the pin goes into a file that is already there or nowhere.
+    // The FIRST module, while it is the manifest's only one: a module whose
+    // contract is the package has declared the siblings that will consume it.
+    const root = tempDir("ecosystem-cpm-");
+    seed(root, { "modules/person/README.md": "declared, not yet written\n" });
+    const entries = parseEntries({
+      modules: [{ slug: "person", codeRoots: ["modules/person"], package: "CsvParser.Person", contract: "package" }],
+    });
+    const shape: SolutionShape = { multi: false, implicit: false, modules: dependencyOrder(entries), deployables: impliedDeployables(entries) };
+    const dotnet = ecosystemNamed("dotnet");
+    assert.throws(
+      () => dotnet.writeCentralPin(root, "CsvParser.Person", "1.0.0-dev.20260913.1.g57c4688"),
+      (error: unknown) => error instanceof EcosystemError && /no Directory\.Packages\.props to pin in: `dabbler modules create` writes it/.test(error.message),
+    );
+    const written = ensureRootFiles(root, shape);
+    assert.ok(written?.written.includes("Directory.Packages.props"), written?.written.join(", "));
+    assert.match(readFileSync(join(root, "Directory.Packages.props"), "utf8"), /<ManagePackageVersionsCentrally>true<\/ManagePackageVersionsCentrally>/);
+    assert.equal(dotnet.writeCentralPin(root, "CsvParser.Person", "1.0.0-dev.20260913.1.g57c4688"), "Directory.Packages.props");
+    assert.match(readFileSync(join(root, "Directory.Packages.props"), "utf8"), /Include="CsvParser\.Person" Version="1\.0\.0-dev\./);
+  });
+
   it("targets the release of the JDK that scaffolded it, and says so", () => {
     // A constant 21 here failed every build on a machine whose JDK was
     // older, on a line the developer had to find and edit first.

@@ -98,6 +98,7 @@ import { isFrameworkInstalledPath, materialPaths } from "./checks.ts";
 import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
   governingConfig,
+  materialWorktreeChanges,
   readWorktreeStatus,
   renderGateRow,
   runGates,
@@ -161,6 +162,8 @@ import {
   amendmentEntries,
   amendmentLine,
   recordAmendment,
+  WorkBegunError,
+  workBegunRefusal,
 } from "./writers.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -1381,6 +1384,20 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     // A fresh registration only: re-registering the session in flight is a
     // continuation, and moving the tree under a session's own work is not.
     if (current === null || requested !== current) {
+      // The declaration's own question, asked here where the condition is
+      // fully known and before any work: a tree carrying changes cannot
+      // declare, and finding that out inside the first `next` -- after the
+      // plan was written -- paused the sample over a file the extension
+      // itself had put there. The same words, so the two never drift.
+      const begun = materialWorktreeChanges(sessionsDir, { beforeWork: true });
+      if (begun.error) {
+        writeErr(`start: refused -- cannot tell whether session ${sessionDisplayNumber(requested)}'s work has begun: ${begun.error}\n`);
+        return EXIT_USAGE;
+      }
+      if (begun.paths.length > 0) {
+        writeErr(`start: refused -- ${workBegunRefusal(requested, begun.paths)}\n`);
+        return EXIT_USAGE;
+      }
       const pulled = pullBeforeStart(repoRootFromSessionsDir(sessionsDir), sessionsDir);
       if (pulled !== null) writeOut(`${pulled}\n`);
     }
@@ -1643,8 +1660,15 @@ export interface DeclareCliOptions {
    * above)" left the toast, which shows the stop's first sentence, saying
    * nothing a person could act on.
    */
-  readonly onRefusal?: (message: string) => void;
+  readonly onRefusal?: (message: string, cause: DeclareRefusalCause) => void;
 }
+
+/**
+ * What refused a declaration, where the words alone cannot say whose fault
+ * it is: `tree` is a working tree that already carries work, which is the
+ * one refusal a driver must not log as the engine's.
+ */
+export type DeclareRefusalCause = "tree" | "other";
 
 /** Declare the session's task list and whether it may publish. */
 export function declare(sessionsDir: string, options: DeclareCliOptions): number {
@@ -1652,9 +1676,9 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     writeErr(`declare: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
-  const refuse = (message: string, code: number): number => {
+  const refuse = (message: string, code: number, cause: DeclareRefusalCause = "other"): number => {
     writeErr(`declare: refused -- ${message}\n`);
-    options.onRefusal?.(message);
+    options.onRefusal?.(message, cause);
     return code;
   };
   const target = resolveTargetSession(sessionsDir, options.sessionNumber);
@@ -1715,7 +1739,7 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     });
   } catch (error) {
     if (!(error instanceof SanctionedWriteError)) throw error;
-    return refuse(error.message, EXIT_USAGE);
+    return refuse(error.message, EXIT_USAGE, error instanceof WorkBegunError ? "tree" : "other");
   } finally {
     releaseLock(lock);
   }

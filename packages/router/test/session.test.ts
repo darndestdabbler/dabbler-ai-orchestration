@@ -69,8 +69,9 @@ import {
   recordAmendment,
   registerSessionStart,
   sessionIsReleasable,
+  workBegunRefusal,
 } from "../src/writers.ts";
-import { cleanRepoAnswers, seed, tempDir } from "./support/answers.ts";
+import { cleanRepoAnswers, gitAnswers, seed, tempDir } from "./support/answers.ts";
 
 /** One verb's exit code and everything it wrote, so a refusal can be read. */
 async function run(
@@ -244,6 +245,30 @@ describe("the identity a session in flight was registered under", () => {
 });
 
 describe("what a start refuses before a session exists", () => {
+  it("refuses a tree that already carries work, in the declaration's own words", async () => {
+    // The sample's session 1 registered over an untracked settings file the
+    // extension had written, answered its plan, and was paused inside the
+    // same `next` when the declaration refused the tree -- a condition fully
+    // known at `start`. So `start` asks the same question, with the same
+    // sentence, before any work and before the pull.
+    const state = stateDir();
+    const dirty = gitAnswers([
+      [["rev-parse", "--show-toplevel"], { stdout: state.repo.split("\\").join("/") }],
+      [["status", "--porcelain"], { stdout: "?? .vscode/settings.json\n" }],
+    ]);
+    try {
+      const refused = await run(() =>
+        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
+      );
+      assert.notEqual(refused.code, EXIT_OK);
+      assert.ok(refused.err.includes(`start: refused -- ${workBegunRefusal(1, [".vscode/settings.json"])}`), refused.err);
+      assert.equal(readRawSessionState(state.sessionsDir), null);
+    } finally {
+      dirty();
+      state.restore();
+    }
+  });
+
   it("stops on a vehicle THIS CHECKOUT chose and cannot reach, naming the layer", async () => {
     // Before anything is billed and before the session is on the record.
     // Only a vehicle somebody CHOSE: a first-run machine with no seat and no

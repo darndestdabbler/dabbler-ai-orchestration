@@ -1416,6 +1416,19 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
       cancelChoice(),
     ],
   },
+  tree: {
+    what: "The working tree carried changes the declaration would not accept.",
+    actor: "operator",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        `Commit or revert them, then carry on from '${parts.phase}'`,
+        "The declaration is made again over a clean tree. No provider call, " +
+          "and the plan already answered is not re-asked.",
+      ),
+      cancelChoice(),
+    ],
+  },
   engine: {
     what: "The engine could not be run, or what it gave back could not be used.",
     actor: "either",

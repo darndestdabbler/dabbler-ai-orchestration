@@ -90,6 +90,14 @@ of the options. A session that genuinely spans the solution is declared
 with no wall and no exposure gate: the choice is made once, before the
 work, and never rediscovered afterwards.
 
+One line under the session's heading in the plan decides which, and
+`session start` and every launcher read it the same way:
+
+| Line in the plan section | What it does |
+| --- | --- |
+| `Module: <slug>` | The session runs **focused**, in that module's own checkout. |
+| `Scope: whole repository` | The session runs **global**, in the repository itself, wherever the line appears in the section. A `Module:` line beside it only says which module the session is about, and the Work Explorer files it there. |
+
 The verbs are `dabbler modules create` and `modules show` for the
 manifest, and `dabbler module contract | pack | open | grant | revoke`
 for one module — its designed seam, its committed package, its focused

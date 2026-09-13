@@ -2154,13 +2154,17 @@ ${this.stopArtifacts()}`,
 
     if (readTaskDeclaration(this.sessionsDir, this.sessionNumber) === null) {
       // The modules reach the record only in a multi-module solution; a
-      // single-module plan carries none, and the judge above saw to it.
+      // single-module plan carries none, and the judge above saw to it. The
+      // reason travels with them: `declare` runs the same judge, and a
+      // cross-module plan handed over without its reason is refused there
+      // after being accepted here.
       const shape = solutionShape(this.repoRoot);
       const code = declare(this.sessionsDir, {
         task: plan.task,
         releasable: plan.releasable,
         sessionNumber: this.sessionNumber,
         modules: shape.multi ? (plan.modules ?? null) : null,
+        reason: plan.reason ?? null,
       });
       if (code !== EXIT_OK) {
         throw new Stop(
@@ -2241,8 +2245,9 @@ ${this.stopArtifacts()}`,
    * nothing else: handed to the engine before it can hit the wall, because
    * an engine that knows what it may read rarely meets a denial at all.
    * Null where the session has no policy -- a one-module solution, or a
-   * declaration that named no module -- and on every later step, which
-   * the engine reaches knowing it.
+   * global session, whose declaration names modules as what it is about
+   * and never as a wall -- and on every later step, which the engine
+   * reaches knowing it.
    */
   private scopeForStep(spec: StepSpec): readonly string[] | null {
     if (!spec.fromPlan || this.requirePlan().steps[0]?.id !== spec.id) return null;

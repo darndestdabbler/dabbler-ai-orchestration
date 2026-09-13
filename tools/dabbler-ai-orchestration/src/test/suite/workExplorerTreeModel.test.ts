@@ -92,6 +92,10 @@ suite("workExplorerTreeModel: nodes", () => {
           kind: "global",
           modules: ["model", "persister"],
         }),
+        // Global too, and its plan section says which module it is ABOUT:
+        // `Module: model` beside `Scope: whole repository`. It runs in the
+        // repository and is filed under model.
+        makeSession({ number: 5, status: "not-started", iconKey: "not-started", kind: "global", module: "model" }),
       ],
     });
     const [repository] = repositoryNodes([multi]);
@@ -102,10 +106,11 @@ suite("workExplorerTreeModel: nodes", () => {
       liveChildren.map((n) => (n.kind === "moduleGroup" ? ["moduleGroup", n.module, childrenOf(n).map((s) => s.kind === "session" ? s.session.number : null)] : [n.kind])),
       [["moduleGroup", "persister", [2]]],
     );
-    // A session naming no module reads under the bucket, after the groups.
+    // A session naming no module reads under the bucket, after the groups;
+    // the attributed global one reads under its module beside the focused one.
     assert.deepStrictEqual(
-      childrenOf(queued).map((n) => (n.kind === "moduleGroup" ? ["moduleGroup", n.module] : n.kind === "session" ? ["session", n.session.number] : [n.kind])),
-      [["moduleGroup", "model"], ["session", 4]],
+      childrenOf(queued).map((n) => (n.kind === "moduleGroup" ? ["moduleGroup", n.module, childrenOf(n).map((s) => s.kind === "session" ? s.session.number : null)] : n.kind === "session" ? ["session", n.session.number] : [n.kind])),
+      [["moduleGroup", "model", [3, 5]], ["session", 4]],
     );
     const group = liveChildren[0];
     assert.ok(group.kind === "moduleGroup");
@@ -129,9 +134,9 @@ suite("workExplorerTreeModel: nodes", () => {
 
   test("a module's checkout shows only the sessions that run in it, and names what runs elsewhere", () => {
     // The folder is one module's. A global session belongs to the
-    // repository and another module's belongs to another folder, so
-    // `session start` refuses both here -- listing them offered a plan this
-    // window cannot act on.
+    // repository -- even one filed under this module -- and another
+    // module's belongs to another folder, so `session start` refuses both
+    // here -- listing them offered a plan this window cannot act on.
     const checkout = makeRepository({
       checkoutModule: "persister",
       sessions: [
@@ -139,6 +144,7 @@ suite("workExplorerTreeModel: nodes", () => {
         makeSession({ number: 2, status: "complete", kind: "focused", module: "model" }),
         makeSession({ number: 3, status: "not-started", iconKey: "not-started", kind: "focused", module: "persister" }),
         makeSession({ number: 4, status: "not-started", iconKey: "not-started", kind: "focused", module: "app" }),
+        makeSession({ number: 5, status: "not-started", iconKey: "not-started", kind: "global", module: "persister" }),
       ],
     });
     const [repository] = repositoryNodes([checkout]);
@@ -157,7 +163,7 @@ suite("workExplorerTreeModel: nodes", () => {
     // Said once, so a checkout whose module is finished is never a blank tree.
     assert.deepStrictEqual(
       childrenOf(buckets[1]).map((n) => (n.kind === "attention" ? n.label : n.kind)),
-      ["3 sessions run outside this checkout"],
+      ["4 sessions run outside this checkout"],
     );
     assert.strictEqual(descriptorFor(repository).description, "0/1 on persister");
   });

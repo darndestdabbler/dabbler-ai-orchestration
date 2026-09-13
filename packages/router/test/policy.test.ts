@@ -11,10 +11,11 @@ import type { DriverInstruction } from "../src/generated/index.ts";
 import { type SolutionShape, dependencyOrder, impliedDeployables, implicitModule, parseEntries } from "../src/modules.ts";
 import { capture } from "../src/output.ts";
 import { policyPath, readPolicy, writePolicy } from "../src/policy.ts";
+import { readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
 import { EXIT_OK, report, sessionScope } from "../src/session.ts";
-import { registerSessionStart } from "../src/writers.ts";
+import { recordSessionCheckout, registerSessionStart } from "../src/writers.ts";
 import { gitAnswers, makeAnsweredSandbox, seed, setProviderKeys, tempDir } from "./support/answers.ts";
 
 // Writing a policy loads the configuration, which asks git where the
@@ -100,6 +101,9 @@ describe("the module policy", () => {
     });
     try {
       registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
+      // A focused session: the checkout on its row is what makes it one, and
+      // the policy is written for it and for nothing else.
+      recordSessionCheckout(sessionsDir, 1, { module: "persister", path: repo });
       const plan = await next(sessionsDir);
       assert.equal(plan.instruction?.step_id, "plan", plan.err);
       // The modules reach the record with the declaration; the plan step
@@ -131,6 +135,58 @@ describe("the module policy", () => {
       const printed = await capture(() => Promise.resolve(sessionScope(sessionsDir)));
       assert.equal(printed.value, EXIT_OK, printed.stderr);
       assert.deepEqual(printed.stdout.trim().split(/\r?\n/), policy.allowed);
+    } finally {
+      restore();
+      resetRouter();
+      resetRuntimeMode();
+    }
+  });
+
+  it("declares a cross-module plan through the driver with the reason the plan gave", async () => {
+    // The sample's session 3: the plan named two modules and said why, the
+    // judge at acceptance read the reason and passed it, and the declaration
+    // ran the same judge without the reason and refused -- every retry
+    // re-read the stored plan and refused again.
+    setProviderKeys();
+    const { repo, sessionsDir, restore } = makeAnsweredSandbox({
+      "docs/modules.yaml": MANIFEST,
+      "modules/model/contract/README.md": "# model\n",
+      "modules/model/src/Person.cs": "public sealed class Person {}\n",
+      "modules/persister/src/Store.cs": "public sealed class Store {}\n",
+    });
+    try {
+      registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
+      const plan = await next(sessionsDir);
+      assert.equal(plan.instruction?.step_id, "plan", plan.err);
+      const accepted = await answer(sessionsDir, plan.instruction?.seq ?? 0, {
+        task: "Give Person a surname and store it.",
+        releasable: false,
+        modules: ["model", "persister"],
+        reason: "the model's contract changes and the store must persist the new field",
+        steps: [
+          {
+            id: "surname",
+            ask: "Add the surname and persist it.",
+            files: ["modules/model/src/Person.cs", "modules/persister/src/Store.cs"],
+            checks: [{ argv: [process.execPath, "-e", "process.exit(0)"] }],
+          },
+        ],
+      });
+      assert.equal(accepted, EXIT_OK);
+      const step = await next(sessionsDir);
+      assert.equal(step.instruction?.kind, "step", `${step.err}\n${JSON.stringify(step.instruction)}`);
+      assert.equal(step.instruction?.step_id, "surname");
+      const row = (readSessionState(sessionsDir)?.["sessions"] as Record<string, unknown>[]).find(
+        (entry) => entry["number"] === 1,
+      );
+      assert.deepEqual(row?.["modules"], ["model", "persister"]);
+      // Global, so no wall: the modules on the row are what the session is
+      // about, and the first step is asked with no scope and no sentence
+      // telling it the other modules are packages -- which in the repository
+      // itself is false.
+      assert.equal(readPolicy(repo, 1), null, "a global declaration writes no policy");
+      assert.equal(step.instruction?.scope, undefined);
+      assert.doesNotMatch(step.instruction?.ask ?? "", /`scope` member/);
     } finally {
       restore();
       resetRouter();

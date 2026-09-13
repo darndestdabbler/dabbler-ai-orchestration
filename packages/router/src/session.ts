@@ -790,11 +790,13 @@ function moduleScopeOfSession(
 }
 
 /**
- * The policy of a module session, written at the moment its modules reach
- * the record. Best-effort, like every derived record beside the ledger: a
- * declaration must not fail because a file nobody types could not be
- * written, and a session with no policy is walled by nothing -- allowed,
- * unobserved -- which is the side the operator chose.
+ * The policy of a focused session, written at the moment its module reaches
+ * the record. A global session has none: the modules it names are what it
+ * is about, and the repository is what it may touch. Best-effort, like
+ * every derived record beside the ledger: a declaration must not fail
+ * because a file nobody types could not be written, and a session with no
+ * policy is walled by nothing -- allowed, unobserved -- which is the side
+ * the operator chose.
  */
 function writeDeclaredPolicy(sessionsDir: string, session: number, modules: readonly string[]): void {
   try {
@@ -1671,14 +1673,17 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
   // other would refuse: an undeclared slug, two modules with no reason, a
   // module named in a single-module repository.
   const declaredShape = solutionShape(repoRootFromSessionsDir(sessionsDir));
+  // A global session -- multi-module, and no checkout on its row -- is the
+  // whole repository: it names any declared modules or none, and it gets no
+  // policy, because the modules it names say what it is about and not what
+  // it may touch.
+  const global = declaredShape.multi && checkoutModuleOf(sessionsDir, target) === null;
   const shapeReasons = judgeModulesForShape(
     options.modules ?? [],
     options.reason ?? null,
     declaredShape,
     "the declaration",
-    // A global session -- multi-module, and no checkout on its row -- is the
-    // whole repository: it names any declared modules or none.
-    declaredShape.multi && checkoutModuleOf(sessionsDir, target) === null,
+    global,
   );
   if (shapeReasons.length > 0) {
     writeErr(`declare: refused -- ${shapeReasons.join("; ")}\n`);
@@ -1708,7 +1713,7 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     releaseLock(lock);
   }
   const modules = (options.modules ?? []).filter((slug) => slug.trim() !== "");
-  if (modules.length > 0) writeDeclaredPolicy(sessionsDir, target, modules);
+  if (modules.length > 0 && !global) writeDeclaredPolicy(sessionsDir, target, modules);
   writeOut(
     `declare: session ${sessionDisplayNumber(target)} declared; releasable=` +
       `${options.releasable ? "yes" : "no"}` +

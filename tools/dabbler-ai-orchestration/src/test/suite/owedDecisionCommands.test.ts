@@ -36,16 +36,19 @@ const STOP: OwedDecision = {
 function decisionUi(overrides: Partial<OwedDecisionUi> = {}): {
   ui: OwedDecisionUi;
   offered: string[][];
+  shown: string[];
   picked: Array<{ label: string; detail: string; picked: boolean }[]>;
   errors: string[];
   infos: string[];
 } {
   const offered: string[][] = [];
+  const shown: string[] = [];
   const picked: Array<{ label: string; detail: string; picked: boolean }[]> = [];
   const errors: string[] = [];
   const infos: string[] = [];
   const ui: OwedDecisionUi = {
-    toast: async (_message, choices) => {
+    toast: async (message, choices) => {
+      shown.push(message);
       offered.push([...choices]);
       return undefined;
     },
@@ -57,7 +60,7 @@ function decisionUi(overrides: Partial<OwedDecisionUi> = {}): {
     showInformationMessage: (m) => infos.push(m),
     ...overrides,
   };
-  return { ui, offered, picked, errors, infos };
+  return { ui, offered, shown, picked, errors, infos };
 }
 
 const target = () => ({ repository: makeRepository(), decision: STOP });
@@ -72,6 +75,29 @@ suite("answering an owed decision", () => {
     assert.deepStrictEqual(offered, [["Run `next` again", OTHER_CHOICE, LATER_CHOICE]]);
     // Dismissing it is not an answer.
     assert.deepStrictEqual(asked, []);
+  });
+
+  test("the toast's body carries the stop's own first sentence under the question", async () => {
+    // The sample's loop: the toast said a session stopped in 'plan' and
+    // asked whether to run it again, and the reason -- which was on the
+    // decision the whole time -- was in a picker nobody had opened yet.
+    const { ui, shown } = decisionUi();
+    const { router } = fakeRouter(0);
+    const refused = {
+      repository: makeRepository(),
+      decision: {
+        ...STOP,
+        determined:
+          "The declaration was refused (its reason is above). A plan is answered before any " +
+          "file changes, and the retry re-reads the stored plan.",
+      },
+    };
+    await offerDecision(refused, ui, router);
+    // One line of why: the first sentence, not the whole account.
+    assert.deepStrictEqual(shown, [`${STOP.question}\nThe declaration was refused (its reason is above).`]);
+    // A brief that determined nothing shows the question alone.
+    await offerDecision({ repository: makeRepository(), decision: { ...STOP, determined: null } }, ui, router);
+    assert.strictEqual(shown[1], STOP.question);
   });
 
   test("taking the recommendation records it, by the option's own label", async () => {

@@ -251,7 +251,7 @@ export type ProgressProjectionSession = {
    */
   kind?: "focused" | "global";
   /**
-   * The module a focused session runs in, by slug. Present exactly when `kind` is 'focused'.
+   * The module a session is filed under, by slug: a focused session's own, or the one a global session's plan section names beside its `Scope: whole repository` line. Present on every focused row, and on a global row only when its section names one.
    */
   module?: string;
   /**

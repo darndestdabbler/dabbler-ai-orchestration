@@ -301,8 +301,11 @@ export const DECOMPOSITION_PROMPT =
   "- **One module per session.** Where `docs/modules.yaml` declares more than\n" +
   "  one module, the heading is followed by `Module: <slug>` on its own line,\n" +
   "  and the session's steps stay inside that module's roots. A session that\n" +
-  "  must change two modules says `Modules: <a>, <b>` and the reason, and\n" +
-  "  that is rare. With one module declared there is nothing to name.\n" +
+  "  must change two modules is global: it says `Scope: whole repository` on\n" +
+  "  its own line, which makes it global wherever it appears in the section,\n" +
+  "  and gives the reason; a `Module:` line beside it only says which module\n" +
+  "  the session is about. That is rare. With one module declared there is\n" +
+  "  nothing to name.\n" +
   "- A session may declare `Policy: fast` or `Policy: verified` on its own\n" +
   "  line; omitting it uses the repository default.\n" +
   "- Do NOT hand-author `sessions.json`: the first `session start` bootstraps\n" +
@@ -374,7 +377,10 @@ export const BOOTSTRAP_PLAN =
   "   module changes, in `docs/modules.yaml`.\n" +
   "3. Break the plan into numbered sessions appended to this file, each\n" +
   "   naming ONE module (`Module: <slug>` under the heading, where the\n" +
-  "   manifest declares more than one). Each session is a focused unit of\n" +
+  "   manifest declares more than one; a session that must span the\n" +
+  "   solution says `Scope: whole repository` on its own line instead, which\n" +
+  "   makes it global wherever it appears, and a `Module:` line beside it\n" +
+  "   only says which module it is about). Each session is a focused unit of\n" +
   "   work one AI coding session can complete: one\n" +
   "   `### Session <N>: <title>` heading, and its steps as a top-level\n" +
   "   ordered list. Step 1 registers the session; the last steps are\n" +

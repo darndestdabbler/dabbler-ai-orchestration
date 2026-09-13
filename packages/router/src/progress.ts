@@ -162,16 +162,21 @@ const SESSION_HEADING_RE =
 const GENERIC_TITLE_RE = /^Session\s+(\d+)$/;
 
 /**
- * Where a session runs, as its plan section states it: the first line under
- * the heading of the form `Module: <slug>` (focused, in that module's
- * folder) or `Scope: whole repository` (global, the repository itself).
- * Bold or code marks around either half are tolerated, because the plan is
- * prose. A section that says neither states no kind, and `session start`
- * derives global from that.
+ * Where a session runs, as its plan section states it: a `Scope: whole
+ * repository` line anywhere under the heading makes it global (the
+ * repository itself), and otherwise a `Module: <slug>` line makes it
+ * focused (that module's folder). Beside a `Scope:` line, a `Module:` line
+ * only says which module the session is about. Bold or code marks around
+ * either half are tolerated, because the plan is prose. A section that
+ * says neither states no kind, and `session start` derives global from
+ * that.
  */
 export interface PlannedSessionKind {
   readonly kind: "focused" | "global";
-  /** The module's slug for a focused session; null for a global one. */
+  /**
+   * A focused session's own module, or the one a global session is about
+   * when a `Module:` line stands beside its `Scope:` line; null otherwise.
+   */
   readonly module: string | null;
 }
 
@@ -192,12 +197,10 @@ interface PlanSection {
 function kindOfSection(body: string): PlannedSessionKind | null {
   const moduleLine = SESSION_MODULE_LINE_RE.exec(body);
   const scopeLine = SESSION_SCOPE_LINE_RE.exec(body);
-  // The FIRST such line decides: a section that says both is read by the
-  // one that comes first, which is what "the first line of the form" means.
-  if (moduleLine !== null && (scopeLine === null || moduleLine.index < scopeLine.index)) {
-    return { kind: "focused", module: moduleLine[1] };
-  }
-  if (scopeLine !== null) return { kind: "global", module: null };
+  // `Scope:` wins wherever it appears: a section that says both is a global
+  // session ABOUT the module -- filed under it, run in the repository.
+  if (scopeLine !== null) return { kind: "global", module: moduleLine?.[1] ?? null };
+  if (moduleLine !== null) return { kind: "focused", module: moduleLine[1] };
   return null;
 }
 
@@ -1841,8 +1844,9 @@ export function checkoutModuleOf(sessionsDir: string, sessionNumber: number): st
 /**
  * A session row's `kind` and `module`: from the checkout `session start`
  * wrote on the row when there is one (focused, in that module), else from
- * what the plan states, else nothing -- a single-module repository's rows
- * project exactly what they always have.
+ * what the plan states -- a global session carries the module it is about
+ * when its section names one -- else nothing, so a single-module
+ * repository's rows project exactly what they always have.
  */
 function sessionKindMembers(
   checkout: unknown,
@@ -1853,9 +1857,7 @@ function sessionKindMembers(
     return { kind: "focused", module: checkoutModule.trim() };
   }
   if (planned === null) return {};
-  return planned.kind === "focused" && planned.module !== null
-    ? { kind: "focused", module: planned.module }
-    : { kind: "global" };
+  return planned.module !== null ? { kind: planned.kind, module: planned.module } : { kind: planned.kind };
 }
 
 function exposureForProjection(repoRoot: string | null, current: unknown): unknown {

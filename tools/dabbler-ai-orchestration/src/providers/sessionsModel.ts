@@ -71,18 +71,18 @@ export function sessionsInOrder(
 }
 
 /**
- * The module a session runs on, or null when it runs on the repository.
+ * The module a session is filed under, or null when it is the repository's.
  *
  * `kind` and `module` are the projection's own answer, computed from the
- * `checkout` the start wrote on the row and from the plan before that.
- * `modules` is a different fact -- everything the session declared it
- * touched -- and reading its first entry as "the module" filed a global
- * planning session that named four of them under whichever came first.
+ * `checkout` the start wrote on the row and from the plan before that: a
+ * focused session's own module, or the one a global session's section says
+ * it is about. `modules` is a different fact -- everything the session
+ * declared it touched -- and reading its first entry as "the module" filed
+ * a global planning session that named four of them under whichever came
+ * first.
  */
 export function moduleOf(session: SessionRecord): string | null {
-  return session.kind === "focused" && typeof session.module === "string" && session.module !== ""
-    ? session.module
-    : null;
+  return typeof session.module === "string" && session.module !== "" ? session.module : null;
 }
 
 /**
@@ -90,16 +90,16 @@ export function moduleOf(session: SessionRecord): string | null {
  * in a module's focused checkout, the ones that RUN there.
  *
  * A checkout exists to hold one module's work, and `session start` refuses
- * every other session in it -- a global one belongs to the repository, and
- * another module's belongs to another folder. The record stays whole, and
- * only the reading narrows: `startableHere` still needs the next session's
- * row to withhold the launcher for the right reason rather than because it
- * could not find one.
+ * every other session in it -- a global one belongs to the repository, even
+ * one filed under this module, and another module's belongs to another
+ * folder. The record stays whole, and only the reading narrows:
+ * `startableHere` still needs the next session's row to withhold the
+ * launcher for the right reason rather than because it could not find one.
  */
 export function sessionsHere(repository: SessionsRepository): SessionRecord[] {
   const slug = repository.checkoutModule;
   if (slug === null) return [...repository.sessions];
-  return repository.sessions.filter((session) => moduleOf(session) === slug);
+  return repository.sessions.filter((session) => session.kind === "focused" && moduleOf(session) === slug);
 }
 
 /**

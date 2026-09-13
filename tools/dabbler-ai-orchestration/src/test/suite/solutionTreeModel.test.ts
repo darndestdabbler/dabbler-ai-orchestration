@@ -5,6 +5,7 @@ import { createRequire } from "module";
 import { configurationNode, spawnProgram, tryWriteProjection } from "dabbler-ai-router";
 import {
   ConfigurationRole,
+  ConfigurationVehicle,
   NO_MODULES_YET,
   PROJECTION_RELPATH,
   PROJECTION_SOURCE_GLOBS,
@@ -900,6 +901,32 @@ suite("solutionTreeModel: what a session is run with", () => {
     const row = descriptorFor(root, p);
     assert.strictEqual(row.expandable, false);
     assert.strictEqual(row.tooltip, "local-overrides.yaml: bad key");
+  });
+
+  test("the authoring Vehicle says none is chosen when engines are installed, and 'none installed' only when none is", () => {
+    // Session 160's walk, on the one machine that matters most: claude and
+    // copilot both on PATH, the router declining to default between them,
+    // and the row reading "none installed". Two facts, two readings.
+    const base = configured().configuration?.authoring as ConfigurationRole;
+    const unchosen = (installed: { engine: string; program: string; path: string | null }[]) =>
+      deepFreeze(
+        configured({
+          authoring: { ...base, vehicle: { ...(base.vehicle as ConfigurationVehicle), chosen: null } },
+          engines: { chosen: null, reason: "which one runs a session is a choice", installed },
+        }),
+      );
+    const node = { kind: "configVehicle" as const, who: "authoring" as const };
+    const two = descriptorFor(node, unchosen([
+      { engine: "claude-code", program: "claude", path: "C:/bin/claude.cmd" },
+      { engine: "copilot", program: "copilot", path: "C:/bin/copilot.cmd" },
+    ]));
+    assert.ok(two.description?.includes("none chosen"), two.description);
+    assert.ok(!two.description?.includes("none installed"), two.description);
+    const none = descriptorFor(node, unchosen([
+      { engine: "claude-code", program: "claude", path: null },
+      { engine: "copilot", program: "copilot", path: null },
+    ]));
+    assert.strictEqual(none.description, "none installed");
   });
 });
 

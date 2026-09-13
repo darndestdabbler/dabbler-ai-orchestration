@@ -98,6 +98,81 @@ One line under the session's heading in the plan decides which, and
 | `Module: <slug>` | The session runs **focused**, in that module's own checkout. |
 | `Scope: whole repository` | The session runs **global**, in the repository itself, wherever the line appears in the section. A `Module:` line beside it only says which module the session is about, and the Work Explorer files it there. |
 
+### Before your first focused session
+
+**What the focused checkout holds.** It is a sparse clone made from
+`origin` beside the repository, as `<repo>.<slug>`, and it holds: the
+module's own code roots; the committed packages under `packages/`; the
+framework's record under `docs/`; the `modules/<sibling>/contract/` folder
+of every module this one depends on, directly or transitively, so it
+compiles against what they promise; the same folder of every module that
+consumes it, so their consumer-contract suites can run against it; and the
+directory of each `sharedFiles` entry. A sibling's code is never in it —
+that is the point: the engine reads the module, and the siblings as the
+promises they publish.
+
+**What a session on it may change.** Anything in the module's own roots,
+and every file at the repository root — build files, the solution file,
+the `.sln` or the root `pom.xml` — because the root's files come with every
+cone. What it may not change is a sibling's code. A file outside the
+module's roots that the module's sessions must nevertheless change — a
+changelog, a notes file, a shared props file in a subdirectory — is
+declared once, in `dabbler.yaml`, and its directory is then in the cone:
+
+```yaml
+modules:
+  csv-deserializer:
+    sharedFiles:
+      - docs/notes/dabbler-issues.md
+```
+
+Use `sharedFiles` when a file outside the module's roots is one the
+module's sessions must change; declare it under each module whose sessions
+must reach it. A change to a shared file reaches every module that names
+it, and every reached module with a package becomes a candidate of the run
+of record; a module with no project file under its roots yet is skipped.
+
+**Module packages are pinned centrally.** The run of record packs each
+changed module's candidate into `packages/` under an immutable dev version
+and pins it where the ecosystem keeps pins: for .NET, a root
+`Directory.Packages.props` with `ManagePackageVersionsCentrally` on, which
+puts the whole solution under central package management — so every
+`PackageReference` takes its version from a `PackageVersion` entry there,
+in a group of your own beside the framework's `Modules` group, and not
+from a `Version` attribute. For Maven it is the root `pom.xml`'s
+`dependencyManagement`. A module with `contract: package` also needs its
+notes page, `modules/<slug>/contract/README.md`, before its first
+candidate: the page is what a sibling's session reads instead of the code.
+
+**What is not pushed is not in it.** The clone is made from `origin`, not
+from your working tree, so a commit you have not pushed is absent from the
+focused checkout. `session start` refuses a tree with uncommitted changes
+or with commits ahead of its upstream, and names which, before it clones.
+
+**The three contract modes.** `contract:` in `docs/modules.yaml` says where
+a sibling reads this module's promise from:
+
+- `package` — the published package is its own abstraction: a value library
+  or shared types, consumed as the package it ships. The default when a
+  package is declared.
+- `designed` — an abstractions project written by hand beside the
+  implementation (`<Package>.Abstractions`, and a `<Package>.ContractTests`
+  the implementation's tests inherit); `dabbler module contract <slug>`
+  scaffolds it, and the surface page is read from that project's source.
+- `generated` — a surface derived from the built assembly by the argv
+  `modules.<slug>.contract.generate` in `dabbler.yaml` names: shape, not
+  behaviour, so the notes page beside it carries the promises.
+
+**Building against a sibling whose package was never published.** A
+focused session cannot: its checkout holds the sibling's contract folder and
+published package, never its source, so a package reference nothing has
+published does not resolve. There are two ways on, and both are decided in
+the plan before the work. The session that completes the sibling declares
+itself releasable and publishes to a feed — a folder on disk is a feed,
+takes no credential, and is enough for the next module to build against.
+Or the session that needs both runs global, with `Scope: whole repository`
+under its heading, and builds the solution in the repository itself.
+
 The verbs are `dabbler modules create` and `modules show` for the
 manifest, and `dabbler module contract | pack | open | grant | revoke`
 for one module — its designed seam, its committed package, its focused

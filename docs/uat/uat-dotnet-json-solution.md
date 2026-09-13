@@ -201,7 +201,7 @@ Two things follow for the rest of this walkthrough:
   own reviewer pool while running would have edited the conditions of its own
   review, so the refresh is refused while one is in flight and says so.
 - **The list you can choose from is the list you just read.** Whatever your
-  seat lists today is what **Dabbler: Set the Model** offers and what
+  seat lists today is what **Dabbler: Set the Primary Reviewer's Model** offers and what
   `dabbler configure --reviewer-model` accepts — the same set, from the same
   reading, so the pane cannot offer a model the command would refuse.
 
@@ -531,7 +531,7 @@ uses.
   it, writes the exposure manifest there, and registers session 001 in that
   folder's ledger. You do not run `module open` first — the registration is
   what makes the folder.
-- **You —** in the Solution Explorer, **Dabbler: Start Focused Session** on
+- **You —** in the Solution Explorer, **Dabbler: Start Focused Session in a New Window** on
   the `model` row (the row the plan names for the next session). Two prompts:
   *`Start session — which engine runs it?`* — pick `Claude Code`
   (`anthropic`) or `GitHub Copilot` (`openai — a seat also needs a
@@ -578,7 +578,7 @@ the Dabbler terminal's silence watcher and the Work Explorer's attention row.
 and Close filling in as it goes; and the `model` row in the Solution Explorer
 leading with `● session 1`.
 
-**Do not press Start Focused Session again while it runs.** It refuses over
+**Do not press Start Focused Session in a New Window again while it runs.** It refuses over
 `docs/sessions/sessions.json` — the ledger the framework itself just wrote —
 and tells you to commit or discard it. Do neither: that file is the router's,
 and never yours. Walk finding 4.
@@ -680,7 +680,7 @@ Commit the `.gitignore` and push it.
 - **Framework —** as step 7, once per module: the plan's `Module:` line for
   session 2 is `store` and for session 3 is `app`, so each start makes that
   module's folder and registers there.
-- **You —** **Dabbler: Start Focused Session** on the `store` row, then on
+- **You —** **Dabbler: Start Focused Session in a New Window** on the `store` row, then on
   the `app` row when session 2 has closed. **Dabbler: Pack Module** on each
   when its session is done, as in step 8.
 - **Underneath —** the same two commands as step 7, per module.

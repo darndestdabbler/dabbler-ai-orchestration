@@ -273,7 +273,7 @@ Maven rule with `bin/` and `obj/` in it, written from the same place.
 
 `openModule` in `packages/router/src/checkout.ts` refuses a dirty clone with
 raw `dirtyPaths`, which counts the session ledger. Register a focused session
-and press **Start Focused Session** (or **Open Module**) again on that module:
+and press **Start Focused Session in a New Window** (or **Open Module**) again on that module:
 
 ```
 module open: refused -- C:\temp\uat130-dotnet.model holds 1 change(s)
@@ -504,7 +504,7 @@ dabbler session start --sessions-dir docs/sessions --engine claude-code --provid
      checkout at C:\temp\uat130-dotnet.model; the exposure manifest is written there.
 ```
 
-and the operator's one click is **Start Focused Session** on the module row,
+and the operator's one click is **Start Focused Session in a New Window** on the module row,
 which runs `module open` in-process, writes the engine and model into the
 folder and opens its window with the AI's terminal already typed. Open Module
 remains, for opening a module folder without starting anything.

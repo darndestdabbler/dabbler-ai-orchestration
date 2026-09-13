@@ -1717,12 +1717,13 @@ suite("the marks in a job's bytes", () => {
     }
   });
 
-  test("leaves a gate that judged nothing unpainted, though it wears the pass mark", () => {
-    // `(N/A)` is not a pass, and the two carry the same mark by design: the
-    // operator reads a column of check marks and the green ones are the
-    // gates that actually judged.
+  test("leaves a gate that judged nothing unpainted: it wears a dash, which is no mark", () => {
+    // `(N/A)` is not a pass and the router no longer opens its row with the
+    // pass mark: a dash is not a mark this terminal paints, so the row
+    // reaches the screen plain with no special case, and the green marks
+    // are exactly the gates that judged.
     const judged = "  \u2713 working_tree_clean";
-    const judgedNothing = `  \u2713 exposure_within_ceiling ${GATE_NOT_APPLICABLE}`;
+    const judgedNothing = `  - exposure_within_ceiling ${GATE_NOT_APPLICABLE}`;
     assert.notStrictEqual(forTerminal(judged, "dark"), judged);
     assert.strictEqual(forTerminal(judgedNothing, "dark"), judgedNothing.replace(/\r?\n/g, "\r\n"));
   });

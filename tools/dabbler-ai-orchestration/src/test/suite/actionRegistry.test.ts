@@ -131,9 +131,13 @@ suite("ActionRegistry: session actions", () => {
       makeSession({ number: 2, status: "not-started", kind: "focused", module: "app" }),
       makeSession({ number: 3, status: "planned", iconKey: "not-started", kind: "global" }),
     ];
+    // Under either title: in the repository itself a focused next session
+    // is offered as Start Session in a New Window, and it is still Start.
+    const isStart = (id: string) =>
+      id === "dabblerSessionSets.startSession" || id === "dabblerSessionSets.startSessionInNewWindow";
     const starts = (repository: ReturnType<typeof makeRepository>) => ({
-      repository: applicableRepositoryActions(repository).map((a) => a.id).includes("dabblerSessionSets.startSession"),
-      row: applicableSessionActions(repository, sessions[1]).map((a) => a.id).includes("dabblerSessionSets.startSession"),
+      repository: applicableRepositoryActions(repository).map((a) => a.id).some(isStart),
+      row: applicableSessionActions(repository, sessions[1]).map((a) => a.id).some(isStart),
     });
     const inApp = makeRepository({ currentSession: null, nextSession: 2, sessions, checkoutModule: "app" });
     assert.deepStrictEqual(starts(inApp), { repository: true, row: true });
@@ -145,6 +149,32 @@ suite("ActionRegistry: session actions", () => {
     assert.strictEqual(starts(inRepository).repository, true);
     const globalNext = makeRepository({ currentSession: null, nextSession: 3, sessions, checkoutModule: "app" });
     assert.strictEqual(starts(globalNext).repository, false);
+  });
+
+  test("a launcher that opens a window says so in its title, and only then", () => {
+    // The sample's developer saw Start Session on the next session's row and
+    // Start Focused Session on the module, and neither said that pressing
+    // it opens a new window on a clone. Same command, and the title is the
+    // only difference: offered under the window title exactly when the next
+    // session is focused and this checkout is the repository itself.
+    const plain = "dabblerSessionSets.startSession";
+    const window = "dabblerSessionSets.startSessionInNewWindow";
+    const sessions = [
+      makeSession({ number: 1, status: "complete" }),
+      makeSession({ number: 2, status: "not-started", kind: "focused", module: "app" }),
+      makeSession({ number: 3, status: "planned", iconKey: "not-started", kind: "global" }),
+    ];
+    const offered = (repository: ReturnType<typeof makeRepository>, row: number) => ({
+      repository: applicableRepositoryActions(repository).map((a) => a.id).filter((id) => id === plain || id === window),
+      row: applicableSessionActions(repository, sessions[row]!).map((a) => a.id).filter((id) => id === plain || id === window),
+    });
+    const focusedNext = makeRepository({ currentSession: null, nextSession: 2, sessions, checkoutModule: null });
+    assert.deepStrictEqual(offered(focusedNext, 1), { repository: [window], row: [window] });
+    const globalNext = makeRepository({ currentSession: null, nextSession: 3, sessions, checkoutModule: null });
+    assert.deepStrictEqual(offered(globalNext, 2), { repository: [plain], row: [plain] });
+    // In the module's own folder the same button opens the AI here.
+    const inApp = makeRepository({ currentSession: null, nextSession: 2, sessions, checkoutModule: "app" });
+    assert.deepStrictEqual(offered(inApp, 1), { repository: [plain], row: [plain] });
   });
 
   test("cancel and restore are mutually exclusive on one row", () => {

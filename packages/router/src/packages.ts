@@ -321,10 +321,15 @@ export function packModule(
   const outputDir = join(root, PACKAGES_DIR);
   mkdirSync(outputDir, { recursive: true });
   const runPack = options.runPack ?? runPackDefault;
-  // A declared pack is the module's own way of packing, and it runs once
-  // with the version substituted; one that cannot take the version is
-  // refused by name rather than passed over for the default, because a
-  // declaration nobody runs is a declaration that lies.
+  // A declared pack that names the version is the module's own way of
+  // packing, and it runs once with the version substituted. One that does
+  // not name it is the PUBLISH's declaration and not this act's: the
+  // candidate gives every package the immutable dev version, while the
+  // publish refuses a pack that names `{version}` because it has none to
+  // give. Refusing here by name -- as this used to -- made the two rules
+  // contradict for the one declaration both read, so a module-attributed
+  // releasable session could pass its run of record or publish, never both.
+  // The default pack is the framework's own act and takes the version.
   let declared: ReturnType<typeof loadDeclaration>;
   try {
     declared = loadDeclaration(options.config ?? null, slug);
@@ -332,13 +337,7 @@ export function packModule(
     if (error instanceof PackagingConfigError) throw new PackagesError(error.message);
     throw error;
   }
-  if (declared !== null && !declared.pack.usesVersion) {
-    throw new PackagesError(
-      `the declared pack for module '${slug}' does not name ${PLACEHOLDER_VERSION}, and ` +
-        "`module pack` gives every package the immutable dev version; add it to the argv " +
-        "(for .NET, -p:PackageVersion={version}) or remove the declaration to take the default",
-    );
-  }
+  if (declared !== null && !declared.pack.usesVersion) declared = null;
   // Targets built by one project (a Maven module's aggregator) share one
   // command, run once.
   const commands: string[][] =

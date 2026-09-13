@@ -387,6 +387,17 @@ describe("dabbler modules", () => {
     assert.match(result.err, /is not a subcommand/);
   });
 
+  it("says what each of the three contract modes is, in the help", async () => {
+    // A developer choosing `--contract` was told the three names and nothing
+    // else; the sample's second session met the modes with no page saying
+    // what `designed` or `generated` meant. The help is the one line each.
+    const help = await run(() => modulesVerb(["--help"]));
+    assert.equal(help.code, 0);
+    assert.match(help.out, /package\s+the published package is its own/);
+    assert.match(help.out, /designed\s+an abstractions project written by/);
+    assert.match(help.out, /generated\s+a surface derived from the built/);
+  });
+
   it("creates with the module vocabulary and shows it back with usedBy derived", async () => {
     const root = tempDir("cli-");
     const model = await run(() =>
@@ -612,6 +623,33 @@ describe("dabbler module", () => {
     assert.equal(result.code, 0, result.err);
     assert.match(result.out, /pinned JsonModel in Directory\.Packages\.props/);
     assert.ok(readCandidateRecord(repo, 1).paths.some((entry) => entry.path === "Directory.Packages.props"));
+  });
+
+  it("skips a module that has no project file yet rather than refusing the candidate", async () => {
+    // A shared file every module names reaches every module, and a solution
+    // planned before its code exists has modules with nothing under their
+    // roots. The sample's first run of record stopped on the first of three
+    // such modules; a candidate of a module with nothing to pack is nothing.
+    const manifest = DOTNET_MANIFEST.replace(
+      "  - slug: app",
+      "  - slug: store\n    kind: library\n    codeRoots: [modules/store]\n    package: JsonStore\n    dependsOn: [model]\n  - slug: app",
+    );
+    const { repo, sessionsDir } = makeAnsweredSandbox({
+      "docs/modules.yaml": manifest,
+      "modules/model/JsonModel/JsonModel.csproj": '<Project Sdk="Microsoft.NET.Sdk" />\n',
+      "modules/model/contract/README.md": "# JsonModel\n",
+      "modules/store/contract/README.md": "# JsonStore\n",
+      "dabbler.yaml": packDeclaration("model", "JsonModel.{v}.nupkg"),
+      "tools/fake-pack.mjs": FAKE_PACK,
+    });
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "pack the model", releasable: false });
+    const result = await run(() =>
+      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "model", "store"]),
+    );
+    assert.equal(result.code, 0, result.err);
+    assert.match(result.out, /packed model/);
+    assert.match(result.out, /skipped store: no project file/);
   });
 });
 

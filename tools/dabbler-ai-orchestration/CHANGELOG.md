@@ -10,6 +10,86 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.5.0] — 2026-09-13
+
+**What a developer reads and clicks around a focused session, made to say
+what it does.** A four-module .NET sample was driven through 2.4.0 from a
+developer's seat, with an issues log kept as it went; 2.4.1 fixed the one
+thing that crashed, this release answers the rest. Nothing here changes what
+a session does — only what you are told before and while it does it.
+
+### Changed
+
+- **Two launchers are retitled, because they open a new window.** When the
+  next session's plan says `Module: <slug>`, pressing Start in the
+  repository makes a focused clone of that module beside the repository and
+  opens it in a new window. The Work Explorer's row now says so — **Start
+  Session in a New Window** — and the Solution Explorer's command is **Start
+  Focused Session in a New Window**. In the module's own window, and for a
+  global session, the row is still **Start Session**. Same command underneath.
+- **A gate that judged nothing no longer wears a tick.** The close's gate
+  rows opened every inapplicable gate with `✓` beside `(N/A)`, so a
+  repository with no test suite declared closed behind nine ticks with no
+  test run. It is a dash now: `- test_run_fresh (N/A)`.
+- **The Configuration pane stops saying "none installed" on a machine that
+  has engines.** With `claude` and `copilot` both on PATH, the router leaves
+  the choice to you and the authoring *Vehicle* row read "none installed".
+  It reads "2 installed, none chosen" now, and "none installed" only when
+  the machine has none.
+
+### Added
+
+- **One line makes a session global, and it is taught.** `Scope: whole
+  repository` under a session's heading in the plan makes it a global
+  session wherever the line appears in the section; a `Module: <slug>` line
+  beside it only says which module the session is about, and the Work
+  Explorer files it there. The plan template `dabbler bootstrap` writes says
+  both forms.
+- **A page to read before your first focused session.** The README's module
+  section now says what the focused checkout holds and why, what a session
+  on it may change (root build files and the solution file included), how
+  to reach a file outside the module's roots with `sharedFiles` in
+  `dabbler.yaml`, that the clone is made from `origin` so what is not pushed
+  is not in it, what the three contract modes mean, and what to do when a
+  sibling's package has never been published. `dabbler modules create
+  --help` says the three modes in a line each.
+- **The declaration names the extension's own write.** The Configuration
+  pane writes the authoring model and the reviewing vehicle into
+  `.vscode/settings.json`, and the declaration refused a tree carrying that
+  change with "commit or revert". When that file is the only change, the
+  refusal now says what it holds and the two ways on: commit it, because it
+  is solution policy; or keep the choice as your own default with `dabbler
+  configure --mine` and revert the file. Nothing commits on your behalf.
+
+### Fixed, found by walking a first releasable module session
+
+Session 3 of the four-module sample — the first that packs and publishes
+— stopped four times in its run of record and publish, each on a rule that
+held on a single-module repository and not on this one:
+
+- **`dabbler packaging --dry-run` named as a plan check no longer fails in
+  a releasable session.** The help promises the rehearsal exits 0 when the
+  block loads; it did so only in a session that may not publish, and in
+  one that may it demanded evidence a session mid-work cannot have.
+- **A `packaging` block whose pack does not name `{version}` is the
+  publish's, and the run of record's candidate takes the framework's own
+  pack instead of refusing it.** The candidate demanded `{version}` and the
+  publish refuses a pack that names it, so one declaration could never
+  satisfy both.
+- **A module with no project file under its roots yet is skipped by the
+  candidate and expected by nothing.** A shared file every module names
+  reaches every module; three of the sample's four had no code by plan,
+  and the candidate refused on the first of them.
+- **A folder feed spelled relative to the repository reaches
+  `dotnet nuget push` absolute.** `--source ../feed` is "invalid" to the
+  tool where the same path absolute is taken; the declaration does not
+  change.
+
+### Already shipped
+
+- **The bundled `dabbler` command** that crashed on every verb from 2.3.0
+  was fixed in 2.4.1; a seat on 2.4.1 already has it.
+
 ## [2.4.1] — 2026-09-13
 
 **The `dabbler` command shipped inside the extension has crashed on every

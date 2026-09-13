@@ -7,7 +7,7 @@
 // asserted from literals.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { beforeEach, describe, it } from "node:test";
 
 import { canonicalPath, snapshotWorktreeTree } from "../src/journal.ts";
@@ -23,6 +23,7 @@ import {
   OUTCOME_PUBLISHED,
   OUTCOME_REFUSED,
   PackagingConfigError,
+  feedAsPushed,
   feedTakesCredential,
   loadDeclaration,
   loadTagRelease,
@@ -274,6 +275,16 @@ describe("a feed that takes no credential", () => {
       "",
     ]) {
       assert.equal(feedTakesCredential(remote), true, remote);
+    }
+    // A folder feed spelled relative to the repository reaches the push
+    // tool absolute: `dotnet nuget push --source ../feed` answered "The
+    // specified source '../feed' is invalid" in the sample, where the same
+    // path absolute is taken. Everything else passes as declared.
+    const root = process.platform === "win32" ? "D:\\repo" : "/srv/repo";
+    assert.equal(feedAsPushed(root, "../shared-feed"), resolve(root, "../shared-feed"));
+    assert.equal(feedAsPushed(root, "feeds/local"), resolve(root, "feeds/local"));
+    for (const asDeclared of ["file:///d/feeds/local", "/var/feeds/local", "\\\\build\\artifacts", "D:\\feed", "https://nuget.internal/v3/index.json", "internal-feed"]) {
+      assert.equal(feedAsPushed(root, asDeclared), asDeclared, asDeclared);
     }
   });
 
@@ -694,5 +705,22 @@ describe("the record", () => {
     assert.equal(existsSync(pushLog), false);
     assert.equal(existsSync(packagingPath(repo, 1)), false);
     assert.throws(() => record(sessionsDir, run), /nothing to file/);
+  });
+
+  it("says the block loads on a dry run whose evidence is not there yet, in a releasable session too", () => {
+    // The help promises a plan check can name the rehearsal in any session.
+    // A releasable session mid-work has no push and no run of record yet by
+    // design, and the sample's first releasable session was refused for
+    // exactly that when its plan named the rehearsal as a check.
+    const { sessionsDir, pushLog, ahead } = publishable();
+    ahead(1);
+    const rehearsed = packageSession(sessionsDir, { config: packagingConfig(pushLog), dryRun: true });
+    assert.equal(rehearsed.ready, false);
+    assert.equal(rehearsed.declared, true);
+    assert.ok(rehearsed.gates.some((gate) => !gate.passed));
+    // The real run keeps refusing: nothing about the gates moved.
+    const attempted = packageSession(sessionsDir, { config: packagingConfig(pushLog) });
+    assert.equal(attempted.declared, false);
+    assert.equal(existsSync(pushLog), false);
   });
 });

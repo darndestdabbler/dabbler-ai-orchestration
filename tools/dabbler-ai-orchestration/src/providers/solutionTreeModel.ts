@@ -1244,13 +1244,20 @@ export function descriptorFor(
         ? (context.chosenEngine ?? vehicle?.chosen ?? null)
         : (vehicle?.chosen ?? null);
       const roleOwn = !authoring && (vehicle?.decidedBy ?? "").startsWith("roles.");
+      // No engine chosen is two different facts: the router declines to
+      // default when two CLIs are on PATH and waits for a person, or the
+      // machine has none. The developer's machine -- claude and copilot both
+      // installed -- read "none installed" until session 162.
+      const installed = (engines?.installed ?? []).filter((entry) => entry.path !== null).length;
       return {
         id: `config:vehicle:${node.who}`,
         label: "Vehicle",
         description: chosen
           ? `${chosen}${shadowed.length > 0 ? " ⚠" : ""}`
           : authoring
-            ? "none installed"
+            ? installed > 0
+              ? `${installed} installed, none chosen`
+              : "none installed"
             : "not read",
         tooltip: [
           vehicleText(vehicle),

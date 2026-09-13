@@ -598,7 +598,9 @@ describe("a stop, as a person reads it", () => {
             `Session 007 paused (${kind}${klass === "deadlock" ? ", deadlock" : ""})`,
             label,
           );
-          assert.match(words.happened, /load-bearing/, label);
+          // The stop's own words open the sentence: a toast shows only the
+          // first one, and the kind's sentence is a category, not a reason.
+          assert.match(words.happened, /^The widget is load-bearing/, label);
           assert.match(words.ended, /has ended/, label);
           assert.match(words.ended, /remains in flight/, label);
           assert.match(words.next, /^Next: /, label);

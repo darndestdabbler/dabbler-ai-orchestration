@@ -8918,3 +8918,9 @@ What it still is: a plaintext credential in the working tree of a repository tha
 Session 159 did not delete it. The machine owns that record, and deleting a session's log to tidy away a finding is the wrong instinct even when the content is wrong. Two things are put to the operator: remove or redact that one file, and rotate the three keys, which is the only action that makes the exposure stop mattering regardless of what else is on disk.
 
 Reproduced by searching .dabbler/ for the value of each DABBLER_*_API_KEY.
+
+## Session 162 — What the developer reads and sees, and the walk
+
+### D279 · 2026-09-13 · Orchestrator (claude-fable-5-1/anthropic) · A declared pack that does not name {version} is the publish's, and the module candidate takes the default pack instead of refusing it
+
+Found by session 162's walk in the csv-parser sample, session 3: the module candidate refused a root packaging block whose pack argv did not name {version}, and the publish refuses one that does, because dabbler packaging supplies no version. Both read the same declaration for a module-attributed session, so a releasable module session could pass its run of record or publish, never both. The rule that refused by name ('a declaration nobody runs is a declaration that lies') is set aside for the candidate only: the candidate is the framework's own act with its own immutable dev version, and a pack declared for a feed is not a lie about it. The publish keeps its refusal. Decided under the unattended-work directive by rules (a) and (c): a developer expects the publish declaration to describe the publish, and one line is simpler than a second declaration.

@@ -388,10 +388,13 @@ describe("the gate row every screen shows", () => {
       renderGateRow(row({ passed: false, remediation: "run: git push" })),
       `${GATE_FAIL_MARK} working_tree_clean  run: git push`,
     );
-    assert.equal(
-      renderGateRow(row({ inapplicable: true, remediation: "no manifest" })),
-      `${GATE_PASS_MARK} working_tree_clean ${GATE_NOT_APPLICABLE}`,
-    );
+    // A gate that judged nothing wears neither mark: the sample closed two
+    // sessions behind nine ticks with no test run because the one that
+    // judged nothing looked like the eight that judged.
+    const judgedNothing = renderGateRow(row({ inapplicable: true, remediation: "no manifest" }));
+    assert.ok(judgedNothing.endsWith(`working_tree_clean ${GATE_NOT_APPLICABLE}`), judgedNothing);
+    assert.ok(!judgedNothing.includes(GATE_PASS_MARK), judgedNothing);
+    assert.ok(!judgedNothing.includes(GATE_FAIL_MARK), judgedNothing);
   });
 
   it("drops the explanation for a non-event and keeps the one for an act", () => {

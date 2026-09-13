@@ -155,6 +155,13 @@ export const GATE_PASS_MARK = "✓";
 export const GATE_FAIL_MARK = "✗";
 /** What a gate that judged nothing says of itself, after its name. */
 export const GATE_NOT_APPLICABLE = "(N/A)";
+/**
+ * The mark a gate that judged nothing carries: neither the pass mark nor
+ * the fail mark. The sample closed two sessions VERIFIED behind nine ticks
+ * with no test run, because the gate that would have run one wore the same
+ * mark as the eight that judged.
+ */
+export const GATE_NOT_APPLICABLE_MARK = "-";
 
 /**
  * One gate as a line, for whoever is showing it.
@@ -166,10 +173,12 @@ export const GATE_NOT_APPLICABLE = "(N/A)";
  * already the same three marks. They were not, and the operator read two
  * formats for one fact.
  *
- * **A gate that judged nothing says `(N/A)` and stops there.** The sentence
- * explaining why its precondition was invisible is the longest text on the
- * busiest screen and it explains something that did not happen; it belongs
- * to whoever is debugging the gate. **A remediation on a gate that DID judge
+ * **A gate that judged nothing wears neither mark, says `(N/A)` and stops
+ * there.** A dash where the tick would be, because a column of ticks with
+ * one that judged nothing among them reads as nine gates passed. The
+ * sentence explaining why its precondition was invisible is the longest
+ * text on the busiest screen and it explains something that did not happen;
+ * it belongs to whoever is debugging the gate. **A remediation on a gate that DID judge
  * is kept**: on a failure it is the operator's next action, and on a pass it
  * appears only under `--force`, where it is the forensic note saying a
  * bookkeeping gate was stepped over. Neither is an explanation of a
@@ -179,9 +188,9 @@ export const GATE_NOT_APPLICABLE = "(N/A)";
  * a gate row SAYS is settled here.
  */
 export function renderGateRow(gate: GateResult, nameWidth = 0): string {
-  const mark = gate.inapplicable || gate.passed ? GATE_PASS_MARK : GATE_FAIL_MARK;
   const name = gate.name.padEnd(nameWidth);
-  if (gate.inapplicable) return `${mark} ${name} ${GATE_NOT_APPLICABLE}`;
+  if (gate.inapplicable) return `${GATE_NOT_APPLICABLE_MARK} ${name} ${GATE_NOT_APPLICABLE}`;
+  const mark = gate.passed ? GATE_PASS_MARK : GATE_FAIL_MARK;
   return gate.remediation
     ? `${mark} ${name}  ${gate.remediation}`
     : `${mark} ${name}`.trimEnd();

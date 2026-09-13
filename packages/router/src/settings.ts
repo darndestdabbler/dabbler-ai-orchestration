@@ -32,6 +32,15 @@ import { applyEdits, modify, parse, type ParseError, printParseErrorCode } from 
 /** Where a checkout's own settings live, relative to its root. */
 export const SETTINGS_RELPATH = join(".vscode", "settings.json");
 
+/**
+ * The `configure` flag that says a choice is this PERSON's rather than this
+ * checkout's: it goes to the user-level preferences instead of this file.
+ * Spelled here, beside the file it keeps a choice OUT of, because the
+ * declaration's refusal names it and the verb parses it, and two spellings
+ * of one flag is how a refusal comes to name a flag the verb refuses.
+ */
+export const MINE_FLAG = "--mine";
+
 export function settingsPath(root: string): string {
   return join(root, SETTINGS_RELPATH);
 }

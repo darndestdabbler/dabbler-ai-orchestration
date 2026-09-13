@@ -49,6 +49,23 @@ export const startableHere = (r: SessionsRepository): boolean => {
 
 const canStart = (r: SessionsRepository): boolean => hasNextSession(r) && startableHere(r);
 
+/**
+ * Whether Start, pressed in THIS window, opens the module's window: the
+ * next session is focused and this checkout is the repository itself. The
+ * same two facts `opensModuleWindow` in sessionCommands.ts reads before it
+ * clones; here they pick the TITLE, so a launcher that opens a window says
+ * so before it is pressed. In the module's own folder the same button
+ * opens the AI here, and is titled as such.
+ */
+export const opensWindow = (r: SessionsRepository): boolean => {
+  if (r.checkoutModule !== null) return false;
+  const next = r.sessions.find((s) => s.number === r.nextSession);
+  return next?.kind === "focused";
+};
+
+const START_SESSION = "dabblerSessionSets.startSession";
+const START_SESSION_IN_NEW_WINDOW = "dabblerSessionSets.startSessionInNewWindow";
+
 // Ordered list; `group` bands: 1xx Open File submenu, 3xx Copy Prompt
 // submenu, 9xx lifecycle.
 export const REPOSITORY_ACTIONS: RepositoryAction[] = [
@@ -56,7 +73,16 @@ export const REPOSITORY_ACTIONS: RepositoryAction[] = [
   { id: "dabblerSessionSets.openActivityLog", label: "Activity Log", group: 102, when: () => true },
   { id: "dabblerSessionSets.openChangeLog", label: "Change Log", group: 103, when: () => true },
   { id: "dabblerSessionSets.openSessionState", label: "Sessions Ledger", group: 104, when: () => true },
-  { id: "dabblerSessionSets.startSession", label: "Start Session", group: 905, when: canStart },
+  // One launcher under two titles, and the title is the only difference:
+  // both run the same command, and which is offered is decided by whether
+  // pressing it opens a window on the module's clone.
+  { id: START_SESSION, label: "Start Session", group: 905, when: (r) => canStart(r) && !opensWindow(r) },
+  {
+    id: START_SESSION_IN_NEW_WINDOW,
+    label: "Start Session in a New Window",
+    group: 905,
+    when: (r) => canStart(r) && opensWindow(r),
+  },
   // The unattended half sits beside Start rather than replacing it: one
   // opens the person's own CLI, the other runs the session with nobody
   // watching, and which of those you want is not something a flag on one
@@ -96,23 +122,31 @@ export interface SessionAction {
   when: (repository: SessionsRepository, session: SessionRecord) => boolean;
 }
 
+// On the row for the session that would actually be registered, and only
+// while nothing is in flight. Both halves matter and neither is decided
+// here: `session start` registers the NEXT session and takes no number, so
+// an entry on any other planned row would start a different session than
+// the one it was clicked on -- and `nextSession` is the router's own answer
+// to which that is, carried through the projection rather than recomputed
+// beside it.
+const isTheNextRow = (repository: SessionsRepository, session: SessionRecord): boolean =>
+  repository.currentSession === null &&
+  repository.nextSession !== null &&
+  session.number === repository.nextSession &&
+  startableHere(repository);
+
 export const SESSION_ACTIONS: SessionAction[] = [
   {
-    id: "dabblerSessionSets.startSession",
+    id: START_SESSION,
     label: "Start Session",
     group: 900,
-    // On the row for the session that would actually be registered, and
-    // only while nothing is in flight. Both halves matter and neither is
-    // decided here: `session start` registers the NEXT session and takes no
-    // number, so an entry on any other planned row would start a different
-    // session than the one it was clicked on -- and `nextSession` is the
-    // router's own answer to which that is, carried through the projection
-    // rather than recomputed beside it.
-    when: (repository, session) =>
-      repository.currentSession === null &&
-      repository.nextSession !== null &&
-      session.number === repository.nextSession &&
-      startableHere(repository),
+    when: (repository, session) => isTheNextRow(repository, session) && !opensWindow(repository),
+  },
+  {
+    id: START_SESSION_IN_NEW_WINDOW,
+    label: "Start Session in a New Window",
+    group: 900,
+    when: (repository, session) => isTheNextRow(repository, session) && opensWindow(repository),
   },
   {
     id: "dabblerSessionSets.resumeSession",

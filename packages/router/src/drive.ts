@@ -84,6 +84,7 @@ import {
 } from "./driver.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
+import { hasProjectFile } from "./ecosystem.ts";
 import { clearModuleSessionMarker, contractDir, readCloneMarker, readModuleSessionMarker } from "./checkout.ts";
 import {
   type LandFacts,
@@ -2159,18 +2160,24 @@ ${this.stopArtifacts()}`,
       // cross-module plan handed over without its reason is refused there
       // after being accepted here.
       const shape = solutionShape(this.repoRoot);
+      // The refusal's own words travel into the stop: the toast shows the
+      // stop's first sentence, and "its reason is above" is not a reason.
+      let refusal = "";
       const code = declare(this.sessionsDir, {
         task: plan.task,
         releasable: plan.releasable,
         sessionNumber: this.sessionNumber,
         modules: shape.multi ? (plan.modules ?? null) : null,
         reason: plan.reason ?? null,
+        onRefusal: (message) => {
+          refusal = message;
+        },
       });
       if (code !== EXIT_OK) {
         throw new Stop(
           "engine",
-          "the declaration was refused (its reason is above); a plan is answered " +
-            "before any file changes",
+          `the declaration was refused: ${refusal === "" ? "its reason is above" : refusal}` +
+            " -- a plan is answered before any file changes",
         );
       }
     }
@@ -3149,6 +3156,10 @@ ${this.stopArtifacts()}`,
       for (const slug of plan.changedModules) {
         const entry = shape.modules.find((module) => module.slug === slug);
         if (entry === undefined || entry.package === null) continue;
+        // The candidate skips a module with no project file under its roots
+        // -- nothing to pack -- so the land expects no candidate of it. One
+        // rule, read by both through `hasProjectFile`.
+        if (!hasProjectFile(this.repoRoot, entry)) continue;
         const record = records.filter((row) => row.package === entry.package && row.session === this.sessionNumber).at(-1);
         const contract = `${contractDir(slug)}/`;
         modules.push({

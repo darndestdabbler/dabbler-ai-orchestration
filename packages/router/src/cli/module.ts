@@ -17,7 +17,7 @@ import { CheckoutError, openModule, preflight, readCloneMarker } from "../checko
 import { ConfigError, loadConfig } from "../config.ts";
 import { ContractError, renderModuleContract } from "../contractdoc.ts";
 import { ensureRootFilesWithSuite } from "../bootstrap/detect.ts";
-import { EcosystemError, ecosystemOf } from "../ecosystem.ts";
+import { EcosystemError, ecosystemOf, hasProjectFile } from "../ecosystem.ts";
 import { sessionsDirFor } from "../evidence.ts";
 import { ExposureError, raiseGrantDecision, revokeGrant } from "../exposure.ts";
 import { writeCandidateRecord } from "../impact.ts";
@@ -171,6 +171,17 @@ function candidateSubcommand(rest: readonly string[]): number {
     const bundled = new Set<string>();
     for (const slug of slugs) {
       const entry = shape.modules.find((module) => module.slug === slug);
+      // A module the manifest declares before its code exists has nothing to
+      // pack, no source for a surface page and no bundle to record. A change
+      // that reaches it -- a shared file every module names -- names it as a
+      // candidate all the same, and refusing the whole run for it stopped
+      // the sample's first run of record on three modules that were empty
+      // by plan. Before the application branch, because a bundle record
+      // asks the ecosystem too.
+      if (entry !== undefined && !hasProjectFile(workspaceRoot, entry)) {
+        writeOut(`skipped ${slug}: no project file under ${entry.codeRoots.join(", ") || "."} yet, so there is nothing to pack\n`);
+        continue;
+      }
       // An application's candidate is the bundle record -- what it ships,
       // at the versions the central pins name -- written into the tree
       // before the run of record so the land carries it, whether or not the

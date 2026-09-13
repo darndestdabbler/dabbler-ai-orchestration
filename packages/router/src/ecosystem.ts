@@ -232,6 +232,23 @@ function isMavenProject(name: string): boolean {
  * module is one ecosystem and a folder that is two is a folder that should
  * be two modules.
  */
+/**
+ * Whether any code root of the module holds a project file the framework
+ * knows. A module the manifest declares before its code exists has none,
+ * and a candidate asked of it has nothing to pack: the sample's shared
+ * notes file reached four modules and three of them were empty.
+ */
+export function hasProjectFile(root: string, entry: ModuleEntry): boolean {
+  const roots = entry.codeRoots.length > 0 ? entry.codeRoots : ["."];
+  for (const codeRoot of roots) {
+    for (const file of walkFiles(join(root, codeRoot))) {
+      const name = relative(root, file).split(/[\\/]/).pop() ?? "";
+      if (isDotnetProject(name) || isMavenProject(name)) return true;
+    }
+  }
+  return false;
+}
+
 export function ecosystemOf(root: string, entry: ModuleEntry): Ecosystem {
   let dotnet = false;
   let maven = false;

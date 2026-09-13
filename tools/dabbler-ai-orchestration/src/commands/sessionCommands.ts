@@ -1049,16 +1049,18 @@ export function registerSessionCommands(
 ): Drives {
   context.subscriptions.push(
     drives,
-    vscode.commands.registerCommand(
-      "dabblerSessionSets.startSession",
-      async (arg: unknown) => {
+    // One launcher under two titles: the registry offers the second id
+    // when pressing Start opens a window on the module's clone, so the
+    // title says so; what runs is the same command.
+    ...["dabblerSessionSets.startSession", "dabblerSessionSets.startSessionInNewWindow"].map((id) =>
+      vscode.commands.registerCommand(id, async (arg: unknown) => {
         const repository = repositoryOf(arg);
         if (!repository) return;
         // No channel is shown: the engine is in the terminal that just
         // opened, and the framework's own work goes to the Dabbler
         // terminal rather than here.
         await runStartSession(repository, ui, router);
-      },
+      }),
     ),
     vscode.commands.registerCommand(
       "dabbler.startUnattendedSession",

@@ -1636,6 +1636,14 @@ export interface DeclareCliOptions {
   readonly modules?: readonly string[] | null;
   /** Why the session must change more than one module; required with two or more. */
   readonly reason?: string | null;
+  /**
+   * Handed every refusal's own words, beside the line written to stderr.
+   * The driver declares on the engine's behalf and stops when this refuses;
+   * a stop that said only "the declaration was refused (its reason is
+   * above)" left the toast, which shows the stop's first sentence, saying
+   * nothing a person could act on.
+   */
+  readonly onRefusal?: (message: string) => void;
 }
 
 /** Declare the session's task list and whether it may publish. */
@@ -1644,20 +1652,24 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     writeErr(`declare: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
+  const refuse = (message: string, code: number): number => {
+    writeErr(`declare: refused -- ${message}\n`);
+    options.onRefusal?.(message);
+    return code;
+  };
   const target = resolveTargetSession(sessionsDir, options.sessionNumber);
   if (target === null) {
-    writeErr(
-      `declare: refused -- no session has been started under ${sessionsDir}. ` +
-        "Run `session start` first.\n",
+    return refuse(
+      `no session has been started under ${sessionsDir}. Run \`session start\` first.`,
+      EXIT_BOUNDARY,
     );
-    return EXIT_BOUNDARY;
   }
   let text: string;
   try {
     text = readBody(options.task, options.taskFile);
   } catch (error) {
     if (error instanceof SanctionedWriteError) {
-      writeErr(`declare: refused -- ${error.message}\n`);
+      return refuse(error.message, EXIT_USAGE);
     } else {
       writeErr(
         `declare: cannot read task -- ${
@@ -1685,18 +1697,14 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     "the declaration",
     global,
   );
-  if (shapeReasons.length > 0) {
-    writeErr(`declare: refused -- ${shapeReasons.join("; ")}\n`);
-    return EXIT_USAGE;
-  }
+  if (shapeReasons.length > 0) return refuse(shapeReasons.join("; "), EXIT_USAGE);
 
   let lock: string;
   try {
     lock = acquireLockWithTimeout(sessionsDir, `declare/${process.pid}`);
   } catch (error) {
     if (!(error instanceof LockContentionError)) throw error;
-    writeErr(`declare: refused -- lifecycle lock contention: ${error.message}\n`);
-    return EXIT_LOCK_CONTENTION;
+    return refuse(`lifecycle lock contention: ${error.message}`, EXIT_LOCK_CONTENTION);
   }
   try {
     declareSessionTask(sessionsDir, {
@@ -1707,8 +1715,7 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     });
   } catch (error) {
     if (!(error instanceof SanctionedWriteError)) throw error;
-    writeErr(`declare: refused -- ${error.message}\n`);
-    return EXIT_USAGE;
+    return refuse(error.message, EXIT_USAGE);
   } finally {
     releaseLock(lock);
   }

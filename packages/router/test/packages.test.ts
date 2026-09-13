@@ -175,11 +175,25 @@ describe("the pack", () => {
     const own = packModule(root, shape, "persister", { config: declared, runPack: runDeclared, digestOf: () => "eeeeeeeeee", baseCommit: null, now: new Date("2026-09-06T23:00:00Z") });
     assert.equal(declaredCalls.length, 1);
     assert.equal(declaredCalls[0]?.[2], own.version);
+    // A declared pack that does not name the version is the publish's, not
+    // the candidate's: the publish refuses a pack that names {version}, so
+    // refusing here too left a module-attributed releasable session with no
+    // declaration both could take. The default pack runs instead.
     const versionless = { modules: { persister: { packaging: { pack: { argv: ["pack-it", "{output}"] }, push: declared.modules.persister.packaging.push } } } };
-    assert.throws(
-      () => packModule(root, shape, "persister", { config: versionless, runPack: runDeclared, digestOf: () => "abababab", baseCommit: null }),
-      /declared pack for module 'persister' does not name \{version\}/,
-    );
+    const defaultCalls: string[][] = [];
+    const runDefault = (argv: readonly string[]): { code: number; output: string } => {
+      defaultCalls.push([...argv]);
+      const output = argv[argv.indexOf("-o") + 1] as string;
+      const version = (argv.find((token) => token.startsWith("-p:PackageVersion=")) ?? "").slice("-p:PackageVersion=".length);
+      for (const id of ["CsvPersister", "CsvPersister.Abstractions", "CsvPersister.ContractTests"]) {
+        writeFileSync(join(output, `${id}.${version}.nupkg`), "bytes", "utf8");
+      }
+      return { code: 0, output: "" };
+    };
+    const fallback = packModule(root, shape, "persister", { config: versionless, runPack: runDefault, digestOf: () => "abababab", baseCommit: null });
+    assert.ok(defaultCalls.length > 0);
+    assert.ok(defaultCalls.every((argv) => argv[0] === "dotnet" && argv[1] === "pack"), JSON.stringify(defaultCalls));
+    assert.ok(defaultCalls.every((argv) => argv.includes(`-p:PackageVersion=${fallback.version}`)));
   });
 
   it("refuses a package over the ceiling unless the feed is under LFS, naming both ways out and leaving no pin or record", () => {

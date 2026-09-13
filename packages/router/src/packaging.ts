@@ -16,7 +16,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import { childEnv, isSetBookkeeping } from "./checks.ts";
 import { type RouterConfig, loadConfig } from "./config.ts";
@@ -387,6 +387,21 @@ export function feedTakesCredential(feed: string): boolean {
   // is a directory and not a host.
   if (/[\\/]/.test(value)) return false;
   return true;
+}
+
+/**
+ * The feed as the push tool receives it: a folder feed spelled relative to
+ * the repository is made absolute, because `dotnet nuget push` refuses
+ * `../feed` as "invalid" where it takes `D:\feed`, and a declaration that
+ * reads as a path to the credential rule above must reach the tool as one.
+ * A URL, an absolute path, a UNC share or `file://` passes as declared.
+ */
+export function feedAsPushed(root: string, feed: string): string {
+  const value = feed.trim();
+  if (feedTakesCredential(value)) return feed;
+  if (/^file:\/\//i.test(value) || /^[A-Za-z]:/.test(value)) return feed;
+  if (value.startsWith("\\\\") || value.startsWith("/")) return feed;
+  return resolve(root, value);
 }
 
 /** The `packaging` block under `modules.<slug>`, or null when the slug has none. */
@@ -1197,7 +1212,7 @@ export function packageSession(
   const gates = runGates(sessionsDir, { omit: [GATE_PUBLISHED_WHEN_RELEASABLE] });
   const failed = gates.filter((gate) => !gate.passed);
   if (failed.length > 0) {
-    return refusal(
+    const refused = refusal(
       sessionNumber,
       true,
       "step (f) runs after (e), and the evidence for the earlier " +
@@ -1205,6 +1220,13 @@ export function packageSession(
         failed.map((g) => `${g.name}: ${g.remediation}`).join("; "),
       gates,
     );
+    // A rehearsal proves the one thing it can prove here, in a releasable
+    // session as in one that may not publish: the block loads. The evidence
+    // for (a) through (e) is the close's to demand, and mid-session it is
+    // not there yet by design -- which is exactly when a plan check names
+    // the rehearsal. The sample's first releasable session named it and
+    // was refused for evidence it could not have had.
+    return options.dryRun === true ? { ...refused, declared: true } : refused;
   }
 
   // A tag release runs no pack and no push: everything below this point is
@@ -1379,7 +1401,7 @@ function execute(
   for (const artifact of artifacts) {
     const common = {
       [PLACEHOLDER_ARTIFACT]: join(outputDir, artifact),
-      [PLACEHOLDER_FEED]: push.feed,
+      [PLACEHOLDER_FEED]: feedAsPushed(root, push.feed),
     };
     const spawnArgv = substitute(push.argv, {
       ...common,

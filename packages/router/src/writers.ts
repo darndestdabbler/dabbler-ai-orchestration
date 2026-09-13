@@ -26,6 +26,7 @@ import {
   repoRootFor,
 } from "./evidence.ts";
 import { materialWorktreeChanges, previewPaths } from "./gates.ts";
+import { MINE_FLAG, SETTINGS_RELPATH } from "./settings.ts";
 import { type ReleasabilityWithdrawn, standingWithdrawal } from "./ledger.ts";
 import { nowIso, platformNewlines } from "./journal.ts";
 import {
@@ -852,6 +853,24 @@ export function declareSessionTask(
     );
   }
   if (paths.length > 0) {
+    // The extension's own write is the one change a person did not make:
+    // the Configuration pane puts the authoring model, the reviewing vehicle
+    // or a credential's NAME into the checkout's settings file, which is
+    // solution policy and meant to be committed. A refusal that only said
+    // "commit or revert" left the sample's developer choosing blind, so
+    // this one names the file and the two ways on. It commits nothing.
+    const settings = SETTINGS_RELPATH.split("\\").join("/");
+    if (paths.every((path) => path.split("\\").join("/") === settings)) {
+      throw new SanctionedWriteError(
+        `session ${number} cannot declare its task list now: the working tree ` +
+          `carries ${settings}, which holds the extension's solution settings ` +
+          "(the authoring model, the reviewing vehicle, a credential's name). " +
+          "Two ways on: commit it, because it is solution policy and travels to " +
+          "everyone who clones; or keep the choice as your own default instead " +
+          `with \`dabbler configure ${MINE_FLAG} <the same flag>\`, which writes ` +
+          "your user-level preferences, and revert the file. Then declare.",
+      );
+    }
     throw new SanctionedWriteError(
       `session ${number} cannot declare its task list now: the working tree ` +
         `already carries ${paths.length} change(s) (${previewPaths(paths)}). ` +

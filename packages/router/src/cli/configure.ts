@@ -61,7 +61,7 @@ import { repoRootFor } from "../journal.ts";
 import { PREFERENCES_FILENAME, selectedModel, writePreferences } from "../preferences.ts";
 import { credentialProvider, holdsCredential, looksLikeASecret } from "../credentials.ts";
 import { vehicleRefusal } from "../discovery.ts";
-import { CREDENTIAL_SETTING_BY_PROVIDER, SETTINGS_RELPATH } from "../settings.ts";
+import { CREDENTIAL_SETTING_BY_PROVIDER, MINE_FLAG, SETTINGS_RELPATH } from "../settings.ts";
 import { workingDirectory } from "../workdir.ts";
 import {
   authoringNode,
@@ -78,8 +78,9 @@ import {
 import { normalizeModelToken } from "../contracts/models.ts";
 import { writeErr, writeOut } from "./output.ts";
 
-/** What says a choice is this PERSON's rather than this checkout's. */
-export const MINE_FLAG = "--mine";
+// The flag's one spelling lives beside the settings file it keeps a choice
+// out of; the declaration's refusal reads the same constant.
+export { MINE_FLAG };
 
 const EXIT_OK = 0;
 const EXIT_REFUSED = 1;

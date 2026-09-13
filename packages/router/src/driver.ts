@@ -1709,7 +1709,10 @@ export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
   const headline = `${session} paused (${stop.kind}${deadlock ? ", deadlock" : ""})`;
   const situation = situationFor(stop);
   const reason = asSentence(stop.reason);
-  const happened = reason === "" ? situation.what : `${situation.what} ${reason}`;
+  // The stop's own words first, the kind's sentence after: a toast shows
+  // only the first sentence, and "The engine could not be run, or what it
+  // gave back could not be used." is a category, not a reason.
+  const happened = reason === "" ? situation.what : `${reason} ${situation.what}`;
   const ended = `The dabbler command that met it has ended; ${session.toLowerCase()} remains in flight.`;
   const { resume } = nextActor(run);
   const actor = actorFor(stop, run);

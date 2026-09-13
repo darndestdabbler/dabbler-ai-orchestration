@@ -73,7 +73,6 @@ import * as path from "path";
 import * as vscode from "vscode";
 
 import {
-  GATE_NOT_APPLICABLE,
   WATCHER_QUIET,
   progressResumed,
   readUncollectedJob,
@@ -706,10 +705,9 @@ const MARK_TONES: Readonly<Record<string, Tone>> = {
  * first column, which is punctuation doing what punctuation is for -- and
  * the prose after it reaches the screen exactly as the runner wrote it.
  *
- * A gate that judged nothing wears the pass mark and is not a pass, so the
- * token the router writes after such a gate's name selects the plain tone.
- * That token is imported rather than spelled here: a second copy is how the
- * two would come to disagree about the same fact.
+ * A gate that judged nothing wears neither the pass mark nor the fail mark:
+ * the router opens its row with a dash, which is no mark this table knows,
+ * so the line reaches the screen unpainted with no special case here.
  */
 function paintMark(line: string, kind: ThemeKind): string {
   const at = line.search(/\S/);
@@ -721,12 +719,7 @@ function paintMark(line: string, kind: ThemeKind): string {
   // part of the word.
   const after = line[at + 1];
   if (after !== undefined && after !== " ") return line;
-  const judgedNothing = tone === "good" && line.trimEnd().endsWith(GATE_NOT_APPLICABLE);
-  return (
-    line.slice(0, at) +
-    (judgedNothing ? mark : paint(mark, tone, kind, true)) +
-    line.slice(at + 1)
-  );
+  return line.slice(0, at) + paint(mark, tone, kind, true) + line.slice(at + 1);
 }
 
 /**

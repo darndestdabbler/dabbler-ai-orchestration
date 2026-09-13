@@ -49,6 +49,7 @@ import {
   removeStopGate,
 } from "../bootstrap/index.ts";
 import { SETTINGS_RELPATH } from "../settings.ts";
+import { staleModelChoice } from "./configure.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;
@@ -154,17 +155,6 @@ function applyTransportPreference(parsed: Parsed): void {
   });
   for (const line of written.changed) writeOut(`bootstrap: ${line}\n`);
   writeOut(`bootstrap: written to ${written.path}\n`);
-  const stale = process.env[TRANSPORT_ENV_VAR];
-  if (stale) {
-    // Not a shadow any more: it decides nothing. Said anyway, because an
-    // operator who exported it once is entitled to know it stopped
-    // mattering -- silence would leave them believing a session is on a
-    // vehicle it is not.
-    writeOut(
-      `bootstrap: ${TRANSPORT_ENV_VAR} is set to '${stale}' in this ` +
-        "environment and is IGNORED -- the file just written is what decides.\n",
-    );
-  }
 }
 
 export async function bootstrapVerb(argv: string[]): Promise<number> {
@@ -284,6 +274,19 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
 
   const configPath = scaffoldProjectConfig(project);
   if (configPath !== null) written.push(configPath);
+  // A stored model choice the catalog no longer lists is met here, at
+  // set-up, through the one reading `session start` refuses on -- rather
+  // than as the first start's refusal, which is where the sample's operator
+  // learned it. A reading that cannot be made is `dabbler configuration
+  // options`'s to explain, and never a failed set-up.
+  try {
+    const stale = staleModelChoice(project);
+    if (stale !== null) {
+      writeOut(`bootstrap: the next \`session start\` would refuse -- ${stale}\n`);
+    }
+  } catch {
+    // Nothing: the set-up stands whatever the catalog holds.
+  }
   if (configPath !== null) {
     const declared = detectEcosystems(project);
     writeOut(`bootstrap: scaffolded ${configPath}\n`);

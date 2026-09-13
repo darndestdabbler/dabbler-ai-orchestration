@@ -15,7 +15,9 @@
 // was built to reach a driver in another process.
 
 import type { ChildProcess } from "child_process";
+import { delimiter } from "path";
 import { spawnProgram, terminateTree } from "dabbler-ai-router";
+import { installedShimDirectory } from "./terminalShim";
 
 /** What to run: the bundled command, on this Node, in this repository. */
 export interface DriveLaunch {
@@ -38,12 +40,24 @@ export interface DriveCommand {
  * Electron runs as Node only when told to. The terminal shim sets the same
  * variable for the same binary; here it is set on the child alone rather
  * than on the extension host.
+ *
+ * The shim's directory goes first on the child's PATH, where the terminal
+ * has it: a plan check may name `dabbler` bare, and it is spawned by this
+ * driver with this environment, so the two places a session runs from must
+ * resolve the name the same way. Windows spells the variable however it
+ * likes (`Path`), so the key already present is the one rewritten.
  */
-export function driveCommand(launch: DriveLaunch): DriveCommand {
-  return {
-    argv: [launch.execPath, launch.cli, ...launch.args],
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
-  };
+export function driveCommand(
+  launch: DriveLaunch,
+  shimDirectory: string | null = installedShimDirectory(),
+): DriveCommand {
+  const env: NodeJS.ProcessEnv = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
+  if (shimDirectory !== null) {
+    const key = Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+    const rest = env[key] ?? "";
+    env[key] = rest === "" ? shimDirectory : `${shimDirectory}${delimiter}${rest}`;
+  }
+  return { argv: [launch.execPath, launch.cli, ...launch.args], env };
 }
 
 /** A running driver, from the caller's side. */

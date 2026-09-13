@@ -260,6 +260,36 @@ interface DriverOptions extends Omit<DriveOptions, "engine" | "adapter"> {
 
 export const MAX_REJECTIONS = 3;
 
+/** git's own convention for a subject line, and what hosting UIs truncate past. */
+export const COMMIT_SUBJECT_WIDTH = 72;
+
+/**
+ * The landed commit's message: the session's title as the subject, the task
+ * paragraph as the body.
+ *
+ * The subject used to be the whole task paragraph on one line -- some 770
+ * characters that `git log --oneline` wrapped and every hosting UI cut --
+ * while the close commit beside it had a short subject, so the framework
+ * plainly knew how to write one. The title comes from the session's row in
+ * sessions.json; where a row has none, the task's first line stands in. A
+ * subject that would still run past the width is cut there, because the
+ * body carries the whole paragraph anyway.
+ */
+export function landCommitMessage(
+  sessionNumber: number,
+  title: string | null,
+  task: string,
+): { readonly subject: string; readonly body: string } {
+  const body = task.trim();
+  const named = (title ?? "").trim() || body.split("\n")[0]?.trim() || "driven session";
+  const full = `Session ${sessionNumber}: ${named}`;
+  const subject =
+    full.length <= COMMIT_SUBJECT_WIDTH
+      ? full
+      : `${full.slice(0, COMMIT_SUBJECT_WIDTH - 1).trimEnd()}…`;
+  return { subject, body };
+}
+
 /**
  * Whether this driver still holds the lease on the run it is about to write.
  *
@@ -2076,7 +2106,9 @@ ${this.stopArtifacts()}`,
       'to do, in words>", "files": ["<every repository-relative file the step creates or ' +
       'changes>"], "checks": [{"argv": ["<program>", "<argument>", ...]}]}\n' +
       "Every step has at least one check, and a check is argv the framework spawns with no " +
-      "shell: exit 0 proves the step. A check runs in a built environment -- PATH, HOME, the " +
+      "shell: exit 0 proves the step. A check may name `dabbler` bare: the folder the shim " +
+      "lives in is first on PATH wherever a session runs, in a terminal the extension opened " +
+      "and under a driver it started. A check runs in a built environment -- PATH, HOME, the " +
       "toolchain roots, a scratch TEMP -- and sees no credential; a driver job (verification, " +
       "the run of record, the publish) inherits the shell, so do not assert a credential from " +
       "a check. A step whose product is prose still has a mechanical " +
@@ -3016,6 +3048,11 @@ ${this.stopArtifacts()}`,
           suites: plan.suites.map((suite) => suite.name),
           candidates: plan.candidates,
           unowned: plan.unowned,
+          // An unowned path reaches no module, so it selects only the suites
+          // bound to none. Said on the line, because the sample's operator
+          // read `unowned=[...]` and could not tell whether that selected
+          // every suite, no suite, or was refused.
+          unownedSelects: plan.unowned.length === 0 ? undefined : "only the suites bound to no module",
         });
       }
       const standing = readCandidateRecord(this.repoRoot, this.sessionNumber).writtenAt;
@@ -3053,7 +3090,13 @@ ${this.stopArtifacts()}`,
     }
     const reached = plan === null ? null : new Set(plan.suites.map((suite) => suite.name));
     const scopes = loadTestScopes(this.config).scopes;
-    for (const suite of this.expensiveSuites()) {
+    const suites = this.expensiveSuites();
+    // Said, rather than left to a gate's N/A: a reader of the record could
+    // not otherwise tell a suite that was skipped from one that was green.
+    if (suites.length === 0) {
+      this.log("run-of-record-none", { reason: "no suite declared; nothing to run" });
+    }
+    for (const suite of suites) {
       if (reached !== null && !reached.has(suite.name)) {
         this.log("run-of-record-skipped", { suite: suite.name, reason: "not reached by the impact plan" });
         continue;
@@ -3214,7 +3257,16 @@ ${this.stopArtifacts()}`,
   }
 
   private phaseLand(): void {
-    const task = this.requirePlan().task.split("\n")[0]?.trim() || "driven session";
+    const rows = readSessionState(this.sessionsDir)?.["sessions"];
+    const row = (Array.isArray(rows) ? rows : []).find(
+      (entry): entry is Record<string, unknown> =>
+        typeof entry === "object" && entry !== null && (entry as Record<string, unknown>)["number"] === this.sessionNumber,
+    );
+    const message = landCommitMessage(
+      this.sessionNumber,
+      typeof row?.["title"] === "string" ? (row["title"] as string) : null,
+      this.requirePlan().task,
+    );
     // Tested bytes are the landed bytes: judged before anything is added or
     // committed, and refused by name -- the suite whose run the tree moved
     // after, the paths that moved, the module whose package was built from
@@ -3227,9 +3279,9 @@ ${this.stopArtifacts()}`,
     // a file outside the cone (the engine's settings under `.claude/`) is
     // otherwise left behind untracked, and the clone stays dirty.
     runGit(this.repoRoot, ["add", "-A", "--sparse", "--", "."]);
-    const committed = runGit(this.repoRoot, [
-      "commit", "-m", `Session ${this.sessionNumber}: ${task}`,
-    ]);
+    // Two `-m`s: git joins them with the blank line a subject and a body
+    // are separated by, and quotes nothing on the way.
+    const committed = runGit(this.repoRoot, ["commit", "-m", message.subject, "-m", message.body]);
     if (committed.code !== 0) {
       // git says "nothing to commit" on stdout and exits 1; that is a session
       // whose work is already committed, which is not a failure to land.

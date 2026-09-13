@@ -111,7 +111,7 @@ const PLAN = {
 };
 
 /** The verifier's scripted answers, and the transport that serves them. */
-function configure(responses: readonly string[]): void {
+function configure(responses: readonly string[], testing: unknown = TESTING): void {
   const dir = tempDir("responses-");
   const files: Record<string, string> = {};
   responses.forEach((text, index) => {
@@ -124,7 +124,7 @@ function configure(responses: readonly string[]): void {
       makeConfig({
         transports: { offline: { responses_dir: dir } },
         transport: { profile: "offline" },
-        testing: TESTING,
+        testing,
       }),
     ),
   });
@@ -906,5 +906,45 @@ describe("an engine that refuses the model it was given", () => {
     // And why an exit code was not enough, so the next reader does not go
     // looking for a failure the status never reported.
     assert.match(String(stop?.reason), /its own bundled catalog/);
+  });
+});
+
+describe("a session with no suite declared", () => {
+  it("says so on the run of record, rather than leaving a gate's dash to be read as green", async () => {
+    // The sample's first session closed VERIFIED with `test_run_fresh (N/A)`
+    // and nothing in the record saying the suite was absent rather than
+    // green. The phase says why it ran nothing, in its own log.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED], { suites: [] });
+    assert.equal(
+      (await capture(() =>
+        Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
+      )).value,
+      EXIT_OK,
+    );
+    const plan = await next(sessionsDir);
+    assert.equal(await answerPlan(sessionsDir, plan.instruction?.seq ?? 0, PLAN), EXIT_OK);
+    const step = await next(sessionsDir);
+    assert.equal(step.instruction?.step_id, "widget");
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+    assert.equal(
+      (await answerStep(sessionsDir, step.instruction?.seq ?? 0, "widget", ["src/widget.py"])).code,
+      EXIT_OK,
+    );
+    const said: string[] = [];
+    const deadline = Date.now() + 180_000;
+    for (;;) {
+      const move = await next(sessionsDir);
+      said.push(move.err);
+      if (move.instruction === null || move.instruction.kind === "done") break;
+      assert.equal(move.instruction.kind, "wait", said.join("\n"));
+      if (Date.now() > deadline) assert.fail("the framework's own jobs never finished");
+      await settleJobs();
+    }
+    assert.match(said.join("\n"), /run-of-record-none reason=no suite declared; nothing to run/);
   });
 });

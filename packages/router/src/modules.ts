@@ -44,6 +44,31 @@ export const EXIT_USAGE = 2;
 export const MANIFEST_RELPATH = join("docs", "modules.yaml");
 
 /**
+ * The comment the manifest opens with, written by everything that writes
+ * the file: the scaffold and every `modules create`.
+ *
+ * A YAML parse keeps no comment, so a header put there once by the scaffold
+ * was gone at the first `create` -- with the one sentence that says why
+ * `dependsOn` is the only direction anyone writes. Regenerated on every
+ * write rather than preserved through one: the file's own explanation is a
+ * constant, not something to be carried across a parse.
+ */
+export const MANIFEST_HEADER = [
+  "# What this repository is built FROM: its modules. The Solution Explorer",
+  "# renders this, and a session is scoped by it. `dabbler modules create`",
+  "# adds an entry and rewrites this file; the placeholder entry a fresh",
+  "# repository starts with is removed by hand when several are declared.",
+  "#",
+  "# `dependsOn` is the only direction anyone writes. Who depends on a",
+  "# module is derived from it -- two directions kept by hand disagree",
+  "# eventually, and the disagreement is silent.",
+  "",
+].join("\n");
+
+/** The `--package` value that declares a module no sibling consumes. */
+export const PACKAGE_NONE = "none";
+
+/**
  * What a module is to the rest of the solution. `shared-types` sits at the
  * bottom of the graph and takes the slowest cadence; `application` composes
  * the libraries and is what a bundle ships.
@@ -730,7 +755,13 @@ export function create(
   ] as const) {
     if (values && values.length > 0) entry[key] = [...values];
   }
-  entry["package"] = options.package || defaultPackage(slug, declared);
+  // `none` is a declaration -- an application no sibling consumes -- and
+  // the manifest's shape for it is no package line at all, which `modules
+  // show` reports as `package: null`. The CLI could not produce that shape
+  // and the sample's operator deleted the line by hand.
+  if (options.package !== PACKAGE_NONE) {
+    entry["package"] = options.package || defaultPackage(slug, declared);
+  }
   if (options.contract) entry["contract"] = options.contract;
   modules.push(entry);
   try {
@@ -743,8 +774,9 @@ export function create(
   mkdirSync(dirname(path), { recursive: true });
   // `newline=""` on the Python side: the manifest carries LF on every
   // platform, so the file a repository commits does not depend on which
-  // router wrote it.
-  writeTextLf(path, dumpManifest(doc));
+  // router wrote it. The header is written ahead of the document on every
+  // write, because the parse above kept none of it.
+  writeTextLf(path, MANIFEST_HEADER + dumpManifest(doc));
   writeOut(dumps(entry) + "\n");
   return EXIT_OK;
 }

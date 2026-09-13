@@ -3245,6 +3245,27 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.5.0"
+    },
+    {
+      "number": 165,
+      "title": "The small things, and the walk",
+      "status": "in-progress",
+      "startedAt": "2026-09-13T17:12:17.028000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5-1",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.5.0",
       "verification": {
         "rounds": 2,
@@ -3252,15 +3273,6 @@
         "verifierProvider": "openai",
         "transport": "api"
       }
-    },
-    {
-      "number": 165,
-      "title": "The small things, and the walk",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     }
   ]
 }

@@ -108,6 +108,22 @@ export function launchers(
   return { [COMMAND_NAME]: shLauncherText(execPath, cliPath) };
 }
 
+let installed: string | null = null;
+
+/**
+ * Where this activation put the launchers, or null before it has.
+ *
+ * The terminal PATH is changed through the environment variable collection,
+ * which reaches terminals and nothing else: the extension host's own
+ * `process.env` is untouched, so a driver it spawns would hand every check
+ * a PATH without the shim on it -- and a plan check naming `dabbler` bare
+ * would pass in a terminal and fail under the drive. The driver reads this
+ * so the two agree.
+ */
+export function installedShimDirectory(): string | null {
+  return installed;
+}
+
 /**
  * Write the launcher and prepend its directory to the terminal PATH.
  *
@@ -138,6 +154,7 @@ export function installTerminalShim(
   } catch {
     return null;
   }
+  installed = directory;
 
   const collection = context.environmentVariableCollection;
   collection.description = "Puts `dabbler` on PATH for this workspace's terminals.";

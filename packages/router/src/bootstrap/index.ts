@@ -46,7 +46,7 @@ import {
   SHARED_BODY,
 } from "./templates.ts";
 
-import { MANIFEST_RELPATH } from "../modules.ts";
+import { MANIFEST_HEADER, MANIFEST_RELPATH } from "../modules.ts";
 
 export * from "./templates.ts";
 export * from "./detect.ts";
@@ -268,9 +268,10 @@ export function scaffoldModuleManifest(projectDir: string): string | null {
   const path = join(projectDir, MANIFEST_RELPATH);
   if (existsSync(path)) return null;
   const name = basename(resolve(projectDir)) || "solution";
+  // The header every writer of the file puts first, then the one paragraph
+  // that is true only of a fresh repository.
   const text = [
-    "# What this repository is built FROM: its modules. The Solution Explorer",
-    "# renders this, and a session is scoped by it.",
+    MANIFEST_HEADER.trimEnd(),
     "#",
     "# One module, because a repository nobody has decomposed yet IS one",
     "# module -- and that is the shape every session runs in until a second",
@@ -278,10 +279,6 @@ export function scaffoldModuleManifest(projectDir: string): string | null {
     "# contracts, the run of record the module's own suites. Session 1 writes",
     "# the solution plan and decides whether there are several; a second",
     "# entry is what switches the module machinery on.",
-    "#",
-    "# `dependsOn` is the only direction anyone writes. Who depends on a",
-    "# module is derived from it -- two directions kept by hand disagree",
-    "# eventually, and the disagreement is silent.",
     "modules:",
     `- slug: ${name}`,
     `  title: ${name}`,

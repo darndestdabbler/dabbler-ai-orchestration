@@ -206,8 +206,8 @@ it was restored from the later commit and re-rendered with
   `bootstrap` used to persist it at user scope, and the variable outranked
   every config layer — so it shadowed the very preference a later run tried
   to set, for every repository on the machine, with no surface able to show
-  it. `configure` and `bootstrap` report one found in the environment as
-  obsolete and name what replaces it. `transport.profile` in a project's
+  it. If it is still set in your environment, unset it: nothing reads it
+  and nothing reports it. `transport.profile` in a project's
   `local-overrides.yaml` is retired the same way and refuses with the one
   command that moves it: `dabbler configure --transport <vehicle>` writes
   this checkout's own `.vscode/settings.json`.
@@ -258,9 +258,8 @@ separate verb, and it is the one that carries who is working:
     dabbler session start --sessions-dir docs/sessions \
         --engine <claude-code|gemini|copilot> --provider <anthropic|openai|google>
 
-A Copilot seat adds `--model` (the seat label is not trusted; identity
-resolves through the model registry). **Every `next` call carries none of
-them** — the session is in flight and its identity is on the record, and a
+A Copilot seat adds `--model`. **Every `next` call carries none of them**
+— the session is in flight and its identity is on the record, and a
 `next` that names an identity with nothing in flight is refused rather
 than starting work nobody asked for.
 
@@ -323,6 +322,8 @@ supposed to ship and did not must not read as one that shipped.
 - State files (`docs/sessions/sessions.json`) and everything under
   `.dabbler/runs/`
   are written by the router only — never by hand, never "fixed up".
+  The router commits its own `docs/sessions/*` files at the land and the
+  close; a step's report never names them.
 - Verdicts come from the **Primary Reviewer** -- *not the author* -- and
   a disputed impasse from the **Auxiliary Reviewer** -- *not the author
   and not the primary*, so a third voice is the role's own definition. A
@@ -368,9 +369,8 @@ nothing, which is exactly why only this one carries the body.
 
 Copilot seats: declare `--model` on the first call, the one that
 registers, and set the vehicle with `dabbler configure --transport
-copilot-cli` when routing through the seat -- nothing persists
-`DABBLER_TRANSPORT` for you any more, because a variable that outranks
-every config layer shadowed the very preference a later run set. Review
-stays cross-provider on every transport.
+copilot-cli` when routing through the seat. If `DABBLER_TRANSPORT` is still
+set in your environment, unset it: nothing reads it. Review stays
+cross-provider on every transport.
 
 <!-- dabbler:managed:end -->

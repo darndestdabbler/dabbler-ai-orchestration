@@ -25,6 +25,8 @@ import {
   judgeStopClass,
   planModulesMember,
   rewindFromPackaging,
+  COMMIT_SUBJECT_WIDTH,
+  landCommitMessage,
   judgeReportFiles,
   judgeReportShape,
   reportIsSpent,
@@ -730,5 +732,26 @@ describe("the question a standing dispute puts to the operator", () => {
     assert.match(refusal, /the cap \(3\) is reached and round 2 carries disputed blocking finding\(s\)/);
     assert.match(refusal, /judged rather than terminated/);
     assert.match(refusal, /dabbler verify adjudicate --sessions-dir docs\/sessions/);
+  });
+});
+
+describe("the landed commit's message", () => {
+  it("puts the session's title in a subject under the width and the whole task in the body", () => {
+    // The sample's first land had a 770-character subject: the task
+    // paragraph on one line, which `git log --oneline` wrapped and every
+    // hosting UI truncated.
+    const task =
+      "Session 1 authors the solution plan from the brief, declares the four modules " +
+      "the console app is built from, and leaves the placeholder entry removed by hand.";
+    const message = landCommitMessage(1, "Author or import the solution plan", task);
+    assert.equal(message.subject, "Session 1: Author or import the solution plan");
+    assert.ok(message.subject.length < COMMIT_SUBJECT_WIDTH);
+    assert.equal(message.body, task);
+    // No title on the row: the task's first line stands in, and is still cut
+    // at the width, because the body carries the paragraph anyway.
+    const untitled = landCommitMessage(12, null, task);
+    assert.ok(untitled.subject.startsWith("Session 12: Session 1 authors"));
+    assert.ok(untitled.subject.length <= COMMIT_SUBJECT_WIDTH);
+    assert.equal(untitled.body, task);
   });
 });

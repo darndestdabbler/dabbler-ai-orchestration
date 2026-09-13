@@ -296,6 +296,27 @@ describe("the start boundary, over a configuration that was typed into", () => {
     }
   });
 
+  it("is reported by `configure` before a start meets it, and fixing it is the same call", () => {
+    // A catalog moves under a stored choice -- the sample's auxiliary model
+    // was a name its vendor stopped serving -- and the first `session start`
+    // was where the operator learned it. The verb that changes the choice
+    // says so, with the same sentence, whatever else the call set.
+    const { root, restore } = machine();
+    try {
+      writePreferences({ role: "reviewer", selected: "gemini-flash-latest" });
+      const outcome = configure({ repoRoot: root, engine: "claude-code" });
+      assert.equal(outcome.refusal, null);
+      assert.match(String(outcome.stale), /Primary Reviewer/);
+      assert.match(String(outcome.stale), /gemini-flash-latest/);
+      assert.match(String(outcome.stale), /dabbler configure --reviewer-model/);
+      // Read after the write: the call that fixes it reports nothing.
+      assert.equal(configure({ repoRoot: root, reviewerModel: "gpt-5.6-terra" }).stale, null);
+    } finally {
+      writePreferences({ role: "reviewer", selected: "" });
+      restore();
+    }
+  });
+
   it("refuses a reviewer that is the author, through the rule the reading already applies", () => {
     // The one rule, and it is NOT restated at the boundary: `roleNode` keeps
     // the author out of the candidates, so a selection equal to the author

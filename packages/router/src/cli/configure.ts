@@ -49,8 +49,8 @@
 import {
   ConfigError,
   VALID_TRANSPORTS,
-  TRANSPORT_ENV_VAR,
   explainReviewingTransport,
+  explainAuthoringModel,
   explainTransport,
   loadConfig,
   writeConfigurationChoice,
@@ -58,6 +58,7 @@ import {
 } from "../config.ts";
 import { BUILT_IN_ENGINES } from "../engines.ts";
 import { repoRootFor } from "../journal.ts";
+import { configuredModelRefusal } from "../session.ts";
 import { PREFERENCES_FILENAME, selectedModel, writePreferences } from "../preferences.ts";
 import { credentialProvider, holdsCredential, looksLikeASecret } from "../credentials.ts";
 import { vehicleRefusal } from "../discovery.ts";
@@ -249,8 +250,27 @@ export interface ConfigureOutcome {
   readonly refusal: string | null;
   readonly changed: readonly string[];
   readonly path: string | null;
-  /** What outranks the file this wrote, when something does. */
-  readonly shadowed: string | null;
+  /**
+   * A stored model choice the next `session start` would refuse, read after
+   * the write through the one reading the start refuses on.
+   *
+   * A catalog moves under a preference: an id a vendor stopped serving, or
+   * renamed, stays in `preferences.json` until somebody changes it, and the
+   * sample's first `session start` was where an operator learned that. Said
+   * here, by the verb that changes it, with the layer and the command -- and
+   * generically, because an alias for one retired id is a second catalog.
+   */
+  readonly stale: string | null;
+}
+
+/**
+ * What `session start` would refuse over this checkout's stored choices, as
+ * a sentence naming the layer and the fix, or null where it would refuse
+ * nothing. The authoring model is the one this checkout resolves for the
+ * next session, so a setting an older catalog accepted is met here too.
+ */
+export function staleModelChoice(repoRoot: string): string | null {
+  return configuredModelRefusal(repoRoot, explainAuthoringModel(null, repoRoot).transport || null);
 }
 
 /**
@@ -259,7 +279,7 @@ export interface ConfigureOutcome {
  */
 export function configure(options: ConfigureOptions): ConfigureOutcome {
   const config = loadConfig(undefined, options.repoRoot);
-  const empty = { changed: [], path: null, shadowed: null };
+  const empty = { changed: [], path: null, stale: null };
   const choice: ConfigurationChoice = {};
   const named: Record<string, string> = {};
   if (
@@ -670,17 +690,9 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
       ...(credentialNote === null ? [] : [credentialNote]),
     ],
     path: written.path,
-    // Not a shadow any more: the variable decides nothing. An operator who
-    // exported it is told so anyway, with the one command that replaces it,
-    // because someone who believes their shell is choosing the vehicle will
-    // otherwise read every later session as having ignored them.
-    shadowed:
-      process.env[TRANSPORT_ENV_VAR]
-        ? `${TRANSPORT_ENV_VAR} is set to '${process.env[TRANSPORT_ENV_VAR]}' in ` +
-          "this environment and is OBSOLETE: it is no longer part of how a " +
-          "vehicle is resolved. What decides is this checkout's " +
-          `${SETTINGS_RELPATH}, which \`dabbler configure --transport\` writes.`
-        : null,
+    // Read AFTER the write, so a call that fixes the stale choice reports
+    // nothing, and a call that sets something else beside it reports it.
+    stale: staleModelChoice(options.repoRoot),
   };
 }
 
@@ -772,7 +784,9 @@ export async function configureVerb(argv: string[]): Promise<number> {
         ? "configure: written to this machine's preferences; it is the " +
           "default for the NEXT session."
         : `configure: written to ${outcome.path}; it is the default for the NEXT session.`,
-      ...(outcome.shadowed === null ? [] : [`configure: ${outcome.shadowed}`]),
+      ...(outcome.stale === null
+        ? []
+        : [`configure: the next \`session start\` would refuse -- ${outcome.stale}`]),
       "",
     ].join("\n"),
   );

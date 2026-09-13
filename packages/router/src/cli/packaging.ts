@@ -14,6 +14,7 @@ import {
   type PackagingRun,
   PackagingConfigError,
   PackagingError,
+  feedTakesCredential,
   loadDeclaration,
   packageSession,
   record,
@@ -127,9 +128,13 @@ function explain(sessionsDir: string, run: PackagingRun): string {
 
   lines.push(`It would pack with:   ${declaration.pack.argv.join(" ")}`);
   lines.push(`It would push to:     ${declaration.push.feed}`);
+  // A folder feed takes no credential, and the declaration loads with none;
+  // the sentence for a name rendered that as a name that was missing.
   lines.push(
-    `Using the credential named ${declaration.push.secret}, which is read ` +
-      "at the moment of the push and written nowhere.",
+    feedTakesCredential(declaration.push.feed)
+      ? `Using the credential named ${declaration.push.secret}, which is read ` +
+          "at the moment of the push and written nowhere."
+      : "No credential: the feed is a folder, and a folder takes none.",
   );
   const failed = run.gates.filter((gate) => !gate.passed);
   if (run.gates.length === 0) {
@@ -154,8 +159,23 @@ function explain(sessionsDir: string, run: PackagingRun): string {
   return lines.join("\n");
 }
 
+/**
+ * The header a rehearsal prints. `refused` is a real run's outcome, and a
+ * reader of a dry run that said it had to know the exit code was what the
+ * check measured; a rehearsal that proved the declaration says that, and
+ * what a real publish would meet.
+ */
+function rehearsalHeading(run: PackagingRun): string {
+  if (run.ready) return "ready (dry run)";
+  if (!run.declared) return run.outcome;
+  const failed = run.gates.filter((gate) => !gate.passed).length;
+  return run.gates.length === 0
+    ? "dry run: the declaration loads; nothing past it was asked"
+    : `dry run: the declaration loads; ${failed} gate(s) would refuse a real publish now`;
+}
+
 function render(run: PackagingRun): string {
-  const lines = [`packaging: ${run.ready ? "ready (dry run)" : run.outcome}`];
+  const lines = [`packaging: ${rehearsalHeading(run)}`];
   // The same row the close prints, from the same function -- which is what
   // this comment used to claim while spelling its own marks a line below.
   const width = Math.max(0, ...run.gates.map((gate) => gate.name.length));

@@ -202,7 +202,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 162 | What the developer reads and sees, and the walk | yes | 2026-09-13 |
 | 163 | The questions nobody needs to answer | no | 2026-09-13 |
 | 164 | What the framework wrote is not the step's | no | 2026-09-13 |
-| 165 | The small things, and the walk | — | not declared |
+| 165 | The small things, and the walk | yes | 2026-09-13 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2351,3 +2351,15 @@ Session 164 holds the framework to the rule that what it wrote is never the step
 **Amended after acceptance:**
 
 - 2026-09-13 — step 'cpm-at-creation': its files: two CLI candidate tests seeded a .NET solution without Directory.Packages.props and relied on the pin writer creating it; they now seed the file a modules create would have written (claude-code (anthropic, claude-fable-5-1))
+
+### Session 165 — The small things, and the walk
+
+**Releasable: yes.**
+
+Session 165 fixes the small things the sample's log recorded and walks the result in the sample against the built VSIX before releasing it. A stored model preference the registry no longer lists is reported by `dabbler configure` and `dabbler bootstrap` with the layer that holds it and the command that changes it, through the same `configuredModelRefusal` reading `session start` refuses on, generically and with no alias for any one id (entry 1). The `DABBLER_TRANSPORT` warning is deleted from `configure` and from `bootstrap`, and the managed body of `AGENTS.md` says in one sentence to unset the variable because nothing reads it (2). `modules create` writes the manifest's comment header on every write from one constant that `bootstrap` scaffolds from too, takes `--package none` for a module no sibling consumes and then writes no package line, and the bootstrap plan template says the placeholder module is removed by hand when several are declared (6). `AGENTS.md`'s managed body says the router commits `docs/sessions/*` itself at the land and the close and a step's report never names them (7). The landed commit's subject is `Session N: <title from sessions.json>`, held under 72 characters, and the task paragraph is its body after a blank line (9). The run-of-record phase logs `no suite declared; nothing to run` when that is why it ran nothing (10). The `impact-plan` line says what an unowned change selects -- only the suites bound to no module -- and the README's module section says the same (18). `packaging --dry-run` prints `dry run: the declaration loads; N gate(s) would refuse a real publish now` instead of `refused`, and `no credential: the feed is a folder` instead of an empty name (19). The plan step's ask says a check may name `dabbler` bare, because the shim folder is on `PATH` wherever a session runs (4). The walk drives the sample's session 4 of csv-parser, focused on csv-deserializer, to `done` through the shim against the built VSIX: a `rebaseline` seen leaving no question on `owed list`, an amend seen in `activity-log.json` after the push, a step reported after the candidate job packed and accepted first time, the close's summary lines read, and the log's remaining entries checked off; what it finds is fixed here if small and raised as owed if not. The release is a minor, 2.6.0, whose notes name the removed `--approver` flag, that `rebaseline` no longer raises a decision, that a package-contract module now scaffolds central package management and its notes page at creation, and the two sample entries found not to be defects.
+
+**Amended after acceptance:**
+
+- 2026-09-13 — step 'no-suite-declared-logged': its files: the test walks a session with no suite to done, which is the walk suite's shape, not the drive suite's (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-13 — step 'plan-ask-names-dabbler': its files and checks: the shim folder reached terminals only: a driver the extension spawned handed checks a PATH without it, so the sentence was true in a terminal and false under the drive; the driver now puts the shim first on the child's PATH, with its test (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-13 — step 'the-walk': its files: the walk found a hand-written nuget.config lacking the committed packages source; documented in the README's central-pinning paragraph (claude-code (anthropic, claude-fable-5-1))

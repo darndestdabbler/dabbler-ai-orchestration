@@ -10,6 +10,90 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.6.0] — 2026-09-13
+
+**The questions nobody needs to answer, the files the framework wrote, and
+the small things.** The rest of the sample's issues log, answered by three
+sessions: what a session asks a person mid-flight (nothing, unless the
+answer changes what the framework does next), what a step is measured
+against (its own files and never the framework's), and nine lines the log
+recorded one at a time. The sample's next session was then driven to its
+close through the extension's own shim, on a focused checkout, before this
+shipped.
+
+### Removed
+
+- **`--approver` is gone from `plan amend`, `verify reopen` and
+  `withdraw-release`.** Each takes `--reason` and nothing about who: the
+  engine registered at `session start` is written into the record where the
+  approver was, as `claude-code (anthropic, claude-fable-5-1)`. A typed
+  `--approver` is refused with the sentence that says the record already
+  knows who is working.
+- **`rebaseline` no longer raises a decision.** The row in `repairs.jsonl`
+  and the moved baseline are the whole of it; nothing asks a person to sign
+  off on a repair they made, and a standing sign-off an earlier version
+  raised is settled once at the close.
+- **The `DABBLER_TRANSPORT` warning.** `configure` and `bootstrap` no longer
+  report the variable; nothing reads it, and the managed instructions say
+  in one sentence to unset it.
+
+### Changed
+
+- **What the framework wrote is never the step's to account for.** A step
+  reported after the candidate job packed is measured without the files
+  that job wrote — the package, its record, the pin — by provenance, so no
+  report is refused for a file the engine never touched. The managed
+  instructions say the router commits `docs/sessions/*` itself, at the land
+  and the close, and a step's report never names those files.
+- **A package-contract module is born with its build files.** `dabbler
+  modules create --contract package` writes `Directory.Packages.props`
+  with central package management on before any project exists, and the
+  module's contract notes page beside it — so no project is built under one
+  rule and then moved under another, and the run of record no longer stops
+  for a page nobody was told to write. A declared folder feed is made where
+  it is needed, before the push and before the candidate's pack.
+- **The landed commit has a subject and a body.** `Session N: <title>` from
+  the session's row, held under 72 characters, and the task paragraph after
+  a blank line — not the whole paragraph on one line.
+- **`packaging --dry-run` says what a rehearsal proved.** `dry run: the
+  declaration loads; N gate(s) would refuse a real publish now` where it
+  said `refused` beside an exit code of 0, and `No credential: the feed is
+  a folder, and a folder takes none` where it named an empty credential.
+- **`modules create` keeps the manifest's header and takes `--package
+  none`.** The comment that says why `dependsOn` is the only direction
+  written is regenerated on every write rather than lost at the first
+  `create`; `--package none` declares a module no sibling consumes and
+  writes no package line; the plan template says the placeholder module is
+  removed by hand when several are declared.
+- **A stored model the catalog no longer lists is reported by `configure`
+  and `bootstrap`**, with the layer that holds it and the command that
+  changes it — the same reading `session start` refuses on, so an upgrade
+  is not discovered as the first start's refusal.
+- **A spent report costs no refusal.** A `next` with nothing new to judge
+  reprints the outstanding instruction; a report that answered an earlier
+  instruction is read as none written.
+- **The plan step's ask says a check may name `dabbler` bare**, because the
+  folder the shim lives in is first on `PATH` wherever a session runs — in
+  a terminal the extension opened, and now under a driver it started too.
+- **Every `plan amend` and `verify reopen` is folded into
+  `activity-log.json`** with its reason, so the pushed history carries it
+  and the close prints one line per amend and per rebaseline.
+- **The run of record says why it ran nothing**: `no suite declared;
+  nothing to run`, where a gate's dash was all a reader had. The
+  `impact-plan` line says what an unowned change selects — only the suites
+  bound to no module — and the README's module section says the same.
+- **A triaged stop prints the amendment it proposes**, with the `plan amend`
+  command that applies it; session 1's template reads the brief from the
+  prompt or `docs/planning/brief.md` and reports `blocked` naming that path
+  instead of asking a person mid-session.
+
+### Not changed, on purpose
+
+- **`invocations=0` on a pulled session's completion line** is what a pulled
+  session has: the engine is not invoked by the framework.
+- **`--help` printed twice for a subcommand's `--help`** is cosmetic and
+  impedes no session.
+
 ## [2.5.0] — 2026-09-13
 
 **What a developer reads and clicks around a focused session, made to say

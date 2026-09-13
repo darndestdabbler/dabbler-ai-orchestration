@@ -1,4 +1,5 @@
 import * as assert from "assert";
+import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { createInProcessRouter } from "dabbler-ai-router";
@@ -1202,6 +1203,17 @@ suite("workExplorerTreeModel: the two surfaces over one record", () => {
       "### Session 1 of 1: Build the widget\n1. Register.\n",
       "utf8",
     );
+    // `start` asks the declaration's own question first -- whether work has
+    // begun in the tree -- so the fixture is a git repository with its plan
+    // committed, the state a repository is in when a session starts.
+    for (const args of [
+      ["init", "-q"],
+      ["add", "-A"],
+      ["-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "plan"],
+    ]) {
+      const git = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+      assert.strictEqual(git.status, 0, `git ${args.join(" ")}: ${git.stdout}${git.stderr}`);
+    }
 
     const router = createInProcessRouter();
     const started = await router.session.start({

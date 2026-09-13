@@ -11,6 +11,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import { delimiter, join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
+import { SOURCE_API, TRANSPORT_API, writeBlock } from "../src/catalog.ts";
 import { bootstrapVerb } from "../src/cli/bootstrap.ts";
 import { owedVerb } from "../src/cli/owed.ts";
 import {
@@ -41,6 +42,7 @@ import {
   refreshOwedDecisions,
 } from "../src/owedDecisions.ts";
 import { capture } from "../src/output.ts";
+import { writePreferences } from "../src/preferences.ts";
 import { solutionShape } from "../src/modules.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
 import { makeAnsweredRepo, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
@@ -87,6 +89,53 @@ describe("where a bootstrap run's transport lands", () => {
     const run = await capture(() => bootstrapVerb(["--project-dir", repo]));
     assert.equal(run.value, 0, run.stderr);
     assert.ok(!existsSync(join(repo, SETTINGS_RELPATH)));
+  });
+});
+
+describe("a stored model choice the catalog no longer lists", () => {
+  it("is reported at set-up, with the layer and the fix, rather than at the first start", async () => {
+    const repo = emptyRepo();
+    const keys = ["DABBLER_ANTHROPIC_API_KEY", "DABBLER_OPENAI_API_KEY", "DABBLER_GEMINI_API_KEY"];
+    const held = keys.map((name) => [name, process.env[name]] as const);
+    for (const name of keys) process.env[name] = "k";
+    // Two models, so the reviewing role has a list to be held to once the
+    // author is excluded from it: the reading refuses on knowledge and never
+    // on the absence of it.
+    writeBlock(TRANSPORT_API, {
+      refreshed_at: "2026-09-11T00:00:00Z",
+      source: SOURCE_API,
+      scope: { providers: ["anthropic", "google", "openai"] },
+      models: [
+        ["claude-opus-5", "anthropic"],
+        ["gpt-5.6-terra", "openai"],
+      ].map(([id, provider]) => ({
+        id: id as string,
+        provider: provider as string,
+        provider_source: "vendor-endpoint",
+        display_name: id as string,
+        enabled: true,
+        price_category: null,
+        cost: null,
+        listed_at: "2026-09-11T00:00:00Z",
+      })),
+      retired: [],
+    });
+    writePreferences({ role: "reviewer", selected: "gemini-flash-latest" });
+    try {
+      // The vehicle this run names is written before the reading, so the
+      // reviewing role is held to the direct-API list just written.
+      const run = await capture(() => bootstrapVerb(["--project-dir", repo, "--transport", TRANSPORT_API]));
+      assert.equal(run.value, 0, run.stderr);
+      assert.match(run.stdout, /bootstrap: the next `session start` would refuse -- The Primary Reviewer's model/);
+      assert.match(run.stdout, /gemini-flash-latest/);
+      assert.match(run.stdout, /dabbler configure --reviewer-model/);
+    } finally {
+      writePreferences({ role: "reviewer", selected: "" });
+      for (const [name, value] of held) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
   });
 });
 

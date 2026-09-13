@@ -131,6 +131,10 @@ module's sessions must change; declare it under each module whose sessions
 must reach it. A change to a shared file reaches every module that names
 it, and every reached module with a package becomes a candidate of the run
 of record; a module with no project file under its roots yet is skipped.
+A changed path that no module's roots or shared files hold is *unowned*:
+it reaches no module, so it selects only the suites bound to no module —
+a suite declared with no `module` answers for the whole repository
+whatever changed — and the `impact-plan` line says so when it lists one.
 
 **Module packages are pinned centrally.** The run of record packs each
 changed module's candidate into `packages/` under an immutable dev version
@@ -142,7 +146,11 @@ in a group of your own beside the framework's `Modules` group, and not
 from a `Version` attribute. A solution with a package-contract module
 manages package versions centrally from its first project: `dabbler
 modules create` writes the file before any project exists, so no project
-is ever built under the old rule and then moved. For Maven it is the root
+is ever built under the old rule and then moved. The pin names a build
+that exists only in the committed `packages/` folder, so `nuget.config`
+must list that folder as a source — the one the framework writes does,
+and one written by hand must add `<add key="modules" value="packages" />`
+itself, because the framework never rewrites a file it did not write. For Maven it is the root
 `pom.xml`'s `dependencyManagement`. A module with `contract: package` also needs its
 notes page, `modules/<slug>/contract/README.md`, before its first
 candidate: the page is what a sibling's session reads instead of the code.

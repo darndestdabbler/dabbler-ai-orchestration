@@ -72,9 +72,8 @@ export const SHARED_BODY =
   "    dabbler session start --sessions-dir docs/sessions \\\n" +
   "        --engine <claude-code|gemini|copilot> --provider <anthropic|openai|google>\n" +
   "\n" +
-  "A Copilot seat adds `--model` (the seat label is not trusted; identity\n" +
-  "resolves through the model registry). **Every `next` call carries none of\n" +
-  "them** — the session is in flight and its identity is on the record, and a\n" +
+  "A Copilot seat adds `--model`. **Every `next` call carries none of them**\n" +
+  "— the session is in flight and its identity is on the record, and a\n" +
   "`next` that names an identity with nothing in flight is refused rather\n" +
   "than starting work nobody asked for.\n" +
   "\n" +
@@ -137,6 +136,8 @@ export const SHARED_BODY =
   "- State files (`docs/sessions/sessions.json`) and everything under\n" +
   "  `.dabbler/runs/`\n" +
   "  are written by the router only — never by hand, never \"fixed up\".\n" +
+  "  The router commits its own `docs/sessions/*` files at the land and the\n" +
+  "  close; a step's report never names them.\n" +
   "- Verdicts come from the **Primary Reviewer** -- *not the author* -- and\n" +
   "  a disputed impasse from the **Auxiliary Reviewer** -- *not the author\n" +
   "  and not the primary*, so a third voice is the role's own definition. A\n" +
@@ -196,10 +197,9 @@ export const AGENTS_TAIL =
   "\n" +
   "Copilot seats: declare `--model` on the first call, the one that\n" +
   "registers, and set the vehicle with `dabbler configure --transport\n" +
-  "copilot-cli` when routing through the seat. `DABBLER_TRANSPORT` is not\n" +
-  "read at all any more: a variable that outranked every file and was\n" +
-  "written by nothing shadowed the very preference a later run set. Review\n" +
-  "stays cross-provider on every transport.\n";
+  "copilot-cli` when routing through the seat. If `DABBLER_TRANSPORT` is still\n" +
+  "set in your environment, unset it: nothing reads it. Review stays\n" +
+  "cross-provider on every transport.\n";
 
 /**
  * Gemini CLI reads `GEMINI.md` unless `context.fileName` says otherwise.
@@ -254,9 +254,10 @@ export const PLAN_PROMPT =
   "Then declare the modules in `docs/modules.yaml` through `dabbler modules\n" +
   "create` (`--kind`, `--depends-on`, `--package`, `--contract`), one entry\n" +
   "per module. The bootstrapped manifest already carries one entry naming\n" +
-  "the repository as the module: leave it when one module is the answer,\n" +
-  "and replace it when there are several. Who depends on a module is\n" +
-  "derived from `dependsOn`, never written.\n" +
+  "the repository as the module: leave it when one module is the answer.\n" +
+  "When there are several, declare each with `create` and remove the\n" +
+  "placeholder entry by hand -- no verb removes one. Who depends on a\n" +
+  "module is derived from `dependsOn`, never written.\n" +
   "\n" +
   "- **Import:** if the operator points you at an existing plan (a doc, a\n" +
   "  ticket, notes), bring its content into that path in this same shape,\n" +
@@ -357,8 +358,9 @@ export const BOOTSTRAP_PLAN =
   "   `docs/planning/project-plan.md` amends that file instead.\n" +
   "3. Declare the modules in `docs/modules.yaml` through `dabbler modules\n" +
   "   create`. The manifest already names this repository as its one\n" +
-  "   module: leave it when one module is the answer, replace it when there\n" +
-  "   are several. Who depends on a module is derived, never written.\n" +
+  "   module: leave it when one module is the answer; when there are\n" +
+  "   several, declare each and remove the placeholder entry by hand. Who\n" +
+  "   depends on a module is derived, never written.\n" +
   "4. Cross-provider verification.\n" +
   "5. Full test suite, recorded as the run of record.\n" +
   "6. Close-out.\n" +

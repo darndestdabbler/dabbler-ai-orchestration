@@ -289,3 +289,197 @@ sessions 3 and 4's records, session 3 closed VERIFIED and published, session
 `module-grant:person`; `D:\Projects\csv-parser-feed` holds the published
 package. The operator's editor, open on the sample since the morning, was
 not touched.
+
+## The second walk: session 165, and the sample's session 4 to its close
+
+**Session 165, 2026-09-13, later the same day.** The VSIX this tree built
+after session 164 — versioned 2.5.0 at the time of the walk, shipping as
+2.6.0 in the release step that follows it — installed into a fresh
+extensions directory and a fresh user data directory of the harness's own
+VS Code, with `APPDATA` and `LOCALAPPDATA` scoped to `D:\tmp\walk-165` and
+the real `HOME`. The sample's session 4, focused on `csv-deserializer`,
+driven from registration to `done` through the shim that activation wrote,
+from a PowerShell whose `PATH` had the shim's folder first — the way a
+developer's integrated terminal has it. Nothing here touched the operator's
+editor, shim, catalog or preferences; the sample's own checkout was touched
+once, by the operator's hand, before the session began.
+
+### The readings
+
+**18. Activation writes both launchers into the installed extension.** The
+Dabbler icon clicked in a window on the sample; within seconds
+`bin\dabbler.cmd` and `bin\dabbler` existed under the scratch global
+storage, the `.cmd` naming the harness's `Code.exe` and the VSIX's own
+`dist\dabbler.cjs`. `dabbler version` through it: *dabbler-ai-router 2.5.0 /
+dabbler-ai-orchestration 2.5.0 (extension)*. The Solution Explorer's rows on
+a machine that has chosen nothing: *csv-parser · 4 modules*, *Configuration
+· copilot-cli*, *csv-parser · 3/9*. The vehicle a fresh machine reads is the
+distribution's `transport.profile`, and it is the seat; recorded, as
+reading 3 of the first walk recorded the same row.
+
+**19. What the operator changed before the session, and why.** The first
+walk left session 4 waiting on a grant it should not need, because the
+run of record was `dotnet test CsvParser.sln` and a focused checkout holds
+one module's projects (reading 15). The shape that works is one suite per
+module, so the operator re-declared `testing.suites` in the sample's root
+`dabbler.yaml` — `person` and `csv-deserializer`, each covering its module's
+roots — and declared the issues log, docs
+otesdabbler-issues.md, as
+`csv-deserializer`'s shared file, committed both and pushed, because the focused clone is made
+from `origin`. A suite whose covers and tests sit under one module's roots
+is that module's without a `module:` line, as the parser infers it. The
+framework's own answer to the collision is still owed to the next plan;
+this is the operator's, and it is the one the README teaches.
+
+**20. `session start --focused --module csv-deserializer` through the
+shim.** From the sample's root: *start: pulled from origin/master (git pull
+--ff-only) before registering.* then *session 004 of sessions registered
+(claude-code) in module 'csv-deserializer's focused checkout at
+D:\Projects\csv-parser.csv-deserializer; the exposure manifest is written
+there.* The clone's cone, from the checkout record the start wrote under
+its `.dabbler` folder: `docs`,
+`docs/notes`, `modules/console-app/contract`, `modules/csv-deserializer`,
+`modules/person/contract`, `packages`. On disk under `modules/`: only
+person's contract folder with its notes page and not a line of
+its source — and the shared issues log under `docs/notes`. The policy's
+`allowed` list: the solution file, the three root build files,
+`global.json`, `nuget.config`, `packages`, `docs/sessions`, the module's
+own roots and contract folder, the sibling's contract folder, and the
+shared file. No stale model was reported at the start: the scratch machine
+had chosen nothing, and this machine's own preferences name a model the
+catalog lists.
+
+**21. The plan ask says a check may name `dabbler` bare, and asks for the
+`modules` member.** The first `next` carried the session's own section
+between the markers and the sentence session 165 added — *A check may name
+`dabbler` bare: the folder the shim lives in is first on PATH wherever a
+session runs, in a terminal the extension opened and under a driver it
+started* — beside the multi-module paragraph and the `plan amend` line. The
+plan answered with three steps and `"modules": ["csv-deserializer"]`, and
+the same call accepted it and declared: *declare: session 004 declared;
+releasable=no; modules=csv-deserializer.*
+
+**22. The library step, and the nuget.config the sample wrote by hand.**
+`Directory.Packages.props` pins `CsvParser.Person` to the build the
+candidate job packed in session 3, `1.0.0-dev.20260913.2.g21df11f`, which
+exists only in the committed `packages/` folder — and the sample's
+`nuget.config`, written by hand in session 3 before any package module
+existed, listed nuget.org and the folder feed and not `packages/`. The
+router's own template lists it (`<add key="modules" value="packages" />`)
+and is written only where the file is absent. The step added the source;
+`dotnet build modules/csv-deserializer/CsvParser.Csv` restored the sibling
+from the committed folder and passed as the step's check. Entry 24 of the
+sample's log; **documented here**, in the README's central-pinning
+paragraph, because a job that rewrote a hand-written `nuget.config` would
+be a job editing the operator's file.
+
+**23. The tests step.** Eight xUnit tests — header order, header case, an
+extra column, a missing column on line 1 before any row, embedded
+delimiters and doubled quotes, blank lines skipped and still counted, and a
+name the shared type would refuse reported as a format error — and both
+projects added to `CsvParser.sln` under a `modules/csv-deserializer`
+solution folder with `dotnet sln add`. The step's check, `dotnet test` on
+the module's test project, passed: *Passed! - Failed: 0, Passed: 8*.
+
+**24. A check that names `dabbler` bare passes under the driven session.**
+The third step's check was `["dabbler", "modules", "show", "."]`. The
+driver's log: *check-passed step=issues-log argv=["dabbler","modules",
+"show","."]*. Entry 4 of the sample's log, closed: the shim's folder was on
+the calling shell's `PATH`, the check's built environment carries `PATH`
+through, and the router's spawn resolves the `.cmd` by `PATHEXT` and hands
+it to `cmd.exe`. Under a driver the extension spawns the same now holds,
+because session 165 put the shim's folder first on that child's `PATH` —
+it reached terminals only before, through the environment variable
+collection, and the extension host's own environment never had it.
+
+**25. The dry run in a session that may not publish.** `dabbler packaging
+--dry-run` mid-session: *No credential: the feed is a folder, and a folder
+takes none.* … *packaging: dry run: the declaration loads; nothing past it
+was asked*, then the releasability refusal, exit 0. Neither `refused` nor
+an empty credential name. Entry 19, closed. `modules create --help` offers
+`--package none` (entry 6).
+
+**26. Verification, the impact plan, the candidate, the run of record.**
+The report of the third step ran its check and started the verification
+job in the same call, and answered `wait` with `retry_after_seconds: 60`.
+Driven from a bounded loop that polled the job's status file and called
+`next` only once the job had exited: round 1 **VERIFIED** (gpt-5.6-terra,
+openai), 35 seconds. Then, on one line: *impact-plan
+modules=["csv-deserializer"] suites=["csv-deserializer"]
+candidates=["csv-deserializer"] unowned=["CsvParser.sln","nuget.config"]
+unownedSelects=only the suites bound to no module* — entry 18, closed: the
+two root build files this session changed belong to no module, and the
+line now says what that selects. The candidate job packed
+`CsvParser.Csv 1.0.0-dev.20260913.1.gdde2ed1` into `packages/`, kept the
+notes page (*a package contract has no surface page*), and pinned it in
+`Directory.Packages.props`. `person`'s suite: *run-of-record-skipped
+suite=person reason=not reached by the impact plan*. The module's own
+suite ran as the run of record and recorded green in 5 seconds. **A
+walker's own defect, recorded:** the first driving loop watched the job's
+status file for a `state` member it never has — the runner writes
+`{exit, ended_at}` — and so never called `next` in nine minutes while the
+verdict sat on disk; the loop was fixed and the next call collected it.
+The framework's `wait` was right; the caller was not.
+
+**27. The land, the close, and what the report never named.** The landed
+commit, `1290434`: subject *Session 4: `PersonCsvReader` and
+`CsvFormatException`* — the title from `sessions.json`, 51 characters —
+and the task paragraph as the body after a blank line. Entry 9, closed.
+Its files: the session's own eleven, and beside them what the framework
+wrote — `docs/sessions/sessions.json`, `activity-log.json`,
+`project-work-plan.md`, `change-log.md`, the `Directory.Packages.props`
+pin, the `.nupkg` and its `.json` under `packages/` — none of which any
+report named, and no report was refused for them (entries 7 and 23). The
+close's log: nine gates ticked, *closed (VERIFIED)*, one round ref pushed,
+*pulled D:\Projects\csv-parser forward (git pull --ff-only), so its window
+sees this session closed*, and *next is session 005 — 5 of 9 left to run*.
+It printed no line for a rebaseline or an amend, because there was none.
+`next` then answered `done`; the completion line reads `invocations=0`,
+which is what a pulled session has (entry 11, not a defect). The sample's
+root checkout was at the closing commit when the loop ended; no window was
+open on it.
+
+**28. What this walk did not exercise, and where each is proved.** No
+change was made outside a step, so no `rebaseline` ran: that it records
+and asks nobody is the walk suite's own test since session 163, and this
+session's close output stands as the other half — nothing printed for a
+session with none. No step of the sample's session was amended: session
+165's own two amendments are folded into this repository's
+`activity-log.json` with their reasons and `by: claude-code (anthropic,
+claude-fable-5-1)`, and travel with its land. The run of record was green,
+so no fix step followed the candidate: that a step's report is measured
+without the candidate's files is session 164's provenance test. The
+Copilot seat as the engine, and the remaining seven modules' sessions,
+were not driven.
+
+### Found
+
+**Fixed in this session:** the driver the extension spawns hands its child
+a `PATH` with the shim's folder first (reading 24), found by verifying the
+sentence before writing it.
+
+**Documented here:** a hand-written `nuget.config` must list `packages/`
+as a source (reading 22), in the README's central-pinning paragraph.
+
+**Recorded and left open:** a fresh machine's vehicle reads as the seat
+(reading 18), which is the distribution's declaration; the framework's own
+answer to a solution-wide suite in a focused checkout (reading 19), still
+owed, with the operator's per-module declaration as the shape that works
+today.
+
+**The sample's log, checked off:** entries 4, 6, 9, 18 and 19 read as
+fixed in this walk; 1, 2, 7, 10, 12, 17, 20, 21, 22 and 23 fixed on the
+framework's record in sessions 163–165; 8, 11 and 14 judged not defects; 3,
+5, 13, 15 and 16 open as their status lines say; 24 and 25 appended by this
+session.
+
+### What is left on disk, after the second walk
+
+Under this tree: `tools/dabbler-ai-orchestration/dabbler-ai-orchestration-2.5.0.vsix`
+as rebuilt at 17:51, gitignored. Under `D:\tmp\walk-165`: `activate.js`,
+`drive-waits.js`, the scratch user data, extensions and state directories,
+and `out/` with each call's instruction and log — none of it holds a key.
+In the sample: session 4 closed VERIFIED at `14cad26` on `origin/master`,
+the root checkout pulled forward to it, `packages/` holding the
+`CsvParser.Csv` dev build, and the focused checkout at
+`D:\Projects\csv-parser.csv-deserializer` left in place at the same commit.

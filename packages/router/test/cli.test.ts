@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { checkoutCone } from "../src/checkout.ts";
-import { loadEntries, solutionShape } from "../src/modules.ts";
+import { MANIFEST_HEADER, loadEntries, solutionShape } from "../src/modules.ts";
 import { packModule } from "../src/packages.ts";
 import { moduleVerb } from "../src/cli/module.ts";
 import { modulesVerb } from "../src/cli/modules.ts";
@@ -171,6 +171,36 @@ describe("dabbler packaging --dry-run", () => {
     assert.equal(result.code, 0, result.err);
     assert.match(result.out, /No gate was asked/);
     assert.doesNotMatch(result.out, /Every gate the close reads passes/);
+  });
+
+  it("says what a rehearsal proved and what a real publish would meet, never `refused`, and no empty credential for a folder feed", async () => {
+    // The sample's releasable session read `packaging: refused` under a
+    // gate table and exit 0, and `Using the credential named ,` for a folder
+    // feed that takes none. A rehearsal is not an attempt, so it does not
+    // report an attempt's outcome.
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    writeFileSync(
+      join(repo, "dabbler.yaml"),
+      [
+        "schema_version: 1",
+        "packaging:",
+        "  pack:",
+        '    argv: ["dotnet", "pack", "-c", "Release", "-o", "{output}"]',
+        "  push:",
+        '    argv: ["dotnet", "nuget", "push", "{artifact}", "--source", "{feed}"]',
+        "    feed: ../csv-parser-feed",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship it", releasable: true });
+    const result = await run(() => packagingVerb(["--dry-run", "--sessions-dir", sessionsDir]));
+    assert.equal(result.code, 0, result.err);
+    assert.match(result.out, /No credential: the feed is a folder/);
+    assert.match(result.out, /packaging: dry run: the declaration loads; \d+ gate\(s\) would refuse a real publish now/);
+    assert.doesNotMatch(result.out, /packaging: refused/);
+    assert.doesNotMatch(result.out, /credential named ,/);
   });
 });
 
@@ -544,6 +574,34 @@ describe("dabbler modules", () => {
     const manifest = readFileSync(join(root, "docs", "modules.yaml"), "utf8");
     assert.match(manifest, /src\/greeter/);
     assert.match(manifest, /tests\/greeter/);
+  });
+
+  it("takes --package none for a module no sibling consumes, and keeps the header on every write", async () => {
+    // The sample's console app is run, never packed, and the manifest's
+    // shape for that is no package line -- which the CLI could not write.
+    // And the header the scaffold put first was gone at the first create,
+    // because a parse keeps no comment; it is written on every write now.
+    const root = tempDir("cli-");
+    const first = await run(() =>
+      modulesVerb(["create", root, "--slug", "model", "--title", "Model", "--package", "CsvModel"]),
+    );
+    assert.equal(first.code, 0, first.err);
+    const app = await run(() =>
+      modulesVerb([
+        "create", root, "--slug", "console", "--title", "Console",
+        "--kind", "application", "--package", "none",
+      ]),
+    );
+    assert.equal(app.code, 0, app.err);
+    const manifest = readFileSync(join(root, "docs", "modules.yaml"), "utf8");
+    assert.ok(manifest.startsWith(MANIFEST_HEADER), manifest);
+    assert.equal((manifest.match(/dependsOn` is the only direction/g) ?? []).length, 1);
+    assert.match(manifest, /package: CsvModel/);
+    assert.ok(!/package: (none|Console|console)/.test(manifest), manifest);
+    const shown = JSON.parse((await run(() => modulesVerb(["show", root]))).out) as {
+      modules: { slug: string; package: string | null }[];
+    };
+    assert.equal(shown.modules.find((m) => m.slug === "console")?.package, null);
   });
 
   it("requires the slug and the title, which the CLI does not default", async () => {

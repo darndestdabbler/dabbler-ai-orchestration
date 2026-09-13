@@ -27,9 +27,19 @@ suite("the driver process", () => {
         args: ["session", "drive", "--engine", "claude-code"],
       };
       // The same Node the shim uses, told to be Node.
-      const command = driveCommand(launch);
+      const command = driveCommand(launch, null);
       assert.deepStrictEqual(command.argv, [process.execPath, launch.cli, ...launch.args]);
       assert.strictEqual(command.env["ELECTRON_RUN_AS_NODE"], "1");
+      // And the shim's directory first on the child's PATH, under whichever
+      // spelling of the variable this host uses, so a plan check naming
+      // `dabbler` bare resolves under the drive as it does in a terminal.
+      const pathKey = Object.keys(process.env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+      const withShim = driveCommand(launch, path.join(dir, "bin"));
+      assert.ok(String(withShim.env[pathKey]).startsWith(path.join(dir, "bin") + path.delimiter));
+      assert.strictEqual(
+        Object.keys(withShim.env).filter((name) => name.toUpperCase() === "PATH").length,
+        1,
+      );
 
       const lines: string[] = [];
       const handle = launchDriver(launch, (line) => lines.push(line));

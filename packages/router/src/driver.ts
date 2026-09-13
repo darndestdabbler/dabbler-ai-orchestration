@@ -30,6 +30,7 @@ import type {
   DriverReport,
   DriverRun,
   DriverWorkPlan,
+  Triage,
 } from "./generated/index.ts";
 import { MACHINE_DIRNAME, runGit } from "./journal.ts";
 import {
@@ -605,7 +606,8 @@ export interface AmendInput {
   /** The step's checks as they should now read, whole. Null leaves them alone. */
   readonly checks: readonly { readonly argv: readonly string[] }[] | null;
   readonly reason: string;
-  readonly approver: string;
+  /** Who was working when it was amended, as the record from `start` says. */
+  readonly by: string;
 }
 
 /**
@@ -685,7 +687,7 @@ export function recordRepair(
  * Session 62 asked for exactly this and nothing in the framework could do
  * it: an engine that had correctly diagnosed a step it could not satisfy
  * had no way to say so except by failing three times. So the step's `files`
- * and its `checks` are amendable, with a reason and an approver, and the
+ * and its `checks` are amendable, with a reason, and the
  * amended plan goes back through `writeWorkPlan` -- an amendment that could
  * write a plan the reader refuses would break the session it meant to save.
  *
@@ -703,11 +705,10 @@ export function amendPlanStep(
   amendedAt: string,
 ): DriverWorkPlan {
   const reason = input.reason.trim();
-  const approver = input.approver.trim();
-  if (reason === "" || approver === "") {
+  if (reason === "") {
     throw new LedgerError(
-      "an amendment carries a reason and an approver; a bar moved by nobody, for no " +
-        "stated reason, is a bar nobody can hold anyone to",
+      "an amendment carries a reason; a bar moved for no stated reason is a bar " +
+        "nobody can hold anyone to",
     );
   }
   if (input.files === null && input.checks === null) {
@@ -746,7 +747,7 @@ export function amendPlanStep(
     session_number: sessionNumber,
     step_id: input.stepId,
     reason,
-    approver,
+    by: input.by,
     amended_at: amendedAt,
     before: { files: [...before.files], checks: before.checks },
     after: { files: after.files, checks: after.checks },
@@ -757,7 +758,8 @@ export function amendPlanStep(
 export interface RoundCapInput {
   readonly cap: number;
   readonly reason: string;
-  readonly approver: string;
+  /** Who was working when it was amended, as the record from `start` says. */
+  readonly by: string;
 }
 
 /**
@@ -769,13 +771,12 @@ export interface RoundCapInput {
  * spot, which is a verification-reducing act. Reachable by anyone who typed
  * a command, attributable to nobody.
  *
- * So it moves here, where the change carries a reason and a name. **This
- * records a claim; it does not prove an authorisation.** The approver is
- * whatever the engine writes, and no gate reads it -- a gate that trusted an
- * engine-written approver would make the authorisation forgeable, which is
- * worse than absent. What the row buys is that the claim EXISTS, next to the
- * rounds already run, reviewable at the close, instead of a bare number
- * appearing on `run.json` with no reason at all.
+ * So it moves here, where the change carries a reason and who was working,
+ * read from the record `start` wrote rather than typed: a name an engine
+ * types proves nothing, and asking for one was a question whose answer
+ * changed nothing. No gate reads either. What the row buys is that the
+ * reason EXISTS, next to the rounds already run, reviewable at the close,
+ * instead of a bare number appearing on `run.json` with no reason at all.
  */
 export function amendRoundCap(
   repoRoot: string,
@@ -784,11 +785,10 @@ export function amendRoundCap(
   amendedAt: string,
 ): DriverRun {
   const reason = input.reason.trim();
-  const approver = input.approver.trim();
-  if (reason === "" || approver === "") {
+  if (reason === "") {
     throw new LedgerError(
-      "an amendment carries a reason and an approver; a cap moved by nobody, for no " +
-        "stated reason, is the bare number this replaces",
+      "an amendment carries a reason; a cap moved for no stated reason is the bare " +
+        "number this replaces",
     );
   }
   if (!Number.isInteger(input.cap) || input.cap < 1) {
@@ -817,9 +817,8 @@ export function amendRoundCap(
       `session ${sessionNumber} already carries its terminal ` +
         `'${String(terminal["type"])}' row at round ${String(terminal["round"])}, and ` +
         "a cap raised past a terminal changes nothing: the terminal is read " +
-        "before the cap is. Rounds past a terminal are BOUGHT, with the same " +
-        'reason and approver this amendment carries: `dabbler verify reopen ' +
-        '--rounds <N> --reason "<why>" --approver <who>`',
+        "before the cap is. Rounds past a terminal are BOUGHT, with a reason as " +
+        'this amendment carries one: `dabbler verify reopen --rounds <N> --reason "<why>"`',
     );
   }
   const before = run.verification?.max_rounds ?? null;
@@ -836,7 +835,7 @@ export function amendRoundCap(
     session_number: sessionNumber,
     step_id: null,
     reason,
-    approver,
+    by: input.by,
     amended_at: amendedAt,
     // Beside the change, because a cap is only readable against the rounds
     // it is being moved past: 4 after three rounds buys a review, and 1
@@ -1369,7 +1368,7 @@ function carryOn(parts: MoveParts, label: string, cost: string): StopChoice {
 }
 
 /** The verb that buys a verification round a cap refused, with what it costs. */
-const REOPEN_COMMAND = 'dabbler verify reopen --rounds 1 --reason "<why>" --approver <who>';
+const REOPEN_COMMAND = 'dabbler verify reopen --rounds 1 --reason "<why>"';
 const REOPEN_COST =
   "One more verification round -- a provider call for the verifier and the " +
   "round's own clock -- recorded as your decision to spend it. It buys " +
@@ -1697,6 +1696,30 @@ function actorSentence(actor: StopActor, resume: string): string {
 /** The choices as lines a person reads, under the sentence that named them. */
 function choiceLines(choices: readonly StopChoice[]): string {
   return choices.map((choice) => `\n  - ${choice.label}: ${choice.command}\n    ${choice.cost}`).join("");
+}
+
+/**
+ * An adviser's proposal to amend a step, as the thing a person would type.
+ *
+ * The framework applies nothing an adviser proposed, so the stop and the
+ * owed row both hand over what would have been applied -- otherwise "Amend
+ * step 'widget'" asks somebody to agree to a change nobody has shown them.
+ * Pure: the proposal and the sessions directory in, the command out.
+ */
+export function renderAmendmentProposal(
+  amendment: NonNullable<Triage["amendment"]>,
+  sessionsDirRel: string,
+): string {
+  const parts = [
+    `dabbler session plan amend --sessions-dir ${sessionsDirRel.replace(/\\/g, "/")}`,
+    `    --step ${amendment.step_id}`,
+  ];
+  if (amendment.files) parts.push(`    --files ${amendment.files.join(",")}`);
+  if (amendment.checks) {
+    parts.push(`    --checks-file <a file holding> ${JSON.stringify(amendment.checks)}`);
+  }
+  parts.push('    --reason "<why>"');
+  return `The proposal, which is yours to make or to refuse:\n${parts.join("\n")}`;
 }
 
 /**

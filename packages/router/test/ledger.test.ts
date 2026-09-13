@@ -268,7 +268,7 @@ describe("withdrawing a session's releasability", () => {
       schema_version: 1,
       session_number: 4,
       reason: "the feed will not take this artifact and the fix is a session away",
-      approver: "operator",
+      by: "claude-code (anthropic)",
       recorded_at: "2026-01-01T00:00:00+00:00",
       framework_version: VERSION,
     };
@@ -279,12 +279,12 @@ describe("withdrawing a session's releasability", () => {
       (r) => r,
     );
     assert.equal(onDisk.length, 1);
-    assert.equal(onDisk[0]?.["approver"], "operator");
+    assert.equal(onDisk[0]?.["by"], "claude-code (anthropic)");
     assert.match(String(onDisk[0]?.["reason"]), /will not take this artifact/);
 
     // And what the gate and the publish phase actually read.
     const standing = standingWithdrawal(repo, 4);
-    assert.equal(standing?.approver, "operator");
+    assert.equal(standing?.by, "claude-code (anthropic)");
     assert.equal(standing?.recordedAt, "2026-01-01T00:00:00+00:00");
 
     // Immutable, for the reason a reopen grant is: a row that can be
@@ -295,10 +295,10 @@ describe("withdrawing a session's releasability", () => {
       1,
     );
 
-    // A reason or an approver the schema will not take is refused before
-    // anything is written, so the file a reader finds is never half a row.
+    // A row the schema will not take is refused before anything is written,
+    // so the file a reader finds is never half a row.
     assert.throws(
-      () => appendWithdrawal(repo, 5, { ...row, session_number: 5, approver: "" }),
+      () => appendWithdrawal(repo, 5, { ...row, session_number: 5, by: "" }),
       /releasability withdrawal/,
     );
     assert.equal(standingWithdrawal(repo, 5), null);

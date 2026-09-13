@@ -11,12 +11,12 @@ import { describe, it } from "node:test";
 import { renderDecision } from "../src/cli/owed.ts";
 import type { Row } from "../src/ledger.ts";
 import {
-  AFTER_CLOSE_NOTE,
   CLASS_ACCOUNTABILITY_SIGNOFF,
   CLASS_EXTERNAL_CONSEQUENCE,
   CLASS_VERIFICATION_REDUCTION,
   EVENT_ANSWERED,
   EVENT_RAISED,
+  EVENT_SUPERSEDED,
   ID_PACKAGING_FEED,
   ID_PACKAGING_SECRET,
   ID_TESTING_SUITES,
@@ -33,8 +33,8 @@ import {
   raiseDisposition,
   raiseOwed,
   raisePackagingDecisions,
-  reaskSessionScopedSignoffs,
   readOwed,
+  settleRepairSignoffs,
   refreshOwedDecisions,
   supersedeOwed,
 } from "../src/owedDecisions.ts";
@@ -245,7 +245,7 @@ describe("asking how a repository publishes", () => {
   });
 });
 
-describe("a signoff whose session has ended", () => {
+describe("a signoff rebaseline once raised", () => {
   const SIGNOFF = {
     decisionClass: CLASS_ACCOUNTABILITY_SIGNOFF,
     question: "Session 7 had work put into its tree outside any step. Does that stand?",
@@ -257,76 +257,37 @@ describe("a signoff whose session has ended", () => {
     sessionNumber: 7,
   } as const;
 
-  it("is asked again in a form a person can act on, once, and leaves other questions alone", () => {
+  it("is settled once, as superseded, and other questions are left alone", () => {
     const repo = tempDir();
     raiseOwed(repo, { ...SIGNOFF, id: "repair-outside-a-step-7" });
-    // An earlier session's signoff that survived its own close is exactly
-    // what this is for: reaching only the closing session would leave the
-    // row that prompted the rule unreachable forever.
     raiseOwed(repo, { ...SIGNOFF, id: "repair-outside-a-step-6", sessionNumber: 6 });
-    // Not about a session, and not a signoff: neither is this rule's business.
+    // Not a repair signoff, or not a signoff at all: neither is this rule's business.
     raiseOwed(repo, { ...SIGNOFF, id: "repository-wide", sessionNumber: null });
     raiseOwed(repo, { ...SIGNOFF, id: "elsewhere", decisionClass: CLASS_EXTERNAL_CONSEQUENCE });
+    // Answered is settled already.
+    raiseOwed(repo, { ...SIGNOFF, id: "repair-outside-a-step-5", sessionNumber: 5 });
+    answerOwed(repo, "repair-outside-a-step-5", "It stands");
 
-    const reasked = reaskSessionScopedSignoffs(repo, 7);
+    const settled = settleRepairSignoffs(repo);
     assert.deepEqual(
-      reasked.map((row) => String(row["id"])).sort(),
+      settled.map((row) => String(row["id"])).sort(),
       ["repair-outside-a-step-6", "repair-outside-a-step-7"],
     );
-
     const current = foldOwed(readOwed(repo));
-    const row = current.get("repair-outside-a-step-7");
-    // Still open, still advisory, still a person's to give: the close was
-    // never held by this and is not held by it now.
-    assert.equal(row?.["event"], EVENT_RAISED);
-    assert.equal(row?.["severity"], SEVERITY_ADVISORY);
-    // Both answers survive by name, and what each one NOW does is what it
-    // leads with -- the undertaking it carried while the session ran is
-    // quoted after it and is no longer offered as an action.
-    const offered = (row?.["options"] ?? []) as Array<Record<string, string>>;
-    assert.deepEqual(offered.map((option) => option["label"]), ["It stands", "It does not"]);
-    for (const option of offered) {
-      const consequence = String(option["consequence"]);
-      assert.ok(consequence.startsWith(AFTER_CLOSE_NOTE), consequence);
-      assert.match(consequence, /performs nothing/);
-      assert.match(consequence, /What it undertook while the session ran: "/);
-    }
-    // The one that promised to act "before the session continues" no longer
-    // promises anything: the words survive only inside that quotation.
-    const undo = offered.find((option) => option["label"] === "It does not");
-    const promise = "The repair is taken back out before the session continues.";
-    assert.ok(String(undo?.["consequence"]).endsWith(`"${promise}"`), undo?.["consequence"]);
-    assert.match(String(row?.["determined"]), /session 7 has closed/);
-    // An earlier session's row names ITS session, not the closing one.
-    assert.match(String(current.get("repair-outside-a-step-6")?.["determined"]), /session 6 has closed/);
-    // The superseded original is still readable, which is what makes the
-    // re-ask a correction rather than a rewrite.
-    assert.equal(readOwed(repo).filter((entry) => entry["id"] === "repair-outside-a-step-7").length, 3);
-
-    // Once. A close run twice must not supersede its own re-ask forever.
-    assert.deepEqual(reaskSessionScopedSignoffs(repo, 7), []);
-    assert.equal(readOwed(repo).filter((entry) => entry["id"] === "repair-outside-a-step-7").length, 3);
-    // The two that are not its business are untouched.
+    // Superseded, never answered: nobody gave the answer, so the record does
+    // not say somebody did -- and it is no longer open, so `owed list`
+    // stops offering it.
+    assert.equal(current.get("repair-outside-a-step-7")?.["event"], EVENT_SUPERSEDED);
+    assert.equal(current.get("repair-outside-a-step-7")?.["sessionNumber"], 7);
+    assert.match(String(current.get("repair-outside-a-step-7")?.["note"]), /repairs\.jsonl/);
+    assert.equal(current.get("repair-outside-a-step-5")?.["event"], EVENT_ANSWERED);
+    assert.ok(!openDecisions(repo).some((row) => String(row["id"]).startsWith("repair-outside-a-step-")));
     for (const id of ["repository-wide", "elsewhere"]) {
       assert.equal(readOwed(repo).filter((entry) => entry["id"] === id).length, 1);
     }
-  });
-
-  it("does not reach a session that has not ended", () => {
-    // A signoff raised during session 9 while session 7 is the one closing
-    // is a question about a session still to come; saying it has closed
-    // would be the framework asserting an outcome it has not reached.
-    const repo = tempDir();
-    raiseOwed(repo, { ...SIGNOFF, id: "repair-outside-a-step-9", sessionNumber: 9 });
-    assert.deepEqual(reaskSessionScopedSignoffs(repo, 7), []);
-    assert.equal(readOwed(repo).length, 1);
-  });
-
-  it("leaves an answered signoff alone: answered is settled", () => {
-    const repo = tempDir();
-    raiseOwed(repo, { ...SIGNOFF, id: "repair-outside-a-step-7" });
-    answerOwed(repo, "repair-outside-a-step-7", "It stands");
-    assert.deepEqual(reaskSessionScopedSignoffs(repo, 7), []);
-    assert.equal(foldOwed(readOwed(repo)).get("repair-outside-a-step-7")?.["event"], EVENT_ANSWERED);
+    // Once: a second close finds nothing open and writes nothing.
+    const before = readOwed(repo).length;
+    assert.deepEqual(settleRepairSignoffs(repo), []);
+    assert.equal(readOwed(repo).length, before);
   });
 });

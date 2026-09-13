@@ -426,8 +426,7 @@ export async function terminateAtCap(
         "\n\"Nothing left to verify\" is true of the tree that round saw. If " +
         "the tree has moved since, the close refuses it and this is the verb " +
         "that buys the round the cap will not:\n" +
-        `  dabbler verify reopen --rounds 1 --reason "<why>" ` +
-        `--approver <who> --sessions-dir ${sessionsDir}\n`,
+        `  dabbler verify reopen --rounds 1 --reason "<why>" --sessions-dir ${sessionsDir}\n`,
     );
     return EXIT_USAGE;
   }
@@ -668,8 +667,7 @@ export async function runRound(
             "tree has moved since it was written -- so the close refuses it " +
             "too -- an operator may buy the review neither verb can give " +
             "you:\n" +
-            `  dabbler verify reopen --rounds 1 --reason "<why>" ` +
-            `--approver <who> --sessions-dir ${sessionsDir}\n`
+            `  dabbler verify reopen --rounds 1 --reason "<why>" --sessions-dir ${sessionsDir}\n`
           : ""),
     );
     return EXIT_USAGE;

@@ -70,6 +70,7 @@ import {
   driverDir,
   planPath,
   readInstruction,
+  readRepairs,
   readRun,
   recordRepair,
   reportPath,
@@ -105,12 +106,7 @@ import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { removeStopGate } from "./bootstrap/index.ts";
 import { PROJECT_CONFIG_FILENAME } from "./config.ts";
-import {
-  CLASS_ACCOUNTABILITY_SIGNOFF,
-  raiseOwed,
-  reaskSessionScopedSignoffs,
-  refreshOwedDecisions,
-} from "./owedDecisions.ts";
+import { refreshOwedDecisions, settleRepairSignoffs } from "./owedDecisions.ts";
 import { isSessionBookkeeping, loadSuitesChecked } from "./testEvidence.ts";
 import { VERSION } from "./version.ts";
 import { nowIso, platformNewlines, repoRootFor, runGit } from "./journal.ts";
@@ -141,6 +137,7 @@ import {
   checkoutModuleOf,
   plannedKindOf,
   type PlannedSessionKind,
+  whoIsWorking,
 } from "./progress.ts";
 import { dumps, pythonRepr, pythonStr } from "./pythonJson.ts";
 import {
@@ -161,6 +158,9 @@ import {
   registerSessionStart,
   releasabilityOf,
   validateAndWriteState,
+  amendmentEntries,
+  amendmentLine,
+  recordAmendment,
 } from "./writers.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -2041,8 +2041,10 @@ export interface RebaselineCliOptions {
  * measured against a tree the framework snapshotted itself, and that is its
  * strongest edge; this verb moves that tree without a step. So it records
  * rather than merely permits: the paths and the reason go to
- * `repairs.jsonl`, and an `accountability-signoff` decision says a person
- * put work in outside a step. What it does NOT do is weaken any judgement
+ * `repairs.jsonl`, and that row is the whole of it. It asks nobody whether
+ * the repair stands: no answer to that would change what the framework does
+ * next, and a question whose answer changes nothing is a row on `owed list`
+ * and not a decision. What it does NOT do is weaken any judgement
  * downstream -- the standing verification round and the run of record both
  * bind to a tree this moves, so a repair after either is refused by exactly
  * the machinery that refuses any other post-verification change. The hole
@@ -2151,45 +2153,10 @@ export function rebaseline(sessionsDir: string, options: RebaselineCliOptions): 
     return EXIT_BOUNDARY;
   }
 
-  // The decision is the point as much as the row is: a machine cannot judge
-  // whether a repair made outside a step was the right one, and the class
-  // for "somebody did this and owns it" is what accountability-signoff is.
-  // It does not block a close -- moving a baseline is not a verification
-  // reduction, and the gates that would notice one still run.
-  raiseOwed(repoRoot, {
-    id: `repair-outside-a-step-${target}`,
-    decisionClass: CLASS_ACCOUNTABILITY_SIGNOFF,
-    question:
-      `Session ${number} had work put into its tree outside any step, while the run was ` +
-      `stopped (${run.stop.kind}). Does that stand as part of this session?`,
-    determined:
-      `${by} reported it as: ${reason}. ` +
-      (paths.length > 0
-        ? `It absorbed ${paths.length} path(s): ${paths.slice(0, 5).join(", ")}` +
-          (paths.length > 5 ? ", ..." : "")
-        : "The tree had not moved since the last baseline, so it absorbed nothing."),
-    options: [
-      {
-        label: "It stands",
-        consequence:
-          "The repair is part of this session's diff and is reviewed with it: the " +
-          "verification round and the run of record both bind to the tree it made.",
-      },
-      {
-        label: "It does not",
-        consequence:
-          "The repair is taken back out of the tree before the session continues, and " +
-          "the baseline moves again when it is.",
-      },
-    ],
-    sessionNumber: target,
-  });
-
   writeOut(
     `rebaseline: session ${number}'s baseline moved to ${tree.slice(0, 12)}; ` +
-      `${paths.length} path(s) recorded as repaired outside a step, and an ` +
-      "accountability-signoff decision raised. The stop is untouched -- re-run to " +
-      "carry on from it.\n" +
+      `${paths.length} path(s) recorded as repaired outside a step in repairs.jsonl; ` +
+      "the close reports it. The stop is untouched -- re-run to carry on from it.\n" +
       `${dumps({ paths: row["paths"], reason })}\n`,
   );
   return EXIT_OK;
@@ -2199,7 +2166,6 @@ export function rebaseline(sessionsDir: string, options: RebaselineCliOptions): 
 
 export interface WithdrawReleaseCliOptions {
   readonly reason: string;
-  readonly approver: string;
   readonly sessionNumber?: number | null;
 }
 
@@ -2216,8 +2182,9 @@ export interface WithdrawReleaseCliOptions {
  * would have had nowhere to go if the Marketplace had refused it.
  *
  * So it is a row, and every property of the row is about keeping it a
- * withdrawal rather than a bypass. It carries a reason and an approver
- * forever. It is immutable and there is one per session. It does not touch
+ * withdrawal rather than a bypass. It carries a reason forever, and who was
+ * working, read from the record `start` wrote rather than typed. It is
+ * immutable and there is one per session. It does not touch
  * the declaration, which stands beside it -- the close REPORTS both, so the
  * record of a session that was supposed to ship and did not is different
  * from the record of one that never was. And it buys nothing else: no gate
@@ -2233,12 +2200,11 @@ export function withdrawRelease(
     return EXIT_USAGE;
   }
   const reason = options.reason.trim();
-  const approver = options.approver.trim();
-  if (reason === "" || approver === "") {
+  if (reason === "") {
     writeErr(
-      "withdraw-release: refused -- a withdrawal carries a reason and an approver. " +
-        "An artifact that was declared and then not shipped, by nobody, for no stated " +
-        "reason, is the silent skip this row exists to replace.\n",
+      "withdraw-release: refused -- a withdrawal carries a reason. An artifact that " +
+        "was declared and then not shipped for no stated reason is the silent skip " +
+        "this row exists to replace.\n",
     );
     return EXIT_USAGE;
   }
@@ -2249,6 +2215,7 @@ export function withdrawRelease(
   }
   const repoRoot = repoRootFromSessionsDir(sessionsDir);
   const number = sessionDisplayNumber(target);
+  const by = whoIsWorking(sessionsDir, target);
 
   // Not declared releasable is not a state to withdraw from: there would be
   // nothing on the record for the row to stand beside, and a withdrawal
@@ -2301,7 +2268,7 @@ export function withdrawRelease(
     schema_version: 1,
     session_number: target,
     reason,
-    approver,
+    by,
     recorded_at: nowIso(),
     framework_version: VERSION,
   };
@@ -2318,7 +2285,7 @@ export function withdrawRelease(
 
   writeOut(
     `withdraw-release: session ${number} will publish nothing.\n` +
-      `  Approved by: ${approver}\n` +
+      `  By: ${by}\n` +
       `  Reason: ${reason}\n` +
       "\nThe declaration stands on the record and this stands beside it, so the close " +
       "reports a session that was declared releasable and did not ship, rather than one " +
@@ -2391,13 +2358,12 @@ export interface PlanAmendCliOptions {
    */
   readonly maxRounds: number | null;
   readonly reason: string;
-  readonly approver: string;
   readonly sessionNumber?: number | null;
 }
 
 /**
  * Amend what one not-yet-accepted step of the driven plan is measured
- * against, with the reason and the approver on the record.
+ * against, with the reason on the record beside who was working.
  *
  * The plan under `.dabbler/runs/` is machine-owned like everything else
  * there, and this is the one writer for it -- which is the point. Session 62
@@ -2416,28 +2382,30 @@ export function planAmend(sessionsDir: string, options: PlanAmendCliOptions): nu
     return EXIT_BOUNDARY;
   }
   const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  const by = whoIsWorking(sessionsDir, target);
 
   // The round cap is the one amendable thing that belongs to the RUN rather
   // than to a step: it is not a bar a step is measured against, it is how
-  // many reviews the tree may still have. Same verb, same reason and same
-  // approver, because it is the same kind of change -- and no gate reads
-  // either one.
+  // many reviews the tree may still have. Same verb and same reason,
+  // because it is the same kind of change -- and no gate reads either one.
   if (options.maxRounds !== null) {
     try {
       const run = amendRoundCap(
         repoRoot,
         target,
-        {
-          cap: options.maxRounds,
-          reason: options.reason,
-          approver: options.approver,
-        },
+        { cap: options.maxRounds, reason: options.reason, by },
         nowIso(),
       );
+      recordAmendment(sessionsDir, {
+        sessionNumber: target,
+        what: `the verification round cap, now ${String(run.verification?.max_rounds)}`,
+        reason: options.reason.trim(),
+        by,
+      });
       writeOut(
         `plan amend: the verification round cap for session ${sessionDisplayNumber(target)} is ` +
-          `now ${run.verification?.max_rounds}, amended by ${options.approver.trim()}; the ` +
-          "claim is on the record with the rounds already run, and no gate reads it.\n",
+          `now ${run.verification?.max_rounds}, amended by ${by}; the reason is on the ` +
+          "record with the rounds already run, and no gate reads it.\n",
       );
       return EXIT_OK;
     } catch (error) {
@@ -2487,7 +2455,7 @@ export function planAmend(sessionsDir: string, options: PlanAmendCliOptions): nu
         files: options.files,
         checks,
         reason: options.reason,
-        approver: options.approver,
+        by,
       },
       run?.accepted_steps ?? [],
       nowIso(),
@@ -2497,15 +2465,53 @@ export function planAmend(sessionsDir: string, options: PlanAmendCliOptions): nu
     writeErr(`plan amend: refused -- ${error.message}\n`);
     return EXIT_BOUNDARY;
   }
+  const moved = [options.files === null ? null : "files", checks === null ? null : "checks"]
+    .filter((part): part is string => part !== null)
+    .join(" and ");
+  recordAmendment(sessionsDir, {
+    sessionNumber: target,
+    what: `step '${String(options.stepId)}': its ${moved}`,
+    reason: options.reason.trim(),
+    by,
+  });
   writeOut(
     `plan amend: step '${options.stepId}' of session ${sessionDisplayNumber(target)} amended by ` +
-      `${options.approver.trim()}; the next instruction for it is measured against the new ` +
+      `${by}; the next instruction for it is measured against the new ` +
       "step, and what changed is on the record.\n",
   );
   return EXIT_OK;
 }
 
 // --- close -------------------------------------------------------------------
+
+/**
+ * What this session stepped over, one line each, for the close to print:
+ * every repair made outside a step and every amendment of the plan, with
+ * its reason. Read from `repairs.jsonl` and the activity log and from
+ * nothing new, because nothing asks a person about either any more -- the
+ * close is where a person reads what happened, so it is where these are
+ * said. A session with none yields nothing.
+ */
+export function steppedOverLines(
+  repoRoot: string | null,
+  sessionsDir: string,
+  sessionNumber: number,
+): string[] {
+  const lines: string[] = [];
+  if (repoRoot) {
+    for (const row of readRepairs(repoRoot, sessionNumber)) {
+      const paths = Array.isArray(row["paths"]) ? row["paths"].length : 0;
+      lines.push(
+        `close: repaired outside a step: ${String(row["reason"])} ` +
+          `(${String(row["by"])}; ${paths} path(s))`,
+      );
+    }
+  }
+  for (const entry of amendmentEntries(sessionsDir, sessionNumber)) {
+    lines.push(`close: amended ${amendmentLine(entry)}`);
+  }
+  return lines;
+}
 
 function localOnly(repoRoot: string): boolean {
   return isFile(join(repoRoot, ".dabbler", "local-only"));
@@ -2630,22 +2636,24 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
         (verdict ? ` (${String(verdict)})` : "") +
         ".\n",
     );
+    for (const line of steppedOverLines(repoRoot, sessionsDir, current as number)) {
+      writeOut(`${line}\n`);
+    }
 
-    // After the flip and not before it: what the re-ask says is that the
-    // session HAS closed, and saying so while it might still be refused
-    // would be the framework asserting an outcome it had not reached.
+    // A repository that still carries a signoff `rebaseline` used to raise
+    // is offered it on every `owed list` until something settles it; the
+    // close does, once, and says so only when it did.
     if (repoRoot) {
       try {
-        const reasked = reaskSessionScopedSignoffs(repoRoot, current as number);
-        for (const row of reasked) {
+        for (const row of settleRepairSignoffs(repoRoot)) {
           writeOut(
-            `close: '${String(row["id"])}' is still open and is asked again for a ` +
-              "session that has ended; `dabbler owed list` has it.\n",
+            `close: '${String(row["id"])}' is settled without an answer; the repair is ` +
+              "on repairs.jsonl and rebaseline no longer asks.\n",
           );
         }
       } catch {
-        // A close must not fail because a brief could not be rewritten. The
-        // standing question is still on the record either way.
+        // A close must not fail because an old row could not be settled. It
+        // stays on the record either way.
       }
     }
 

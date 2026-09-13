@@ -338,12 +338,15 @@ export const BOOTSTRAP_PLAN =
   "### Session 1: Author or import the solution plan\n" +
   "\n" +
   "1. Register.\n" +
-  "2. Ask the operator what the solution is — its purpose, who uses it, what\n" +
-  "   it must do and what is out of scope, what success looks like, and\n" +
-  "   whether a plan, brief or notes already exist — unless the repository or\n" +
-  "   your prompt already says. The plan's substance is theirs: do not search\n" +
-  "   neighbouring directories for one, and do not draft one from the folder\n" +
-  "   name. Then create — or import — `docs/planning/solution-plan.md`: the\n" +
+  "2. The brief is the prompt this session was started with, or\n" +
+  "   `docs/planning/brief.md`: what the solution is — its purpose, who uses\n" +
+  "   it, what it must do and what is out of scope, what success looks like,\n" +
+  "   and whether a plan or notes already exist. With neither, report this\n" +
+  "   step `blocked` naming that path, so the session stops here before any\n" +
+  "   work and a person supplies the brief where it will be read. The plan's\n" +
+  "   substance is theirs: do not search neighbouring directories for one,\n" +
+  "   and do not draft one from the folder name. Then create — or import —\n" +
+  "   `docs/planning/solution-plan.md`: the\n" +
   "   objective a reader can act on; the modules, with what each is\n" +
   "   responsible for, the contract each exposes (what must be true going\n" +
   "   in, what is guaranteed coming out, how it fails), the dependency\n" +

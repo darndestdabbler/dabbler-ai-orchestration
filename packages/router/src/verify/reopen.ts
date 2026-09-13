@@ -17,10 +17,11 @@
 // named terminal; it never suspends the cap. It cannot reach an
 // adjudication, because that is a third provider's judgment and not a
 // budget. It cannot be written where nothing is stuck, so it can never
-// become the ordinary way to raise a cap. And it carries a reason and an
-// approver forever, because the whole difference between this and a waiver
-// is that a waiver accepted work over a standing finding while this buys
-// the review that would settle one.
+// become the ordinary way to raise a cap. And it carries a reason forever,
+// with who was working read from the record `start` wrote rather than
+// typed, because the whole difference between this and a waiver is that a
+// waiver accepted work over a standing finding while this buys the review
+// that would settle one.
 
 import { writeErr, writeOut } from "../output.ts";
 import { repoRootFor } from "../evidence.ts";
@@ -34,8 +35,9 @@ import {
   standingReopen,
   type Row,
 } from "../ledger.ts";
-import { readSessionState } from "../progress.ts";
+import { readSessionState, whoIsWorking } from "../progress.ts";
 import { VERSION } from "../version.ts";
+import { recordAmendment } from "../writers.ts";
 import { EXIT_OK, EXIT_STATE, EXIT_USAGE } from "./errors.ts";
 import {
   NO_ROUND_CAP_CLEAN,
@@ -49,7 +51,6 @@ export interface ReopenOptions {
   /** How many further rounds this grant buys. */
   readonly rounds: number;
   readonly reason: string;
-  readonly approver: string;
 }
 
 /** What is stuck, and whether a grant may reach it. */
@@ -126,7 +127,7 @@ export function classifyStuck(
       "now, so there is no budget to buy past. This verb exists for a cap " +
       "that has already ended a loop; the cap itself moves before it is " +
       'reached with `dabbler session plan amend --max-rounds <N> --reason ' +
-      '"<why>" --approver <who>`. Run the round:\n  dabbler verify',
+      '"<why>"`. Run the round:\n  dabbler verify',
   };
 }
 
@@ -154,15 +155,14 @@ export function runReopen(sessionsDir: string, options: ReopenOptions): number {
     return EXIT_USAGE;
   }
   const reason = options.reason.trim();
-  const approver = options.approver.trim();
-  if (reason === "" || approver === "") {
+  if (reason === "") {
     writeErr(
-      "verify reopen: refused -- a grant carries a reason and an approver. " +
-        "Rounds bought by nobody, for no stated reason, are the bare " +
-        "override this row exists to replace.\n",
+      "verify reopen: refused -- a grant carries a reason. Rounds bought for no " +
+        "stated reason are the bare override this row exists to replace.\n",
     );
     return EXIT_USAGE;
   }
+  const by = whoIsWorking(sessionsDir, current);
 
   const priorRounds = readRounds(repoRoot, current);
   const cap = verificationRoundCap(loadConfig());
@@ -179,7 +179,7 @@ export function runReopen(sessionsDir: string, options: ReopenOptions): number {
     terminal: stuck.terminal,
     cap: stuck.afterRound + options.rounds,
     reason,
-    approver,
+    by,
     recorded_at: nowIso(),
     framework_version: VERSION,
   };
@@ -193,13 +193,21 @@ export function runReopen(sessionsDir: string, options: ReopenOptions): number {
     writeErr(`verify reopen: refused -- ${error.message}\n`);
     return EXIT_USAGE;
   }
+  recordAmendment(sessionsDir, {
+    sessionNumber: current,
+    what:
+      `verification reopened after round ${stuck.afterRound}: ${options.rounds} round(s) ` +
+      `bought, cap ${String(record["cap"])}`,
+    reason,
+    by,
+  });
 
   writeOut(
     `Reopened session ${current}'s verification after round ` +
       `${stuck.afterRound} (${stuck.terminal}).\n` +
       `  ${options.rounds} further round(s) bought; the cap is now ` +
       `${record["cap"] as number}.\n` +
-      `  Approved by: ${approver}\n` +
+      `  By: ${by}\n` +
       `  Reason: ${reason}\n` +
       "\nThe grant is on the record and buys rounds, never a verdict: " +
       "nothing is verified until a round says so, and reaching the new cap " +

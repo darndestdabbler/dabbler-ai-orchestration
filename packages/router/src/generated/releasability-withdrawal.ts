@@ -13,9 +13,9 @@ export type ReleasabilityWithdrawal = {
    */
   reason: string;
   /**
-   * Who withdrew it. Not a verdict and never read as one: this says a person decided nothing would be published, never that anything passed.
+   * Who was working when it was withdrawn, from the session's orchestrator block. Not a verdict and never read as one: this says nothing would be published, never that anything passed.
    */
-  approver: string;
+  by: string;
   /**
    * The worktree snapshot when the withdrawal was made, so a reader can see which tree the decision was taken against. Absent when the snapshot could not be taken.
    */

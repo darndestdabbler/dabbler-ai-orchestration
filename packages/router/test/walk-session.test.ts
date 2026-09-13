@@ -22,9 +22,8 @@ import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "..
 import type { DriverInstruction } from "../src/generated/index.ts";
 import { readRounds } from "../src/ledger.ts";
 import {
-  AFTER_CLOSE_NOTE,
   CLASS_ACCOUNTABILITY_SIGNOFF,
-  EVENT_RAISED,
+  EVENT_SUPERSEDED,
   foldOwed,
   raiseOwed,
   readOwed,
@@ -35,7 +34,7 @@ import { resetForTests as resetRouter } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
 import { EXIT_OK, planAmend, report, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
-import { readTaskDeclaration } from "../src/writers.ts";
+import { amendmentEntries, readTaskDeclaration } from "../src/writers.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
 import { settleJobs, useInProcessJobs } from "./support/inProcessJobs.ts";
 import { gitOut, makeRepo } from "./support/repo.ts";
@@ -221,6 +220,9 @@ describe("one session, walked from next to done", () => {
     assert.equal(plan.instruction?.step_id, "plan");
     // The session's own text reaches the engine, so the plan is of THIS work.
     assert.match(String(plan.instruction?.ask), /Make `widget\(\)` return 2\./);
+    // And the one way a step is changed after acceptance, so an engine that
+    // diagnoses a wrong check has the verb in front of it.
+    assert.match(String(plan.instruction?.ask), /dabbler session plan amend --step <id>/);
     // Stdout is the instruction and nothing else -- a parser reads it -- and
     // everything the verbs said on the way is on stderr, where the person is.
     assert.match(plan.err, /dabbler \[/);
@@ -238,9 +240,9 @@ describe("one session, walked from next to done", () => {
     assert.equal(readTaskDeclaration(sessionsDir, 1)?.["task"], PLAN.task);
     milestones.push("planned and declared");
 
-    // A signoff this session owes about itself, raised the way the framework
-    // raises one, and left open on purpose: what it offers must still be
-    // answerable once the close has landed the work it asks about.
+    // A signoff an earlier version of `rebaseline` raised, left open on
+    // purpose: the close settles it, because nothing raises or answers it
+    // any more and a question nobody can act on must not stand forever.
     raiseOwed(repo, {
       id: "repair-outside-a-step-1",
       decisionClass: CLASS_ACCOUNTABILITY_SIGNOFF,
@@ -279,6 +281,16 @@ describe("one session, walked from next to done", () => {
     assert.match(String(refusedCheck.instruction?.reasons?.join(" ")), /check-failed/);
     milestones.push("refused the work its own check rejects");
 
+    // --- a call with nothing new to judge reprints, and costs nothing -------
+    // The report on disk answered the instruction before this one and was
+    // judged then. Asking again is asking what is outstanding: the same
+    // instruction, the same seq, and no refusal spent -- a third one here
+    // would have stopped the session for a report nobody wrote.
+    const again = await next(sessionsDir);
+    assert.equal(again.instruction?.kind, "rejection");
+    assert.equal(again.instruction?.seq, refusedCheck.instruction?.seq);
+    assert.equal(readRun(repo, 1)?.rejections, 2);
+
     // --- the step is amended, and the NEXT judgement uses the amendment -----
     // The check was wrong, not the work. A step is re-read from the plan
     // before it is judged again, so an amendment moves what the next
@@ -307,7 +319,6 @@ describe("one session, walked from next to done", () => {
           checksFile,
           maxRounds: null,
           reason: "the check named the value the plan guessed, not the one the work needs",
-          approver: "the walkthrough",
         }),
       ),
     );
@@ -315,6 +326,13 @@ describe("one session, walked from next to done", () => {
     assert.deepEqual(readWorkPlan(repo, 1)?.steps[0]?.checks[0]?.argv.slice(-1), [
       "process.exit(require('fs').readFileSync('src/widget.py','utf8').includes('return 3') ? 0 : 1)",
     ]);
+    // The amendment reaches the pushed history: the activity log carries
+    // it with its reason, beside the declaration, and the driver's own
+    // journal under `.dabbler/runs/` is not the only place it exists.
+    const folded = amendmentEntries(sessionsDir, 1);
+    assert.equal(folded.length, 1);
+    assert.match(String(folded[0]?.["what"]), /step 'widget': its checks/);
+    assert.match(String(folded[0]?.["reason"]), /the value the plan guessed/);
     milestones.push("amended the step it was refused under");
 
     // --- the same report, now accepted, because the definition moved --------
@@ -374,6 +392,12 @@ describe("one session, walked from next to done", () => {
       `next printed no instruction (exit ${last.code}); stderr:\n${last.err}\n${jobLogs}`,
     );
     milestones.push("done");
+    // The close said what this session stepped over: the one amendment,
+    // with its reason, so a person reading the close does not have to know
+    // the driver's journal exists. The close is a job, so its words are in
+    // its log.
+    const closeLog = readFileSync(join(repo, ".dabbler", "runs", "s1", "driver", "jobs", "close.log"), "utf8");
+    assert.match(closeLog, /close: amended step 'widget': its checks: the check named the value the plan guessed/);
 
     // --- and what each phase left behind ------------------------------------
     // Verification: one round, recorded by the verifier and nobody else.
@@ -423,19 +447,11 @@ describe("one session, walked from next to done", () => {
     assert.equal(readInstruction(repo, 1)?.answer_command, undefined);
     assert.ok(existsSync(join(repo, ".dabbler", "runs", "s1", "driver", "run.json")));
 
-    // The signoff is still a person's to give -- it never held the close --
-    // but the close leaves no question offering to undo what it has landed.
+    // The signoff an earlier version raised is settled by the close, once,
+    // and as superseded rather than answered: nobody answered it.
     const signoff = foldOwed(readOwed(repo)).get("repair-outside-a-step-1");
-    assert.equal(signoff?.["event"], EVENT_RAISED);
-    const offered = (signoff?.["options"] as Array<Record<string, string>>).map(
-      (option) => option["consequence"],
-    );
-    assert.deepEqual(
-      offered.filter((consequence) => !consequence.startsWith(AFTER_CLOSE_NOTE)),
-      [],
-      "an answer still leads with a promise to act on a session that has ended",
-    );
-    assert.match(String(signoff?.["determined"]), /session 1 has closed/);
+    assert.equal(signoff?.["event"], EVENT_SUPERSEDED);
+    assert.match(String(signoff?.["note"]), /repairs\.jsonl/);
 
     assert.deepEqual(milestones, [
       "registered and asked to plan",

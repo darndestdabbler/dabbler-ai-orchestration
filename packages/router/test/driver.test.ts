@@ -19,6 +19,7 @@ import {
   readDispositions,
   readReport,
   readWatcher,
+  renderAmendmentProposal,
   renderStop,
   renderUncollected,
   reportPath,
@@ -564,6 +565,30 @@ describe("the watcher over one session's directory", () => {
     sandbox.status(" M widget.ts");
     assert.ok(Date.parse(treeTouchedAt(repo) as string) > Date.parse(ISSUED));
     assert.equal(readWatcher(repo, 1, 60, NOW).state, WATCHER_QUIET);
+  });
+});
+
+describe("an adviser's proposal, as a person would type it", () => {
+  it("names the step, what moves, and the reason flag, and nothing about who", () => {
+    // What is printed at the stop and offered on the owed row is the same
+    // rendering: a proposal a person cannot type is a description. Who was
+    // working is on the record, so there is no name to type.
+    const text = renderAmendmentProposal(
+      {
+        step_id: "widget",
+        files: ["src/widget.py", "tests/test_widget.py"],
+        checks: [{ argv: ["node", "--test"] }],
+        relaxes_a_gate: false,
+        reason: "the check named the value the plan guessed",
+      },
+      "docs\\sessions",
+    );
+    assert.match(text, /plan amend --sessions-dir docs\/sessions/);
+    assert.match(text, /--step widget/);
+    assert.match(text, /--files src\/widget\.py,tests\/test_widget\.py/);
+    assert.match(text, /--checks-file .*"node","--test"/);
+    assert.match(text, /--reason "<why>"/);
+    assert.doesNotMatch(text, /--approver/);
   });
 });
 

@@ -285,7 +285,7 @@ export interface VerificationFacts {
    * null. The grant reopened a cap terminal, so that terminal's own "this is
    * as reviewed as it gets" no longer holds and the gate must not read it.
    */
-  readonly unspentGrant: { readonly afterRound: number; readonly approver: string } | null;
+  readonly unspentGrant: { readonly afterRound: number; readonly by: string } | null;
   readonly setRel: string;
 }
 
@@ -327,7 +327,7 @@ export function readVerificationFacts(sessionsDir: string): VerificationFacts {
       (facts.rounds[facts.rounds.length - 1] as Record<string, unknown>)["round"],
     );
     if (latestRound <= grant.afterRound) {
-      facts.unspentGrant = { afterRound: grant.afterRound, approver: grant.approver };
+      facts.unspentGrant = { afterRound: grant.afterRound, by: grant.by };
       return facts;
     }
   }
@@ -383,7 +383,7 @@ export function judgeVerification(facts: VerificationFacts, sessionsDir: string)
   if (facts.unspentGrant !== null) {
     return [
       false,
-      `${facts.unspentGrant.approver} reopened verification after round ` +
+      `${facts.unspentGrant.by} reopened verification after round ` +
         `${facts.unspentGrant.afterRound} and no round has run since. The ` +
         "grant bought a review; it is not one. Run it: " +
         verifyCommand(sessionsDir),
@@ -1027,7 +1027,7 @@ export function checkPublishedWhenReleasable(sessionsDir: string): Check {
   if (withdrawn !== null && !rows.some((row) => row["outcome"] === OUTCOME_PUBLISHED)) {
     return [
       true,
-      `declared releasable, and its releasability was WITHDRAWN by ${withdrawn.approver} ` +
+      `declared releasable, and its releasability was WITHDRAWN by ${withdrawn.by} ` +
         `on ${withdrawn.recordedAt}: ${withdrawn.reason}. Nothing was published, and the ` +
         "declaration stands on the record beside the withdrawal rather than being " +
         "rewritten by it.",

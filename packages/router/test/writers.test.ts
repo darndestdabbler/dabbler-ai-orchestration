@@ -27,12 +27,15 @@ import {
 } from "../src/session.ts";
 import { VERSION } from "../src/version.ts";
 import {
+  KIND_AMENDMENT,
   SanctionedWriteError,
+  amendmentEntries,
   appendDecision,
   buildOrchestratorBlock,
   commitBeforeDeclaring,
   declareSessionTask,
   planStepKey,
+  recordAmendment,
   recordProjectPlan,
   registerSessionStart,
   renderDecisionsLog,
@@ -260,6 +263,32 @@ describe("registering a session start", () => {
     writeFileSync(path, JSON.stringify(state), "utf8");
     const rebuilt = registerSessionStart(sessionsDir, 1, { engine: "claude-code" })["sessions"] as Record<string, unknown>[];
     assert.equal("verification" in rebuilt[0], false);
+  });
+});
+
+describe("recording an amendment", () => {
+  it("folds it into the activity log and the work plan renders it under its session", () => {
+    // The driver's own journals live under `.dabbler/runs/`, which is not
+    // pushed; the activity log is, so this is where a changed check or a
+    // bought round becomes visible in the landed history.
+    const { sessionsDir } = makeSessionsDir();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do the thing.", releasable: false });
+    const entry = recordAmendment(sessionsDir, {
+      sessionNumber: 1,
+      what: "step 'widget': its checks",
+      reason: "the check named the value the plan guessed",
+      by: "claude-code (anthropic)",
+    });
+    assert.equal(entry["kind"], KIND_AMENDMENT);
+    const log = JSON.parse(readFileSync(join(sessionsDir, "activity-log.json"), "utf8"));
+    assert.ok(log.entries.some((row: Record<string, unknown>) => row["kind"] === KIND_AMENDMENT && row["sessionNumber"] === 1));
+    assert.equal(amendmentEntries(sessionsDir, 1).length, 1);
+    assert.equal(amendmentEntries(sessionsDir, 2).length, 0);
+    const rendered = renderProjectWorkPlan(sessionsDir);
+    assert.match(rendered, /Amended after acceptance/);
+    assert.match(rendered, /step 'widget': its checks: the check named the value the plan guessed \(claude-code \(anthropic\)\)/);
+    assert.throws(() => recordAmendment(sessionsDir, { sessionNumber: 1, what: "x", reason: " ", by: "y" }), SanctionedWriteError);
   });
 });
 

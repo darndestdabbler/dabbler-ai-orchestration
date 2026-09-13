@@ -465,7 +465,6 @@ describe("a repository walked through the verification loop", () => {
       runReopen(sessionsDir, {
         rounds: 1,
         reason: "the repair to the release path landed unreviewed",
-        approver: "operator",
       }),
     );
     assert.equal(granted.code, EXIT_OK, granted.err);
@@ -473,7 +472,7 @@ describe("a repository walked through the verification loop", () => {
     // A grant is not a verdict: the gate refuses until a round has run.
     const [afterGrant, sinceGrant] = checkVerificationClean(sessionsDir);
     assert.equal(afterGrant, false);
-    assert.match(sinceGrant, /operator reopened verification after round 2/);
+    assert.match(sinceGrant, /claude-code \(anthropic\) reopened verification after round 2/);
 
     // The bought round runs, over the flag that says one, and settles it.
     const reviewed = await captured(() => runRound(sessionsDir, { maxRounds: 1 }));

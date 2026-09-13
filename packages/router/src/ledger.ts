@@ -604,7 +604,8 @@ export interface ReopenGrant {
   readonly cap: number;
   readonly terminal: string;
   readonly reason: string;
-  readonly approver: string;
+  /** Who was working when the grant was made, as the record from `start` said. */
+  readonly by: string;
 }
 
 /**
@@ -630,7 +631,7 @@ export function standingReopen(repoRoot: string, sessionNumber: number): ReopenG
     cap: Number(newest["cap"]),
     terminal: String(newest["terminal"]),
     reason: String(newest["reason"]),
-    approver: String(newest["approver"]),
+    by: String(newest["by"]),
   };
 }
 
@@ -675,7 +676,8 @@ export function appendWithdrawal(
 /** One operator withdrawal, as the gate and the publish phase read it. */
 export interface ReleasabilityWithdrawn {
   readonly reason: string;
-  readonly approver: string;
+  /** Who was working when it was withdrawn, as the record from `start` said. */
+  readonly by: string;
   readonly recordedAt: string;
 }
 
@@ -695,7 +697,7 @@ export function standingWithdrawal(
   if (row === null || row === undefined) return null;
   return {
     reason: String(row["reason"]),
-    approver: String(row["approver"]),
+    by: String(row["by"]),
     recordedAt: String(row["recorded_at"]),
   };
 }

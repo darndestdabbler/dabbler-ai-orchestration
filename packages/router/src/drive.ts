@@ -79,6 +79,7 @@ import {
   writeRun,
   appendSupervision,
   progressResumed,
+  renderAmendmentProposal,
   renderStop,
   type StopRendering,
 } from "./driver.ts";
@@ -331,19 +332,33 @@ export function stepChangedPaths(
 }
 
 /**
+ * A report that answered an earlier instruction and was judged then.
+ *
+ * It is still on disk because nothing removes it, and the next instruction
+ * was issued over it. The sample's engine called `next` with the previous,
+ * already-accepted report in place and was charged one of the step's three
+ * refusals for a report it had not written. A spent report is no report.
+ */
+export function reportIsSpent(report: DriverReport | null, instruction: DriverInstruction): boolean {
+  return report !== null && report.seq < instruction.seq;
+}
+
+/**
  * Whether a report answers the instruction it was handed at all.
  *
  * Read before the tree is: a report about something else cannot be measured
  * against this change set, and reading the tree to say so would be work
  * spent on an answer already known to be the wrong one. `"blocked"` is the
  * engine saying the step cannot be done; `"ok"` sends it on to the files.
+ * A spent report is judged as none written; one AHEAD of the instruction,
+ * or for another step, is refused as the wrong answer it is.
  */
 export function judgeReportShape(
   report: DriverReport | null,
   instruction: DriverInstruction,
   spec: StepSpec,
 ): string[] | "blocked" | "ok" {
-  if (report === null) {
+  if (report === null || reportIsSpent(report, instruction)) {
     return [
       refusal(
         RULE.noReport,
@@ -1353,10 +1368,10 @@ class Driver {
    * The CAP is not typeable here at all. It came off any `next` call and
    * always won -- so `--max-rounds 1` with four rounds run routed the tree
    * straight to its at-cap branch, a verification-reducing act with no
-   * approver anywhere on the record and reachable by anyone who typed a
+   * reason anywhere on the record and reachable by anyone who typed a
    * command. It now comes from `verification.settings.max_rounds` and moves
    * only through `dabbler session plan amend --max-rounds`, which states a
-   * reason and an approver. What is carried here is what the run already
+   * reason beside who was working. What is carried here is what the run already
    * holds, and nothing else may set it.
    */
   private verificationSettings(existing: DriverRun["verification"]): DriverRun["verification"] {
@@ -1601,26 +1616,9 @@ ${this.stopArtifacts()}`,
     return lines.join("\n");
   }
 
-  /**
-   * An adviser's proposal, as the thing a person would actually type.
-   *
-   * The framework applies nothing, so the option has to hand over what it
-   * would have applied -- otherwise "Amend step 'widget'" asks somebody to
-   * agree to a change nobody has shown them.
-   */
+  /** An adviser's proposal as the thing a person would type, for this repository's sessions directory. */
   private amendmentProposal(amendment: NonNullable<Triage["amendment"]>): string {
-    const parts = [
-      `dabbler session plan amend --sessions-dir ${relative(this.repoRoot, this.sessionsDir).replace(/\\/g, "/")}`,
-      `    --step ${amendment.step_id}`,
-    ];
-    if (amendment.files) parts.push(`    --files ${amendment.files.join(",")}`);
-    if (amendment.checks) {
-      parts.push(
-        `    --checks-file <a file holding> ${JSON.stringify(amendment.checks)}`,
-      );
-    }
-    parts.push('    --reason "<why>" --approver "<you>"');
-    return `The proposal, which is yours to make or to refuse:\n${parts.join("\n")}`;
+    return renderAmendmentProposal(amendment, relative(this.repoRoot, this.sessionsDir));
   }
 
   /**
@@ -2089,7 +2087,13 @@ ${this.stopArtifacts()}`,
       "repository never declares a dependency on it. Name it only when this plan's own steps " +
       "need those repositories on disk; a plan for one repository of a many-repository " +
       "solution leaves it out.\n" +
-      "Do not include schema_version, session_number or recorded_at: the framework stamps them."
+      "Do not include schema_version, session_number or recorded_at: the framework stamps them.\n" +
+      // Said here because the sample's engine failed a step three times
+      // rather than change a check it had correctly diagnosed: the verb
+      // existed and nothing in the instruction named it.
+      "Once this plan is accepted, a step's files or checks are changed -- not by editing " +
+      "the record -- with `dabbler session plan amend --step <id> --files <a,b> | " +
+      '--checks-file <path> --reason "<why>"`, which is on the record.'
     );
   }
 
@@ -2362,6 +2366,14 @@ ${this.stopArtifacts()}`,
         answer_command: this.answerCommand("step", spec.id),
       });
       const report = readReport(this.repoRoot, this.sessionNumber);
+      // Under the pull, a call with nothing new to judge is a call asking
+      // what is outstanding: the instruction is printed again, same seq,
+      // and no refusal is spent. Under the push the engine was invoked and
+      // wrote nothing, which is the refusal `judge` makes of it.
+      if (this.pull && (report === null || reportIsSpent(report, instruction))) {
+        this.log("instruction-outstanding", { seq: instruction.seq, step: spec.id });
+        throw new Awaiting(instruction);
+      }
       const judged = await this.judge(report, instruction, spec);
       if (judged === "blocked") {
         throw new Stop(
@@ -2624,9 +2636,9 @@ ${this.stopArtifacts()}`,
         `no further verification round may open (${noRound}), and this is not the ` +
           `tree that was verified: ${why} A cap terminal is a spent round budget ` +
           "rather than a judgment, so an operator may buy the review this change " +
-          'has not had: `dabbler verify reopen --rounds 1 --reason "<why>" ' +
-          "--approver <who>`, which is recorded as the decision to spend another " +
-          "round that it is. Putting the tree back is the other answer.",
+          'has not had: `dabbler verify reopen --rounds 1 --reason "<why>"`, ' +
+          "which is recorded as the decision to spend another round that it is. " +
+          "Putting the tree back is the other answer.",
         "cap-terminal-tree-moved",
       );
     }
@@ -3654,11 +3666,19 @@ ${this.stopArtifacts()}`,
       // The whole rendering, ways on included. The command that met the
       // stop is the surface a person is already looking at, and printing
       // three of the four things it knows sent one operator to look for
-      // the fourth in a record they had no reason to know existed.
+      // the fourth in a record they had no reason to know existed. Where
+      // triage proposed an amendment, the proposal is printed with the
+      // command that makes it, so an engine reading the stop can act.
+      const proposed = ladder?.advice?.answer.amendment ?? null;
       writeErr(
         `dabbler: ${words.headline} in phase '${this.run.phase}' after ` +
           `${this.run.invocations} invocation(s).\n${words.happened}\n` +
-          `${words.ended} ${words.next}${words.ways}\n`,
+          `${words.ended} ${words.next}${words.ways}\n` +
+          (proposed === null
+            ? ""
+            : `\nAn adviser proposed amending step '${proposed.step_id}'` +
+              `${proposed.relaxes_a_gate ? " -- IT RELAXES A GATE" : ""}: ${proposed.reason}\n` +
+              `${this.amendmentProposal(proposed)}\n`),
       );
       return EXIT_GATE_FAILED;
     }

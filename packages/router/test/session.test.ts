@@ -59,10 +59,17 @@ import {
   repairedPaths,
   restore,
   start,
+  steppedOverLines,
   withdrawRelease,
   type SequenceFacts,
 } from "../src/session.ts";
-import { readTaskDeclaration, registerSessionStart, sessionIsReleasable } from "../src/writers.ts";
+import { recordRepair, writeRun } from "../src/driver.ts";
+import {
+  readTaskDeclaration,
+  recordAmendment,
+  registerSessionStart,
+  sessionIsReleasable,
+} from "../src/writers.ts";
 import { cleanRepoAnswers, seed, tempDir } from "./support/answers.ts";
 
 /** One verb's exit code and everything it wrote, so a refusal can be read. */
@@ -989,6 +996,57 @@ describe("the module manifest", () => {
   });
 });
 
+// --- What the close says was stepped over ----------------------------------------
+
+describe("what the close says was stepped over", () => {
+  it("is one line per repair and per amendment with its reason, and nothing for a session with neither", () => {
+    // Nobody is asked about a repair or an amendment any more, so the close
+    // is where a person reads that they happened -- from the record, and
+    // from nothing new.
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      assert.deepEqual(steppedOverLines(state.repo, state.sessionsDir, 1), []);
+
+      writeRun(state.repo, 1, {
+        schema_version: 1,
+        session_number: 1,
+        engine: "claude-code",
+        phase: "work",
+        seq: 2,
+        invocations: 0,
+        max_invocations: 24,
+        accepted_steps: [] as string[],
+        baseline_tree: null,
+        stop: { kind: "engine", reason: "it fell over", class: "first", step_id: "widget", at: "2026-09-13T10:00:00-04:00" },
+        started_at: "2026-09-13T09:00:00-04:00",
+        updated_at: "2026-09-13T10:00:00-04:00",
+      });
+      recordRepair(state.repo, 1, {
+        reason: "restored the deleted fixture",
+        by: "the operator",
+        paths: ["tests/fixture.json"],
+        baselineTree: "0123456789abcdef0123456789abcdef01234567",
+        recordedAt: "2026-09-13T10:05:00-04:00",
+      });
+      recordAmendment(state.sessionsDir, {
+        sessionNumber: 1,
+        what: "step 'widget': its checks",
+        reason: "the check named the value the plan guessed",
+        by: "claude-code (anthropic)",
+      });
+      const lines = steppedOverLines(state.repo, state.sessionsDir, 1);
+      assert.equal(lines.length, 2);
+      assert.match(lines[0] ?? "", /^close: repaired outside a step: restored the deleted fixture \(the operator; 1 path\(s\)\)$/);
+      assert.match(lines[1] ?? "", /^close: amended step 'widget': its checks: the check named the value the plan guessed \(claude-code \(anthropic\)\)$/);
+      // Another session's record says nothing about this one.
+      assert.deepEqual(steppedOverLines(state.repo, state.sessionsDir, 2), []);
+    } finally {
+      state.restore();
+    }
+  });
+});
+
 // --- Withdrawing a declared releasability ---------------------------------------
 
 describe("the exit a releasable session had none of", () => {
@@ -1010,18 +1068,15 @@ describe("the exit a releasable session had none of", () => {
       assert.equal(sessionIsReleasable(state.sessionsDir, 1), true);
       assert.equal(checkPublishedWhenReleasable(state.sessionsDir)[0], false);
 
-      // A withdrawal by nobody, for no reason, is the silent skip this row
-      // replaces, so it is refused before anything is written.
-      const bare = await run(() =>
-        withdrawRelease(state.sessionsDir, { reason: "  ", approver: "operator" }),
-      );
+      // A withdrawal for no reason is the silent skip this row replaces, so
+      // it is refused before anything is written.
+      const bare = await run(() => withdrawRelease(state.sessionsDir, { reason: "  " }));
       assert.equal(bare.code, EXIT_USAGE);
       assert.equal(standingWithdrawal(state.repo, 1), null);
 
       const withdrawn = await run(() =>
         withdrawRelease(state.sessionsDir, {
           reason: "the Marketplace refused the artifact and the fix is a session away",
-          approver: "operator",
         }),
       );
       assert.equal(withdrawn.code, EXIT_OK);
@@ -1029,8 +1084,9 @@ describe("the exit a releasable session had none of", () => {
       // Read back off the record, not off the return value: `packageSession`
       // answered `published` while the append refused the row, and two
       // versions shipped unrecorded because a test stopped at the answer.
+      // Who was working comes off the record `start` wrote, never off a flag.
       const row = standingWithdrawal(state.repo, 1);
-      assert.equal(row?.approver, "operator");
+      assert.equal(row?.by, "claude-code");
       assert.match(String(row?.reason), /Marketplace refused/);
 
       // The publish phase now passes straight through...
@@ -1041,12 +1097,12 @@ describe("the exit a releasable session had none of", () => {
       // to ship and did not identical to one that never was.
       const gate = checkPublishedWhenReleasable(state.sessionsDir);
       assert.equal(gate[0], true);
-      assert.match(gate[1], /WITHDRAWN by operator/);
+      assert.match(gate[1], /WITHDRAWN by claude-code/);
       assert.match(gate[1], /Marketplace refused/);
 
       // Through the close's own gate runner, not only the predicate: what
       // the close prints and records is a row out of `runGates`, and this
-      // is the row. It passes, and it carries the approver and the reason,
+      // is the row. It passes, and it carries who was working and the reason,
       // so a reader of the close sees a session that was declared
       // releasable, did not ship, and on whose word.
       const gateRow = runGates(state.sessionsDir).find(
@@ -1054,14 +1110,14 @@ describe("the exit a releasable session had none of", () => {
       );
       assert.equal(gateRow?.passed, true);
       assert.equal(gateRow?.inapplicable, false);
-      assert.match(String(gateRow?.remediation), /WITHDRAWN by operator/);
+      assert.match(String(gateRow?.remediation), /WITHDRAWN by claude-code/);
       assert.match(String(gateRow?.remediation), /Marketplace refused/);
       // And the declaration is not rewritten by any of it.
       assert.equal(readTaskDeclaration(state.sessionsDir, 1)?.["releasable"], true);
 
       // One per session, ever.
       const again = await run(() =>
-        withdrawRelease(state.sessionsDir, { reason: "again", approver: "operator" }),
+        withdrawRelease(state.sessionsDir, { reason: "again" }),
       );
       assert.equal(again.code, EXIT_BOUNDARY);
       assert.match(again.err, /already been withdrawn/);
@@ -1094,7 +1150,7 @@ describe("the exit a releasable session had none of", () => {
       });
 
       const refused = await run(() =>
-        withdrawRelease(state.sessionsDir, { reason: "too late", approver: "operator" }),
+        withdrawRelease(state.sessionsDir, { reason: "too late" }),
       );
       assert.equal(refused.code, EXIT_BOUNDARY);
       assert.match(refused.err, /has already published/);
@@ -1107,7 +1163,7 @@ describe("the exit a releasable session had none of", () => {
         schema_version: 1,
         session_number: 1,
         reason: "written past the verb",
-        approver: "somebody",
+        by: "somebody",
         recorded_at: "2026-01-02T00:00:00+00:00",
       });
       const gate = checkPublishedWhenReleasable(state.sessionsDir);
@@ -1125,7 +1181,7 @@ describe("the exit a releasable session had none of", () => {
       registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
       await run(() => declare(state.sessionsDir, { task: "Do it.", releasable: false }));
       const refused = await run(() =>
-        withdrawRelease(state.sessionsDir, { reason: "no", approver: "operator" }),
+        withdrawRelease(state.sessionsDir, { reason: "no" }),
       );
       assert.equal(refused.code, EXIT_BOUNDARY);
       assert.match(refused.err, /did not declare itself releasable/);

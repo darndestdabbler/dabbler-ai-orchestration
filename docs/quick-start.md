@@ -236,8 +236,8 @@ dabbler verify
   (`verification.settings.max_rounds`, default 3). `dabbler verify
   --max-rounds` overrides it for a round you run by hand; inside a driven
   session the cap is not typeable at all and moves only through `dabbler
-  session plan amend --max-rounds`, which records a reason and an approver
-  (see [driving-a-session.md](driving-a-session.md)).
+  session plan amend --max-rounds`, which records a reason beside who was
+  working (see [driving-a-session.md](driving-a-session.md)).
 
 ### If a blocking finding is contested: dispute → adjudicate
 

@@ -227,6 +227,27 @@ describe("dabbler session, the whole surface", () => {
     writePreferences({ engine: "" });
   });
 
+  it("refuses a typed --approver and says the record already knows who is working", async () => {
+    // The flag recorded a claim no gate read, and an engine typed its own
+    // name into it. Refused rather than ignored: the parser takes any
+    // `--flag value` pair, so a dropped flag would vanish in silence.
+    const { sessionsDir } = makeAnsweredSandbox();
+    const amend = await run(() =>
+      sessionVerb([
+        "plan", "amend", "--sessions-dir", sessionsDir,
+        "--step", "x", "--reason", "r", "--approver", "me",
+      ]),
+    );
+    assert.equal(amend.code, 2);
+    assert.match(amend.err, /--approver is gone/);
+    assert.match(amend.err, /session start/);
+    const withdrawn = await run(() =>
+      sessionVerb(["withdraw-release", "--sessions-dir", sessionsDir, "--reason", "r", "--approver", "me"]),
+    );
+    assert.equal(withdrawn.code, 2);
+    assert.match(withdrawn.err, /--approver is gone/);
+  });
+
   it("refuses a subcommand that does not exist, and says so differently", async () => {
     const result = await run(() => sessionVerb(["clsoe"]));
     assert.equal(result.code, 2);

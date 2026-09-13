@@ -258,7 +258,7 @@ two providers.
 | `terminal` | `remediated_at_cap` \| `cap-clean` | what stood when the grant was made |
 | `cap` | integer ≥ 2 | the absolute cap the grant sets; must exceed `after_round`, and wins over the configured cap and over `--max-rounds` |
 | `reason` | string | why the refused review is worth buying — permanent, read beside the rounds it authorised |
-| `approver` | string | who authorised it; **never** read as a verdict |
+| `by` | string | who was working, from the session record; **never** read as a verdict |
 | `tree_at_grant` | string | the worktree snapshot at the grant, when one could be taken |
 | `recorded_at` | string | timestamp |
 | `framework_version` | string | the router that recorded it |
@@ -292,7 +292,7 @@ and landed. This row is the other exit.
 | `schema_version` | integer ≥ 1 | |
 | `session_number` | integer ≥ 1 | |
 | `reason` | string | why the declared artifact must not ship — permanent, read beside the declaration it withdraws |
-| `approver` | string | who withdrew it; **never** read as a verdict |
+| `by` | string | who was working, from the session record; **never** read as a verdict |
 | `tree_at_withdrawal` | string | the worktree snapshot at the withdrawal, when one could be taken |
 | `recorded_at` | string | timestamp |
 | `framework_version` | string | the router that recorded it |

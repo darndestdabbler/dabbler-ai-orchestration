@@ -56,7 +56,7 @@ const SUMMARY: Record<string, string> = {
   drive: "run the next session end to end: the framework drives, the engine answers",
   interrupt: "end the engine's running invocation under a driven session, with a reason",
   rebaseline: "record a repair made while the run was stopped, and move the baseline",
-  "withdraw-release": "withdraw a releasable session's releasability, with a reason and an approver",
+  "withdraw-release": "withdraw a releasable session's releasability, with a reason",
   report: "answer the driver's outstanding instruction",
   plan: "record the plan prose in project-work-plan.md; `plan amend` changes a driven step",
   close: "run gates and close the session",
@@ -181,8 +181,8 @@ const OPTIONS: Record<string, readonly string[]> = {
   ],
   "withdraw-release": [
     "  --reason TEXT            required: why the artifact this session was declared to",
-    "                           ship must not ship",
-    "  --approver WHO           required: who decided it",
+    "                           ship must not ship. Who was working is on the record",
+    "                           from `session start` and is written into the row",
     "",
     "  Releasability is declared at step (a) and `published_when_releasable` is an",
     "  evidence gate, so `close --force` cannot answer it and a releasable session that",
@@ -215,11 +215,11 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --checks-file PATH       the step's checks, whole, as JSON: [{\"argv\": [...]}]",
     "  --max-rounds N           instead of a step: the verification round cap this RUN",
     "                           verifies under. It is not typeable on `next` or `drive`;",
-    "                           here the change carries a reason, a name and the rounds",
-    "                           already run. No gate reads the approver -- this records a",
-    "                           claim, it does not prove an authorisation",
-    "  --reason TEXT            required: why this is the minimal change",
-    "  --approver WHO           required: who is answerable for it",
+    "                           here the change carries a reason and the rounds already",
+    "                           run, and no gate reads it",
+    "  --reason TEXT            required: why this is the minimal change. Who was working",
+    "                           is on the record from `session start` and is written",
+    "                           into the row; there is no flag for it",
   ],
   close: [
     "  --dry-run                print the gate rows and write nothing",
@@ -296,6 +296,12 @@ function kindFlag(switches: ReadonlySet<string>, verb: string): "focused" | "glo
 }
 const REPEATABLE_MODULE = "--module";
 
+/** The flag three verbs once required, and the sentence that says why they no longer take it. */
+export const APPROVER_FLAG = "--approver";
+export const APPROVER_GONE =
+  `${APPROVER_FLAG} is gone: the record already knows who is working, from ` +
+  "`dabbler session start`, and writes it into the row -- give --reason and nothing about who";
+
 /**
  * Why a driving call refuses `--max-rounds` instead of accepting it.
  *
@@ -306,8 +312,8 @@ const REPEATABLE_MODULE = "--module";
 const CAP_NOT_TYPEABLE =
   "the verification round cap is not typeable here. It is " +
   "`verification.settings.max_rounds` in the configuration, and it moves for one run " +
-  'through `dabbler session plan amend --max-rounds <N> --reason "<why>" --approver ' +
-  "<who>` -- which records the claim, the rounds already run and who made it. Typed " +
+  'through `dabbler session plan amend --max-rounds <N> --reason "<why>"` -- which ' +
+  "records the reason, the rounds already run and who was working. Typed " +
   "on a driving call it always won over the persisted value and recorded nothing, in " +
   "either direction: a cap at or below the rounds already run ends verification.";
 
@@ -397,10 +403,14 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     return EXIT_USAGE;
   }
 
+  if (values.has(APPROVER_FLAG)) {
+    writeErr(`dabbler session ${subcommand}: ${APPROVER_GONE}\n`);
+    return EXIT_USAGE;
+  }
+
   if (subcommand === "plan" && parsed.positional[0] === "amend") {
     const stepId = values.get("--step");
     const reason = values.get("--reason");
-    const approver = values.get("--approver");
     const maxRounds = integer(values.get("--max-rounds"), "--max-rounds");
     if (typeof maxRounds === "string") {
       writeErr(`dabbler session plan amend: ${maxRounds}\n`);
@@ -418,11 +428,10 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     const missing = [
       stepId === undefined && maxRounds === null ? "--step" : null,
       reason === undefined ? "--reason" : null,
-      approver === undefined ? "--approver" : null,
     ].filter((flag): flag is string => flag !== null);
     if (missing.length > 0) {
-      // An amendment nobody signed, for no stated reason, is a bar moved by
-      // nobody -- so none of the three is optional.
+      // An amendment for no stated reason is a bar moved for nothing -- so
+      // neither is optional.
       writeErr(
         `dabbler session plan amend: the following arguments are required: ${missing.join(", ")}
 `,
@@ -439,7 +448,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       checksFile: values.get("--checks-file") ?? null,
       maxRounds,
       reason: reason as string,
-      approver: approver as string,
       sessionNumber,
     });
   }
@@ -671,17 +679,14 @@ export async function sessionVerb(argv: string[]): Promise<number> {
   }
 
   if (subcommand === "withdraw-release") {
-    const missing = ["--reason", "--approver"].filter((flag) => !values.has(flag));
-    if (missing.length > 0) {
+    if (!values.has("--reason")) {
       writeErr(
-        "dabbler session withdraw-release: the following arguments are required: " +
-          `${missing.join(", ")}\n`,
+        "dabbler session withdraw-release: the following arguments are required: --reason\n",
       );
       return EXIT_USAGE;
     }
     return withdrawRelease(sessionsDir, {
       reason: values.get("--reason") ?? "",
-      approver: values.get("--approver") ?? "",
       sessionNumber,
     });
   }

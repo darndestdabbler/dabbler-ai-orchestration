@@ -80,19 +80,17 @@ session next` and do what it says until it says `done`.*
 
   ```
   dabbler session plan amend --sessions-dir docs/sessions \
-      --max-rounds 4 --reason "<why this tree is worth another round>" \
-      --approver <who>
+      --max-rounds 4 --reason "<why this tree is worth another round>"
   ```
 
   which writes the cap to `run.json` and appends the before, the after, the
-  rounds already run, the reason and the approver to `amendments.jsonl`.
-  **State what that buys and no more.** The approver is whatever the engine
-  writes, so the row is a CLAIM and not proof that anybody authorised
-  anything — and no gate reads it, because a gate that trusted an
-  engine-written approver would make the authorisation forgeable, which is
-  worse than absent. What it buys is that the claim exists, next to the
-  rounds it is being spent past, reviewable at the close, instead of a bare
-  number appearing on `run.json` with no reason at all.
+  rounds already run, the reason and who was working to `amendments.jsonl`.
+  **State what that buys and no more.** Who was working is read from the
+  record `session start` wrote, never typed: a name an engine types proves
+  nothing, so there is no `--approver` — and no gate reads the row. What it
+  buys is that the reason exists, next to the rounds it is being spent
+  past, reviewable at the close, instead of a bare number appearing on
+  `run.json` with no reason at all.
 
   `dabbler verify --max-rounds` is unchanged: that is the verb's own flag,
   for a round run by hand outside a driven session.
@@ -535,7 +533,7 @@ A cap terminal is a spent **budget**, not a judgment, so the operator may
 buy the review it refused:
 
 ```
-dabbler verify reopen --rounds 1 --reason "<why>" --approver <who>
+dabbler verify reopen --rounds 1 --reason "<why>"
 ```
 
 That records a grant in `.dabbler/runs/s<N>/verification-reopens.jsonl` and
@@ -555,10 +553,10 @@ for the waiver this framework does not have:
 - **It is refused where nothing is stuck**, so it cannot quietly become the
   ordinary way a cap is raised. Before the cap is reached, the cap is what
   moves: `session plan amend --max-rounds`.
-- **The reason and the approver are permanent**, and no gate reads the
-  approver — a gate that trusted an engine-written name would make the
-  authorisation forgeable, which is worse than absent. What the row buys is
-  that the claim exists, beside the rounds it authorised.
+- **The reason is permanent**, beside who was working as the record from
+  `session start` says it — there is no `--approver`, because a name an
+  engine types proves nothing — and no gate reads either. What the row
+  buys is that the reason exists, beside the rounds it authorised.
 
 ### The other stop with no forward exit: a releasable session that must not ship
 
@@ -572,7 +570,7 @@ session whose artifact must not go out had one exit, `cancel`, which throws
 away work that verified and landed.
 
 ```
-dabbler session withdraw-release --reason "<why>" --approver <who>
+dabbler session withdraw-release --reason "<why>"
 ```
 
 That records a row in
@@ -587,7 +585,8 @@ narrow on purpose:
 - **It changes nothing else.** No other gate reads it. The verification
   round, the run of record and the close judge the session on exactly the
   evidence they would have.
-- **The reason and the approver are permanent**, and one per session, ever.
+- **The reason is permanent**, beside who was working as the record from
+  `session start` says it, and one per session, ever.
 
 ## The end
 

@@ -354,6 +354,34 @@ export function readSessionState(
   return raw === null ? null : derivedView(raw);
 }
 
+/** The word a row carries for who acted when the record names nobody. */
+export const NOBODY_ON_THE_RECORD = "the operator";
+
+/**
+ * Who is working on a session, as one string, from the orchestrator block
+ * `start` wrote: `claude-code (anthropic, claude-fable-5-1)`. A row that
+ * records an act -- an amendment, a grant, a withdrawal -- carries this
+ * where it once carried a typed `--approver`, because a name an engine
+ * types proves nothing and the record already knows who registered.
+ */
+export function whoIsWorking(sessionsDir: string, sessionNumber: number): string {
+  const state = readSessionState(sessionsDir);
+  const sessions = Array.isArray(state?.["sessions"]) ? state["sessions"] : [];
+  const record = sessions.find(
+    (row): row is Record<string, unknown> => isRecord(row) && row["number"] === sessionNumber,
+  );
+  const block = record?.["orchestrator"];
+  if (!isRecord(block)) return NOBODY_ON_THE_RECORD;
+  const field = (name: string): string => {
+    const value = block[name];
+    return typeof value === "string" ? value.trim() : "";
+  };
+  const engine = field("engine");
+  if (engine === "") return NOBODY_ON_THE_RECORD;
+  const detail = [field("provider"), field("model")].filter((part) => part !== "");
+  return detail.length > 0 ? `${engine} (${detail.join(", ")})` : engine;
+}
+
 export function readActivityLog(
   sessionsDir: string,
 ): Record<string, unknown> | null {

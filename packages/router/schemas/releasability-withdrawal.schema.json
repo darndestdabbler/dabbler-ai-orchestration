@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "releasability-withdrawals.jsonl row (one operator withdrawal of a session's releasability)",
-  "description": "One row per operator withdrawal of a session's declared releasability, in .dabbler/runs/s<N>/releasability-withdrawals.jsonl. Releasability is declared at step (a), before the work, and the 'published_when_releasable' gate is EVIDENCE -- so 'close --force' cannot answer it, and a session that declared itself releasable and then must not ship had no exit but 'cancel', which throws away verified work that landed. This row is that exit. It does not make the session not-releasable in retrospect: the declaration stands on the record and this stands beside it, so the close reports that a session which was supposed to ship did not, and on whose word. Written only by the CLI (dabbler session withdraw-release). One per session, ever, and immutable: a withdrawal that could be rewritten would say nothing about who decided what.",
+  "description": "One row per operator withdrawal of a session's declared releasability, in .dabbler/runs/s<N>/releasability-withdrawals.jsonl. Releasability is declared at step (a), before the work, and the 'published_when_releasable' gate is EVIDENCE -- so 'close --force' cannot answer it, and a session that declared itself releasable and then must not ship had no exit but 'cancel', which throws away verified work that landed. This row is that exit. It does not make the session not-releasable in retrospect: the declaration stands on the record and this stands beside it, so the close reports that a session which was supposed to ship did not, and on whose word. Written only by the CLI (dabbler session withdraw-release), which writes 'by' from the session record 'dabbler session start' made rather than taking a name. One per session, ever, and immutable: a withdrawal that could be rewritten would say nothing about who decided what.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "session_number",
     "reason",
-    "approver",
+    "by",
     "recorded_at"
   ],
   "properties": {
@@ -24,10 +24,10 @@
       "minLength": 1,
       "description": "Why the artifact this session was declared to ship must not ship. Permanent, and read beside the declaration it withdraws."
     },
-    "approver": {
+    "by": {
       "type": "string",
       "minLength": 1,
-      "description": "Who withdrew it. Not a verdict and never read as one: this says a person decided nothing would be published, never that anything passed."
+      "description": "Who was working when it was withdrawn, from the session's orchestrator block. Not a verdict and never read as one: this says nothing would be published, never that anything passed."
     },
     "tree_at_withdrawal": {
       "type": "string",

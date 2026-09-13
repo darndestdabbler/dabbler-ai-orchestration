@@ -27,6 +27,7 @@ import {
   rewindFromPackaging,
   judgeReportFiles,
   judgeReportShape,
+  reportIsSpent,
   localGateReceipt,
   suiteRetrySeconds,
   staleJobDisposition,
@@ -97,14 +98,22 @@ describe("whether a report answers the instruction at all", () => {
     assert.match(String((refused as string[])[0]), /dabbler session report --seq 4/);
   });
 
-  it("refuses a report answering a different seq, or a different step", () => {
-    assert.deepEqual(rules(judgeReportShape(report({ seq: 3 }), INSTRUCTION, SPEC)), [
+  it("refuses a report ahead of the instruction, or for a different step", () => {
+    assert.deepEqual(rules(judgeReportShape(report({ seq: 5 }), INSTRUCTION, SPEC)), [
       "report-seq",
     ]);
     assert.deepEqual(
       rules(judgeReportShape(report({ step_id: "other" }), INSTRUCTION, SPEC)),
       ["report-step"],
     );
+  });
+
+  it("reads a report that answered an earlier instruction as no report at all", () => {
+    // It was judged when it was written and is on disk only because nothing
+    // removes it; charging a refusal for it charges the engine for a report
+    // it did not write.
+    assert.ok(reportIsSpent(report({ seq: 3 }), INSTRUCTION));
+    assert.deepEqual(rules(judgeReportShape(report({ seq: 3 }), INSTRUCTION, SPEC)), ["no-report"]);
   });
 
   it("reads blocked as an answer rather than as a refusal", () => {
@@ -118,7 +127,7 @@ describe("whether a report answers the instruction at all", () => {
     // set, so reading the tree to say so would be work spent on an answer
     // already known to be the wrong one. Both wrong at once, both named.
     assert.deepEqual(
-      rules(judgeReportShape(report({ seq: 3, step_id: "other" }), INSTRUCTION, SPEC)),
+      rules(judgeReportShape(report({ seq: 5, step_id: "other" }), INSTRUCTION, SPEC)),
       ["report-seq", "report-step"],
     );
   });

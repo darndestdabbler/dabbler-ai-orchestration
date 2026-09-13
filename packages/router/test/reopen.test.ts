@@ -50,7 +50,7 @@ const grant = (afterRound: number, cap: number) => ({
   terminal: "remediated_at_cap",
   cap,
   reason: "the fix to the release path landed unreviewed",
-  approver: "operator",
+  by: "claude-code (anthropic)",
   recorded_at: "2026-09-09T07:40:00.000000-04:00",
 });
 
@@ -181,7 +181,7 @@ describe("what the reopen verb refuses", () => {
     });
     // Before the terminal the amendment is the right verb and still works.
     assert.equal(
-      amendRoundCap(repo, 137, { cap: 5, reason: "r", approver: "operator" }, "2026-09-09T06:00:00-04:00")
+      amendRoundCap(repo, 137, { cap: 5, reason: "r", by: "claude-code" }, "2026-09-09T06:00:00-04:00")
         .verification?.max_rounds,
       5,
     );
@@ -197,7 +197,7 @@ describe("what the reopen verb refuses", () => {
     // terminal was written and never opened round 5.
     assert.throws(
       () =>
-        amendRoundCap(repo, 137, { cap: 9, reason: "r", approver: "operator" }, "2026-09-09T06:37:21-04:00"),
+        amendRoundCap(repo, 137, { cap: 9, reason: "r", by: "claude-code" }, "2026-09-09T06:37:21-04:00"),
       /a cap raised past a terminal changes nothing[\s\S]*verify reopen/,
     );
   });

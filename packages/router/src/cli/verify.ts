@@ -16,6 +16,7 @@ import { recordDispute, runAdjudication } from "../verify/disputes.ts";
 import { runPrepare } from "../verify/prepare.ts";
 import { runReanchor } from "../verify/reanchor.ts";
 import { runReopen } from "../verify/reopen.ts";
+import { APPROVER_FLAG, APPROVER_GONE } from "./session.ts";
 import { runRound } from "../verify/rounds.ts";
 import {
   runStepAmend,
@@ -121,7 +122,7 @@ function usage(): string {
     "       dabbler verify adjudicate [--max-rounds N] [--transport T]",
     "       dabbler verify prepare [--claims FILE]",
     "       dabbler verify reanchor --commit COMMIT --reason TEXT",
-    "       dabbler verify reopen --rounds N --reason TEXT --approver WHO",
+    "       dabbler verify reopen --rounds N --reason TEXT",
     "       dabbler verify step <open|close|status|amend|guard-commit>",
     "",
     "one cross-provider verification round; the loop continues on re-invocation",
@@ -269,18 +270,18 @@ async function reanchorMain(argv: readonly string[]): Promise<number> {
 }
 
 async function reopenMain(argv: readonly string[]): Promise<number> {
-  const parsed = parseArgs(argv, [SESSIONS_DIR, "--rounds", "--reason", "--approver"]);
+  if (argv.includes(APPROVER_FLAG)) {
+    writeErr(`dabbler verify reopen: ${APPROVER_GONE}\n`);
+    return EXIT_USAGE;
+  }
+  const parsed = parseArgs(argv, [SESSIONS_DIR, "--rounds", "--reason"]);
   if (typeof parsed === "string") {
     writeErr(`dabbler verify reopen: ${parsed}\n`);
     return EXIT_USAGE;
   }
   const reason = parsed.values.get("--reason");
-  const approver = parsed.values.get("--approver");
-  if (reason === undefined || approver === undefined) {
-    writeErr(
-      "dabbler verify reopen: the following arguments are required: " +
-        "--reason, --approver\n",
-    );
+  if (reason === undefined) {
+    writeErr("dabbler verify reopen: the following arguments are required: --reason\n");
     return EXIT_USAGE;
   }
   // Defaulted, and to one. A grant is for the review in front of the
@@ -294,7 +295,7 @@ async function reopenMain(argv: readonly string[]): Promise<number> {
   }
   const resolved = resolvedSessions("verify reopen", parsed);
   if ("code" in resolved) return resolved.code;
-  return runReopen(resolved.dir, { rounds: rounds ?? 1, reason, approver });
+  return runReopen(resolved.dir, { rounds: rounds ?? 1, reason });
 }
 
 const STEP_VERBS = ["open", "close", "status", "amend", "guard-commit"];

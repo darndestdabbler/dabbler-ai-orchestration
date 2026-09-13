@@ -474,86 +474,43 @@ export function owedExists(repoRoot: string): boolean {
   return existsSync(owedPath(repoRoot));
 }
 
-/**
- * The sentence a re-asked signoff carries, and the marker that it was.
- *
- * In the brief so a reader sees it, and read back so the re-ask happens
- * once: a close run twice must not supersede its own re-ask forever.
- */
-export const AFTER_CLOSE_NOTE = "Asked again after the close:";
+/** The id prefix `rebaseline` once raised a signoff under, one per session. */
+export const REPAIR_SIGNOFF_ID_PREFIX = "repair-outside-a-step-";
 
 /**
- * Re-ask the accountability signoffs of every session that has ended, in
- * the form that is still answerable.
+ * Settle, once, the signoffs `rebaseline` used to raise.
  *
- * `repair-outside-a-step-137` stood open after 137 had closed, verified,
- * published and shipped, still offering "It does not" -- whose consequence
- * undertakes to take the repair back out of the tree "before the session
- * continues". There was no session to continue, so one of the two answers
- * on offer had become impossible, and the question went on offering it.
+ * A repair made while the loop was stopped is recorded in `repairs.jsonl`
+ * and moves the baseline, and that is the whole of it: no answer to "does
+ * that stand?" changed what the framework did next, so the question was a
+ * row on `owed list` and nothing else. It is not raised any more. A
+ * repository that still carries one from an earlier version is offered it
+ * on every `owed list` until something settles it, so the close does --
+ * as superseded, with the reason, and never as answered: nobody gave the
+ * answer, and the record must not say somebody did.
  *
- * That it does not BLOCK the close is right and stays: an
- * accountability-signoff is not a verification reduction, and the signoff
- * stays a person's to give. "Does not block the close" and "survives the
- * close forever, still offering to undo shipped work" are different
- * decisions, and only the first was ever taken.
- *
- * What changes is the brief, not the question: every option keeps its label
- * and its original words, and each gains what answering NOW actually does.
- * The framework does not need to understand any particular signoff to say
- * that truthfully -- after the close nothing an answer implies is performed
- * by answering, because the work is landed. `raiseOwed` sees a changed
- * brief, supersedes the standing row and re-raises, so both stay on the
- * record and the current one is what the reader is offered.
- *
- * Scoped to rows raised about a SESSION -- one about the repository
- * outlives any session and is not this rule's business -- and to every
- * such session that has ended, not only the one just closed. A signoff
- * that survived its own close before this existed is exactly the row the
- * rule is for, and reaching only `throughSession` would leave the one that
- * prompted it unreachable forever.
- *
- * The corrected consequence LEADS, and what the option undertook while its
- * session ran follows it as a quotation. Appending the correction to the
- * old promise left both in one sentence, so an option still read "the
- * repair is taken back out" and then "performs nothing" -- which is worse
- * than either, because a person choosing it is choosing the first half.
+ * Returns the rows it settled. Once: a superseded row is not open, so the
+ * next close finds nothing.
  */
-export function reaskSessionScopedSignoffs(repoRoot: string, throughSession: number): Row[] {
-  const reasked: Row[] = [];
-  for (const row of foldOwed(readOwed(repoRoot)).values()) {
-    if (row["event"] !== EVENT_RAISED) continue;
+export function settleRepairSignoffs(repoRoot: string): Row[] {
+  const settled: Row[] = [];
+  for (const row of openDecisions(repoRoot)) {
     if (row["class"] !== CLASS_ACCOUNTABILITY_SIGNOFF) continue;
+    const id = String(row["id"]);
+    if (!id.startsWith(REPAIR_SIGNOFF_ID_PREFIX)) continue;
     const about = row["sessionNumber"];
-    if (typeof about !== "number" || about > throughSession) continue;
-    const determined = String(row["determined"] ?? "");
-    if (determined.includes(AFTER_CLOSE_NOTE)) continue;
-    const options = (Array.isArray(row["options"]) ? row["options"] : []).map((entry) => ({
-      label: String((entry as Row)["label"]),
-      consequence:
-        `${AFTER_CLOSE_NOTE} answering settles the record and performs nothing, because ` +
-        `session ${about}'s work is landed. Anything this answer would have undone is work ` +
-        `for a later session. What it undertook while the session ran: ` +
-        `"${String((entry as Row)["consequence"])}"`,
-    }));
-    if (options.length < 2) continue;
-    const next = raiseOwed(repoRoot, {
-      id: String(row["id"]),
-      decisionClass: CLASS_ACCOUNTABILITY_SIGNOFF,
-      question: String(row["question"] ?? ""),
-      determined:
-        `${determined}\n\n${AFTER_CLOSE_NOTE} session ${about} has closed. Its work is ` +
-        "verified, landed and, where it was releasable, published, so no answer here " +
-        "changes the tree. What is being asked for is the signoff.",
-      options,
-      recommendation: row["recommendation"] === undefined ? null : (row["recommendation"] as string | null),
-      onNoAnswer: row["onNoAnswer"] === undefined ? null : (row["onNoAnswer"] as string | null),
-      file: row["file"] === undefined ? null : (row["file"] as string | null),
-      sessionNumber: about,
-    });
-    if (next !== null) reasked.push(next);
+    settled.push(
+      supersedeOwed(
+        repoRoot,
+        id,
+        "settled without an answer: the repair is on repairs.jsonl and the baseline " +
+          "moved when it was recorded, and answering never performed anything. " +
+          "rebaseline no longer raises this question",
+        typeof about === "number" ? about : null,
+      ),
+    );
   }
-  return reasked;
+  return settled;
 }
 
 // --- The conditions the framework raises for itself ---------------------------

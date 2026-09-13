@@ -25,9 +25,9 @@ export type VerificationReopen = {
    */
   reason: string;
   /**
-   * Who authorised it. Not a verdict and never read as one: this says a person bought a round, never that anything passed.
+   * Who was working when the grant was made, from the session's orchestrator block. Not a verdict and never read as one: this says a round was bought, never that anything passed.
    */
-  approver: string;
+  by: string;
   /**
    * The worktree snapshot when the grant was made, so a reader can see whether the rounds it bought reviewed the tree the operator was looking at. Absent when the snapshot could not be taken.
    */

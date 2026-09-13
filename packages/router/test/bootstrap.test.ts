@@ -382,6 +382,12 @@ describe("the scaffolded setup sessions", () => {
     assert.match(text, /### Session 1:/);
     assert.match(text, /### Session 2:/);
     assert.match(text, /Do NOT hand-author `sessions\.json`/);
+    // Session 1 has nobody to ask mid-session: the protocol has nothing
+    // between `step` and `report`. The brief is read from a path, and a
+    // missing one is an honest `blocked` at the first step.
+    assert.match(text, /docs\/planning\/brief\.md/);
+    assert.match(text, /report this\s+step `blocked`/);
+    assert.doesNotMatch(text, /Ask the operator/);
   });
 
   it("never overwrites a plan the repository already has", () => {

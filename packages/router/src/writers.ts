@@ -70,6 +70,8 @@ export const WORK_PLAN_FILENAME = "project-work-plan.md";
 export const KIND_DECISION = "decision";
 export { KIND_TASK_DECLARATION };
 export const KIND_PROJECT_PLAN = "project-plan";
+/** A step, a round cap or a verification loop moved after the plan was accepted, with its reason. */
+export const KIND_AMENDMENT = "amendment";
 
 /**
  * Who decided. Closed, because "who made it" is only answerable against a
@@ -925,6 +927,53 @@ export function recordProjectPlan(sessionsDir: string, body: string): Entry {
   return entry;
 }
 
+export interface AmendmentOptions {
+  readonly sessionNumber: number;
+  /** What moved, in one clause: a step's checks, the round cap, a reopened loop. */
+  readonly what: string;
+  readonly reason: string;
+  /** Who was working, as the record from `start` says. */
+  readonly by: string;
+}
+
+/**
+ * Fold an amendment into the activity log, beside the events it already
+ * records.
+ *
+ * `amendments.jsonl` and `verification-reopens.jsonl` are the driver's own
+ * journals under `.dabbler/runs/`, which `bootstrap` ignores; a step whose
+ * checks were changed, or a loop bought past its cap, left no trace in the
+ * pushed history. The activity log is committed with the session, so this
+ * entry is what `project-work-plan.md` and the landed commit carry.
+ */
+export function recordAmendment(sessionsDir: string, options: AmendmentOptions): Entry {
+  const entry: Entry = {
+    kind: KIND_AMENDMENT,
+    sessionNumber: requireSessionNumber(options.sessionNumber),
+    dateTime: nowIsoFull(),
+    what: requireText(options.what, "what"),
+    reason: requireText(options.reason, "reason"),
+    by: requireText(options.by, "by"),
+  };
+  const log = readOrCreateActivityLog(sessionsDir);
+  pushEntry(log, entry);
+  writeActivityLog(sessionsDir, log);
+  renderProjectWorkPlan(sessionsDir);
+  return entry;
+}
+
+/** A session's amendments, oldest first, as the close and the work plan read them. */
+export function amendmentEntries(sessionsDir: string, sessionNumber: number): Entry[] {
+  return entriesOfKind(readOrCreateActivityLog(sessionsDir), KIND_AMENDMENT).filter(
+    (entry) => entry["sessionNumber"] === sessionNumber,
+  );
+}
+
+/** One amendment as a line a person reads: what moved, why, and who was working. */
+export function amendmentLine(entry: Entry): string {
+  return `${String(entry["what"])}: ${String(entry["reason"])} (${String(entry["by"])})`;
+}
+
 /**
  * The session's declaration, or null.
  *
@@ -1183,6 +1232,17 @@ export function renderProjectWorkPlan(sessionsDir: string): string {
       "",
       String(declared["task"] ?? "").trim(),
     );
+    // What moved after the plan was accepted, one line each; a session
+    // with none says nothing about it.
+    const amended = entriesOfKind(log, KIND_AMENDMENT).filter(
+      (entry) => entry["sessionNumber"] === number,
+    );
+    if (amended.length > 0) {
+      lines.push("", "**Amended after acceptance:**", "");
+      for (const entry of amended) {
+        lines.push(`- ${String(entry["dateTime"] ?? "").slice(0, 10)} — ${amendmentLine(entry)}`);
+      }
+    }
   }
   const text = trimTrailingNewlines(lines.join("\n")) + "\n";
   writeTextLf(join(sessionsDir, WORK_PLAN_FILENAME), text);

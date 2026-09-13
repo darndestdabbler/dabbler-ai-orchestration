@@ -144,8 +144,8 @@ amend --max-rounds` was accepted, recorded in `amendments.jsonl` and did
 nothing. Session 137 raised 3 to 5 twenty seconds after the terminal was
 written and never opened round 5.
 
-**The exit is `dabbler verify reopen --rounds N --reason "<why>"
---approver <who>`.** A cap terminal is a spent budget, not a judgment, so
+**The exit is `dabbler verify reopen --rounds N --reason "<why>"`.** A
+cap terminal is a spent budget, not a judgment, so
 an operator may buy the review it refused. It buys rounds and never a
 verdict, buys named rounds and never a mode, and never reaches an
 adjudication. `plan amend --max-rounds` now refuses after a terminal and

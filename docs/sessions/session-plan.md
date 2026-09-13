@@ -9719,25 +9719,45 @@ gates *Start* on the next session being focused; that row gains a title of
 its own — *Start Session in a New Window* — and the Solution Explorer's
 command becomes *Start Focused Session in a New Window*. Titles only.
 
+**A machine with engines installed is not told it has none.** The pane's
+authoring *Vehicle* row renders a null engine choice as "none installed",
+which is wrong on the one machine that matters most: a developer's, with
+two engine CLIs on PATH, where the router declines to default and waits for
+a person to choose. The row says what is true instead — that there are
+engines to choose from and none is chosen yet — and stays "none installed"
+only when the machine really has none. The words change in
+`solutionTreeModel.ts`, the one ternary that reads the null; nothing about
+the resolution moves. Found by session 160's shim walk against 2.4.1.
+
 **The walk, against the built VSIX, in the sample.** Session 3 of
 `csv-parser`, global and attributed to `person`, started from the Work
 Explorer without a flag; session 4, focused, appending to the notes from
 its clone through a `sharedFiles` entry; a stop toast read for its reason;
-the close's gate rows with no suite declared. Whatever the walk finds is
-fixed here if small and raised as owed if not — deferring the walk is what
-let the pane ship broken in 155, and the shim ship broken twice.
+the close's gate rows with no suite declared; and the Configuration pane's
+authoring rows read on this two-CLI machine, so the "none installed" fix is
+seen in the surface it belongs to. The walk also records the tab name of
+the *Update the Catalog* terminal, which showed the shell process rather
+than the record's title in the 160 walk; that is noted, not fixed, unless
+the cause turns out to be a line. Whatever the walk finds is fixed here if
+small and raised as owed if not — deferring the walk is what let the pane
+ship broken in 155, and the shim ship broken twice.
 
 **Steps.** (1) The README section and the help text. (2) The refusal that
-names the settings file. (3) The dash. (4) The two titles. (5) The walk in
+names the settings file. (3) The dash. (4) The two titles. (5) The
+authoring *Vehicle* row's words when no engine is chosen. (6) The walk in
 the sample, and what it finds.
 
 **Tests.** A tree whose only change is `.vscode/settings.json` is refused
 with the two ways on. An inapplicable gate renders neither the pass mark
 nor the fail mark. A focused next-session row carries the window title and
-a global one does not. The contract-mode help names all three.
+a global one does not. The contract-mode help names all three. The
+authoring *Vehicle* row reads "none installed" only when no engine is
+installed, and says a choice is owed when engines are present and none is
+chosen.
 
 **Releasable.** Yes, as a **minor**: two commands are retitled and a plan
 line gains a meaning. The notes name the retitled launchers, the `Scope:`
-line that makes a session global, `sharedFiles`, and that 2.4.1 already
-carried the shim.
+line that makes a session global, `sharedFiles`, that the Configuration
+pane no longer says "none installed" on a machine that has engines, and
+that 2.4.1 already carried the shim.
 

@@ -3151,9 +3151,9 @@
     {
       "number": 160,
       "title": "The shim that ships",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-13T05:47:19.860000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-13T06:20:39.914000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

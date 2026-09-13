@@ -2,6 +2,62 @@
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 165 CLOSED, 2026-09-13 — the small things, the walk, and 2.6.0
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 165 | nine small things from the sample's log (stale model choice reported by `configure`/`bootstrap`; `DABBLER_TRANSPORT` warning deleted; manifest header regenerated and `--package none`; the managed body says the router commits `docs/sessions/*`; landed commit subject = the session's title, body = the task; `no suite declared; nothing to run`; `unownedSelects` on the impact-plan line + README; dry-run wording; the plan ask says a check may name `dabbler` bare — and the driver the extension spawns now puts the shim folder first on the child's PATH, which was the one place that sentence was false); the walk drove the sample's session 4 to `done` through the installed VSIX's shim on a focused checkout (readings 18–28 of `docs/uat/uat-csv-parser-walk.md`); release 2.6.0 | CLOSED VERIFIED at round 2 (round 1 VERIFIED, nits only; the run of record then failed and the fix step was re-verified), landed `645d919a`, closed at the following commit. **`vsix-v2.6.0` pushed at 23:52Z; CI's publish job needs the `marketplace` environment's approval — check it** |
+>
+> **Nothing is planned next.** `nextSession` is null: the 163–165 block is
+> complete. Whole session 17:11 → 19:53 local, twelve steps plus one fix
+> step, every report accepted first time; three amendments, no rebaseline.
+>
+> **The operator's direction for the next session (verbatim in spirit):**
+> the publish stopped at `publication:2.6.0` and the engine handed the
+> operator three commands (`owed answer --choice publish`, a second `dabbler
+> release`, `session next`). *"If you just need to confirm with the human
+> operator that it is OK to publish, then just ask me that! My developers
+> will hate this."* The next session should make a publish one question and
+> one act: the framework asks once, a yes tags and continues, no owed row and
+> no verbs to type; and it should look at every other decision a person is
+> still asked mid-session the same way. The `marketplace` CI environment
+> asks a person to approve the job too, so today a publish is consented to
+> twice.
+>
+> **What the run of record found that verification did not.** Session 164
+> made `start` ask the declaration's tree question first, which it can only
+> ask of a git repository; the extension's parity test
+> (`workExplorerTreeModel.test.ts`) started a session in a plain temp
+> directory and passed 164's run of record only because the extension suite
+> imports the router from `packages/router/dist/index.cjs`, built before
+> that change. CI on master was RED for 164's close and handoff commits for
+> the same reason; 165's push is green. The fixture is a repository now.
+> **Rebuild the router before trusting the extension suite's green.**
+>
+> **The walk's precondition, and what stays owed.** A solution-wide `dotnet
+> test CsvParser.sln` cannot run in a focused checkout; the operator
+> re-declared one suite per module in the sample's `dabbler.yaml` and
+> `sharedFiles: [docs/notes/dabbler-issues.md]` under
+> `modules.csv-deserializer`, and the session ran clean end to end. The
+> framework's own answer stays owed. Found in the sample: a hand-written
+> `nuget.config` lacked the committed `packages/` source (README paragraph
+> added; entry 24 of the sample's log). Not exercised in the sample:
+> rebaseline, an in-sample amend, a fix step after the candidate.
+>
+> **The verifier's nits, for a later small-things step.** (1)
+> `staleModelChoice` passes `explainAuthoringModel(...).transport` — the
+> field is the reading's VALUE (a model id) but reads as a transport; rename
+> or comment. (2) `landCommitMessage` allows exactly 72 characters where the
+> words say "under 72". (3) The walk's three unexercised events.
+>
+> **Traps met.** A job's status file is `{exit, ended_at}` with no `state`
+> member. A scaffolded repository's reviewing vehicle resolves to the seat
+> (`transport.profile`), so a `configuredModelRefusal` test must write
+> `--transport api` first and the catalog needs two models. The managed
+> AGENTS.md fence has a 150-line budget. `TRANSPORT_API` is exported by both
+> `catalog.ts` and `config.ts`. The walk's VSIX is versioned 2.5.0 when the
+> release step comes after the walk.
+
 > ## SESSION 164 CLOSED, 2026-09-13 — what the framework wrote is not the step's
 >
 > | session | what | state |

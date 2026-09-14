@@ -81,13 +81,10 @@ import {
   writeReport,
   writeWorkPlan,
   appendSupervision,
-  judgeModulesForShape,
 } from "./driver.ts";
-import { ManifestError, solutionShape } from "./modules.ts";
 import {
   ENUMERATION_CLI_ALIASES,
   configurationNode,
-  tryWriteProjection,
 } from "./projection.ts";
 import { isFrameworkInstalledPath, materialPaths } from "./checks.ts";
 import {
@@ -601,21 +598,6 @@ export interface StartOptions {
   readonly effort?: string | null;
   readonly sessionNumber?: number | null;
   readonly totalSessions?: number | null;
-}
-
-/**
- * The Solution Explorer's projection, rewritten where a session's modules
- * come into or out of play: the module rows mark the session in flight,
- * and the start and the close are the two moments that changes. For a
- * multi-module shape only, and best-effort -- a registration or a close
- * must not fail because a rendering could not be written.
- */
-function reprojectSolution(root: string): void {
-  try {
-    if (solutionShape(root).multi) tryWriteProjection(root);
-  } catch {
-    // Deliberately silent: see above.
-  }
 }
 
 /** The first line of a git error, for a one-line message. */
@@ -1150,13 +1132,8 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
         if (pulled !== null) writeOut(`${pulled}\n`);
       }
     }
-    try {
-      solutionShape(repoRootFromSessionsDir(sessionsDir));
-    } catch (error) {
-      if (!(error instanceof ManifestError)) throw error;
-      writeErr(`start: refused -- ${error.message}\n`);
-      return EXIT_USAGE;
-    }
+    // What the repository still declares that nothing reads: said, and refused never.
+    for (const line of retiredDeclarationLines(repoRootFromSessionsDir(sessionsDir))) writeOut(`${line}\n`);
     // Free, and before the session exists: what the roles may resolve to is
     // established while there is still nothing whose review it could change.
     for (const line of await refreshDiscovery()) writeOut(`${line}\n`);
@@ -1199,8 +1176,6 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     // forbids. The declaration is the plan step's answer; the tests are the
     // framework's.
     writeOut(`Next: dabbler session next --sessions-dir ${sessionsDir}\n`);
-    // The modules in play changed: the Solution Explorer marks the session.
-    reprojectSolution(repoRootFromSessionsDir(sessionsDir));
     return EXIT_OK;
   } finally {
     releaseLock(lock);
@@ -1317,6 +1292,35 @@ export function decision(sessionsDir: string, options: DecisionCliOptions): numb
   return EXIT_OK;
 }
 
+/**
+ * What a repository still declares that nothing reads any more, one line
+ * each. Said and never refused: the declarations are the repository's, and
+ * a start that stopped over a file nothing reads would strand the checkout.
+ */
+export function retiredDeclarationLines(root: string): string[] {
+  const lines: string[] = [];
+  if (existsSync(join(root, "docs", "modules.yaml"))) {
+    lines.push("start: docs/modules.yaml is no longer read; the Solution Explorer reads the solution's build files.");
+  }
+  let config: unknown;
+  try {
+    config = loadConfig(undefined, root);
+  } catch {
+    return lines;
+  }
+  const declared = isRecord(config) ? config : {};
+  const modules = isRecord(declared["modules"]) ? declared["modules"] : {};
+  if (Object.values(modules).some((entry) => isRecord(entry) && entry["sharedFiles"] !== undefined)) {
+    lines.push("start: sharedFiles in dabbler.yaml is no longer read; a step may change any file its plan names.");
+  }
+  const testing = isRecord(declared["testing"]) ? declared["testing"] : {};
+  const suites = Array.isArray(testing["suites"]) ? testing["suites"] : [];
+  if (suites.some((suite) => isRecord(suite) && (suite["module"] !== undefined || suite["against"] !== undefined))) {
+    lines.push("start: a suite's module and against in dabbler.yaml are no longer read; every expensive suite runs at the end of a session.");
+  }
+  return lines;
+}
+
 /** The hold every session of a repository that declares no packaging carries. */
 export const NOTHING_TO_PUBLISH = "this repository declares no packaging, so there is nothing to publish";
 
@@ -1327,8 +1331,6 @@ export interface DeclareCliOptions {
   /** Why a held session publishes nothing; the record carries it beside the declaration. */
   readonly holdReason?: string | null;
   readonly sessionNumber?: number | null;
-  /** The module(s) the session works in; given only for a multi-module solution. */
-  readonly modules?: readonly string[] | null;
   /**
    * Handed every refusal's own words, beside the line written to stderr.
    * The driver declares on the engine's behalf and stops when this refuses;
@@ -1380,17 +1382,6 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     return EXIT_USAGE;
   }
 
-  // The typed path is held to the solution's shape by the same judge the
-  // driven plan meets at acceptance, so neither can persist a module the
-  // other would refuse: an undeclared slug, or a module named in a
-  // single-module repository.
-  const shapeReasons = judgeModulesForShape(
-    options.modules ?? [],
-    solutionShape(repoRootFromSessionsDir(sessionsDir)),
-    "the declaration",
-  );
-  if (shapeReasons.length > 0) return refuse(shapeReasons.join("; "), EXIT_USAGE);
-
   let lock: string;
   // A repository that declares no packaging has nothing to publish, so a
   // session in it is held whatever its plan said. Recorded on the
@@ -1401,11 +1392,10 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     // The sessions dir's own repository, not the cwd's: a typed declare and
     // a driven one both name the checkout they declare for.
     const config = loadConfig(undefined, repoRootFor(sessionsDir) ?? dirname(sessionsDir));
-    const module = options.modules?.[0] ?? null;
     let declared = true;
     try {
       // A tag release declares no pack and no push, and is packaging too.
-      declared = loadTagRelease(config, module) !== null || loadDeclaration(config, module) !== null;
+      declared = loadTagRelease(config, null) !== null || loadDeclaration(config, null) !== null;
     } catch (error) {
       // A malformed block is packaging's to refuse, in its own words.
       if (!(error instanceof PackagingConfigError)) throw error;
@@ -1425,7 +1415,6 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
       task: text,
       releasable,
       holdReason,
-      modules: options.modules ?? null,
     });
   } catch (error) {
     if (!(error instanceof SanctionedWriteError)) throw error;
@@ -1433,12 +1422,10 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
   } finally {
     releaseLock(lock);
   }
-  const modules = (options.modules ?? []).filter((slug) => slug.trim() !== "");
   writeOut(
     `declare: session ${sessionDisplayNumber(target)} declared; releasable=` +
       `${releasable ? "yes" : "no"}` +
-      `${holdReason ? `; held: ${holdReason}` : ""}` +
-      `${modules.length > 0 ? `; modules=${modules.join(",")}` : ""}.\n`,
+      `${holdReason ? `; held: ${holdReason}` : ""}.\n`,
   );
   return EXIT_OK;
 }
@@ -2248,8 +2235,6 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
           );
         }
       }
-      // The session is out of play: its module's row stops saying so.
-      reprojectSolution(repoRoot);
     }
     writeWhatComesNext(sessionsDir);
     return EXIT_OK;

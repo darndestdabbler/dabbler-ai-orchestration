@@ -85,20 +85,16 @@ dabbler bootstrap --print-plan-prompt
 dabbler bootstrap --print-decomposition-prompt
 ```
 
-### 1b. Modules, if the solution has more than one
+### 1b. The solution is its build files
 
-A solution is declared as modules in `docs/modules.yaml` — a slug, a kind,
-the code roots it owns, and the siblings it depends on. `dabbler modules
-create` writes one and `dabbler modules show` reads them back. A
-session's plan section may name the modules it touches with
-`Module: <slug>` — as many as it touches, or none — and every session
-runs in the repository itself.
-
-A module reaches a sibling by project reference — a `<ProjectReference>`
-listed in the root solution file for .NET, a dependency at
-`${project.version}` listed in the parent `pom.xml` for Maven. A
-single-module repository needs none of this: with no manifest the
-repository is one implicit module.
+Nothing is declared beside them. The Solution Explorer reads the root
+`.slnx`, `.sln` or `pom.xml` — every `.csproj` or `pom.xml` under the
+root where there is none — and shows each project, what it references and
+what references it. A project reaches a sibling by project reference — a
+`<ProjectReference>` listed in the root solution file for .NET, a dependency
+at `${project.version}` listed in the parent `pom.xml` for Maven — and every
+session runs in the repository itself. A repository with no build files is one
+project: itself.
 
 ## 2. Start a session
 

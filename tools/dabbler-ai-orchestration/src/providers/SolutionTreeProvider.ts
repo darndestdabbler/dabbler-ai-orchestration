@@ -6,8 +6,8 @@
 // and owns the platform lifecycle.
 //
 // It reads a projection written by the router (`projection.ts`, written by
-// every command that moves a declaration); it never reads the module
-// manifest itself.
+// every command that moves a declaration); it never reads the build files
+// itself.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -61,8 +61,8 @@ const TONE: Record<string, string> = {
   attention: "charts.yellow",
   done: "charts.green",
   muted: "disabledForeground",
-  // The module a session is working in: the milestone blue the Dabbler
-  // terminal says a lifecycle milestone in, so the two surfaces agree.
+  // The milestone blue the Dabbler terminal says a lifecycle milestone in,
+  // so the two surfaces agree.
   milestone: "charts.blue",
 };
 

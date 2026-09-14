@@ -44,8 +44,6 @@ import {
   type BootstrapOptions,
   type ConfigureOptions,
   type LedgerVerbs,
-  type ModuleCreateOptions,
-  type ModuleVerbs,
   type RepositoryTarget,
   type Router,
   type RouterResult,
@@ -318,35 +316,6 @@ export class InProcessRouter implements Router {
       if (o.stop === true) args.push("--stop");
       optional(args, "--session-number", o.sessionNumber?.toString());
       return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
-    },
-  };
-
-  // --- modules ---------------------------------------------------------------
-
-  public readonly modules: ModuleVerbs = {
-    /**
-     * The workspace root is passed as the verb's positional argument as
-     * well as being where the router stands: standing somewhere is an
-     * ambient value a refactor can change without anyone noticing the
-     * module manifest moved with it.
-     *
-     * `--title` is REQUIRED by `modules create`, so the contract's
-     * "omitted when the default (the slug) was accepted" is satisfied here
-     * by sending the slug. Omitting the flag sent a usage error instead of
-     * taking a default the verb does not have -- which is what the
-     * extension did whenever an operator pressed Enter past the title
-     * prompt.
-     */
-    create: (o: ModuleCreateOptions) => {
-      const title = (o.title ?? "").trim() || o.slug;
-      const args = ["create", o.workspaceRoot, "--slug", o.slug, "--title", title];
-      optional(args, "--plan-path", o.planPath);
-      optional(args, "--code-root", o.codeRoot);
-      optional(args, "--spec-section", o.specSection);
-      optional(args, "--kind", o.kind);
-      for (const dependency of o.dependsOn ?? []) args.push("--depends-on", dependency);
-      optional(args, "--package", o.package);
-      return this.text("modules", args, o.workspaceRoot);
     },
   };
 

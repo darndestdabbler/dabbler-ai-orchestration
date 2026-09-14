@@ -274,51 +274,32 @@ Maven module publishes through its own lifecycle.
 
 ---
 
-## Step 3 — Declare the three modules
+## Step 3 — Decide the three modules
 
-- **Framework —** nothing here; which modules a solution has is yours. What
-  it derives from your answers is the other direction: you write only
-  `depends on`, and *used by* is worked out from it.
-- **You —** run **Dabbler: New Module** three times:
+- **No framework register —** there is nothing to declare: a solution is its
+  build files, and the framework reads the parent `pom.xml` and its
+  `<modules>` as they are written. Which modules a solution has is a
+  **person's** judgement, and the session plan says it.
+- **No UI register —** for the same reason, a **person's** judgement and no
+  gap: there is no button to declare a module, and none is missing.
+- **No command underneath —** nothing is run here.
 
-  | prompt | model | store | app |
-  | --- | --- | --- | --- |
-  | `New module (1/2): slug` | `model` | `store` | `app` |
-  | `New module (2/4): display title` | `Item model` | `SQLite store` | `JSON loader` |
-  | `New module (3/4): kind` | `shared-types` | `library` | `application` |
-  | `New module (4/4): depends on` | *(leave blank)* | `model` | `model, store` |
+The solution will be three Maven modules under one parent, each a `<module>`
+in the root `pom.xml`:
 
-  (The first prompt really is titled `1/2` while the rest count to four —
-  walk finding 8.)
-- **Underneath —**
-  ```
-  dabbler modules create . --slug model --title "Item model" --kind shared-types --code-root modules/model --package com.example:json-model
-  dabbler modules create . --slug store --title "SQLite store" --kind library --code-root modules/store --package com.example:json-store --depends-on model
-  dabbler modules create . --slug app --title "JSON loader" --kind application --code-root modules/app --package com.example:json-loader --depends-on model --depends-on store
-  ```
+| module | artifactId | depends on |
+| --- | --- | --- |
+| `modules/model` | `json-model` | — |
+| `modules/store` | `json-store` | `json-model` |
+| `modules/app` | `json-loader` | `json-model`, `json-store` |
 
-**The CLI form carries two values the button does not ask for**: the **code
-root**, which the button defaults to `modules/<slug>`, and the **package**,
-which it defaults to the slug. If you used the button, open
-`docs\modules.yaml` and set each `package` by hand. **Java package names are
-`groupId:artifactId`, with a colon.**
+**Java package names are `groupId:artifactId`, with a colon**, and a module
+depends on a sibling at `${project.version}` in the same reactor.
 
-**Expect the last create to print exactly:**
-
-```
-{"slug": "app", "title": "JSON loader", "kind": "application", "codeRoots": ["modules/app"], "dependsOn": ["model", "store"], "package": "com.example:json-loader"}
-note: no module holds a project file yet, so the root build files wait for the first one that does
-```
-
-That note is the important part. Dabbler decides whether this is a .NET or a
-Java solution by looking for a project file — a `.csproj` or a `pom.xml`.
-Until one exists it writes no root files at all. A session writes them once
-its work is done, but session 1 needs the parent POM to build, so step 5 is
-where you write it.
-
-**Check what it recorded** in the **Solution Explorer**: three module rows,
-each with its kind, its *Depends on* and its *Used by*. The CLI form of the
-same view is `dabbler modules show .`.
+**Check it once steps 4 and 5 are done** in the **Solution Explorer**: a row
+for `json-model`, read from the parent `pom.xml`'s `<modules>`. Each later
+module appears when its POM is listed there, with what it depends on and what
+depends on it.
 
 ---
 
@@ -370,9 +351,9 @@ missing, as a blocking fault, and the round was spent disputing it.
 ## Step 5 — Write the parent POM
 
 - **No framework register —** and this is a gap the **framework** should
-  close. It writes the parent POM where a module already holds a POM: from
-  `dabbler modules create`, or once a session's work is done. Here the
-  modules were declared first and no session has run, and session 1 needs the
+  close. It writes the parent POM once a session's work is done, where the
+  build files hold more than one module and the root has no `pom.xml`. Here
+  no session has run and one module POM exists, and session 1 needs the
   parent to build.
 - **No UI register —** nothing offers it; the **framework**'s to close, for
   the reason above.
@@ -483,19 +464,14 @@ which is the walkthrough's own check reading as green over an empty run of
 record. If instead it says `no tests affected by this change set`, the rule
 is wrong.
 
-**Dabbler: Show Impact** on a module row shows the same plan for that
-module's roots.
-
 ---
 
 ## Step 7 — Commit and push what you wrote
 
 - **No framework register —** a gap the **framework** should close, at the
   declaration. `session start` refuses a working tree that carries changes,
-  and steps 3 to 6 have written files nobody has committed — including
-  `docs\modules.yaml`, which bootstrap did not commit because `modules
-  create` wrote it after bootstrap ran, and the POMs and the `.gitignore`
-  line you wrote. Walk finding 2.
+  and steps 4 to 6 have written files nobody has committed: the POMs, the
+  `.gitignore` line and `dabbler.yaml`.
 - **No UI register —** Start Session does not offer the commit, and nothing
   sets the upstream that the land's bare `git push` needs. It is the
   framework's to close, at the same moment it refuses the tree.
@@ -619,8 +595,6 @@ nobody has run against Maven yet, so detail there is worth most.
 Each was found by walking this document on 8 September 2026 and is written up
 in `docs/uat/uat-walk-findings.md` with its reproduction.
 
-- **New Module asks four of a module's six values** (step 3). Finding 1.
-- **Bootstrap does not commit the modules manifest** (step 7). Finding 2.
 - **Nothing in the UI sets the remote or the upstream** (steps 2 and 7).
   Finding 5.
 - **Troubleshoot runs no toolchain checks** (prerequisites). Finding 6.

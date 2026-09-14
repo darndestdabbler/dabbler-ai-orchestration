@@ -27,7 +27,7 @@
 // installed by the thing it guards is installed too late.
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 import { SESSIONS_DIRNAME, SESSION_PLAN_FILENAME } from "../evidence.ts";
 import { readText } from "../textfile.ts";
@@ -45,8 +45,6 @@ import {
   PRE_COMMIT_HOOK,
   SHARED_BODY,
 } from "./templates.ts";
-
-import { MANIFEST_HEADER, MANIFEST_RELPATH } from "../modules.ts";
 
 export * from "./templates.ts";
 export * from "./detect.ts";
@@ -249,53 +247,6 @@ export function writeInstructionFiles(
     written.push(path);
   }
   return written;
-}
-
-/**
- * The one-module solution a fresh repository is, written so the Solution
- * Explorer has something true to show from the first minute and so that
- * nothing module-shaped switches on.
- *
- * One module, named for the repository, whose roots are the repository. It
- * is a real declaration rather than a placeholder -- a repository nobody
- * has decomposed yet IS one module, and that is the shape every session
- * runs in until a second entry is declared, with the run of record the
- * module's own suites. Session
- * 1 writes the solution plan and decides whether there are several. Left
- * exactly as it is when a manifest already exists.
- */
-export function scaffoldModuleManifest(projectDir: string): string | null {
-  const path = join(projectDir, MANIFEST_RELPATH);
-  if (existsSync(path)) return null;
-  const name = basename(resolve(projectDir)) || "solution";
-  // The header every writer of the file puts first, then the one paragraph
-  // that is true only of a fresh repository.
-  const text = [
-    MANIFEST_HEADER.trimEnd(),
-    "#",
-    "# One module, because a repository nobody has decomposed yet IS one",
-    "# module -- and that is the shape every session runs in until a second",
-    "# entry is declared here, with the run of record the module's own",
-    "# suites. Session 1 writes",
-    "# the solution plan and decides whether there are several; a second",
-    "# entry is what switches the module machinery on.",
-    "modules:",
-    `- slug: ${name}`,
-    `  title: ${name}`,
-    "  kind: application",
-    // Quoted: a bare `.` reads as a number under the YAML 1.1 resolver the
-    // manifest is parsed with, and the roots must be strings.
-    "  codeRoots:",
-    "  - '.'",
-    "",
-  ].join("\n");
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, text, "utf8");
-  } catch {
-    return null;
-  }
-  return path;
 }
 
 /**

@@ -197,7 +197,7 @@ suite("ActionRegistry: package.json menu registry", () => {
     // view shows, and who is affected when one of those things changes.
     // "solution" alone would pass on the view's own name, which is the
     // sentence the item called unclear in the first place.
-    for (const promise of [/built FROM/i, /modules/i, /promises|breaks|changes/i]) {
+    for (const promise of [/built FROM/i, /projects/i, /promises|breaks|changes/i]) {
       assert.ok(
         promise.test(solution.contents),
         `the welcome does not say what the view is for (${promise})`,
@@ -293,7 +293,7 @@ function whenHolds(when: string, view: string, viewItem: string): boolean {
  *
  * Rich deliberately: the reverse assertion below is only as strong as the
  * rows these draw, so every `contextValue` the manifest gates on has to be
- * producible here -- a module of each kind, and a producer in each of its
+ * producible here -- projects of more than one kind, and a producer in each of its
  * three locations.
  */
 const FIXTURES: Array<{
@@ -380,26 +380,10 @@ const FIXTURES: Array<{
     ],
   };
   const multi: Projection = {
-    solution: { name: "s", title: "s", multi: true, implicit: false, moduleCount: 2 },
-    modules: [
-      {
-        slug: "model",
-        title: "The model",
-        kind: "shared-types",
-        package: "Model",
-        codeRoots: ["modules/model"],
-        dependsOn: [],
-        usedBy: ["app"],
-      },
-      {
-        slug: "app",
-        title: "The app",
-        kind: "application",
-        package: null,
-        codeRoots: ["modules/app"],
-        dependsOn: ["model"],
-        usedBy: [],
-      },
+    solution: { name: "s", title: "s", ecosystem: "dotnet", projectCount: 2 },
+    projects: [
+      { name: "Model", path: "src/Model/Model.csproj", kind: "library", dependsOn: [], usedBy: ["App"] },
+      { name: "App", path: "src/App/App.csproj", kind: "service", dependsOn: ["Model"], usedBy: [] },
     ],
     external: [
       {
@@ -419,23 +403,13 @@ const FIXTURES: Array<{
     configuration,
   };
   const single: Projection = {
-    solution: { name: "one", title: "one", multi: false, implicit: true, moduleCount: 1 },
-    modules: [
-      {
-        slug: "one",
-        title: "one",
-        kind: "application",
-        package: null,
-        codeRoots: ["."],
-        dependsOn: [],
-        usedBy: [],
-      },
-    ],
+    solution: { name: "one", title: "one", ecosystem: null, projectCount: 1 },
+    projects: [{ name: "one", path: ".", kind: "application", dependsOn: [], usedBy: [] }],
     configuration,
   };
   return [
-    { from: "a solution of two modules", projection: multi, context: {} },
-    { from: "the repository as its module", projection: single, context: {} },
+    { from: "a solution of two projects", projection: multi, context: {} },
+    { from: "a repository with no build files", projection: single, context: {} },
   ];
 })();
 

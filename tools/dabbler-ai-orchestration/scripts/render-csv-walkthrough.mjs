@@ -41,9 +41,8 @@ const doc = `# Building the CSV solution: four modules, one repository
 
 You are going to build a .NET solution that watches a folder for CSV files,
 reads each one into \`Person\` objects, and stores them in a database. You will
-build it as **four modules**, because that is the unit this framework works in:
-one module is one developer's unit of work, and a session names the modules it
-touches.
+build it as **four modules**, each a project and its tests in one solution:
+one module is one developer's unit of work.
 
 | Module | Kind | What it is | Package |
 | --- | --- | --- | --- |
@@ -91,47 +90,24 @@ repository row, and \`docs/sessions/session-plan.md\` appears.
 
 ---
 
-## 2. Declare the four modules
+## 2. The four modules are projects
 
-Use **New Module** on the Work Explorer's title bar, once per module. It asks
-four questions: the slug, the display title, the kind, and what it depends on.
+There is nothing to declare. The solution is its build files: each module is a
+project under \`modules/<name>/src\`, with its tests in a project under
+\`modules/<name>/tests\`, and one \`.slnx\` at the root lists them all. The
+Solution Explorer reads them and shows each project with its kind, what it
+references and — derived, never typed — what references it.
 
-Or declare them from a terminal, which is faster for four:
+The sessions write the projects. Once the build files hold more than one
+project and the root has no solution file, the framework writes the root build
+files as that session's work is done, before it is verified, and **never
+rewrites them**: the \`.slnx\` listing the projects, \`Directory.Build.props\`
+and \`Directory.Build.targets\`, with \`bin/\` and \`obj/\` added to
+\`.gitignore\`.
 
-\`\`\`
-dabbler modules create . --slug model         --title "Person model"        --kind shared-types --code-root modules/model         --package CsvModel
-dabbler modules create . --slug deserializer  --title "CSV deserializer"    --kind library      --code-root modules/deserializer  --package CsvDeserializer --depends-on model
-dabbler modules create . --slug persister     --title "Person persistence"  --kind library      --code-root modules/persister     --package CsvPersister    --depends-on model
-dabbler modules create . --slug app           --title "CSV watcher"         --kind application  --code-root modules/app           --package CsvWatcher      --depends-on model --depends-on deserializer --depends-on persister
-\`\`\`
-
-Check what was declared:
-
-\`\`\`
-dabbler modules show .
-\`\`\`
-
-**You should see:** \`"multi": true\`, four modules, and \`usedBy\` filled in for
-\`model\` even though you never typed it. \`dependsOn\` is the only direction
-anyone writes; who depends on a module is **derived**, because two directions
-kept by hand disagree eventually and the disagreement is silent.
-
-> **The manifest rejects an unknown key rather than ignoring it.** The keys are
-> \`slug\`, \`title\`, \`planPath\`, \`codeRoots\`, \`touches\`, \`specSections\`,
-> \`contextAssets\`, \`kind\`, \`dependsOn\`, \`package\`.
-
-When the manifest becomes multi-module and a module already holds a project
-file, the framework writes the root build files where they are absent and
-**never rewrites them**: a solution file listing the modules' projects,
-\`Directory.Build.props\` and \`Directory.Build.targets\`, with \`bin/\` and
-\`obj/\` added to \`.gitignore\`. Declared before any code, as here, the modules
-get none yet: the framework writes them once the first session's work is done,
-before it is verified.
-
-**A shortcut for a quick look, rather than typing all four \`modules create\`
-calls:** \`node tools/dabbler-ai-orchestration/scripts/stage-csv-solution.mjs
---root <a folder under C:/temp> --reset\` writes exactly this manifest, the
-sources for all four modules, and a planned four-session
+**A shortcut for a quick look:** \`node tools/dabbler-ai-orchestration/scripts/stage-csv-solution.mjs
+--root <a folder under C:/temp> --reset\` writes the sources and projects for
+all four modules, the solution file, and a planned four-session
 \`docs/sessions/session-plan.md\`, in one call. It is what stages the corpus
 Section 4 below is a tour of.
 
@@ -148,7 +124,7 @@ healed from it, and clicking a row in the Work Explorer lands on it:
 \`\`\`
 
 **You should see:** the Work Explorer showing the repository at **0/4**, with
-the sessions grouped **by module** under a **Not Started** bucket.
+the sessions under a **Not Started** bucket.
 
 ---
 
@@ -190,40 +166,18 @@ steps.
 
 ## 6. Change the model, and see who breaks
 
-Once all four modules exist, change something in \`modules/model\` and ask:
+Once all four modules exist, expand **CsvModel** in the Solution Explorer and
+open **Used by**.
 
-\`\`\`
-dabbler affected
-\`\`\`
+**You should see** every project that references it, directly or through
+another: \`CsvDeserializer\`, \`CsvPersister\`, their test projects and
+\`CsvWatcher\`. Nobody typed that list. It is read from the
+\`<ProjectReference>\` elements, and it is the list a change to \`Person\` can
+break.
 
-Or right-click the module and choose **Show Impact**.
-
-**You should see** the plan for that change:
-
-\`\`\`
-scope: a hypothetical change of modules/model/src/CsvModel/Person.cs
-modules: model
-  repository-wide        suite dotnet ()  <-
-
-dotnet test --nologo
-\`\`\`
-
-**The change reaches \`model\`, and the one suite this solution declares.** That
-suite names no module, so it answers for the whole repository and any change
-reaches it — and because every module references the model's project, one
-\`dotnet test\` at the root is what proves the siblings still build against the
-change.
-
-The run of record for a session is **only the suites its change reaches**, not
-every suite in the repository. A solution that declares a suite per module sees
-a change to \`model\` reach each consumer's suites as well, because \`model\` is
-shared types.
-
-A session that changes two modules names both:
-
-\`\`\`
-dabbler session declare --module model --module persister
-\`\`\`
+One \`dotnet test\` at the root proves they still build against the change,
+because the solution file lists every project, and it is the session's run of
+record: every expensive suite runs once the session's work is verified.
 
 ---
 
@@ -254,11 +208,9 @@ never half-stored.
 ## What to check when something looks wrong
 
 - **The Solution Explorer says "It fills in once the repository is set up" but
-  you have a \`docs/modules.yaml\`.** The projection under
-  \`.dabbler/solution/solution.json\` has not been derived. Touch the manifest
-  or a \`.csproj\`, or run the explicit refresh, and it fills in.
-- **The module context menu item is missing.** \`Show Impact\` is right-click
-  only, on every module row.
+  you have project files.** The projection under
+  \`.dabbler/solution/solution.json\` has not been derived. Touch a \`.csproj\`
+  or the \`.slnx\`, or run the explicit refresh, and it fills in.
 - **The framework stopped.** Read its own account first —
   \`dabbler status\`, the \`stop\` on \`.dabbler/runs/s<N>/driver/run.json\`, and the
   outstanding instruction's \`reasons\`. Never edit a record, a verdict or a gate

@@ -45,11 +45,10 @@ cap left the fix unreviewed, so the work lands labelled unreviewed; or
 *unresolved*, where findings still stand and nothing lands but the record.
 No verdict a person can type exists anywhere in the product.
 
-**3. Modules, in the one repository you opened.**
-Declare your solution's modules once, in `docs/modules.yaml`. Every session
-runs in the repository itself, and a session's plan names the modules it
-touches, or none. The Solution Explorer shows each module with its package
-and its run of record, and offers Show Impact on every module row.
+**3. The build files are the solution.**
+The Solution Explorer reads your `.slnx`, `.sln`, `.csproj` or `pom.xml` files
+and shows each project, what it references and what references it — there is
+nothing to declare beside them. Every session runs in the repository itself.
 
 **4. Works through a Copilot seat or direct API keys.**
 

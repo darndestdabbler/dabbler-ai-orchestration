@@ -106,7 +106,6 @@ export const LEDGER_FILENAME = "sessions.json";
 export const PLAN_FILENAME = "session-plan.md";
 export const ACTIVITY_LOG_FILENAME = "activity-log.json";
 export const CHANGE_LOG_FILENAME = "change-log.md";
-export const MODULES_MANIFEST_REL = path.join("docs", "modules.yaml");
 
 /** `<root>/docs/sessions`, whether or not it exists. */
 export function sessionsDirOf(root: string): string {

@@ -23,7 +23,6 @@ import {
   renderProjectConfig,
   scaffoldBootstrapSessions,
   scaffoldProjectConfig,
-  scaffoldModuleManifest,
   writeInstructionFiles,
 } from "../src/bootstrap/index.ts";
 import {
@@ -34,7 +33,6 @@ import { EXIT_BLOCKING } from "../src/contracts/exitCodes.ts";
 import { SETTINGS_RELPATH } from "../src/settings.ts";
 import { capture } from "../src/output.ts";
 import { writePreferences } from "../src/preferences.ts";
-import { solutionShape } from "../src/modules.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
 import { makeAnsweredRepo, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
 
@@ -621,32 +619,13 @@ describe("what setup says about publishing", () => {
 });
 
 describe("what the Solution Explorer has to render", () => {
-  it("scaffolds a one-module manifest the framework reads as single-module, and a plan that names the solution plan", () => {
-    // A fresh repository IS one module, and one module is the shape in
-    // which nothing module-shaped switches on -- the requirement every
-    // session of the modules block is held to.
+  it("scaffolds a plan that names the solution plan, and no modules manifest", () => {
     const repo = emptyRepo();
-    assert.equal(scaffoldModuleManifest(repo), join(repo, "docs", "modules.yaml"));
-    const shape = solutionShape(repo);
-    assert.equal(shape.multi, false);
-    assert.equal(shape.implicit, false);
-    assert.equal(shape.modules.length, 1);
-    assert.equal(shape.modules[0]?.kind, "application");
-    assert.deepEqual(shape.modules[0]?.codeRoots, ["."]);
     for (const path of scaffoldBootstrapSessions(repo)) {
       if (!path.endsWith("session-plan.md")) continue;
-      const plan = readFileSync(path, "utf8");
-      assert.match(plan, /docs\/planning\/solution-plan\.md/);
-      assert.match(plan, /one module\s+is a fine answer/i);
+      assert.match(readFileSync(path, "utf8"), /docs\/planning\/solution-plan\.md/);
     }
-  });
-
-  it("leaves a manifest the project already wrote alone", () => {
-    const repo = emptyRepo();
-    mkdirSync(join(repo, "docs"), { recursive: true });
-    writeFileSync(join(repo, "docs", "modules.yaml"), "# mine\n", "utf8");
-    assert.equal(scaffoldModuleManifest(repo), null);
-    assert.equal(readFileSync(join(repo, "docs", "modules.yaml"), "utf8"), "# mine\n");
+    assert.equal(existsSync(join(repo, "docs", "modules.yaml")), false);
   });
 
   it("writes the first projection, so the tree has content before any verb", async () => {

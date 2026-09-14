@@ -44,7 +44,6 @@ import {
   sessionRunDir,
 } from "./ledger.ts";
 import { loadSchemaFile, schemaFailure, tolerantSchemaFailure } from "./schema/validate.ts";
-import type { SolutionShape } from "./modules.ts";
 
 export const DRIVER_DIRNAME = "driver";
 export const DRIVER_SCHEMA_VERSION = 1;
@@ -303,23 +302,6 @@ export function validateWorkPlan(
 }
 
 /**
- * What a plan's `modules` may say, judged against the solution's shape.
- *
- * The schema can say the list is non-empty and unique; it cannot say the
- * slugs exist, that a cross-module session gives its reason, or that a
- * single-module repository names nothing. Those are the shape's rules, and
- * they are judged here, at acceptance, in the words a rejection carries. A
- * single-module solution accepts an absent list and refuses a named module
- * that is not its own; nothing module-shaped is asked of it.
- */
-export function judgeWorkPlanModules(
-  plan: DriverWorkPlan,
-  shape: SolutionShape,
-): string[] {
-  return judgeModulesForShape(plan.modules ?? [], shape, "the plan");
-}
-
-/**
  * A plan names what it will NOT do, and at least one thing.
  *
  * Judged here and not by the schema's `required`, because a plan already
@@ -349,42 +331,6 @@ export function judgeWorkPlanHold(plan: DriverWorkPlan): string[] {
     "the plan's `hold_release` is blank: a hold carries the one reason the session publishes " +
       "nothing, or is left out so the session ships",
   ];
-}
-
-/**
- * The same judgment for any declaration of modules -- the driven plan and
- * the typed `session declare --module` alike, so neither path can persist a
- * module the other would refuse. `who` names the declaration in the words
- * a refusal carries.
- */
-export function judgeModulesForShape(
-  modules: readonly string[],
-  shape: SolutionShape,
-  who = "the declaration",
-): string[] {
-  const named = modules.map((slug) => slug.trim()).filter((slug) => slug !== "");
-  const declared = new Set(shape.modules.map((module) => module.slug));
-  const reasons: string[] = [];
-  if (!shape.multi) {
-    for (const slug of named) {
-      if (!declared.has(slug)) {
-        reasons.push(
-          `${who} names module '${slug}', and this repository is a single-module ` +
-            "solution whose one module is " +
-            `'${shape.modules[0]?.slug ?? ""}'; a single-module declaration names none`,
-        );
-      }
-    }
-    return reasons;
-  }
-  // Every session runs in the whole repository, so a declaration names the
-  // modules it touches, as many as that is, or none.
-  for (const slug of named) {
-    if (!declared.has(slug)) {
-      reasons.push(`${who} names module '${slug}', which docs/modules.yaml does not declare`);
-    }
-  }
-  return reasons;
 }
 
 /**

@@ -1,31 +1,24 @@
-// The ecosystem seam: the root build files a multi-module solution needs,
-// for .NET and for Maven, and which of the two a module is.
+// The root build files a solution of more than one project needs, for .NET
+// and for Maven.
 //
-// A module reaches a sibling by project reference -- a `<ProjectReference>`
+// A project reaches a sibling by project reference -- a `<ProjectReference>`
 // for .NET, with both projects listed in the solution file; a dependency at
 // `${project.version}` for Maven, with both modules listed in the parent
 // POM and built in one reactor run. The engine writes the projects and their
 // references; what is here is only the root those projects build under.
 //
-// Which ecosystem a module is comes from what its roots contain -- a
-// `.csproj` or a solution file, or a `pom.xml` -- and never from a
-// declaration, because a declaration that disagreed with the tree would
-// have to be wrong about one of them.
+// Which ecosystem, and which projects, come from the project graph -- the
+// build files themselves -- and never from a declaration, because a
+// declaration that disagreed with the tree would have to be wrong about one
+// of them.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 
-import type { ModuleEntry, SolutionShape } from "./modules.ts";
+import type { ProjectGraph } from "./projectGraph.ts";
 
 export type EcosystemKey = "dotnet" | "maven";
-
-export class EcosystemError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "EcosystemError";
-  }
-}
 
 /** What a root-file scaffold left behind: written where absent, skipped where present. */
 export interface ScaffoldResult {
@@ -43,147 +36,23 @@ export interface ScaffoldResult {
   readonly notes: readonly string[];
 }
 
-interface Ecosystem {
-  readonly key: EcosystemKey;
-  /**
-   * The root build files a multi-module solution of this ecosystem needs,
-   * each written only where absent and never rewritten.
-   */
-  rootFiles(root: string, shape: SolutionShape): ScaffoldResult;
-}
-
-const SKIPPED_DIRS: ReadonlySet<string> = new Set([
-  ".git", "bin", "obj", "node_modules", "packages", "target", ".dabbler",
-]);
-
-/** Files under a directory, bounded in depth, skipping build output. */
-function walkFiles(dir: string, depth = 6): string[] {
-  const out: string[] = [];
-  let entries: string[];
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return out;
-  }
-  for (const name of entries.sort()) {
-    const full = join(dir, name);
-    let isDir = false;
-    try {
-      isDir = statSync(full).isDirectory();
-    } catch {
-      continue;
-    }
-    if (isDir) {
-      if (!SKIPPED_DIRS.has(name) && depth > 0) out.push(...walkFiles(full, depth - 1));
-    } else {
-      out.push(full);
-    }
-  }
-  return out;
-}
-
-function isDotnetProject(name: string): boolean {
-  return /\.(csproj|sln|slnx)$/i.test(name);
-}
-
-function isMavenProject(name: string): boolean {
-  return name === "pom.xml";
-}
-
 /**
- * Which ecosystem a module is, from what its roots contain. Neither refuses
- * naming the module and what was looked for; both refuse too, because a
- * module is one ecosystem and a folder that is two is a folder that should
- * be two modules.
+ * The root build files a solution of more than one project needs, each
+ * written only where absent. Nothing is written for one project, which
+ * builds from its own folder, nor where the root already holds a solution
+ * file or a parent POM: the build has its root, and a second solution file
+ * beside the first makes `dotnet test` refuse to choose between them.
  */
-export function ecosystemOf(root: string, entry: ModuleEntry): Ecosystem {
-  let dotnet = false;
-  let maven = false;
-  const roots = entry.codeRoots.length > 0 ? entry.codeRoots : ["."];
-  for (const codeRoot of roots) {
-    for (const file of walkFiles(join(root, codeRoot))) {
-      const name = relative(root, file).split(/[\\/]/).pop() ?? "";
-      if (isDotnetProject(name)) dotnet = true;
-      if (isMavenProject(name)) maven = true;
-    }
+export function ensureRootFiles(root: string, graph: ProjectGraph): ScaffoldResult | null {
+  if (graph.projects.length < 2) return null;
+  if (graph.ecosystem === "dotnet") {
+    return readdirSync(root).some((name) => /\.slnx?$/i.test(name)) ? null : rootFilesDotnet(root, graph);
   }
-  if (dotnet && maven) {
-    throw new EcosystemError(
-      `module '${entry.slug}' holds both a .NET project and a pom.xml under ` +
-        `${roots.join(", ")}; a module is one ecosystem`,
-    );
-  }
-  if (dotnet) return DOTNET;
-  if (maven) return MAVEN;
-  throw new EcosystemError(
-    `module '${entry.slug}' has no project file the framework knows under ` +
-      `${roots.join(", ")}: a .csproj or a solution file for .NET, or a pom.xml for Maven`,
-  );
-}
-
-/**
- * The root build files a multi-module solution needs, written where absent
- * by `modules create` as the second entry lands. The ecosystem is the first
- * module's whose roots hold a project file. A multi-module solution whose
- * modules are still empty folders gets nothing yet and is told so; a
- * single-module solution gets nothing ever.
- */
-export function ensureRootFiles(root: string, shape: SolutionShape): ScaffoldResult | null {
-  if (!shape.multi) return null;
-  for (const entry of shape.modules) {
-    let ecosystem: Ecosystem;
-    try {
-      ecosystem = ecosystemOf(root, entry);
-    } catch (error) {
-      if (error instanceof EcosystemError) continue;
-      throw error;
-    }
-    return ecosystem.rootFiles(root, shape);
-  }
-  return {
-    written: [],
-    skipped: [],
-    notes: [
-      "no module holds a project file yet, so the root build files wait for the first " +
-        "one that does",
-    ],
-  };
-}
-
-/**
- * Which ecosystem this solution's root build files belong to, or null while
- * no module holds a project file yet.
- *
- * `ensureRootFiles` answers this on the way to writing them, and the suite
- * declaration needs the same answer without the writing. The knowledge is
- * one function's; asking it twice is cheap and keeps it one.
- */
-export function ecosystemOfSolution(root: string, shape: SolutionShape): EcosystemKey | null {
-  if (!shape.multi) return null;
-  for (const entry of shape.modules) {
-    try {
-      return ecosystemOf(root, entry).key;
-    } catch (error) {
-      if (error instanceof EcosystemError) continue;
-      throw error;
-    }
+  if (graph.ecosystem === "maven") {
+    return existsSync(join(root, "pom.xml")) ? null : rootFilesMaven(root, graph);
   }
   return null;
 }
-
-const DOTNET: Ecosystem = {
-  key: "dotnet",
-  rootFiles(root: string, shape: SolutionShape): ScaffoldResult {
-    return rootFilesDotnet(root, shape);
-  },
-};
-
-const MAVEN: Ecosystem = {
-  key: "maven",
-  rootFiles(root: string, shape: SolutionShape): ScaffoldResult {
-    return rootFilesMaven(root, shape);
-  },
-};
 
 function posix(path: string): string {
   return path.split("\\").join("/");
@@ -243,39 +112,17 @@ function writeIfAbsent(root: string, rel: string, text: string, result: { writte
 const SLNX_SDK_FLOOR = "9.0.200";
 
 /**
- * Every .NET project under the solution's modules, root-relative and sorted.
- *
- * The projects are found rather than declared, because the module folder is
- * where they are and a second list of them is a second thing to keep true.
- */
-function dotnetProjectFiles(root: string, shape: SolutionShape): string[] {
-  const found = new Set<string>();
-  for (const entry of shape.modules) {
-    const roots = entry.codeRoots.length > 0 ? entry.codeRoots : [`modules/${entry.slug}`];
-    for (const codeRoot of roots) {
-      for (const file of walkFiles(join(root, codeRoot))) {
-        const lowered = file.toLowerCase();
-        if (lowered.endsWith(".csproj") || lowered.endsWith(".fsproj")) {
-          found.add(posix(relative(root, file)));
-        }
-      }
-    }
-  }
-  return [...found].sort();
-}
-
-/**
- * The three files a multi-module .NET solution needs at its root, written
- * only where absent, and MSBuild's output ignored.
+ * The three files a .NET solution of several projects needs at its root,
+ * written only where absent, and MSBuild's output ignored.
  *
  * The solution file is here because `dotnet test` resolves the project or
  * solution in the directory it runs in: a solution whose projects all live
- * under `modules/` had nothing at its root, so the suite this scaffold
- * declares answered `MSB1003: Specify a project or solution file`. It lists
- * the projects that exist when it is written, says to add each as it gets
- * one, and is never rewritten afterwards.
+ * in folders had nothing at its root, so the suite this scaffold declares
+ * answered `MSB1003: Specify a project or solution file`. It lists the
+ * projects that exist when it is written, says to add each one created
+ * later, and is never rewritten afterwards.
  */
-function rootFilesDotnet(root: string, shape: SolutionShape): ScaffoldResult {
+function rootFilesDotnet(root: string, graph: ProjectGraph): ScaffoldResult {
   const result = {
     written: [] as string[],
     skipped: [] as string[],
@@ -304,7 +151,7 @@ function rootFilesDotnet(root: string, shape: SolutionShape): ScaffoldResult {
   // convention to obey.
   // Resolved first: a root given as `.` has no name of its own to lend.
   const solution = `${basename(resolve(root))}.slnx`;
-  const projects = dotnetProjectFiles(root, shape);
+  const projects = graph.projects.map((project) => project.path).sort();
   // `.slnx`, not `.sln`: it is plain XML a scaffold can write and a person
   // can read and edit, where `.sln` carries a per-project GUID that no
   // generator has any business inventing.
@@ -314,9 +161,9 @@ function rootFilesDotnet(root: string, shape: SolutionShape): ScaffoldResult {
     [
       "<Solution>",
       "  <!-- The solution's projects. `dotnet test` resolves the solution in the directory",
-      "       it runs in, so this file is what gives the root suite something to run. A module",
+      "       it runs in, so this file is what gives the root suite something to run. A project",
       "       reaches a sibling with a <ProjectReference>, and both projects are listed here.",
-      "       Add a project here when a module gets one. -->",
+      "       Add each project you create here. -->",
       ...projects.map((path) => `  <Project Path="${path}" />`),
       "</Solution>",
       "",
@@ -328,11 +175,6 @@ function rootFilesDotnet(root: string, shape: SolutionShape): ScaffoldResult {
       `${solution} is an XML solution file, which the .NET SDK reads from ` +
         `${SLNX_SDK_FLOOR} onward; below that release it is not a solution file at all.`,
     );
-    if (projects.length === 0) {
-      result.notes.push(
-        `no module holds a project file yet, so ${solution} lists none; add each as it gets one`,
-      );
-    }
   }
   ensureIgnoreRules(
     root,
@@ -427,11 +269,11 @@ export function javaReleaseOf(output: string | null): number | null {
 }
 
 /**
- * The root files a multi-module Maven solution needs, written only where
- * absent: the parent POM -- its properties, the compiler release, and the
- * modules it builds in one reactor run -- and Maven's output ignored.
+ * The root files a Maven solution of several modules needs, written only
+ * where absent: the parent POM -- its properties, the compiler release, and
+ * the modules it builds in one reactor run -- and Maven's output ignored.
  */
-function rootFilesMaven(root: string, shape: SolutionShape): ScaffoldResult {
+function rootFilesMaven(root: string, graph: ProjectGraph): ScaffoldResult {
   const result = {
     written: [] as string[],
     skipped: [] as string[],
@@ -440,11 +282,10 @@ function rootFilesMaven(root: string, shape: SolutionShape): ScaffoldResult {
   };
   const moduleDirs: string[] = [];
   let groupId: string | null = null;
-  for (const entry of shape.modules) {
-    const dir = posix(entry.codeRoots[0] ?? `modules/${entry.slug}`);
-    const pom = readPom(join(root, dir, "pom.xml"));
+  for (const project of graph.projects) {
+    const pom = readPom(join(root, project.path));
     if (pom === null) continue;
-    moduleDirs.push(dir);
+    moduleDirs.push(posix(dirname(project.path)));
     groupId ??= pom.groupId;
   }
   const parentArtifact = `${basename(resolve(root)).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "solution"}-parent`;
@@ -492,7 +333,6 @@ function rootFilesMaven(root: string, shape: SolutionShape): ScaffoldResult {
     result,
   );
   ensureIgnoreRules(root, ["target/"], "# Maven's own output, which lands inside the module it built.", result);
-  if (moduleDirs.length === 0) result.notes.push("no module holds a pom.xml yet, so the parent POM lists none; add each as it gets one");
   // Only when the parent POM is this scaffold's: an existing one carries
   // whatever release its team chose, and saying anything about it here
   // would be a claim about a file nothing wrote.

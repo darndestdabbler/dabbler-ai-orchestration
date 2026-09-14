@@ -1,5 +1,5 @@
-// The projection the Solution Explorer renders: modules from the manifest,
-// in dependency order, with who-uses-whom derived and never declared.
+// The projection the Solution Explorer renders: projects from the build
+// files, in dependency order, with who-uses-whom derived and never declared.
 
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -33,120 +33,24 @@ import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 import { TRANSPORT_COPILOT_CLI, loadConfig, resetProjectRootCache } from "../src/config.ts";
 import { SETTING_REVIEWER_TRANSPORT, SETTING_TRANSPORT, writeSettings } from "../src/settings.ts";
 
-type Module = {
-  slug: string;
-  kind: string;
-  dependsOn: string[];
-  usedBy: string[];
-};
-
-describe("the module projection", () => {
-  it("projects the manifest in dependency order with usedBy derived", () => {
+describe("the solution projection", () => {
+  it("projects a .slnx repository's projects with their kinds, dependsOn and usedBy, and writes where the Explorer reads", () => {
     const root = tempDir("projection-");
     seed(root, {
-      "docs/modules.yaml": [
-        "modules:",
-        "- slug: listener",
-        "  kind: application",
-        "  dependsOn: [deserializer, persister]",
-        "- slug: persister",
-        "  dependsOn: [model]",
-        "  package: CsvPersister",
-        "  contract: designed",
-        "- slug: deserializer",
-        "  dependsOn: [model]",
-        "  package: CsvDeserializer",
-        "- slug: model",
-        "  kind: shared-types",
-        "  package: CsvModel",
-        "",
-      ].join("\n"),
+      "Csv.slnx": '<Solution>\n  <Project Path="src/Csv.Api/Csv.Api.csproj" />\n  <Project Path="src/Csv.Model/Csv.Model.csproj" />\n</Solution>\n',
+      "src/Csv.Api/Csv.Api.csproj":
+        '<Project Sdk="Microsoft.NET.Sdk.Web"><ItemGroup><ProjectReference Include="../Csv.Model/Csv.Model.csproj" /></ItemGroup></Project>\n',
+      "src/Csv.Model/Csv.Model.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>\n',
+      // A manifest a repository still carries is not what the tree reads.
+      "docs/modules.yaml": "modules:\n- slug: ghost\n",
     });
     const doc = project(root);
-    const solution = doc.solution as { multi: boolean; implicit: boolean; moduleCount: number };
-    assert.equal(solution.multi, true);
-    assert.equal(solution.implicit, false);
-    assert.equal(solution.moduleCount, 4);
-    const modules = doc.modules as Module[];
-    assert.deepEqual(modules.map((m) => m.slug), ["model", "persister", "deserializer", "listener"]);
-    assert.deepEqual(modules[0]?.usedBy, ["persister", "deserializer", "listener"]);
-    assert.deepEqual(modules[3]?.usedBy, []);
-    // A contract the manifest still carries is read and projects nothing.
-    assert.equal("contractDir" in (modules[1] ?? {}), false);
-  });
-
-  it("projects the deployables a solution declares, including one nothing ships yet", () => {
-    const root = tempDir("projection-");
-    seed(root, {
-      "docs/modules.yaml": [
-        "modules:",
-        "- slug: api",
-        "  kind: application",
-        "  dependsOn: [core]",
-        "- slug: tool",
-        "  kind: application",
-        "- slug: core",
-        "  kind: library",
-        "  package: Core",
-        "deployables:",
-        "- slug: edge",
-        "  title: Edge service",
-        "  kind: service",
-        "  from: [api, tool]",
-        "  runtime: container",
-        "  publish: acr",
-        "- slug: installer",
-        "  kind: cli",
-        "  from: []",
-        "",
-      ].join("\n"),
-    });
-    const doc = project(root);
-    const deployables = doc.deployables as { slug: string; from: string[]; kind: string | null; publish: string | null; declared: boolean }[];
-    assert.deepEqual(
-      deployables.map((one) => [one.slug, one.from, one.kind, one.publish, one.declared]),
-      [
-        ["edge", ["api", "tool"], "service", "acr", true],
-        ["installer", [], "cli", null, true],
-      ],
-    );
-  });
-
-  it("marks the in-flight session's modules from its declaration, and a retired checkout on the row marks nothing", () => {
-    const manifest = "modules:\n- slug: model\n  codeRoots:\n  - modules/model\n- slug: persister\n  dependsOn: [model]\n  codeRoots:\n  - modules/persister\n";
-    const repo = tempDir("projection-");
-    seed(repo, {
-      "docs/modules.yaml": manifest,
-      "docs/sessions/sessions.json": JSON.stringify({
-        schemaVersion: 5,
-        sessions: [{ number: 7, status: "in-progress", modules: ["persister"] }],
-      }),
-    });
-    const marked = project(repo).modules as { slug: string; inSession: number | null }[];
-    assert.deepEqual(marked.map((m) => [m.slug, m.inSession]), [["model", null], ["persister", 7]]);
-    // A row the focused checkout wrote is read, and its checkout says nothing.
-    const old = tempDir("projection-");
-    seed(old, {
-      "docs/modules.yaml": manifest,
-      "docs/sessions/sessions.json": JSON.stringify({
-        schemaVersion: 5,
-        sessions: [{ number: 7, status: "in-progress", checkout: { module: "persister", path: old } }],
-      }),
-    });
-    assert.ok((project(old).modules as { inSession: number | null }[]).every((m) => m.inSession === null));
-  });
-
-  it("projects an absent manifest as the one implicit module, and writes where the Explorer reads", () => {
-    const root = tempDir("projection-");
-    const doc = project(root);
-    const solution = doc.solution as { multi: boolean; implicit: boolean };
-    assert.equal(solution.multi, false);
-    assert.equal(solution.implicit, true);
-    const modules = doc.modules as Module[];
-    assert.equal(modules.length, 1);
-    assert.equal(modules[0]?.slug, basename(root));
-    assert.equal(modules[0]?.kind, "application");
-    assert.deepEqual(modules[0]?.usedBy, []);
+    assert.deepEqual(doc.solution, { name: basename(root), title: basename(root), ecosystem: "dotnet", projectCount: 2 });
+    assert.deepEqual(doc.projects, [
+      { name: "Csv.Model", path: "src/Csv.Model/Csv.Model.csproj", kind: "library", dependsOn: [], usedBy: ["Csv.Api"] },
+      { name: "Csv.Api", path: "src/Csv.Api/Csv.Api.csproj", kind: "service", dependsOn: ["Csv.Model"], usedBy: [] },
+    ]);
+    assert.equal("modules" in doc, false);
     const path = writeProjection(root);
     assert.equal(path, join(root, ".dabbler", "solution", "solution.json"));
     assert.ok(existsSync(path));
@@ -164,7 +68,7 @@ describe("the module projection", () => {
     assert.equal("configuration" in doc, false);
     const written = JSON.parse(readFileSync(writeProjection(root), "utf8")) as Record<string, unknown>;
     assert.equal("configuration" in written, false);
-    assert.ok(Array.isArray(written["modules"]));
+    assert.ok(Array.isArray(written["projects"]));
   });
 });
 

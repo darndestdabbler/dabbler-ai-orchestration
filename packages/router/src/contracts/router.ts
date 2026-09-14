@@ -176,39 +176,6 @@ export interface SessionVerbs {
   interrupt(options: SessionInterruptOptions): Promise<RouterResult<RouterText>>;
 }
 
-export interface ModuleCreateOptions {
-  readonly workspaceRoot: string;
-  readonly slug: string;
-  /** Omitted rather than empty when the default (the slug) was accepted. */
-  readonly title?: string;
-  readonly planPath?: string;
-  readonly codeRoot?: string;
-  readonly specSection?: string;
-  /** `shared-types`, `library` (the default) or `application`. */
-  readonly kind?: string;
-  /** Slugs this module consumes; who consumes it is derived, never declared. */
-  readonly dependsOn?: readonly string[];
-  /** The artifact id a sibling consumes. */
-  readonly package?: string;
-}
-
-/**
- * One verb, because the manifest has one writer.
- *
- * `list` and `retire` were declared here before either router grew them,
- * and session 31 -- which ports `modules` -- found that neither exists on
- * either side: `ai_router.modules` has exactly `create`, and the manifest
- * is create-only by design, with rename, delete and reorganization staying
- * manual edits to the file. A contract naming a verb nothing implements is
- * a promise to a caller that would be refused at the moment it was needed,
- * so they are trimmed rather than stubbed (D162/D152). The session that
- * decides retirement should be a verb adds it here and in both routers, in
- * that order.
- */
-export interface ModuleVerbs {
-  create(options: ModuleCreateOptions): Promise<RouterResult<RouterText>>;
-}
-
 export interface VerifyRoundOptions extends RepositoryTarget {
   readonly maxRounds?: number;
   readonly transport?: string;
@@ -412,7 +379,7 @@ export interface AffectedOptions extends RepositoryTarget {
   readonly json?: boolean;
   /**
    * Plan a hypothetical change of these repository-relative paths instead of
-   * the working tree's: what the Explorer's Show Impact asks for a module.
+   * the working tree's.
    */
   readonly paths?: readonly string[];
 }
@@ -429,7 +396,6 @@ export interface AffectedOptions extends RepositoryTarget {
  */
 export interface Router {
   readonly session: SessionVerbs;
-  readonly modules: ModuleVerbs;
   readonly verify: VerifyVerbs;
   readonly ledger: LedgerVerbs;
   readonly testEvidence: TestEvidenceVerbs;

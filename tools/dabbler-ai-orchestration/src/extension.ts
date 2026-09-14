@@ -3,7 +3,6 @@ import * as path from "path";
 import { registerOpenFileCommands } from "./commands/openFile";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
-import { registerNewModuleCommand } from "./commands/newModule";
 import {
   ENGINES,
   defaultSessionRunUi,
@@ -58,7 +57,6 @@ import {
   setRoleModel,
   setTransport,
 } from "./commands/configurationCommands";
-import { showImpact } from "./commands/showImpact";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 import { productionRouter } from "./router/host";
 
@@ -372,11 +370,6 @@ export function activate(context: vscode.ExtensionContext): void {
         ),
       ),
     ),
-    // What a change under the module would reach: the router's impact plan
-    // for a hypothetical change, shown rather than computed here.
-    vscode.commands.registerCommand("dabblerSolution.showImpact", (node?: SolutionNode) =>
-      showImpact(productionRouter(), { node, projection: solutionProvider.currentProjection() }),
-    ),
     // The four an ABSENT row has: a row that could only say "not on this
     // machine" is where this journey used to end. Each writes through the
     // router -- the extension never authors the declaration itself -- and
@@ -439,9 +432,6 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   safeRegister("cancelLifecycleCommands", () =>
     registerCancelLifecycleCommands(context, { refreshView: refreshAll }),
-  );
-  safeRegister("newModuleCommand", () =>
-    registerNewModuleCommand(context, { refreshView: refreshAll }),
   );
   safeRegister("bootstrapProjectCommand", () =>
     registerBootstrapProjectCommand(context, { refreshView: refreshAll }),

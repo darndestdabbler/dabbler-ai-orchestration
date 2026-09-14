@@ -10,6 +10,64 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.0.0] — 2026-09-14
+
+**The build files are the solution.** Sessions 170, 171 and 172 removed the
+module machinery a solution had to be declared into. Every session runs in
+the repository you opened, a sibling is a project reference, and the
+Solution Explorer reads the `.slnx`, `.sln`, `.csproj` and `pom.xml` files
+you already have. A major release, because every one of the removals below is
+a command, a button or a declaration somebody may still be using.
+
+### Removed
+
+- **Focused sessions.** No focused checkout, no module grants, no exposure
+  gate, no Open Module, Start Focused Session, End Grant or Start Session in
+  a New Window. `session start --module/--focused/--global` and
+  `session next --request-grant` are gone.
+- **Module packs and in-repository packages.** No `dabbler module pack`,
+  `candidate` or `contract`, no candidate job before the run of record, no
+  `packages/` feed, no sibling pins and no `pins_current` gate. Pack Module,
+  and the Contract and Bundles rows, are gone from the extension.
+- **Contract pages.** `modules create --contract` and `contractdoc --module`
+  are gone; `dabbler contractdoc <file>` still renders a contract file.
+- **`docs/modules.yaml`.** The framework neither reads nor writes it:
+  `dabbler modules create` and `modules show`, the New Module and Show Impact
+  commands, bootstrap's one-module manifest, the plan's `modules` paragraph,
+  `session declare --module`, `deployables:`, `sharedFiles`, a suite's
+  `module` and `against`, and module-based test selection are all gone.
+
+### Changed
+
+- **The Solution Explorer reads the build files.** Each project is a row
+  with its kind — service, worker, application, test project or library —
+  what it references and what references it, for .NET (the root `.slnx` or
+  `.sln`, or every `.csproj`) and Maven (the root `pom.xml` and its
+  `<modules>`). A repository with neither is one project: itself.
+- **Every expensive suite runs** as a session's run of record, and the
+  close demands every required one. The verifier's scope is the session's
+  changed files in every session.
+- **The root build files are written from the graph.** Where the build files
+  hold more than one project and the root has no solution file or parent
+  POM, the framework writes them once a session's work is done, before it is
+  verified, and never rewrites them.
+
+### What a repository that has them keeps
+
+Everything, unread. A `docs/modules.yaml`, a `packages/` folder, contract
+folders, a `modules:` block in `dabbler.yaml` and a suite's `module` or
+`against` stay exactly where they are. `dabbler session start` prints one
+line for each declaration it finds that is no longer read, and refuses
+nothing. Recorded plans and declarations that name modules are still
+accepted, and the member is ignored.
+
+### How a sibling is referenced now
+
+A .NET project references its sibling with a `<ProjectReference>`, and both
+projects are listed in the solution file at the root. A Maven module depends
+on its sibling at `${project.version}`, and both are listed under
+`<modules>` in the parent `pom.xml`, built in one reactor run.
+
 ## [2.9.0] — 2026-09-14
 
 **Nothing gets stuck, nothing waits.** The two stops a tutorial met that no

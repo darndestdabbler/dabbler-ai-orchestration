@@ -14,9 +14,8 @@ import {
   upstreamRemote,
 } from "../evidence.ts";
 import { loadSelectionConfig, selectTests } from "../checks.ts";
-import { moduleConfigs, solutionShape } from "../modules.ts";
 import { loadSuitesChecked } from "../testEvidence.ts";
-import { deployableLines, preverifyBaseline, runnableCommands, workingTreeChanges } from "../affected.ts";
+import { preverifyBaseline, runnableCommands, workingTreeChanges } from "../affected.ts";
 import { dumps } from "../pythonJson.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -147,25 +146,8 @@ export async function affectedVerb(argv: string[]): Promise<number> {
     return EXIT_USAGE;
   }
 
-  // The module form, when the manifest declares more than one module: the
-  // shape, the suites with their module fields, and each module's shared
-  // files. A single-module repository hands the selector nothing extra and
-  // gets the file form it always had.
-  const shape = solutionShape(repoRoot);
-  const declaredSuites = loadSuitesChecked(config, { shape }).suites;
-  const moduleContext = shape.multi
-    ? {
-        shape,
-        suites: declaredSuites,
-        sharedFiles: new Map(
-          [...moduleConfigs(config, shape.modules).values()].map((entry) => [
-            entry.slug,
-            entry.sharedFiles,
-          ]),
-        ),
-      }
-    : null;
-  const result = selectTests(repoRoot, changed, loaded.config, moduleContext);
+  const declaredSuites = loadSuitesChecked(config).suites;
+  const result = selectTests(repoRoot, changed, loaded.config);
   if (json) {
     writeOut(dumps(result.toDict(), { indent: 2 }) + "\n");
     return EXIT_OK;
@@ -191,29 +173,11 @@ export async function affectedVerb(argv: string[]): Promise<number> {
     writeOut(lines.join(""));
     return EXIT_OK;
   }
-  // The modules the change reached, and the suites it selects whole --
-  // each with why: the module's own change, or a consumer's contract
-  // against it.
-  if (result.modules.length > 0) lines.push(`modules: ${result.modules.join(", ")}\n`);
-  // What the change reaches on the way out: the deployables the modules it
-  // touched feed, and the declared ones nothing ships yet. Both are
-  // statements about the solution's shape, and neither gates anything.
-  for (const line of deployableLines(shape.deployables, result.modules)) lines.push(`${line}\n`);
-  // The rest of the plan: the paths no module owns, which the plan reaches
-  // nothing for.
-  if (result.impact !== null && result.impact.unowned.length > 0) {
-    lines.push(`unowned: ${result.impact.unowned.join(", ")} (no module's roots or shared files hold these)\n`);
-  }
-  for (const suite of result.suites) {
-    lines.push(
-      `  ${pad(suite.reason, 22)} suite ${suite.name} (${suite.module})  <- ${suite.selectedBy}\n`,
-    );
-  }
   for (const risk of result.risks) lines.push(`  RISK ${risk.kind}: ${risk.path}\n`);
   for (const choice of result.selected) {
     lines.push(`  ${pad(choice.reason, 22)} ${choice.path}  <- ${choice.selectedBy}\n`);
   }
-  if (result.selected.length === 0 && result.suites.length === 0) {
+  if (result.selected.length === 0) {
     lines.push("no tests affected by this change set\n");
     writeOut(lines.join(""));
     return EXIT_OK;

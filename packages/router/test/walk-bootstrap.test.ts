@@ -23,11 +23,8 @@ import {
   detectPackaging,
 } from "../src/bootstrap/index.ts";
 import { bootstrapVerb } from "../src/cli/bootstrap.ts";
-import { sessionsDirFor } from "../src/evidence.ts";
-import { materialWorktreeChanges } from "../src/gates.ts";
 import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/packaging.ts";
 import { capture } from "../src/output.ts";
-import { solutionShape } from "../src/modules.ts";
 import { CATALOG_FILENAME } from "../src/catalog.ts";
 import { RECORD_CATALOG } from "../src/discovery.ts";
 import { git, gitOut, makeRepo, scratchDir, writeFiles } from "./support/repo.ts";
@@ -141,13 +138,8 @@ describe("a project on its first day", () => {
     milestones.push("what it would publish is readable, and undeclared");
 
     // --- what the Solution Explorer renders --------------------------------
-    // The view was empty in every new project and explained nothing. A fresh
-    // repository IS a one-module solution, and one module is the shape in
-    // which nothing module-shaped switches on.
-    const shape = solutionShape(repo);
-    assert.equal(shape.multi, false);
-    assert.equal(shape.modules.length, 1);
-    assert.equal(shape.modules[0]?.kind, "application");
+    // The view was empty in every new project and explained nothing. The
+    // projection reads the build files from the first minute.
     assert.ok(existsSync(join(repo, ".dabbler", "solution", "solution.json")));
     milestones.push("the Explorer has something to render");
 
@@ -194,32 +186,6 @@ describe("a project on its first day", () => {
       "setup committed its own work",
       "a release names nothing, because nothing declares a version",
     ]);
-  });
-
-  it("commits the modules manifest the operator declared before running it", async () => {
-    // The order both walkthroughs teach: declare the modules, then set the
-    // project up. The manifest is on disk and untracked when bootstrap
-    // runs, so it is in nothing bootstrap wrote -- and session 1 is then
-    // refused by the very tree this command has just called clean.
-    const repo = makeRepo(PROJECT, { origin: true });
-    writeFiles(repo, {
-      "docs/modules.yaml":
-        "modules:\n- slug: acme-csv\n  title: acme-csv\n  kind: application\n  codeRoots:\n  - '.'\n",
-    });
-    assert.equal(
-      gitOut(repo, "status", "--porcelain", "--", "docs/modules.yaml").trim(),
-      "?? docs/modules.yaml",
-    );
-
-    const setup = await capture(() =>
-      bootstrapVerb(["--project-dir", repo]),
-    );
-    assert.equal(setup.value, 0, setup.stderr);
-
-    assert.match(gitOut(repo, "show", "--name-only", "--format=", "HEAD"), /docs\/modules\.yaml/);
-    // And the sentence it prints about session 1 is true of the tree it is
-    // standing in, which is the whole of what was wrong.
-    assert.deepEqual(materialWorktreeChanges(sessionsDirFor(repo)).paths, []);
   });
 
   it("records the remote it is given and leaves the branch tracking it", async () => {

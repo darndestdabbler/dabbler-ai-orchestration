@@ -140,47 +140,6 @@ write(
 `,
 );
 
-// ---------------------------------------------------------------------------
-// The manifest -- the file that makes this a multi-module solution
-// ---------------------------------------------------------------------------
-
-// Key names are the SHIPPED ones: codeRoots and dependsOn, not `roots:` or
-// `depends_on:` -- the manifest reader refuses an unknown key rather than
-// ignoring it.
-write(
-  "docs/modules.yaml",
-  `# The CSV solution, as declared. Four modules, one repository.
-#
-# 'dependsOn' is the only direction anyone writes; who depends on a module is
-# derived, because two directions kept by hand disagree eventually and the
-# disagreement is silent.
-modules:
-  - slug: model
-    title: Person model
-    kind: shared-types
-    codeRoots: ['modules/model']
-    package: CsvModel
-  - slug: deserializer
-    title: CSV deserializer
-    kind: library
-    codeRoots: ['modules/deserializer']
-    dependsOn: ['model']
-    package: CsvDeserializer
-  - slug: persister
-    title: Person persistence
-    kind: library
-    codeRoots: ['modules/persister']
-    dependsOn: ['model']
-    package: CsvPersister
-  - slug: app
-    title: CSV watcher application
-    kind: application
-    codeRoots: ['modules/app']
-    dependsOn: ['model', 'deserializer', 'persister']
-    package: CsvWatcher
-`,
-);
-
 write(
   "dabbler.yaml",
   `# What this repository declares about itself.
@@ -245,9 +204,8 @@ write(
   "docs/sessions/session-plan.md",
   `# Session plan -- the CSV solution
 
-Each session names the one module it works in. A session that must change two
-modules names both, and the framework runs both modules' suites as its run of
-record.
+Each session names the one module it works in, and every session runs in the
+whole repository with every expensive suite as its run of record.
 
 ### Session 1 of 4: The Person model
 

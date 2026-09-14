@@ -30,7 +30,6 @@ import {
   validateRun,
   validateReport,
   validateWorkPlan,
-  judgeWorkPlanModules,
   judgeWorkPlanHold,
   judgeWorkPlanNonGoals,
   watcherReading,
@@ -233,26 +232,9 @@ describe("the four answer schemas", () => {
     assert.throws(() => validateWorkPlan({ ...PLAN, non_goals: [] }), /non_goals/);
   });
 
-  it("a plan's modules are judged against the solution's shape: declared slugs, any number or none, nothing for one", () => {
-    const shape = (multi: boolean, ...slugs: string[]) =>
-      ({ multi, implicit: false, modules: slugs.map((slug) => ({ slug })) }) as unknown as Parameters<
-        typeof judgeWorkPlanModules
-      >[1];
-    const many = shape(true, "model", "persister", "listener");
-    const plan = validateWorkPlan(PLAN);
-    // Two modules need no reason.
-    assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["model", "persister"] }, many), []);
-    // An undeclared slug is refused by name.
-    assert.match(judgeWorkPlanModules({ ...plan, modules: ["ghost"] }, many)[0] ?? "", /module 'ghost', which docs\/modules\.yaml does not declare/);
-    assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["persister"] }, many), []);
-    // A multi-module plan may name no module: the whole repository.
-    assert.deepEqual(judgeWorkPlanModules(plan, many), []);
-    // A single-module solution: absent is right, its own module is
-    // tolerated, another name is refused.
-    const one = shape(false, "csv-model");
-    assert.deepEqual(judgeWorkPlanModules(plan, one), []);
-    assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["csv-model"] }, one), []);
-    assert.match(judgeWorkPlanModules({ ...plan, modules: ["other"] }, one)[0] ?? "", /single-module/);
+  it("still accepts a recorded plan that names modules, and reads nothing from them", () => {
+    const recorded = validateWorkPlan({ ...PLAN, modules: ["model", "persister"], reason: "both" });
+    assert.deepEqual(recorded.steps, validateWorkPlan(PLAN).steps);
   });
 
   it("reads a run the focused checkout wrote, suites owed elsewhere and all", () => {

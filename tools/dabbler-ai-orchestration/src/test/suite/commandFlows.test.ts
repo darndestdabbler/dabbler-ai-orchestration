@@ -6,8 +6,6 @@ import {
   runCancelSessionFlow,
   runRestoreSessionFlow,
 } from "../../commands/cancelLifecycleCommands";
-import { NewModuleUi, runNewModuleFlow } from "../../commands/newModule";
-import { ShowImpactUi, showImpact } from "../../commands/showImpact";
 import {
   cloneRepository,
   createRepository,
@@ -121,57 +119,6 @@ suite("cancel/restore flows", () => {
     const refreshed = await runRestoreSessionFlow(CANCELLABLE, ui, fakeRouter(0).router);
     assert.strictEqual(refreshed, true);
     assert.ok(infos[0].includes("session 3"));
-  });
-});
-
-suite("new module flow", () => {
-  function moduleUi(
-    answers: Array<string | undefined>,
-    root: string | undefined,
-  ): { ui: NewModuleUi; errors: string[]; infos: string[] } {
-    const errors: string[] = [];
-    const infos: string[] = [];
-    let call = 0;
-    return {
-      ui: {
-        showInputBox: (async () => answers[call++]) as NewModuleUi["showInputBox"],
-        showInformationMessage: (m: string) => infos.push(m),
-        showErrorMessage: (m: string) => errors.push(m),
-        workspaceRoot: () => root,
-      },
-      errors,
-      infos,
-    };
-  }
-
-  test("creates the module and tells the operator how to use it", async () => {
-    // Slug, title, kind and depends-on; Enter past the last two takes the
-    // manifest's defaults, a library that depends on nothing.
-    const { ui, infos } = moduleUi(["greeter", "Greeter", "", ""], "D:\\ws");
-    const created = await runNewModuleFlow(ui, fakeRouter(0).router);
-    assert.strictEqual(created, true);
-    assert.ok(infos[0].includes("greeter"));
-  });
-
-  test("no workspace folder is an error, not a crash", async () => {
-    const { ui, errors } = moduleUi([], undefined);
-    assert.strictEqual(await runNewModuleFlow(ui, unusableRouter()), false);
-    assert.ok(errors[0].includes("workspace"));
-  });
-
-  test("cancelling either input aborts silently", async () => {
-    const { ui, errors } = moduleUi([undefined], "D:\\ws");
-    assert.strictEqual(await runNewModuleFlow(ui, unusableRouter()), false);
-    assert.strictEqual(errors.length, 0);
-  });
-
-  test("a duplicate-slug refusal from the CLI surfaces as an error", async () => {
-    const { ui, errors } = moduleUi(["dupe", "", "", ""], "D:\\ws");
-    assert.strictEqual(
-      await runNewModuleFlow(ui, fakeRouter(1, 'module "dupe" already exists').router),
-      false,
-    );
-    assert.ok(errors[0].includes("dupe"));
   });
 });
 
@@ -1068,46 +1015,6 @@ suite("Resume Session", () => {
     const idle = driveUi();
     assert.strictEqual(await runResumeSession({ ...repository, currentSession: null }, idle.ui, "D:\\ext\\dabbler.cjs"), false);
     assert.strictEqual(idle.terminals.length, 0);
-  });
-});
-
-suite("Show Impact", () => {
-  const multi: Projection = {
-    solution: { name: "csv-pipeline", title: "csv-pipeline", multi: true, implicit: false, moduleCount: 2 },
-    modules: [
-      { slug: "model", title: "model", kind: "shared-types", package: "CsvModel", codeRoots: ["modules/model"], dependsOn: [], usedBy: ["persister"] },
-      { slug: "persister", title: "persister", kind: "library", package: "CsvPersister", codeRoots: ["modules/persister"], dependsOn: ["model"], usedBy: [] },
-    ],
-  };
-
-  test("Show Impact plans a hypothetical change under the module's roots and shows the router's plan, or its refusal", async () => {
-    const plan =
-      "scope: a hypothetical change of modules/persister\n" +
-      "modules: persister\n" +
-      "  module-changed         suite persister-unit (persister)  <- modules/persister\n";
-    const answered = fakeRouter(0, plan);
-    const logged: string[] = [];
-    const infos: string[] = [];
-    const warnings: string[] = [];
-    const ui: ShowImpactUi = {
-      showInformationMessage: (m: string) => infos.push(m),
-      showWarningMessage: (m: string) => warnings.push(m),
-      log: (text: string) => logged.push(text),
-      workspaceRoot: () => "D:\\ws\\csv-pipeline",
-    };
-    await showImpact(answered.router, { node: { kind: "module", slug: "persister" }, projection: multi }, ui);
-    // The router was asked for the module's roots, and its answer is shown whole and in brief.
-    assert.deepStrictEqual(answered.affectedOptions.map((o) => o.paths), [["modules/persister"]]);
-    assert.strictEqual(logged.length, 1);
-    assert.ok(logged[0].includes("module-changed         suite persister-unit"));
-    assert.strictEqual(infos.length, 1);
-    assert.ok(infos[0].startsWith("persister: modules: persister · module-changed"), infos[0]);
-    assert.deepStrictEqual(warnings, []);
-
-    const refused = fakeRouter(1, "affected: testing.selection is malformed: rules[0] names no test");
-    await showImpact(refused.router, { node: { kind: "module", slug: "persister" }, projection: multi }, ui);
-    assert.deepStrictEqual(warnings, ["affected: testing.selection is malformed: rules[0] names no test"]);
-    assert.strictEqual(infos.length, 1);
   });
 });
 

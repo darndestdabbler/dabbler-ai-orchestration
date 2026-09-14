@@ -65,11 +65,11 @@ export type DriverWorkPlan = {
   }[];
   recorded_at: string;
   /**
-   * The module(s) this session works in, by slug from docs/modules.yaml. Judged at acceptance against the solution's shape: in a multi-module solution the plan names at least one declared module and, when it names more than one, says why in `reason`; a single-module solution leaves it out, because its repository is the module. Absent in every session of a single-module repository.
+   * Read by nothing. A plan recorded while docs/modules.yaml was read may name the module(s) it worked in; it is accepted and the member ignored, and the plan ask no longer mentions it.
    */
   modules?: string[];
   /**
-   * Why this session touches the modules it names. Optional and read by nothing: a session names as many modules as its work touches without giving a reason, and the member stays so a plan recorded while it was required is still read.
+   * Read by nothing. The member stays so a plan recorded while it was asked for is still read.
    */
   reason?: string;
 };

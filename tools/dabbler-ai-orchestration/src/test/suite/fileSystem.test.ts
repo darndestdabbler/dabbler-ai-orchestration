@@ -6,7 +6,6 @@ import {
   scanRepositories,
   sessionsDirOf,
 } from "../../utils/fileSystem";
-import { readModuleSlugs } from "../../utils/moduleAuthoring";
 import { ProjectionCache } from "../../utils/projection";
 import { makeProjection, makeTempDir, rmrf, writeFileTree } from "./helpers";
 
@@ -18,28 +17,6 @@ function setWorkspaceFolders(roots: string[]): void {
   (vscode.workspace as unknown as StubWorkspace).workspaceFolders =
     roots.length > 0 ? roots.map((r) => ({ uri: { fsPath: r } })) : undefined;
 }
-
-suite("fileSystem: module manifest slugs", () => {
-  let dir: string;
-  setup(() => (dir = makeTempDir("dabbler-man-")));
-  teardown(() => rmrf(dir));
-
-  test("an absent, invalid or listless manifest reads as no slugs", () => {
-    assert.deepStrictEqual(readModuleSlugs(dir), []);
-    writeFileTree(dir, { "docs/modules.yaml": "modules: [unclosed" });
-    assert.deepStrictEqual(readModuleSlugs(dir), []);
-    writeFileTree(dir, { "docs/modules.yaml": "something: else\n" });
-    assert.deepStrictEqual(readModuleSlugs(dir), []);
-  });
-
-  test("slugs keep file order and drop duplicates", () => {
-    writeFileTree(dir, {
-      "docs/modules.yaml":
-        "modules:\n  - slug: beta\n  - slug: alpha\n  - slug: beta\n",
-    });
-    assert.deepStrictEqual(readModuleSlugs(dir), ["beta", "alpha"]);
-  });
-});
 
 suite("fileSystem: workspace scan", () => {
   let root: string;

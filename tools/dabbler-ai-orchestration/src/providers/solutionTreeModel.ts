@@ -2,7 +2,7 @@
 // can drive it.
 //
 // This file renders; it never decides. The projection is written by the
-// router (`projection.ts`) from the module manifest and the sibling
+// router (`projection.ts`) from the build files and the sibling
 // repositories' declarations, and every derived fact -- dependency order,
 // who uses whom -- is derived there. Two
 // implementations of one rule disagree eventually, and the disagreement
@@ -11,33 +11,25 @@
 export interface ProjectionSolution {
   name: string;
   title: string;
-  /** More than one module declared: the shape in which the module machinery is on. */
-  multi: boolean;
-  /** No manifest at all: the repository is taken to be the one module. */
-  implicit: boolean;
-  moduleCount: number;
+  /** "dotnet", "maven", or null for a repository with neither. */
+  ecosystem?: string | null;
+  projectCount: number;
 }
 
 /**
- * One module, as the manifest declares it and the router derives the rest.
+ * One project, as its build file declares it and the router derives the rest.
  *
- * `usedBy` is derived from every other module's `dependsOn` and written
+ * `usedBy` is derived from every other project's references and written
  * nowhere.
  */
-export interface ProjectionModule {
-  slug: string;
-  title: string;
+export interface ProjectionProject {
+  name: string;
+  /** The build file, repository-relative; `.` for a repository that is one project. */
+  path: string;
+  /** service, worker, application, test or library. */
   kind: string;
-  package?: string | null;
-  codeRoots: string[];
   dependsOn: string[];
   usedBy: string[];
-  /** The session working in this module right now, or null. */
-  inSession?: number | null;
-  /** The latest run of record of the module's suites: green, red, or none recorded. */
-  runOfRecord?: "green" | "red" | "none";
-  /** Consumers whose contract suite against this module is red. */
-  blocking?: string[];
 }
 
 export interface ProjectionExternal {
@@ -312,7 +304,7 @@ export interface ProjectionConfiguration {
 export interface Projection {
   solution: ProjectionSolution;
   /** In dependency order, as the router projects them. */
-  modules: ProjectionModule[];
+  projects: ProjectionProject[];
   external?: ProjectionExternal[];
   members?: ProjectionMember[];
   /** What a session is run with; absent in a projection written before it existed. */
@@ -329,11 +321,11 @@ export type ConfigRoleName = "authoring" | "primaryReviewer" | "auxiliaryReviewe
 
 export type SolutionNode =
   | { kind: "solution" }
-  | { kind: "module"; slug: string }
-  | { kind: "dependsOn"; slug: string }
-  | { kind: "dependency"; slug: string; dependency: string }
-  | { kind: "usedBy"; slug: string }
-  | { kind: "consumer"; slug: string; consumer: string }
+  | { kind: "project"; name: string }
+  | { kind: "dependsOn"; name: string }
+  | { kind: "dependency"; name: string; dependency: string }
+  | { kind: "usedBy"; name: string }
+  | { kind: "consumer"; name: string; consumer: string }
   | { kind: "externalGroup" }
   | { kind: "external"; id: string }
   | { kind: "externalUsedBy"; id: string }
@@ -375,8 +367,13 @@ export interface RowDescriptor {
   command?: string;
 }
 
-function find(p: Projection, slug: string): ProjectionModule | undefined {
-  return p.modules.find((m) => m.slug === slug);
+/** The projection's projects; a document an older router wrote carries none. */
+function projects(p: Projection): ProjectionProject[] {
+  return p.projects ?? [];
+}
+
+function find(p: Projection, name: string): ProjectionProject | undefined {
+  return projects(p).find((project) => project.name === name);
 }
 
 export function rootNodes(): SolutionNode[] {
@@ -572,8 +569,8 @@ function members(p: Projection): ProjectionMember[] {
   return p.members ?? [];
 }
 
-/** What the solution row says under its title when it has no module rows to show. */
-export const NO_MODULES_YET = "no modules yet — session 1 writes the solution plan";
+/** What the solution row says under its title when it has no project rows to show. */
+export const NO_PROJECTS_YET = "no projects yet — session 1 writes the solution plan";
 
 /**
  * The document the tree renders, relative to a repository root.
@@ -589,37 +586,28 @@ export const PROJECTION_RELPATH = ".dabbler/solution/solution.json";
  * Every file whose change can change what this tree shows.
  *
  * The projection is DERIVED, and it is written by the commands that move a
- * declaration: `modules create`, the `deps` verbs that place a repository,
- * `bootstrap`, and the driver when a plan asks for one. Nothing rewrites it
- * when the declarations underneath it move by hand -- a module added to the
- * manifest in an editor, a sibling cloned, a version bumped in a build file
- * -- so the view spent a whole session showing what was true when the last
- * event was recorded.
- *
- * Watching only the projection cannot fix that: an event on a file nothing
- * rewrote re-reads the same bytes. These are the inputs, and a change to one
+ * declaration: the `deps` verbs that place a repository, `bootstrap`, and the
+ * driver as a session moves. Nothing rewrites it when the files underneath
+ * it move by hand -- a project added in an editor, a sibling cloned, a
+ * version bumped in a build file -- so those are watched, and a change to one
  * of them is what the tree re-derives on.
  *
  * Repository-relative glob patterns, because that is what the watcher takes:
  *
- * - `docs/modules.yaml` -- what this repository builds: every module row,
- *   the dependency order and who uses whom.
+ * - the solution and project files -- every project row, the dependency
+ *   order, who references whom, and the pins the drift rows read.
  * - `solution-dependencies.json` -- who produces what it consumes, and the
  *   membership rows, which come from nowhere else.
- * - the build files -- the PIN is read from them on every projection rather
- *   than copied, so the drift rows change when they do.
  *
  * The projection itself is deliberately absent: it is this list's output,
  * and re-deriving on it would be a loop.
  */
 export const PROJECTION_SOURCE_GLOBS: readonly string[] = [
-  "docs/modules.yaml",
-  "solution-dependencies.json",
+  "**/*.sln",
+  "**/*.slnx",
   "**/*.csproj",
   "**/pom.xml",
-  // The modules in play: the in-flight row of this root's ledger moves the
-  // module rows' mark, and never touches the projection file itself.
-  "docs/sessions/sessions.json",
+  "solution-dependencies.json",
 ];
 
 /** Where a producing repository is, as three states rather than two. */
@@ -673,11 +661,11 @@ function locationNote(e: ProjectionExternal, at: ExternalLocation): string {
 export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
   switch (node.kind) {
     case "solution": {
-      // The router's order is dependency order: a module after everything
-      // it depends on, the application that composes the others last.
-      const own: SolutionNode[] = p.modules.map((m) => ({
-        kind: "module" as const,
-        slug: m.slug,
+      // The router's order is dependency order: a project after everything
+      // it references.
+      const own: SolutionNode[] = projects(p).map((project) => ({
+        kind: "project" as const,
+        name: project.name,
       }));
       // Only when there is something to say. An empty folder is a row the
       // reader has to open to learn nothing.
@@ -745,33 +733,31 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
         repository,
       })));
     }
-    case "module": {
-      const m = find(p, node.slug);
+    case "project": {
+      const m = find(p, node.name);
       if (!m) return [];
       const out: SolutionNode[] = [];
-      // Each child only when there is something to say. A single-module
-      // solution -- the repository as the module -- shows one row and
-      // nothing under it, which is the shape in which nothing module-shaped
-      // has switched on.
-      if (m.dependsOn.length > 0) out.push({ kind: "dependsOn", slug: m.slug });
-      if (m.usedBy.length > 0) out.push({ kind: "usedBy", slug: m.slug });
+      // Each child only when there is something to say: a project that
+      // references nothing and that nothing references is one row.
+      if (m.dependsOn.length > 0) out.push({ kind: "dependsOn", name: m.name });
+      if (m.usedBy.length > 0) out.push({ kind: "usedBy", name: m.name });
       return out;
     }
     case "dependsOn": {
-      const m = find(p, node.slug);
+      const m = find(p, node.name);
       if (!m) return [];
       return m.dependsOn.map((dependency) => ({
         kind: "dependency" as const,
-        slug: node.slug,
+        name: node.name,
         dependency,
       }));
     }
     case "usedBy": {
-      const m = find(p, node.slug);
+      const m = find(p, node.name);
       if (!m) return [];
       return m.usedBy.map((consumer) => ({
         kind: "consumer" as const,
-        slug: node.slug,
+        name: node.name,
         consumer,
       }));
     }
@@ -781,8 +767,10 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
 }
 
 const KIND_ICONS: Record<string, string> = {
+  service: "server-process",
+  worker: "sync",
   application: "layers",
-  "shared-types": "symbol-structure",
+  test: "beaker",
   library: "package",
 };
 
@@ -805,107 +793,80 @@ export function descriptorFor(
   switch (node.kind) {
     case "solution": {
       const s = p.solution;
-      const count = p.modules.length;
+      const count = projects(p).length;
       return {
         id: `solution:${s.name}`,
         label: s.title,
-        description:
-          count === 0 ? NO_MODULES_YET : s.multi ? `${count} modules` : "one module",
+        description: count === 0 ? NO_PROJECTS_YET : count === 1 ? "one project" : `${count} projects`,
         tooltip:
           count === 0
-            ? "Nothing is declared yet. Session 1 writes the solution plan, and the " +
-              "modules appear here from docs/modules.yaml."
-            : s.multi
-              ? "What this solution is built from, in dependency order."
-              : "The repository is the module. A second entry in docs/modules.yaml is " +
-                "what switches the module machinery on.",
+            ? "Nothing is built yet. Session 1 writes the solution plan, and the projects " +
+              "appear here as their build files are written."
+            : "What this solution is built from, read from its build files, in dependency order.",
         icon: { id: "project" },
         expandable: true,
         contextValue: "dabblerSolution",
       };
     }
-    case "module": {
-      const m = find(p, node.slug);
+    case "project": {
+      const m = find(p, node.name);
       if (!m) {
-        return { id: `module:${node.slug}`, label: node.slug, expandable: false };
+        return { id: `project:${node.name}`, label: node.name, expandable: false };
       }
-      const bits: string[] = [];
-      // The session working here right now leads the row: it is the thing
-      // a person scanning the tree is looking for, in either window.
-      const active = typeof m.inSession === "number";
-      if (active) bits.push(`● session ${m.inSession}`);
-      bits.push(m.kind);
-      bits.push(m.package ? `package: ${m.package}` : "no package");
-      // The run of record reads on the row, from the records and never from
-      // a claim: green, red, or none where nothing has been recorded.
-      if (m.runOfRecord !== undefined && p.solution.multi) bits.push(`run of record: ${m.runOfRecord}`);
-      const tone = active
-        ? ("milestone" as const)
-        : m.runOfRecord === "red"
-          ? ("attention" as const)
-          : m.runOfRecord === "green"
-            ? ("done" as const)
-            : undefined;
       return {
-        id: `module:${m.slug}`,
-        label: m.slug,
-        description: bits.join(" · "),
-        tooltip: active
-          ? `${m.title} — session ${m.inSession} is working here.`
-          : m.runOfRecord === "red"
-            ? `${m.title} — its latest run of record is red.`
-            : m.title,
-        icon: { id: KIND_ICONS[m.kind] ?? "package", ...(tone === undefined ? {} : { tone }) },
+        id: `project:${m.name}`,
+        label: m.name,
+        description: m.path === "." ? m.kind : `${m.kind} · ${m.path}`,
+        tooltip:
+          m.path === "."
+            ? "No build file was found, so the repository is its one project."
+            : m.path,
+        icon: { id: KIND_ICONS[m.kind] ?? "package" },
         expandable: childrenOf(node, p).length > 0,
-        contextValue: `dabblerModule:${m.kind}` + (active ? ";active" : ""),
+        contextValue: `dabblerProject:${m.kind}`,
       };
     }
     case "dependsOn": {
-      const m = find(p, node.slug);
+      const m = find(p, node.name);
       const n = m ? m.dependsOn.length : 0;
       return {
-        id: `dependsOn:${node.slug}`,
+        id: `dependsOn:${node.name}`,
         label: "Depends on",
         description: `${n}`,
-        tooltip: "What this module consumes, as its manifest entry declares.",
+        tooltip: "The projects this one references, as its build file declares.",
         icon: { id: "arrow-down" },
         expandable: n > 0,
       };
     }
     case "dependency":
       return {
-        id: `dependency:${node.slug}:${node.dependency}`,
+        id: `dependency:${node.name}:${node.dependency}`,
         label: node.dependency,
         icon: { id: "arrow-small-right", tone: "muted" },
         expandable: false,
       };
     case "usedBy": {
-      const m = find(p, node.slug);
+      const m = find(p, node.name);
       const n = m ? m.usedBy.length : 0;
       return {
-        id: `usedBy:${node.slug}`,
+        id: `usedBy:${node.name}`,
         label: "Used by",
         description: `${n}`,
         // The line nobody can get anywhere else, and the reason people are
-        // willing to change a module instead of adding one beside it.
-        // Derived from every other module's dependsOn, never declared.
-        tooltip: "These break if this contract changes.",
+        // willing to change a project instead of adding one beside it.
+        // Derived from every other project's references, never declared.
+        tooltip: "These break if this project changes.",
         icon: { id: "references" },
         expandable: n > 0,
       };
     }
-    case "consumer": {
-      // A consumer whose contract suite against this producer is red is
-      // blocked by the producer, and says so on the row.
-      const blocked = (find(p, node.slug)?.blocking ?? []).includes(node.consumer);
+    case "consumer":
       return {
-        id: `consumer:${node.slug}:${node.consumer}`,
+        id: `consumer:${node.name}:${node.consumer}`,
         label: node.consumer,
-        ...(blocked ? { description: "blocking", tooltip: `${node.consumer}'s contract suite against ${node.slug} is red.` } : {}),
-        icon: { id: blocked ? "warning" : "arrow-small-right", tone: blocked ? "attention" : "muted" },
+        icon: { id: "arrow-small-right", tone: "muted" },
         expandable: false,
       };
-    }
     case "externalGroup": {
       const rows = externals(p);
       const drifting = rows.filter((e) => e.driftKind !== null && e.driftKind !== undefined);

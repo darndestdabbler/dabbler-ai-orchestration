@@ -247,17 +247,12 @@ export const PLAN_PROMPT =
   "  it concise — session 2 turns each into numbered sessions, so scope each\n" +
   "  to a handful of focused AI sessions.\n" +
   "\n" +
-  "Then declare the modules in `docs/modules.yaml` through `dabbler modules\n" +
-  "create` (`--kind`, `--depends-on`, `--package`), one entry\n" +
-  "per module. The bootstrapped manifest already carries one entry naming\n" +
-  "the repository as the module: leave it when one module is the answer.\n" +
-  "When there are several, declare each with `create` and remove the\n" +
-  "placeholder entry by hand -- no verb removes one. Who depends on a\n" +
-  "module is derived from `dependsOn`, never written. A module reaches a\n" +
-  "sibling by project reference: a `<ProjectReference>` with both projects\n" +
-  "listed in the root solution file for .NET, a dependency at\n" +
-  "`${project.version}` with both modules listed in the parent `pom.xml`\n" +
-  "for Maven.\n" +
+  "Each module is a project in the solution's build files -- a `.csproj`\n" +
+  "listed in the root solution file for .NET, a Maven module listed in the\n" +
+  "parent `pom.xml` -- and reaches a sibling by project reference: a\n" +
+  "`<ProjectReference>` for .NET, a dependency at `${project.version}` for\n" +
+  "Maven. Who depends on a module is read from those references, never\n" +
+  "written. The sessions that build the modules write their projects.\n" +
   "\n" +
   "- **Import:** if the operator points you at an existing plan (a doc, a\n" +
   "  ticket, notes), bring its content into that path in this same shape,\n" +
@@ -278,11 +273,9 @@ export const DECOMPOSITION_PROMPT =
   "should exist at all, whether its contract is a promise something can\n" +
   "prove, and whether the dependency direction is the one that hides the\n" +
   "decisions most likely to change; where the plan deferred a cut, decide it\n" +
-  "or say why it stays deferred. Record the answers in the plan's rationale\n" +
-  "and, where a module changes, in `docs/modules.yaml`. Then decompose the\n" +
-  "plan into a sequence of numbered sessions. Each session is a focused unit\n" +
-  "of work that one AI coding session can complete, and each names ONE\n" +
-  "module.\n" +
+  "or say why it stays deferred. Record the answers in the plan's rationale.\n" +
+  "Then decompose the plan into a sequence of numbered sessions. Each\n" +
+  "session is a focused unit of work that one AI coding session can complete.\n" +
   "\n" +
   "Append the sessions to `docs/sessions/session-plan.md`, under its\n" +
   "`## Sessions` heading. There is no level above a session: no sets, no\n" +
@@ -299,10 +292,6 @@ export const DECOMPOSITION_PROMPT =
   "  only tests that run before the round are each step's own checks; never\n" +
   "  write a step that says \"run the tests\" without saying which run it\n" +
   "  means.\n" +
-  "- **Modules.** Where `docs/modules.yaml` declares more than one module, a\n" +
-  "  session may say which modules it touches, as many as that is, or none:\n" +
-  "  every session runs in the whole repository. With one module declared\n" +
-  "  there is nothing to name.\n" +
   "- A session may declare `Policy: fast` or `Policy: verified` on its own\n" +
   "  line; omitting it uses the repository default.\n" +
   "- Do NOT hand-author `sessions.json`: the first `session start` bootstraps\n" +
@@ -352,22 +341,18 @@ export const BOOTSTRAP_PLAN =
   "   feature areas with their key deliverables, each scoped to a handful of\n" +
   "   focused AI sessions. A repository that already has\n" +
   "   `docs/planning/project-plan.md` amends that file instead.\n" +
-  "3. Declare the modules in `docs/modules.yaml` through `dabbler modules\n" +
-  "   create`. The manifest already names this repository as its one\n" +
-  "   module: leave it when one module is the answer; when there are\n" +
-  "   several, declare each and remove the placeholder entry by hand. Who\n" +
-  "   depends on a module is derived, never written. A module reaches a\n" +
-  "   sibling by project reference: a `<ProjectReference>` with both projects\n" +
-  "   listed in the root solution file for .NET, a dependency at\n" +
-  "   `${project.version}` with both modules listed in the parent `pom.xml`\n" +
-  "   for Maven.\n" +
+  "3. Where the plan has several modules, say in it how each is a project:\n" +
+  "   a `.csproj` listed in the root solution file for .NET, or a Maven module\n" +
+  "   listed in the parent `pom.xml`, each reaching a sibling by project\n" +
+  "   reference -- a `<ProjectReference>`, or a dependency at\n" +
+  "   `${project.version}`. The sessions that build the modules write the\n" +
+  "   projects.\n" +
   "4. Cross-provider verification.\n" +
   "5. Full test suite, recorded as the run of record.\n" +
   "6. Close-out.\n" +
   "\n" +
-  "**Creates:** `docs/planning/solution-plan.md`, and the module manifest as\n" +
-  "the plan decided it. A later revision is just another plan session that\n" +
-  "amends the same files.\n" +
+  "**Creates:** `docs/planning/solution-plan.md`. A later revision is just\n" +
+  "another plan session that amends the same file.\n" +
   "\n" +
   "### Session 2: Challenge the plan, then break it into numbered sessions\n" +
   "\n" +
@@ -378,11 +363,9 @@ export const BOOTSTRAP_PLAN =
   "   module, whether it should exist, whether its contract is a promise\n" +
   "   something can prove, and whether the dependency direction hides the\n" +
   "   decisions most likely to change; decide each deferred cut or say why it\n" +
-  "   stays deferred. Record the answers in the plan's rationale and, where a\n" +
-  "   module changes, in `docs/modules.yaml`.\n" +
-  "3. Break the plan into numbered sessions appended to this file, each\n" +
-  "   saying which modules it touches where the manifest declares more\n" +
-  "   than one. Each session is a focused unit of\n" +
+  "   stays deferred. Record the answers in the plan's rationale.\n" +
+  "3. Break the plan into numbered sessions appended to this file. Each\n" +
+  "   session is a focused unit of\n" +
   "   work one AI coding session can complete: one\n" +
   "   `### Session <N>: <title>` heading, and its steps as a top-level\n" +
   "   ordered list. Step 1 registers the session; the last steps are\n" +

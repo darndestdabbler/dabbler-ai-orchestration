@@ -11,7 +11,7 @@ import {
   render,
 } from "../contractdoc.ts";
 import { platformNewlines } from "../journal.ts";
-import { consumersOf, solutionShape } from "../modules.ts";
+import { readProjectGraph, usedBy } from "../projectGraph.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_USAGE = 2;
@@ -26,34 +26,22 @@ function usage(): string {
     "options:",
     "  -h, --help            show this help message and exit",
     "  --workspace-root WORKSPACE_ROOT",
-    "                        read docs/modules.yaml from here for the diagram",
+    "                        read the build files from here for the diagram",
     "  -o OUT, --out OUT     write here instead of stdout",
     "",
   ].join("\n");
 }
 
 /**
- * The contract's place in the module graph, from the manifest: the module
- * whose slug or package the contract names, its declared `dependsOn` and
- * its derived consumers. A single-module solution has no graph to draw,
- * and neither does a contract for something the manifest does not declare.
+ * The contract's place in the project graph, from the build files: the
+ * project the contract's component names, what it references and who
+ * references it. A component no build file names has no graph to draw.
  */
 function graphFor(workspaceRoot: string, component: string): ContractGraph | null {
-  let shape;
-  try {
-    shape = solutionShape(workspaceRoot);
-  } catch {
-    return null;
-  }
-  if (!shape.multi) return null;
-  const entry = shape.modules.find(
-    (module) => module.slug === component || module.package === component,
-  );
-  if (entry === undefined) return null;
-  return {
-    dependsOn: [...entry.dependsOn],
-    usedBy: consumersOf(shape.modules, entry.slug),
-  };
+  const graph = readProjectGraph(workspaceRoot);
+  const project = graph.projects.find((entry) => entry.name === component);
+  if (project === undefined) return null;
+  return { dependsOn: [...project.dependsOn], usedBy: usedBy(graph, project.name) };
 }
 
 export function contractdocVerb(argv: string[]): Promise<number> {
@@ -112,7 +100,7 @@ function run(argv: string[]): number {
     throw error;
   }
 
-  // The diagram is a bonus; a missing or single-module manifest draws none.
+  // The diagram is a bonus; a component no build file names draws none.
   const graph = graphFor(workspaceRoot, String(document.component));
 
   const text = render(document, graph);

@@ -10,9 +10,8 @@
 // of a policy nobody checks.
 //
 // Risk flags are never declared by a step's own author. They are derived
-// here, mechanically, from the file envelope and (for the integration-module
-// flag) the repository's own module manifest (`docs/modules.yaml`, read
-// through `modules`) -- a step does not get to say its own work is low-risk.
+// here, mechanically, from the file envelope -- a step does not get to say
+// its own work is low-risk.
 //
 // Whether the work stayed inside its plan is decided the same way:
 // `compareToEnvelope` diffs the working tree against the declared envelope. A
@@ -30,7 +29,6 @@ import {
   atomicWriteJsonIndented,
   sessionRunDir,
 } from "./ledger.ts";
-import { loadEntries } from "./modules.ts";
 import { dumps } from "./pythonJson.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
 import { readText } from "./textfile.ts";
@@ -39,7 +37,6 @@ export const SCHEMA_VERSION = 1;
 export const PLAN_FILENAME = "approved-plan.json";
 
 export const RISK_PUBLIC_INTERFACE = "public-interface";
-export const RISK_INTEGRATION_MODULE = "integration-module";
 export const RISK_SENSITIVE_PATH = "sensitive-path";
 export const RISK_DEPENDENCY_CHANGE = "dependency-change";
 
@@ -250,20 +247,15 @@ export function newPlan(
 /**
  * Validate and atomically replace the plan.
  *
- * Every step's `risk_flags` is recomputed from its `file_envelope` (and, for
- * integration-module, `workspaceRoot`'s manifest) and overwrites whatever the
- * caller supplied -- a step's own author never gets the last word on its own
- * risk. Refused once the plan on disk is approved: `appendAmendment` is the
- * only legal change after that point.
+ * Every step's `risk_flags` is recomputed from its `file_envelope` and
+ * overwrites whatever the caller supplied -- a step's own author never gets
+ * the last word on its own risk. Refused once the plan on disk is approved:
+ * `appendAmendment` is the only legal change after that point.
  */
-export function writePlan(
-  runDir: string,
-  plan: Plan,
-  workspaceRoot: string | null = null,
-): Plan {
+export function writePlan(runDir: string, plan: Plan): Plan {
   const copy = deepCopy(plan);
   for (const step of stepsOf(copy)) {
-    step["risk_flags"] = deriveRiskFlags(stringList(step["file_envelope"]), workspaceRoot);
+    step["risk_flags"] = deriveRiskFlags(stringList(step["file_envelope"]));
   }
   validateSchema(copy);
   const path = join(runDir, PLAN_FILENAME);
@@ -407,7 +399,7 @@ export function appendAmendment(
  * path raises the flag for it, or a supervisor could amend its way out of the
  * review its own risk earns.
  */
-export function effectivePlan(plan: Plan, workspaceRoot: string | null = null): Plan {
+export function effectivePlan(plan: Plan): Plan {
   const folded = deepCopy(plan);
   const byId = new Map<unknown, Record<string, unknown>>();
   for (const step of stepsOf(folded)) {
@@ -432,7 +424,7 @@ export function effectivePlan(plan: Plan, workspaceRoot: string | null = null): 
   }
   for (const stepId of touched) {
     const step = byId.get(stepId)!;
-    step["risk_flags"] = deriveRiskFlags(stringList(step["file_envelope"]), workspaceRoot);
+    step["risk_flags"] = deriveRiskFlags(stringList(step["file_envelope"]));
   }
   return folded;
 }
@@ -624,48 +616,20 @@ function isPublicInterfacePath(path: string): boolean {
   return TOP_LEVEL_MODULE.test(normalizePath(path));
 }
 
-function touchesIntegrationModule(path: string, workspaceRoot: string | null): boolean {
-  if (workspaceRoot === null) return false;
-  let entries;
-  try {
-    entries = loadEntries(workspaceRoot);
-  } catch {
-    // A manifest this router cannot read says nothing about integration,
-    // which is the same answer Python's `except ValueError` gives.
-    return false;
-  }
-  const normalized = normalizePath(path);
-  for (const entry of entries) {
-    if (entry.touches.length === 0) continue;
-    for (const root of entry.codeRoots) {
-      const rootNorm = `${normalizePath(root).replace(/\/+$/, "")}/`;
-      if (normalized.startsWith(rootNorm) || normalized === normalizePath(root)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 /**
- * Risk flags derived mechanically from `fileEnvelope` (repo-relative paths)
- * and, for the integration-module flag, the repository manifest at
- * `workspaceRoot`. Order is fixed so the result is stable.
+ * Risk flags derived mechanically from `fileEnvelope` (repo-relative paths).
+ * Order is fixed so the result is stable. The schema still names
+ * `integration-module`, so a plan recorded while a manifest raised it reads.
  */
-export function deriveRiskFlags(
-  fileEnvelope: readonly string[],
-  workspaceRoot: string | null = null,
-): string[] {
+export function deriveRiskFlags(fileEnvelope: readonly string[]): string[] {
   const flags = new Set<string>();
   for (const path of fileEnvelope) {
     if (isPublicInterfacePath(path)) flags.add(RISK_PUBLIC_INTERFACE);
     if (isSensitivePath(path)) flags.add(RISK_SENSITIVE_PATH);
     if (isDependencyPath(path)) flags.add(RISK_DEPENDENCY_CHANGE);
-    if (touchesIntegrationModule(path, workspaceRoot)) flags.add(RISK_INTEGRATION_MODULE);
   }
   const order = [
     RISK_PUBLIC_INTERFACE,
-    RISK_INTEGRATION_MODULE,
     RISK_SENSITIVE_PATH,
     RISK_DEPENDENCY_CHANGE,
   ];

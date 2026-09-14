@@ -21,7 +21,6 @@ import {
   disputedFindingsBrief,
   idleInstruction,
   judgeRegistration,
-  planModulesMember,
   rewindFromPackaging,
   COMMIT_SUBJECT_WIDTH,
   landCommitMessage,
@@ -39,7 +38,6 @@ import {
 import { rewindPhaseFor } from "../src/gates.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
-import { dependencyOrder, impliedDeployables, parseEntries } from "../src/modules.ts";
 import { gitAnswers } from "./support/answers.ts";
 
 const INSTRUCTION = {
@@ -408,38 +406,6 @@ describe("what the local gate receipt names", () => {
   // that can actually move, which is a fact about a real remote and not
   // about a script. The assertion lives in walk-git-states.test.ts, over a
   // real origin, beside the receipt's deliberate exception.
-});
-
-describe("what the plan instruction asks for", () => {
-  it("names the modules member in a multi-module solution, and nothing in a single-module one", () => {
-    // The Java walk: driver.ts refuses a declaration that names no module,
-    // and the instruction listing the members a plan carries never
-    // mentioned it. An engine answering what it was asked for was refused,
-    // and the second identical refusal is a deadlock.
-    const entries = parseEntries({
-      modules: [
-        { slug: "model", kind: "shared-types" },
-        { slug: "store" },
-        { slug: "app", kind: "application", dependsOn: ["store"] },
-      ],
-    });
-    const many = planModulesMember({
-      multi: true,
-      implicit: false,
-      modules: dependencyOrder(entries),
-      deployables: impliedDeployables(entries),
-    });
-    assert.match(many, /one further member is optional/);
-    assert.match(many, /modules {5}the module\(s\) this session works in/);
-    assert.match(many, /Declared here: model, store, app/);
-    assert.doesNotMatch(many, /reason {6}/);
-
-    const one = parseEntries({ modules: [{ slug: "only" }] });
-    assert.equal(
-      planModulesMember({ multi: false, implicit: false, modules: one, deployables: impliedDeployables(one) }),
-      "",
-    );
-  });
 });
 
 describe("a publish refused on an earlier phase's evidence", () => {

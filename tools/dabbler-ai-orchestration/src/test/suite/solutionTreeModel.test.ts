@@ -6,12 +6,12 @@ import { configurationNode, spawnProgram, tryWriteProjection } from "dabbler-ai-
 import {
   ConfigurationRole,
   ConfigurationVehicle,
-  NO_MODULES_YET,
+  NO_PROJECTS_YET,
   PROJECTION_RELPATH,
   PROJECTION_SOURCE_GLOBS,
   Projection,
   ProjectionConfiguration,
-  ProjectionModule,
+  ProjectionProject,
   childrenOf,
   descriptorFor,
   externalLocation,
@@ -30,140 +30,59 @@ import {
 import type { SessionsRepository } from "../../utils/fileSystem";
 import { makeTempDir, rmrf, writeFileTree } from "./helpers";
 
-/** The CSV pipeline's four modules, as the router projects them: dependency order, usedBy derived. */
-function modules(): ProjectionModule[] {
+/** A CSV service's three projects, as the router projects them: dependency order, usedBy derived. */
+function projects(): ProjectionProject[] {
   return [
-    {
-      slug: "model", title: "CSV model", kind: "shared-types", package: "CsvModel",
-      codeRoots: ["modules/model"], dependsOn: [],
-      usedBy: ["deserializer", "persister", "listener"],
-    },
-    {
-      slug: "deserializer", title: "CSV deserializer", kind: "library", package: "CsvDeserializer",
-      codeRoots: ["modules/deserializer"], dependsOn: ["model"],
-      usedBy: ["listener"],
-    },
-    {
-      slug: "persister", title: "EF Core persister", kind: "library", package: "CsvPersister",
-      codeRoots: ["modules/persister"], dependsOn: ["model"],
-      usedBy: ["listener"],
-    },
-    {
-      slug: "listener", title: "The listener", kind: "application", package: null,
-      codeRoots: ["modules/listener"],
-      dependsOn: ["model", "deserializer", "persister"], usedBy: [],
-    },
+    { name: "Csv.Model", path: "src/Csv.Model/Csv.Model.csproj", kind: "library", dependsOn: [], usedBy: ["Csv.Api", "Csv.Tests"] },
+    { name: "Csv.Api", path: "src/Csv.Api/Csv.Api.csproj", kind: "service", dependsOn: ["Csv.Model"], usedBy: ["Csv.Tests"] },
+    { name: "Csv.Tests", path: "tests/Csv.Tests/Csv.Tests.csproj", kind: "test", dependsOn: ["Csv.Api", "Csv.Model"], usedBy: [] },
   ];
 }
 
 function projection(over: Partial<Projection> = {}): Projection {
-  const rows = modules();
+  const rows = projects();
   return {
-    solution: { name: "csv-pipeline", title: "csv-pipeline", multi: true, implicit: false, moduleCount: rows.length },
-    modules: rows,
+    solution: { name: "csv", title: "csv", ecosystem: "dotnet", projectCount: rows.length },
+    projects: rows,
     ...over,
   };
 }
 
-/** A repository that IS its one module: an absent manifest, or one entry. */
+/** A repository with no build files: the one project it is. */
 function single(): Projection {
   return {
-    solution: { name: "csv-model", title: "csv-model", multi: false, implicit: true, moduleCount: 1 },
-    modules: [
-      {
-        slug: "csv-model", title: "csv-model", kind: "application", package: null,
-        codeRoots: ["."], dependsOn: [], usedBy: [],
-      },
-    ],
+    solution: { name: "csv-model", title: "csv-model", ecosystem: null, projectCount: 1 },
+    projects: [{ name: "csv-model", path: ".", kind: "application", dependsOn: [], usedBy: [] }],
   };
 }
 
-suite("solutionTreeModel: modules", () => {
-  test("renders the modules in the router's dependency order, with depends-on and used-by derived", () => {
+suite("solutionTreeModel: projects", () => {
+  test("renders a projection's project rows in the router's dependency order, with depends-on and used-by", () => {
     const p = projection();
     const roots = rootNodes();
     // The solution, and beside it what a session is run with.
     assert.deepStrictEqual(roots.map((n) => n.kind), ["solution", "configuration"]);
     const rows = childrenOf(roots[0], p);
+    assert.deepStrictEqual(rows.map((n) => (n as { name: string }).name), ["Csv.Model", "Csv.Api", "Csv.Tests"]);
+    // The library at the bottom is used by everything above it, and the row
+    // says so without anyone having written it down.
+    assert.deepStrictEqual(childrenOf({ kind: "project", name: "Csv.Model" }, p).map((n) => n.kind), ["usedBy"]);
     assert.deepStrictEqual(
-      rows.map((n) => (n as { slug: string }).slug),
-      ["model", "deserializer", "persister", "listener"],
+      childrenOf({ kind: "usedBy", name: "Csv.Model" }, p).map((n) => (n as { consumer: string }).consumer),
+      ["Csv.Api", "Csv.Tests"],
     );
-    // The shared-types module at the bottom is used by everything above it,
-    // and the row says so without anyone having written it down.
-    const model = childrenOf({ kind: "module", slug: "model" }, p).map((n) => n.kind);
-    assert.deepStrictEqual(model, ["usedBy"]);
     assert.deepStrictEqual(
-      childrenOf({ kind: "usedBy", slug: "model" }, p).map((n) => (n as { consumer: string }).consumer),
-      ["deserializer", "persister", "listener"],
+      childrenOf({ kind: "dependsOn", name: "Csv.Tests" }, p).map((n) => (n as { dependency: string }).dependency),
+      ["Csv.Api", "Csv.Model"],
     );
-    // The application composes the three and nothing uses it.
-    const listener = childrenOf({ kind: "module", slug: "listener" }, p).map((n) => n.kind);
-    assert.deepStrictEqual(listener, ["dependsOn"]);
-    assert.deepStrictEqual(
-      childrenOf({ kind: "dependsOn", slug: "listener" }, p).map((n) => (n as { dependency: string }).dependency),
-      ["model", "deserializer", "persister"],
-    );
-    const row = descriptorFor({ kind: "module", slug: "persister" }, p);
-    assert.ok(row.description?.includes("library"));
-    assert.ok(row.description?.includes("CsvPersister"));
-    assert.strictEqual(row.tooltip, "EF Core persister");
-    assert.ok(descriptorFor({ kind: "solution" }, p).description?.includes("4 modules"));
+    const api = descriptorFor({ kind: "project", name: "Csv.Api" }, p);
+    assert.strictEqual(api.description, "service · src/Csv.Api/Csv.Api.csproj");
+    assert.strictEqual(api.contextValue, "dabblerProject:service");
+    assert.strictEqual(api.expandable, true);
+    assert.strictEqual(descriptorFor({ kind: "solution" }, p).description, "3 projects");
   });
 
-  test("the module a session is working in says so, in the milestone tone, and carries ;active", () => {
-    const p = projection();
-    const persister = p.modules.find((m) => m.slug === "persister");
-    assert.ok(persister);
-    persister.inSession = 7;
-    const active = descriptorFor({ kind: "module", slug: "persister" }, p);
-    assert.ok(active.description?.startsWith("● session 7"), active.description);
-    assert.strictEqual(active.icon?.tone, "milestone");
-    assert.ok(active.contextValue?.includes(";active"));
-    assert.ok(active.tooltip?.includes("session 7 is working here"));
-    const idle = descriptorFor({ kind: "module", slug: "model" }, p);
-    assert.ok(!idle.description?.includes("session"));
-    assert.ok(!idle.contextValue?.includes(";active"));
-  });
-
-  test("the module row reads its run of record, and a consumer whose contract suite against it is red reads blocking", () => {
-    // Both are readings of the records beside the run, projected by the
-    // router; the row restates them and computes nothing.
-    const rows = modules().map((m) =>
-      m.slug === "model"
-        ? { ...m, runOfRecord: "green" as const, blocking: ["persister"] }
-        : m.slug === "persister"
-          ? { ...m, runOfRecord: "red" as const, blocking: [] }
-          : { ...m, runOfRecord: "none" as const, blocking: [] },
-    );
-    const p = projection({ modules: rows });
-    const model = descriptorFor({ kind: "module", slug: "model" }, p);
-    assert.ok(model.description?.includes("run of record: green"), model.description);
-    assert.strictEqual(model.icon?.tone, "done");
-    const persister = descriptorFor({ kind: "module", slug: "persister" }, p);
-    assert.ok(persister.description?.includes("run of record: red"));
-    assert.strictEqual(persister.icon?.tone, "attention");
-    assert.ok(descriptorFor({ kind: "module", slug: "listener" }, p).description?.includes("run of record: none"));
-
-    // Under the model's used-by, the persister is blocked; the deserializer is not.
-    const blocked = descriptorFor({ kind: "consumer", slug: "model", consumer: "persister" }, p);
-    assert.strictEqual(blocked.description, "blocking");
-    assert.strictEqual(blocked.icon?.tone, "attention");
-    const fine = descriptorFor({ kind: "consumer", slug: "model", consumer: "deserializer" }, p);
-    assert.strictEqual(fine.description, undefined);
-
-    // A single-module solution's row says nothing of a run of record: the
-    // repository is the module, and the Work Explorer is where its runs read.
-    const single = descriptorFor({ kind: "module", slug: "csv-model" }, {
-      solution: { name: "csv-model", title: "csv-model", multi: false, implicit: true, moduleCount: 1 },
-      modules: [{ slug: "csv-model", title: "csv-model", kind: "application", package: null, codeRoots: ["."], dependsOn: [], usedBy: [], runOfRecord: "none" }],
-    });
-    assert.ok(!single.description?.includes("run of record"));
-  });
-
-  test("a single-module solution is one row with nothing under it", () => {
-    // The repository is the module. Nothing module-shaped has switched on,
-    // and the tree says so by having nothing to expand.
+  test("a repository with no build files is one row with nothing under it", () => {
     const p = single();
     const rows = childrenOf({ kind: "solution" }, p);
     assert.strictEqual(rows.length, 1);
@@ -171,33 +90,27 @@ suite("solutionTreeModel: modules", () => {
     const row = descriptorFor(rows[0], p);
     assert.strictEqual(row.label, "csv-model");
     assert.strictEqual(row.expandable, false);
-    assert.strictEqual(descriptorFor({ kind: "solution" }, p).description, "one module");
+    assert.strictEqual(descriptorFor({ kind: "solution" }, p).description, "one project");
   });
 
-  test("an empty manifest says what session 1 does", () => {
-    const p = projection({
-      solution: { name: "fresh", title: "fresh", multi: false, implicit: false, moduleCount: 0 },
-      modules: [],
-    });
-    assert.deepStrictEqual(childrenOf({ kind: "solution" }, p), []);
-    const row = descriptorFor({ kind: "solution" }, p);
-    assert.strictEqual(row.description, NO_MODULES_YET);
-    assert.ok(row.tooltip?.includes("docs/modules.yaml"));
-  });
-
-  test("an unknown module yields no children rather than throwing", () => {
-    assert.deepStrictEqual(childrenOf({ kind: "module", slug: "ghost" }, projection()), []);
+  test("a projection with no projects, or one an older router wrote, says what session 1 does", () => {
+    const empty = projection({ solution: { name: "fresh", title: "fresh", projectCount: 0 }, projects: [] });
+    assert.deepStrictEqual(childrenOf({ kind: "solution" }, empty), []);
+    assert.strictEqual(descriptorFor({ kind: "solution" }, empty).description, NO_PROJECTS_YET);
+    const older = { solution: { name: "old", title: "old", projectCount: 0 } } as unknown as Projection;
+    assert.deepStrictEqual(childrenOf({ kind: "solution" }, older), []);
+    assert.deepStrictEqual(childrenOf({ kind: "project", name: "ghost" }, projection()), []);
   });
 
   test("every node kind resolves to a descriptor with a stable id", () => {
     const p = projection();
     const nodes = [
       { kind: "solution" as const },
-      { kind: "module" as const, slug: "model" },
-      { kind: "dependsOn" as const, slug: "listener" },
-      { kind: "dependency" as const, slug: "listener", dependency: "model" },
-      { kind: "usedBy" as const, slug: "model" },
-      { kind: "consumer" as const, slug: "model", consumer: "listener" },
+      { kind: "project" as const, name: "Csv.Model" },
+      { kind: "dependsOn" as const, name: "Csv.Tests" },
+      { kind: "dependency" as const, name: "Csv.Tests", dependency: "Csv.Model" },
+      { kind: "usedBy" as const, name: "Csv.Model" },
+      { kind: "consumer" as const, name: "Csv.Model", consumer: "Csv.Api" },
     ];
     const ids = nodes.map((n) => descriptorFor(n, p).id);
     assert.strictEqual(new Set(ids).size, ids.length);
@@ -338,9 +251,10 @@ suite("solutionTreeModel: what other repositories build", () => {
     // What the tree re-derives on is the INPUTS.
     const globs = [...PROJECTION_SOURCE_GLOBS];
     // What this repository builds, and what it takes from the others: the
-    // module rows come from the first, the membership rows from the second
-    // and from nowhere else.
-    assert.ok(globs.includes("docs/modules.yaml"));
+    // project rows come from the solution and project files, the membership
+    // rows from the declaration and from nowhere else.
+    assert.ok(globs.includes("**/*.slnx") && globs.includes("**/*.sln"));
+    assert.ok(!globs.includes("docs/modules.yaml"));
     assert.ok(globs.includes("solution-dependencies.json"));
     // The pin is read from the build files on every projection rather than
     // copied, so the drift rows change when they do.

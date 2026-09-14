@@ -50,7 +50,6 @@ import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
 import { readRun } from "./driver.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
-import { type ImpactPlan, demandedByPlan, readImpactPlan } from "./impact.ts";
 import {
   repoRelativePath,
   repoRootFor,
@@ -751,28 +750,12 @@ export function checkTestRunFresh(
   const root = repoRootFor(sessionsDir);
   const declared = judgeSuiteDeclaration(loaded, root === null ? [] : codeEcosystems(root));
   if (declared !== null) return declared;
-  // A module session's run of record ran the suites its impact plan reached
-  // and no other; the gate demands the same ones, from the same plan. A
-  // session with no plan -- a single-module solution -- is demanded every
-  // required suite, as it always was.
   const current = currentSession(sessionsDir);
   const inFlight = root !== null && typeof current === "number";
   // Driven: the framework runs the suite itself after verification, so the
   // row inside a session states what it measured and no way to satisfy it.
   const driven = inFlight && readRun(root, current) !== null;
-  return judgeFreshness(
-    demandedByPlan(
-      evaluateFreshness(sessionsDir, null, loaded.suites, { driven }),
-      planForGate(sessionsDir),
-    ),
-  );
-}
-
-function planForGate(sessionsDir: string): ImpactPlan | null {
-  const root = repoRootFor(sessionsDir);
-  const current = currentSession(sessionsDir);
-  if (root === null || typeof current !== "number") return null;
-  return readImpactPlan(root, current);
+  return judgeFreshness(evaluateFreshness(sessionsDir, null, loaded.suites, { driven }));
 }
 
 // --- published_when_releasable ------------------------------------------------

@@ -1,16 +1,12 @@
-// The projection the Solution Explorer reads: the module manifest, joined
-// to what the tree and the sibling repositories say.
+// The projection the Solution Explorer reads: the solution's projects, read
+// from its build files, joined to what the sibling repositories say.
 //
 // The extension renders; the router decides. The extension never reads the
-// manifest or the sibling repositories itself, because two implementations
-// of one rule disagree eventually and the disagreement shows up as a wrong
-// row nobody can explain. Everything here is DERIVED: dependency order and
-// `usedBy` from `dependsOn`, the drift rows from build files read on every
-// projection.
-//
-// A single-module solution -- an absent manifest, or one entry -- projects
-// one module row and nothing module-shaped beyond it, which is the shape of
-// every repository that predates the manifest.
+// build files or the sibling repositories itself, because two
+// implementations of one rule disagree eventually and the disagreement shows
+// up as a wrong row nobody can explain. Everything here is DERIVED:
+// dependency order and `usedBy` from the project references, the drift rows
+// from build files read on every projection.
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -47,16 +43,8 @@ import { sessionsDirFor } from "./evidence.ts";
 import { platformNewlines } from "./journal.ts";
 import { PREFERENCES_FILENAME, chosenEngine } from "./preferences.ts";
 import { dumps } from "./pythonJson.ts";
-import { type SolutionShape, consumersOf, ManifestError, solutionShape } from "./modules.ts";
+import { readProjectGraph, usedBy } from "./projectGraph.ts";
 import { readRawSessionState } from "./sessionState.ts";
-import {
-  OUTCOME_PASSED,
-  STAGE_FINAL_FULL,
-  type SuiteSpec,
-  type TestRunRecord,
-  loadSuitesChecked,
-  readRecords,
-} from "./testEvidence.ts";
 import {
   assembleSolution,
   locateProducer,
@@ -96,72 +84,6 @@ export const PROJECTION_RELPATH = join(".dabbler", "solution", "solution.json");
 
 export function projectionPath(root: string): string {
   return join(root, PROJECTION_RELPATH);
-}
-
-/**
- * The modules the in-flight session's declaration names, and which session.
- * Null when nothing is in flight here.
- */
-function modulesInSession(root: string): { readonly session: number; readonly modules: ReadonlySet<string> } | null {
-  try {
-    const raw = readRawSessionState(sessionsDirFor(root));
-    const sessions = Array.isArray(raw?.["sessions"]) ? (raw?.["sessions"] as Record<string, unknown>[]) : [];
-    const current = sessions.find((row) => row["status"] === "in-progress");
-    if (current === undefined || typeof current["number"] !== "number") return null;
-    const named = Array.isArray(current["modules"]) ? (current["modules"] as unknown[]).map(String) : [];
-    return { session: current["number"], modules: new Set(named) };
-  } catch {
-    // An unreadable ledger marks nothing.
-    return null;
-  }
-}
-
-export type RunOfRecordState = "green" | "red" | "none";
-
-/**
- * Each module's run of record and who it blocks, from the latest final-full
- * record of every suite the module declares. Green when every expensive
- * suite of the module has a passed latest record; red when any latest is
- * not passed; none where a suite has no record, or the module declares no
- * suite. A consumer is blocked by a producer when its consumer-contract
- * suite against that producer is red. Nothing here is declared: it is a
- * reading of the records beside the run.
- */
-function runsOfRecord(
-  root: string,
-  shape: SolutionShape,
-): Map<string, { readonly state: RunOfRecordState; readonly blocking: string[] }> {
-  const out = new Map<string, { state: RunOfRecordState; blocking: string[] }>();
-  for (const entry of shape.modules) out.set(entry.slug, { state: "none", blocking: [] });
-  if (!shape.multi) return out;
-  let suites: readonly SuiteSpec[];
-  let records: readonly TestRunRecord[];
-  try {
-    suites = loadSuitesChecked(loadConfig(undefined, root), { shape }).suites;
-    records = readRecords(root);
-  } catch {
-    return out;
-  }
-  const latest = (suite: string): TestRunRecord | null =>
-    records.filter((row) => row.suite === suite && row.stage === STAGE_FINAL_FULL).at(-1) ?? null;
-  for (const entry of shape.modules) {
-    const own = suites.filter((suite) => suite.expensive && suite.module === entry.slug);
-    if (own.length === 0) continue;
-    const latests = own.map((suite) => latest(suite.name));
-    const state: RunOfRecordState = latests.some((row) => row !== null && row.outcome !== OUTCOME_PASSED)
-      ? "red"
-      : latests.every((row) => row !== null && row.outcome === OUTCOME_PASSED)
-        ? "green"
-        : "none";
-    out.get(entry.slug)!.state = state;
-  }
-  for (const suite of suites) {
-    if (suite.role !== "consumer-contract" || !suite.against || !suite.module) continue;
-    const row = latest(suite.name);
-    if (row !== null && row.outcome !== OUTCOME_PASSED) out.get(suite.against)?.blocking.push(suite.module);
-  }
-  for (const value of out.values()) value.blocking.sort();
-  return out;
 }
 
 // --- What a session is run with ---------------------------------------------
@@ -1072,50 +994,18 @@ export function configurationNode(
 }
 
 export function project(root: string): Record<string, unknown> {
-  const shape = solutionShape(root);
+  const graph = readProjectGraph(root);
   const name = basename(resolve(root)) || "solution";
-  const inPlay = modulesInSession(root);
-  const runs = runsOfRecord(root, shape);
-  const modules: Node[] = shape.modules.map((entry) => {
-    return {
-      slug: entry.slug,
-      title: entry.title,
-      kind: entry.kind,
-      package: entry.package,
-      codeRoots: [...entry.codeRoots],
-      dependsOn: [...entry.dependsOn],
-      // Derived on every projection, declared nowhere.
-      usedBy: consumersOf(shape.modules, entry.slug),
-      // The session working in this module right now, or null: the Explorer
-      // marks the row.
-      inSession: inPlay !== null && inPlay.modules.has(entry.slug) ? inPlay.session : null,
-      // The latest run of record of the module's suites, and the consumers
-      // whose contract suite against it is red.
-      runOfRecord: runs.get(entry.slug)?.state ?? "none",
-      blocking: [...(runs.get(entry.slug)?.blocking ?? [])],
-    } satisfies Node;
-  });
   const doc: Node = {
-    solution: {
-      name,
-      title: name,
-      multi: shape.multi,
-      implicit: shape.implicit,
-      moduleCount: modules.length,
-    },
-    modules,
-    // What the solution says it ships, from the manifest: a declared
-    // deployable no module feeds yet is here with an empty `from`, because
-    // that is a true statement about the shape of the solution during
-    // decomposition and not a gap in it.
-    deployables: shape.deployables.map((deployable) => ({
-      slug: deployable.slug,
-      title: deployable.title,
-      kind: deployable.kind,
-      from: [...deployable.from],
-      runtime: deployable.runtime,
-      publish: deployable.publish,
-      declared: deployable.declared,
+    solution: { name, title: name, ecosystem: graph.ecosystem, projectCount: graph.projects.length },
+    // In dependency order, with who references each project derived on
+    // every projection and declared nowhere.
+    projects: graph.projects.map((project) => ({
+      name: project.name,
+      path: project.path,
+      kind: project.kind,
+      dependsOn: [...project.dependsOn],
+      usedBy: usedBy(graph, project.name),
     })),
   };
   // One assembly for both halves of the cross-repository graph. It reads
@@ -1143,19 +1033,12 @@ export function writeProjection(root: string): string {
 }
 
 /**
- * Write the projection, or leave the event that was just recorded standing.
- *
- * A manifest problem must not swallow an event that is already on the log;
- * `dabbler modules show` surfaces the manifest error plainly when someone
- * asks for it.
+ * Write the projection, for the verbs that record an event. A projection read
+ * from build files has no declaration to refuse, so nothing here can stop the
+ * event that was just recorded.
  */
 export function tryWriteProjection(root: string): void {
-  try {
-    writeProjection(root);
-  } catch (error) {
-    if (error instanceof ManifestError) return;
-    throw error;
-  }
+  writeProjection(root);
 }
 
 /**

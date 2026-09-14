@@ -24,10 +24,10 @@ suite("SolutionTreeProvider: derives at startup", () => {
     rmrf(root);
   });
 
-  test("a fresh clone with a manifest but no projection derives one without any watcher event", async () => {
+  test("a fresh clone with build files but no projection derives one without any watcher event", async () => {
     writeFileTree(root, {
-      "docs/modules.yaml":
-        "modules:\n  - slug: model\n    title: Model\n  - slug: app\n    title: App\n    dependsOn: [model]\n",
+      "src/Model/Model.csproj": "<Project />\n",
+      "src/App/App.csproj": '<Project><ItemGroup><ProjectReference Include="../Model/Model.csproj" /></ItemGroup></Project>\n',
     });
     const projectionFile = path.join(root, ".dabbler", "solution", "solution.json");
     assert.ok(!fs.existsSync(projectionFile), "precondition: no projection yet");
@@ -39,12 +39,12 @@ suite("SolutionTreeProvider: derives at startup", () => {
     assert.ok(fs.existsSync(projectionFile), "projection was never derived");
     const projection = provider.currentProjection();
     assert.ok(projection, "provider read no projection back");
-    assert.strictEqual(projection!.modules.length, 2);
+    assert.strictEqual(projection!.projects.length, 2);
     assert.deepStrictEqual(
-      projection!.modules.map((m) => m.slug),
-      ["model", "app"],
+      projection!.projects.map((m) => m.name),
+      ["Model", "App"],
     );
-    // The welcome text is what NO_MODULES_YET renders over; a derived,
+    // The welcome text is what NO_PROJECTS_YET renders over; a derived,
     // populated projection must offer real root rows instead.
     assert.ok(rootNodes().length > 0);
   });
@@ -58,12 +58,12 @@ suite("SolutionTreeProvider: derives at startup", () => {
     const projectionFile = path.join(root, ".dabbler", "solution", "solution.json");
     fs.mkdirSync(path.dirname(projectionFile), { recursive: true });
     const stale = {
-      solution: { name: "x", title: "x", multi: false, implicit: true, moduleCount: 1 },
-      modules: [],
+      solution: { name: "x", title: "x", projectCount: 1 },
+      projects: [],
     };
     fs.writeFileSync(projectionFile, JSON.stringify(stale), "utf8");
     writeFileTree(root, {
-      "docs/modules.yaml": "modules:\n  - slug: model\n    title: Model\n",
+      "src/Model/Model.csproj": "<Project />\n",
     });
 
     provider = new SolutionTreeProvider(root);
@@ -73,8 +73,8 @@ suite("SolutionTreeProvider: derives at startup", () => {
     // when the window opened is what the pane renders.
     assert.notStrictEqual(fs.readFileSync(projectionFile, "utf8"), JSON.stringify(stale));
     assert.deepStrictEqual(
-      provider.currentProjection()?.modules.map((m) => m.slug),
-      ["model"],
+      provider.currentProjection()?.projects.map((m) => m.name),
+      ["Model"],
     );
   });
 
@@ -92,14 +92,14 @@ suite("SolutionTreeProvider: derives at startup", () => {
     fs.writeFileSync(
       projectionFile,
       JSON.stringify({
-        solution: { name: "x", title: "x", multi: false, implicit: true, moduleCount: 1 },
-        modules: [],
+        solution: { name: "x", title: "x", projectCount: 1 },
+        projects: [],
         configuration: { engines: { chosen: "an-engine-no-router-would-name" } },
       }),
       "utf8",
     );
     writeFileTree(root, {
-      "docs/modules.yaml": "modules:\n  - slug: model\n    title: Model\n",
+      "src/Model/Model.csproj": "<Project />\n",
     });
 
     provider = new SolutionTreeProvider(root);
@@ -134,7 +134,7 @@ suite("SolutionTreeProvider: derives at startup", () => {
     const stubbed = typeof stub.__watchers === "function";
     if (stubbed) stub.__clearWatchers?.();
     writeFileTree(root, {
-      "docs/modules.yaml": "modules:\n  - slug: model\n    title: Model\n",
+      "src/Model/Model.csproj": "<Project />\n",
     });
     provider = new SolutionTreeProvider(root);
     await sleep(PAST_SETTLE_MS);
@@ -180,7 +180,7 @@ suite("SolutionTreeProvider: derives at startup", () => {
     // `dabbler configure` or a catalog refresh typed in a terminal has to
     // reach the pane, and this is the only thing that makes it.
     writeFileTree(root, {
-      "docs/modules.yaml": "modules:\n  - slug: model\n    title: Model\n",
+      "src/Model/Model.csproj": "<Project />\n",
     });
     provider = new SolutionTreeProvider(root);
     await sleep(PAST_SETTLE_MS);
@@ -217,7 +217,7 @@ suite("SolutionTreeProvider: derives at startup", () => {
     // painting; it is not a repaint, and it is not freshness anybody may
     // choose from.
     writeFileTree(root, {
-      "docs/modules.yaml": "modules:\n  - slug: model\n    title: Model\n",
+      "src/Model/Model.csproj": "<Project />\n",
     });
     provider = new SolutionTreeProvider(root);
     await sleep(PAST_SETTLE_MS);

@@ -837,12 +837,6 @@ export function declareSessionTask(
     readonly releasable: boolean;
     /** Why a held session publishes nothing; written beside `releasable` when given. */
     readonly holdReason?: string | null;
-    /**
-     * The module(s) the session works in. Given for a multi-module solution
-     * and written onto the declaration and the session record; absent or
-     * empty for a single-module one, which persists nothing module-shaped.
-     */
-    readonly modules?: readonly string[] | null;
   },
 ): Entry {
   const number = requireSessionNumber(options.sessionNumber);
@@ -882,7 +876,6 @@ export function declareSessionTask(
   }
   if (paths.length > 0) throw new WorkBegunError(workBegunRefusal(number, paths));
 
-  const modules = [...new Set((options.modules ?? []).map((slug) => slug.trim()).filter(Boolean))];
   const entry: Entry = {
     kind: KIND_TASK_DECLARATION,
     sessionNumber: number,
@@ -890,23 +883,9 @@ export function declareSessionTask(
     task,
     releasable: options.releasable,
     ...(options.holdReason ? { holdReason: options.holdReason } : {}),
-    ...(modules.length > 0 ? { modules } : {}),
   };
   pushEntry(log, entry);
   writeActivityLog(sessionsDir, log);
-  if (modules.length > 0) {
-    // The record carries the modules too, so a reader of the ledger -- the
-    // Work Explorer grouping sessions by module, `dabbler status` -- does
-    // not have to fold the activity log to learn them. Written here, by
-    // the declaring writer, and by nothing else.
-    const raw = readRawSessionState(sessionsDir);
-    if (isRecord(raw) && Array.isArray(raw["sessions"])) {
-      for (const record of raw["sessions"]) {
-        if (isRecord(record) && record["number"] === number) record["modules"] = modules;
-      }
-      validateAndWriteState(sessionsDir, raw);
-    }
-  }
   renderProjectWorkPlan(sessionsDir);
   return entry;
 }

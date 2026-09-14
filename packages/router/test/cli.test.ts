@@ -1,5 +1,5 @@
 // The command lines the lifecycle documents: `dabbler session`'s
-// subcommands, `dabbler status` and `dabbler modules`.
+// subcommands and `dabbler status`.
 //
 // The parser's whole grammar is not the contract, the flags the lifecycle
 // documents are -- so what is asserted here is that every documented flag
@@ -12,8 +12,6 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { depsVerb } from "../src/cli/deps.ts";
-import { MANIFEST_HEADER, loadEntries } from "../src/modules.ts";
-import { modulesVerb } from "../src/cli/modules.ts";
 import { packagingVerb } from "../src/cli/packaging.ts";
 import { HANDLERS } from "../src/cli/registry.ts";
 import { authVerb } from "../src/cli/auth.ts";
@@ -360,148 +358,6 @@ describe("dabbler status", () => {
     const unknown = await run(() => statusVerb(["--sessions"]));
     assert.equal(unknown.code, 2);
     assert.match(unknown.err, /unrecognized argument/);
-  });
-});
-
-describe("dabbler modules", () => {
-  it("refuses a subcommand it does not have", async () => {
-    const result = await run(() => modulesVerb(["retire", tempDir("cli-")]));
-    assert.equal(result.code, 2);
-    assert.match(result.err, /is not a subcommand/);
-  });
-
-  it("creates with the module vocabulary and shows it back with usedBy derived", async () => {
-    const root = tempDir("cli-");
-    const model = await run(() =>
-      modulesVerb([
-        "create", root, "--slug", "model", "--title", "Model",
-        "--kind", "shared-types", "--package", "CsvModel", "--code-root", "modules/model",
-      ]),
-    );
-    assert.equal(model.code, 0);
-    const persister = await run(() =>
-      modulesVerb([
-        "create", root, "--slug", "persister", "--title", "Persister",
-        "--depends-on", "model", "--package", "CsvPersister",
-      ]),
-    );
-    assert.equal(persister.code, 0);
-    const shown = await run(() => modulesVerb(["show", root]));
-    assert.equal(shown.code, 0);
-    const doc = JSON.parse(shown.out) as {
-      multi: boolean;
-      modules: { slug: string; kind: string; usedBy: string[] }[];
-    };
-    assert.equal(doc.multi, true);
-    assert.deepEqual(doc.modules.map((m) => m.slug), ["model", "persister"]);
-    assert.deepEqual(doc.modules[0], {
-      slug: "model", title: "Model", kind: "shared-types", package: "CsvModel",
-      codeRoots: ["modules/model"], dependsOn: [], usedBy: ["persister"],
-      // Neither module is an application, so nothing here ships on its own.
-      shipsIn: [],
-    });
-    // The verb that moved the manifest rewrote the projection the Solution
-    // Explorer reads, so a terminal `create` shows up in the tree.
-    const projected = JSON.parse(
-      readFileSync(join(root, ".dabbler", "solution", "solution.json"), "utf8"),
-    ) as { modules: { slug: string }[] };
-    assert.deepEqual(projected.modules.map((m) => m.slug), ["model", "persister"]);
-    // A dependency the manifest does not declare is refused at write time.
-    const dangling = await run(() =>
-      modulesVerb(["create", root, "--slug", "x", "--title", "X", "--depends-on", "nope"]),
-    );
-    assert.equal(dangling.code, 1);
-    assert.match(dangling.err, /does not declare/);
-  });
-
-  it("defaults the code root and the package, so a module made from the button's four answers opens", async () => {
-    // The New Module flow asks slug, title, kind and depends-on. Both
-    // operations a multi-module solution exists for used to refuse what
-    // those four answers produced, and the walk met both in its first
-    // twenty minutes.
-    const root = tempDir("cli-");
-    for (const [slug, title] of [["model", "Model"], ["reports", "Reports"]]) {
-      const made = await run(() =>
-        modulesVerb(["create", root, "--slug", slug, "--title", title, "--kind", "shared-types"]),
-      );
-      assert.equal(made.code, 0);
-    }
-    const entries = loadEntries(root);
-    assert.deepEqual(entries.map((entry) => entry.codeRoots), [["modules/model"], ["modules/reports"]]);
-    assert.deepEqual(entries.map((entry) => entry.package), ["model", "reports"]);
-
-    // The casing is the repository's, taken from a sibling that declares
-    // one: a groupId is shared and the artifactId is the module's.
-    const maven = tempDir("cli-");
-    await run(() =>
-      modulesVerb(["create", maven, "--slug", "model", "--title", "Model", "--package", "com.example:model"]),
-    );
-    await run(() => modulesVerb(["create", maven, "--slug", "reports", "--title", "Reports"]));
-    assert.equal(loadEntries(maven)[1]?.package, "com.example:reports");
-  });
-
-  it("passes the root positionally and collects each repeatable flag", async () => {
-    const root = tempDir("cli-");
-    const result = await run(() =>
-      modulesVerb([
-        "create",
-        root,
-        "--slug",
-        "greeter",
-        "--title",
-        "Greeter",
-        "--code-root",
-        "src/greeter",
-        "--code-root",
-        "tests/greeter",
-      ]),
-    );
-    assert.equal(result.code, 0);
-    const manifest = readFileSync(join(root, "docs", "modules.yaml"), "utf8");
-    assert.match(manifest, /src\/greeter/);
-    assert.match(manifest, /tests\/greeter/);
-  });
-
-  it("takes --package none for a module no sibling consumes, and keeps the header on every write", async () => {
-    // The sample's console app is run, never packed, and the manifest's
-    // shape for that is no package line -- which the CLI could not write.
-    // And the header the scaffold put first was gone at the first create,
-    // because a parse keeps no comment; it is written on every write now.
-    const root = tempDir("cli-");
-    const first = await run(() =>
-      modulesVerb(["create", root, "--slug", "model", "--title", "Model", "--package", "CsvModel"]),
-    );
-    assert.equal(first.code, 0, first.err);
-    const app = await run(() =>
-      modulesVerb([
-        "create", root, "--slug", "console", "--title", "Console",
-        "--kind", "application", "--package", "none",
-      ]),
-    );
-    assert.equal(app.code, 0, app.err);
-    const manifest = readFileSync(join(root, "docs", "modules.yaml"), "utf8");
-    assert.ok(manifest.startsWith(MANIFEST_HEADER), manifest);
-    assert.equal((manifest.match(/dependsOn` is the only direction/g) ?? []).length, 1);
-    assert.match(manifest, /package: CsvModel/);
-    assert.ok(!/package: (none|Console|console)/.test(manifest), manifest);
-    const shown = JSON.parse((await run(() => modulesVerb(["show", root]))).out) as {
-      modules: { slug: string; package: string | null }[];
-    };
-    assert.equal(shown.modules.find((m) => m.slug === "console")?.package, null);
-  });
-
-  it("requires the slug and the title, which the CLI does not default", async () => {
-    const result = await run(() => modulesVerb(["create", tempDir("cli-")]));
-    assert.equal(result.code, 2);
-    assert.match(result.err, /--slug, --title/);
-  });
-
-  it("refuses a workspace root that is not a directory", async () => {
-    const result = await run(() =>
-      modulesVerb(["create", join(tempDir("cli-"), "nowhere"), "--slug", "a", "--title", "A"]),
-    );
-    assert.equal(result.code, 2);
-    assert.match(result.err, /not a directory/);
   });
 });
 

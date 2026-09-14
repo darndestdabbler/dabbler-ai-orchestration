@@ -33,8 +33,6 @@ import {
   runGit,
 } from "./journal.ts";
 import { LIFECYCLE_WRITTEN_FILES, RUNS_DIRNAME } from "./ledger.ts";
-import { modulesReachedBy } from "./impact.ts";
-import { type SolutionShape, moduleConfigs } from "./modules.ts";
 import { PythonFloat, dumps, pythonFloatRepr, pythonRepr } from "./pythonJson.ts";
 
 export { matchingPrefixes } from "./checks.ts";
@@ -172,55 +170,12 @@ export interface SuiteSpec {
    * as information without being the close's obligation.
    */
   readonly requiredForClose?: boolean;
-  /** The module this suite proves, by slug; null for a repository-wide suite. */
-  readonly module?: string | null;
   readonly role?: SuiteRole;
-  /** For a consumer-contract suite: the provider it runs against, by slug. */
-  readonly against?: string | null;
 }
 
 /** The close's obligation, read through the one rule for the absent field. */
 export function suiteRequiredForClose(suite: SuiteSpec): boolean {
   return suite.requiredForClose ?? suite.expensive;
-}
-
-/** What the loader is told about the solution, when the caller knows it. */
-/**
- * The one module whose code roots (or shared files) hold every cover and
- * every test root of a suite, or null: none, more than one, or a path no
- * module owns. Read only for a multi-module shape.
- */
-function inferSuiteModule(
-  config: unknown,
-  shape: SolutionShape | null,
-  covers: readonly string[],
-  testRoots: unknown,
-): string | null {
-  if (shape === null || !shape.multi) return null;
-  const roots = Array.isArray(testRoots) ? testRoots.filter((root): root is string => typeof root === "string") : [];
-  const paths = [...covers, ...roots].map((path) => path.trim()).filter((path) => path !== "");
-  if (paths.length === 0) return null;
-  const shared = new Map(
-    [...moduleConfigs(config, shape.modules).values()].map((module) => [module.slug, module.sharedFiles]),
-  );
-  let owner: string | null = null;
-  for (const path of paths) {
-    const owners = modulesReachedBy(shape, path, shared);
-    if (owners.length !== 1) return null;
-    if (owner !== null && owners[0] !== owner) return null;
-    owner = owners[0] ?? null;
-  }
-  return owner;
-}
-
-export interface SuiteLoadOptions {
-  /**
-   * The solution's shape. When it is multi-module, a suite's `module` and
-   * `against` must name declared modules; for a single-module solution the
-   * module fields are not consulted at all, so nothing changes for a
-   * repository that declares none.
-   */
-  readonly shape?: SolutionShape | null;
 }
 
 export interface SuiteLoadResult {
@@ -314,7 +269,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export function loadSuitesChecked(
   config: unknown,
-  options: SuiteLoadOptions = {},
 ): SuiteLoadResult {
   const done = (
     suites: readonly SuiteSpec[],
@@ -362,57 +316,12 @@ export function loadSuitesChecked(
       return;
     }
     const role = roleRaw as SuiteRole;
-    const slugOf = (key: string): string | null | undefined => {
-      const value = entry[key];
-      if (value === null || value === undefined) return null;
-      if (typeof value !== "string" || value.trim() === "") {
-        errors.push(`${label}.${key} must name a module by its slug`);
-        return undefined;
-      }
-      return value.trim();
-    };
-    const declaredModule = slugOf("module");
-    const against = slugOf("against");
-    if (declaredModule === undefined || against === undefined) return;
-    // A suite that says nothing of its module belongs to the one module
-    // whose roots hold everything it covers and everything it tests, so
-    // nobody types `module:` for the ordinary case; one that spans
-    // modules, or reaches the root, stays repository-wide.
-    const moduleSlug =
-      declaredModule ?? inferSuiteModule(config, options.shape ?? null, covers as string[], entry["test_roots"]);
-    if (role === "consumer-contract" && against === null) {
-      errors.push(
-        `${label} ('${name.trim()}') is a consumer-contract suite and must say which ` +
-          "provider it runs against",
-      );
-      return;
-    }
-    if (role !== "consumer-contract" && against !== null) {
-      errors.push(
-        `${label} ('${name.trim()}') names 'against', which only a consumer-contract suite does`,
-      );
-      return;
-    }
+    // `module` and `against` named a declared module and are read and
+    // ignored: nothing selects, scopes or judges by module any more.
     const required = entry["required_for_close"];
     if (required !== undefined && required !== null && typeof required !== "boolean") {
       errors.push(`${label}.required_for_close must be true or false`);
       return;
-    }
-    // The module fields are held to the manifest only where the manifest
-    // has more than one module to name; a single-module repository is not
-    // asked about a vocabulary it does not use.
-    const shape = options.shape ?? null;
-    if (shape !== null && shape.multi) {
-      const declared = new Set(shape.modules.map((module) => module.slug));
-      for (const [key, slug] of [["module", moduleSlug], ["against", against]] as const) {
-        if (slug !== null && !declared.has(slug)) {
-          errors.push(
-            `${label} ('${name.trim()}') names ${key} '${slug}', which docs/modules.yaml ` +
-              "does not declare",
-          );
-          return;
-        }
-      }
     }
     suites.push({
       name: name.trim(),
@@ -421,9 +330,7 @@ export function loadSuitesChecked(
       expensive,
       runsWhole: Boolean(entry["runs_whole"]),
       requiredForClose: typeof required === "boolean" ? required : expensive,
-      module: moduleSlug,
       role,
-      against,
     });
   });
   // A suite that is not expensive is never the run of record, and the

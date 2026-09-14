@@ -35,7 +35,7 @@
 // two are compared directly. Only the lines actually shown are compared, so a
 // truncated or ranged read is not slandered as a transform.
 
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative } from "node:path";
 
 import {
@@ -47,7 +47,6 @@ import {
   selectionTestRoots,
 } from "./checks.ts";
 import { canonicalPath } from "./journal.ts";
-import { type SolutionShape, dependenciesOf } from "./modules.ts";
 import { pythonRepr } from "./pythonJson.ts";
 
 /**
@@ -292,60 +291,6 @@ export function sessionScope(
     .map(posix);
   const scope = new Set(changed);
   for (const dependency of declaredDependencies(repoRoot, changed)) scope.add(dependency);
-  const setRel = sessionsDir ? relativePosix(repoRoot, sessionsDir) : null;
-  if (setRel) scope.add(setRel);
-  return [...scope].sort();
-}
-
-/** The build files a solution keeps at its root, which every module's build reads. */
-const ROOT_BUILD_FILES: readonly string[] = [
-  "global.json",
-  "Directory.Build.props",
-  "Directory.Build.targets",
-  "Directory.Packages.props",
-  "nuget.config",
-];
-
-/** A .NET solution file, in either format. */
-const SOLUTION_FILE = /\.slnx?$/i;
-
-/**
- * The module form of the scope, for a session that names its module(s) in a
- * multi-module solution: each named module's `codeRoots` and every
- * transitive dependency's -- a dependency is a project reference, and its
- * source is what the module builds against -- the root build files and the
- * solution file present at the root, its shared files, and the sessions
- * directory. Never a module the named ones do not reach.
- */
-export function moduleScope(
-  repoRoot: string,
-  sessionsDir: string | null,
-  shape: SolutionShape,
-  slugs: readonly string[],
-  sharedFiles: ReadonlyMap<string, readonly string[]> = new Map(),
-): string[] {
-  const scope = new Set<string>();
-  for (const slug of slugs) {
-    const entry = shape.modules.find((module) => module.slug === slug);
-    if (entry === undefined) continue;
-    const reached = [entry, ...dependenciesOf(shape.modules, slug).map((dependency) => shape.modules.find((module) => module.slug === dependency))];
-    for (const module of reached) {
-      if (module === undefined) continue;
-      for (const codeRoot of module.codeRoots.length > 0 ? module.codeRoots : ["."]) {
-        const rel = posix(codeRoot).replace(/^\.\/+/, "").replace(/\/+$/, "");
-        if (rel !== "" && rel !== ".") scope.add(rel);
-      }
-    }
-    for (const shared of sharedFiles.get(slug) ?? []) scope.add(posix(shared));
-  }
-  for (const name of ROOT_BUILD_FILES) if (isFile(join(repoRoot, name))) scope.add(name);
-  try {
-    for (const name of readdirSync(repoRoot)) {
-      if (SOLUTION_FILE.test(name) && isFile(join(repoRoot, name))) scope.add(name);
-    }
-  } catch {
-    // No root to list is no solution file to add.
-  }
   const setRel = sessionsDir ? relativePosix(repoRoot, sessionsDir) : null;
   if (setRel) scope.add(setRel);
   return [...scope].sort();

@@ -59,10 +59,10 @@
       "members": [
         "bootstrap",
         "discovery",
-        "modules",
         "solutionDeps",
         "contractdoc",
-        "ecosystem"
+        "ecosystem",
+        "projectGraph"
       ]
     },
     "workflow-instruction": {
@@ -81,8 +81,7 @@
       "members": [
         "testEvidence",
         "affected",
-        "facts",
-        "impact"
+        "facts"
       ]
     },
     "workflow-verification": {

@@ -19,7 +19,6 @@ import { releaseVerb } from "./release.ts";
 import { discoveryVerb } from "./discovery.ts";
 import { factsVerb } from "./facts.ts";
 import { metricsVerb } from "./metrics.ts";
-import { modulesVerb } from "./modules.ts";
 import { packagingVerb } from "./packaging.ts";
 import { repoVerb } from "./repo.ts";
 import { statusVerb } from "./status.ts";
@@ -48,7 +47,6 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   discovery: discoveryVerb,
   facts: factsVerb,
   metrics: metricsVerb,
-  modules: modulesVerb,
   packaging: packagingVerb,
   repo: repoVerb,
   "seat-cost": seatCostVerb,

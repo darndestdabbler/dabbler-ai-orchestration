@@ -525,11 +525,6 @@ testing:
           - packages/router/test/gates.test.ts
           - packages/router/test/walk-git-states.test.ts
           - packages/router/test/walk-record.test.ts
-      # The module manifest: one reader, one writer, one command line.
-      - when: packages/router/src/modules.ts
-        select:
-          - packages/router/test/session.test.ts
-          - packages/router/test/cli.test.ts
       # The pre-verification stage. `checks` is the leaf -- the declaration,
       # the path grammar and the executor -- so it selects its own test and
       # the two modules that import it; `test_evidence` and `affected` are
@@ -593,14 +588,12 @@ testing:
       - when: packages/router/src/ecosystem.ts
         select:
           - packages/router/test/ecosystem.test.ts
-          - packages/router/test/gates.test.ts
-      # The impact plan: what a change reaches, computed once for the
-      # selector, the run of record and the close gate.
-      - when: packages/router/src/impact.ts
+      # The solution's shape, read from its build files, and the root files
+      # written from it.
+      - when: packages/router/src/projectGraph.ts
         select:
-          - packages/router/test/impact.test.ts
-          - packages/router/test/checks.test.ts
-          - packages/router/test/walk-impact.test.ts
+          - packages/router/test/projectGraph.test.ts
+          - packages/router/test/ecosystem.test.ts
       # The atomic land: the judge of whether the tested bytes are the
       # landed bytes.
       - when: packages/router/src/land.ts

@@ -26,8 +26,8 @@ const CONTRACT: Record<string, unknown> = {
   ],
 };
 
-// csv-parser's place in a three-module graph, as `dabbler contractdoc`
-// derives it from docs/modules.yaml: what it declares, and who is derived
+// csv-parser's place in a three-project graph, as `dabbler contractdoc`
+// derives it from the build files: what it declares, and who is derived
 // to use it.
 const GRAPH: ContractGraph = { dependsOn: ["csv-model"], usedBy: ["csv-app"] };
 
@@ -67,7 +67,7 @@ describe("rendering", () => {
     assert.ok(render(CONTRACT, GRAPH).includes("**Used by:** `csv-app`"));
   });
 
-  it("draws no diagram for a module the manifest does not place, nor for one with no edges", () => {
+  it("draws no diagram for a component no build file places, nor for one with no edges", () => {
     const out = render({ component: "stranger", operations: [{ name: "go" }] }, null);
     assert.ok(!out.includes("```mermaid"));
     const alone = render(CONTRACT, { dependsOn: [], usedBy: [] });

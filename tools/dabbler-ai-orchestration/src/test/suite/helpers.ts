@@ -249,7 +249,6 @@ export function fakeRouter(
           return answer("session interrupt", { stdout: message });
         },
       },
-      modules: { create: text("modules create") },
       verify: {
         round: text("verify"),
         dispute: text("verify dispute"),

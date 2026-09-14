@@ -19,7 +19,7 @@ export type Dabbler = {
    */
   packaging?: Record<string, unknown>;
   /**
-   * Per-module declarations, keyed by a slug docs/modules.yaml declares: `packaging` (the root block's shape, used for that module's publish), `sharedFiles` (repository-relative paths outside the module's roots a session on it may change), and `contract` ({generate: argv} for the generated-surface fallback). Validated in full by the module manifest reader (modules.ts), which refuses a slug the manifest does not declare; the shape is left open here for the same reason the testing block is. Absent in a single-module repository, where nothing module-shaped is consulted.
+   * No longer read. Per-module declarations (`packaging`, `sharedFiles`, `contract`) keyed by a slug docs/modules.yaml declared; the solution's shape is read from its build files now, and a start that finds `sharedFiles` here says it is not read and refuses nothing. Left open so a configuration that still carries the block loads.
    */
   modules?: Record<string, unknown>;
   /**

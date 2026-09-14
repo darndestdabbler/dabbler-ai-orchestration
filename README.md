@@ -61,46 +61,34 @@ a real run: [docs/uat/uat-dotnet-json-solution.md](docs/uat/uat-dotnet-json-solu
 (.NET) and [docs/uat/uat-java-json-solution.md](docs/uat/uat-java-json-solution.md)
 (Java, Maven and Spring).
 
-## Modules
+## Solutions
 
-A solution is declared as **modules** in `docs/modules.yaml` — a slug, a
-kind, the code roots it owns, and the siblings it depends on. Every session
-runs in the repository you opened, and a session's plan may name the
-modules it touches, as many as that is, or none.
+A solution is its build files. The Solution Explorer reads the root `.slnx`
+or `.sln` — every `.csproj` under the root where there is neither — or the
+root `pom.xml` and its `<modules>`, and shows each project with its kind (a
+service, a worker, an application, a test project or a library), what it
+references and what references it. Nothing is declared beside the build
+files, and a repository with none is one project: itself. Every session runs
+in the repository you opened, and its plan names the files each step changes.
 
-**Files outside a module's roots.** A file outside the module's roots that
-the module's sessions change — a changelog, a notes file, a shared props
-file in a subdirectory — is declared once, in `dabbler.yaml`:
+**A sibling is a project reference.** A .NET project reaches a sibling with a
+`<ProjectReference>` to its project, and the solution file at the root lists
+both; a Maven module depends on a sibling at `${project.version}`, and the
+parent `pom.xml` lists both under `<modules>`, built in one reactor run. Where
+the build files hold more than one project and the root has no solution file
+or parent POM, the framework writes the root build files once a session's work
+is done, before it is verified, and never rewrites them: for .NET the `.slnx`,
+`Directory.Build.props` and `Directory.Build.targets`, with `bin/` and `obj/`
+ignored; for Maven the parent POM, with `target/` ignored. Every expensive
+suite runs as a session's run of record.
 
-```yaml
-modules:
-  csv-deserializer:
-    sharedFiles:
-      - docs/notes/dabbler-issues.md
-```
+**A repository that declared modules keeps its files.** A `modules.yaml` under
+`docs/`, a `modules:` block in `dabbler.yaml` and a suite's `module` or
+`against` are no longer read. `dabbler session start` names each one it
+finds, in one line, and refuses nothing.
 
-Declare it under each module whose sessions must reach it. A change to a
-shared file reaches every module that names it. A changed path that no
-module's roots or shared files hold is *unowned*: it reaches no module, so
-it selects only the suites bound to no module — a suite declared with no
-`module` answers for the whole repository whatever changed — and the
-`impact-plan` line says so when it lists one.
-
-**A sibling is a project reference.** A .NET module reaches a sibling with
-a `<ProjectReference>` to its project, and the solution file at the root
-lists both; a Maven module depends on a sibling at `${project.version}`, and
-the parent `pom.xml` lists both under `<modules>`, built in one reactor run.
-When the manifest becomes multi-module and a module already holds a project
-file, `dabbler modules create` writes the root build files where they are
-absent and never rewrites them: for .NET the `.slnx`, `Directory.Build.props`
-and `Directory.Build.targets`, with `bin/` and `obj/` ignored; for Maven the
-parent POM, with `target/` ignored. Where no module holds a project yet, the
-framework writes them once the work of the session that adds the first
-project is done, before that work is verified.
-
-The verbs are `dabbler modules create` and `modules show`. Worked end to end in the two UAT
-walkthroughs above and, module by module across a four-module solution,
-in
+Worked end to end in the two UAT walkthroughs above and, project by project
+across a four-module solution, in
 [docs/tutorials/csv-solution/csv-multi-module-walkthrough.md](docs/tutorials/csv-solution/csv-multi-module-walkthrough.md).
 
 ## Install

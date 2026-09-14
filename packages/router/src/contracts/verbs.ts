@@ -43,11 +43,6 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "where this repository is, from the lifecycle's own record",
   },
   {
-    verb: "modules",
-    extensionFacing: true,
-    summary: "create and show the modules of a workspace",
-  },
-  {
     verb: "affected",
     extensionFacing: false,
     summary: "the tests this change makes necessary, and the command to run",

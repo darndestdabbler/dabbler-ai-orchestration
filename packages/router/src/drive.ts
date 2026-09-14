@@ -38,7 +38,6 @@ import { dirname, join, relative } from "node:path";
 import {
   checkRunGreen,
   makeCheck,
-  materialPaths,
   timeoutFor,
   execute as executeCheck,
 } from "./checks.ts";
@@ -68,7 +67,6 @@ import {
   readWatcher,
   readWorkPlan,
   isWorkPhase,
-  judgeWorkPlanModules,
   judgeWorkPlanHold,
   judgeWorkPlanNonGoals,
   planPath,
@@ -84,7 +82,8 @@ import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
 import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
-import { EcosystemError, type ScaffoldResult, ensureRootFiles } from "./ecosystem.ts";
+import { ensureRootFiles } from "./ecosystem.ts";
+import { readProjectGraph } from "./projectGraph.ts";
 import { BUILT_IN_ENGINES, builtInEngine, engineAliases } from "./engines.ts";
 import type { Engine, EngineOutcome, EngineOutput } from "./engines.ts";
 import {
@@ -97,8 +96,6 @@ import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
   type EvidencePhase,
   checkVerificationClean,
-  hookRemovedFor,
-  readWorktreeStatus,
   rewindPhaseFor,
 } from "./gates.ts";
 import type {
@@ -110,14 +107,6 @@ import type {
 import { type Job, endJob, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
 import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
 import { tryWriteProjection } from "./projection.ts";
-import { ManifestError, type SolutionShape, moduleConfigs, solutionShape } from "./modules.ts";
-import {
-  type ImpactPlan,
-  planImpact,
-  readImpactPlan,
-  standsSince,
-  writeImpactPlan,
-} from "./impact.ts";
 import {
   changedPathsBetween,
   headBranch,
@@ -278,26 +267,14 @@ export function landCommitMessage(
  * without the file having been rewound, which is not this fence's to judge.
  */
 /**
- * The `modules` paragraph the plan instruction carries in a multi-module
- * solution, and nothing at all in a single-module one.
- *
- * `driver.ts` refuses a declaration that names no module when the manifest
- * declares more than one, and the instruction listed the members a plan
- * carries without ever mentioning it -- so an engine answering exactly what
- * it was asked for was refused, every time, in the shape the modules block
- * exists for. Measured on the Java walk, 2026-09-07, where the session
- * could not get past its plan.
+ * How a project reaches a sibling, which every plan is told. The build files
+ * are the solution: the framework reads them, and writes only the root files
+ * a solution of several projects lacks.
  */
-export function planModulesMember(shape: SolutionShape): string {
-  if (!shape.multi) return "";
-  const slugs = shape.modules.map((entry) => entry.slug).join(", ");
-  return (
-    "This solution declares more than one module, so one further member is optional:\n" +
-    '  modules     the module(s) this session works in, by slug from docs/modules.yaml: ' +
-    `["<slug>", ...]. Declared here: ${slugs}. Name as many as the work touches, or leave it out.\n` +
-    "A module reaches a sibling by project reference: in .NET a <ProjectReference> to the sibling's project, with both projects listed in the solution file at the root; in Maven a <dependency> on the sibling at ${project.version}, with both modules listed under <modules> in the parent pom.xml and built in one reactor run. A step that writes a module's project adds it to that root file; where there is none yet, the framework writes the root build files once the work is done, before it is verified.\n"
-  );
-}
+export const SIBLING_REFERENCE =
+  "A project reaches a sibling by project reference: in .NET a <ProjectReference> to the sibling's project, with both projects listed in the solution file at the root; " +
+  "in Maven a <dependency> on the sibling at ${project.version}, with both modules listed under <modules> in the parent pom.xml and built in one reactor run. " +
+  "A step that writes a project adds it to that root file; where there is none yet, the framework writes the root build files once the work is done, before it is verified.\n";
 
 export function judgeLease(mine: number, onDisk: number): { readonly refusal: string | null } {
   if (onDisk <= mine) return { refusal: null };
@@ -603,8 +580,6 @@ const RULE = {
   filesChangedOmits: "files-changed-omits",
   checkFailed: "check-failed",
   noWorkPlan: "no-work-plan",
-  /** The plan's modules do not fit the solution's shape. */
-  planModules: "plan-modules",
   /** The plan names nothing it will not do. */
   planNonGoals: "plan-non-goals",
   /** The plan holds its release with no reason. */
@@ -864,19 +839,6 @@ export function judgeRegistration(facts: RegistrationFacts): RegistrationOutcome
  * a real one; this is the only instruction that can honestly name none, and a
  * reader that treats 0 as a session will find no record for it.
  */
-/** The module(s) a session's declaration names, or none. */
-function sessionModulesOf(sessionsDir: string, sessionNumber: number): string[] {
-  const rows = readSessionState(sessionsDir)?.["sessions"];
-  for (const row of Array.isArray(rows) ? rows : []) {
-    if (typeof row !== "object" || row === null || Array.isArray(row)) continue;
-    const record = row as Record<string, unknown>;
-    if (Number(record["number"]) !== sessionNumber) continue;
-    const modules = record["modules"];
-    return Array.isArray(modules) ? modules.map(String).filter((slug) => slug.trim() !== "") : [];
-  }
-  return [];
-}
-
 export function idleInstruction(now: string): DriverInstruction {
   return {
     schema_version: DRIVER_SCHEMA_VERSION,
@@ -1706,12 +1668,7 @@ class Driver {
       "a check. A step whose product is prose still has a mechanical " +
       "check. Keep steps small, one concern each; the files a step lists are exactly the " +
       "files it will touch, because its report is measured against them.\n" +
-      // The member a multi-module solution's declaration is refused
-      // without. It went unsaid until the Java walk met it: an engine
-      // answering exactly what it was asked for was refused every time. Said
-      // only where it is required, because a single-module repository IS the
-      // module.
-      this.modulesMember() +
+      SIBLING_REFERENCE +
       this.suiteGap() +
       "One member is optional and is left out of a single-repository session:\n" +
       '  repositories  other repositories of this SOLUTION the plan needs to exist: [{"id": ' +
@@ -1732,15 +1689,6 @@ class Driver {
     );
   }
 
-  /** The `modules` paragraph for this repository's shape, or nothing. */
-  private modulesMember(): string {
-    try {
-      return planModulesMember(solutionShape(this.repoRoot));
-    } catch {
-      return "";
-    }
-  }
-
   private async phasePlan(): Promise<void> {
     let plan = readWorkPlan(this.repoRoot, this.sessionNumber);
     let reasons: string[] = [];
@@ -1756,12 +1704,10 @@ class Driver {
       });
       plan = readWorkPlan(this.repoRoot, this.sessionNumber);
       if (plan !== null) {
-        // The schema accepted it; the solution's shape may not. A plan that
-        // names an undeclared module is
-        // handed back with the shape's own words, and the file is removed
-        // so the next answer is judged afresh rather than re-read.
+        // The schema accepted it; what a schema cannot say may still refuse
+        // it. A refused plan is handed back with the judge's own words, and
+        // the file is removed so the next answer is judged afresh.
         const planReasons = [
-          ...judgeWorkPlanModules(plan, solutionShape(this.repoRoot)).map((reason) => refusal(RULE.planModules, reason)),
           ...judgeWorkPlanNonGoals(plan).map((reason) => refusal(RULE.planNonGoals, reason)),
           ...judgeWorkPlanHold(plan).map((reason) => refusal(RULE.planHold, reason)),
         ];
@@ -1797,12 +1743,6 @@ class Driver {
     this.placePlannedRepositories(plan);
 
     if (readTaskDeclaration(this.sessionsDir, this.sessionNumber) === null) {
-      // The modules reach the record only in a multi-module solution; a
-      // single-module plan carries none, and the judge above saw to it. The
-      // reason travels with them: `declare` runs the same judge, and a
-      // cross-module plan handed over without its reason is refused there
-      // after being accepted here.
-      const shape = solutionShape(this.repoRoot);
       // The refusal's own words travel into the stop: the toast shows the
       // stop's first sentence, and "its reason is above" is not a reason.
       const refused: { message: string; cause: DeclareRefusalCause } = { message: "", cause: "other" };
@@ -1811,7 +1751,6 @@ class Driver {
         releasable: plan.hold_release === undefined,
         holdReason: plan.hold_release ?? null,
         sessionNumber: this.sessionNumber,
-        modules: shape.multi ? (plan.modules ?? null) : null,
         onRefusal: (message, cause) => {
           refused.message = message;
           refused.cause = cause;
@@ -2118,23 +2057,15 @@ class Driver {
   }
 
   /**
-   * The root build files a multi-module solution needs, written where absent
-   * once the work is done and before it is verified -- the one moment every
-   * path into a round passes. `modules create` writes them only when a module
-   * already holds a project file, so a solution declared before its code gets
-   * them here, from the session that wrote its first project. They are part
-   * of the tree the round reviews and the land commits, and the step baseline
-   * moves past them, so no later step has to account for what the framework
-   * wrote.
+   * The root build files a solution of several projects needs, written where
+   * absent once the work is done and before it is verified -- the one moment
+   * every path into a round passes, so a solution gets them from the session
+   * that wrote its projects. They are part of the tree the round reviews and
+   * the land commits, and the step baseline moves past them, so no later
+   * step has to account for what the framework wrote.
    */
   private writeRootFiles(): void {
-    let written: ScaffoldResult | null;
-    try {
-      written = ensureRootFiles(this.repoRoot, solutionShape(this.repoRoot));
-    } catch (error) {
-      if (error instanceof ManifestError || error instanceof EcosystemError) return;
-      throw error;
-    }
+    const written = ensureRootFiles(this.repoRoot, readProjectGraph(this.repoRoot));
     const wrote = [...(written?.written ?? []), ...(written?.changed ?? [])];
     if (wrote.length === 0) return;
     const tree = snapshotWorktreeTree(this.repoRoot);
@@ -2574,78 +2505,8 @@ class Driver {
    * that owned it. Deterministic, and invisible while a repository had one
    * suite.
    */
-  /**
-   * The impact plan of a module session, or null for every other session:
-   * a single-module solution, or a session whose row names no module. The
-   * changed paths are the session's whole diff, HEAD to the working tree.
-   */
-  private impactPlanForSession(): ImpactPlan | null {
-    let shape: SolutionShape;
-    try {
-      shape = solutionShape(this.repoRoot);
-    } catch (error) {
-      if (error instanceof ManifestError) return null;
-      throw error;
-    }
-    if (!shape.multi) return null;
-    const modules = sessionModulesOf(this.sessionsDir, this.sessionNumber);
-    if (modules.length === 0) return null;
-    const loaded = loadSuitesChecked(this.config, { shape });
-    if (loaded.errors.length > 0) {
-      throw new Stop("tests", `testing.suites is malformed: ${loaded.errors.join("; ")}`);
-    }
-    // The session's changed paths are its material worktree changes: the
-    // work, and not the ledger it wrote, the machine state under .dabbler/,
-    // or the engine's settings the registration installed. A driven session
-    // commits only at the land, so at the run of record its whole change is
-    // still on the worktree.
-    const status = readWorktreeStatus(this.repoRoot);
-    if (status.error !== "") throw new Stop("tests", `could not read the working tree: ${status.error}`);
-    const changed = materialPaths(
-      status.text,
-      relative(this.repoRoot, this.sessionsDir).split("\\").join("/"),
-      { beforeWork: true, hookRemoved: hookRemovedFor(this.sessionsDir) },
-    );
-    return planImpact(
-      shape,
-      loaded.suites,
-      changed,
-      new Map(
-        [...moduleConfigs(this.config, shape.modules).values()].map((module) => [module.slug, module.sharedFiles]),
-      ),
-    );
-  }
-
   private async phaseRunOfRecord(): Promise<void> {
-    // A module session runs only the suites its impact plan reached; the plan
-    // is written beside the run so the close gate demands the same suites.
-    // Every other session runs every expensive suite. One plan per verified
-    // tree: the phase re-entered -- after a stop, or while a suite's job runs
-    // -- reads it back rather than recomputing it.
-    const verifiedAt = String(latestRound(this.repoRoot, this.sessionNumber)?.["recorded_at"] ?? "");
-    const recorded = readImpactPlan(this.repoRoot, this.sessionNumber);
-    const plan =
-      recorded !== null && standsSince(recorded.writtenAt, verifiedAt)
-        ? recorded
-        : this.impactPlanForSession();
-    if (plan !== null) {
-      if (plan === recorded) {
-        this.log("impact-plan-standing", { written: plan.writtenAt ?? null });
-      } else {
-        writeImpactPlan(this.repoRoot, this.sessionNumber, plan);
-        this.log("impact-plan", {
-          modules: plan.changedModules,
-          suites: plan.suites.map((suite) => suite.name),
-          unowned: plan.unowned,
-          // An unowned path reaches no module, so it selects only the suites
-          // bound to none. Said on the line, because the sample's operator
-          // read `unowned=[...]` and could not tell whether that selected
-          // every suite, no suite, or was refused.
-          unownedSelects: plan.unowned.length === 0 ? undefined : "only the suites bound to no module",
-        });
-      }
-    }
-    const reached = plan === null ? null : new Set(plan.suites.map((suite) => suite.name));
+    // Every expensive suite runs, against the verified tree.
     const suites = this.expensiveSuites();
     // Said, rather than left to a gate's N/A: a reader of the record could
     // not otherwise tell a suite that was skipped from one that was green.
@@ -2653,10 +2514,6 @@ class Driver {
       this.log("run-of-record-none", { reason: "no suite declared; nothing to run" });
     }
     for (const suite of suites) {
-      if (reached !== null && !reached.has(suite.name)) {
-        this.log("run-of-record-skipped", { suite: suite.name, reason: "not reached by the impact plan" });
-        continue;
-      }
       const jobName = `run of record: ${suite.name}`;
       const standing = evaluateFreshness(this.sessionsDir, null, [suite], {
         repoRoot: this.repoRoot,
@@ -2733,15 +2590,11 @@ class Driver {
    * since the verified tree.
    */
   private landFacts(): LandFacts {
-    const plan = readImpactPlan(this.repoRoot, this.sessionNumber);
     const loaded = loadSuitesChecked(this.config);
     if (loaded.errors.length > 0) {
       throw new Stop("land", `testing.suites is malformed: ${loaded.errors.join("; ")}`);
     }
-    const owed =
-      plan !== null && plan.multi
-        ? loaded.suites.filter((suite) => plan.suites.some((reached) => reached.name === suite.name))
-        : loaded.suites.filter((suite) => suite.expensive && suiteRequiredForClose(suite));
+    const owed = loaded.suites.filter((suite) => suite.expensive && suiteRequiredForClose(suite));
     const runs = readRecords(this.repoRoot);
     const suites: LandSuiteFact[] = owed.map((suite) => {
       const latest = runs.filter((row) => row.suite === suite.name && row.stage === STAGE_FINAL_FULL).at(-1);

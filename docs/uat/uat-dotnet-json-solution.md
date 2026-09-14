@@ -282,66 +282,35 @@ configure` set. Name the vehicle for THIS checkout with `dabbler configure
 
 ---
 
-## Step 3 — Declare the three modules
+## Step 3 — Decide the three modules
 
-- **Framework —** nothing at this moment; which modules a solution has is
-  yours to say. What the framework does with the answer is derive the rest:
-  you write only `depends on`, and *used by* is worked out from it.
-- **You —** run **Dabbler: New Module** three times. Four prompts each:
+- **No framework register —** there is nothing to declare: a solution is its
+  build files, and the framework reads them as the sessions write them. Which
+  modules a solution has is a **person's** judgement, and step 4 writes it
+  into the plan.
+- **No UI register —** for the same reason, a **person's** judgement and no
+  gap: there is no button to declare a module, and none is missing.
+- **No command underneath —** nothing is run here.
 
-  | prompt | model | store | app |
-  | --- | --- | --- | --- |
-  | `New module (1/2): slug` | `model` | `store` | `app` |
-  | `New module (2/4): display title` | `Item model` | `SQLite store` | `JSON loader` |
-  | `New module (3/4): kind` | `shared-types` | `library` | `application` |
-  | `New module (4/4): depends on` | *(leave blank)* | `model` | `model, store` |
+The solution will be three .NET projects, each written by the session that
+builds it, each under its module's folder:
 
-  Each ends with `Module "<slug>" added to docs/modules.yaml.` (The first
-  prompt really is titled `1/2` while the rest count to four — walk finding
-  8, cosmetic, and it means the flow is longer than the first box implies.)
-- **Underneath —**
-  ```
-  dabbler modules create . --slug model --title "Item model" --kind shared-types
-  dabbler modules create . --slug store --title "SQLite store" --kind library --depends-on model
-  dabbler modules create . --slug app --title "JSON loader" --kind application --depends-on model --depends-on store
-  ```
+| module | project | references |
+| --- | --- | --- |
+| `modules\model` | `JsonModel` | — |
+| `modules\store` | `JsonStore` | `JsonModel` |
+| `modules\app` | `JsonLoader` | `JsonModel`, `JsonStore` |
 
-**Then make the file say what the projects will be called.** New Module asks
-four of a module's values and defaults the code root to `modules/<slug>` and
-the package to the slug. Open `docs\modules.yaml` and set each `package`, so
-the file reads:
+A project reaches a sibling with a `<ProjectReference>`. Once the build files
+hold more than one project and the root has no solution file, the framework
+writes the `.slnx` that lists them, `Directory.Build.props` and
+`Directory.Build.targets`, before that session's work is verified, and never
+rewrites them.
 
-```yaml
-modules:
-- slug: model
-  title: Item model
-  kind: shared-types
-  codeRoots:
-  - modules/model
-  package: JsonModel
-- slug: store
-  title: SQLite store
-  kind: library
-  codeRoots:
-  - modules/store
-  package: JsonStore
-  dependsOn:
-  - model
-- slug: app
-  title: JSON loader
-  kind: application
-  codeRoots:
-  - modules/app
-  package: JsonLoader
-  dependsOn:
-  - model
-  - store
-```
-
-**Check what it recorded** in the **Solution Explorer**: three module rows,
-each with its kind, its *Depends on* and its *Used by*. `model` is used by
-`store` and `app` — **which you never typed.** The CLI form of the same view
-is `dabbler modules show .`, and `"multi"` in its answer must be `true`.
+**Check it after session 2** in the **Solution Explorer**: a row for each
+project the sessions have written, with its kind, its *Depends on* and its
+*Used by*. `JsonModel` is used by `JsonStore` — **which nobody typed**: it
+is read from the `<ProjectReference>`.
 
 ---
 
@@ -469,8 +438,7 @@ has nothing to do. If it says `no tests affected by this change set`, the
 rule is wrong.
 
 You add three more lines to `selection.rules` for each module as you write
-its tests. **Dabbler: Show Impact** on a module row shows the same plan for
-that module's roots.
+its tests.
 
 ---
 
@@ -478,10 +446,8 @@ that module's roots.
 
 - **No framework register —** and this is a gap the **framework** should
   close, at the declaration. `session start` refuses a working tree that
-  carries changes, and steps 3 to 5 have just written three files that nobody
-  has committed — including `docs\modules.yaml`, which bootstrap did not
-  commit because `modules create` wrote it after bootstrap ran. Walk findings
-  2 and 5.
+  carries changes, and steps 4 and 5 have just written three files that nobody
+  has committed. Walk finding 5.
 - **No UI register —** Start Session does not offer the commit, and nothing
   sets the upstream that the land's bare `git push` needs. It is the
   framework's to close, at the same moment it refuses the tree.
@@ -496,7 +462,7 @@ that module's roots.
 
 ```
 start: refused -- session 1 cannot declare its task list now: the working tree already
-         carries 3 change(s) (docs/sessions/session-plan.md, docs/modules.yaml, items.json).
+         carries 3 change(s) (dabbler.yaml, docs/sessions/session-plan.md, items.json).
          The declaration comes before the work -- one made after it is a model deciding in
          hindsight what may be published. Commit or revert, then declare.
 ```
@@ -674,8 +640,6 @@ view is the one under test.
 Each of these was found by walking this document on 8 September 2026 and is
 written up in `docs/uat/uat-walk-findings.md` with its reproduction.
 
-- **New Module asks four of a module's six values** (step 3). Finding 1.
-- **Bootstrap does not commit the modules manifest** (step 6). Finding 2.
 - **Nothing in the UI sets the remote or the upstream** (steps 2 and 6).
   Finding 5.
 - **Troubleshoot runs no toolchain checks** (prerequisites). Finding 6.

@@ -25,14 +25,12 @@ import {
   briefing,
   declaredDependencies,
   grantForTransport,
-  moduleScope,
   readFidelity,
   recordForRound,
   recordRow,
   sessionScope,
   summaryLine,
 } from "../src/agency.ts";
-import { dependencyOrder, parseEntries, impliedDeployables } from "../src/modules.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
 const scopes = [{ suite: "unit", roots: ["tests/"], glob: "test_*.py" }];
@@ -80,40 +78,6 @@ describe("scope", () => {
     assert.deepEqual(sessionScope(repo, join(repo, "docs", "sessions"), ["pkg/a.py"]), ["docs/sessions", "pkg/a.py", "pkg/b.py"]);
     assert.deepEqual([...declaredDependencies(repo, ["pkg/a.py"])], ["pkg/b.py"]);
     assert.deepEqual(sessionScope(repo, null, ["pkg/c.py"]), ["pkg/c.py"]);
-  });
-
-  it("in the module form takes the module's roots and every dependency's roots, the root files and the sessions directory, and nothing of a module it does not reach", () => {
-    const repo = tempDir();
-    seed(repo, {
-      "global.json": "{}\n",
-      "Directory.Packages.props": "<Project />\n",
-      "Pipeline.sln": "",
-      "modules/model/src/CsvModel/Person.cs": "public sealed class Person {}\n",
-      "modules/persister/src/CsvPersister/Store.cs": "public sealed class Store {}\n",
-      "modules/listener/src/Listener/Program.cs": "public static class Program {}\n",
-      "build/common.props": "<Project />\n",
-    });
-    mkdirSync(join(repo, "docs", "sessions"), { recursive: true });
-    const entries = parseEntries({
-      modules: [
-        { slug: "model", codeRoots: ["modules/model"] },
-        { slug: "persister", codeRoots: ["modules/persister"], dependsOn: ["model"] },
-        { slug: "listener", codeRoots: ["modules/listener"], dependsOn: ["persister"] },
-      ],
-    });
-    const shape = { multi: true, implicit: false, modules: dependencyOrder(entries), deployables: impliedDeployables(entries) };
-    const scope = moduleScope(repo, join(repo, "docs", "sessions"), shape, ["persister"], new Map([["persister", ["build/common.props"]]]));
-    // The model is a project reference the persister builds against; the
-    // listener consumes the persister and is not reached.
-    assert.deepEqual(scope, [
-      "Directory.Packages.props",
-      "Pipeline.sln",
-      "build/common.props",
-      "docs/sessions",
-      "global.json",
-      "modules/model",
-      "modules/persister",
-    ]);
   });
 });
 

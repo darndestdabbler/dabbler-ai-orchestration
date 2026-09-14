@@ -1,8 +1,8 @@
 {
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
-  "description": "Organize AI-led development like work: modules, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
-  "version": "2.9.0",
+  "description": "Organize AI-led development like work: solutions, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
+  "version": "3.0.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -110,12 +110,6 @@
         "category": "Dabbler"
       },
       {
-        "command": "dabbler.newModule",
-        "title": "New Module",
-        "category": "Dabbler",
-        "icon": "$(add)"
-      },
-      {
         "command": "dabblerSessionSets.cancel",
         "title": "Cancel Session",
         "category": "Dabbler"
@@ -206,12 +200,6 @@
         "title": "Store a Key on This Machine",
         "category": "Dabbler",
         "icon": "$(key)"
-      },
-      {
-        "command": "dabblerSolution.showImpact",
-        "title": "Show Impact",
-        "category": "Dabbler",
-        "icon": "$(list-tree)"
       },
       {
         "command": "dabblerSolution.revealRepository",
@@ -315,10 +303,6 @@
           "when": "false"
         },
         {
-          "command": "dabblerSolution.showImpact",
-          "when": "false"
-        },
-        {
           "command": "dabblerWorkExplorer.activateSession",
           "when": "false"
         },
@@ -336,11 +320,6 @@
           "command": "dabblerSessionSets.refresh",
           "when": "view == dabblerWorkExplorerTree",
           "group": "navigation@1"
-        },
-        {
-          "command": "dabbler.newModule",
-          "when": "view == dabblerWorkExplorerTree",
-          "group": "navigation@2"
         },
         {
           "command": "dabblerSolution.openWorkspace",
@@ -383,11 +362,6 @@
           "command": "dabblerSessionSets.restore",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-restore;/",
           "group": "9_lifecycle@902"
-        },
-        {
-          "command": "dabblerSolution.showImpact",
-          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerModule:/",
-          "group": "1_open@2"
         },
         {
           "command": "dabblerSolution.setEngine",
@@ -520,7 +494,7 @@
           {
             "id": "startSession",
             "title": "Start session 1",
-            "description": "Session 1 authors the solution plan and declares the modules (one module is a fine answer); session 2 challenges the cuts and breaks the plan into numbered sessions, one module each. Session 1 asks you what the solution is -- the plan's substance is yours, and it does not guess it.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
+            "description": "Session 1 authors the solution plan (one module is a fine answer); session 2 challenges the cuts and breaks the plan into numbered sessions. Session 1 asks you what the solution is -- the plan's substance is yours, and it does not guess it.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
             "media": {
               "markdown": "media/walkthrough-session.md"
             }
@@ -531,7 +505,7 @@
     "viewsWelcome": [
       {
         "view": "dabblerSolutionTree",
-        "contents": "This shows what the project is being built FROM: its modules, what each one promises, and who breaks when one of them changes.\n\nIt fills in once the repository is set up. Session 1 writes the solution plan, and the modules appear here from docs/modules.yaml.\n[Set Up New Project](command:dabbler.setupNewProject)",
+        "contents": "This shows what the project is being built FROM: its projects, what each one references, and who breaks when one of them changes.\n\nIt fills in once the repository is set up, from the solution's build files as the sessions write them.\n[Set Up New Project](command:dabbler.setupNewProject)",
         "when": "true"
       },
       {
@@ -602,7 +576,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.9",
-    "dabbler-ai-router": "2.9.0",
+    "dabbler-ai-router": "3.0.0",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",

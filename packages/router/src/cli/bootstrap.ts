@@ -15,7 +15,7 @@
 // checkout's own `.vscode/settings.json`, which is where a choice about a
 // checkout belongs: committed, visible, and one command from changed.
 
-import { existsSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -27,7 +27,6 @@ import {
 import { freshnessWarnings } from "../discovery.ts";
 import { SESSIONS_DIRNAME, ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
 import { haveCommonHistory, remoteDefaultBranch, repoRelativePath, runGit } from "../journal.ts";
-import { MANIFEST_RELPATH } from "../modules.ts";
 import { PROJECT_CONFIG_FILENAME } from "../config.ts";
 import { STATUS_IN_PROGRESS } from "../progress.ts";
 import { readRawSessionState } from "../sessionState.ts";
@@ -43,7 +42,6 @@ import {
   ensureCommitGuard,
   ensureGitignore,
   scaffoldBootstrapSessions,
-  scaffoldModuleManifest,
   scaffoldProjectConfig,
   writeInstructionFiles,
   removeStopGate,
@@ -339,20 +337,13 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     );
   }
 
-  // The Solution Explorer had nothing to render in a fresh project and no
-  // way to say why. This is the manifest half -- one module, the
-  // repository, so nothing module-shaped switches on; the welcome state is
-  // the extension's, and the projection below is the third.
-  const manifest = scaffoldModuleManifest(project);
-  if (manifest !== null) {
-    writeOut(`bootstrap: scaffolded ${manifest}
-`);
-    written.push(manifest);
-    try {
-      writeProjection(project);
-    } catch {
-      // A manifest that will not project is `modules show`'s to explain.
-    }
+  // The Solution Explorer has something to render from the first minute:
+  // the projection reads the build files, and a repository with none is
+  // its one project.
+  try {
+    writeProjection(project);
+  } catch {
+    // A rendering must not stop set-up; the tree derives again when it opens.
   }
 
   const scaffolded = scaffoldBootstrapSessions(project);
@@ -373,20 +364,11 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   // phase. With a session in flight the land's `git add -A` is what
   // commits these, and the step's report still passes -- the driver
   // compares trees, not commits.
-  //
-  // The one file bootstrap commits without having written it. The manifest
-  // is the declaration the Solution Explorer renders and every session is
-  // scoped by, and bootstrap writes it itself whenever it is absent -- so
-  // the only way it is missing from `written` is that the operator declared
-  // their modules BEFORE running set-up, which is the order both
-  // walkthroughs teach. Left uncommitted it is precisely the tree that
-  // refuses session 1, underneath a sentence from this command saying it
-  // will not be.
-  const adopted = manifest === null ? untrackedManifest(project) : null;
+
   const inFlight = sessionInFlight(project);
   const commit =
     inFlight === null
-      ? commitOwnScaffold(project, adopted === null ? written : [...written, adopted])
+      ? commitOwnScaffold(project, written)
       : { committed: false, reason: "" };
   if (inFlight !== null && written.length > 0) {
     // "Its land commits them" is true only AFTER the session has declared
@@ -402,13 +384,8 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
           : `${commitBeforeDeclaring(undeclared, "them")}\n`),
     );
   } else if (commit.committed) {
-    // The count is of what this command WROTE, and the manifest it adopted
-    // is named rather than folded into it: a person reading "7 files" for a
-    // run that wrote six has been told something false about the one file
-    // that was theirs.
     writeOut(
       `bootstrap: committed ${written.length} file(s) it wrote` +
-        (adopted === null ? "" : `, and the ${MANIFEST_RELPATH} it found untracked`) +
         "; the declaration a session makes comes before its work, so session 1 " +
         "would be refused while they sat uncommitted.\n",
     );
@@ -607,25 +584,6 @@ function defaultBranchMismatch(projectDir: string, pushedBranch: string): string
     "bootstrap: either way, which branch is default is a setting on the host and no git " +
     "command changes it; the verb prints where to move it.\n"
   );
-}
-
-/**
- * The modules manifest, when it is on disk and git has never seen it.
- *
- * Untracked is the whole test. A tracked manifest carrying uncommitted
- * edits is the operator's own change to their own declaration, and the rule
- * below holds for it exactly as it holds for a source file: bootstrap
- * commits what it wrote, plus this one declaration when nothing else ever
- * will, and never somebody's work.
- */
-function untrackedManifest(projectDir: string): string | null {
-  const path = join(projectDir, MANIFEST_RELPATH);
-  if (!existsSync(path)) return null;
-  const root = repoRootFor(projectDir);
-  if (root === null) return null;
-  const status = runGit(root, ["status", "--porcelain", "--", repoRelativePath(root, path)]);
-  if (status.code !== 0) return null;
-  return status.stdout.split("\n").some((line) => line.startsWith("??")) ? path : null;
 }
 
 /**

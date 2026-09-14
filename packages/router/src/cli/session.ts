@@ -229,8 +229,6 @@ interface Parsed {
   readonly values: Map<string, string>;
   readonly switches: Set<string>;
   readonly positional: string[];
-  /** `--module <slug>`, repeatable; the declaration's modules. */
-  readonly modules: string[];
 }
 
 /**
@@ -238,20 +236,22 @@ interface Parsed {
  * Refused rather than read as `--flag value`: a dropped flag that parsed as
  * nothing would publish, and a misspelled one is a usage error already.
  */
-const RETIRED_FLAGS: ReadonlyMap<string, string> = new Map(
-  ["--releasable", "--not-releasable"].map((flag) => [
-    flag,
-    `argument ${flag}: gone -- a session ships unless its plan holds it, and \`--hold-release "<reason>"\` is the hold`,
-  ]),
-);
+const RETIRED_FLAGS: ReadonlyMap<string, string> = new Map([
+  ...["--releasable", "--not-releasable"].map(
+    (flag) =>
+      [
+        flag,
+        `argument ${flag}: gone -- a session ships unless its plan holds it, and \`--hold-release "<reason>"\` is the hold`,
+      ] as const,
+  ),
+  ["--module", "argument --module: gone -- a session works in the whole solution, and its plan's steps name every file it changes"],
+]);
 
 const SWITCHES = new Set([
   "--dry-run",
   "--force",
   "--stop",
 ]);
-
-const REPEATABLE_MODULE = "--module";
 
 /** The flag three verbs once required, and the sentence that says why they no longer take it. */
 export const APPROVER_FLAG = "--approver";
@@ -278,7 +278,6 @@ function parseArgs(argv: readonly string[]): Parsed | string {
   const values = new Map<string, string>();
   const switches = new Set<string>();
   const positional: string[] = [];
-  const modules: string[] = [];
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (!token.startsWith("--")) {
@@ -290,8 +289,7 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     if (retired !== undefined) return retired;
     if (equals !== -1) {
       const flag = token.slice(0, equals);
-      if (flag === REPEATABLE_MODULE) modules.push(token.slice(equals + 1));
-      else values.set(flag, token.slice(equals + 1));
+      values.set(flag, token.slice(equals + 1));
       continue;
     }
     if (SWITCHES.has(token)) {
@@ -302,13 +300,10 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     if (next === undefined || next.startsWith("--")) {
       return `argument ${token}: expected one argument`;
     }
-    // The one repeatable flag: a session in a multi-module solution names
-    // the module(s) it works in on `declare`, once each.
-    if (token === REPEATABLE_MODULE) modules.push(next);
-    else values.set(token, next);
+    values.set(token, next);
     index += 1;
   }
-  return { values, switches, positional, modules };
+  return { values, switches, positional };
 }
 
 function integer(raw: string | undefined, flag: string): number | null | string {
@@ -721,7 +716,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     releasable: holdReason === null,
     holdReason,
     sessionNumber,
-    modules: parsed.modules,
   });
 }
 

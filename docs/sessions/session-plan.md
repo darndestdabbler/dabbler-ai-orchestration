@@ -10435,3 +10435,428 @@ tone test changes with it.
 **Releasable.** Yes, as a **minor** (2.9.0): the notes name the collected
 close, the removed deadlock label, the in-call wait and the four fixes from
 the tutorial's issues log.
+
+## Why sessions 170–175 exist: the solution is what its build files say
+
+The operator's rulings of 2026-09-14 (`docs/operator-decisions.md`, after
+consult round 15: `docs/design/consults/round15-synthesis.md`), with session
+169 pushed as the point the machinery can be brought back from:
+
+1. **The module machinery goes.** The focused checkout (a second, sparse
+   clone per module), the in-repository packages that let a module build
+   without its siblings' source, the contract pages, and `docs/modules.yaml`
+   were all built so an AI session could not read a sibling's source. They
+   cost thousands of lines, a second window, a pull at every close, a
+   solution-wide suite that could not run, and both deadlocks the staff
+   watched. A skilled .NET or Java team works in one checkout with project
+   references, and so will a session: .NET `ProjectReference` and the
+   solution file; Maven's reactor and a sibling `<dependency>`. The Solution
+   Explorer is read from the build files.
+2. **Releasing is a project setting, on request by default**, turned to ship
+   by default from the solution's context menu. This repository ships by
+   default.
+3. **Planning asks how production is split**, offering the shop's default —
+   an application tier that calls an API tier, and only the API tier talks
+   to the database — and what each part is handed over as. A tutorial
+   produces whatever artifact is easiest to test.
+4. **Tests are named after what they test**, and the whole suite runs at a
+   session's end while it costs no more than about 5% of the session.
+5. **Zero deadlocks** (session 169's ruling) governs every step of this
+   block: nothing here adds a stop a person cannot move with one command,
+   and a rule that would refuse is written as a line to the reviewer or a
+   hold on the release instead.
+
+**Order.** 170 deletes the checkout first, because a sibling project
+reference cannot resolve in a checkout that holds no sibling source. 171
+then replaces packages with references. 172 deletes the manifest the first
+two stopped needing, and fills the Solution Explorer from the build files.
+173 needs 172's project graph for "the projects that depend on this one".
+174 is independent of 173 and follows it only to keep one change in flight.
+175 walks the result, timed.
+
+**Releases.** 170 and 171 hold their release for 172: a half-removed module
+model is not something to hand the operator's staff. 172 releases 3.0.0, a
+major — focused sessions, `dabbler module pack` and the manifest are gone.
+173 and 174 release minors; 175 releases what its walk fixes.
+
+**What is NOT built, anywhere in the block.** No replacement wall of any
+kind: no read limits, no step rejection for a file in another project, no
+exposure measure. No migration tool for a repository that already has
+`packages/`, contract pages or a manifest: its files stay where they are and
+nothing reads them. No Gradle reader. No per-shop configuration layer. No
+method-level test selection. No deployment.
+
+### Session 170 of 175: One checkout
+
+Scope: whole repository
+
+**Every session runs in the repository the developer opened.** Deleted:
+`packages/router/src/checkout.ts`, `exposure.ts` and `policy.ts`, with their
+tests `checkout.test.ts`, `exposure.test.ts`, `policy.test.ts` and
+`walk-checkout.test.ts` (and the walkthrough's entry in
+`test/support/no-git.ts` and the count `check-suite-cost.ts` holds it to).
+`contractDir`, `ROOT_BUILD_FILES` and `SOLUTION_FILE`, which `agency.ts` and
+`drive.ts` import from `checkout.ts`, move to the one file that keeps using
+each.
+
+**Deleted with them:**
+- the verbs `module open`, `module preflight`, `module grant`, `module
+  revoke` and `session scope`; the flags `session start --module`,
+  `--focused` and `--global`, and `session next --request-grant` with its
+  `--reason`;
+- in `session.ts`, `judgeSessionKind`, `prepareModuleStart`,
+  `writeDeclaredPolicy`, `pullRepositoryForward` and `writeCloseExposure`,
+  and the focused branches of `start` and `close`;
+- in `drive.ts`, the module-session marker's refusal, the grant request,
+  `scopeForStep` and the scope sentence of a step's ask,
+  `suiteOwedElsewhere` and the run-of-record skip that writes
+  `suites_owed_elsewhere`; the land's `git add` loses `--sparse`;
+- the `exposure_within_ceiling` gate, and the schema members that exist only
+  for the checkout: `suites_owed_elsewhere` on `driver-run`, the row's
+  `checkout` on `sessions`, and `exposure`, `checkoutModule`,
+  `focusedSession` and the session `kind` on the progress projection. A
+  recorded run or row that carries one is still read: the members become
+  optional and unused, never refused;
+- the `Module:` and `Scope:` plan lines' meaning as a session KIND, with
+  `plannedKindOf` and `sessionKindMembers` in `progress.ts`: the Work
+  Explorer lists sessions by status, which is the operator's standing
+  preference.
+
+**A multi-module session may name no module.** `judgeModulesForShape` in
+`driver.ts` took "no checkout on the row" to mean global; with no checkout,
+every session is. A plan in a multi-module solution may name the modules it
+touches or none, and naming two needs no reason. An undeclared name is still
+refused at acceptance, where a plan is amended in one command.
+
+**The extension.** Deleted: `commands/openModule.ts`,
+`commands/moduleGrant.ts`, the `dabblerSolution.openModule`,
+`startFocusedSession` and `revokeModule` contributions and menus, the
+start-request file and its consumer in `sessionCommands.ts`, "Start Session
+in a New Window" in `ActionRegistry.ts`, the kind label in
+`sessionsModel.ts`, the focused text and kind description in
+`workExplorerTreeModel.ts`, the `;focused`, `;granted` and `;next-session`
+tokens in `solutionTreeModel.ts` (Show Impact and Pack Module move to every
+module row), and the kind and marker lines in `dabblerTerminal.ts`.
+
+**The words.** The managed body's focused-session paragraph
+(`bootstrap/templates.ts`, and so `AGENTS.md`), the plan templates' `Module:`
+and `Scope:` rules, the README's focused-versus-global section and the
+extension README's third feature. `check-uat-registers.mjs` and the UAT
+walkthroughs that name the deleted buttons are updated in the same step, so
+the register check holds.
+
+**Two small things owed by session 169.** A provider failure's message
+carries the provider's own error text (`transports/api.ts`): OpenAI's
+`credit_balance_exhausted` read as "HTTP 429 Too Many Requests". And the
+remote-line test in `session.test.ts` asserts that start's output holds
+exactly one line about the remote, not one line containing "origin".
+
+**Non-goals.** No change to the in-repository packages, contract pages or
+`docs/modules.yaml` (171 and 172); no change to `sharedFiles`, which still
+feeds the impact plan until 172; no change to which tests run.
+
+**Steps.** (1) The router: the three files, the verbs, flags, gate, schema
+members and branches. (2) The declaration rule for a session naming no
+module. (3) The extension. (4) The words and the register check. (5) The two
+small things.
+
+**Tests.** A session in a multi-module solution whose plan names no module is
+declared. A run carrying `suites_owed_elsewhere` and a row carrying
+`checkout` are still read. A provider's error text reaches the failure's
+message. The start test asserts exactly one remote line. The deleted files'
+tests go with them; the extension's focused-start and Open Module suites go.
+
+**Hold.** `hold_release`: the module machinery's removal ships whole in
+session 172.
+
+### Session 171 of 175: Project references
+
+Scope: whole repository
+
+**A sibling is a project reference.** In a .NET solution a module reaches its
+sibling with `<ProjectReference>` and the solution file lists both; in Maven
+the parent `pom.xml` lists both under `<modules>` and one depends on the
+other at `${project.version}`, built in one reactor run. The managed body's
+"the other modules are here as packages and contract folders" sentence and
+the plan ask say this instead.
+
+**Deleted:**
+- `packages/router/src/packages.ts` and its test; the verbs `module pack`,
+  `module candidate` and `module contract`, `modules create --contract`, and
+  `contractdoc --module` (the file form of `contractdoc` stays);
+- the candidate job in `phaseRunOfRecord`, `bundleCandidates`, the
+  candidate's files subtracted from a step's changes (`drive.ts`,
+  `session.ts`), and the module digests, `receiptCorrespondence` and bundle
+  fields of the land and its receipt; `candidateTrunk`, `gateIsCandidate` and
+  the `candidate/s<N>` push are the CI merge gate and STAY;
+- in `land.ts`, the module part of `judgeLandReadiness`, `judgePins`,
+  `bundleRecord` and the bundle readers and writers;
+- the `pins_current` gate;
+- in `ecosystem.ts`, every package, pin, contract and API-surface member of
+  the ecosystem seam for .NET and Maven (`packArgv`, `feedRootArgv`,
+  `writeCentralPin`, `readSurface`, `scaffoldContract` and the rest the
+  inventory names), `pinPackageVersion`, `PACKAGES_DIR`, `contractNotesPage`,
+  `readCSharpSurface`, `readJavaSurface`, and the .NET and Maven contract
+  scaffolds;
+- the module form of `contractdoc.ts`, `CONTRACT_MODES` and the manifest's
+  `contract` member, `packagesCeiling`, the contract folder added to a
+  suite's `covers` (`testEvidence.ts`), `contractDir` and the projection's
+  contract and bundle fields;
+- in the extension, `commands/packModule.ts` and its contribution and test,
+  and the Solution Explorer's contract and bundle nodes.
+
+**What the root files become.** For .NET: the `.slnx`,
+`Directory.Build.props`, `Directory.Build.targets` and the `bin/`/`obj/`
+ignore rules — no `nuget.config` packages source, no
+`Directory.Packages.props`, no `packages/` folder. For Maven: the parent POM
+with its properties, compiler release and `<modules>`, and the `target/`
+ignore rule — no local repository, no `dependencyManagement` pins, no deploy
+or flatten plugin, no `packages/`.
+
+**What survives untouched.** The release: `packaging.pack` and `push`,
+`packageSession`, `loadDeclaration`, `loadTagRelease`, `pushReleaseTag`, the
+`{version}` placeholder a release uses, and `published_when_releasable`.
+
+**Non-goals.** No change to `docs/modules.yaml` or the Solution Explorer's
+module rows (172); nothing written into a customer's existing `packages/`,
+`nuget.config` or contract folders; no scaffolder that writes a module's
+project — the engine writes projects, and the plan ask says how siblings are
+referenced.
+
+**Steps.** (1) The router's candidate job, land, gate and verbs. (2)
+`ecosystem.ts` and the root files. (3) `contractdoc.ts`, the manifest's
+contract member and the projection fields. (4) The extension. (5) The words:
+managed body, plan ask, README, `docs/quick-start.md`, the CSV tutorial.
+
+**Tests.** The .NET root files for a two-module solution hold no packages
+source and no central pin file; the Maven parent lists its modules and
+declares no local repository or flatten plugin. A session whose modules
+reference each other lands and closes with no candidate job. The deleted
+machinery's tests go with it.
+
+**Hold.** `hold_release`: the module machinery's removal ships whole in
+session 172.
+
+### Session 172 of 175: The build files are the solution
+
+Scope: whole repository
+
+**One reader of the solution's shape.** A new `projectGraph.ts` replaces
+`modules.ts` and `impact.ts`, which are deleted. For .NET it reads the
+root's `.slnx` or `.sln` (every `.csproj` under the root when there is none),
+each project's `<ProjectReference>`s resolved to projects, and its kind from
+the project SDK and `OutputType`: `Microsoft.NET.Sdk.Web` is a service,
+`Microsoft.NET.Sdk.Worker` a worker, `OutputType Exe` an application, a
+project referencing `Microsoft.NET.Test.Sdk` a test project, anything else a
+library. For Maven it reads the root `pom.xml`'s `<modules>` recursively, each
+module's `artifactId`, its `<packaging>` (`war` is a service) and the
+`spring-boot-maven-plugin` (a service), and a `<dependency>` on a sibling's
+artifact as a reference. A repository with neither is one project: itself.
+`solutionDeps.ts` keeps its multi-repository mode and lends its XML reader
+and POM parsing; nothing is parsed twice.
+
+**What reads it.** The Solution Explorer's projection (`projection.ts`
+writes `solution.json` as projects with kind, depends-on and used-by), the
+extension's Solution Explorer (project rows in place of module rows; the
+watched files become `.sln`, `.slnx`, `.csproj` and `pom.xml`), and bootstrap
+detection.
+
+**Deleted:** `docs/modules.yaml` as anything the framework reads or writes,
+with `modules create`, `modules show`, the extension's New Module command and
+`utils/moduleAuthoring.ts`; `bootstrap`'s one-module manifest; the plan
+ask's modules paragraph (`planModulesMember`) and the declaration's module
+judgments (`judgeWorkPlanModules`, `judgeModulesForShape`); the
+`deployables:` block and the bundle and deployable lines of `dabbler
+affected`; `sharedFiles`; a suite's `module` and `against`; module-based
+test selection (`reachModules`, `demandedByPlan`, the `selectTests` module
+form) and the extension's Show Impact command; the verifier's module scope
+(`agency.moduleScope`), because the plan's steps name every file a step may
+change and the reviewer reads the diff against them;
+`touchesIntegrationModule` in `approvedPlan.ts`. The run of record runs every
+expensive suite until 173.
+
+**A record written before is read.** A recorded work plan or declaration
+carrying `modules` is accepted and the member is ignored. A `dabbler.yaml`
+carrying `sharedFiles`, a suite `module` or `against`, or a manifest on disk
+prints one line naming what is no longer read, and refuses nothing.
+
+**Non-goals.** No change to which tests run beyond "every expensive suite"
+(173); no graph for ecosystems other than .NET and Maven; no rendering of
+external packages beyond what the multi-repository mode already shows.
+
+**Steps.** (1) `projectGraph.ts`, with `modules.ts` and `impact.ts` deleted
+and their callers moved. (2) The projection and the extension's Solution
+Explorer. (3) The verbs, the plan ask and the declaration. (4) The words:
+README's modules section becomes a solutions section, `docs/quick-start.md`,
+the UAT walkthroughs and their register check, the viewsWelcome text. (5)
+`package.json` to 3.0.0 with the notes.
+
+**Tests.** A `.slnx` with a web project referencing a library, and a test
+project referencing both, reads as three projects with their kinds and
+references. A Maven parent with two modules, one depending on the other and
+one carrying the Spring Boot plugin, reads the same way. A repository with no
+build files is one project. The Solution Explorer renders a projection's
+project rows with depends-on and used-by. A recorded plan carrying `modules`
+is still accepted. The manifest's tests go with it.
+
+**Releasable.** Yes, as a **major** (3.0.0): the notes say focused sessions,
+module packs, contract pages and `docs/modules.yaml` are gone, what a
+repository that has them keeps, and how a sibling is referenced now.
+
+### Session 173 of 175: Tests named after what they test
+
+Scope: whole repository
+
+**The convention.** A source file's tests are the test file named after it,
+in each ecosystem's own form: `CsvSerializer.cs` and `CsvSerializerTests`,
+`CsvSerializer.java` and `CsvSerializerTest`, this repository's
+`src/checks.ts` and `test/checks.test.ts`. A suite in `dabbler.yaml` declares
+its name pattern and the argv that runs a selection; `bootstrap` writes the
+.NET form (`dotnet test --filter` over the matching class names) and the
+Maven form (`mvn test -Dtest=<names> -Dsurefire.failIfNoSpecifiedTests=false`),
+and this repository declares its own. The planning text and the managed body
+say: a new public method gets a test named after it, a changed one has its
+tests updated or confirmed, and a removed one takes its tests with it.
+
+**Each step.** After a step's own checks, the framework runs the tests named
+after the source files the step changed, and any test file the step wrote or
+edited. A changed source file with no named test is a line the reviewer is
+shown; it refuses nothing.
+
+**The end of a session.** Each expensive suite runs whole when its last
+recorded whole run took no more than 60 seconds or 5% of the median
+wall-clock time of the repository's last five closed sessions, whichever is
+longer — and whole when there is no history to judge by. A suite past that
+runs the named tests of every source file the session changed, plus every
+test project of a project that depends on a changed one (Maven's `-pl
+<changed> -amd`; for .NET, from 172's graph), recorded as a `final-targeted`
+run that names what it selected. The freshness gate accepts that record for
+a suite past the threshold, over the same tree.
+
+**The whole suite before a release.** A releasing session runs the whole of
+any suite that ran targeted before it packages. A red whole run does not
+stop the session: the close holds the release, names the suite, and the
+session closes with the failure on its record for the next session to fix.
+CI's full run after the push is unchanged.
+
+**Deleted.** The hand-written `testing.selection` `rules` and `repo_wide`
+(`smoke` stays, as what runs where a changed file has no named test);
+`preverifyGate` in `affected.ts`, which nothing calls; this repository's own
+selection rules in `dabbler.yaml`.
+
+**Non-goals.** No method-level selection; no code comments listing tests; no
+coverage tool; no change to the per-step checks an engine declares.
+
+**Steps.** (1) The name pattern, the suite's selection argv and the
+bootstrap defaults. (2) The step's named tests and the reviewer's line. (3)
+The end-of-session threshold, the `final-targeted` record and the gate. (4)
+The whole run before a release and the held close. (5) The words, the
+deletions, and the release.
+
+**Tests.** A changed `.cs`, `.java` and `.ts` file each select their named
+tests. A changed library selects the tests of a project referencing it. A
+suite under the threshold runs whole; one over it runs targeted and the gate
+accepts the record; one with no history runs whole. A red whole run before a
+release holds the release and the session closes. A changed file with no
+named test reaches the reviewer and refuses nothing.
+
+**Releasable.** Yes, as a **minor**.
+
+### Session 174 of 175: What planning asks, and when a session releases
+
+Scope: whole repository
+
+**Releasing is a project setting.** `dabbler.release` in the checkout's
+`.vscode/settings.json`, written by `dabbler configure --release on-request |
+ship-by-default` and read beside `dabbler.transport` (`settings.ts`). Not a
+`dabbler.yaml` key: `release:` there already means the candidate merge gate.
+Absent means on request. On request, a session publishes only when its plan
+carries `release` with the one reason it releases now; ship by default, it
+publishes unless its plan carries `hold_release`, as today. The plan ask
+names the member the setting uses; a plan carrying the other is accepted and
+the setting decides. `NOTHING_TO_PUBLISH` and the verdict hold are
+unchanged. This repository commits `ship-by-default`.
+
+**The Solution Explorer.** The solution row gains **Ship by Default** and
+**Release on Request**, one shown at a time, each writing the setting through
+`router.configure`, the way the Configuration section writes a vehicle.
+
+**Planning asks how production is split.** `BOOTSTRAP_PLAN`'s session 1 and
+`PLAN_PROMPT` ask the person, before any module is proposed: *what runs
+separately in production, and which part may talk to the database?* —
+offering the default "an application tier that calls an API tier, and only
+the API tier talks to the database". The answer is recorded in
+`docs/planning/solution-plan.md` under *Production split*, with *Handoff
+artifacts*: what each separately running part is handed over as — an IIS
+site package or a Windows Service for .NET, a runnable jar, a war or an image
+for Java, a SQL migration script for the database. Session 2 creates the
+projects the split names, writes `packaging.pack` to produce the handoff
+artifacts, and — where only the API tier may reach the database — adds that
+rule as an architecture test in the solution's own tests. The template names
+the standard command for each form (`dotnet publish`, a Worker Service
+published for a service host, `dotnet ef migrations script --idempotent`,
+`mvn package`, Spring Boot's `build-image`), so the engine produces the real
+form later; a tutorial produces the easiest one to test.
+
+**Packaging without a feed.** A `packaging` block with `pack` and no `push`
+produces its artifacts into the run's package folder and publishes nothing
+further; the release tag is still made.
+
+**Non-goals.** No per-shop configuration layer: the default is in the
+template. No deployment. No framework check of the tier rule beyond the test
+the solution owns. No change to what a hold or a verdict does.
+
+**Steps.** (1) The setting, `configure`, the plan members and the publish
+phase. (2) The Solution Explorer commands. (3) The planning templates. (4)
+Pack without push. (5) The words, this repository's setting, and the
+release.
+
+**Tests.** With no setting, a plan without `release` publishes nothing and one
+with it publishes; with ship by default, a plan without `hold_release`
+publishes. `configure --release` writes the setting. The solution row offers
+the command that changes the setting and it writes it. A pack-only block
+produces artifacts and the tag. A bootstrapped session 1 asks the production
+split.
+
+**Releasable.** Yes, as a **minor**.
+
+### Session 175 of 175: The walk, timed
+
+Scope: whole repository
+
+**What is walked.** The extension this tree builds, installed into a scratch
+editor as a developer installs it, driving two new solutions in scratch
+repositories under `C:\temp` with a bare origin each: the CSV tutorial in
+.NET — a console application tier that sends parsed people to an API tier
+that alone writes them to SQLite — from bootstrap through session 3, the
+`Person` class; and a two-project Maven reactor through its first session.
+Every session is timed from its `supervision.jsonl`, its job logs and its
+ledger row: registration, planning, the engine's work, each review round, the
+run of record, the land, the release and the close.
+
+**What passes.** No stop that one `dabbler session next` or one named
+command does not move. A one-class session's framework time — everything but
+the engine's authoring and the review round — under two minutes, and the
+session under six. The handoff artifacts produced by `packaging.pack`. The
+Solution Explorer showing the projects the build files declare. The provider
+bill for the walk from `dabbler seat-cost` and the API usage, recorded, so the
+context cost the module wall was built against is measured rather than
+assumed.
+
+**What a finding becomes.** A defect found is fixed in this session with its
+test; a finding that is a larger change is written up as a later session and
+the walk records it. The record is `docs/uat/uat-simplified-walk.md`, and
+`docs/tutorials/csv-solution/` is rewritten from what the walk did.
+
+**Non-goals.** No new capability; no deployment of the artifacts; no
+unattended `session drive`.
+
+**Steps.** (1) Build and install the extension; the scratch repositories.
+(2) The .NET tutorial, sessions 1–3, timed. (3) The Maven reactor, timed.
+(4) The fixes found, each with its test. (5) The record, the tutorial and the
+release.
+
+**Tests.** One per defect the walk finds, and none otherwise.
+
+**Releasable.** Yes: a **patch** when the walk finds defects, and nothing to
+publish when it finds none (the plan holds, naming the clean walk).

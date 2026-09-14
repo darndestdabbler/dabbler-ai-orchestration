@@ -21,13 +21,11 @@ import {
 import { sessionNext } from "../src/drive.ts";
 import {
   ExposureError,
-  raiseGrantDecision,
+  makeGrant,
   readExposure,
   readGrants,
   revokeGrant,
-  settleAnsweredGrants,
 } from "../src/exposure.ts";
-import { answerOwed, foldOwed, readOwed } from "../src/owedDecisions.ts";
 import { solutionShape } from "../src/modules.ts";
 import { capture } from "../src/output.ts";
 import { EXIT_OK, pullRepositoryForward, start } from "../src/session.ts";
@@ -281,38 +279,27 @@ describe("a session started on a module", () => {
 describe("a grant, and its revoke", () => {
   const clone = defaultClonePath(repo, "persister", null);
 
-  it("answered grant, widens the clone to the sibling's source, records the bytes and the reason, and the brief ends with the permanent form", () => {
+  it("a request is a grant: the clone widens to the sibling's source at once, and the record carries the reason and the permanent form", () => {
     const shape = solutionShape(clone);
-    const decision = raiseGrantDecision(clone, shape, 1, "model", "debugging the mapper");
-    assert.equal(decision, "module-grant:model");
-    // The brief says how to stop asking: a shared file in the manifest.
-    const brief = foldOwed(readOwed(clone)).get(decision);
+    assert.equal(existsSync(join(clone, "modules", "model", "src")), false);
+    const made = makeGrant(clone, shape, 1, "model", "debugging the mapper");
+    assert.equal(made.grant.sibling, "model");
+    // How to stop asking: a shared file in the manifest.
     assert.match(
-      String(brief?.["determined"]),
+      made.permanentForm,
       /To keep this for every persister session, add modules\/model to persister's sharedFiles in dabbler\.yaml\./,
     );
-    // Raised, not applied: the request alone changes nothing on disk.
-    assert.equal(existsSync(join(clone, "modules", "model", "src")), false);
-    assert.deepEqual(settleAnsweredGrants(clone, shape, 1), { applied: [], denied: [], open: [decision] });
-
-    answerOwed(clone, decision, "grant", 1);
-    const settled = settleAnsweredGrants(clone, shape, 1);
-    assert.equal(settled.applied.length, 1);
-    assert.equal(settled.applied[0]?.sibling, "model");
     assert.ok(existsSync(join(clone, "modules", "model", "src", "CsvModel", "Person.cs")));
     // Nothing untracked appears: what status shows is the session's own
     // registration (its ledger), never machine state under .dabbler/.
     assert.doesNotMatch(gitOut(clone, "status", "--porcelain"), /\.dabbler/);
     const exposure = readExposure(clone, 1);
     assert.ok((exposure?.siblings[0]?.bytes ?? 0) > 0);
-    // The sibling's SOURCE, which is what the grant widened the cone for.
-    // Its project file is not exposure: cone mode puts one in every
-    // focused checkout, granted or not, and a manifest naming an artifact
-    // is what the contract folder already says out loud.
+    // The sibling's SOURCE, which is what the grant widened the cone for;
+    // its project file is not exposure, cone mode puts one in every checkout.
     assert.deepEqual(exposure?.siblings[0]?.files, ["modules/model/src/CsvModel/Person.cs"]);
     assert.equal(exposure?.grants[0]?.reason, "debugging the mapper");
-    // Settled once: a second look applies nothing again.
-    assert.deepEqual(settleAnsweredGrants(clone, shape, 1), { applied: [], denied: [], open: [] });
+    assert.deepEqual(readGrants(clone, 1).map((row) => row.event), ["requested", "granted"]);
   });
 
   it("refuses to revoke while the sibling's roots hold a change, and once it is discarded narrows the cone again and records it", () => {

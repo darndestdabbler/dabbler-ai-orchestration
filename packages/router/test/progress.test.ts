@@ -11,7 +11,6 @@ import { describe, it } from "node:test";
 
 import { writeRun, writeWorkPlan } from "../src/driver.ts";
 import { appendRound, roundsPath } from "../src/ledger.ts";
-import { CLASS_VALUE_TRADEOFF, raiseOwed } from "../src/owedDecisions.ts";
 import {
   DEFAULT_STALLED_AFTER_SECONDS,
   SESSION_STATUSES,
@@ -239,31 +238,6 @@ describe("the source of a projection's sessions", () => {
     );
     // A bound either of them may clear says so, and the button stays.
     assert.equal(stopped({ kind: "interrupted", reason: "you asked it to stop", at }), "either");
-  });
-
-  it("carries an open decision's whole brief, options and consequences included", () => {
-    // A surface with the labels but not their consequences would be a menu
-    // with no prices.
-    const { repo, sessionsDir } = makeStateDirs();
-    raiseOwed(repo, {
-      id: "driver-stop-s1", decisionClass: CLASS_VALUE_TRADEOFF,
-      question: "Session 001 stopped (budget). Run it again, or cancel it?",
-      determined: "the loop met driver.max_invocations (1)",
-      options: [
-        { label: "Run `next` again", consequence: "It resumes from 'steps'." },
-        { label: "Cancel the session", consequence: "It ends with a reason on the record." },
-      ],
-      recommendation: "Run `next` again", confidence: "high",
-      onNoAnswer: "The session stays in flight and its record stops moving.",
-    });
-    const [decision] = repository(sessionsDir)["owedDecisions"] as Record<string, unknown>[];
-    assert.equal(decision["id"], "driver-stop-s1");
-    assert.equal(decision["blocking"], false);
-    assert.equal(decision["recommendation"], "Run `next` again");
-    assert.deepEqual(decision["options"], [
-      { label: "Run `next` again", consequence: "It resumes from 'steps'." },
-      { label: "Cancel the session", consequence: "It ends with a reason on the record." },
-    ]);
   });
 
   it("calls an unreadable ledger a fault rather than a fresh repository", () => {

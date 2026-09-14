@@ -555,6 +555,16 @@ export function readRun(repoRoot: string, sessionNumber: number): DriverRun | nu
   return readArtifact(runPath(repoRoot, sessionNumber), validateRun);
 }
 
+/**
+ * The suites a run recorded as owed to another module's session, by name:
+ * reached by the impact plan, with no test of theirs on this disk. The
+ * freshness gate excuses them here and demands them nowhere else, because
+ * the module whose tests they are runs them in its own session.
+ */
+export function suitesOwedElsewhere(run: DriverRun | null): Set<string> {
+  return new Set((run?.suites_owed_elsewhere ?? []).map((row) => row.suite));
+}
+
 // --- Whole-file writes -------------------------------------------------------
 
 // Each writer validates before it writes, so the file on disk is by
@@ -1257,7 +1267,7 @@ function lastAnsweredAt(repoRoot: string, sessionNumber: number): string | null 
 //
 // The record keeps `kind`, `class`, `reason` and `step_id`, and gates and
 // tests read those. A person reads words, and the words are made here and
-// nowhere else: the driver's stderr line, the stop's owed decision, the
+// nowhere else: the driver's stderr line, the
 // `dabbler status` task row and the Dabbler terminal all call this, so none
 // of them can word a stop differently from the others.
 //
@@ -1330,7 +1340,7 @@ export interface StopRendering {
   readonly actor: StopActor;
   /**
    * The ways on, best first -- the first is what the framework would
-   * choose, and what its owed decision recommends. Never fewer than two: a
+   * choose. Never fewer than two: a
    * question with one answer is a notification.
    */
   readonly choices: readonly StopChoice[];
@@ -1442,8 +1452,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
       carryOn(
         parts,
         `Clear what step${parts.step} is blocked on, then carry on`,
-        "Whatever the blocker itself costs; an owed item may already carry " +
-          "it, and `dabbler owed list` says whether one does.",
+        "Whatever the blocker itself costs; the step's report says what it is.",
       ),
       cancelChoice(),
     ],
@@ -1519,8 +1528,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
       carryOn(
         parts,
         "Satisfy the gate the close named, then carry on",
-        "Whatever the gate demands. An owed decision is answered with " +
-          "`dabbler owed answer`, and the close is run again.",
+        "Whatever the gate demands; its row names it, and the close is run again.",
       ),
       cancelChoice(),
     ],

@@ -26,7 +26,6 @@ import { sessionsDirFor } from "./evidence.ts";
 import { atomicWriteJson, nowIso, runGit } from "./journal.ts";
 import { sessionRunDir } from "./ledger.ts";
 import { type ModuleEntry, type SolutionShape, moduleConfigs } from "./modules.ts";
-import { CLASS_VALUE_TRADEOFF, EVENT_ANSWERED, foldOwed, raiseOwed, readOwed } from "./owedDecisions.ts";
 
 export class ExposureError extends Error {
   constructor(message: string) {
@@ -46,7 +45,7 @@ export interface GrantRow {
   readonly sibling: string;
   readonly reason: string;
   readonly at: string;
-  /** The owed decision the row belongs to. */
+  /** The request the row belongs to: `module-grant:<sibling>[:<n>]`. */
   readonly decision: string;
 }
 
@@ -91,7 +90,7 @@ export function grantsPath(root: string, session: number): string {
 }
 
 /**
- * The id of the owed decision a grant of `sibling` is answered through. An
+ * The id a grant of `sibling` is recorded under, one per request. An
  * answered decision is settled for good, so a second request for the same
  * sibling -- after a revoke, say -- is a new question with its own number.
  */
@@ -100,8 +99,6 @@ export function grantDecisionId(sibling: string, sequence = 1): string {
 }
 
 export const GRANT_DECISION_PREFIX = "module-grant:";
-export const GRANT = "grant";
-export const DENY = "deny";
 
 function posix(path: string): string {
   return path.split("\\").join("/");
@@ -359,21 +356,23 @@ function refreshExposure(root: string, shape: SolutionShape, session: number): E
 }
 
 /**
- * Ask the operator to widen the session's checkout to a sibling's source.
+ * Widen the session's checkout to a sibling's source at the engine's
+ * request, and record why.
  *
- * An owed decision with `deny` recommended: the wall is the design, and a
- * grant is the exception somebody signs for. The request is recorded even
- * before it is answered, so the manifest can say a grant was asked for.
- * The brief ends with the permanent form, because a grant every session
- * of this module asks for is a shared file the manifest should declare.
+ * The wall is the design and a grant is the exception -- but an exception
+ * the engine takes with a reason on the record, not one a person waits to
+ * sign: a developer does not stop work to ask a lead's permission to read a
+ * sibling's code. What is kept is the record (the request, the grant, the
+ * bytes it exposed) and the permanent form, which is a shared file the
+ * manifest should declare so the next session does not ask.
  */
-export function raiseGrantDecision(
+export function makeGrant(
   root: string,
   shape: SolutionShape,
   session: number,
   sibling: string,
   reason: string,
-): string {
+): { readonly grant: GrantInForce; readonly permanentForm: string } {
   entryOf(shape, sibling);
   const modules = modulesOfSession(root, session);
   if (modules.includes(sibling)) {
@@ -383,34 +382,13 @@ export function raiseGrantDecision(
   const decision = grantDecisionId(sibling, nextGrantSequence(readGrants(root, session), sibling));
   const own = modules[0] ?? "";
   const roots = rootsOf(entryOf(shape, sibling));
-  raiseOwed(root, {
-    id: decision,
-    decisionClass: CLASS_VALUE_TRADEOFF,
-    question: `Widen session ${session}'s focused checkout to module '${sibling}'s source?`,
-    determined:
-      `Session ${session} works in module ${modules.map((slug) => `'${slug}'`).join(", ")}'s focused ` +
-      `checkout, where '${sibling}' is present as its package and its contract folder and never ` +
-      `as source. The engine asked for its source: ${reason.trim()}. A grant fetches the sibling's ` +
-      "blobs into this clone's object store and widens the cone to them; the exposure manifest " +
-      `records the grant and the bytes it exposes. To keep this for every ${own} session, add ` +
-      `${roots.join(", ")} to ${own}'s sharedFiles in dabbler.yaml.`,
-    options: [
-      {
-        label: GRANT,
-        consequence: `The cone widens to ${roots.join(", ")}. Recorded in the exposure manifest with this reason.`,
-      },
-      {
-        label: DENY,
-        consequence: "The cone stays narrow; the session works against the sibling's package and contract.",
-      },
-    ],
-    recommendation: DENY,
-    confidence: "medium",
-    onNoAnswer: "The cone stays narrow: the session proceeds against the sibling's package and contract.",
-    sessionNumber: session,
-  });
   appendGrant(root, session, { event: "requested", sibling, reason: reason.trim(), decision });
-  return decision;
+  const grant = applyGrant(root, shape, session, sibling, { reason: reason.trim(), decision });
+  return {
+    grant,
+    permanentForm:
+      `To keep this for every ${own} session, add ${roots.join(", ")} to ${own}'s sharedFiles in dabbler.yaml.`,
+  };
 }
 
 /** One past the requests already made for this sibling in this session. */
@@ -420,8 +398,7 @@ export function nextGrantSequence(rows: readonly GrantRow[], sibling: string): n
 
 /**
  * Widen the clone to the sibling's roots, record the grant and rewrite the
- * manifest. The framework does this on the operator's `grant`, never on
- * the request.
+ * manifest.
  */
 export function applyGrant(
   root: string,
@@ -484,53 +461,4 @@ export function revokeGrant(root: string, shape: SolutionShape, session: number,
   const narrowed = runGit(root, ["sparse-checkout", "set", "--cone", ...[...cone].sort()]);
   if (narrowed.code !== 0) throw new ExposureError(`narrowing the cone failed: ${narrowed.stderr}`);
   refreshExposure(root, shape, session);
-}
-
-export interface GrantSettlement {
-  readonly applied: readonly GrantInForce[];
-  readonly denied: readonly string[];
-  /** Decisions still waiting on the operator. */
-  readonly open: readonly string[];
-}
-
-/**
- * Act on what the operator has answered since the last look: a request
- * answered `grant` is applied, one answered `deny` is recorded, and one not
- * answered yet is reported open. Idempotent: a request already settled is
- * left alone.
- */
-export function settleAnsweredGrants(root: string, shape: SolutionShape, session: number): GrantSettlement {
-  const rows = readGrants(root, session);
-  const decisions = foldOwed(readOwed(root));
-  const settled = new Set(
-    rows.filter((row) => row.event !== "requested").map((row) => row.decision),
-  );
-  const applied: GrantInForce[] = [];
-  const denied: string[] = [];
-  const open: string[] = [];
-  for (const request of rows.filter((row) => row.event === "requested")) {
-    if (settled.has(request.decision)) continue;
-    const current = decisions.get(request.decision);
-    if (current === undefined || current["event"] !== EVENT_ANSWERED) {
-      open.push(request.decision);
-      continue;
-    }
-    if (String(current["answer"] ?? "") === GRANT) {
-      applied.push(
-        applyGrant(root, shape, session, request.sibling, {
-          reason: request.reason,
-          decision: request.decision,
-        }),
-      );
-    } else {
-      appendGrant(root, session, {
-        event: "denied",
-        sibling: request.sibling,
-        reason: request.reason,
-        decision: request.decision,
-      });
-      denied.push(request.decision);
-    }
-  }
-  return { applied, denied, open };
 }

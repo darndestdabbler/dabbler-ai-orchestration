@@ -27,8 +27,8 @@ import {
 import { freshnessWarnings } from "../discovery.ts";
 import { SESSIONS_DIRNAME, ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
 import { haveCommonHistory, remoteDefaultBranch, repoRelativePath, runGit } from "../journal.ts";
-import { raisePackagingDecisions, raiseRemoteDecision } from "../owedDecisions.ts";
 import { MANIFEST_RELPATH } from "../modules.ts";
+import { PROJECT_CONFIG_FILENAME } from "../config.ts";
 import { STATUS_IN_PROGRESS } from "../progress.ts";
 import { readRawSessionState } from "../sessionState.ts";
 import { writeProjection } from "../projection.ts";
@@ -200,7 +200,7 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   // project on its first day. The extension's Set Up New Project already
   // initialises one; a plain-shell bootstrap left the operator to do it by
   // hand, after every verb had refused. The remote is still theirs: the
-  // owed decision below asks for it once.
+  // line below says so once, and the push gate at every close.
   if (repoRootFor(project) === null) {
     const init = runGit(project, ["init"]);
     if (init.code !== 0) {
@@ -214,12 +214,12 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     writeOut(
       `bootstrap: initialised a git repository in ${project} -- the framework ` +
         "needs one for its tree hashes, its commit and its push. Add a remote " +
-        "before the first close; `dabbler owed list` asks where it should push.\n",
+        "before the first close; until then the repository is local-only.\n",
     );
   }
 
   // Where this project pushes, when the caller was given it. Recorded here,
-  // before the owed decision below reads whether this repository has a
+  // before the line below says whether this repository has a
   // remote; the PUSH waits until the scaffold is committed, because until
   // then there is nothing to push.
   const remote = parsed.remote === null ? null : addOrigin(project, parsed.remote.trim());
@@ -303,27 +303,20 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   }
   // The same, for publishing. A repository whose build files say they are
   // meant to become a package has everything derivable already derived; what
-  // it cannot derive is where the result goes, and asking that once at setup
-  // is the difference between publishing and hand-authoring pack and push
-  // argv before the first release.
+  // it cannot derive is where the result goes, and saying so once at setup
+  // is what gets it declared before the first release: until it is, every
+  // session is held with nothing to publish, and nobody is asked.
   const packaging = detectPackaging(project);
   const packagingRoot = repoRootFor(project);
   if (packagingRoot !== null && !declaresPackaging(project)) {
     if (packaging.recipe !== null) {
-      try {
-        raisePackagingDecisions(packagingRoot, {
-          ecosystem: packaging.recipe.key,
-          packCommand: packaging.recipe.pack.join(" "),
-        });
-        writeOut(
-          "bootstrap: this repository's build files say they are meant to be " +
-            `published (${packaging.recipe.key}). Two questions are waiting in ` +
-            "`dabbler owed list`: which feed, and the NAME of the credential. " +
-            "Answer them and the packaging block is written for you.\n",
-        );
-      } catch {
-        // A brief that cannot be written must not fail a bootstrap.
-      }
+      writeOut(
+        "bootstrap: this repository's build files say they are meant to be " +
+          `published (${packaging.recipe.key}), and ${PROJECT_CONFIG_FILENAME} declares no ` +
+          "`packaging:` block. Until it does, every session is held with nothing to publish: " +
+          "declare the feed and the NAME of the credential variable there -- the commented " +
+          `block shows the shape, and the pack is \`${packaging.recipe.pack.join(" ")}\`.\n`,
+      );
     } else if (packaging.reason) {
       // Silence that explains itself. "No packaging block" and "no packaging
       // block BECAUSE your project files are below the root" are the same
@@ -333,24 +326,17 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     }
   }
 
-  // Asked at setup, where the answer is cheap, rather than at the close --
+  // Said at setup, where it is cheap to act on, rather than at the close --
   // which is where it used to surface, as a printed `git push
-  // --set-upstream` for a remote nobody had created.
+  // --set-upstream` for a remote nobody had created. Nobody is asked: a
+  // repository with no remote is local-only by that fact, and the push
+  // gate says so at every close until one is added.
   const repoRoot = repoRootFor(project);
-  if (repoRoot !== null) {
-    try {
-      const raised = raiseRemoteDecision(repoRoot, {
-        hasRemote: runGit(repoRoot, ["remote"]).stdout.trim() !== "",
-      });
-      if (raised !== null) {
-        writeOut(
-          "bootstrap: this repository has no remote. `dabbler owed list` " +
-            "asks where it should push; answering settles it once.\n",
-        );
-      }
-    } catch {
-      // A brief that cannot be written must not fail a setup.
-    }
+  if (repoRoot !== null && runGit(repoRoot, ["remote"]).stdout.trim() === "") {
+    writeOut(
+      "bootstrap: this repository has no remote, so it is local-only: the land " +
+        "pushes nothing until `git remote add origin <url>`.\n",
+    );
   }
 
   // The Solution Explorer had nothing to render in a fresh project and no
@@ -406,8 +392,7 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     // "Its land commits them" is true only AFTER the session has declared
     // its task; before that the declaration refuses a tree carrying
     // changes, and the operator is who commits them. One rule, in
-    // writers.ts beside what a declaration is, because `owed answer`
-    // writes into the same window and has to say the same thing.
+    // writers.ts beside what a declaration is.
     // Bootstrap still commits nothing itself: session 94's rule stands.
     const undeclared = undeclaredSessionInFlight(join(project, "docs", SESSIONS_DIRNAME));
     writeOut(

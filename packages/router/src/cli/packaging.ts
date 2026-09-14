@@ -106,18 +106,18 @@ function explain(sessionsDir: string, run: PackagingRun): string {
     const reading = root === null ? null : detectPackaging(root);
     if (reading?.recipe) {
       // NOT a declaration. A repository whose build files say they are meant
-      // to be published, and whose feed question is still open, is waiting on
-      // an answer -- and calling that "publishes nothing" tells the operator
-      // the state is settled one sentence before saying it is not.
+      // to be published, and whose dabbler.yaml declares no packaging block,
+      // is held with nothing to publish -- and calling that "publishes
+      // nothing" tells the operator the state is settled when it is not.
       lines.push(
         "This repository publishes nothing YET -- not as a declaration, but " +
-          "because the two answers that would let it are still open.",
+          "because dabbler.yaml declares no `packaging:` block.",
       );
       lines.push(
         `Its build files say it is meant to: they look packable with ` +
-          `\`${reading.recipe.pack.join(" ")}\`. Two answers are all that is ` +
-          "missing -- which feed, and the NAME of the credential. " +
-          "`dabbler owed list` has both questions waiting.",
+          `\`${reading.recipe.pack.join(" ")}\`. Declare the feed and the NAME of the ` +
+          "credential variable under `packaging:` in dabbler.yaml; the commented block " +
+          "shows the shape.",
       );
     } else {
       lines.push("This repository publishes nothing today, and that is a declaration.");

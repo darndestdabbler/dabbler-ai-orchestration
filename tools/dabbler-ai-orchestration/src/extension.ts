@@ -15,13 +15,6 @@ import {
   startFromRequest,
 } from "./commands/sessionCommands";
 import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
-import {
-  DecisionAnnouncer,
-  badgeFor,
-  defaultOwedDecisionUi,
-  offerDecision,
-  registerOwedDecisionCommands,
-} from "./commands/owedDecisionCommands";
 import { installTerminalShim } from "./router/terminalShim";
 import {
   disposeDabblerTerminals,
@@ -110,12 +103,6 @@ export function activate(context: vscode.ExtensionContext): void {
   treeProvider.onDiagnostic((message) => {
     treeView.message = message;
   });
-  // What the framework is waiting on a person for, said in the three places
-  // a person might be looking: the badge on the activity bar, a toast for
-  // one that is newly open, and the row itself (which carries the brief and
-  // the command to answer it).
-  registerOwedDecisionCommands(context);
-  const announcer = new DecisionAnnouncer();
   // The repository this window is showing, as the last scan read it: what
   // Start Focused Session starts from, and what the Solution Explorer is
   // told the next session's module is.
@@ -125,7 +112,6 @@ export function activate(context: vscode.ExtensionContext): void {
   let workspaceRepository: SessionsRepository | undefined;
   let startRequestConsumed = false;
   treeProvider.onScan((repositories) => {
-    treeView.badge = badgeFor(repositories);
     // A session starting anywhere -- the operator's own CLI, most often --
     // brings the framework's terminal into view. The scan is the reading
     // that knows; the transition rule is the terminal's.
@@ -147,13 +133,6 @@ export function activate(context: vscode.ExtensionContext): void {
     if (workspaceRepository && !startRequestConsumed) {
       startRequestConsumed = true;
       void startFromRequest(workspaceRepository, defaultSessionRunUi(), defaultDriveLauncher(), sharedDrives());
-    }
-    for (const target of announcer.fresh(repositories)) {
-      void offerDecision(target, defaultOwedDecisionUi(), productionRouter()).then(
-        (answered) => {
-          if (answered) treeProvider.refresh();
-        },
-      );
     }
   });
 

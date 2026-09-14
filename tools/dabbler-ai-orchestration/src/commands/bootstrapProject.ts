@@ -48,8 +48,8 @@ export interface SetUpProjectUi {
    * not to ask for it at all: the close pushes, the close pulls the
    * repository forward, and a focused checkout is CLONED from the origin,
    * so a project with no remote cannot close its first session. Skipping is
-   * a real answer -- the project is set up without one, and `dabbler owed
-   * list` still asks for it later.
+   * a real answer -- the project is set up without one, local-only until a
+   * remote is added, and the push gate says so at every close.
    */
   askRemote?: () => Promise<string | undefined>;
   /** Start session 1 in the project just prepared. */
@@ -301,8 +301,8 @@ export function registerBootstrapProjectCommand(
  *
  * Skipping is a real answer and is why this is an input box with no
  * validation rather than a required step: a project set up without a remote
- * is a project that works until its first close, and the owed decision
- * `dabbler owed list` raises is what asks again.
+ * is local-only until one is added, and the push gate says so at every
+ * close.
  */
 async function askRemote(): Promise<string | undefined> {
   return vscode.window.showInputBox({

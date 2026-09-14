@@ -342,7 +342,7 @@ function declaresSuiteNamed(text: string, name: string): boolean {
  * The narrow half of scaffolding: `scaffoldProjectConfig` writes a whole file
  * and refuses an existing one, which is right at setup and useless later --
  * a repository that grew code after setup has a config file and no suite, and
- * that is the case an answered owed decision has to be able to act on.
+ * that is the case the written block has to cover.
  *
  * Two states the Java walk met, and both are answered here rather than
  * refused. A repository with NO `dabbler.yaml` gets one written: the

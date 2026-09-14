@@ -44,8 +44,8 @@ There is one implementation, in TypeScript, and it runs two ways:
    record). There is no waiver and no verdict a person can type.
 4. `dabbler session close` runs the gates `GATE_CHECKS` declares —
    verification clean, working tree clean, pushed to remote, test run
-   fresh, pins current, exposure within ceiling, owed decisions answered,
-   published when releasable, and verdict vocabulary — then flips the
+   fresh, pins current, exposure within ceiling, published when
+   releasable, and verdict vocabulary — then flips the
    state. The verification gate reads the ledger; there is no stamp, no
    override, no hand-writable record.
 

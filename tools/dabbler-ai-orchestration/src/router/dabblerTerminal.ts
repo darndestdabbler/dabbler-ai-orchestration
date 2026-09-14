@@ -147,13 +147,6 @@ const ROUNDS_FILENAME = "rounds.jsonl";
 const TEST_RUNS_FILENAME = "test-runs.jsonl";
 
 /**
- * The owed decisions of the repository, beside the test runs and read the
- * same way: forward from where it stood when this terminal first looked.
- * What is spoken from it is the `answered` fold alone.
- */
-const OWED_FILENAME = "owed-decisions.jsonl";
-
-/**
  * A verdict's tone.
  *
  * `VERIFIED` is the only clean one and it is the only green one. Everything
@@ -184,9 +177,9 @@ export function lineTone(event: string, fields: Record<string, string> = {}): To
   // pause that says "running this again unchanged reaches this exact point
   // again", and softening that word would cost the operator money.
   if (event === "paused") return fields["class"] === "deadlock" ? "bad" : "warn";
-  // The two honest green events, and no third: the phase moved past a
-  // pause with nothing in its place, and a person answered a question.
-  if (event === "progress-resumed" || event === "decision-answered") return "good";
+  // The one honest green event, and no second: the phase moved past a
+  // pause with nothing in its place.
+  if (event === "progress-resumed") return "good";
   // A finished job nobody collected is amber for the watcher's reason: the
   // framework knows of nothing wrong, and what is being said is that the
   // next call is owed and nobody has made it.
@@ -1513,7 +1506,6 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     const runDir = path.dirname(path.dirname(runPath));
     this.drainRounds(path.join(runDir, ROUNDS_FILENAME));
     this.drainTestRuns(path.join(this.repoRoot, RUNS_REL, TEST_RUNS_FILENAME));
-    this.drainOwed(path.join(this.repoRoot, RUNS_REL, OWED_FILENAME));
 
     if (collected !== null) {
       // What it exited with is the record's to say, not this terminal's to
@@ -1776,24 +1768,6 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   /** Test runs as they are recorded; the first look already said this session's. */
   private drainTestRuns(file: string): void {
     for (const row of this.newRows(file, false)) this.line("tests", testRunFields(row));
-  }
-
-  /**
-   * The second green event: a question folded to `answered`.
-   *
-   * Repository-wide like the test runs, and not replayed for the same
-   * reason. Only the `answered` fold is spoken -- a question raised is an
-   * attention row in the Explorer, and a question superseded is the
-   * framework tidying after itself, and neither is something a person did.
-   */
-  private drainOwed(file: string): void {
-    for (const row of this.newRows(file, false)) {
-      if (row["event"] !== "answered") continue;
-      this.line("decision-answered", {
-        id: String(row["id"] ?? "?"),
-        answer: String(row["answer"] ?? ""),
-      });
-    }
   }
 
   /**

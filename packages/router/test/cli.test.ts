@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { checkoutCone } from "../src/checkout.ts";
+import { depsVerb } from "../src/cli/deps.ts";
 import { MANIFEST_HEADER, loadEntries, solutionShape } from "../src/modules.ts";
 import { packModule } from "../src/packages.ts";
 import { moduleVerb } from "../src/cli/module.ts";
@@ -220,6 +221,19 @@ describe("dabbler version", () => {
     mkdirSync(join(extension, "dist"), { recursive: true });
     assert.deepEqual(extensionAbove(join(extension, "dist")), ["some-extension", "9.9.9"]);
     assert.equal(extensionAbove(tempDir("no-ext-")), null);
+  });
+});
+
+describe("dabbler deps", () => {
+  it("reads a package no repository of the solution declares as external, and says so", async () => {
+    // What used to be a question per package is a fact the output states.
+    const { sessionsDir } = makeAnsweredSandbox({
+      "App.csproj":
+        '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Newtonsoft.Json" Version="13.0.1" /></ItemGroup></Project>\n',
+    });
+    const result = await run(() => depsVerb(["check", "--sessions-dir", sessionsDir]));
+    assert.equal(result.code, 0, result.err);
+    assert.match(result.out, /Newtonsoft\.Json.*read as external/);
   });
 });
 

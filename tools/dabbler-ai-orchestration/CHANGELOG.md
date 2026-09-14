@@ -10,6 +10,59 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.8.0] — 2026-09-14
+
+**Nothing is owed.** The owed-decision module is gone: no `dabbler owed`,
+no Answer Owed Decision, no `owed_decisions` gate, no rows a person is
+waited on for. Every question the module could raise is now a default the
+framework takes and records, or a refusal that names its fix, and none is
+a toast or a chat question. Decisions stay documented in the activity log
+and the decisions log, which never read the deleted file.
+
+### Changed
+
+- **A grant is made when asked for.** `session next --request-grant <slug>
+  --reason` widens a focused checkout to the sibling's source at once,
+  records the reason in the grants log and the exposure manifest, and
+  prints the permanent form: the sibling's root under this module's
+  `sharedFiles` in dabbler.yaml. `dabbler module grant` is the same act by
+  hand. Nothing waits on a person, and `deny` is no longer an answer
+  anyone gives.
+- **A suite is a rule at the gate.** `test_run_fresh` refuses a close where
+  the build files say there is code and dabbler.yaml declares no suite,
+  naming the file and `testing.suites`; a repository of documents stays
+  inapplicable. The plan ask says so before the work, so the engine
+  declares one as a step. `session start` and the close raise nothing.
+- **No remote is local-only by that fact.** The push gate waives itself
+  for a repository with no remote and names `git remote add origin`;
+  bootstrap says the same once. The `.dabbler/local-only` marker is no
+  longer read or written.
+- **An undeclared package is external.** `dabbler deps` reads a package no
+  repository of the solution declares as external and says so in one line,
+  with how to declare otherwise. A feed that is not a package source on
+  this machine is a refusal naming NuGet.config and the directories that
+  could be it; `deps feeds --apply` is gone with the answer it applied.
+- **Build files that say a repository publishes are one printed line** at
+  bootstrap, naming the `packaging:` block, the feed and the NAME of the
+  credential variable; until the block exists every session is held with
+  nothing to publish.
+- **A stop raises no row.** The framework terminal prints the stop's own
+  sentence, its substance, its ways on with the command for each, and the
+  amendment triage proposed. The next `session next` resumes it.
+- **A suite whose tests are not in a focused folder is recorded on the
+  session's run** (`suites_owed_elsewhere` in `driver/run.json`), and the
+  freshness gate excuses it from there.
+
+### Removed
+
+- `packages/router/src/owedDecisions.ts`, `dabbler owed list|answer`, the
+  `owed-decisions` and `owed-decision-current` schemas, the
+  `owed_decisions` close gate (eight gates remain), the projection's
+  `owedDecisions` member, and the in-process `owed` verbs.
+- In the extension: the Answer Owed Decision command, its walkthrough step
+  and page, the attention rows and the activity-bar badge the decisions
+  drew, and the terminal's `decision-answered` line.
+
 ## [2.7.0] — 2026-09-14
 
 **The judgment calls nobody needs to be asked.** Two sessions on the rule

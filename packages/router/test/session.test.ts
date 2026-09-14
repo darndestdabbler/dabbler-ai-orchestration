@@ -29,7 +29,6 @@ import {
 import { capture } from "../src/output.ts";
 import { readExposure } from "../src/exposure.ts";
 import { platformNewlines } from "../src/journal.ts";
-import { readOwed } from "../src/owedDecisions.ts";
 import { checkPublishedWhenReleasable } from "../src/gates.ts";
 import { readPolicy } from "../src/policy.ts";
 import { TRANSPORT_COPILOT_CLI, resetProjectRootCache } from "../src/config.ts";
@@ -575,7 +574,6 @@ describe("cancelling and restoring through the verb", () => {
       assert.equal(engine.code, EXIT_BOUNDARY);
       assert.match(engine.err, /a person's verb, never the engine's/);
       assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
-      assert.deepEqual(readOwed(state.repo), []);
       const person = await run(() => cancel(state.sessionsDir, 1, { reason: "stop", force: true, engine: false }));
       assert.equal(person.code, EXIT_OK);
       assert.equal(sessionOf(state.sessionsDir)["status"], "cancelled");

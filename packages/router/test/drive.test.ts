@@ -42,10 +42,10 @@ import {
 } from "../src/drive.ts";
 import { judgeFreshness, rewindPhaseFor } from "../src/gates.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
-import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
+import type { DriverInstruction, DriverReport, DriverRun } from "../src/generated/index.ts";
 import { type ImpactPlan, demandedByPlan } from "../src/impact.ts";
 import { dependencyOrder, impliedDeployables, parseEntries } from "../src/modules.ts";
-import { answerOwed, raiseRunOfRecordOwed, suitesOwedElsewhere } from "../src/owedDecisions.ts";
+import { suitesOwedElsewhere } from "../src/driver.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 
 const INSTRUCTION = {
@@ -466,25 +466,17 @@ describe("a reached suite whose tests are not in this folder", () => {
     seed(root, { "modules/listener/tests/Compatibility.cs": "" });
     assert.equal(suiteOwedElsewhere(root, sibling, plan, scopes), null);
 
-    // Recorded as owed, with the module on the row, and the close here does
-    // not demand a record that cannot exist here; without the record it would.
-    const row = raiseRunOfRecordOwed(root, 3, sibling.name, "listener");
-    assert.equal(row?.["module"], "listener");
-    assert.deepEqual([...suitesOwedElsewhere(root, 3)], [sibling.name]);
+    // Recorded on the session's own run, and the close here does not demand
+    // a record that cannot exist here; without the record it would.
+    const run = { suites_owed_elsewhere: [{ suite: sibling.name, module: "listener" }] } as unknown as DriverRun;
+    assert.deepEqual([...suitesOwedElsewhere(run)], [sibling.name]);
+    assert.deepEqual([...suitesOwedElsewhere(null)], []);
     const verdicts = [
       { suite: own.name, required: true, passed: true, reason: "fresh", changedInputs: [] },
       { suite: sibling.name, required: true, passed: false, reason: "no record", changedInputs: [] },
     ];
-    assert.deepEqual(judgeFreshness(demandedByPlan(verdicts, plan, suitesOwedElsewhere(root, 3))), [true, ""]);
+    assert.deepEqual(judgeFreshness(demandedByPlan(verdicts, plan, suitesOwedElsewhere(run))), [true, ""]);
     assert.match(judgeFreshness(demandedByPlan(verdicts, plan))[1], /listener-against-persister/);
-    // Accepting the recommendation keeps the suite owed elsewhere: the
-    // close must not get back the demand the decision was raised to lift.
-    answerOwed(root, String(row?.["id"]), "Owed to listener's session", 3);
-    assert.deepEqual([...suitesOwedElsewhere(root, 3)], [sibling.name]);
-    // The other answer puts it back on this session's close.
-    const other = raiseRunOfRecordOwed(root, 3, "listener-unit", "listener");
-    answerOwed(root, String(other?.["id"]), "Run it in the repository now", 3);
-    assert.deepEqual([...suitesOwedElsewhere(root, 3)], [sibling.name]);
   });
 });
 

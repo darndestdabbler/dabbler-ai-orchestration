@@ -150,15 +150,6 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "pack, then push to the declared feed",
   },
   {
-    // The operator's inbox. Extension-facing because the answer is a
-    // decision, and a decision reserved to a person should not require a
-    // terminal -- the Explorer renders these rows and the framework acts on
-    // the answer.
-    verb: "owed",
-    extensionFacing: true,
-    summary: "what the framework is waiting on a person for; list and answer",
-  },
-  {
     // The second opinion on a stopped session, and the one verb both modes
     // call: an attended engine when it is stuck, the unattended loop on a
     // deadlock. Not extension-facing -- it spends a provider call, and a

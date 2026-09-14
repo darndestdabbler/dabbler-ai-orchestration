@@ -33,14 +33,12 @@ import {
   verifyQuote,
 } from "../src/evidence.ts";
 import {
-  checkOwedDecisions,
   checkTestRunFresh,
   checkVerificationClean,
   checkWorkingTreeClean,
 } from "../src/gates.ts";
 import { roundRef, snapshotWorktreeTree } from "../src/journal.ts";
 import { appendRound, readRounds } from "../src/ledger.ts";
-import { CLASS_EXTERNAL_CONSEQUENCE, answerOwed, openDecisions, raiseOwed, readOwed, foldOwed } from "../src/owedDecisions.ts";
 import { buildProjection, buildTaskRows, readActivityLog } from "../src/progress.ts";
 import {
   digestOfEntries,
@@ -186,19 +184,6 @@ describe("a repository walked through the record one session leaves", () => {
     assert.match(checkVerificationClean(sessionsDir)[1], /^session-state integrity/);
     writeFileSync(path, sanctioned, "utf8");
     assert.equal(detectOutOfBandWrite(sessionsDir, repo, { requireRecord: true }), null);
-  });
-
-  milestone("an owed decision is raised, does not hold the close in its class, and folds once answered", () => {
-    raiseOwed(repo, {
-      id: "remote", decisionClass: CLASS_EXTERNAL_CONSEQUENCE, question: "Push where?", determined: "No remote is configured.",
-      options: [{ label: "attach", consequence: "A remote is added." }, { label: "local-only", consequence: "Nothing is pushed." }],
-      recommendation: "attach", onNoAnswer: "The wait is recorded.",
-    });
-    assert.equal(openDecisions(repo).length, 1);
-    assert.equal(checkOwedDecisions(sessionsDir)[0], true);
-    answerOwed(repo, "remote", "local-only");
-    assert.equal(foldOwed(readOwed(repo)).get("remote")?.["answer"], "local-only");
-    assert.equal(openDecisions(repo).length, 0);
   });
 
   milestone("the projection reads the ledger, the task rows and the clean verification view", () => {

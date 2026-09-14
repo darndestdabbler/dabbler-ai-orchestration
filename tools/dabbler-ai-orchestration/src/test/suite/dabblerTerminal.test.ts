@@ -523,35 +523,6 @@ suite("the Dabbler terminal", () => {
     rmrf(root);
   });
 
-  test("says a decision answered, from the owed ledger, and only from where it first looked", () => {
-    const { root, written, terminal } = drivenRepo(RUNNING);
-    const owed = path.join(root, ".dabbler", "runs", "owed-decisions.jsonl");
-    // Rows written before this terminal existed are history, and a question
-    // raised is not something a person did: neither is spoken.
-    fs.writeFileSync(
-      owed,
-      `${JSON.stringify({ id: "old-question", event: "answered", state: "answered", answer: "Yes" })}\n` +
-        `${JSON.stringify({ id: "driver-stop-s62", event: "raised", state: "open" })}\n`,
-      "utf8",
-    );
-    terminal.poll();
-    assert.ok(!plain(written.join("")).includes("decision-answered"));
-
-    written.length = 0;
-    fs.appendFileSync(
-      owed,
-      `${JSON.stringify({ id: "driver-stop-s62", event: "answered", state: "answered", answer: "Run `next` again" })}\n`,
-      "utf8",
-    );
-    terminal.poll();
-    const spoken = plain(written.join(""));
-    assert.ok(spoken.includes("decision-answered id=driver-stop-s62 answer=Run `next` again"), spoken);
-    assert.ok(!spoken.includes("old-question"));
-
-    terminal.dispose();
-    rmrf(root);
-  });
-
   test("resolves the same tone in either theme, and never the same colour", () => {
     // Two palettes, one vocabulary. A tone that resolved to one colour in
     // both themes would be unreadable in one of them, which is the failure
@@ -581,7 +552,6 @@ suite("the Dabbler terminal", () => {
     assert.strictEqual(lineTone("paused", { class: "deadlock" }), "bad");
     // The two honest green events, and no third.
     assert.strictEqual(lineTone("progress-resumed", {}), "good");
-    assert.strictEqual(lineTone("decision-answered", {}), "good");
     // An unrecognised verdict warns rather than passing as clean, because
     // that is exactly the case where guessing "fine" is worst.
     assert.strictEqual(lineTone("verify", { verdict: "SOMETHING_NEW" }), "warn");

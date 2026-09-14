@@ -13,7 +13,6 @@ import { afterEach, describe, it } from "node:test";
 
 import { SOURCE_API, TRANSPORT_API, writeBlock } from "../src/catalog.ts";
 import { bootstrapVerb } from "../src/cli/bootstrap.ts";
-import { owedVerb } from "../src/cli/owed.ts";
 import {
   MANAGED_END,
   MANAGED_START,
@@ -33,14 +32,6 @@ import {
 } from "../src/config.ts";
 import { EXIT_BLOCKING } from "../src/contracts/exitCodes.ts";
 import { SETTINGS_RELPATH } from "../src/settings.ts";
-import {
-  ID_GIT_REMOTE,
-  ID_TESTING_SUITES,
-  blockingDecisions,
-  openDecisions,
-  raiseRemoteDecision,
-  refreshOwedDecisions,
-} from "../src/owedDecisions.ts";
 import { capture } from "../src/output.ts";
 import { writePreferences } from "../src/preferences.ts";
 import { solutionShape } from "../src/modules.ts";
@@ -602,21 +593,30 @@ describe("what setup does about the operator's typing", () => {
     assert.match(after.stdout, /its land is what commits them/);
   });
 
-  it("asks where the repository pushes rather than printing a push command", async () => {
+  it("says a repository with no remote is local-only, and asks nobody", async () => {
     // The close used to print `git push --set-upstream <remote> main` for a
-    // remote nobody had created.
+    // remote nobody had created; then setup asked where to push. Now the
+    // fact is the answer: no remote is local-only, said once here and at
+    // every close by the push gate.
     const repo = emptyRepo();
-    await bootstrapVerb(["--project-dir", repo]);
-    assert.ok(openDecisions(repo).map((row) => String(row["id"])).includes(ID_GIT_REMOTE));
+    const out = await capture(() => bootstrapVerb(["--project-dir", repo]));
+    assert.match(out.stdout, /local-only/);
+    assert.match(out.stdout, /git remote add origin/);
+    assert.equal(existsSync(join(repo, ".dabbler", "runs", "owed-decisions.jsonl")), false);
   });
+});
 
-  it("does not ask a repository that already has a remote, and never holds the close", () => {
-    // Staying local is a real answer, so the question is advisory.
-    const { repo } = makeAnsweredSandbox();
-    assert.equal(raiseRemoteDecision(repo, { hasRemote: true }), null);
-    const local = emptyRepo();
-    assert.equal(raiseRemoteDecision(local, { hasRemote: false })?.["severity"], "advisory");
-    assert.equal(blockingDecisions(local).length, 0);
+describe("what setup says about publishing", () => {
+  it("names the packaging block a publishing repository lacks, and asks nobody", async () => {
+    // Build files that say a repository publishes used to raise two
+    // questions; the fact is printed once, and every session is held with
+    // nothing to publish until the block exists.
+    const repo = emptyRepo();
+    seed(repo, { "Acme.Csv.csproj": "<Project><PropertyGroup><PackageId>Acme.Csv</PackageId></PropertyGroup></Project>\n" });
+    const out = await capture(() => bootstrapVerb(["--project-dir", repo]));
+    assert.match(out.stdout, /meant to be published \(dotnet\)/);
+    assert.match(out.stdout, /`packaging:` block/);
+    assert.equal(existsSync(join(repo, ".dabbler", "runs", "owed-decisions.jsonl")), false);
   });
 });
 
@@ -653,36 +653,5 @@ describe("what the Solution Explorer has to render", () => {
     const repo = emptyRepo();
     await bootstrapVerb(["--project-dir", repo]);
     assert.ok(existsSync(join(repo, ".dabbler", "solution", "solution.json")));
-  });
-});
-
-describe("answering a decision that writes the project config", () => {
-  it("names the commit while the session has not declared, and says nothing once it has", async () => {
-    // `session start` raises testing-suites, and the recommended answer
-    // writes the tracked dabbler.yaml -- inside the window where the
-    // declaration refuses a tree carrying changes. The Java walk of
-    // 2026-09-07 met exactly that, one verb over from the bootstrap case
-    // session 116 fixed.
-    const { repo, sessionsDir } = makeAnsweredSandbox({ "pom.xml": "<project/>\n" });
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    refreshOwedDecisions(repo, { ecosystems: ["maven"], hasExpensiveSuite: false, configFilename: "dabbler.yaml" });
-    const undeclared = await capture(() =>
-      owedVerb(["answer", "--sessions-dir", sessionsDir, "--id", ID_TESTING_SUITES, "--choice", "declare"]),
-    );
-    assert.equal(undeclared.value, 0, undeclared.stderr);
-    assert.match(undeclared.stdout, /has not declared its task yet/);
-    assert.match(undeclared.stdout, /git add -A && git commit/);
-
-    // Declared: the land commits what the session touched, and there is
-    // nothing to warn about.
-    const second = makeAnsweredSandbox({ "pom.xml": "<project/>\n" });
-    registerSessionStart(second.sessionsDir, 1, { engine: "claude-code" });
-    declareSessionTask(second.sessionsDir, { sessionNumber: 1, task: "the work", releasable: false });
-    refreshOwedDecisions(second.repo, { ecosystems: ["maven"], hasExpensiveSuite: false, configFilename: "dabbler.yaml" });
-    const declared = await capture(() =>
-      owedVerb(["answer", "--sessions-dir", second.sessionsDir, "--id", ID_TESTING_SUITES, "--choice", "declare"]),
-    );
-    assert.equal(declared.value, 0, declared.stderr);
-    assert.doesNotMatch(declared.stdout, /has not declared its task yet/);
   });
 });

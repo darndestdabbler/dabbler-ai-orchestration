@@ -53,10 +53,10 @@ import {
   driverInvocationCap,
   loadConfig,
   verificationRoundCap,
+  PROJECT_CONFIG_FILENAME,
 } from "./config.ts";
 import {
   DISPOSITION_SCHEMA,
-  DRIVER_DIRNAME,
   DRIVER_SCHEMA_VERSION,
   PHASE_WORK,
   REPORT_SCHEMA,
@@ -83,7 +83,6 @@ import {
   progressResumed,
   renderAmendmentProposal,
   renderStop,
-  type StopRendering,
 } from "./driver.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
@@ -99,7 +98,8 @@ import {
   receiptCorrespondence,
 } from "./land.ts";
 import { readRecords as readCorrespondence } from "./packages.ts";
-import { ExposureError, raiseGrantDecision, settleAnsweredGrants } from "./exposure.ts";
+import { ExposureError, makeGrant } from "./exposure.ts";
+import { detectEcosystems } from "./bootstrap/detect.ts";
 import { readPolicy } from "./policy.ts";
 import { BUILT_IN_ENGINES, builtInEngine, engineAliases } from "./engines.ts";
 import type { Engine, EngineOutcome, EngineOutput } from "./engines.ts";
@@ -108,7 +108,6 @@ import {
   FIDELITY_UNKNOWN,
   observedFidelity,
 } from "./selection.ts";
-import { clip, stripEscapes } from "./engines.ts";
 import { SESSION_PLAN_FILENAME } from "./evidence.ts";
 import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
@@ -150,23 +149,14 @@ import {
 } from "./journal.ts";
 import {
   LedgerError,
-  RUNS_DIRNAME,
   type Row,
   latestRound,
   readDisputes,
   readPackaging,
   readRounds,
 } from "./ledger.ts";
-import {
-  CLASS_VALUE_TRADEOFF,
-  openDecisions,
-  owedPath,
-  raiseOwed,
-  raiseRunOfRecordOwed,
-  supersedeOwed,
-} from "./owedDecisions.ts";
 import { checkoutModuleOf, readSessionState, sessionDisplayNumber, stalledAfterSeconds } from "./progress.ts";
-import { TriageError, type TriageOutcome, collectArtifacts, triage } from "./triage.ts";
+import { TriageError, type TriageOutcome, triage } from "./triage.ts";
 import {
   EXIT_BOUNDARY,
   EXIT_GATE_FAILED,
@@ -649,8 +639,6 @@ function refusal(rule: string, reason: string): string {
 /** How many advisers a deadlock is taken to before it is taken to a person. */
 const TRIAGE_RUNGS = 2;
 
-/** The third answer a stopped loop has, when an adviser proposed one. */
-const AMEND_CHOICE = "Amend step";
 
 /** One stop, as the history remembers it and the ladder compares against it. */
 interface StopEntry {
@@ -796,18 +784,6 @@ type StopKind = NonNullable<DriverRun["stop"]>["kind"];
 type StopCode = NonNullable<NonNullable<DriverRun["stop"]>["code"]>;
 
 /**
- * The one decision a stop raises, per session.
- *
- * Keyed on the session rather than on the stop, because `raiseOwed` folds by
- * id: a second stop of the same kind and reason leaves one row, and a stop
- * whose reason has changed supersedes the stale brief instead of stacking a
- * second question about the same session.
- */
-function stopDecisionId(sessionNumber: number): string {
-  return `driver-stop-s${sessionNumber}`;
-}
-
-/**
  * The loop halting short of the close, with the reason a person reads.
  *
  * Written out longhand rather than as a parameter property, and so is the
@@ -829,7 +805,7 @@ class Stop extends Error {
    * The substance a person needs to answer this stop, where the reason
    * cannot carry it: the findings, the grounds, the evidence.
    *
-   * It rides to the stop's own owed decision and nowhere else. The reason
+   * It is printed with the stop and nowhere else. The reason
    * on `run.json` stays what the deadlock classifier compares -- short, and
    * identical when the same impasse is met twice -- and a brief that grew
    * a timestamp or a path would make every stop look like a first.
@@ -1390,7 +1366,6 @@ class Driver {
       lease_epoch: this.run.lease_epoch,
       phase: this.run.phase,
     });
-    if (existing.stop) this.settleStopDecision(existing.stop.kind);
     this.log("run-resumed", {
       session: sessionDisplayNumber(current),
       phase: this.run.phase,
@@ -1425,106 +1400,6 @@ class Driver {
     const transport = this.options.transport ?? existing?.transport ?? null;
     if (maxRounds === null && transport === null) return null;
     return { max_rounds: maxRounds, transport };
-  }
-
-  /**
-   * The stop, as a question the operator can answer where they answer
-   * everything else.
-   *
-   * A halted loop is a decision -- run it again, or give this session up --
-   * and until now it was answerable only by whoever thought to read
-   * `run.json`. It is raised in a class that does NOT refuse a close: a
-   * driver that stopped is not a verification reduction, and a bookkeeping
-   * question that could block a close would hold work the verifier passed.
-   *
-   * A failure to write the question is never allowed to swallow the stop.
-   * The reason is on `run.json` and on stderr either way, and a stop
-   * reported as a crash would cost more than the row it failed to write.
-   */
-  private raiseStopDecision(
-    words: StopRendering,
-    ladder: Ladder | null = null,
-    substance: string | null = null,
-  ): void {
-    const advice = ladder?.advice ?? null;
-    // The brief's first paragraph is the rendering, whole: what happened,
-    // that the command ended and the session did not, and who acts next.
-    // A stop that carries its own substance -- the findings a dispute
-    // stands over, their grounds, what they cite -- says it here, where
-    // the person answering has it in front of them. It is not on
-    // `run.json`: the record's reason is what the deadlock classifier
-    // compares, and a brief is what a person reads.
-    const reason =
-      `${words.happened} ${words.ended} ${words.next}` +
-      (substance ? `\n\n${substance}` : "");
-    // The ways on are the stop's own, not a second list beside them: one
-    // pair of words per stop, offered here and printed there, so what the
-    // brief offers and what the stop says cannot disagree. Each option
-    // carries the command that carries it out, because a choice a person
-    // cannot act on is a description.
-    const options = words.choices.map((choice) => ({
-      label: choice.label,
-      consequence: `${choice.cost}\n\n  ${choice.command}`,
-    }));
-    const recommended = options[0]?.label ?? null;
-    // An amendment is an OPTION and never an act. The framework applies
-    // nothing an adviser proposed; choosing it is what records it, and where
-    // it relaxes a gate that is the first thing the chooser is told.
-    const amendment = advice?.answer.amendment ?? null;
-    if (amendment) {
-      options.push({
-        label: `${AMEND_CHOICE} '${amendment.step_id}'`,
-        consequence:
-          (amendment.relaxes_a_gate
-            ? "IT RELAXES A GATE: this weakens what the framework checks. "
-            : "It relaxes no gate. ") +
-          `${amendment.reason}\n\n${this.amendmentProposal(amendment)}\n\n` +
-          "The framework applies no adviser's proposal on its own authority. " +
-          "Choosing this records the decision; the command above is how it is made.",
-      });
-    }
-    try {
-      raiseOwed(this.repoRoot, {
-        id: stopDecisionId(this.sessionNumber),
-        decisionClass: CLASS_VALUE_TRADEOFF,
-        question: `${words.headline} in phase '${this.run.phase}'. Run it again, or cancel it?`,
-        // Three briefs, and which one this is says how much is known. No
-        // ladder was climbed: the stop's own reason, which is what an
-        // attended session reads. An adviser answered: its opinion, marked
-        // as one. Nobody could: the raw artifacts, because "the framework
-        // stopped and its advisers could not classify it" is honest and an
-        // invented recommendation is not.
-        determined:
-          ladder === null
-            ? reason
-            : advice !== null
-              ? `${reason}
-
-${advice.brief}`
-              : `${reason}
-
-No adviser could classify this. The raw artifacts:
-${this.stopArtifacts()}`,
-        options,
-        // The stop's own first choice is what the framework would do, so it
-        // is what it recommends -- and where an adviser proposed an
-        // amendment, that is the thing it actually has an opinion about.
-        recommendation:
-          ladder === null
-            ? recommended
-            : advice === null
-              ? null
-              : amendment
-                ? `${AMEND_CHOICE} '${amendment.step_id}'`
-                : recommended,
-        onNoAnswer:
-          "Nothing happens. The session stays in flight and its record stops " +
-          "moving until someone resumes it or cancels it.",
-        sessionNumber: this.sessionNumber,
-      });
-    } catch (error) {
-      this.log("owed-not-raised", { reason: (error as Error).message });
-    }
   }
 
   /**
@@ -1598,96 +1473,9 @@ ${this.stopArtifacts()}`,
     return { advice };
   }
 
-  /**
-   * What the framework itself knows about the stop, unsummarised.
-   *
-   * The floor's brief, and deliberately the framework's own facts rather
-   * than a model's account of them: the refusals as they were written, the
-   * step they were written against, and where the rest of it is on disk.
-   */
-  private stopArtifacts(): string {
-    let artifacts;
-    try {
-      artifacts = collectArtifacts(this.repoRoot, this.sessionNumber);
-    } catch (error) {
-      return `(the record could not be read: ${(error as Error).message})`;
-    }
-    const lines: string[] = [];
-    const stop = artifacts.run?.stop ?? null;
-    if (stop !== null) {
-      lines.push(
-        `run.json: phase '${artifacts.run?.phase}', stop '${stop.kind}'` +
-          `${stop.class ? ` (${stop.class})` : ""} on step '${stop.step_id ?? "-"}'`,
-        `  ${stop.reason}`,
-      );
-    }
-    const history = artifacts.run?.stop_history ?? [];
-    if (history.length > 1) {
-      lines.push(`the ${history.length} stops before this one, oldest first:`);
-      lines.push(...history.map((row) => `  ${row.kind} on ${row.step_id ?? "-"}: ${clip(row.reason, 200)}`));
-    }
-    const instruction = artifacts.instruction;
-    if (instruction !== null) {
-      lines.push(
-        `instruction.json: seq ${instruction.seq}, ${instruction.kind}` +
-          `${instruction.step_id ? ` for step '${instruction.step_id}'` : ""}`,
-        `  asked: ${clip(instruction.ask ?? "", 400)}`,
-      );
-    }
-    if (artifacts.reasons.length > 0) {
-      lines.push("the refusals, as written:", ...artifacts.reasons.map((row) => `  ${clip(row, 400)}`));
-    }
-    const report = artifacts.report;
-    if (report !== null) {
-      lines.push(
-        `report.json: seq ${report.seq}, step '${report.step_id}', ${report.status}` +
-          `; files ${report.files_changed.join(", ") || "(none)"}`,
-        `  notes: ${clip(report.notes, 300)}`,
-      );
-    }
-    if (artifacts.step !== null) {
-      lines.push(`the step the plan declares: '${artifacts.step.id}', files ${artifacts.step.files.join(", ")}`);
-    }
-    if (artifacts.transcriptTail.trim() !== "") {
-      // The transcript is engine-derived, so the escapes come out before it
-      // is cut: a truncation that takes a colour's reset and leaves its
-      // opener is what session 61 watched turn a whole brief green.
-      lines.push(
-        "the end of the engine's transcript:",
-        tail(stripEscapes(artifacts.transcriptTail), 1200),
-      );
-    }
-    const dir = `${RUNS_DIRNAME}/s${this.sessionNumber}/${DRIVER_DIRNAME}`;
-    lines.push(`All of it, whole and unclipped, is under ${dir}/.`);
-    return lines.join("\n");
-  }
-
   /** An adviser's proposal as the thing a person would type, for this repository's sessions directory. */
   private amendmentProposal(amendment: NonNullable<Triage["amendment"]>): string {
     return renderAmendmentProposal(amendment, relative(this.repoRoot, this.sessionsDir));
-  }
-
-  /**
-   * The question a stop raised, retired the moment it is answered by acting.
-   *
-   * Resuming IS the answer to "run it again, or cancel it?", and this is the
-   * only path that can know it was given -- nobody types `owed answer` to
-   * say what they have just done. An answered decision is left alone: it is
-   * settled, and superseding it would rewrite what the operator agreed to.
-   */
-  private settleStopDecision(kind: StopKind): void {
-    const id = stopDecisionId(this.sessionNumber);
-    try {
-      if (!openDecisions(this.repoRoot).some((row) => row["id"] === id)) return;
-      supersedeOwed(
-        this.repoRoot,
-        id,
-        `the session was resumed after its '${kind}' stop`,
-        this.sessionNumber,
-      );
-    } catch (error) {
-      this.log("owed-not-superseded", { reason: (error as Error).message });
-    }
   }
 
   // --- the conversation ------------------------------------------------------
@@ -2085,6 +1873,27 @@ ${this.stopArtifacts()}`,
 
   // --- plan ------------------------------------------------------------------
 
+  /**
+   * One sentence, only where the repository builds code and declares no
+   * suite: the freshness gate refuses such a close, and the plan is where
+   * the engine can still do something about it.
+   */
+  private suiteGap(): string {
+    const loaded = loadSuitesChecked(this.config);
+    if (!loaded.ok || loaded.suites.some((suite) => suite.expensive)) return "";
+    let code: string[] = [];
+    try {
+      code = detectEcosystems(this.repoRoot).map((eco) => eco.key);
+    } catch {
+      return "";
+    }
+    if (code.length === 0) return "";
+    return (
+      `This repository builds ${code.join(", ")} code and ${PROJECT_CONFIG_FILENAME} declares no test ` +
+      "suite: one of this plan's steps declares one under testing.suites, or the close refuses.\n"
+    );
+  }
+
   private planAsk(): string {
     let excerpt = "";
     try {
@@ -2132,6 +1941,7 @@ ${this.stopArtifacts()}`,
       // the second identical refusal is a deadlock. Said only where it is
       // required, because a single-module repository IS the module.
       this.modulesMember() +
+      this.suiteGap() +
       "One member is optional and is left out of a single-repository session:\n" +
       '  repositories  other repositories of this SOLUTION the plan needs to exist: [{"id": ' +
       '"<repository id>", "path": "<optional, relative to this root>"}]. Each is placed when ' +
@@ -3140,7 +2950,16 @@ ${this.stopArtifacts()}`,
       const owedTo = suiteOwedElsewhere(this.repoRoot, suite, plan, scopes);
       if (owedTo !== null) {
         this.log("run-of-record-skipped", { suite: suite.name, reason: "tests-not-on-disk", module: owedTo });
-        raiseRunOfRecordOwed(this.repoRoot, this.sessionNumber, suite.name, owedTo);
+        // On the session's own run, where the freshness gate reads it: the
+        // close here must not demand a record that cannot exist here.
+        this.run = {
+          ...this.run,
+          suites_owed_elsewhere: [
+            ...(this.run.suites_owed_elsewhere ?? []).filter((row) => row.suite !== suite.name),
+            { suite: suite.name, module: owedTo },
+          ],
+        };
+        this.save();
         continue;
       }
       const jobName = `run of record: ${suite.name}`;
@@ -3769,7 +3588,6 @@ ${this.stopArtifacts()}`,
       // The words are the router's one rendering of a stop, shared with the
       // status row and the terminal; what is on disk is the record above.
       const words = renderStop(this.run.stop as NonNullable<DriverRun["stop"]>, this.run);
-      this.raiseStopDecision(words, ladder, error.brief);
       // The whole rendering, ways on included. The command that met the
       // stop is the surface a person is already looking at, and printing
       // three of the four things it knows sent one operator to look for
@@ -3780,6 +3598,9 @@ ${this.stopArtifacts()}`,
       writeErr(
         `dabbler: ${words.headline} in phase '${this.run.phase}' after ` +
           `${this.run.invocations} invocation(s).\n${words.happened}\n` +
+          // The stop's own substance -- the findings a dispute stands over,
+          // their grounds, what they cite -- printed where the person is.
+          (error.brief ? `\n${error.brief}\n\n` : "") +
           `${words.ended} ${words.next}${words.ways}\n` +
           (proposed === null
             ? ""
@@ -3902,39 +3723,18 @@ export async function sessionNext(sessionsDir: string, options: NextOptions): Pr
     }
     clearModuleSessionMarker(fullCheckout);
   }
-  // In a module session's clone, the grants the operator has answered are
-  // acted on before the session moves, and a request the engine makes here
-  // -- or one still standing -- is answered with a wait on the decision:
-  // nothing is owed but another `next`, once a person has said.
+  // In a module session's clone, a grant the engine asks for here is made
+  // at once and recorded with its reason: nothing waits on a person, and
+  // the permanent form is printed beside it.
   const current = readSessionState(sessionsDir)?.["currentSession"];
-  if (typeof current === "number" && readCloneMarker(fullCheckout) !== null) {
+  if (typeof current === "number" && readCloneMarker(fullCheckout) !== null && options.requestGrant) {
     try {
       const shape = solutionShape(fullCheckout);
-      if (options.requestGrant) {
-        raiseGrantDecision(fullCheckout, shape, current, options.requestGrant, options.reason ?? "");
-      }
-      const settled = settleAnsweredGrants(fullCheckout, shape, current);
-      for (const grant of settled.applied) {
-        writeErr(`dabbler: granted -- the checkout now holds module '${grant.sibling}'s source\n`);
-      }
-      if (settled.open.length > 0) {
-        const waiting: DriverInstruction = {
-          schema_version: DRIVER_SCHEMA_VERSION,
-          seq: readRun(fullCheckout, current)?.seq ?? 0,
-          session_number: current,
-          issued_at: nowIso(),
-          kind: "wait",
-          ask:
-            `Waiting on the operator to answer ${settled.open.join(", ")} -- a grant of a sibling's ` +
-            "source. Nothing is owed but another `next` once it is answered; the work goes on " +
-            "against the sibling's package and contract meanwhile.",
-          retry_after_seconds: 60,
-          log: relative(fullCheckout, owedPath(fullCheckout)).split("\\").join("/"),
-          answer_command: `dabbler session next --sessions-dir ${sessionsDir}`,
-        };
-        writeOut(`${JSON.stringify(waiting, null, 2)}\n`);
-        return EXIT_OK;
-      }
+      const made = makeGrant(fullCheckout, shape, current, options.requestGrant, options.reason ?? "");
+      writeErr(
+        `dabbler: granted -- the checkout now holds module '${made.grant.sibling}'s source, ` +
+          `recorded with the reason. ${made.permanentForm}\n`,
+      );
     } catch (error) {
       if (!(error instanceof ExposureError)) throw error;
       writeErr(`next: refused -- ${error.message}\n`);

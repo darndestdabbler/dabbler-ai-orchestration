@@ -603,13 +603,12 @@ packaging:
 `release: tag` and a `pack`/`push` pair are **mutually exclusive**: a
 repository releases one way, and a block claiming both leaves the record
 unable to say which one it describes. The declared release is an annotated
-`vsix-v<version>` tag; `dabbler release` makes it, and the packaging run
-**records whether it reached origin** rather than making it — a tag is
-public to everyone the moment CI sees it, so it waits on the operator's own
-`publication` decision (`dabbler owed list`) instead of on a phase
-advancing. A run whose tag is not on origin is `refused` and names the verb.
-The gate is unchanged: it still asks for a `published` row, and only a tag
-that actually reached origin earns one.
+`vsix-v<version>` tag; the packaging run makes it at the commit the session
+landed and pushes it where origin has none, or records the one already
+there — a session ships unless its plan holds it, and nobody is asked.
+`dabbler release` is the same act by hand. The gate is unchanged: it still
+asks for a `published` row, and only a tag that actually reached origin
+earns one.
 
 ## Seat catalog lockfile — `copilot-catalog.lock`
 

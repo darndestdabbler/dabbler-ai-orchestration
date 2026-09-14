@@ -17,15 +17,9 @@ import { join, resolve } from "node:path";
 import { repoRootFor, resolveSessionsDir, SessionsRootNotFoundError } from "../evidence.ts";
 import { workingDirectory } from "../workdir.ts";
 import {
-  ID_FEED_SOURCE,
-  currentDecisions,
-  raiseFeedDecision,
-  raiseOwnershipDecision,
-} from "../owedDecisions.ts";
-import {
   ResolutionError,
+  NUGET_CONFIG_FILENAME,
   configuredFeeds,
-  declareFeed,
   localSourceCandidates,
   reconcileResolution,
   restoreFromSource,
@@ -72,7 +66,7 @@ function usage(): string {
   return [
     "usage: dabbler deps [-h] [--sessions-dir SESSIONS_DIR]",
     "                    {check,show,feeds,source,restore,locate,clone,scaffold}",
-    "                    [--package ID] [--repository ID] [--path DIR] [--remote URL] [--apply]",
+    "                    [--package ID] [--repository ID] [--path DIR] [--remote URL]",
     "",
     "  check     compare the declaration against the build files",
     "  show      print the declared edges as JSON",
@@ -89,7 +83,6 @@ function usage(): string {
     "                           `scaffold` act on -- the `producedBy` id, not a path",
     "  --path DIR               where that repository is, or where to create it",
     "  --remote URL             its remote, which survives a move and a second clone",
-    "  --apply                  write an answered feed decision into this repository",
     "  --sessions-dir PATH      the sessions root; derived from the cwd when absent",
     "  -h, --help               show this message",
     "",
@@ -111,7 +104,6 @@ function run(argv: string[]): number {
   let repositoryId: string | null = null;
   let pathArg: string | null = null;
   let remoteArg: string | null = null;
-  let apply = false;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--sessions-dir") {
@@ -137,10 +129,6 @@ function run(argv: string[]): number {
     if (token === "--remote") {
       remoteArg = argv[index + 1] ?? null;
       index += 1;
-      continue;
-    }
-    if (token === "--apply") {
-      apply = true;
       continue;
     }
     if (!token.startsWith("--") && command === null) {
@@ -203,7 +191,7 @@ function run(argv: string[]): number {
     }
   }
 
-  if (command === "feeds") return feeds(root, apply);
+  if (command === "feeds") return feeds(root);
   if (command === "source" || command === "restore") {
     if (command === "source" && packageId === null) {
       writeErr("deps source: --package is required\n");
@@ -254,11 +242,12 @@ function run(argv: string[]): number {
         "files; whether any of them is built by one of your own repositories " +
         "is not derivable from a build file.\n",
     );
-    const raised = raiseOwnershipForUnclassified(root, self.refs, known);
-    if (raised.length > 0) {
+    const external = unclassified(self.refs, known);
+    if (external.length > 0) {
       writeOut(
-        `deps: asked about ${raised.length} of them — ` +
-          "`dabbler owed list` reads the questions.\n",
+        `deps: ${external.length} of them (${external.join(", ")}) read as external -- no repository ` +
+          "of this solution declares them. A package one of your own repositories builds is " +
+          `declared in ${DEPS_FILENAME} with its producedBy; nobody is asked.\n`,
       );
     }
     // The findings are printed here too. An undeclared repository with a
@@ -289,7 +278,11 @@ function run(argv: string[]): number {
     `  ${self.refs.length} direct dependenc(ies) read from this repository's ` +
       "build files\n",
   );
-  raiseOwnershipForUnclassified(root, self.refs, known);
+  const external = unclassified(self.refs, known);
+  if (external.length > 0) {
+    writeOut(`  ${external.length} of them (${external.join(", ")}) read as external: no repository of this solution declares them; one your own repositories build is declared in ${DEPS_FILENAME} with its producedBy
+`);
+  }
   reportFindings(findings);
   return EXIT_OK;
 }
@@ -416,38 +409,20 @@ function scaffold(repoRoot: string, repositoryId: string, pathArg: string | null
   return EXIT_OK;
 }
 
+
 /**
- * Ask, once per package, whether a dependency is one of ours.
- *
- * Only for packages nothing has classified yet: a declared edge is answered,
- * and a package already recorded external is not re-asked -- `raiseOwed` is
- * idempotent by id, which is what keeps this from becoming the per-session
- * re-ask the owed record exists to end.
+ * The packages nothing has classified: not declared, not read from source,
+ * not unreadable. External by default, said and never asked: whether a
+ * package is one of ours is a declaration in the dependency file, and a
+ * missing declaration is a fact the output states.
  */
-function raiseOwnershipForUnclassified(
-  repoRoot: string,
-  refs: readonly BuildReference[],
-  known: ReadonlySet<string>,
-): string[] {
-  const asked: string[] = [];
-  const seen = new Set<string>();
+function unclassified(refs: readonly BuildReference[], known: ReadonlySet<string>): string[] {
+  const ids = new Set<string>();
   for (const ref of refs) {
-    // An id the build tool alone can resolve is not a question anyone can
-    // answer -- "is (unreadable) one of yours" has no useful answer.
     if (ref.id === UNREADABLE_ID || ref.fromSource) continue;
-    if (known.has(ref.id) || seen.has(ref.id)) continue;
-    seen.add(ref.id);
-    try {
-      const row = raiseOwnershipDecision(repoRoot, {
-        packageId: ref.id,
-        seenIn: ref.file,
-      });
-      if (row !== null) asked.push(ref.id);
-    } catch {
-      // A brief that cannot be written must not fail a read-only check.
-    }
+    if (!known.has(ref.id)) ids.add(ref.id);
   }
-  return asked;
+  return [...ids];
 }
 
 /** The disagreements, or the sentence that says there are none. */
@@ -470,10 +445,10 @@ function reportFindings(findings: readonly { kind: string; detail: string }[]): 
  * What this machine has configured, and what the declaration expects of it.
  *
  * Reading is not writing. The user-level configuration is inspected so the
- * operator can be told what is already there; only the repository-scoped file
- * is ever written, and only as the execution of an answered decision.
+ * operator can be told what is already there, and a feed this machine does
+ * not know is a refusal that names the file to declare it in.
  */
-function feeds(root: string, apply: boolean): number {
+function feeds(root: string): number {
   const deps = loadDeps(root);
   const configured = configuredFeeds(root);
   writeOut(`${configured.length} package source(s) configured\n`);
@@ -499,58 +474,22 @@ function feeds(root: string, apply: boolean): number {
       continue;
     }
     unresolved += 1;
-    const answer = answeredFeed(root, feed);
-    if (answer === null) {
-      // Asked, not guessed. What is behind a feed name is a URL or a
-      // directory on this machine, and picking one wrong sends a restore at
-      // somebody else's server.
-      const raised = raiseFeedDecision(root, {
-        feed,
-        packageId,
-        candidates: localSourceCandidates(root),
-      });
-      writeOut(
-        `\n'${feed}' is not a package source on this machine` +
-          (raised === null ? " (already asked)" : "") +
-          " — `dabbler owed list` reads the question.\n",
-      );
-      continue;
-    }
-    if (!apply) {
-      writeOut(
-        `\n'${feed}' was answered: ${answer}. ` +
-          "`dabbler deps feeds --apply` writes it into this repository.\n",
-      );
-      continue;
-    }
-    // The execution of the answer, not a second asking. The operator decided;
-    // the framework does the typing, which is the whole point of asking.
-    try {
-      const path = declareFeed(root, { key: feed, value: answer });
-      writeOut(`\nwrote '${feed}' = ${answer} to ${path}\n`);
-      unresolved -= 1;
-    } catch (error) {
-      writeErr(
-        `deps: could not declare '${feed}': ${
-          error instanceof Error ? error.message : String(error)
-        }\n`,
-      );
-    }
+    // Refused, not guessed: what is behind a feed name is a URL or a
+    // directory on this machine, and picking one wrong sends a restore at
+    // somebody else's server. The file that declares sources is named, and
+    // so are the directories on this machine that could be it.
+    const candidates = localSourceCandidates(root);
+    writeOut(
+      `\n'${feed}' is not a package source on this machine: declare it in ${NUGET_CONFIG_FILENAME} ` +
+      "(a URL, or a directory on this machine" +
+        (candidates.length > 0 ? ` -- ${candidates.join(", ")} could be it` : "") +
+        ").\n",
+    );
   }
-  return unresolved === 0 ? EXIT_OK : EXIT_OK;
+  return unresolved === 0 ? EXIT_OK : EXIT_REFUSED;
 }
 
 /** The operator's answer to a feed question, when they have given one. */
-function answeredFeed(root: string, feed: string): string | null {
-  for (const row of currentDecisions(root)) {
-    if (String(row["id"]) !== `${ID_FEED_SOURCE}:${feed}`) continue;
-    const answer = row["answer"];
-    if (typeof answer !== "string" || !answer) return null;
-    return answer === "leave it unconfigured" ? null : answer;
-  }
-  return null;
-}
-
 /**
  * Step into a dependency's source, reversibly.
  *

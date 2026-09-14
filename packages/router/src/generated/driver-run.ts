@@ -150,6 +150,16 @@ export type DriverRun = {
     at: string;
   }[];
   /**
+   * Suites the impact plan reached whose tests are not in this focused folder: skipped here, recorded so the freshness gate does not demand a record that cannot exist here, and run by the named module's own session.
+   */
+  suites_owed_elsewhere?: {
+    suite: string;
+    /**
+     * The module whose own session runs it.
+     */
+    module: string;
+  }[];
+  /**
    * The stop the run resumed past, until the phase moves on. Set by the resume that clears `stop`, and cleared by the first phase change after it -- the one honest 'progress resumed', said exactly once -- or by a new stop landing first, which is spoken as its own pause. On the record rather than in memory because under the pull every `next` is a fresh process, and the process that resumes is never the one that advances. Optional: a run written before this member is a run this reader opens, and its absence means nothing was resumed past.
    */
   resumed_from?: {
@@ -183,7 +193,7 @@ export type DriverRun = {
      */
     adviser?: string | null;
     /**
-     * The change an adviser proposed, kept whole because the option on the owed decision is otherwise a menu item with nothing behind it: the proposal lives in one process and the person who answers is in another. Nothing here is applied by the framework -- it is what a person needs in order to type `dabbler session plan amend` themselves, or to decide not to.
+     * The change an adviser proposed, kept whole because the stop prints it as the command a person would type: the proposal lives in one process and the person who answers is in another. Nothing here is applied by the framework -- it is what a person needs in order to type `dabbler session plan amend` themselves, or to decide not to.
      */
     amendment?: {
       step_id: string;

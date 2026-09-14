@@ -177,6 +177,19 @@
       },
       "description": "The rewinds this run has already made: a later phase refused on an earlier phase's evidence, and the loop went back and remade it. Here for the same reason `stop_history` is, and it is NOT the same list -- a rewind is not a stop, throws nothing, and is therefore invisible to the deadlock classifier. One rewind per distinct refusal is the bound: a refusal already in this list means going back did not fix it, and the loop stops instead of remaking the same evidence forever."
     },
+    "suites_owed_elsewhere": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["suite", "module"],
+        "properties": {
+          "suite": { "type": "string", "minLength": 1 },
+          "module": { "type": "string", "minLength": 1, "description": "The module whose own session runs it." }
+        }
+      },
+      "description": "Suites the impact plan reached whose tests are not in this focused folder: skipped here, recorded so the freshness gate does not demand a record that cannot exist here, and run by the named module's own session."
+    },
     "resumed_from": {
       "type": ["object", "null"],
       "additionalProperties": false,
@@ -242,7 +255,7 @@
             "reason": { "type": "string", "minLength": 1 },
             "relaxes_a_gate": { "type": "boolean" }
           },
-          "description": "The change an adviser proposed, kept whole because the option on the owed decision is otherwise a menu item with nothing behind it: the proposal lives in one process and the person who answers is in another. Nothing here is applied by the framework -- it is what a person needs in order to type `dabbler session plan amend` themselves, or to decide not to."
+          "description": "The change an adviser proposed, kept whole because the stop prints it as the command a person would type: the proposal lives in one process and the person who answers is in another. Nothing here is applied by the framework -- it is what a person needs in order to type `dabbler session plan amend` themselves, or to decide not to."
         },
         "at": { "type": "string", "minLength": 1 }
       },

@@ -177,17 +177,15 @@ describe("a repository walked through the states the close gates read", () => {
     ]);
   });
 
-  milestone("with the remote gone, the local-only marker waives the gate and its absence does not", () => {
+  milestone("with the remote gone, the repository is local-only by that fact and the gate waives itself", () => {
     git(repo, "remote", "remove", "origin");
     assert.equal(runGit(repo, ["remote"]).stdout, "");
     assert.notEqual(runGit(repo, ["remote", "get-url", "origin"]).code, 0);
-    assert.equal(judgePushState(readPushFacts(repo))[0], false);
-    mkdirSync(join(repo, ".dabbler"), { recursive: true });
-    writeFileSync(join(repo, ".dabbler", "local-only"), "", "utf8");
     const facts = readPushFacts(repo);
-    assert.equal(facts.localOnlyMarker, true);
     assert.equal(facts.hasRemote, false);
-    assert.equal(judgePushState(facts)[0], true);
+    const row = judgePushState(facts);
+    assert.equal(row[0], true);
+    assert.match(row[1], /git remote add origin/);
   });
 
   milestone("a detached HEAD is refused", () => {

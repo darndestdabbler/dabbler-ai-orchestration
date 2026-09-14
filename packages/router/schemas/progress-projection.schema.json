@@ -56,7 +56,6 @@
         "lastActivityAt",
         "possiblyStalled",
         "stalledAfterSeconds",
-        "owedDecisions",
         "plannedSessions",
         "nextSession",
         "forceClosed",
@@ -85,48 +84,6 @@
         "stalledAfterSeconds": {
           "type": ["integer", "null"],
           "description": "The threshold `possiblyStalled` was judged against, published so a reader never has to guess which number produced the answer. Null when nothing is in flight."
-        },
-        "owedDecisions": {
-          "type": "array",
-          "description": "What this repository is waiting on a person for, folded from the owed-decision ledger. Carried on the projection because the Explorer's attention view is meant to be ONE place the operator looks -- a view that had to read a second file to answer half its rows would be the second place.",
-          "items": {
-            "type": "object",
-            "required": ["id", "question", "severity", "blocking"],
-            "additionalProperties": false,
-            "properties": {
-              "id": { "type": "string" },
-              "question": { "type": "string" },
-              "severity": { "type": "string", "enum": ["blocking", "advisory"] },
-              "blocking": {
-                "type": "boolean",
-                "description": "Whether leaving this unanswered refuses the close."
-              },
-              "onNoAnswer": { "type": ["string", "null"] },
-              "determined": {
-                "type": ["string", "null"],
-                "description": "What the framework established on its own before asking, carried so a reader can judge the question without opening the ledger behind it."
-              },
-              "options": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["label", "consequence"],
-                  "additionalProperties": false,
-                  "properties": {
-                    "label": { "type": "string" },
-                    "consequence": { "type": "string" }
-                  }
-                },
-                "description": "Each choice with what follows from it, as the brief states them. A surface that offered the labels alone would be asking the operator to decide from a menu with no prices."
-              },
-              "recommendation": { "type": ["string", "null"] },
-              "sessionNumber": {
-                "type": ["integer", "null"],
-                "description": "The session the decision was raised for, when one was: a grant request renders on its session's row. Null, or absent, for a repository-wide question."
-              },
-              "confidence": { "type": ["string", "null"], "enum": ["high", "medium", "low", null] }
-            }
-          }
         },
         "plannedSessions": {
           "description": "How many sessions the plan declares that the ledger has not reached. Zero for a repository whose ledger has caught up. It is published rather than left to be counted from the rows because 'is this project finished' is the question the count answers, and a reader that re-derived it would be a second implementation of the rule.",

@@ -19,7 +19,7 @@ import { ContractError, renderModuleContract } from "../contractdoc.ts";
 import { ensureRootFilesWithSuite } from "../bootstrap/detect.ts";
 import { EcosystemError, ecosystemOf, hasProjectFile } from "../ecosystem.ts";
 import { sessionsDirFor } from "../evidence.ts";
-import { ExposureError, raiseGrantDecision, revokeGrant } from "../exposure.ts";
+import { ExposureError, makeGrant, revokeGrant } from "../exposure.ts";
 import { writeCandidateRecord } from "../impact.ts";
 import { platformNewlines, runGit } from "../journal.ts";
 import { LandError, bundleRecord, writeBundleRecord } from "../land.ts";
@@ -98,11 +98,10 @@ function usage(): string {
     "Defender's real-time protection is on. A recorded run, not a test: the numbers",
     "decide whether a session gets a fresh clone or the per-module clone reset.",
     "",
-    "grant: in a module session's focused checkout, ask the operator to widen it to a",
-    "sibling's source. Raises the owed decision module-grant:<sibling> (deny is the",
-    "recommendation); answered grant through `dabbler owed answer` or the Work",
-    "Explorer, the framework widens the cone and records the grant in the exposure",
-    "manifest; the brief says how to keep it for every session (sharedFiles).",
+    "grant: in a module session's focused checkout, widen it to a sibling's source,",
+    "recorded with the reason (--reason). The framework widens the cone at once and",
+    "the exposure manifest says so; the permanent form is the sibling's root under",
+    "this module's sharedFiles in dabbler.yaml.",
     "",
     "revoke: end a grant -- refused while the sibling's roots hold changes; narrows the",
     "cone again and records it.",
@@ -357,11 +356,11 @@ function grantSubcommand(verb: "grant" | "revoke", rest: readonly string[]): num
   try {
     const shape = solutionShape(context.root);
     if (verb === "grant") {
-      const decision = raiseGrantDecision(context.root, shape, context.session, slug, reason ?? "");
+      const made = makeGrant(context.root, shape, context.session, slug, reason ?? "");
       writeOut(
-        `module grant: raised owed decision '${decision}' for session ${context.session}. ` +
-          `Answer it with \`dabbler owed answer --id ${decision} --choice grant\` (or deny), or in the ` +
-          "Work Explorer; on grant the framework widens the checkout.\n",
+        `module grant: the checkout now holds module '${made.grant.sibling}'s source, recorded with ` +
+          `the reason. ${made.permanentForm} Reload the window (Developer: Reload Window) so the ` +
+          "editor and the build see it.\n",
       );
     } else {
       revokeGrant(context.root, shape, context.session, slug);

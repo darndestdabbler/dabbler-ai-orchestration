@@ -11,7 +11,6 @@ import type {
   ConfigureOptions,
   AffectedOptions,
   DepsRepositoryOptions,
-  OwedAnswerOptions,
   Router,
   RouterResult,
   SessionInterruptOptions,
@@ -129,7 +128,6 @@ export function makeRepository(
     invariantViolation: null,
     lastActivityAt: null,
     possiblyStalled: false,
-    owedDecisions: [],
     orchestrator: null,
     sessions: [],
     ...overrides,
@@ -156,8 +154,7 @@ export function makeProjection(
       lastActivityAt: null,
       possiblyStalled: false,
       stalledAfterSeconds: null,
-      owedDecisions: [],
-      forceClosed: false,
+        forceClosed: false,
       orchestrator: null,
       invariantViolation: null,
       ...(overrides.repository ?? {}),
@@ -210,7 +207,6 @@ export function fakeRouter(
   /** What the Configuration section asked the router to set. */
   configureOptions: ConfigureOptions[];
   interruptOptions: SessionInterruptOptions[];
-  owedAnswers: OwedAnswerOptions[];
   /** Which repository each writing `deps` verb was asked about. */
   depsCalls: { verb: string; options: DepsRepositoryOptions }[];
   /** What `affected` was asked to plan: the hypothetical paths, when any. */
@@ -224,9 +220,6 @@ export function fakeRouter(
   const configureOptions: ConfigureOptions[] = [];
   const bootstrapOptions: BootstrapOptions[] = [];
   const interruptOptions: SessionInterruptOptions[] = [];
-  // And the same for an answered decision: which option the operator chose
-  // is the whole behaviour a surface that offers them has.
-  const owedAnswers: OwedAnswerOptions[] = [];
   const depsCalls: { verb: string; options: DepsRepositoryOptions }[] = [];
   const affectedOptions: AffectedOptions[] = [];
   const answer = <T,>(verb: string, value: T): Promise<RouterResult<T>> => {
@@ -243,7 +236,6 @@ export function fakeRouter(
     bootstrapOptions,
     configureOptions,
     interruptOptions,
-    owedAnswers,
     depsCalls,
     affectedOptions,
     router: {
@@ -275,12 +267,6 @@ export function fakeRouter(
         stepClose: text("verify step close"),
         stepStatus: text("verify step status"),
         stepAmend: text("verify step amend"),
-      },
-      owed: {
-        answer: (options: OwedAnswerOptions) => {
-          owedAnswers.push(options);
-          return answer("owed answer", { stdout: message });
-        },
       },
       deps: {
         locate: (options: DepsRepositoryOptions) => {

@@ -48,7 +48,6 @@ import {
   readRounds,
 } from "./ledger.ts";
 import { readExposure } from "./exposure.ts";
-import { openDecisions } from "./owedDecisions.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
 import {
   OUTCOME_PASSED,
@@ -1814,7 +1813,6 @@ export function buildProjection(
       lastActivityAt: movedAt,
       possiblyStalled: possiblyStalled(movedAt, view["currentSession"] ?? null, threshold),
       stalledAfterSeconds: view["currentSession"] ? threshold : null,
-      owedDecisions: owedForProjection(repoRoot),
       // Counted off the rows rather than off `planned`, so the two ways a row
       // can be planned -- merged over a ledger, or sourced from the plan
       // because there is no ledger -- are counted once each and by one rule.
@@ -2040,43 +2038,3 @@ export function stalledAfterSeconds(repoRoot: string): number {
   return DEFAULT_STALLED_AFTER_SECONDS;
 }
 
-/**
- * What the repository is waiting on a person for, in the shape a row renders.
- *
- * Carried on the projection rather than read separately by the Explorer,
- * because the attention view is supposed to be ONE place the operator looks
- * -- and a view that had to open a second file to answer half its rows would
- * be the second place rather than the first.
- *
- * Never fails a projection: a record that cannot be read is a fault the
- * `owed_decisions` gate reports at the close, where refusing is useful. A
- * tree that would not render because of it would be the fault made worse.
- */
-function owedForProjection(repoRoot: string | null): Record<string, unknown>[] {
-  if (repoRoot === null) return [];
-  try {
-    return openDecisions(repoRoot).map((row) => ({
-      id: String(row["id"]),
-      question: String(row["question"] ?? ""),
-      severity: String(row["severity"] ?? "advisory"),
-      blocking: row["severity"] === "blocking",
-      onNoAnswer: (row["onNoAnswer"] as string | null) ?? null,
-      // The rest of the brief travels with the question. A surface that had
-      // the labels but not their consequences would be asking the operator
-      // to choose from a menu with no prices, and one that had to open the
-      // ledger for them would be the second place they look.
-      determined: (row["determined"] as string | null) ?? null,
-      options: Array.isArray(row["options"])
-        ? (row["options"] as Array<Record<string, unknown>>).map((option) => ({
-            label: String(option["label"] ?? ""),
-            consequence: String(option["consequence"] ?? ""),
-          }))
-        : [],
-      recommendation: (row["recommendation"] as string | null) ?? null,
-      confidence: (row["confidence"] as string | null) ?? null,
-      sessionNumber: typeof row["sessionNumber"] === "number" ? row["sessionNumber"] : null,
-    }));
-  } catch {
-    return [];
-  }
-}

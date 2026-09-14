@@ -21,7 +21,6 @@ import { factsVerb } from "./facts.ts";
 import { metricsVerb } from "./metrics.ts";
 import { moduleVerb } from "./module.ts";
 import { modulesVerb } from "./modules.ts";
-import { owedVerb } from "./owed.ts";
 import { packagingVerb } from "./packaging.ts";
 import { repoVerb } from "./repo.ts";
 import { statusVerb } from "./status.ts";
@@ -52,7 +51,6 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   metrics: metricsVerb,
   module: moduleVerb,
   modules: modulesVerb,
-  owed: owedVerb,
   packaging: packagingVerb,
   repo: repoVerb,
   "seat-cost": seatCostVerb,

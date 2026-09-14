@@ -45,7 +45,6 @@ const SHIPPED = [
   "tools/dabbler-ai-orchestration/CHANGELOG.md",
   "tools/dabbler-ai-orchestration/media/walkthrough-setup.md",
   "tools/dabbler-ai-orchestration/media/walkthrough-session.md",
-  "tools/dabbler-ai-orchestration/media/walkthrough-owed.md",
   "docs/quick-start.md",
   "docs/driving-a-session.md",
   // The three documents that walk a stranger through the product end to

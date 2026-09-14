@@ -333,7 +333,6 @@ testing:
           - tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/driveProcess.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts
-          - tools/dabbler-ai-orchestration/src/test/suite/owedDecisionCommands.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/sessionsModel.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/specSectionLocator.test.ts
@@ -407,18 +406,6 @@ testing:
       - when: packages/router/src/jobs.ts
         select:
           - packages/router/test/walk-jobs.test.ts
-      # The questions a machine may not answer: how one is raised, when a
-      # brief that changed supersedes an open row, and the one answer that
-      # cannot be taken back. Its own test is the rules; `release` is the
-      # publication decision, which is keyed to the version it authorises;
-      # the close's gate refuses on a blocking one; and the walkthrough sees
-      # the rows land in a real record.
-      - when: packages/router/src/owedDecisions.ts
-        select:
-          - packages/router/test/owedDecisions.test.ts
-          - packages/router/test/release.test.ts
-          - packages/router/test/gates.test.ts
-          - packages/router/test/walk-record.test.ts
       # The package's export surface. No test imports it directly -- it is a
       # re-export file -- so what answers for it is what exercises the two
       # things it hands out: the in-process router, and the contracts.
@@ -438,7 +425,6 @@ testing:
           - tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/driveProcess.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts
-          - tools/dabbler-ai-orchestration/src/test/suite/owedDecisionCommands.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/sessionsModel.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts

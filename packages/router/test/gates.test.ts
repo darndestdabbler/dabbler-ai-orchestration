@@ -16,7 +16,6 @@ import {
   classifyPushFailure,
   judgeFreshness,
   judgeLatestRound,
-  judgeOwedDecisions,
   judgePackagingRecord,
   judgePushState,
   judgeSuiteDeclaration,
@@ -67,7 +66,6 @@ function pushFacts(overrides: Partial<PushFacts>): PushFacts {
   return {
     branch: "main",
     upstream: "origin/main",
-    localOnlyMarker: false,
     hasRemote: true,
     ahead: 0,
     dryRunError: null,
@@ -83,16 +81,12 @@ describe("pushed_to_remote: the row from the push facts", () => {
     ]);
   });
 
-  it("waives the gate for a local-only repository with no remote at all", () => {
-    const row = judgePushState(pushFacts({ upstream: null, localOnlyMarker: true, hasRemote: false }));
+  it("waives the gate for a repository with no remote, by that fact, and names the command that adds one", () => {
+    // Nobody is asked whether a repository with no remote is local-only: it is.
+    const row = judgePushState(pushFacts({ upstream: null, hasRemote: false }));
     assert.equal(row[0], true);
-    assert.match(row[1], /local-only repo: push gate waived/);
-  });
-
-  it("does not waive it when the marker is present but a remote is configured", () => {
-    const row = judgePushState(pushFacts({ upstream: null, localOnlyMarker: true, hasRemote: true }));
-    assert.equal(row[0], false);
-    assert.match(row[1], /has no upstream/);
+    assert.match(row[1], /local-only/);
+    assert.match(row[1], /git remote add origin/);
   });
 
   it("refuses a branch with no upstream and names the command that sets one", () => {
@@ -219,6 +213,16 @@ describe("test_run_fresh: the declaration, then the verdicts", () => {
     ]);
   });
 
+  it("refuses code with no suite, naming the file, and stays inapplicable for a repository of documents", () => {
+    // The rule that used to be a question: code here and nothing to run it
+    // is refused at the gate, and the plan ask says so before the work.
+    const row = judgeSuiteDeclaration(loaded([], [false]), ["dotnet"]);
+    assert.equal(row?.[0], false);
+    assert.match(row?.[1] ?? "", /builds dotnet code/);
+    assert.match(row?.[1] ?? "", /dabbler\.yaml under testing\.suites/);
+    assert.equal(judgeSuiteDeclaration(loaded([], [false]), [])?.[2], true);
+  });
+
   it("hands over to the verdicts when an expensive suite is declared", () => {
     assert.equal(judgeSuiteDeclaration(loaded([], [false, true])), null);
   });
@@ -244,18 +248,6 @@ describe("test_run_fresh: the declaration, then the verdicts", () => {
     assert.equal(row[1], "unit: this session changed unit's covered surfaces but no final-full run of record exists");
     // Outside a session the recipe is what a person driving by hand needs.
     assert.match(judgeFreshness([freshnessVerdict(unit, { ...facts, driven: false })])[1], /dabbler test-evidence record/);
-  });
-});
-
-describe("owed_decisions", () => {
-  it("passes when nothing is owed", () => {
-    assert.deepEqual(judgeOwedDecisions([]), [true, ""]);
-  });
-
-  it("refuses and names every unanswered verification-reducing decision", () => {
-    const row = judgeOwedDecisions([{ id: "suite-undeclared" }, { id: "source-resolution" }]);
-    assert.equal(row[0], false);
-    assert.match(row[1], /^2 unanswered decision\(s\) would reduce what verification proves: suite-undeclared, source-resolution\./);
   });
 });
 
@@ -317,9 +309,9 @@ describe("the driver", () => {
   it("omits a named gate rather than passing it", () => {
     const rows = runGates(SESSIONS, {
       omit: ["published_when_releasable"],
-      gates: [["published_when_releasable", pass], ["owed_decisions", pass]],
+      gates: [["published_when_releasable", pass], ["verdict_vocabulary", pass]],
     });
-    assert.deepEqual(rows.map((row) => row.name), ["owed_decisions"]);
+    assert.deepEqual(rows.map((row) => row.name), ["verdict_vocabulary"]);
   });
 
   it("marks an inapplicable row as such and not as a pass", () => {
@@ -338,7 +330,7 @@ describe("the driver", () => {
     );
   });
 
-  it("runs the nine in the order the close prints them", () => {
+  it("runs the eight in the order the close prints them", () => {
     assert.deepEqual(GATE_CHECKS.map(([name]) => name), [
       "verification_clean",
       "working_tree_clean",
@@ -346,7 +338,6 @@ describe("the driver", () => {
       "test_run_fresh",
       "pins_current",
       "exposure_within_ceiling",
-      "owed_decisions",
       "published_when_releasable",
       "verdict_vocabulary",
     ]);
@@ -365,14 +356,13 @@ describe("which phase makes a gate's evidence", () => {
     for (const name of GATE_EVIDENCE_PHASE.keys()) {
       assert.ok(registered.has(name), `${name} is mapped to a phase and is not a gate`);
     }
-    // The unmapped ones are unmapped deliberately: an owed decision is a
-    // person's to answer, a verdict's vocabulary is the verifier's, and the
-    // remaining three are about what landed rather than about evidence a
-    // phase remakes. A publish refused on any of them stops.
+    // The unmapped ones are unmapped deliberately: a verdict's vocabulary is
+    // the verifier's, and the remaining three are about what landed rather
+    // than about evidence a phase remakes. A publish refused on any of them
+    // stops.
     const unmapped = [...registered].filter((name) => !GATE_EVIDENCE_PHASE.has(name));
     assert.deepEqual(unmapped.sort(), [
       "exposure_within_ceiling",
-      "owed_decisions",
       "pins_current",
       "published_when_releasable",
       "verdict_vocabulary",

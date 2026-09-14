@@ -11,8 +11,6 @@ export * from "./driver-instruction.ts";
 export * from "./driver-report.ts";
 export * from "./driver-run.ts";
 export * from "./driver-work-plan.ts";
-export * from "./owed-decision-current.ts";
-export * from "./owed-decisions.ts";
 export * from "./packaging.ts";
 export * from "./progress-projection.ts";
 export * from "./review-claims.ts";

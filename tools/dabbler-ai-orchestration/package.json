@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: modules, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -299,11 +299,6 @@
         "command": "dabbler.showFrameworkTerminal",
         "title": "Show Framework Terminal",
         "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.answerOwedDecision",
-        "title": "Answer Owed Decision",
-        "category": "Dabbler"
       }
     ],
     "menus": {
@@ -370,10 +365,6 @@
         },
         {
           "command": "dabblerWorkExplorer.activateSession",
-          "when": "false"
-        },
-        {
-          "command": "dabbler.answerOwedDecision",
           "when": "false"
         },
         {
@@ -597,14 +588,6 @@
             ]
           },
           {
-            "id": "answerOwed",
-            "title": "Answer what the framework cannot decide",
-            "description": "Setup asks where the repository pushes, and a later session asks how its tests run. Each arrives as one question with its options, a recommendation and what happens if you leave it -- and the framework writes the answer.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
-            "media": {
-              "markdown": "media/walkthrough-owed.md"
-            }
-          },
-          {
             "id": "startSession",
             "title": "Start session 1",
             "description": "Session 1 authors the solution plan and declares the modules (one module is a fine answer); session 2 challenges the cuts and breaks the plan into numbered sessions, one module each. Session 1 asks you what the solution is -- the plan's substance is yours, and it does not guess it.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
@@ -689,7 +672,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.9",
-    "dabbler-ai-router": "2.7.0",
+    "dabbler-ai-router": "2.8.0",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",

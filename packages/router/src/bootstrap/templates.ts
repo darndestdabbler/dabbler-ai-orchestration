@@ -126,7 +126,7 @@ export const SHARED_BODY =
   "  class, the outstanding instruction's `reasons`, and the transcripts.\n" +
   "- Where the framework is source in this tree you may fix it, and the fix\n" +
   "  rides in this session's own diff; where it is an installed package,\n" +
-  "  report the step `blocked` with the diagnosis and raise an owed item.\n" +
+  "  report the step `blocked` with the diagnosis in its notes.\n" +
   "- Never touch the record, a verdict or a gate to get past a stop. The whole\n" +
   "  protocol is the *When the framework stops* section of dabbler's\n" +
   "  `docs/driving-a-session.md`.\n" +
@@ -152,7 +152,7 @@ export const SHARED_BODY =
   "- In a focused session the other modules are here as packages and\n" +
   "  contract folders, not source. If the work cannot be done without a\n" +
   "  sibling's source, ask with `dabbler session next --request-grant <slug>\n" +
-  "  --reason <why>` and wait for the answer; never take it. `session cancel\n" +
+  "  --reason <why>`: the grant is made and recorded; never take it. `session cancel\n" +
   "  --force` is a person's verb, never the engine's.\n" +
   "\n" +
   "## Writing files\n" +

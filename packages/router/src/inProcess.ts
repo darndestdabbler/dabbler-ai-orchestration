@@ -51,8 +51,6 @@ import {
   type ModuleRevokeOptions,
   type ModuleVerbs,
   type OneModuleVerbs,
-  type OwedAnswerOptions,
-  type OwedVerbs,
   type RepositoryTarget,
   type Router,
   type RouterResult,
@@ -443,25 +441,6 @@ export class InProcessRouter implements Router {
     }
     return this.text("verify", args, o.repoRoot);
   }
-
-  // --- what is owed a person ---------------------------------------------------
-
-  /**
-   * The answer goes through `dabbler owed answer` and not through
-   * `answerOwed`, because that verb is more than the row it writes: for
-   * some questions it does the thing the answer authorises FIRST -- writes
-   * the suite block, the packaging block, attaches the remote -- and
-   * records only if that worked. A caller that appended the row itself
-   * would settle questions whose act never happened.
-   */
-  public readonly owed: OwedVerbs = {
-    answer: (o: OwedAnswerOptions) => {
-      const args = ["answer", "--id", o.id, "--choice", o.choice, ...targetArgs(o)];
-      optional(args, "--note", o.note);
-      optional(args, "--value", o.value);
-      return this.text("owed", args, o.repoRoot);
-    },
-  };
 
   // --- the record, read as values ---------------------------------------------
 

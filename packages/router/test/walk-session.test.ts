@@ -21,13 +21,6 @@ import { driveSession, sessionNext, type Engine } from "../src/drive.ts";
 import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
 import { readRounds } from "../src/ledger.ts";
-import {
-  CLASS_ACCOUNTABILITY_SIGNOFF,
-  EVENT_SUPERSEDED,
-  foldOwed,
-  raiseOwed,
-  readOwed,
-} from "../src/owedDecisions.ts";
 import { capture } from "../src/output.ts";
 import { readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
@@ -242,21 +235,6 @@ describe("one session, walked from next to done", () => {
     assert.equal(readTaskDeclaration(sessionsDir, 1)?.["holdReason"], PLAN.hold_release);
     milestones.push("planned and declared");
 
-    // A signoff an earlier version of `rebaseline` raised, left open on
-    // purpose: the close settles it, because nothing raises or answers it
-    // any more and a question nobody can act on must not stand forever.
-    raiseOwed(repo, {
-      id: "repair-outside-a-step-1",
-      decisionClass: CLASS_ACCOUNTABILITY_SIGNOFF,
-      question: "Session 1 had work put into its tree outside any step. Does that stand?",
-      determined: "It absorbed one path.",
-      options: [
-        { label: "It stands", consequence: "The repair is reviewed with this session's diff." },
-        { label: "It does not", consequence: "The repair is taken back out before the session continues." },
-      ],
-      sessionNumber: 1,
-    });
-
     // --- a report that names what the tree did not move is refused -----------
     const wrong = await answerStep(sessionsDir, step.instruction?.seq ?? 0, "widget", [
       "src/widget.py",
@@ -448,12 +426,6 @@ describe("one session, walked from next to done", () => {
     assert.equal(readInstruction(repo, 1)?.kind, "done");
     assert.equal(readInstruction(repo, 1)?.answer_command, undefined);
     assert.ok(existsSync(join(repo, ".dabbler", "runs", "s1", "driver", "run.json")));
-
-    // The signoff an earlier version raised is settled by the close, once,
-    // and as superseded rather than answered: nobody answered it.
-    const signoff = foldOwed(readOwed(repo)).get("repair-outside-a-step-1");
-    assert.equal(signoff?.["event"], EVENT_SUPERSEDED);
-    assert.match(String(signoff?.["note"]), /repairs\.jsonl/);
 
     assert.deepEqual(milestones, [
       "registered and asked to plan",

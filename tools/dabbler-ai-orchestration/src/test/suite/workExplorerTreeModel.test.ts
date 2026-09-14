@@ -18,7 +18,6 @@ import {
   repositoryDescriptor,
   repositoryNodes,
   repositoryTooltip,
-  attentionDescriptor,
   attentionNodes,
   sessionDescriptor,
   sessionNodes,
@@ -167,45 +166,6 @@ suite("workExplorerTreeModel: nodes", () => {
       ["4 sessions run outside this checkout"],
     );
     assert.strictEqual(descriptorFor(repository).description, "0/1 on persister");
-  });
-
-  test("a grant request renders on the session that asked, as the decision it is, with grant and deny as the answers", () => {
-    const decision = {
-      id: "module-grant:model",
-      question: "Widen session 2's focused checkout to module 'model's source?",
-      severity: "advisory" as const,
-      blocking: false,
-      determined: "The engine asked for its source: stepping through the mapper.",
-      recommendation: "deny",
-      onNoAnswer: "The cone stays narrow.",
-      sessionNumber: 2,
-      options: [
-        { label: "grant", consequence: "The cone widens to modules/model." },
-        { label: "deny", consequence: "The cone stays narrow." },
-      ],
-    };
-    const repository = makeRepository({
-      owedDecisions: [decision],
-      sessions: [
-        makeSession({ number: 1, status: "complete", modules: ["model"] }),
-        makeSession({ number: 2, status: "in-progress", iconKey: "in-progress", modules: ["persister"] }),
-      ],
-    });
-    const [node] = repositoryNodes([repository]);
-    const sessions = bucketNodes(node).flatMap((bucket) => childrenOf(bucket)).flatMap((n) => (n.kind === "moduleGroup" ? childrenOf(n) : [n]));
-    const asking = sessions.find((n) => n.kind === "session" && n.session.number === 2);
-    const quiet = sessions.find((n) => n.kind === "session" && n.session.number === 1);
-    assert.ok(asking && quiet);
-    const [first] = childrenOf(asking);
-    assert.ok(first.kind === "attention" && first.decision?.id === "module-grant:model");
-    const row = descriptorFor(first);
-    assert.strictEqual(row.command?.command, "dabbler.answerOwedDecision");
-    assert.deepStrictEqual(row.command?.arguments, [{ repository, decision: repository.owedDecisions[0] }]);
-    assert.ok(row.tooltip?.includes("**grant**"));
-    assert.ok(row.tooltip?.includes("**deny**"));
-    assert.ok(row.tooltip?.includes("recommended"));
-    // Not on the session that did not ask.
-    assert.deepStrictEqual(childrenOf(quiet).filter((n) => n.kind === "attention"), []);
   });
 
   test("a closed session that stopped at the cap is an Information note, not an attention row", () => {
@@ -531,75 +491,12 @@ suite("workExplorerTreeModel: session descriptor", () => {
     const waiting = makeRepository({
       currentSession: 3,
       possiblyStalled: true,
-      owedDecisions: [
-        {
-          id: "testing-suites",
-          question: "How do this repository's tests run?",
-          severity: "blocking",
-          blocking: true,
-          onNoAnswer: null,
-        },
-      ],
     });
     const rows = attentionNodes({ kind: "repository", repository: waiting });
-    assert.strictEqual(rows.length, 2);
-    // Blocking first: it is the one that costs something.
-    assert.strictEqual(rows[0].subject, "owed");
-    assert.strictEqual(rows[0].urgent, true);
-    assert.strictEqual(rows[1].subject, "stalled");
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].subject, "stalled");
     // Never urgent: a quiet record is worth saying and is not an alarm.
-    assert.strictEqual(rows[1].urgent, false);
-  });
-
-  test("a stop and a question read differently, and each carries its whole brief", () => {
-    const waiting = makeRepository({
-      owedDecisions: [
-        {
-          id: "driver-stop-s62",
-          question: "Session 062 stopped (budget) in phase 'steps'. Run it again, or cancel it?",
-          severity: "advisory",
-          blocking: false,
-          determined: "the loop met driver.max_invocations (24)",
-          recommendation: "Run `next` again",
-          onNoAnswer: "The session stays in flight until someone resumes it or cancels it.",
-          options: [
-            { label: "Run `next` again", consequence: "It resumes from 'steps'." },
-            { label: "Cancel the session", consequence: "It ends with a reason on the record." },
-          ],
-        },
-        {
-          id: "git-remote",
-          question: "Where should this repository push?",
-          severity: "advisory",
-          blocking: false,
-          options: [
-            { label: "attach", consequence: "The close pushes there." },
-            { label: "stay-local", consequence: "Nothing is ever pushed." },
-          ],
-        },
-      ],
-    });
-    const rows = attentionNodes({ kind: "repository", repository: waiting });
-    const stop = attentionDescriptor(rows[0]);
-    const question = attentionDescriptor(rows[1]);
-
-    // A halted framework and a question it is asking are different things.
-    assert.deepStrictEqual(stop.icon, { kind: "theme", id: "warning", color: "charts.yellow" });
-    assert.deepStrictEqual(question.icon, { kind: "theme", id: "question", color: "charts.blue" });
-
-    // The tooltip is the whole brief: choosing from labels alone is
-    // choosing from a menu with no prices.
-    assert.ok(stop.tooltip?.includes("driver.max_invocations (24)"));
-    assert.ok(stop.tooltip?.includes("It resumes from 'steps'."));
-    assert.ok(stop.tooltip?.includes("It ends with a reason on the record."));
-    assert.ok(stop.tooltip?.includes("recommended"));
-    assert.ok(stop.tooltip?.includes("stays in flight"));
-
-    // Clicking the row is how it gets answered.
-    assert.strictEqual(stop.command?.command, "dabbler.answerOwedDecision");
-    assert.deepStrictEqual(stop.command?.arguments, [
-      { repository: waiting, decision: waiting.owedDecisions[0] },
-    ]);
+    assert.strictEqual(rows[0].urgent, false);
   });
 
   test("the liveness row says working while the framework runs something, waiting between calls", () => {

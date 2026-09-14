@@ -93,10 +93,10 @@ cross-provider round and its remediation, the complete test suite as the
 run of record, the commit, the push and the close are all the framework's
 — not a checklist anyone has to remember.
 
-**6. Nine gates at the close, each one earned.** `session close` runs
+**6. Eight gates at the close, each one earned.** `session close` runs
 verification clean, working tree clean, pushed to remote, test run fresh,
-pins current, exposure within ceiling, owed decisions answered, published
-when releasable, and verdict vocabulary — and only then flips the state
+pins current, exposure within ceiling, published when releasable, and
+verdict vocabulary — and only then flips the state
 and commits its own bookkeeping. Every one of them exists because a real
 incident got past a weaker check; none guards a hypothetical.
 

@@ -97,7 +97,6 @@ import { candidatePathsAsWritten, readCandidateRecord } from "./impact.ts";
 import { isFrameworkInstalledPath, materialPaths } from "./checks.ts";
 import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
-  governingConfig,
   materialWorktreeChanges,
   readWorktreeStatus,
   renderGateRow,
@@ -105,16 +104,12 @@ import {
 } from "./gates.ts";
 import { PackagingConfigError, loadDeclaration, loadTagRelease } from "./packaging.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
-import { detectEcosystems } from "./bootstrap/detect.ts";
 import { removeStopGate } from "./bootstrap/index.ts";
-import { PROJECT_CONFIG_FILENAME } from "./config.ts";
-import { refreshOwedDecisions, settleRepairSignoffs } from "./owedDecisions.ts";
-import { isSessionBookkeeping, loadSuitesChecked } from "./testEvidence.ts";
+import { isSessionBookkeeping } from "./testEvidence.ts";
 import { nowIso, platformNewlines, repoRootFor, runGit } from "./journal.ts";
 import {
   LedgerError,
   RUNS_DIRNAME,
-  type Row,
   latestRound,
 } from "./ledger.ts";
 import {
@@ -1494,25 +1489,6 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
         // Deliberately silent: see above.
       }
     }
-    // Raised before the work, so the question is standing before the session
-    // that would trip over it begins. Idempotent, and best-effort: a
-    // registration must not fail because a brief could not be written.
-    try {
-      // Not for a module session registered from the full checkout: the
-      // governing configuration is read where the command stands, and the
-      // clone is not where it stands, so the question would be asked of a
-      // declaration nobody read. The close asks it again, in the clone.
-      const raised = moduleStart === null ? raiseSuiteDecisionIfOwed(registerIn, requested) : null;
-      if (raised !== null) {
-        writeOut(
-          `start: raised owed decision '${String(raised["id"])}' -- ` +
-            "`dabbler owed list` reads it. The work is not blocked; the close " +
-            "is, until it is answered.\n",
-        );
-      }
-    } catch {
-      // Deliberately silent: see above.
-    }
     // The one thing true under both flows. This used to print the typed
     // lifecycle's recipe -- `session declare`, then `dabbler affected` --
     // which contradicted the managed body the engine had just read, and
@@ -2092,8 +2068,8 @@ export interface RebaselineCliOptions {
  * rather than merely permits: the paths and the reason go to
  * `repairs.jsonl`, and that row is the whole of it. It asks nobody whether
  * the repair stands: no answer to that would change what the framework does
- * next, and a question whose answer changes nothing is a row on `owed list`
- * and not a decision. What it does NOT do is weaken any judgement
+ * next, and a question whose answer changes nothing is not a decision.
+ * What it does NOT do is weaken any judgement
  * downstream -- the standing verification round and the run of record both
  * bind to a tree this moves, so a repair after either is refused by exactly
  * the machinery that refuses any other post-verification change. The hole
@@ -2483,17 +2459,6 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
       return EXIT_BOUNDARY;
     }
 
-    // Refreshed against the tree the session actually produced, not the one
-    // it started with. A repository that had no build files at `start` and
-    // grew them during the session is the greenfield transition this whole
-    // mechanism exists for -- raising only at registration would miss the
-    // first code-writing session every time.
-    try {
-      raiseSuiteDecisionIfOwed(sessionsDir, current as number);
-    } catch {
-      // A close must not fail because a brief could not be written; the gate
-      // below reads whatever is on disk.
-    }
     // Before the gates and not as one of them. A gate answers a question
     // about evidence that exists; this is a refusal to produce evidence at
     // all, and `--force` bypasses bookkeeping gates -- it must not become a
@@ -2554,23 +2519,6 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
     );
     for (const line of steppedOverLines(repoRoot, sessionsDir, current as number)) {
       writeOut(`${line}\n`);
-    }
-
-    // A repository that still carries a signoff `rebaseline` used to raise
-    // is offered it on every `owed list` until something settles it; the
-    // close does, once, and says so only when it did.
-    if (repoRoot) {
-      try {
-        for (const row of settleRepairSignoffs(repoRoot)) {
-          writeOut(
-            `close: '${String(row["id"])}' is settled without an answer; the repair is ` +
-              "on repairs.jsonl and rebaseline no longer asks.\n",
-          );
-        }
-      } catch {
-        // A close must not fail because an old row could not be settled. It
-        // stays on the record either way.
-      }
     }
 
     if (repoRoot) {
@@ -3107,41 +3055,6 @@ export function restore(
 }
 
 export { DECIDERS, SESSION_PLAN_FILENAME };
-
-/**
- * Raise the suite-declaration question when this repository owes it.
- *
- * The two facts it needs come from opposite places on purpose: what the
- * repository BUILDS is read from its build files, and what it DECLARES is read
- * from its configuration. A question is owed only when those disagree -- there
- * is code here and no way to test it -- which is why a repository of documents
- * is never asked.
- */
-function raiseSuiteDecisionIfOwed(
-  sessionsDir: string,
-  sessionNumber: number,
-): Row | null {
-  const root = repoRootFor(sessionsDir);
-  if (root === null) return null;
-  const loaded = loadSuitesChecked(governingConfig(sessionsDir));
-  // A malformed declaration is `test_run_fresh`'s to refuse, not a gap to
-  // ask about: the operator declared something, and telling them they
-  // declared nothing would be wrong.
-  if (!loaded.ok) return null;
-  const ecosystems = detectEcosystems(root);
-  return refreshOwedDecisions(root, {
-    ecosystems: ecosystems.map((eco) => eco.key),
-    hasExpensiveSuite: loaded.suites.some((suite) => suite.expensive),
-    configFilename: PROJECT_CONFIG_FILENAME,
-    // Whether the repository has grown somewhere for tests to live. The
-    // detected roots are the ecosystem's conventional ones, so this asks the
-    // question in the ecosystem's own terms rather than guessing at a name.
-    hasTestRoot: ecosystems.some((eco) =>
-      eco.testRoots.some((relative) => existsSync(join(root, relative))),
-    ),
-    sessionNumber,
-  });
-}
 
 // --- the session in flight, for the verbs that read the ledger alone ----------
 

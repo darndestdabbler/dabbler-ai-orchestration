@@ -252,7 +252,7 @@ export interface ModulePackOptions {
 
 export interface OneModuleVerbs {
   open(options: ModuleOpenOptions): Promise<RouterResult<RouterText>>;
-  /** Raise the owed decision that widens the checkout to a sibling's source. */
+  /** Widen the checkout to a sibling's source, recorded with the reason. */
   grant(options: ModuleGrantOptions): Promise<RouterResult<RouterText>>;
   /** End a grant: narrow the checkout again. */
   revoke(options: ModuleRevokeOptions): Promise<RouterResult<RouterText>>;
@@ -420,7 +420,7 @@ export interface BootstrapOptions {
    * The close pushes, the close pulls the repository forward, and a focused
    * checkout is CLONED from the origin, so a project with no remote cannot
    * close its first session. Absent is a real answer -- the project is set
-   * up without one, and the owed decision still asks for it later.
+   * up without one, local-only until a remote is added.
    */
   readonly remote?: string;
 }
@@ -435,27 +435,6 @@ export interface BootstrapOptions {
  * needed, so it is trimmed rather than stubbed -- D162/D152, the same
  * ruling that took `modules list` and `modules retire` out.
  */
-/**
- * Settle one owed decision: the operator's choice, by the option's label.
- *
- * It exists so a surface that SHOWS the brief can also take the answer
- * where it was read. The rule that only a person answers is not restated
- * here -- the verb this reaches is the one writer, and a caller that wrote
- * the row itself would be the second.
- */
-export interface OwedAnswerOptions extends RepositoryTarget {
-  readonly id: string;
-  /** The option chosen, by its label, exactly as the brief states it. */
-  readonly choice: string;
-  readonly note?: string;
-  /** The datum an answer carries, for a choice that is not its own value. */
-  readonly value?: string;
-}
-
-export interface OwedVerbs {
-  answer(options: OwedAnswerOptions): Promise<RouterResult<RouterText>>;
-}
-
 export interface LedgerVerbs {
   /** The last round row of one session, or null when it has none. */
   latestRound(
@@ -511,7 +490,6 @@ export interface Router {
   /** One module of a multi-module solution: its focused checkout. */
   readonly module: OneModuleVerbs;
   readonly verify: VerifyVerbs;
-  readonly owed: OwedVerbs;
   readonly ledger: LedgerVerbs;
   readonly testEvidence: TestEvidenceVerbs;
   readonly approvedPlan: ApprovedPlanVerbs;

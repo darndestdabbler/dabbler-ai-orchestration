@@ -27,7 +27,6 @@ import { sessionsDirFor } from "../src/evidence.ts";
 import { materialWorktreeChanges } from "../src/gates.ts";
 import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/packaging.ts";
 import { capture } from "../src/output.ts";
-import { ID_GIT_REMOTE, openDecisions } from "../src/owedDecisions.ts";
 import { solutionShape } from "../src/modules.ts";
 import { CATALOG_FILENAME } from "../src/catalog.ts";
 import { RECORD_CATALOG } from "../src/discovery.ts";
@@ -152,11 +151,6 @@ describe("a project on its first day", () => {
     assert.ok(existsSync(join(repo, ".dabbler", "solution", "solution.json")));
     milestones.push("the Explorer has something to render");
 
-    // --- what the framework is waiting on a person for ---------------------
-    // This repository has an upstream, so the remote question is not asked.
-    assert.ok(!openDecisions(repo).map((row) => String(row["id"])).includes(ID_GIT_REMOTE));
-    milestones.push("nothing is owed that the repository already answered");
-
     // --- what setup left in git --------------------------------------------
     // It commits its own files and only those: the operator's README was
     // already committed, their work in progress is still theirs and
@@ -197,7 +191,6 @@ describe("a project on its first day", () => {
       "its suites are declared from what it holds",
       "what it would publish is readable, and undeclared",
       "the Explorer has something to render",
-      "nothing is owed that the repository already answered",
       "setup committed its own work",
       "a release names nothing, because nothing declares a version",
     ]);

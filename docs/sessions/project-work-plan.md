@@ -205,7 +205,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 165 | The small things, and the walk | yes | 2026-09-13 |
 | 166 | The cap, the non-goals, and the sentence | no | 2026-09-14 |
 | 167 | Ship by default, and the one question that goes | yes | 2026-09-14 |
-| 168 | Nothing is owed | — | not declared |
+| 168 | Nothing is owed | yes | 2026-09-14 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2392,3 +2392,18 @@ Session 167 makes a session ship by default. A hold with a reason replaces the r
 - 2026-09-14 — step 'no-publish-without-a-verdict': its files: the one test lives beside the releasability tests in session.test.ts, which already holds the fixture; gates.test's rows are pure (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-14 — step 'the-question-goes': its files: the withdrawal's record lived in ledger.ts and the driver's skip reason named it; the git fake learns tag; gates.test and bootstrap.test needed nothing (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-14 — step 'the-words': its files and checks: the words met a rule that had to be made true first: a repository that declares no packaging has nothing to publish, so declare holds the session and says so; the schema reference carries the word withdraw in an unrelated row (claude-code (anthropic, claude-fable-5-1))
+
+### Session 168 — Nothing is owed
+
+**Releasable: yes.**
+
+Session 168 deletes owed decisions. Nothing is owed a person: every question the module could raise becomes a recorded default or a refusal that names its fix, and none becomes a toast or a chat question. A grant is made when asked for: `session next --request-grant <slug> --reason` widens the cone at once, records the reason in the grants log and the exposure manifest, and prints the permanent form. A suite is a rule at the gate: `test_run_fresh` refuses a close where the build files say there is code and `dabbler.yaml` declares no suite, naming the file, and the plan ask says so before the work. A repository with no remote is local-only by that fact: the push gate waives itself and says why, and nothing writes a marker. A package no repository of the solution declares is external, said in `deps`' output. A feed that is not a source on this machine is a refusal naming the file that declares sources, and build files that say a repository publishes are one line at bootstrap naming the `packaging:` block. A stop raises no row: its own text already carries the reason and any amendment triage proposed. A suite whose tests are not in a focused folder is recorded on the session's own run, and the freshness gate reads it there. Then the module goes: owedDecisions.ts, the `owed` verb, its two schemas and generated types, the `owed_decisions` gate, the projection's owed rows, the in-process `owed` verbs and their contract, and in the extension the Answer Owed Decision command, its walkthrough step and page, and every row the Work Explorer and the Dabbler Terminal rendered for a decision. Decisions stay documented in activity-log.json, decisions-log.md and docs/operator-decisions.md, none of which read the deleted file. The session releases 2.8.0 as a minor.
+
+**Amended after acceptance:**
+
+- 2026-09-14 — step 'grants-are-made': its files: the typed module grant verb and the owed verb's grant answer call the same function; both follow it (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'suites-and-remote-by-rule': its files: the marker's walk test and bootstrap's remote test follow the rule; session.test asserted nothing about the question (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'deps-and-packaging-by-rule': its files: the bootstrap walk asserted nothing about the questions; the two tests live in cli.test and bootstrap.test (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'stops-and-owed-suites-on-the-run': its files: the one test sits in drive.test.ts beside the suite it already covers; gates.test needed nothing (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'the-module-goes': its files and checks: the verb table, the shipped-page list, the run schema's one phrase and eight more sentences named the inbox; commandFlows runs alone because three of its tests are order-sensitive beside the terminal's at HEAD too (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'the-module-goes': its files: the selection map and the boundaries declaration named the module and its test; both are what lint reads (claude-code (anthropic, claude-fable-5-1))

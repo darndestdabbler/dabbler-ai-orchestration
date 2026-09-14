@@ -312,7 +312,7 @@ packaging run on its record cannot close: the close refuses.
   class, the outstanding instruction's `reasons`, and the transcripts.
 - Where the framework is source in this tree you may fix it, and the fix
   rides in this session's own diff; where it is an installed package,
-  report the step `blocked` with the diagnosis and raise an owed item.
+  report the step `blocked` with the diagnosis in its notes.
 - Never touch the record, a verdict or a gate to get past a stop. The whole
   protocol is the *When the framework stops* section of dabbler's
   `docs/driving-a-session.md`.
@@ -338,7 +338,7 @@ packaging run on its record cannot close: the close refuses.
 - In a focused session the other modules are here as packages and
   contract folders, not source. If the work cannot be done without a
   sibling's source, ask with `dabbler session next --request-grant <slug>
-  --reason <why>` and wait for the answer; never take it. `session cancel
+  --reason <why>`: the grant is made and recorded; never take it. `session cancel
   --force` is a person's verb, never the engine's.
 
 ## Writing files

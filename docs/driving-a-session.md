@@ -593,7 +593,6 @@ Behind that, in the close's own log:
   working_tree_clean  PASS
   pushed_to_remote    PASS
   test_run_fresh      PASS
-  owed_decisions      PASS
   verdict_vocabulary  PASS
 close: session 001 of sessions closed (VERIFIED).
 ```
@@ -715,58 +714,14 @@ is your own Esc.
 
 ### When the framework stops, it says so
 
-A halt is raised as a decision, so one kind of row serves every "waiting
-on you". It appears above the session buckets with a warning glyph, a
-toast offers the recommended answer, and the activity-bar badge carries
-the count. After `session interrupt --stop` on the walk, this is the row
-and the badge the Explorer built — printed here as the model carries them,
-since a screenshot cannot be pasted into a text file:
-
-```
-ROW  Session 001 paused (interrupted) in phase 'preverify'. Run it again, or cancel it?
-     Nothing happens. The session stays in flight and its record stops moving until someone resumes it or cancels it.
-     icon={"kind":"theme","id":"warning","color":"charts.yellow"} command=dabbler.answerOwedDecision
-
-BADGE {"value":1,"tooltip":"Dabbler is waiting on you: Session 001 paused (interrupted) in phase 'preverify'. Run it again, or cancel it?"}
-```
-
-The row's tooltip is the whole brief — the question, what the framework
-already established, and each option with what follows from it:
-
-```
-**Session 001 paused (interrupted) in phase 'preverify'. Run it again, or cancel it?**
-
-Somebody asked it to stop. The widget needs a rethink. The dabbler command that met it has ended; session 001 remains in flight. Next: you. `dabbler session drive` resumes it from 'preverify'; `dabbler session cancel` ends it instead.
-
-- **Run `next` again** — *recommended*: The session resumes from 'preverify'. The steps it has already accepted are not asked for again.
-- **Cancel the session**: `dabbler session cancel` ends it with a reason on the record. What the working tree already carries stays where it is.
-
-If nobody answers: Nothing happens. The session stays in flight and its record stops moving until someone resumes it or cancels it.
-```
-
-The toast offers the recommended option by its own label, *Other…* and
-*Later*. **Later records nothing** — dismissing a toast is not a decision,
-and the row stays. *Other…*, or a click on the row, opens a picker whose
-items carry each consequence:
-
-```
-Run `next` again  ◀ default
-  detail: The session resumes from 'preverify'. The steps it has already accepted are not asked for again. (recommended)
-Cancel the session
-  detail: `dabbler session cancel` ends it with a reason on the record. What the working tree already carries stays where it is.
-```
-
-Choosing records the answer through `dabbler owed answer`, which is the
-same one writer the command line uses:
-
-```
-owed: 'driver-stop-s1' answered 'Run `next` again'.
-```
-
-Answering does not itself resume the session — the next `session next`
-does, from the phase it stopped in, and nothing already accepted is asked
-for again. That call is the one you make in your own CLI, and this is what
-it printed there:
+A halt is printed where you are: the Dabbler terminal carries the stop's
+own sentence — what happened, that the command ended and the session did
+not, who acts next — its ways on with the command for each, and, where
+triage proposed an amendment, the `plan amend` that makes it. Nothing is
+raised for anyone to answer, and nothing waits. The next `session next`
+resumes it, from the phase it stopped in, and nothing already accepted is
+asked for again. That call is the one you make in your own CLI, and this
+is what it printed there:
 
 ```
 dabbler [14:22:18] run-resumed session=001 phase=preverify invocations=0 max_invocations=24 after=interrupted

@@ -47,12 +47,11 @@
       ]
     },
     "record": {
-      "comment": "The machine-owned record and its readers: rounds, evidence, critique provenance, owed decisions.",
+      "comment": "The machine-owned record and its readers: rounds, evidence, critique provenance.",
       "members": [
         "ledger",
         "evidence",
-        "critique",
-        "owedDecisions"
+        "critique"
       ]
     },
     "workflow-startup": {

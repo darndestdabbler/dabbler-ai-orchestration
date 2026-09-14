@@ -721,10 +721,10 @@ describe("the record", () => {
     });
     assert.equal(run.ready, true);
     // Every close gate but published_when_releasable, which the rehearsal
-    // leaves unasked: eight since the pins and the exposure joined them.
+    // leaves unasked: seven, now that nothing is owed.
     assert.deepEqual(
       run.gates.map((gate) => gate.passed),
-      [true, true, true, true, true, true, true, true],
+      [true, true, true, true, true, true, true],
     );
     assert.equal(existsSync(pushLog), false);
     assert.equal(existsSync(packagingPath(repo, 1)), false);

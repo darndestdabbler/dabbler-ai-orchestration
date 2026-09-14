@@ -18,13 +18,6 @@ import {
   type RouterEcho,
 } from "../src/inProcess.ts";
 import { capture, writeErr, writeOut } from "../src/output.ts";
-import {
-  CLASS_VALUE_TRADEOFF,
-  foldOwed,
-  openDecisions,
-  raiseOwed,
-  readOwed,
-} from "../src/owedDecisions.ts";
 import { standIn, workingDirectory } from "../src/workdir.ts";
 import { makeAnsweredSandbox } from "./support/answers.ts";
 
@@ -228,37 +221,6 @@ describe("the in-process router", () => {
     assert.ok(existsSync(join(repo, "AGENTS.md")));
   });
 
-  it("settles an owed decision, and the ledger is what says so", async () => {
-    const { repo, sessionsDir } = makeAnsweredSandbox();
-    raiseOwed(repo, {
-      id: "driver-stop-s1",
-      decisionClass: CLASS_VALUE_TRADEOFF,
-      question: "Session 001 stopped (budget). Run it again, or cancel it?",
-      determined: "the loop met driver.max_invocations (1)",
-      options: [
-        { label: "Run `next` again", consequence: "It resumes from the phase it stopped in." },
-        { label: "Cancel the session", consequence: "It ends with a reason on the record." },
-      ],
-      recommendation: "Run `next` again",
-    });
-
-    const result = await createInProcessRouter().owed.answer({
-      repoRoot: repo,
-      sessionsDir,
-      id: "driver-stop-s1",
-      choice: "Run `next` again",
-      note: "answered from the Work Explorer",
-    });
-
-    assert.equal(result.ok, true);
-    // Answered, and therefore no longer owed -- which is the half the
-    // surface that raised it reads back.
-    assert.deepEqual(openDecisions(repo), []);
-    const settled = foldOwed(readOwed(repo)).get("driver-stop-s1");
-    assert.equal(settled?.["event"], "answered");
-    assert.equal(settled?.["answer"], "Run `next` again");
-    assert.equal(settled?.["note"], "answered from the Work Explorer");
-  });
 
   it("reads the last round of a session, or null when it has none", async () => {
     const { repo } = makeAnsweredSandbox();

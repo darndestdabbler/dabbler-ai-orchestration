@@ -286,25 +286,6 @@ export function moduleGroupSessionNodes(node: ModuleGroupNode): SessionNode[] {
 }
 
 /**
- * The decisions raised for this session -- a grant request, in the block
- * that introduced them -- rendered on the session that asked, as the
- * attention rows they are, with their own options as the answers.
- */
-export function sessionDecisionNodes(node: SessionNode): AttentionNode[] {
-  return (node.repository.owedDecisions ?? [])
-    .filter((owed) => owed.sessionNumber === node.session.number && owed.id.startsWith("module-grant:"))
-    .map((owed) => ({
-      kind: "attention" as const,
-      repository: node.repository,
-      subject: "owed" as const,
-      label: owed.question,
-      detail: owed.blocking ? "Holds the close until you answer it" : owed.onNoAnswer || "Waiting on you",
-      urgent: owed.blocking,
-      decision: owed,
-    }));
-}
-
-/**
  * The third level: the in-flight session's tasks, exactly as the
  * projection lists them. A refusal outranks the list — the projection
  * refuses an unreadable execution record rather than emitting rows, and
@@ -413,10 +394,9 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
     case "moduleGroup":
       return moduleGroupSessionNodes(node);
     case "session":
-      // What is asked of the operator for this session reads first; then
-      // what stopped it, above what it was doing: the verification row,
+      // What stopped it, above what it was doing: the verification row,
       // then the tasks.
-      return [...sessionDecisionNodes(node), ...verificationNodes(node), ...taskNodes(node)];
+      return [...verificationNodes(node), ...taskNodes(node)];
     case "verification":
       return findingNodes(node);
     case "task":
@@ -1093,7 +1073,7 @@ export function descriptorFor(node: WorkExplorerNode): RowDescriptor {
  *
  * The attention view is the answer to "three new things to look at, in three
  * places, is not an improvement": sessions 38, 39 and 40 each added something
- * worth seeing — planned sessions, owed decisions, task rows — and each of
+ * worth seeing — planned sessions, stalled runs, task rows — and each of
  * them lived somewhere different. Nothing here is derived. Every row restates
  * a fact the projection already carries, in the place the operator is
  * already looking.
@@ -1101,50 +1081,11 @@ export function descriptorFor(node: WorkExplorerNode): RowDescriptor {
 export interface AttentionNode {
   readonly kind: "attention";
   readonly repository: SessionsRepository;
-  readonly subject: "owed" | "stalled" | "unresolved";
+  readonly subject: "stalled" | "unresolved";
   readonly label: string;
   readonly detail: string;
   /** Blocking work, as opposed to merely worth knowing. */
   readonly urgent: boolean;
-  /**
-   * The whole brief, for a row that is a decision.
-   *
-   * Carried rather than flattened into the tooltip here, because the same
-   * row is what the answer flow is opened with: one object says what to
-   * show and what to offer, so the two cannot describe different options.
-   */
-  readonly decision?: OwedDecision;
-}
-
-/** One open decision, exactly as the projection publishes it. */
-export type OwedDecision = SessionsRepository["owedDecisions"][number];
-
-/**
- * A stop and a question look different at a glance.
- *
- * The framework raises its own stops as decisions (`driver-stop-s<N>`), so
- * they arrive through the same list as everything else -- and an operator
- * scanning several projects needs "this one halted" to survive peripheral
- * vision, which is what the warning glyph is for.
- */
-export function isDriverStop(decision: OwedDecision): boolean {
-  return decision.id.startsWith("driver-stop-");
-}
-
-/** The brief as markdown: the question, what is known, and what each answer costs. */
-export function decisionTooltip(decision: OwedDecision): string {
-  const lines = [`**${decision.question}**`];
-  if (decision.determined) lines.push("", decision.determined);
-  const options = decision.options ?? [];
-  if (options.length > 0) {
-    lines.push("");
-    for (const option of options) {
-      const recommended = option.label === decision.recommendation ? " — *recommended*" : "";
-      lines.push(`- **${option.label}**${recommended}: ${option.consequence}`);
-    }
-  }
-  if (decision.onNoAnswer) lines.push("", `If nobody answers: ${decision.onNoAnswer}`);
-  return lines.join("\n");
 }
 
 /**
@@ -1156,23 +1097,6 @@ export function decisionTooltip(decision: OwedDecision): string {
 export function attentionNodes(node: RepositoryNode): AttentionNode[] {
   const repository = node.repository;
   const rows: AttentionNode[] = [];
-
-  for (const owed of repository.owedDecisions ?? []) {
-    rows.push({
-      kind: "attention",
-      repository,
-      subject: "owed",
-      label: owed.question,
-      // The blocking one says what it costs; the advisory one says what
-      // happens if it is never answered, which is the honest reason it is
-      // safe to ignore.
-      detail: owed.blocking
-        ? "Holds the close until you answer it"
-        : owed.onNoAnswer || "Waiting on you",
-      urgent: owed.blocking,
-      decision: owed,
-    });
-  }
 
   // The liveness row renders whenever something is in flight, not only when
   // it has gone quiet: "what happened while I was away" is a question about
@@ -1349,41 +1273,20 @@ export function moduleGroupDescriptor(node: ModuleGroupNode): RowDescriptor {
 
 /** An attention row, which is a leaf and carries no menu of its own. */
 export function attentionDescriptor(node: AttentionNode): RowDescriptor {
-  const decision = node.decision;
   return {
     id: `attention:${node.repository.root}/${node.subject}/${node.label}`,
     label: node.label,
     description: node.detail,
-    // A decision's tooltip is the whole brief. It is the one surface with
-    // room for the consequences, and an operator deciding from labels
-    // alone is choosing from a menu with no prices.
-    tooltip: decision ? decisionTooltip(decision) : `**${node.label}**\n\n${node.detail}`,
+    tooltip: `**${node.label}**\n\n${node.detail}`,
     icon: {
       kind: "theme",
       // Urgency is the icon's whole job here: an operator scanning several
       // projects needs "this one is blocked" to survive peripheral vision.
-      // A halted framework and a question it is asking are different
-      // things and read as different glyphs.
-      id: decision ? (isDriverStop(decision) ? "warning" : "question") : node.urgent ? "error" : "info",
-      color: decision
-        ? isDriverStop(decision)
-          ? "charts.yellow"
-          : "charts.blue"
-        : node.urgent
-          ? "charts.yellow"
-          : undefined,
+      id: node.urgent ? "error" : "info",
+      color: node.urgent ? "charts.yellow" : undefined,
     },
     contextValue: tokenString([NODE_TOKEN.attention, `attention-${node.subject}`]),
     collapsible: "none",
-    // Clicking the row is how it is answered, because it is where the
-    // operator is already looking when they decide to.
-    command: decision
-      ? {
-          command: "dabbler.answerOwedDecision",
-          title: "Answer",
-          arguments: [{ repository: node.repository, decision }],
-        }
-      : undefined,
   };
 }
 

@@ -8,9 +8,10 @@
 // - `working_tree_clean`: 41 real firings -- "forgot to git add".
 // - `pushed_to_remote`: 29 real firings -- work stranded local.
 // - `test_run_fresh`: 5 firings -- a close on code the suite never saw.
-// - `owed_decisions`: csv-model, 2026-08-30 -- session 1 closed at a clean
-//   5/5 in a repository that declared no suite, and nothing would have
-//   changed when the work became code. It does NOT guard `test_run_fresh`:
+// - `test_run_fresh`'s suite rule: csv-model, 2026-08-30 -- session 1 closed
+//   at a clean 5/5 in a repository that declared no suite, and nothing would
+//   have changed when the work became code. The row refuses code with no
+//   suite, and nobody is asked:
 //   that gate answers "did the declared suite run against this tree", and
 //   this one answers "is something unanswered that would make the answer
 //   meaningless". A gate cannot see its own missing precondition, which is
@@ -36,8 +37,8 @@
 // and no repository; the readers are exercised once, in the git-states
 // walkthrough.
 
-import { existsSync, realpathSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
 
 import {
   type WorktreeGateOptions,
@@ -47,7 +48,8 @@ import {
 import type { RouterConfig } from "./config.ts";
 import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
 import { EcosystemError, ecosystemOf } from "./ecosystem.ts";
-import { readRun } from "./driver.ts";
+import { readRun, suitesOwedElsewhere } from "./driver.ts";
+import { detectEcosystems } from "./bootstrap/detect.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
 import { readExposure } from "./exposure.ts";
 import { type PackageReferenceFact, candidatesFromRecord, judgeExposure, judgePins } from "./land.ts";
@@ -77,7 +79,6 @@ import {
 import { releasabilityOf } from "./writers.ts";
 import { readSessionState } from "./progress.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
-import { blockingDecisions, suitesOwedElsewhere } from "./owedDecisions.ts";
 import {
   evaluateFreshness,
   loadSuitesChecked,
@@ -137,8 +138,8 @@ export interface GateResult {
    * reports PASS for a check it never performed grows quieter as the work
    * grows more consequential, which is how a repository with no declared
    * suite closed a clean 5/5 having run nothing. An inapplicable gate does
-   * not block -- what blocks is an owed decision in the verification-reduction
-   * class -- but it never claims to have proved anything.
+   * not block -- code with no suite is refused by the row itself -- but it
+   * never claims to have proved anything.
    */
   readonly inapplicable: boolean;
 }
@@ -605,8 +606,7 @@ export interface PushFacts {
   readonly branch: string | null;
   /** The upstream's name, or null when the branch tracks nothing. */
   readonly upstream: string | null;
-  /** Read only when there is no upstream: the waiver's two conditions. */
-  readonly localOnlyMarker: boolean;
+  /** Read only when there is no upstream: a repository with no remote is local-only by that fact. */
   readonly hasRemote: boolean;
   /** Commits the upstream has not seen; 0 when unknown. */
   readonly ahead: number;
@@ -626,7 +626,6 @@ export function readPushFacts(root: string): PushFacts {
   const facts = {
     branch: null as string | null,
     upstream: null as string | null,
-    localOnlyMarker: false,
     hasRemote: true,
     ahead: 0,
     dryRunError: null as string | null,
@@ -641,8 +640,7 @@ export function readPushFacts(root: string): PushFacts {
     "@{u}",
   ]);
   if (upstream.code !== 0) {
-    facts.localOnlyMarker = existsSync(join(root, ".dabbler", "local-only"));
-    facts.hasRemote = facts.localOnlyMarker ? hasRemote(root) : true;
+    facts.hasRemote = hasRemote(root);
     return facts;
   }
   facts.upstream = upstream.stdout;
@@ -660,11 +658,11 @@ export function judgePushState(facts: PushFacts): Check {
     return [false, "HEAD is detached; check out a branch before close-out"];
   }
   if (facts.upstream === null) {
-    if (facts.localOnlyMarker && !facts.hasRemote) {
+    if (!facts.hasRemote) {
       return [
         true,
-        "local-only repo: push gate waived (.dabbler/local-only " +
-          "marker present, no remote configured)",
+        "no remote is configured, so this repository is local-only and nothing is pushed; " +
+          "`git remote add origin <url>` makes the land push",
       ];
     }
     return [
@@ -717,7 +715,10 @@ export function governingConfig(sessionsDir: string): RouterConfig | null {
  * What the suite declaration alone decides: malformed refuses, no expensive
  * suite is inapplicable, otherwise null and the freshness verdicts are next.
  */
-export function judgeSuiteDeclaration(loaded: SuiteLoadResult): Check | null {
+export function judgeSuiteDeclaration(
+  loaded: SuiteLoadResult,
+  code: readonly string[] = [],
+): Check | null {
   if (loaded.errors.length > 0) {
     // "No expensive suites declared" and "every declared suite was a typo
     // and got dropped" must never be indistinguishable.
@@ -733,9 +734,17 @@ export function judgeSuiteDeclaration(loaded: SuiteLoadResult): Check | null {
     ];
   }
   if (!loaded.suites.some((suite) => suite.expensive)) {
-    // Inapplicable, not passed. Nothing here can be proved and nothing here is
-    // claimed. What refuses the close is the owed decision that says a suite
-    // is undeclared, not this row.
+    // Code with no suite is refused here, in the row that judges suites: a
+    // session cannot call its work verified while nothing runs the tests
+    // of a repository that builds something. A repository of documents has
+    // nothing to run and is inapplicable, not passed.
+    if (code.length > 0) {
+      return [
+        false,
+        `no suite is declared, and this repository builds ${code.join(", ")} code: declare one ` +
+          `in ${PROJECT_CONFIG_FILENAME} under testing.suites, or nothing measures the work`,
+      ];
+    }
     return [true, "no suite is declared, so nothing was measured", true];
   }
   return null;
@@ -748,19 +757,28 @@ export function judgeFreshness(verdicts: readonly FreshnessVerdict[]): Check {
   return [false, failures.map((v) => `${v.suite}: ${v.reason}`).join("; ")];
 }
 
+/** The ecosystems whose build files say this repository builds code; empty for a repository of documents. */
+function codeEcosystems(root: string): string[] {
+  try {
+    return detectEcosystems(root).map((eco) => eco.key);
+  } catch {
+    return [];
+  }
+}
+
 export function checkTestRunFresh(
   sessionsDir: string,
   config: RouterConfig | null = null,
 ): Check {
   const governing = config ?? governingConfig(sessionsDir);
   const loaded = loadSuitesChecked(governing);
-  const declared = judgeSuiteDeclaration(loaded);
+  const root = repoRootFor(sessionsDir);
+  const declared = judgeSuiteDeclaration(loaded, root === null ? [] : codeEcosystems(root));
   if (declared !== null) return declared;
   // A module session's run of record ran the suites its impact plan reached
   // and no other; the gate demands the same ones, from the same plan. A
   // session with no plan -- a single-module solution -- is demanded every
   // required suite, as it always was.
-  const root = repoRootFor(sessionsDir);
   const current = currentSession(sessionsDir);
   const inFlight = root !== null && typeof current === "number";
   // Driven: the framework runs the suite itself after verification, so the
@@ -770,7 +788,7 @@ export function checkTestRunFresh(
     demandedByPlan(
       evaluateFreshness(sessionsDir, null, loaded.suites, { driven }),
       planForGate(sessionsDir),
-      inFlight ? suitesOwedElsewhere(root, current) : new Set(),
+      inFlight ? suitesOwedElsewhere(readRun(root, current)) : new Set(),
     ),
   );
 }
@@ -886,54 +904,6 @@ export function checkExposureWithinCeiling(sessionsDir: string): Check {
   // manifest records it, the row names it, nothing refuses on it.
   const noted = manifest.siblingBytes ?? [];
   return [true, noted.length === 0 ? "" : `held; noted, not refused: ${noted.join("; ")}`];
-}
-
-// --- owed_decisions -----------------------------------------------------------
-
-/** The owed-decision row, from the blocking rows alone. */
-export function judgeOwedDecisions(blocking: readonly Record<string, unknown>[]): Check {
-  if (blocking.length === 0) return [true, ""];
-  const names = blocking.map((row) => String(row["id"])).join(", ");
-  return [
-    false,
-    `${blocking.length} unanswered decision(s) would reduce what verification ` +
-      `proves: ${names}. The work is done and the record cannot call it ` +
-      "verified until they are answered -- run `dabbler owed list` to read " +
-      "them, and `dabbler owed answer` to settle one.",
-  ];
-}
-
-/**
- * No unanswered question is standing that would make this close a lie.
- *
- * Only the verification-reduction class refuses, and the refusal is the
- * resolution of two rules that look contradictory until they are ordered:
- * nothing in this framework blocks on a person, AND anything that reduces
- * verification is reserved to one. Both hold, because the first is about
- * judgment calls and verification reduction is not a judgment call. So the
- * work proceeds, the session runs to the end, and what stops is the record
- * claiming to be verified.
- *
- * A repository with no owed record has nothing owed, which is the ordinary
- * case and must stay free.
- */
-export function checkOwedDecisions(sessionsDir: string): Check {
-  const root = repoRootFor(sessionsDir);
-  if (root === null) return [true, ""];
-  let blocking;
-  try {
-    blocking = blockingDecisions(root);
-  } catch (error) {
-    // An unreadable record is a fault, not an absence: answering it with
-    // "nothing is owed" is how a corrupt file becomes a clean close.
-    return [
-      false,
-      `the owed-decision record could not be read: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    ];
-  }
-  return judgeOwedDecisions(blocking);
 }
 
 // --- published_when_releasable ------------------------------------------------
@@ -1092,7 +1062,6 @@ export const GATE_CHECKS: readonly (readonly [string, Predicate])[] = [
   ["test_run_fresh", checkTestRunFresh],
   ["pins_current", checkPinsCurrent],
   ["exposure_within_ceiling", checkExposureWithinCeiling],
-  ["owed_decisions", checkOwedDecisions],
   [GATE_PUBLISHED_WHEN_RELEASABLE, checkPublishedWhenReleasable],
   ["verdict_vocabulary", checkVerdictVocabulary],
 ];

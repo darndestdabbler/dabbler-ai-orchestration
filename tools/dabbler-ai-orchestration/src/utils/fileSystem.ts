@@ -89,8 +89,6 @@ export interface SessionsRepository {
   /** Derived liveness: when the record last moved, and whether it stopped. */
   lastActivityAt: string | null;
   possiblyStalled: boolean;
-  /** What the repository is waiting on a person for, as the attention view reads it. */
-  owedDecisions: ProgressProjectionRepository["owedDecisions"];
   /**
    * Whether the framework is running something right now.
    *
@@ -242,7 +240,6 @@ function buildRepository(
     focusedSession: p ? p.repository.focusedSession ?? null : null,
     lastActivityAt: p ? p.repository.lastActivityAt : null,
     possiblyStalled: p ? p.repository.possiblyStalled : false,
-    owedDecisions: p ? p.repository.owedDecisions : [],
     activity: currentActivity(root),
     uncollected: uncollectedWords(root),
     forceClosed: p ? p.repository.forceClosed : false,

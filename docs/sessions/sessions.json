@@ -3361,9 +3361,9 @@
     {
       "number": 170,
       "title": "One checkout",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-14T12:38:44.309000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-14T13:31:29.975000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

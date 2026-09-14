@@ -3277,9 +3277,9 @@
     {
       "number": 166,
       "title": "The cap, the non-goals, and the sentence",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-14T05:10:07.789000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-14T05:29:09.381000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

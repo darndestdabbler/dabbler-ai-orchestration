@@ -2,6 +2,18 @@
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 170 CLOSED, 2026-09-14 — one checkout
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 170 | every session runs in the repository the developer opened: `checkout.ts`, `exposure.ts`, `policy.ts` and `walk-checkout` deleted; `module open/preflight/grant/revoke`, `session scope`, `start --module/--focused/--global`, `next --request-grant` gone; the `exposure_within_ceiling` gate gone (seven close gates); the members the checkout wrote (`checkout` on a row, `suites_owed_elsewhere` on a run, `exposure`/`checkoutModule`/`focusedSession`/`kind`/`module` on the projection, `scope` on an instruction) stay optional and unread; a multi-module plan or declaration names any declared modules or none, and two need no reason; the extension loses Open Module, Start Focused Session, End Grant, Start Session in a New Window, the start request, kind labels, the Work Explorer's module grouping and the terminal's kind line, and Show Impact / Pack Module sit on every module row; the managed body, templates, READMEs, quick start, both UAT walkthroughs and the CSV walkthrough say one checkout; a provider failure names the provider's own error code and message | CLOSED VERIFIED r2 (r1 VERIFIED; the run of record then failed on `packaging.test.ts`'s dry-run gate count, fixed), landed `900105c8`, closed `1243766d`. **Held by plan** for session 172 |
+>
+> **171 is next** (project references).
+>
+> **Left as found, for a later small-things step.** Stale "focused clone" comments in `test/agency.test.ts` and `test/walk-bootstrap.test.ts`; `dabblerTerminal.test.ts` paints a fixture row named `exposure_within_ceiling`; the work plan schema keeps `reason` (optional, read by nothing); `media/work-explorer-modules.png` is no longer referenced by the extension README; the .NET UAT's Step 6 prose still says `session start` refuses a dirty tree (it does, with the declaration's words).
+>
+> **Traps met.** `packages/router/build.mjs` resolves paths from the working directory: build with `npm run build -w dabbler-ai-router`. `agency.ts` importing `projection.ts` closes an import cycle, so `contractDirFor` lives in `modules.ts`. A test that counts close gates can sit outside every step's checks (`packaging.test.ts`): only the run of record caught it.
+
 > ## SESSION 169 CLOSED, 2026-09-14 — nothing gets stuck, nothing waits; 2.9.0 tagged
 >
 > | session | what | state |

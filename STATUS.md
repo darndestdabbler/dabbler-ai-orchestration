@@ -2,6 +2,18 @@
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 172 CLOSED, 2026-09-14 — the build files are the solution; 3.0.0 tagged
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 172 | `projectGraph.ts` is the one reader of a solution's shape: the root `.slnx`/`.sln` (every `.csproj` without one) with `<ProjectReference>`s and kinds from the SDK, `OutputType` and `Microsoft.NET.Test.Sdk`; the root `pom.xml`'s `<modules>` read recursively (every `pom.xml` without one), `war` or the Spring Boot plugin a service; neither is one project, itself. `modules.ts` and `impact.ts` deleted with every caller: the root build files are written from the graph where it holds more than one project and the root has no solution file or parent POM; every expensive suite is the run of record and the close demands every required one; every round scopes to the changed files (`agency.moduleScope`, `touchesIntegrationModule`, `deployableLines` gone); `dabbler affected` has no module form. `solution.json` is `solution {name, title, ecosystem, projectCount}` + `projects [{name, path, kind, dependsOn, usedBy}]`, the Explorer renders project rows and watches `.sln`/`.slnx`/`.csproj`/`pom.xml`; New Module, Show Impact, `moduleAuthoring.ts`, `dabbler modules`, the Router contract's modules verbs, bootstrap's manifest, `planModulesMember`, `judgeWorkPlanModules`/`judgeModulesForShape` and `ensureRootFilesWithSuite` deleted; `session declare --module` is a retired flag with its sentence; `session start` prints one line per retired declaration (`docs/modules.yaml`, `sharedFiles`, a suite's `module`/`against`) and refuses nothing; a recorded plan naming modules is still accepted. README's solutions section, the quick start, both UAT walkthroughs (step 3 decides, declares nothing), the CSV tutorial (regenerated from its render script), templates and the extension's welcome say so. 3.0.0 notes cover 170–172 | CLOSED VERIFIED r1 (three nits, none blocking), landed `6008f4cd`, closed `92a0f279`. **`vsix-v3.0.0` tagged by the publish phase** |
+>
+> **173 is next** (tests named after what they test).
+>
+> **Left as found.** The round-1 nits: `reactorPoms` drops a Maven POM that both builds something and aggregates children (a `war` parent with modules reads as its leaves only); a Maven POM is parsed twice (`reactorPoms` then `mavenGraph`); the worker, `OutputType Exe` and `war` kind branches have no test of their own. `csvWalkSteps.ts` (the Playwright walk the tutorial's tour section renders from) still says the Work Explorer groups sessions by module, stale since 170. Session 170's small things stand.
+>
+> **Traps met.** One file can mix line endings (`affected.ts` is CRLF with an LF block): an anchor has to be tried as written before CRLF. The extension's unit suite resolves `dabbler-ai-router` through `packages/router/dist`, so rebuild the router before an extension test that derives a projection. `git rm` refuses a file carrying this session's own earlier edit; the file is being deleted, so `-f`. A `\n` inside `node -e` under Git Bash quoting reaches JavaScript as a newline: put multi-line edits in a spec file. A test that seeds `dabbler.yaml` needs `schema_version: 1` or `session start` refuses the file before the code under test runs.
+
 > ## SESSION 171 CLOSED, 2026-09-14 — project references
 >
 > | session | what | state |

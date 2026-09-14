@@ -2,6 +2,18 @@
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 171 CLOSED, 2026-09-14 — project references
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 171 | a sibling module is a project reference: `packages.ts` and the whole `module` verb (pack, candidate, contract) deleted; the candidate job, the candidate record and the impact plan's `candidates`; the land's module facts and the receipts' correspondence and bundles; `pins_current` (six close gates); every package, pin, contract and API-surface member of the ecosystem seam; contractdoc's module form, `modules create --contract`, the manifest's `contract` member (the key is still read and ignored, as are `modules.<slug>.contract` and `modules.packages`), the derived contract covers and the projection's contract, contractDir, bundles and shippedIn; the extension's Pack Module, Contract and Bundles rows and the Router contract's `module.pack`. The .NET root files are the `.slnx`, `Directory.Build.props` (Source Link property gone with the wall it served) and `Directory.Build.targets` with `bin/`/`obj/` ignored; Maven's are a parent POM with properties, compiler release and `<modules>` with `target/` ignored. The framework writes absent root files in `phasePreverify` -- every path into a round -- and moves the step baseline past them, so a solution declared before its code gets them from the session that wrote its first project. The plan ask, both plan templates, README, quick start, the CSV tutorial (its corpus restaged with project references builds and passes 10/10 with one `dotnet test`) and both UAT walkthroughs say how siblings are referenced | CLOSED VERIFIED r2 (r1: two blocking findings fixed -- no root files on the declare-before-code path, and the CSV staging script still wrote `Directory.Packages.props`), landed `fe1906c3`, closed `63cff35b`. Held for 172 |
+>
+> **172 is next** (the build files are the solution).
+>
+> **Left as found.** `dabbler.schema.json`'s `modules` description still names `contract.generate` (the key is ignored, and 172 removes the block). Session 170's small things stand. `ensureRootFiles` writes a `.slnx` or parent POM once and never updates it: each later session adds its module's projects, as the plan ask says.
+>
+> **Traps met.** Some working copies are CRLF (`projection.test.ts`, `contractdoc.ts`): a whole-line anchor must strip `\r`. Parallel Bash calls that `cd` move the shell's directory for the calls after them. Deleting the manifest's `contract` default widened a .NET root-file branch that keyed on it: delete the branch with its reason, not only the condition. Removing a writer can strand a lifecycle path the writer served -- the candidate job was the only thing writing root files for a solution declared before its code.
+
 > ## SESSION 170 CLOSED, 2026-09-14 — one checkout
 >
 > | session | what | state |

@@ -10076,3 +10076,261 @@ verbs and a template line changes meaning. The notes name the removed
 flag, that `rebaseline` no longer raises a decision, that a package-contract
 module now scaffolds CPM and its notes page at creation, and the two
 sample entries found not to be defects.
+
+## Why sessions 166–168 exist: the judgment calls nobody needs to be asked
+
+The operator's direction on 2026-09-14, after driving 163–165: a session
+still asks a person for things a person never declines, and keeps a queue
+of questions developers will route around. Four directives, each checked
+against the ledger and put to Sol and Gemini (`docs/design/consults/
+round14-brief.md`, `-sol.md`, `-gemini.md`; the decision is
+`round14-synthesis.md`), and the operator's rule that generalises them:
+**any judgment call the framework or the AI can make from a rule is made,
+recorded, and never asked.** The four:
+
+1. **The verification cap is 7, not 3.** Of 159 sessions with a round
+   count, 16 needed more than 3 rounds and 15 of those finished within 7;
+   every `verify reopen` ever recorded was granted and every reopened
+   session reached VERIFIED. The reviewer's rubric (severity by expected
+   consequence, the "so what?" gate, nits non-blocking) is what keeps the
+   extra rounds from grinding.
+2. **After the first release, every session releases unless it cannot.**
+   Once new or fixed functionality can be delivered it is delivered;
+   publication is preapproved. A release is held only for (a) the first
+   release, whose go-live is discussed in the plan as early as possible,
+   and (b) work that depends on a later session or another module. The
+   framework holds no "first release happened" state: a hold is a hold
+   with a reason, and the first one is the plan's to keep until it says go.
+3. **Owed decisions are eliminated.** Decisions from a person and from an
+   AI stay documented -- `activity-log.json`, `decisions-log.md`,
+   `docs/operator-decisions.md` -- and nothing is owed. Every question the
+   owed module could raise becomes a recorded default or a refusal that
+   names its fix; none becomes a toast or a chat question. The module
+   grant is a recorded default too, which the operator chose knowing it
+   reverses the 2026-09-08 ruling that a person answers it.
+4. **Non-goals, and the sentence both roles are told.** The author names
+   non-goals in the work plan; the reviewer judges the work against the
+   goals and the non-goals; and both are told, in the operator's words,
+   that over-engineering is strictly forbidden and that the value AI brings
+   is measured as much by the simplicity and clarity of its design and
+   implementation as by the alignment of the solution with the stated
+   requirements and objectives.
+
+What is NOT built, on all three voices: a convergence rule beside the cap;
+any first-release flag or state; a `version_bump` member; a pending
+questions inbox under a new name; a diff-size, file-count or dependency
+count check; simplicity text in the provider system prompts or the managed
+`AGENTS.md` body.
+
+Order: 167 goes before 168 because the publication decision lives in the
+owed module -- 167 deletes the one decision and 168 deletes the rest.
+
+### Session 166 of 168: The cap, the non-goals, and the sentence
+
+Scope: whole repository
+
+**The cap is 7.** `verification.settings.max_rounds` in
+`packages/router/router-config.yaml` becomes 7; `verificationRoundCap`
+already reads it. `docs/run-core-blueprint.md` line 838 and any prose that
+says three rounds says seven. `verify reopen` stays exactly as it is: the
+8th round is bought the way the 4th was.
+
+**Non-goals are a required member of the work plan.**
+`packages/router/schemas/driver-work-plan.schema.json` gains `non_goals`:
+an array of strings, required, at least one item, each non-empty; the
+generated type follows (`npm run generate:types` or the script under
+`packages/router/scripts` that writes `src/generated/`). `planAsk` in
+`packages/router/src/drive.ts` names the member beside `task` and
+`releasable`: the non-goals are what this session will NOT do -- the
+exclusions the session plan's section states, or the nearest concrete
+boundary of the task where it states none -- and an engine that cannot
+name one has not understood the scope. A plan without them is refused by
+the same validation that refuses a plan without steps, and the refusal
+names the member.
+
+**The author is told once, the reviewer every round.** The plan ask
+carries the operator's sentence verbatim: over-engineering is strictly
+forbidden, and the value AI brings to a solution is measured as much by
+the simplicity and clarity of its design and implementation as by the
+alignment of the solution with the stated requirements and objectives.
+`stepAsk` repeats the plan's non-goals in one line under each step's ask,
+so the author holds them during the work and not only before it. Nothing
+goes in `prompt-templates/system-prompts.md` and nothing in the managed
+`AGENTS.md` body.
+
+**The reviewer sees the goals and the non-goals.** `buildTaskBlock` in
+`packages/router/src/verify/prompts.ts` adds, after the session plan's
+excerpt, the accepted work plan's `task` and its `non_goals` read from
+`driver/plan.json` (a session with no plan -- a typed session -- adds
+nothing). `prompt-templates/verification.md` gains one criterion, **Scope
+and simplicity**, between Completeness and False confidence, with two
+halves: work that a named non-goal covers is a blocking finding whose
+evidence quotes the non-goal beside the diff hunk and whose failure
+scenario is unreviewed surface nobody asked for; work beyond the task that
+no non-goal names -- a needless abstraction, a generality nothing uses, an
+option nobody asked for -- is a nit unless it clears the "so what?" test
+on its own, and never opens a round by itself. The operator's sentence
+sits at the head of that criterion, verbatim. The clean-verdict paragraph
+is unchanged: a reviewer cannot manufacture an over-engineering Major
+without quoting the plan's own text.
+
+**Steps.** (1) The cap: the config line and the two documents. (2) The
+schema member and its generated type; the plan ask and the step ask. (3)
+The task block and the template criterion. (4) `docs/driving-a-session.md`
+says a plan carries non-goals and a step's ask repeats them.
+
+**Tests.** A plan with no `non_goals`, or an empty list, is refused naming
+the member; a plan with one is accepted and `plan-accepted` logs it. The
+task block for a session whose `driver/plan.json` carries non-goals
+contains them; for a session with no plan it is unchanged. The round cap
+read from the shipped configuration is 7. Three tests, one per behaviour.
+
+**Releasable.** No: 167 changes what a releasing session is, and ships it.
+
+### Session 167 of 168: Ship by default, and the one question that goes
+
+Scope: whole repository
+
+**A hold with a reason replaces the boolean.** In the work-plan schema,
+`releasable` is deleted and an optional `hold_release` string takes its
+place: present, it names what the work waits on -- a later session, a
+sibling module, the first release's go-live -- and the session publishes
+nothing; absent, the session publishes. `planAsk` says it in the
+operator's words: once new or fixed functionality can be delivered, it is
+delivered; hold only for the first release or a stated dependency. The
+declaration `phasePlan` writes carries the hold and its reason, and the
+ledger's declaration record (`sessions.schema.json`, `writers.ts`
+`releasabilityOf` / `sessionIsReleasable`) reads releasable as "no hold".
+`session declare` takes `--hold-release "<reason>"` in place of
+`--releasable` / `--not-releasable`, and the typed and driven paths agree
+as they do today.
+
+**The version is the diff's to show.** No member for it. The plan ask
+says: a releasing session bumps the version in the manifest as part of
+its work -- patch unless the change adds a capability (minor) or breaks a
+consumer (major) -- and the task paragraph says which; `packaging` already
+refuses a version released before, and the reviewer reads the bump in the
+delta.
+
+**No publish without a verdict.** `phasePublish` publishes only when the
+session's verification verdict is VERIFIED: a `REMEDIATED_AT_CAP` close
+ships nothing, the close says so in one line, and the fix is the next
+session's -- which is case (b) of the rule. This is the safety net for a
+customer's module, which the framework packs and pushes from the session's
+machine with no CI gate in front of it.
+
+**The publication question goes.** `raisePublicationDecision`,
+`publicationDecisionId` and the `publication:<version>` brief are deleted
+from `owedDecisions.ts`; `dabbler release` states what ships and tags,
+with no answer read and `--reask` gone; `packaging.ts` reads no decision
+before the tag. For this repository the `marketplace` environment in CI
+still asks a person to approve the job; the framework cannot remove that
+and does not try. `session withdraw-release`, its record
+`releasability-withdrawals.jsonl`, and the close's reporting of a
+withdrawal are deleted: a session that must not ship is a session with a
+hold, declared before the work, and there is no re-declaration.
+
+**The gate is re-read, not deleted.** `published_when_releasable` in
+`gates.ts` becomes "published unless held": a session with no hold and no
+`published` row does not close as one that shipped. Its name may stay;
+its words say hold.
+
+**The words.** The managed `AGENTS.md` body's releasability paragraph
+(`bootstrap/templates.ts`, within the 150-line fence budget), `docs/
+driving-a-session.md`'s "the other stop with no forward exit" (deleted
+with the verb), and the README's sentence on releases say the new rule.
+
+**Steps.** (1) The schema, the generated type, the plan ask, the
+declaration and `session declare`. (2) `phasePublish` and the close line.
+(3) The publication decision, `release`, `--reask`, `withdraw-release` and
+its record, deleted; the gate re-read. (4) The words: template, docs,
+README, and this repository's own `package.json` bumped to 2.7.0 with the
+release notes. (5) The release.
+
+**Tests.** A plan with `hold_release` is declared held and its session
+runs no publish job; a plan without it is declared releasable. A session
+closed `REMEDIATED_AT_CAP` runs no publish and the close output names the
+verdict as the reason. `dabbler release` on a clean, pushed tree tags
+without an owed row existing. `session declare --releasable` is refused
+as unknown. The gate refuses a session with no hold and no published row.
+Five tests, one per behaviour; the withdrawal's tests go with the verb.
+
+**Releasable.** Yes, as a **minor**: the first session released under its
+own rule, and the last publication a person answers by hand. The notes
+name the cap, the non-goals, the hold, the removed flags and verb.
+
+### Session 168 of 168: Nothing is owed
+
+Scope: whole repository
+
+**The module goes.** `packages/router/src/owedDecisions.ts`,
+`packages/router/src/cli/owed.ts`, the schemas
+`owed-decisions.schema.json` and `owed-decision-current.schema.json` and
+their generated types, the `owed_decisions` close gate, the
+`dabbler owed` verb from the CLI's table, the progress projection's owed
+fields, and in the extension `commands/owedDecisionCommands.ts` with its
+test, the `dabbler.answerOwedDecision` contribution, the walkthrough step
+`answerOwed` and `media/walkthrough-owed.md`, and every owed row the Work
+Explorer tree model and the Dabbler Terminal render. `.dabbler/runs/
+owed-decisions.jsonl` is never read again; a repository that has one keeps
+a file nothing opens.
+
+**What each question becomes.** In the brief's order of preference -- a
+recorded default first, a refusal that names its fix second, and no third
+kind:
+
+- `testing-suites` and `testing-suites-tests-exist`: `session start`
+  refuses when `dabbler.yaml` declares no suite, naming the file and the
+  key, and the close's freshness row refuses the same way instead of
+  passing as "nothing measured". The bootstrap template already writes the
+  suites key, so the refusal meets only a repository that emptied it.
+- `git-remote`: `session start` refuses when the repository has no
+  remote, naming `git remote add origin <url>`; `bootstrap` prints the
+  fact in one line and raises nothing.
+- `dependency-ownership:<pkg>`: `dabbler deps` treats a package no
+  repository of the solution declares as external, says so in its output
+  in one line with how to declare otherwise, and asks nothing.
+- `feed-source:<feed>`, `packaging-feed`, `packaging-secret`: `packaging`
+  and `bootstrap` refuse with the setting and the NAME of the variable, in
+  the shape `session start` uses -- what refused, who acts, the command --
+  and raise nothing.
+- `driver-stop-s<N>`: deleted with nothing in its place; the stop's own
+  text already carries the reason and, when triage produced one, the
+  amendment it proposes.
+- `run-of-record-owed/s<N>/<suite>`: the skip is recorded on the
+  session's own run (`driver/run.json`, a `suites_owed_elsewhere` list or
+  the existing `run-of-record-skipped` log line read back), and
+  `suitesOwedElsewhere` in the freshness gate reads that instead of the
+  owed file. A focused session that reaches a sibling's suite still
+  closes, as it must.
+- `module-grant:<sibling>`: `session next --request-grant <slug> --reason`
+  makes the grant at once -- the cone widens, the exposure manifest and
+  the activity log carry the reason, and the response prints the permanent
+  form (add the root to the module's `sharedFiles`). The Work Explorer
+  renders a grant as a plain row on the session; nothing to answer. The
+  managed body's sentence "ask ... and wait for the answer; never take
+  it" becomes "ask ... with the reason; the grant is made and recorded".
+
+**The words.** `docs/driving-a-session.md`, the README, the managed body
+and the walkthrough no longer mention an owed decision; `dabbler status`
+prints no owed line.
+
+**Steps.** (1) The replacements, one per bullet, with the owed calls
+removed from each caller (`bootstrap.ts`, `deps.ts`, `release.ts`,
+`drive.ts`, `exposure.ts`, `gates.ts`, `progress.ts`, `session.ts`). (2)
+The module, the verb, the schemas and the generated types deleted; the
+gate removed from `GATE_CHECKS`. (3) The extension: the command, its test,
+the contributions, the walkthrough, the tree model and terminal rows. (4)
+The words, and `package.json` bumped to 2.8.0 with the notes. (5) The
+release.
+
+**Tests.** `session start` refuses a repository with no declared suite,
+naming `dabbler.yaml`; and one with no remote, naming the command.
+`request-grant` widens the cone in one call and the manifest carries the
+reason. The freshness gate excuses a suite the run recorded as owed
+elsewhere and demands one it did not. Four router tests, one per
+behaviour; the extension's owed tests are deleted and none added. The
+suite count falls by the owed module's own tests.
+
+**Releasable.** Yes, as a **minor**: the notes name the deleted verb and
+command, the automatic grant, and the refusals that replace the questions.

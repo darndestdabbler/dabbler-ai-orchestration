@@ -2,6 +2,18 @@
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 169 CLOSED, 2026-09-14 — nothing gets stuck, nothing waits; 2.9.0 tagged
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 169 | the operator's zero-deadlock ruling, after staff watched the CSV tutorial deadlock twice (`docs/framework-issues-log.md`): a closed session is collected rather than closed again, a published one is not published twice; the `DEADLOCK` classifier, its note and the automatic triage ladder deleted; `next` waits inside the call on a job (`WAIT_IN_CALL_MS`, 45 s, passed by the CLI) and a standing wait asks for 5 s; a module's own contract folder in its cone; `modules create .` names the solution from the resolved root; session 1 asks for a missing brief; `session start` asks the origin first (15 s, no prompt) and skips the pull when it does not answer | CLOSED VERIFIED r2 (r1: the remote check ran after an unbounded pull; fixed), landed `49ecfec2`. **`vsix-v2.9.0` tagged by the publish phase; CI's publish job running at the close** |
+>
+> **Decided the same day** (`docs/operator-decisions.md`, consult round 15): with 169 pushed as the restore point, the focused module folder, in-repository packages and `docs/modules.yaml` are to be DELETED — project references for .NET and Maven, the Solution Explorer read from the build files; releasing becomes a project-level setting defaulting to on request (Ship by Default from the solution's context menu; this repository ships by default); planning asks the production split with the shop default application → API → database; tests are named after what they test, and the whole suite runs at a session's end while it costs at most about 5% of the session. **Nothing is planned yet.**
+>
+> **Owed to the next small-things step.** A provider failure's stop drops the provider's own words: round 2 read "HTTP 429 Too Many Requests" when OpenAI's body said `credit_balance_exhausted` — show the body. The round-2 nit: the remote-line test counts only lines containing "origin".
+>
+> **Traps met.** `cleanRepoAnswers` and the answered-repo table throw on any git command they do not list, so a new git call in `start` needs rows in both. In-process test jobs run only from `settleJobs` and `capture` refuses to nest, so an in-call wait must be off for them; the in-call wait's own test restores real jobs for one session.
+
 > ## SESSIONS 166–168 CLOSED, 2026-09-14 — the judgment calls nobody needs to be asked; 2.7.0 and 2.8.0 tagged
 >
 > | session | what | state |

@@ -2,6 +2,24 @@
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSIONS 166–168 CLOSED, 2026-09-14 — the judgment calls nobody needs to be asked; 2.7.0 and 2.8.0 tagged
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 166 | the verification cap is 7 (`max_rounds` and its fallback constant); `non_goals` in every work plan, judged at acceptance by `judgeWorkPlanNonGoals` so a recorded plan is read as recorded; the plan ask carries the operator's sentence on over-engineering and every step's ask repeats the non-goals; `buildTaskBlock` hands the reviewer the plan's task and non-goals; `verification.md` gains the *Scope and simplicity* criterion (blocking only on a named non-goal, a nit otherwise) | CLOSED VERIFIED r2 (r1: one blocking finding disputed and withdrawn), landed `06a1a6e3`. Not released, by plan |
+> | 167 | ship by default: `hold_release` replaces `releasable` in the plan, `session declare --hold-release` replaces the two flags, the declaration carries `holdReason`; no publish without VERIFIED (`releasabilityOf` reports a hold by declaration, by verdict, or by a repository that declares no packaging — `NOTHING_TO_PUBLISH`, set by `declare`); the publication decision, `release --reask` and `session withdraw-release` deleted; the packaging run makes the tag (`pushReleaseTag`) at the commit the tag names; the gate reads hold and verdict | CLOSED VERIFIED r2 (r1: two blocking findings disputed and withdrawn, two nits fixed), landed `e50bac5d`. **2.7.0 tagged by the publish phase itself; CI's publish job green** |
+> | 168 | nothing is owed: `owedDecisions.ts`, `dabbler owed`, its schemas, the `owed_decisions` gate, the projection's rows, the in-process verbs, the extension's Answer Owed Decision, walkthrough and rows, all deleted. Each question became a rule: a grant is made when asked for (`makeGrant`); code with no suite is refused by `test_run_fresh` and named in the plan ask; no remote is local-only by that fact; an undeclared package is external; an unknown feed is a refusal naming NuGet.config; bootstrap prints the packaging line; a stop raises no row and prints its own substance; a suite owed elsewhere is on `run.json` | CLOSED VERIFIED r2 (r1: one blocking finding disputed and withdrawn, one nit fixed), landed `f0394f2f`. **2.8.0 tagged by the publish phase; CI's publish job running at the close** |
+>
+> **Nothing is planned next.** The 166–168 block is complete; `nextSession` is null.
+>
+> **The rule this block installed, in the operator's words:** any judgment call the framework or the AI can make from a rule is made, recorded and never asked. The consult is `docs/design/consults/round14-*.md`; the decision is its synthesis. Eight close gates remain.
+>
+> **Why the Work Explorer said "Execution record unreadable" on 167 and 168.** The installed extension was 2.5.0, whose bundled router requires `releasable` in `driver/plan.json` and refuses `non_goals` as an unknown member; the plans this block wrote are valid to the router in this tree and to 2.7.0 onward. Installing 2.8.0 answers it. Nothing in the record is wrong.
+>
+> **Traps met.** A schema member added as `required` refuses the in-flight session's own recorded plan — `plan amend` re-validates it — so a new member is judged at acceptance and read as recorded (166). A `git stash` mid-session preserves CRLF on the files git warns about, but check `git diff --numstat` afterwards. Three `commandFlows` tests fail when run in one `run-unit` invocation beside `dabblerTerminal.test.ts`, at HEAD too; the whole suite and each file alone pass (168's step 5 runs them separately). `doc-paths.mjs` refuses `docs/driving-a-session.md`'s placeholder paths, so a documentation step checks its sentences instead. The verifier reads "required" in a plan literally: say where a rule is enforced.
+>
+> **Nits the verifier left, unfixed by choice.** `session start` prints nothing when a code-bearing repository declares no suite (the plan ask and the close's gate carry it); `sessionNext --request-grant` is tested through `makeGrant` rather than through the verb; `hold_release: "   "` is refused at acceptance, not by the schema.
+
 > ## SESSION 165 CLOSED, 2026-09-13 — the small things, the walk, and 2.6.0
 >
 > | session | what | state |

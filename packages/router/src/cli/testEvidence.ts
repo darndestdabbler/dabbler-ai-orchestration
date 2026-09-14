@@ -23,6 +23,7 @@ import {
   RecordError,
   STAGES,
   STAGE_FINAL_FULL,
+  STAGE_FINAL_TARGETED,
   STAGE_PREVERIFY_TARGETED,
   appendSeals,
   loadSuitesChecked,
@@ -31,6 +32,7 @@ import {
 } from "../testEvidence.ts";
 import {
   classifyPreverifyCommand,
+  sessionSelection,
   preverifyBaseline,
   preverifyRecipe,
   workingTreeChanges,
@@ -159,8 +161,8 @@ function judgeNoneSelected(
     return EXIT_USAGE;
   }
   const mine = selectTests(root, changed, loaded.config).forSuite(suite.name);
-  if (mine.allTestsAffected || mine.testPaths.length > 0) {
-    const count = mine.allTestsAffected ? "every" : String(mine.testPaths.length);
+  if (mine.testPaths.length > 0) {
+    const count = String(mine.testPaths.length);
     writeErr(
       `test_evidence: the selector chose ${count} test(s) of ${suite.name}, so ` +
         `${OUTCOME_NONE_SELECTED} is not what happened. Run them and record ` +
@@ -223,7 +225,7 @@ function judgePreverifyCommand(
     policy: verdict.policy,
     reason: verdict.reason,
     selected: mine.selected.map((entry) => [entry.path, entry.reason] as const),
-    sanctioned: targetedCommand(suite.command, mine, { runsWhole: suite.runsWhole }),
+    sanctioned: targetedCommand(suite.command, mine, suite),
   };
 }
 
@@ -328,7 +330,7 @@ async function runSuite(argv: readonly string[]): Promise<number> {
     );
     return EXIT_USAGE;
   }
-  const command = given ?? suite.command;
+  let command = given ?? suite.command;
   // The same policy judgement `record` makes, from the same inputs. A run
   // that spawns the suite here does not get a different vocabulary from one
   // the operator ran -- that would be two rules for one question.
@@ -354,6 +356,47 @@ async function runSuite(argv: readonly string[]): Promise<number> {
     if (typeof judged === "number") return judged;
     ({ policy, reason: policyReason, selected } = judged);
   }
+  if (stage === STAGE_FINAL_TARGETED) {
+    // The tests the session's changes select, named here from the tree in
+    // hand rather than by the caller.
+    const selecting = Date.now();
+    const declared = loadSelectionConfig(loadConfig());
+    const changed = workingTreeChanges(root, null);
+    if (!declared.ok || changed === null) {
+      writeErr(
+        `test_evidence: no ${suite.name} selection can be made: ` +
+          (declared.ok ? "the change set could not be determined" : declared.errors.join("; ")) +
+          "\n",
+      );
+      return EXIT_USAGE;
+    }
+    const mine = sessionSelection(root, changed, declared.config).forSuite(suite.name);
+    const targeted = targetedCommand(suite.command, mine, suite);
+    if (targeted === "") {
+      // The session's changes select none of this suite's tests. Nothing
+      // runs and the record says so: a whole run recorded as targeted would
+      // spend what the threshold exists to save, under a name that hides it.
+      try {
+        const record = recordRun(sessionsDir, suite, OUTCOME_NONE_SELECTED, {
+          stage,
+          durationSeconds: Math.max(1, Math.round((Date.now() - selecting) / 1000)),
+          sessionNumber: currentSessionNumber(sessionsDir),
+          repoRoot: root,
+        });
+        writeOut(
+          `recorded ${record.suite} [${record.stage}]: ${record.outcome} -- ` +
+            "the session's changes select none of its tests\n",
+        );
+      } catch (error) {
+        if (!(error instanceof RecordError)) throw error;
+        writeErr(`test_evidence: ${error.message}\n`);
+        return EXIT_USAGE;
+      }
+      return EXIT_OK;
+    }
+    command = targeted;
+    selected = mine.selected.map((entry) => [entry.path, entry.reason] as const);
+  }
   const observedStart = nowIso("microseconds");
   writeOut(`running ${suiteName}: ${command}\n`);
   const started = Date.now();
@@ -373,7 +416,7 @@ async function runSuite(argv: readonly string[]): Promise<number> {
     const record = recordRun(sessionsDir, suite, outcome, {
       stage,
       durationSeconds,
-      command: stage === STAGE_PREVERIFY_TARGETED ? command : null,
+      command: stage === STAGE_FINAL_FULL ? null : command,
       policy,
       policyReason,
       selectedTests: selected,

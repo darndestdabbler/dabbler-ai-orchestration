@@ -10,6 +10,48 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.1.0] — 2026-09-14
+
+**Tests are named after what they test.** A source file's tests are the test
+file named after it — `CsvSerializer.cs` and `CsvSerializerTests.cs`,
+`CsvSerializer.java` and `CsvSerializerTest.java`, `checks.ts` and
+`checks.test.ts` — and the framework runs them for you: after each step, at
+the end of a session, and before a release.
+
+### Added
+
+- **`test_name` and `select` on a suite.** `test_name` is the name a source
+  file's tests take, `{name}` standing for its stem; `select` is the command
+  that runs a selection, with `{paths}` for the selected test files or
+  `{names}` for their class names joined by `select_separator`.
+  `dabbler bootstrap` writes the .NET form (`dotnet test --filter {names}`,
+  separator `|`) and the Maven form (`mvn -q test -Dtest={names}
+  -Dsurefire.failIfNoSpecifiedTests=false`).
+- **The tests named after each step's changes run with that step.** After a
+  step's own checks pass, every suite that declares `select` runs the tests
+  named after the files the step changed, and a red run refuses the step. A
+  changed source file with no test named after it runs the smoke tests and
+  is listed for the reviewer; it refuses nothing.
+- **A targeted run of record.** At the end of a session a suite runs whole
+  when its last whole run took no more than a minute or 5% of the median
+  length of the last five closed sessions, whichever is longer. Past that it
+  runs the tests the session's changes select plus every test of a project
+  that references a changed project, recorded as `final-targeted` with what
+  it selected; the freshness gate and the land accept that record over the
+  same tree.
+- **The whole suite before a release.** A releasing session runs whole every
+  suite that ran targeted before it packages. A red whole run holds the
+  release, names the suite, and the session closes with the failure on its
+  record for the next session to fix. CI's full run after the push is
+  unchanged.
+
+### Removed
+
+- **Hand-written selection maps.** `testing.selection.rules` and
+  `testing.selection.repo_wide` are no longer read; `dabbler session start`
+  names them in one line and refuses nothing. `testing.selection.smoke`
+  stays.
+
 ## [3.0.0] — 2026-09-14
 
 **The build files are the solution.** Sessions 170, 171 and 172 removed the

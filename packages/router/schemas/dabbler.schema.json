@@ -13,7 +13,7 @@
     },
     "testing": {
       "type": "object",
-      "description": "Suites, deterministic controls, and the path-to-test selection rules. Validated in full by ai_router.checks and ai_router.affected, which is where the vocabulary lives; the shape is left open here so there is one parser rather than two that eventually disagree. Each suite declares its own test_roots and test_glob, because a repository that is Java and .NET at once has two of each; a suite whose runner takes no list of test files -- `mvn -q test`, `dotnet test` -- declares runs_whole, and the framework then runs it complete rather than inventing a narrowing syntax it cannot know."
+      "description": "Suites, deterministic controls, and the smoke tests. Validated in full by checks.ts and testEvidence.ts, which is where the vocabulary lives; the shape is left open here so there is one parser rather than two that eventually disagree. Each suite declares its own test_roots and test_glob, because a repository that is Java and .NET at once has two of each, and test_name, the basename a source file's tests take with {name} for its stem ({name}Tests.cs, {name}Test.java, {name}.test.ts). select is the command that runs a selection: {paths} for the selected test files, {names} for their names joined by select_separator (a comma unless it says otherwise) -- `dotnet test --filter {names}` with separator |, `mvn -q test -Dtest={names} -Dsurefire.failIfNoSpecifiedTests=false`. A suite with no select runs whole. testing.selection.smoke runs where a changed source file has no test named after it; selection.rules and selection.repo_wide are no longer read."
     },
     "packaging": {
       "type": "object",

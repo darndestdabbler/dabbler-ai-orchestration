@@ -429,6 +429,7 @@ describe("registering a session", () => {
         "docs/modules.yaml": "modules:\n- slug: model\n",
         "dabbler.yaml":
           "schema_version: 1\ntesting:\n  suites:\n  - name: unit\n    command: npm test\n    covers: ['.']\n    expensive: true\n    module: model\n" +
+          "  selection:\n    repo_wide: ['.']\n" +
           "modules:\n  model:\n    sharedFiles: [build.props]\n",
       });
       resetProjectRootCache();
@@ -437,6 +438,7 @@ describe("registering a session", () => {
       assert.match(registered.out, /docs\/modules\.yaml is no longer read/);
       assert.match(registered.out, /sharedFiles in dabbler\.yaml is no longer read/);
       assert.match(registered.out, /module and against in dabbler\.yaml are no longer read/);
+      assert.match(registered.out, /testing\.selection rules and repo_wide in dabbler\.yaml are no longer read/);
     } finally {
       state.restore();
       resetProjectRootCache();

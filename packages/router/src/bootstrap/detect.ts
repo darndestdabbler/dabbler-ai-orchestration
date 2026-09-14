@@ -31,10 +31,12 @@ import {
 /**
  * One buildable ecosystem, and the suite declaration it implies.
  *
- * `runsWhole` is true for every runner that takes a filter rather than a list
- * of test files. The framework then runs that suite complete instead of
- * inventing a narrowing syntax it cannot know -- `mvn -q test <file>` reads
- * the path as a lifecycle argument, and `dotnet test` wants a project.
+ * `testName` and `select` are the ecosystem's own way to run the tests named
+ * after a source file: .NET filters by class name (`dotnet test --filter
+ * "A|B"`), Maven by test class (`-Dtest=A,B`). `runsWhole` is true for a
+ * runner that takes a filter rather than a list of test files and declares
+ * no `select`: the framework runs that suite complete rather than invent a
+ * narrowing syntax it cannot know.
  */
 export interface Ecosystem {
   readonly key: string;
@@ -42,6 +44,9 @@ export interface Ecosystem {
   readonly runsWhole: boolean;
   readonly testRoots: readonly string[];
   readonly testGlob: string;
+  readonly testName?: string;
+  readonly select?: string;
+  readonly selectSeparator?: string;
 }
 
 function exists(root: string, ...names: readonly string[]): boolean {
@@ -112,12 +117,19 @@ function detectPython(root: string): Ecosystem | null {
  */
 function detectMaven(root: string): Ecosystem | null {
   if (!exists(root, "pom.xml")) return null;
+  const command = wrapped(root, "mvnw", "./mvnw -q test", "mvn -q test");
+  // The whole repository is the test root: a reactor keeps each module's
+  // tests under that module's own `src/test/java`, and `-Dtest` runs across
+  // the reactor, where a module holding none of the named classes is not a
+  // failure.
   return {
     key: "maven",
-    command: wrapped(root, "mvnw", "./mvnw -q test", "mvn -q test"),
-    runsWhole: true,
-    testRoots: ["src/test/java"],
+    command,
+    runsWhole: false,
+    testRoots: ["."],
     testGlob: "*Test.java",
+    testName: "{name}Test.java",
+    select: `${command} -Dtest={names} -Dsurefire.failIfNoSpecifiedTests=false`,
   };
 }
 
@@ -142,9 +154,12 @@ function detectDotnet(root: string): Ecosystem | null {
   return {
     key: "dotnet",
     command: "dotnet test",
-    runsWhole: true,
+    runsWhole: false,
     testRoots: ["tests"],
     testGlob: "*Tests.cs",
+    testName: "{name}Tests.cs",
+    select: "dotnet test --filter {names}",
+    selectSeparator: "|",
   };
 }
 
@@ -238,6 +253,9 @@ function suiteBlock(eco: Ecosystem): string {
   lines.push("      test_roots:");
   for (const root of eco.testRoots) lines.push(`        - ${root}`);
   lines.push(`      test_glob: "${eco.testGlob}"`);
+  if (eco.testName) lines.push(`      test_name: "${eco.testName}"`);
+  if (eco.select) lines.push(`      select: ${eco.select}`);
+  if (eco.selectSeparator) lines.push(`      select_separator: "${eco.selectSeparator}"`);
   return lines.join("\n");
 }
 

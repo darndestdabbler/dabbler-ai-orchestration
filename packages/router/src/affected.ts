@@ -11,47 +11,36 @@
 //
 // Every selected test carries the reason that pulled it in, so a reader can
 // tell "the selector understood this change" from "the selector gave up". A
-// changed path that maps to no test is never widened into a full-suite run:
-// it records `selection_unknown`, pulls in the configured smoke tests, and
-// raises a risk for verification to inspect. Running everything is the
-// expensive way to hide an incomplete mapping.
+// source file's tests are the tests named after it; one with none is never
+// widened into a full-suite run: it records `selection_unknown`, pulls in the
+// configured smoke tests, and is shown to the reviewer.
 //
 // A remediation is measured against the previous round's snapshot, not the
 // session's start. Otherwise one repository-wide edit early in a session makes
 // every later round demand the whole suite again, and the stage that exists to
 // delete that run becomes the thing prescribing it.
-//
-// Nothing here reads the code under review. What maps to what is declared by
-// the repository in its own configuration, in whatever language it is written.
-// The proof a change is sound is the complete suite against the final verified
-// tree; selection is only the economy on the way there. A rule that has gone
-// stale therefore costs a late discovery in that run and cannot ship a defect,
-// while a mapping the framework guesses is wrong silently.
 
 import { PROJECT_CONFIG_FILENAME } from "./config.ts";
 import {
   SelectionResult,
   posixPath,
-  shlexSplit,
-  loadSelectionConfig,
+  REASON_DEPENDENT_PROJECT,
   selectTests,
+  shlexSplit,
+  testFilesUnder,
+  type SelectionConfig,
   targetedCommand,
 } from "./checks.ts";
 import { effectiveBaseline, readRounds } from "./ledger.ts";
 import { changedPathsBetween, runGit, snapshotWorktreeTree } from "./journal.ts";
 import { readSessionState } from "./progress.ts";
+import { readProjectGraph, usedBy } from "./projectGraph.ts";
 import {
   ACCEPTED_POLICIES,
-  OUTCOME_PASSED,
-  POLICY_ALL_TESTS_AFFECTED,
   POLICY_OPERATOR_OVERRIDE,
   POLICY_SUITE_WHOLE,
   POLICY_TARGETED,
   POLICY_VIOLATION,
-  STAGE_PREVERIFY_TARGETED,
-  loadSuitesChecked,
-  readRecords,
-  surfaceDigest,
   type SuiteSpec,
 } from "./testEvidence.ts";
 
@@ -61,11 +50,10 @@ import {
 // Re-exported because this module is the lifecycle-facing name for them.
 export {
   REASON_CHANGED_TEST,
-  REASON_CONFIGURED_RULE,
+  REASON_NAMED_TEST,
   REASON_PRECEDENCE,
   REASON_SMOKE,
   RISK_SELECTION_UNKNOWN,
-  RULE_FIELDS,
   SELECTION_FIELDS,
   SelectionResult,
   isTestFile,
@@ -134,6 +122,43 @@ export function workingTreeChanges(
   return changedPathsBetween(repoRoot, baseline, current);
 }
 
+/**
+ * What a session's changes select at its end: the tests named after each
+ * changed file, and every test under a project that references -- directly
+ * or through another -- a project holding a changed file, read from the
+ * build files for .NET and Maven alike.
+ */
+export function sessionSelection(
+  repoRoot: string,
+  changed: readonly string[],
+  selection: SelectionConfig,
+): SelectionResult {
+  const named = selectTests(repoRoot, changed, selection);
+  const graph = readProjectGraph(repoRoot);
+  if (graph.ecosystem === null) return named;
+  const dirOf = (buildFile: string): string =>
+    buildFile.includes("/") ? buildFile.slice(0, buildFile.lastIndexOf("/")) : "";
+  const holds = (dir: string, rel: string): boolean =>
+    dir === "" || rel === dir || rel.startsWith(`${dir}/`);
+  const reached = new Set<string>();
+  for (const project of graph.projects) {
+    const dir = dirOf(project.path);
+    if (!changed.some((rel) => holds(dir, posixPath(rel)))) continue;
+    for (const name of usedBy(graph, project.name)) reached.add(name);
+  }
+  const selected = [...named.selected];
+  const seen = new Set(selected.map((entry) => entry.path));
+  for (const project of graph.projects) {
+    if (!reached.has(project.name)) continue;
+    for (const test of testFilesUnder(repoRoot, dirOf(project.path), selection)) {
+      if (seen.has(test.path)) continue;
+      seen.add(test.path);
+      selected.push({ path: test.path, reason: REASON_DEPENDENT_PROJECT, selectedBy: project.name, suite: test.suite });
+    }
+  }
+  return new SelectionResult({ selected, risks: named.risks });
+}
+
 export interface PreverifyVerdict {
   readonly policy: string;
   readonly reason: string;
@@ -147,31 +172,6 @@ function verdict(
   missing: readonly string[] = [],
 ): PreverifyVerdict {
   return { policy, reason, missing, accepted: ACCEPTED_POLICIES.includes(policy) };
-}
-
-export interface PreverifyGate {
-  readonly ok: boolean;
-  readonly reason: string;
-  readonly suite: string;
-  readonly command: string;
-  /**
-   * `[suite, command, policy]` for each run that satisfied the gate.
-   *
-   * A verdict that says only "accepted" cannot be audited later: the record
-   * has to name the command it accepted and what made it acceptable, or
-   * nothing downstream can tell which run was blessed.
-   */
-  readonly accepted: ReadonlyArray<readonly [string, string, string]>;
-}
-
-function gate(
-  ok: boolean,
-  reason = "",
-  suite = "",
-  command = "",
-  accepted: ReadonlyArray<readonly [string, string, string]> = [],
-): PreverifyGate {
-  return { ok, reason, suite, command, accepted };
 }
 
 function commandTokens(command: unknown): Set<string> {
@@ -249,7 +249,7 @@ export function runnableCommands(
   }
   return suites
     .map((suite) =>
-      targetedCommand(suite.command, result.forSuite(suite.name), { runsWhole: suite.runsWhole }),
+      targetedCommand(suite.command, result.forSuite(suite.name), suite),
     )
     .filter((command) => command !== "");
 }
@@ -329,10 +329,9 @@ function overrideOrViolation(
  * What makes `command` acceptable pre-verification evidence, or why it is not.
  *
  * A command earns `targeted` by naming every test the selector chose -- not
- * most of them, and not the directory they live in. The two repository-wide
- * exceptions are the only other ways through, and each lands in the record
- * under its own name so a reader can tell a proved exception from an asserted
- * one. Everything else is a `policy_violation`: the run happened, it cost what
+ * most of them, and not the directory they live in. An operator override
+ * with a reason is the only other way through, and it lands in the record
+ * under its own name so a reader can tell it from a targeted run. Everything else is a `policy_violation`: the run happened, it cost what
  * it cost, and it proves nothing about the change.
  *
  * Zero selected tests is not a free pass. A change declared to affect no test
@@ -351,9 +350,6 @@ export function classifyPreverifyCommand(
 ): PreverifyVerdict {
   const overrideReason = options.overrideReason;
   const declaredCommand = options.declaredCommand ?? "";
-  if (result.allTestsAffected) {
-    return verdict(POLICY_ALL_TESTS_AFFECTED, result.allAffectedReason);
-  }
   const paths = result.testPaths;
   if (paths.length === 0) {
     return overrideOrViolation(
@@ -398,130 +394,3 @@ export function classifyPreverifyCommand(
   );
 }
 
-/**
- * Whether valid targeted selection evidence exists for the tree as it now
- * stands.
- *
- * Validity is four things at once: the run was pre-verification, its command
- * survived the policy, it was green, and it digest-matches the surfaces the
- * suite covers right now. The last one is what makes remediation cheap and
- * honest -- a fix moves the surfaces, so the affected tests are rerun rather
- * than re-cited.
- */
-export function preverifyGate(
-  repoRoot: string,
-  sessionsDir: string,
-  config: unknown,
-): PreverifyGate {
-  const loaded = loadSuitesChecked(config);
-  if (!loaded.ok) {
-    return gate(false, "testing.suites is malformed: " + loaded.errors.join("; "));
-  }
-  const expensive = loaded.suites.filter((suite) => suite.expensive);
-  if (expensive.length === 0) return gate(true);
-  const selection = loadSelectionConfig(config);
-  if (!selection.ok) {
-    return gate(false, "testing.selection is malformed: " + selection.errors.join("; "));
-  }
-  const changed = workingTreeChanges(
-    repoRoot,
-    preverifyBaseline(repoRoot, sessionsDir),
-  );
-  if (changed === null) {
-    return gate(
-      false,
-      "the change set could not be determined, so no run can be proved " +
-        "targeted against it (failing closed)",
-    );
-  }
-  const result = selectTests(repoRoot, changed, selection.config);
-  const unknown = result.unknownPaths;
-  if (unknown.length > 0 && selection.config.smoke.length === 0) {
-    // Uncertainty is supposed to buy the smoke tests. Where none are declared
-    // it buys nothing at all, and the tests the *mapped* paths selected would
-    // otherwise make the gap read as covered -- a green record for one half of
-    // a change says nothing about the other.
-    return gate(
-      false,
-      "the selector could not map " +
-        unknown.slice(0, 5).join(", ") +
-        (unknown.length > 5 ? "..." : "") +
-        " to any test and no testing.selection.smoke fallback is declared, so " +
-        "nothing ran for those paths. Declare the mapping rather than widening " +
-        "the run",
-      expensive[0]!.name,
-      "",
-    );
-  }
-  if (!result.allTestsAffected && result.testPaths.length === 0) {
-    // Declared to affect no test: nothing to prove, and nothing to ask for.
-    // Demanding a record here is what would put the full suite in front of
-    // verification on the most ordinary change there is.
-    return gate(true);
-  }
-  const records = readRecords(repoRoot);
-  const accepted: Array<readonly [string, string, string]> = [];
-  for (const suite of expensive) {
-    const forSuite = result.forSuite(suite.name);
-    if (!result.allTestsAffected && forSuite.testPaths.length === 0) {
-      // The rule three branches up, per suite instead of per change set: a
-      // suite the selection named no test of has nothing to prove. Without it
-      // the gate is not merely strict, it is unsatisfiable -- an empty
-      // selection yields an empty targeted command, and a preverify record
-      // must name the command that ran. A repository with one expensive suite
-      // never reaches this; one with two reaches it whenever a change touches
-      // only the other's surfaces.
-      continue;
-    }
-    const current = surfaceDigest(repoRoot, suite.covers, { sessionsDir });
-    if (current === null) {
-      return gate(
-        false,
-        `the surfaces ${suite.name} covers could not be digested (failing closed)`,
-        suite.name,
-        targetedCommand(suite.command, forSuite, { runsWhole: suite.runsWhole }),
-      );
-    }
-    const mine = records.filter(
-      (row) => row.suite === suite.name && row.stage === STAGE_PREVERIFY_TARGETED,
-    );
-    const blessed = mine.find(
-      (row) =>
-        ACCEPTED_POLICIES.includes(row.policy) &&
-        row.outcome === OUTCOME_PASSED &&
-        row.surfaceDigest === current,
-    );
-    if (blessed !== undefined) {
-      accepted.push([suite.name, blessed.command, blessed.policy]);
-      continue;
-    }
-    let why: string;
-    if (mine.length === 0) {
-      why = `no pre-verification run of ${suite.name} is recorded`;
-    } else if (mine.every((row) => row.policy === POLICY_VIOLATION)) {
-      why =
-        `every recorded pre-verification run of ${suite.name} is a ` +
-        `${POLICY_VIOLATION}`;
-    } else if (
-      !mine.some(
-        (row) =>
-          ACCEPTED_POLICIES.includes(row.policy) && row.outcome === OUTCOME_PASSED,
-      )
-    ) {
-      why =
-        `the pre-verification run of ${suite.name} is not green; a red ` +
-        "targeted run returns to you, not to a verifier";
-    } else {
-      why =
-        `the pre-verification run of ${suite.name} predates a change to the ` +
-        "surfaces it covers";
-    }
-    return gate(
-      false,
-      why,
-      suite.name,
-      targetedCommand(suite.command, forSuite, { runsWhole: suite.runsWhole }),
-    );
-  }
-  return gate(true, "", "", "", accepted);
-}

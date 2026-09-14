@@ -4,7 +4,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { RECORD_PLACEHOLDER, commandNamesTest, preverifyRecipe, recordCommand, remediationRecipe } from "../src/affected.ts";
+import { RECORD_PLACEHOLDER, commandNamesTest, preverifyRecipe, recordCommand, remediationRecipe, sessionSelection } from "../src/affected.ts";
+import { seed, tempDir } from "./support/answers.ts";
 import { STAGE_FINAL_FULL, runOfRecordRecipe } from "../src/testEvidence.ts";
 
 describe("what a command names", () => {
@@ -14,6 +15,44 @@ describe("what a command names", () => {
     assert.equal(commandNamesTest("python -m pytest tests/", "tests/test_a.py"), false);
     assert.equal(commandNamesTest("python -m pytest tests/test_ab.py", "tests/test_a.py"), false);
     assert.equal(commandNamesTest("pytest tests\\test_a.py", "tests/test_a.py"), true);
+  });
+});
+
+describe("what a session's changes select at its end", () => {
+  it("selects the tests of a project that references a changed library, beside the tests named after the change", () => {
+    const repo = tempDir();
+    seed(repo, {
+      "Csv.slnx":
+        "<Solution>\n" +
+        '  <Project Path="src/Csv.Model/Csv.Model.csproj" />\n' +
+        '  <Project Path="src/Csv.Api/Csv.Api.csproj" />\n' +
+        '  <Project Path="tests/Csv.Api.Tests/Csv.Api.Tests.csproj" />\n' +
+        "</Solution>\n",
+      "src/Csv.Model/Csv.Model.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>\n',
+      "src/Csv.Model/CsvReader.cs": "class CsvReader {}\n",
+      "src/Csv.Api/Csv.Api.csproj":
+        '<Project Sdk="Microsoft.NET.Sdk.Web">\n' +
+        '  <ItemGroup><ProjectReference Include="..\\Csv.Model\\Csv.Model.csproj" /></ItemGroup>\n' +
+        "</Project>\n",
+      "tests/Csv.Api.Tests/Csv.Api.Tests.csproj":
+        '<Project Sdk="Microsoft.NET.Sdk">\n' +
+        "  <ItemGroup>\n" +
+        '    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />\n' +
+        '    <ProjectReference Include="../../src/Csv.Api/Csv.Api.csproj" />\n' +
+        "  </ItemGroup>\n" +
+        "</Project>\n",
+      "tests/Csv.Api.Tests/RoutesTests.cs": "class RoutesTests {}\n",
+      "tests/Csv.Model.Tests/CsvReaderTests.cs": "class CsvReaderTests {}\n",
+    });
+    const selection = { scopes: [{ suite: "dotnet", roots: ["tests"], glob: "*Tests.cs", testName: "{name}Tests.cs" }], smoke: [] };
+    const result = sessionSelection(repo, ["src/Csv.Model/CsvReader.cs"], selection);
+    assert.deepEqual(
+      result.selected.map((entry) => [entry.path, entry.reason, entry.selectedBy]),
+      [
+        ["tests/Csv.Model.Tests/CsvReaderTests.cs", "named-test", "src/Csv.Model/CsvReader.cs"],
+        ["tests/Csv.Api.Tests/RoutesTests.cs", "dependent-project", "Csv.Api.Tests"],
+      ],
+    );
   });
 });
 

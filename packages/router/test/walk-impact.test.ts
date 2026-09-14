@@ -59,7 +59,6 @@ const TESTING = {
       covers: ["modules/persister/", "tests/"],
     },
   ],
-  selection: { repo_wide: ["dabbler.yaml"], smoke: [], rules: [] },
 };
 
 const PLAN = {

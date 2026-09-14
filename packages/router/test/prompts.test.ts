@@ -116,6 +116,15 @@ describe("the task block a round opens with", () => {
     const block = buildTaskBlock(sessionsDir, 1, 1, [], null, repo);
     assert.ok(block.includes("Task: Make the widget real.") && block.includes("- A second widget."));
   });
+
+  it("names the changed source files no test is named after, and says nothing when every one has a test", () => {
+    const repo = tempDir();
+    seed(repo, { "docs/sessions/session-plan.md": "### Session 1 of 1: First things\n1. Build the widget.\n" });
+    const sessionsDir = join(repo, "docs", "sessions");
+    const block = buildTaskBlock(sessionsDir, 1, 1, [], null, repo, null, ["src/widget.py"]);
+    assert.ok(block.includes("no test named after them") && block.includes("- src/widget.py"));
+    assert.ok(!buildTaskBlock(sessionsDir, 1, 1, [], null, repo, null, []).includes("no test named after them"));
+  });
 });
 
 describe("the adjudicator's brief", () => {

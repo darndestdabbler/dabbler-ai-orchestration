@@ -23,7 +23,9 @@ import {
   SESSION_PLAN_FILENAME,
   STATE_FILENAME,
   recordStateWrite,
+  repoRootFromSessionsDir,
 } from "./evidence.ts";
+import { readRecords, releaseTestsHold } from "./testEvidence.ts";
 import { materialWorktreeChanges, previewPaths } from "./gates.ts";
 import { MINE_FLAG, SETTINGS_RELPATH } from "./settings.ts";
 import { nowIso, platformNewlines } from "./journal.ts";
@@ -1043,7 +1045,12 @@ export function releasabilityOf(
         : null;
     return { declared, hold };
   }
-  return { declared, hold: verdictHold(sessionsDir, sessionNumber) };
+  return {
+    declared,
+    hold:
+      verdictHold(sessionsDir, sessionNumber) ??
+      releaseTestsHold(readRecords(repoRootFromSessionsDir(sessionsDir)), sessionNumber),
+  };
 }
 
 /**

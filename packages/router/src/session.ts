@@ -1318,6 +1318,10 @@ export function retiredDeclarationLines(root: string): string[] {
   if (suites.some((suite) => isRecord(suite) && (suite["module"] !== undefined || suite["against"] !== undefined))) {
     lines.push("start: a suite's module and against in dabbler.yaml are no longer read; every expensive suite runs at the end of a session.");
   }
+  const selection = isRecord(testing["selection"]) ? testing["selection"] : {};
+  if (selection["rules"] !== undefined || selection["repo_wide"] !== undefined) {
+    lines.push("start: testing.selection rules and repo_wide in dabbler.yaml are no longer read; a source file's tests are the tests named after it.");
+  }
   return lines;
 }
 

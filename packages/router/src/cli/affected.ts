@@ -168,11 +168,6 @@ export async function affectedVerb(argv: string[]): Promise<number> {
   const commands = (): string =>
     "\n" + runnableCommands(suites, result, declared.length).join("\n") + "\n";
 
-  if (result.allTestsAffected) {
-    lines.push(`all tests affected: ${result.allAffectedReason}\n`, commands());
-    writeOut(lines.join(""));
-    return EXIT_OK;
-  }
   for (const risk of result.risks) lines.push(`  RISK ${risk.kind}: ${risk.path}\n`);
   for (const choice of result.selected) {
     lines.push(`  ${pad(choice.reason, 22)} ${choice.path}  <- ${choice.selectedBy}\n`);

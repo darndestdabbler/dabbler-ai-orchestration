@@ -12,7 +12,6 @@ import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 const CONFIG = {
   testing: {
     suites: [{ name: "unit", command: "python -m pytest", covers: ["src/"], expensive: true, test_roots: ["tests"], test_glob: "test_*.py" }],
-    selection: { rules: [{ when: "docs/", select: [] }] },
   },
 } as unknown as RouterConfig;
 

@@ -279,6 +279,21 @@ export function workPlanBlock(repoRoot: string | null, sessionNumber: number): s
   return lines.join("\n");
 }
 
+/**
+ * The changed source files no test is named after. Shown, never judged: the
+ * reviewer weighs whether what changed is tested, and nothing here refuses.
+ */
+export function untestedBlock(untested: readonly string[]): string {
+  if (untested.length === 0) return "";
+  return [
+    "#### Changed source files with no test named after them",
+    "",
+    "A source file's tests are the test file named after it. These files changed and " +
+      "have none; judge whether what changed in them is tested:",
+    ...untested.map((path) => `- ${path}`),
+  ].join("\n");
+}
+
 export function buildTaskBlock(
   sessionsDir: string,
   sessionNumber: number,
@@ -287,6 +302,7 @@ export function buildTaskBlock(
   disputes: readonly Row[] | null = null,
   repoRoot: string | null = null,
   grant: AgencyGrant | null = null,
+  untested: readonly string[] = [],
 ): string {
   const parts: string[] = [];
   const prior = priorFindingsBlock(priorRounds, disputes, repoRoot);
@@ -299,6 +315,8 @@ export function buildTaskBlock(
   );
   const plan = workPlanBlock(repoRoot, sessionNumber);
   if (plan) parts.push(plan);
+  const gap = untestedBlock(untested);
+  if (gap) parts.push(gap);
   const brief = grant !== null ? briefing(grant) : "";
   if (brief) parts.push(brief);
   return parts.join("\n\n");

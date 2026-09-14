@@ -876,61 +876,16 @@ export function factRecordToDict(record: FactRecord): Record<string, unknown> {
   return out;
 }
 
-/** The shape `affected.preverifyGate` answers with, as this module reads it. */
-export interface TestsGate {
-  readonly reason: string;
-  readonly accepted: ReadonlyArray<readonly [string, string, string]>;
-}
-
-/**
- * The selected-test run, as a fact rather than a verdict.
- *
- * A refusing gate never reaches here -- the round ends before any fact is
- * collected -- so there is no failing case to write. A gate that accepted
- * nothing accepted nothing *because nothing had to run*: no expensive suite,
- * or a change the selector maps to no test. That is `not_applicable`, and
- * calling it `pass` would put a green test row on a change no test ever saw.
- */
-function testsFacts(gate: TestsGate | null): ControlFact[] {
-  if (gate === null) return [];
-  if (gate.accepted.length === 0) {
-    return [
-      controlFact(
-        KIND_TESTS,
-        STATUS_NOT_APPLICABLE,
-        "",
-        false,
-        gate.reason || "no selected test run was required for this change set",
-      ),
-    ];
-  }
-  return gate.accepted.map(([suite, command, policy]) =>
-    controlFact(
-      KIND_TESTS,
-      STATUS_PASS,
-      command,
-      false,
-      `${suite}: accepted as ${policy}`,
-    ),
-  );
-}
-
 /**
  * Every deterministic fact about the tree as it now stands, in one record:
- * the declared controls, the pre-verification test command the selector
- * sanctioned, and the lines the change adds.
- *
- * The test row is a record, not a second gate. The refusal that keeps an
- * unproved change out of a round lives in `affected.preverifyGate` and stays
- * there; repeating it here would be a guard guarding a guard. The changed
- * lines are context of the same kind: nothing is judged by them.
+ * the declared controls and the lines the change adds. The changed lines
+ * are context: nothing is judged by them.
  */
 export async function collectFacts(
   repoRoot: string,
   sessionsDir: string,
   config: unknown,
   options: {
-    gate?: TestsGate | null;
     roundNumber?: number | null;
     sessionNumber?: number | null;
   } = {},
@@ -939,7 +894,7 @@ export async function collectFacts(
 
   const { facts, errors } = collectControlFacts(repoRoot, config);
   return factRecord({
-    controls: [...facts, ...testsFacts(options.gate ?? null)],
+    controls: [...facts],
     changed: changedLines(repoRoot, preverifyBaseline(repoRoot, sessionsDir)),
     sessionNumber: options.sessionNumber ?? null,
     roundNumber: options.roundNumber ?? null,

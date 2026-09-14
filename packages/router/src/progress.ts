@@ -50,6 +50,7 @@ import { pythonRepr, pythonStr } from "./pythonJson.ts";
 import {
   OUTCOME_PASSED,
   STAGE_FINAL_FULL,
+  STAGE_FINAL_TARGETED,
   STAGE_PREVERIFY_TARGETED,
   type TestRunRecord,
   readRecords,
@@ -1050,7 +1051,9 @@ export function buildTaskRows(
   const stoppedShort = view !== null && view["terminal"] !== null && !verified;
 
   const preverify = passedRun(STAGE_PREVERIFY_TARGETED, null);
-  const runOfRecord = verified ? passedRun(STAGE_FINAL_FULL, epoch(latestRoundAt)) : null;
+  const runOfRecord = verified
+    ? passedRun(STAGE_FINAL_FULL, epoch(latestRoundAt)) ?? passedRun(STAGE_FINAL_TARGETED, epoch(latestRoundAt))
+    : null;
 
   // A driven session that stopped short of the close is an attention row:
   // the first phase not done is blocked, and its intent says which bound

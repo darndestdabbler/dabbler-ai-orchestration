@@ -1,7 +1,7 @@
 // The test selector: what the repository declares a test to be, how a change
 // reaches a test, and which commands a selection sanctions. A seeded
 // directory stands in for the checkout; no git. The policy that makes a
-// targeted run evidence, and the gate, are preverify.test.ts.
+// targeted run evidence is preverify.test.ts.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
@@ -13,6 +13,7 @@ import {
   namesATest,
   selectTests,
   selectionTestRoots,
+  targetedCommand,
   type SelectionConfig,
 } from "../src/checks.ts";
 import { seed, tempDir } from "./support/answers.ts";
@@ -24,10 +25,8 @@ function tree(): string {
 }
 
 const SELECTION: SelectionConfig = {
-  scopes: [{ suite: "python", roots: ["tests"], glob: "test_*.py" }],
+  scopes: [{ suite: "python", roots: ["tests"], glob: "test_*.py", testName: "test_{name}.py" }],
   smoke: ["tests/test_smoke.py"],
-  repoWide: ["tests/conftest.py", "pytest.ini"],
-  rules: [["docs/", []], ["packages/router/router-config.yaml", ["tests/test_engine.py"]], ["ai_router/engine.py", ["tests/test_engine.py", "tests/test_widget.py"]]],
 };
 
 describe("what the selector calls a test", () => {
@@ -44,31 +43,46 @@ describe("what the selector calls a test", () => {
     assert.deepEqual(helper.testPaths, ["tests/test_smoke.py"]);
   });
 
-  it("reaches a test from a source file only through a configured rule, naming the path that did it", () => {
-    const result = selectTests(tree(), ["ai_router/engine.py"], SELECTION);
-    assert.deepEqual(result.testPaths, ["tests/test_engine.py", "tests/test_widget.py"]);
-    assert.ok(result.selected.every((s) => s.reason === "configured-rule" && s.selectedBy === "ai_router/engine.py"));
-    assert.equal(result.allTestsAffected, false);
-  });
-
-  it("buys the smoke tests with uncertainty, reads an empty rule target as a mapping, and proves every test affected only from a declared repository-wide path", () => {
-    const unknown = selectTests(tree(), ["scripts/deploy.rb"], SELECTION);
-    assert.deepEqual(unknown.unknownPaths, ["scripts/deploy.rb"]);
-    assert.equal(unknown.risks[0]?.kind, "selection_unknown");
-    assert.deepEqual(unknown.testPaths, ["tests/test_smoke.py"]);
-    const mapped = selectTests(tree(), ["docs/plan.md"], SELECTION);
-    assert.deepEqual(mapped.testPaths, []);
-    assert.deepEqual(mapped.risks, []);
-    const wide = selectTests(tree(), ["tests/conftest.py"], SELECTION);
-    assert.equal(wide.allTestsAffected, true);
-    assert.match(String(wide.allAffectedReason), /conftest/);
+  it("selects the tests named after a changed .cs, .java and .ts file from each suite's own roots, and buys the smoke tests for a source file with none", () => {
+    const repo = tempDir();
+    seed(repo, {
+      "src/Csv/CsvSerializer.cs": "class CsvSerializer {}\n",
+      "tests/Csv.Tests/CsvSerializerTests.cs": "class CsvSerializerTests {}\n",
+      "src/main/java/csv/Adder.java": "class Adder {}\n",
+      "src/test/java/csv/AdderTest.java": "class AdderTest {}\n",
+      "packages/router/src/checks.ts": "export {};\n",
+      "packages/router/test/checks.test.ts": "export {};\n",
+      "packages/router/src/drive.ts": "export {};\n",
+      "packages/router/test/schema.test.ts": "export {};\n",
+    });
+    const selection: SelectionConfig = {
+      scopes: [
+        { suite: "dotnet", roots: ["tests"], glob: "*Tests.cs", testName: "{name}Tests.cs" },
+        { suite: "maven", roots: ["src/test/java"], glob: "*Test.java", testName: "{name}Test.java" },
+        { suite: "typescript", roots: ["packages/router/test"], glob: "*.test.ts", testName: "{name}.test.ts" },
+      ],
+      smoke: ["packages/router/test/schema.test.ts"],
+    };
+    const named = selectTests(repo, ["src/Csv/CsvSerializer.cs", "src/main/java/csv/Adder.java", "packages/router/src/checks.ts", "README.md"], selection);
+    assert.deepEqual(
+      named.selected.map((entry) => [entry.path, entry.reason, entry.selectedBy, entry.suite]),
+      [
+        ["packages/router/test/checks.test.ts", "named-test", "packages/router/src/checks.ts", "typescript"],
+        ["src/test/java/csv/AdderTest.java", "named-test", "src/main/java/csv/Adder.java", "maven"],
+        ["tests/Csv.Tests/CsvSerializerTests.cs", "named-test", "src/Csv/CsvSerializer.cs", "dotnet"],
+      ],
+    );
+    assert.deepEqual(named.risks, []);
+    const unnamed = selectTests(repo, ["packages/router/src/drive.ts"], selection);
+    assert.deepEqual(unnamed.unknownPaths, ["packages/router/src/drive.ts"]);
+    assert.deepEqual(unnamed.testPaths, ["packages/router/test/schema.test.ts"]);
   });
 
   it("maps the file the framework installed at registration to nothing, rather than to nobody", () => {
     // `session start` edits the hook file (removing the Stop hook an earlier
-    // framework installed) before any rule could name it; reporting it as
-    // selection_unknown told every claude-code session its first change set
-    // was unmapped.
+    // framework installed) before anything could name a test for it;
+    // reporting it as selection_unknown told every claude-code session its
+    // first change set was unmapped.
     const installed = selectTests(tree(), [".claude/settings.json"], SELECTION);
     assert.deepEqual(installed.unknownPaths, []);
     assert.deepEqual(installed.risks, []);
@@ -86,23 +100,24 @@ describe("reading the selection declaration", () => {
     },
   };
 
-  it("reports a malformed rule rather than dropping it, refuses a test root with no glob, and refuses the retired repository-wide declaration by name", () => {
-    const rule = loadSelectionConfig({ testing: { selection: { rules: [{ when: "ai_router/", selct: ["tests/test_a.py"] }] } } });
-    assert.equal(rule.ok, false);
-    assert.ok(rule.errors.some((error) => error.includes("select")));
+  it("reads the retired hand-written maps without refusing them, refuses a test root with no glob and a test name with no {name}, and refuses the retired repository-wide test_roots by name", () => {
+    const maps = loadSelectionConfig({ testing: { selection: { repo_wide: ["."], rules: [{ when: "ai_router/", select: ["tests/test_a.py"] }] } } });
+    assert.equal(maps.ok, true);
+    assert.deepEqual(maps.config, { scopes: [], smoke: [] });
     const noGlob = loadSelectionConfig({ testing: { suites: [{ name: "maven", command: "mvn -q test", test_roots: ["src/test/java"] }] } });
     assert.ok(!noGlob.ok && noGlob.errors.some((error) => error.includes("test_glob")));
+    const fixedName = loadSelectionConfig({ testing: { suites: [{ name: "maven", command: "mvn -q test", test_roots: ["src/test/java"], test_glob: "*Test.java", test_name: "AllTest.java" }] } });
+    assert.ok(!fixedName.ok && fixedName.errors.some((error) => error.includes("{name}")));
     const retired = loadSelectionConfig({ testing: { suites: [{ name: "python", command: "pytest", test_roots: ["tests"], test_glob: "test_*.py" }], selection: { test_roots: ["spec"], test_glob: "*_spec.py" } } });
     assert.ok(!retired.ok && retired.errors.some((error) => error.includes("testing.suites")));
   });
 
-  it("confines each suite's convention to that suite's roots, reads the scopes with no rules declared, and gives a suite that runs no test files no scope", () => {
+  it("confines each suite's convention to that suite's roots, and gives a suite that runs no test files no scope", () => {
     const selection = loadSelectionConfig(TWO_ECOSYSTEMS).config;
     assert.equal(namesATest("src/test/java/AdderTest.java", selection), true);
     assert.equal(namesATest("test/AdderTests.cs", selection), true);
     assert.equal(namesATest("src/test/java/AdderTests.cs", selection), false);
     assert.equal(namesATest("src/main/java/Adder.java", selection), false);
-    assert.deepEqual(selection.rules, []);
     assert.equal(declaresTests(selection), true);
     assert.deepEqual(selectionTestRoots(selection), ["src/test/java", "test"]);
     const smoke = loadSelectionConfig({ testing: { suites: [{ name: "smoke", command: "python smoke.py" }] } });
@@ -120,5 +135,26 @@ describe("the command a selection sanctions", () => {
     const cheap = runnableCommands([], new SelectionResult(), 1);
     assert.ok(cheap[0].includes("expensive") && !cheap[0].includes("no suite is declared"));
   });
-});
 
+  it("renders a suite's selection command from the selected paths or their names, quoting what a shell would split", () => {
+    const result = new SelectionResult({
+      selected: [
+        { path: "tests/Csv.Tests/CsvSerializerTests.cs", reason: "named-test", selectedBy: "src/Csv/CsvSerializer.cs", suite: "dotnet" },
+        { path: "tests/Csv.Tests/CsvReaderTests.cs", reason: "named-test", selectedBy: "src/Csv/CsvReader.cs", suite: "dotnet" },
+      ],
+    });
+    assert.equal(
+      targetedCommand("dotnet test", result, { select: "dotnet test --filter {names}", selectSeparator: "|" }),
+      'dotnet test --filter "CsvReaderTests|CsvSerializerTests"',
+    );
+    assert.equal(
+      targetedCommand("mvn -q test", result, { select: "mvn -q test -Dtest={names}" }),
+      "mvn -q test -Dtest=CsvReaderTests,CsvSerializerTests",
+    );
+    assert.equal(
+      targetedCommand("node run.mjs", result, { select: "node run.mjs {paths}" }),
+      "node run.mjs tests/Csv.Tests/CsvReaderTests.cs tests/Csv.Tests/CsvSerializerTests.cs",
+    );
+    assert.equal(targetedCommand("dotnet test", new SelectionResult(), { select: "dotnet test --filter {names}" }), "");
+  });
+});

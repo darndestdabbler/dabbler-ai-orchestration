@@ -282,14 +282,17 @@ Four kinds of instruction, and no fifth:
 
 Everything the framework now does for itself happens inside those calls:
 declaring the work, each step's own checks, cross-provider verification
-and its remediation rounds, the complete suite as the run of record, the
-commit, the push, and the close. The tests that run are each step's own
-checks and that complete suite: the Primary Reviewer reviews without
-writing or running one, and no other test run happens between a step and
-the round.
+and its remediation rounds, the suites as the run of record, the commit,
+the push, and the close. The tests that run are each step's own checks and
+the tests named after what it changed, then the suites — whole, or the
+tests the session selects where a whole run costs too much, and whole
+before a release. The Primary Reviewer reviews without writing or running one.
 None of them is yours to run, and none of them is yours to skip ahead to
 — the instruction in hand is the whole of what is asked. `dabbler
 version` says which router this is; report it when you report a problem.
+A source file's tests are the file named after it (`checks.ts`,
+`checks.test.ts`): a new public method gets a test there, a changed one has
+its tests updated or confirmed, and a removed one takes its tests with it.
 
 **The framework owns the clock, the state and the sequencing.** An
 instruction that names a command is answered by running that command —

@@ -37,6 +37,7 @@ import { PythonFloat, dumps, pythonFloatRepr, pythonRepr } from "./pythonJson.ts
 
 export { matchingPrefixes } from "./checks.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
+import { readRawSessionState } from "./sessionState.ts";
 
 
 export const OUTCOME_PASSED = "passed";
@@ -73,9 +74,139 @@ export const OUTCOMES: readonly string[] = [
  */
 export const STAGE_PREVERIFY_TARGETED = "preverify-targeted";
 export const STAGE_FINAL_FULL = "final-full";
+/**
+ * The run of record of a suite whose whole run costs more than a session
+ * should spend on it: the tests the session's changes select, bound to the
+ * tree as `final-full` is, and naming what it selected. `runsWholeAtClose`
+ * says which of the two a suite owes.
+ */
+export const STAGE_FINAL_TARGETED = "final-targeted";
 export const STAGES: readonly string[] = [
-  STAGE_PREVERIFY_TARGETED, STAGE_FINAL_FULL,
+  STAGE_PREVERIFY_TARGETED, STAGE_FINAL_FULL, STAGE_FINAL_TARGETED,
 ];
+
+/** A whole run this short is always affordable, however short the sessions are. */
+export const WHOLE_RUN_FLOOR_SECONDS = 60;
+/** The share of a session's wall-clock time a whole run may take. */
+export const WHOLE_RUN_SHARE = 0.05;
+/** How many of the last closed sessions the median is taken over. */
+const WHOLE_RUN_SESSIONS = 5;
+
+/**
+ * Whether `suite` runs whole at the end of session `sessionNumber`, and why.
+ *
+ * Whole when it declares no `select`, when no earlier session recorded a
+ * whole run of it, or when the last such run took no more than the longer of
+ * a minute and 5% of the median wall-clock time of the last five closed
+ * sessions. The session's own runs are not read: a whole run it makes before
+ * a release must not change, at the close, which run of record it owed.
+ */
+export function runsWholeAtClose(
+  suite: SuiteSpec,
+  records: readonly TestRunRecord[],
+  sessionSeconds: readonly number[],
+  sessionNumber: number | null,
+): { readonly whole: boolean; readonly reason: string } {
+  if (suite.select === undefined) {
+    return { whole: true, reason: `${suite.name} declares no select` };
+  }
+  const last = records
+    .filter(
+      (row) =>
+        row.suite === suite.name &&
+        row.stage === STAGE_FINAL_FULL &&
+        row.durationSeconds !== null &&
+        row.sessionNumber !== sessionNumber,
+    )
+    .at(-1);
+  if (last === undefined) {
+    return { whole: true, reason: `no earlier whole run of ${suite.name} is on record` };
+  }
+  const recent = [...sessionSeconds.slice(-WHOLE_RUN_SESSIONS)].sort((a, b) => a - b);
+  const middle = Math.floor(recent.length / 2);
+  const median =
+    recent.length === 0
+      ? 0
+      : recent.length % 2 === 1
+        ? (recent[middle] as number)
+        : ((recent[middle - 1] as number) + (recent[middle] as number)) / 2;
+  const limit = Math.max(WHOLE_RUN_FLOOR_SECONDS, WHOLE_RUN_SHARE * median);
+  const took = last.durationSeconds as number;
+  return took <= limit
+    ? { whole: true, reason: `the last whole run of ${suite.name} took ${took}s, within ${Math.round(limit)}s` }
+    : { whole: false, reason: `the last whole run of ${suite.name} took ${took}s, past ${Math.round(limit)}s` };
+}
+
+/**
+ * Each suite this session ran targeted, mapped to the outcome of the whole
+ * run it made after that -- null while it has made none.
+ */
+function wholeRunsAfterTargeted(
+  records: readonly TestRunRecord[],
+  sessionNumber: number,
+): Map<string, string | null> {
+  const after = new Map<string, string | null>();
+  for (const row of records) {
+    if (row.sessionNumber !== sessionNumber) continue;
+    if (row.stage === STAGE_FINAL_TARGETED) {
+      // Every targeted run of record owes a whole run before a release, one
+      // that selected nothing included: a change that selects no test of a
+      // suite -- a lockfile, a declaration, another ecosystem's source -- is
+      // still what the whole run before a release is there to catch.
+      after.set(row.suite, null);
+    } else if (row.stage === STAGE_FINAL_FULL && after.has(row.suite)) {
+      after.set(row.suite, row.outcome);
+    }
+  }
+  return after;
+}
+
+/**
+ * The suites a releasing session runs whole before it packages: every one
+ * whose run of record this session was targeted and that has not run whole
+ * since.
+ */
+export function wholeRunsOwedBeforeRelease(
+  records: readonly TestRunRecord[],
+  sessionNumber: number,
+): string[] {
+  return [...wholeRunsAfterTargeted(records, sessionNumber)]
+    .filter(([, outcome]) => outcome === null)
+    .map(([suite]) => suite);
+}
+
+/**
+ * What holds a release on its tests, in words naming the suites, or null: a
+ * red whole run after a targeted run of record. The session still closes,
+ * with the failure on its record for the next session to fix.
+ */
+export function releaseTestsHold(
+  records: readonly TestRunRecord[],
+  sessionNumber: number,
+): string | null {
+  const red = [...wholeRunsAfterTargeted(records, sessionNumber)]
+    .filter(([, outcome]) => outcome !== null && outcome !== OUTCOME_PASSED)
+    .map(([suite]) => suite);
+  if (red.length === 0) return null;
+  return (
+    `held by its tests: the whole ${red.join(" and ")} run before the release failed, ` +
+    "and a session publishes only what its whole suites pass"
+  );
+}
+
+/** The wall-clock seconds of each closed session, in the order they closed. */
+export function closedSessionSeconds(state: Record<string, unknown> | null): number[] {
+  const rows = state !== null && Array.isArray(state["sessions"]) ? (state["sessions"] as unknown[]) : [];
+  return rows
+    .filter((row): row is Record<string, unknown> => isRecord(row) && row["status"] === "complete")
+    .map((row) => {
+      const closed = Date.parse(String(row["completedAt"]));
+      return { closed, seconds: (closed - Date.parse(String(row["startedAt"]))) / 1000 };
+    })
+    .filter((row) => Number.isFinite(row.seconds) && row.seconds > 0)
+    .sort((left, right) => left.closed - right.closed)
+    .map((row) => row.seconds);
+}
 
 // What made a pre-verification command acceptable, or what made it invalid.
 // `final-full` runs carry none of these: the complete suite IS the declared
@@ -163,6 +294,14 @@ export interface SuiteSpec {
   readonly expensive: boolean;
   /** The runner takes no subset, so a run of it is the complete suite. */
   readonly runsWhole: boolean;
+  /**
+   * The command that runs a selection of this suite's tests: `{paths}` for
+   * the selected test files, `{names}` for their names without extension.
+   * Absent where the suite declares no way to run part of itself.
+   */
+  readonly select?: string;
+  /** What joins `{names}`; a comma unless the suite says otherwise. */
+  readonly selectSeparator?: string;
   /**
    * Whether the close demands a fresh green record of this suite. Absent
    * means "the same as `expensive`", which is what the one flag used to
@@ -323,12 +462,24 @@ export function loadSuitesChecked(
       errors.push(`${label}.required_for_close must be true or false`);
       return;
     }
+    const select = entry["select"];
+    if (select !== undefined && (typeof select !== "string" || !/\{(paths|names)\}/.test(select))) {
+      errors.push(`${label}.select must be a command naming {paths} or {names}`);
+      return;
+    }
+    const separator = entry["select_separator"];
+    if (separator !== undefined && (typeof separator !== "string" || separator === "")) {
+      errors.push(`${label}.select_separator must be a non-empty string`);
+      return;
+    }
     suites.push({
       name: name.trim(),
       command: command.trim(),
       covers: [...(covers as string[])],
       expensive,
       runsWhole: Boolean(entry["runs_whole"]),
+      ...(typeof select === "string" ? { select: select.trim() } : {}),
+      ...(typeof separator === "string" ? { selectSeparator: separator } : {}),
       requiredForClose: typeof required === "boolean" ? required : expensive,
       role,
     });
@@ -619,16 +770,23 @@ export function recordRun(
       `stage must be one of ${pyTuple(STAGES)}, got ${pythonRepr(stage)}`,
     );
   }
-  if (outcome === OUTCOME_NONE_SELECTED && stage !== STAGE_PREVERIFY_TARGETED) {
+  if (outcome === OUTCOME_NONE_SELECTED && stage === STAGE_FINAL_FULL) {
     throw new RecordError(
-      `${OUTCOME_NONE_SELECTED} is a pre-verification outcome; a final-full run ` +
-        "is the run of record and cannot be a run that did not happen",
+      `${OUTCOME_NONE_SELECTED} is a selection's outcome; a final-full run ` +
+        "is the whole suite and cannot be a run that did not happen",
     );
   }
-  if (stage === STAGE_PREVERIFY_TARGETED && outcome === OUTCOME_NONE_SELECTED) {
+  if (outcome === OUTCOME_NONE_SELECTED) {
+    // A pre-verification selection, or a targeted run of record, that chose
+    // no test of this suite: nothing ran, so nothing is named as having run.
     if (command !== null) {
       throw new RecordError(
         `a ${OUTCOME_NONE_SELECTED} record names no command, because nothing ran`,
+      );
+    }
+    if (stage === STAGE_FINAL_TARGETED && policy) {
+      throw new RecordError(
+        "the pre-verification policy vocabulary does not apply to a final-targeted run",
       );
     }
   } else if (stage === STAGE_PREVERIFY_TARGETED) {
@@ -640,6 +798,15 @@ export function recordRun(
     if (!POLICIES.includes(policy)) {
       throw new RecordError(
         `policy must be one of ${pyTuple(POLICIES)}, got ${pythonRepr(policy)}`,
+      );
+    }
+  } else if (stage === STAGE_FINAL_TARGETED) {
+    if (String(command ?? "").trim() === "") {
+      throw new RecordError("a final-targeted record must name the command that ran");
+    }
+    if (policy) {
+      throw new RecordError(
+        "the pre-verification policy vocabulary does not apply to a final-targeted run",
       );
     }
   } else {
@@ -675,7 +842,7 @@ export function recordRun(
   const digest = surfaceDigest(root, suite.covers, { sessionsDir });
   if (digest === null) throw new RecordError("could not digest the covered surfaces");
   let wholeTree = "";
-  if (stage === STAGE_FINAL_FULL) {
+  if (stage === STAGE_FINAL_FULL || stage === STAGE_FINAL_TARGETED) {
     // The run of record is the claim that this tree is proved. A tree with a
     // dependency resolving from a sibling checkout is not the tree that
     // ships, and a green suite against it proves something about a
@@ -786,6 +953,9 @@ export function evaluateFreshness(
   const affected =
     filesChanged === null ? null : affectedSuites(filesChanged, suites, { sessionsRel });
   const records = root ? readRecords(root) : [];
+  const state = readRawSessionState(sessionsDir);
+  const sessionSeconds = closedSessionSeconds(state);
+  const inFlight = typeof state?.["currentSession"] === "number" ? (state["currentSession"] as number) : null;
   const verdicts: FreshnessVerdict[] = [];
 
   for (const suite of suites) {
@@ -823,6 +993,7 @@ export function evaluateFreshness(
         records,
         currentTree: () => treeDigest(root, { sessionsDir }),
         driven,
+        wholeAtClose: runsWholeAtClose(suite, records, sessionSeconds, inFlight).whole,
       }),
     );
   }
@@ -848,15 +1019,24 @@ export interface FreshnessFacts {
    * hand is who it was written for.
    */
   readonly driven: boolean;
+  /**
+   * Whether the suite owed a whole run (`final-full`) or the tests the
+   * session's changes select (`final-targeted`), as `runsWholeAtClose`
+   * decided it. Absent means whole.
+   */
+  readonly wholeAtClose?: boolean;
 }
 
 /**
  * One expensive suite's freshness, from the facts alone: no run of record,
  * a record that predates the surfaces, a red one, one whose tree moved, or
- * fresh and green.
+ * fresh and green. Only the stage the suite owed is read, so a whole run
+ * taken before a release neither stands in for a targeted run of record nor
+ * refuses one.
  */
 export function freshnessVerdict(suite: SuiteSpec, facts: FreshnessFacts): FreshnessVerdict {
   const { changed, current, records } = facts;
+  const stage = facts.wholeAtClose === false ? STAGE_FINAL_TARGETED : STAGE_FINAL_FULL;
   // Judged for every expensive suite, demanded only for the ones the close
   // requires: a suite run for information gets its verdict on the record
   // and never refuses the close.
@@ -871,7 +1051,7 @@ export function freshnessVerdict(suite: SuiteSpec, facts: FreshnessFacts): Fresh
     return verdict(false, "could not digest the covered surfaces (failing closed)");
   }
   const mine = records.filter(
-    (row) => row.suite === suite.name && row.stage === STAGE_FINAL_FULL,
+    (row) => row.suite === suite.name && row.stage === stage,
   );
   if (mine.length === 0) {
     const targeted = records.filter(
@@ -879,7 +1059,7 @@ export function freshnessVerdict(suite: SuiteSpec, facts: FreshnessFacts): Fresh
     );
     let preamble =
       `this session changed ${suite.name}'s covered surfaces but no ` +
-      "final-full run of record exists";
+      `${stage} run of record exists`;
     if (targeted.length > 0) {
       preamble +=
         ` (${targeted.length} preverify-targeted record(s) are present; a ` +
@@ -909,7 +1089,11 @@ export function freshnessVerdict(suite: SuiteSpec, facts: FreshnessFacts): Fresh
         : `${measured}; re-run \`${suite.command}\` after your last code change and record it again`,
     );
   }
-  if (latest.outcome !== OUTCOME_PASSED) {
+  // A targeted run of record that selected nothing ran nothing: the session
+  // touched none of this suite, and the record binding that to the tree is
+  // what the close needs.
+  const selectedNothing = stage === STAGE_FINAL_TARGETED && latest.outcome === OUTCOME_NONE_SELECTED;
+  if (latest.outcome !== OUTCOME_PASSED && !selectedNothing) {
     return verdict(
       false,
       `the ${suite.name} run of record is fresh but its outcome is ` +

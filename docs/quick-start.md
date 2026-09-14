@@ -326,14 +326,21 @@ testing:
       covers: [src/, tests/]
       test_roots: [tests]
       test_glob: "test_*.py"
+      test_name: "test_{name}.py"
+      select: python -m pytest {paths}
 packaging: {}          # omit entirely if this repository publishes nothing
 paths:
   sensitive_paths: []
 ```
 
 - **Tracked, unlike the overlay below.** CI reads the suite command, the
-  next machine reads the selection rules, and `dabbler affected`
+  next machine reads how its tests are named, and `dabbler affected`
   refuses to run without them.
+- A source file's tests are the tests named after it. `test_name` is the
+  name they take, `{name}` standing for the source file's stem, and
+  `select` runs a selection: `{paths}` the selected test files, `{names}`
+  their class names. After each step the framework runs the tests named
+  after what the step changed.
 - `test_roots` and `test_glob` belong to a **suite**, not the
   repository: one that is Java and .NET at once has two of each.
 - Providers, models, roles and transports are not declarable here.

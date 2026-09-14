@@ -62,6 +62,10 @@ export const CONTROL_KINDS: ReadonlySet<string> = new Set([
 export const SUITE_FIELDS: ReadonlySet<string> = new Set([
   "name", "command", "argv", "covers", "cwd", "expensive", "small",
   "timeout_seconds", "test_roots", "test_glob", "runs_whole",
+  // A suite's tests are named after what they test: `test_name` is the
+  // basename a source file's tests take, `{name}` standing for its stem, and
+  // `select` is the command that runs a selection of them.
+  "test_name", "select", "select_separator",
   // What a suite is (unit, provider-contract, consumer-contract) and whether
   // the close demands it -- a word of its own beside `expensive`, which had
   // meant both "the run of record" and "required for close". `module` and
@@ -77,32 +81,36 @@ export const CONTROL_FIELDS: ReadonlySet<string> = new Set([
 // --- The repository's own declarations ----------------------------------------
 //
 // Selection is deterministic: the same changed paths against the same tree
-// always yield the same tests, in the same order, with the same reasons. What
-// maps to what is declared by the repository in its own configuration, in
-// whatever language it is written -- an inferred mapping needs a parser per
-// ecosystem and buys an optimization on an optimization. A changed path that
-// maps to no test is never widened into a full-suite run: it records
-// `selection_unknown`, pulls in the configured smoke tests, and raises a
-// risk. Running everything is the expensive way to hide an incomplete
-// mapping.
+// always yield the same tests, in the same order, with the same reasons. A
+// source file's tests are the tests named after it, in its suite's own form
+// (`test_name`), so selection reads file names and never the code. A source
+// file with no test named after it is never widened into a full-suite run:
+// it records `selection_unknown`, pulls in the configured smoke tests, and
+// is shown to the reviewer.
 
 export const REASON_CHANGED_TEST = "changed-test";
-export const REASON_CONFIGURED_RULE = "configured-rule";
+export const REASON_NAMED_TEST = "named-test";
+/** A test of a project that references a project the change is in. */
+export const REASON_DEPENDENT_PROJECT = "dependent-project";
 export const REASON_SMOKE = "selection-unknown-smoke";
 /**
  * Strongest first. A test selected by several routes is recorded once, under
  * the most specific reason that reached it.
  */
 export const REASON_PRECEDENCE: readonly string[] = [
-  REASON_CHANGED_TEST, REASON_CONFIGURED_RULE, REASON_SMOKE,
+  REASON_CHANGED_TEST, REASON_NAMED_TEST, REASON_DEPENDENT_PROJECT, REASON_SMOKE,
 ];
 
 export const RISK_SELECTION_UNKNOWN = "selection_unknown";
 
+/**
+ * `rules` and `repo_wide` were hand-written maps from a path to its tests.
+ * They are read and ignored, so a repository that still carries them is not
+ * refused for it; `session start` says they are no longer read.
+ */
 export const SELECTION_FIELDS: ReadonlySet<string> = new Set([
   "smoke", "repo_wide", "rules",
 ]);
-export const RULE_FIELDS: ReadonlySet<string> = new Set(["when", "select"]);
 
 /**
  * Where they went. Named in the refusal so a config written against the old
@@ -302,6 +310,12 @@ export interface SuiteScope {
   readonly suite: string;
   readonly roots: readonly string[];
   readonly glob: string;
+  /**
+   * The basename a source file's tests take, `{name}` standing for the
+   * source file's stem: `{name}Tests.cs`, `{name}Test.java`,
+   * `{name}.test.ts`. Absent where the suite names no tests after anything.
+   */
+  readonly testName?: string;
 }
 
 export function scopeIsComplete(scope: SuiteScope): boolean {
@@ -344,14 +358,12 @@ export function anyTestFileUnder(dir: string, glob: string): boolean {
 export interface SelectionConfig {
   /** One entry per suite that declares where its tests live. */
   readonly scopes: readonly SuiteScope[];
+  /** What runs where a changed source file has no test named after it. */
   readonly smoke: readonly string[];
-  readonly repoWide: readonly string[];
-  /** `[whenPrefix, [testPath, ...]]`: a changed path under the prefix selects those tests. */
-  readonly rules: ReadonlyArray<readonly [string, readonly string[]]>;
 }
 
 export function emptySelectionConfig(): SelectionConfig {
-  return { scopes: [], smoke: [], repoWide: [], rules: [] };
+  return { scopes: [], smoke: [] };
 }
 
 /** Every declared test root, in declaration order, deduplicated. */
@@ -382,21 +394,15 @@ export interface SelectionConfigResult {
 export class SelectionResult {
   readonly selected: readonly SelectedTest[];
   readonly risks: readonly SelectionRisk[];
-  readonly allTestsAffected: boolean;
-  readonly allAffectedReason: string;
 
   constructor(
     fields: {
       selected?: readonly SelectedTest[];
       risks?: readonly SelectionRisk[];
-      allTestsAffected?: boolean;
-      allAffectedReason?: string;
     } = {},
   ) {
     this.selected = fields.selected ?? [];
     this.risks = fields.risks ?? [];
-    this.allTestsAffected = fields.allTestsAffected ?? false;
-    this.allAffectedReason = fields.allAffectedReason ?? "";
   }
 
   get testPaths(): string[] {
@@ -424,11 +430,13 @@ export class SelectionResult {
         (entry) => entry.suite === "" || entry.suite === name,
       ),
       risks: this.risks,
-      allTestsAffected: this.allTestsAffected,
-      allAffectedReason: this.allAffectedReason,
     });
   }
 
+  /**
+   * The record's shape keeps `allTestsAffected` and its reason, which a
+   * declared repository-wide path once set; nothing sets them now.
+   */
   toDict(): Record<string, unknown> {
     return {
       selected: this.selected.map((entry) => ({
@@ -442,8 +450,8 @@ export class SelectionResult {
         path: risk.path,
         detail: risk.detail,
       })),
-      allTestsAffected: this.allTestsAffected,
-      allAffectedReason: this.allAffectedReason,
+      allTestsAffected: false,
+      allAffectedReason: "",
     };
   }
 }
@@ -521,16 +529,29 @@ export function loadTestScopes(config: unknown): {
       );
       return;
     }
-    scopes.push({ suite: name, roots, glob: globRaw.trim() });
+    const testName = entry["test_name"];
+    if (testName !== undefined && (typeof testName !== "string" || !testName.includes("{name}"))) {
+      errors.push(
+        `${label}.test_name must be a file name containing {name}, which stands for ` +
+          "the stem of the source file the test is named after",
+      );
+      return;
+    }
+    scopes.push({
+      suite: name,
+      roots,
+      glob: globRaw.trim(),
+      ...(typeof testName === "string" ? { testName: testName.trim() } : {}),
+    });
   });
   return { scopes, errors };
 }
 
 /**
- * The declared selection rules plus every declaration error.
+ * The suites' test scopes and the smoke tests, plus every declaration error.
  *
- * A silently dropped rule and no rule at all must never look the same: a typo
- * that removes a mapping turns real coverage into `selection_unknown`.
+ * A silently dropped declaration and none at all must never look the same: a
+ * typo that removes a test name turns real coverage into `selection_unknown`.
  */
 export function loadSelectionConfig(config: unknown): SelectionConfigResult {
   const result = (
@@ -543,8 +564,7 @@ export function loadSelectionConfig(config: unknown): SelectionConfigResult {
   });
   if (!isRecord(config)) return result(emptySelectionConfig(), []);
   // Scopes come from the suites, so they are read whether or not this
-  // repository declares any mapping rules: a repository with one suite and no
-  // rules still knows what a test file looks like.
+  // repository declares a selection block at all.
   const { scopes, errors: scopeErrors } = loadTestScopes(config);
   const testing = testingBlock(config);
   const raw = testing ? testing["selection"] : undefined;
@@ -582,57 +602,7 @@ export function loadSelectionConfig(config: unknown): SelectionConfigResult {
   };
 
   const smoke = strList(raw["smoke"], "testing.selection.smoke");
-  const repoWide = strList(raw["repo_wide"], "testing.selection.repo_wide");
-
-  const rules: Array<readonly [string, readonly string[]]> = [];
-  let rawRules = raw["rules"];
-  if (rawRules !== null && rawRules !== undefined && !Array.isArray(rawRules)) {
-    errors.push("testing.selection.rules must be a list");
-    rawRules = null;
-  }
-  const entries = Array.isArray(rawRules) ? rawRules : [];
-  entries.forEach((entry, index) => {
-    const label = `testing.selection.rules[${index}]`;
-    if (!isRecord(entry)) {
-      errors.push(`${label} must be a mapping`);
-      return;
-    }
-    const extra = unknownKeys(entry, RULE_FIELDS);
-    if (extra.length > 0) {
-      errors.push(`${label} has unknown key(s) ${pythonRepr(extra)}`);
-    }
-    const when = entry["when"];
-    if (typeof when !== "string" || when.trim() === "") {
-      errors.push(`${label}.when must be a non-empty path prefix`);
-      return;
-    }
-    const select = entry["select"];
-    // An explicit empty list is the declaration "this path affects no test",
-    // which is different from "unmapped" and must stay expressible. A
-    // `{module: <slug>}` entry named a module's suites; it is read and
-    // ignored, so a declaration that still carries one is not refused.
-    const isModuleTarget = (value: unknown): value is { module: string } =>
-      isRecord(value) &&
-      Object.keys(value).length === 1 &&
-      typeof value["module"] === "string" &&
-      value["module"].trim() !== "";
-    if (
-      select === null ||
-      select === undefined ||
-      !Array.isArray(select) ||
-      !select.every((value) => typeof value === "string" || isModuleTarget(value))
-    ) {
-      errors.push(`${label}.select must be a list of test paths or {module: <slug>} entries`);
-      return;
-    }
-    const paths = (select as unknown[])
-      .filter((value): value is string => typeof value === "string")
-      .map((value) => value.trim())
-      .filter((v) => v !== "");
-    rules.push([when.trim(), paths]);
-  });
-
-  return result({ scopes, smoke, repoWide, rules }, errors);
+  return result({ scopes, smoke }, errors);
 }
 
 /**
@@ -869,13 +839,104 @@ export function materialPaths(
   return blocking;
 }
 
+/** Directories no suite's tests live under, skipped when files are listed. */
+const UNLISTED_DIRECTORIES: ReadonlySet<string> = new Set([
+  "node_modules", ".git", ".dabbler", "bin", "obj", "target",
+]);
+
+/** Every file under `dir`, repository-relative and forward-slashed, sorted. */
+function filesUnder(repoRoot: string, dir: string): string[] {
+  const rootRel = normaliseRel(dir);
+  const found: string[] = [];
+  const walk = (folder: string, rel: string): void => {
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = readdirSync(folder, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const child = rel === "" ? entry.name : `${rel}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (!UNLISTED_DIRECTORIES.has(entry.name)) walk(join(folder, entry.name), child);
+      } else {
+        found.push(child);
+      }
+    }
+  };
+  walk(join(repoRoot, ...rootRel.split("/").filter((part) => part !== "")), rootRel);
+  return found.sort();
+}
+
+/**
+ * The test files under `dir` -- every file there a suite's declaration
+ * claims -- with the suite that claims each. A project's tests, where the
+ * project is a directory.
+ */
+export function testFilesUnder(
+  repoRoot: string,
+  dir: string,
+  selection: SelectionConfig,
+): Array<{ readonly path: string; readonly suite: string }> {
+  return filesUnder(repoRoot, dir).flatMap((path) => {
+    const scope = scopeForTest(path, selection);
+    return scope === null ? [] : [{ path, suite: scope.suite }];
+  });
+}
+
+/**
+ * A reader of tests by name: for a changed file, the files under each suite's
+ * roots named that suite's `test_name` with `{name}` as the file's stem, and
+ * owned by that suite. Null where no suite names tests after a file with that
+ * extension -- a document or a manifest is not a source file here. Each root
+ * is listed once, however many files changed.
+ */
+function namedTestReader(
+  repoRoot: string,
+  selection: SelectionConfig,
+): (rel: string) => string[] | null {
+  const listings = new Map<string, string[]>();
+  const listed = (root: string): string[] => {
+    const key = normaliseRel(root);
+    let found = listings.get(key);
+    if (found === undefined) {
+      found = filesUnder(repoRoot, key);
+      listings.set(key, found);
+    }
+    return found;
+  };
+  return (rel) => {
+    const base = rel.slice(rel.lastIndexOf("/") + 1);
+    let applies = false;
+    const tests: string[] = [];
+    for (const scope of selection.scopes) {
+      if (!scopeIsComplete(scope) || !scope.testName) continue;
+      const dot = scope.testName.lastIndexOf(".");
+      if (dot < 0) continue;
+      const extension = scope.testName.slice(dot);
+      if (base.length <= extension.length || !base.endsWith(extension)) continue;
+      applies = true;
+      const target = scope.testName.split("{name}").join(base.slice(0, -extension.length));
+      for (const root of scope.roots) {
+        for (const file of listed(root)) {
+          if (file.slice(file.lastIndexOf("/") + 1) !== target) continue;
+          if (scopeForTest(file, selection)?.suite === scope.suite) tests.push(file);
+        }
+      }
+    }
+    return applies ? [...new Set(tests)] : null;
+  };
+}
+
 /**
  * The tests `changedPaths` make necessary, each with the reason that selected
  * it, plus the risks the selection raised.
  *
- * Reasons are assigned by precedence, so a test reachable by several routes is
- * recorded once under the most specific one. Nothing here widens to the full
- * suite except an explicitly declared repository-wide path.
+ * A changed test selects itself. A changed source file -- one whose
+ * extension some suite's `test_name` carries -- selects the tests named after
+ * it, and one with none is a risk that buys the smoke tests. Anything else
+ * selects nothing. Reasons are assigned by precedence, so a test reachable by
+ * several routes is recorded once under the most specific one.
  */
 export function selectTests(
   repoRoot: string,
@@ -885,19 +946,6 @@ export function selectTests(
   const changed = changedPaths
     .filter((path) => String(path).trim() !== "")
     .map((path) => posixPath(path));
-
-  const repoWideHits =
-    selection.repoWide.length > 0
-      ? changed.filter((rel) => matchingPrefixes(rel, selection.repoWide).length > 0)
-      : [];
-  if (repoWideHits.length > 0) {
-    return new SelectionResult({
-      allTestsAffected: true,
-      allAffectedReason:
-        "declared repository-wide path(s) changed: " +
-        [...new Set(repoWideHits)].sort().join(", "),
-    });
-  }
 
   // Best reason wins: {test path: [precedence index, reason, selectedBy]}
   const best = new Map<string, [number, string, string]>();
@@ -911,44 +959,31 @@ export function selectTests(
   };
 
   const unknown: string[] = [];
+  const namedTests = namedTestReader(repoRoot, selection);
   for (const rel of changed) {
-    let matched = false;
-
     if (isTestFile(repoRoot, rel, selection)) {
       offer(rel, REASON_CHANGED_TEST, rel);
-      matched = true;
+      continue;
     }
-    // Everything else under a test root -- a shared helper, a fixture, a
-    // package marker -- maps to nothing on its own. It must fall through to
-    // the rules and, failing those, to selection_unknown: treating it as
-    // mapped would return clean targeted evidence for a change that can break
-    // any test using it.
-
-    for (const [when, targets] of selection.rules) {
-      if (matchingPrefixes(rel, [when]).length > 0) {
-        // An empty target list is a declaration that this path affects no
-        // test -- mapped, deliberately selecting nothing.
-        matched = true;
-        for (const target of targets) offer(target, REASON_CONFIGURED_RULE, rel);
-      }
-    }
-
-    // A file the framework itself installed at registration is not the
-    // session's change and reaches no test: it is mapped to nothing, the way
-    // an empty rule target is, rather than reported as a path nobody
-    // thought about. No scaffolded rule names it, because it did not exist
-    // when the rules were written.
-    if (!matched && isFrameworkInstalledPath(rel)) matched = true;
-
-    if (!matched) unknown.push(rel);
+    // A test file that is gone has nothing left to run. A file the framework
+    // itself installed at registration is not the session's change.
+    if (namesATest(rel, selection) || isFrameworkInstalledPath(rel)) continue;
+    // Everything else with a source extension -- a shared helper under a
+    // test root included -- answers through the tests named after it, and
+    // one with none is selection_unknown: treating it as covered would return
+    // clean targeted evidence for a change that can break any test using it.
+    const tests = namedTests(rel);
+    if (tests === null) continue;
+    if (tests.length === 0) unknown.push(rel);
+    for (const test of tests) offer(test, REASON_NAMED_TEST, rel);
   }
 
   const risks: SelectionRisk[] = [...new Set(unknown)].sort().map((rel) => ({
     kind: RISK_SELECTION_UNKNOWN,
     path: rel,
     detail:
-      "no test maps to this path; the configured smoke tests ran instead and " +
-      "verification must judge the exposure. Add a testing.selection rule " +
+      "no test is named after this file; the configured smoke tests ran instead " +
+      "and verification must judge the exposure. Add a test named after it " +
       "rather than widening the run.",
   }));
   if (unknown.length > 0) {
@@ -977,33 +1012,45 @@ export function selectTests(
 }
 
 /**
- * The command this change set sanctions, or `""` when it sanctions none.
+ * The command this change set sanctions, or `""` when it sanctions none: a
+ * change that selects no test has nothing to run, and naming the suite there
+ * would be this module recommending the one run it exists to refuse.
  *
- * The bare suite command is correct only where the selector proved every test
- * affected; a change mapped to no test has nothing to run, and naming the
- * suite there would be this module recommending the one run it exists to
- * refuse.
- *
- * Appending the selected paths is a *convention*, not a universal: pytest,
- * vitest, jest and `go test` take a file list, and `mvn -q test` and `dotnet
- * test` do not -- the first would read the path as a lifecycle argument and
- * the second wants a project. A suite whose runner has no subset form
- * declares `runs_whole` and is handed its own command unchanged, which is
- * then the smallest honest run of it. Guessing a narrowing syntax per
- * ecosystem is how this module would start emitting commands nobody can run,
- * under a policy name that says they proved something.
+ * A suite that declares `select` is handed its own selection command:
+ * `{paths}` the selected test files, `{names}` their file names without the
+ * extension -- the class name in .NET and Java -- joined by
+ * `selectSeparator`. A substitution a shell would split is quoted, because
+ * `dotnet test --filter A|B` is a pipe. A suite that declares `runs_whole` is
+ * handed its own command unchanged. Otherwise the selected paths are
+ * appended, which is what pytest, jest and `go test` take. Guessing a
+ * narrowing syntax per ecosystem is how this module would start emitting
+ * commands nobody can run.
  */
 export function targetedCommand(
   base: string,
   result: SelectionResult,
-  options: { runsWhole?: boolean } = {},
+  options: { runsWhole?: boolean; select?: string; selectSeparator?: string } = {},
 ): string {
   const command = String(base ?? "").trim();
-  if (result.allTestsAffected) return command;
   const paths = result.testPaths;
   if (paths.length === 0) return "";
+  if (options.select) {
+    const names = [
+      ...new Set(paths.map((path) => path.slice(path.lastIndexOf("/") + 1).replace(/\.[^.]*$/, ""))),
+    ].sort();
+    return options.select
+      .split("{paths}")
+      .join(paths.map(shellWord).join(" "))
+      .split("{names}")
+      .join(shellWord(names.join(options.selectSeparator ?? ",")));
+  }
   if (options.runsWhole === true) return command;
   return [command, ...paths].join(" ");
+}
+
+/** One word for a shell, quoted only where it would otherwise be split or reinterpreted. */
+function shellWord(value: string): string {
+  return /^[\w./,:=@+-]+$/.test(value) ? value : `"${value}"`;
 }
 
 export const RECORD_PLACEHOLDER = "<the command you ran>";

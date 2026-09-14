@@ -472,7 +472,6 @@ describe("what a repository declares about its tests", () => {
     const config = renderProjectConfig(detectEcosystems(project));
     assert.match(config, /name: python/);
     assert.match(config, /name: maven/);
-    assert.match(config, /runs_whole: true/);
   });
 
   it("declares nothing from a build file that declares no test command", () => {
@@ -521,12 +520,13 @@ describe("what a repository declares about its tests", () => {
     assert.equal(detectEcosystems(project)[0]?.command, "./gradlew test");
   });
 
-  it("maps every path rather than none", () => {
-    // A path no rule covers is `selection_unknown`, and pre-verification
-    // fails closed. The only honest starting mapping is repository-wide.
+  it("names a .NET and a Maven suite's tests after what they test, and runs a selection in each ecosystem's own form", () => {
     const project = tempDir("bootstrap-");
-    seed(project, { "pytest.ini": "[pytest]\n" });
-    assert.match(renderProjectConfig(detectEcosystems(project)), /repo_wide/);
+    seed(project, { "Csv.slnx": "<Solution />\n", "pom.xml": "<project/>\n" });
+    const config = renderProjectConfig(detectEcosystems(project));
+    assert.match(config, /test_name: "\{name\}Tests\.cs"\n {6}select: dotnet test --filter \{names\}\n {6}select_separator: "\|"/);
+    assert.match(config, /test_name: "\{name\}Test\.java"\n {6}select: mvn -q test -Dtest=\{names\} -Dsurefire\.failIfNoSpecifiedTests=false/);
+    assert.doesNotMatch(config, /repo_wide|runs_whole/);
   });
 
   it("declares no suite for a repository that says nothing", () => {

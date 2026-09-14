@@ -122,9 +122,9 @@ describe("a project on its first day", () => {
     assert.ok(ecosystems.includes("python"), ecosystems.join(","));
     const declared = readFileSync(join(repo, "dabbler.yaml"), "utf8");
     assert.match(declared, /name: python/);
-    // Every path is mapped, because a path no rule covers is
-    // `selection_unknown` and pre-verification fails closed.
-    assert.match(declared, /repo_wide/);
+    // Its tests are named after what they test, and .NET runs a selection of
+    // them by class name.
+    assert.match(declared, /select: dotnet test --filter \{names\}/);
     milestones.push("its suites are declared from what it holds");
 
     // --- what it says it publishes -----------------------------------------

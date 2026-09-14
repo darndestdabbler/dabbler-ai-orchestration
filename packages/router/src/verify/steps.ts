@@ -223,9 +223,7 @@ export function stepDeterministicFacts(
   let controls: ControlFact[] = [...collectControlFacts(repoRoot, config).facts];
   const result = selectTests(repoRoot, changedPaths, selection.config);
   for (const suite of suites.suites) {
-    const command = targetedCommand(suite.command, result.forSuite(suite.name), {
-      runsWhole: suite.runsWhole,
-    });
+    const command = targetedCommand(suite.command, result.forSuite(suite.name), suite);
     if (!command) {
       controls = [
         ...controls,

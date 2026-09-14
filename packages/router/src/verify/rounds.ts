@@ -34,6 +34,7 @@ import {
 } from "../agency.ts";
 import {
   loadSelectionConfig,
+  selectTests,
   workingTreeChanges,
 } from "../affected.ts";
 import { writeErr, writeOut } from "../output.ts";
@@ -702,21 +703,21 @@ export async function runRound(
   const disputes = readDisputes(repoRoot, current);
   // The verifier's scope: the session's changed files, what they import, and
   // the sessions root.
-  const scope = sessionScope(
-    repoRoot,
-    sessionsDir,
+  const changed =
     workingTreeChanges(
       repoRoot,
       roundNumber === 1
         ? null
         : String(effectiveBaseline(repoRoot, current, priorRounds[priorRounds.length - 1] as Row)),
-    ) ?? [],
-  );
+    ) ?? [];
+  const scope = sessionScope(repoRoot, sessionsDir, changed);
   const verificationSettings = settingsBlock(config);
   const readBudget =
     (verificationSettings["read_budget"] as number | undefined) ||
     DEFAULT_READ_BUDGET;
   const selection = loadSelectionConfig(config).config;
+  // Shown to the reviewer, never judged here.
+  const untested = selectTests(repoRoot, changed, selection).unknownPaths;
 
   // A code review round grants no write. The tests phase of spec 3.c.ii is
   // where the verifier authors tests, and a surface offered in every round
@@ -773,6 +774,7 @@ export async function runRound(
       disputes,
       repoRoot,
       grant,
+      untested,
     ),
     "session-verification",
     evidence,

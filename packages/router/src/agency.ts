@@ -416,7 +416,7 @@ export function grantOperations(grant: AgencyGrant): string[] {
 }
 
 export function grantSelection(grant: AgencyGrant): SelectionConfig {
-  return { scopes: grant.testScopes, smoke: [], repoWide: [], rules: [] };
+  return { scopes: grant.testScopes, smoke: [] };
 }
 
 /** Every root a write could land under, across the declared suites. */

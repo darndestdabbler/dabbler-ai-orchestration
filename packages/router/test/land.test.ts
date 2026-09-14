@@ -21,6 +21,11 @@ describe("the land", () => {
 
     // The same facts with the digest matching: nothing to refuse.
     assert.equal(judgeLandReadiness({ ...moved, treeNow: "tree-a", moved: [] }), null);
+    // A targeted run of record that selected nothing is not red, and lands the tree it was bound to.
+    assert.equal(
+      judgeLandReadiness({ ...moved, treeNow: "tree-a", moved: [], suites: [{ name: "persister-unit", latest: { ...GREEN, outcome: "none-selected" }, surfaceNow: "surface-a" }] }),
+      null,
+    );
 
     // A red or missing run refuses too, and a stale surface says so.
     assert.match(judgeLandReadiness({ ...moved, treeNow: "tree-a", suites: [{ name: "x", latest: null, surfaceNow: null }] }) ?? "", /x has no run of record/);

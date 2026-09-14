@@ -210,7 +210,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 170 | One checkout | no | 2026-09-14 |
 | 171 | Project references | no | 2026-09-14 |
 | 172 | The build files are the solution | yes | 2026-09-14 |
-| 173 | Tests named after what they test | — | not declared |
+| 173 | Tests named after what they test | yes | 2026-09-14 |
 | 174 | What planning asks, and when a session releases | — | not declared |
 | 175 | The walk, timed | — | not declared |
 
@@ -2465,3 +2465,18 @@ Session 172 makes the build files the solution. A new packages/router/src/projec
 - 2026-09-14 — step 'the-verbs-and-the-declaration': its files: The Router contract loses its modules verbs, so the extension's fake router in helpers.ts loses them too; ensureRootFilesWithSuite has no caller once modules create is deleted, so its test in ecosystem.test.ts goes with it (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-14 — step 'the-verbs-and-the-declaration': its files: writers.test.ts holds the test of the declaration writing modules onto the record, which declareSessionTask no longer does (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-14 — step 'the-words': its files: actionRegistry.test.ts asserts the Solution Explorer's welcome names modules; the welcome now names projects, so the assertion moves with it (claude-code (anthropic, claude-fable-5-1))
+
+### Session 173 — Tests named after what they test
+
+**Releasable: yes.**
+
+Tests are named after what they test. A suite in dabbler.yaml declares test_name, the basename its tests take with {name} for the source file's stem ({name}.test.ts, {name}Tests.cs, {name}Test.java), and select, the command that runs a selection, with {paths} for the selected test files or {names} for their class names joined by select_separator (a comma unless it says otherwise). The selector in checks.ts stops reading hand-written mappings: a changed test file selects itself, a changed source file selects the test files under a suite's test_roots whose basename is that suite's test_name for its stem, a source file with no named test is a selection_unknown risk that buys the smoke tests, and every other path selects nothing. testing.selection's rules and repo_wide are read and ignored, and this repository's are deleted with check-selection-map.ts and the uncalled affected.preverifyGate; smoke stays. bootstrap writes the .NET form (test_name {name}Tests.cs, select dotnet test --filter {names} with separator |) and the Maven form (test_name {name}Test.java, select mvn -q test -Dtest={names} -Dsurefire.failIfNoSpecifiedTests=false), and this repository declares its three suites' own. After a step's own checks the driver runs, for every suite declaring select, the tests the step's changed files select, and a red run refuses the report as a failed check does; the reviewer's task block lists the session's changed source files that have no named test, and that refuses nothing. At the end of a session each expensive suite runs whole when it has no recorded whole run, declares no select, or its last whole run took no more than 60 seconds or 5% of the median wall-clock time of the repository's last five closed sessions, whichever is longer; otherwise it runs the tests the session's changed files select plus every test file under a project that depends on a changed project (from projectGraph.ts, for .NET and Maven alike), recorded as a final-targeted run naming its selection and bound to the tree, and the freshness gate and the land accept that record for a suite past the threshold. A releasing session runs whole every suite whose run of record was targeted before it packages; a red whole run does not stop the session: releasabilityOf holds the release naming the suite, the publish is skipped, and the session closes with the failure on its record. The plan ask and the managed body say a new public method gets a test named after it, a changed one has its tests updated or confirmed, and a removed one takes its tests with it; session start prints one line when dabbler.yaml still declares rules or repo_wide; README, the quick start and the schema reference say so. The release is a minor, 3.1.0.
+
+**Amended after acceptance:**
+
+- 2026-09-14 — step 'named-test-selection': its files: agency.ts builds a SelectionConfig literal and has to drop the two members the selector no longer has (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'named-test-selection': its files: check-suite-cost.ts names check-selection-map.ts as its neighbour in the lint gate, and that file is deleted (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'bootstrap-defaults': its files: the schema description step 1 rewrote is compiled into generated/dabbler.ts, and the compile control refuses stale generated types (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'step-named-tests': its files: the red named test is walked where a real step is judged, in walk-session, whose check milestone it now refuses (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'whole-run-before-release': its files: the hold is judged from the test records, so it is a pure function beside them and tested in testEvidence.test.ts; the close gate's reader spawns git, which the unit tests may not (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'release-3-1-0': its files: version.json is the one declared version; stamp-version writes it into the two manifests and the lock file (claude-code (anthropic, claude-fable-5-1))

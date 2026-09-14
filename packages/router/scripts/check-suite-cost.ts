@@ -16,12 +16,12 @@
 // The shape of the failure is the same both times: a protection with no
 // auditor, so its lapse is invisible until someone measures. That is what
 // this control is for. It rides in the lint gate beside
-// `check-selection-map.ts`, and every session runs it.
+// `check-boundaries.ts`, and every session runs it.
 //
 // A control rather than a test, deliberately: the ground rules forbid tests
 // of test infrastructure, and the thing being held here is the test
-// infrastructure's own declaration. Reading source and spawning probes is
-// what `check-selection-map.ts` and `check-boundaries.ts` already do.
+// infrastructure's own declaration. Reading source is what
+// `check-boundaries.ts` already does.
 
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";

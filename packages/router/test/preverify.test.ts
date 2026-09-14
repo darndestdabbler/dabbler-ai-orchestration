@@ -1,13 +1,11 @@
 // Pre-verification: the policy that makes a targeted run evidence, judged
-// from a selection and a command. The gate that stands in front of a round is
-// walked in walk-git-states.test.ts, whose repository is real.
+// from a selection and a command.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { classifyPreverifyCommand } from "../src/affected.ts";
 import { selectTests, targetedCommand, type SelectionConfig } from "../src/checks.ts";
 import {
-  POLICY_ALL_TESTS_AFFECTED,
   POLICY_OPERATOR_OVERRIDE,
   POLICY_SUITE_WHOLE,
   POLICY_TARGETED,
@@ -22,10 +20,8 @@ function tree(): string {
 }
 
 const SELECTION: SelectionConfig = {
-  scopes: [{ suite: "python", roots: ["tests"], glob: "test_*.py" }],
+  scopes: [{ suite: "python", roots: ["tests"], glob: "test_*.py", testName: "test_{name}.py" }],
   smoke: ["tests/test_smoke.py"],
-  repoWide: ["tests/conftest.py", "pytest.ini"],
-  rules: [["docs/", []], ["ai_router/engine.py", ["tests/test_engine.py", "tests/test_widget.py"]]],
 };
 
 describe("what makes a pre-verification run evidence", () => {
@@ -50,12 +46,7 @@ describe("what makes a pre-verification run evidence", () => {
     assert.equal(classifyPreverifyCommand("mvn -q test -DskipTests", result, { runsWhole: true, declaredCommand: "mvn -q test" }).policy, POLICY_VIOLATION);
   });
 
-  it("carries the proof with a repository-wide exception, accepts an operator override only with a reason, and asks for no run where no test is affected", () => {
-    const wide = selectTests(tree(), ["tests/conftest.py"], SELECTION);
-    const proved = classifyPreverifyCommand("python -m pytest", wide);
-    assert.equal(proved.policy, POLICY_ALL_TESTS_AFFECTED);
-    assert.match(proved.reason, /conftest/);
-    assert.equal(targetedCommand("python -m pytest", wide), "python -m pytest");
+  it("accepts an operator override only with a reason, and asks for no run where no test is affected", () => {
     const result = selectTests(tree(), ["ai_router/engine.py"], SELECTION);
     const given = classifyPreverifyCommand("python -m pytest", result, { overrideReason: "pytest plugin upgrade; selection is untrusted" });
     assert.equal(given.policy, POLICY_OPERATOR_OVERRIDE);
@@ -66,4 +57,3 @@ describe("what makes a pre-verification run evidence", () => {
     assert.equal(classifyPreverifyCommand("python -m pytest", none).policy, POLICY_VIOLATION);
   });
 });
-

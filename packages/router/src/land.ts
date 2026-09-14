@@ -60,7 +60,8 @@ export function judgeLandReadiness(facts: LandFacts): string | null {
       reasons.push(`${suite.name} has no run of record`);
       continue;
     }
-    if (suite.latest.outcome !== "passed") {
+    // A targeted run of record that selected nothing ran nothing, and is not red.
+    if (suite.latest.outcome !== "passed" && suite.latest.outcome !== "none-selected") {
       reasons.push(`${suite.name}'s run of record is ${suite.latest.outcome}, not green`);
       continue;
     }

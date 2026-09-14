@@ -288,8 +288,8 @@ function copyTemplate(template: string, target: string): void {
 }
 
 /**
- * The seed a walkthrough works over: a session plan of two, one suite with
- * its selection rules, one source file and the test that covers it.
+ * The seed a walkthrough works over: a session plan of two, one suite that
+ * names its tests after what they test, one source file and its test.
  */
 export const SANDBOX_SEED: Record<string, string> = {
   "docs/sessions/session-plan.md":
@@ -300,10 +300,9 @@ export const SANDBOX_SEED: Record<string, string> = {
     "schema_version: 1\n\ntesting:\n  suites:\n    - name: unit\n" +
     "      command: python -m pytest\n      expensive: true\n" +
     "      covers:\n        - src/\n        - tests/\n" +
-    "      test_roots:\n        - tests\n      test_glob: \"test_*.py\"\n\n" +
-    "  selection:\n    repo_wide:\n      - dabbler.yaml\n" +
-    "    smoke:\n      - tests/test_widget.py\n    rules:\n" +
-    "      - when: src/widget.py\n        select:\n          - tests/test_widget.py\n",
+    "      test_roots:\n        - tests\n      test_glob: \"test_*.py\"\n" +
+    "      test_name: \"test_{name}.py\"\n\n" +
+    "  selection:\n    smoke:\n      - tests/test_widget.py\n",
   "src/widget.py": "def widget():\n    return 1\n",
   "tests/test_widget.py": "def test_widget():\n    assert True\n",
   ".gitignore": ".dabbler/\n",

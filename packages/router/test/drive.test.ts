@@ -28,6 +28,7 @@ import {
   judgeReportShape,
   reportIsSpent,
   localGateReceipt,
+  namedTestCommands,
   suiteRetrySeconds,
   staleJobDisposition,
   stepChangedPaths,
@@ -38,7 +39,7 @@ import {
 import { rewindPhaseFor } from "../src/gates.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
-import { gitAnswers } from "./support/answers.ts";
+import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 
 const INSTRUCTION = {
   schema_version: 1,
@@ -228,6 +229,25 @@ describe("what a running job of another name means", () => {
     for (const status of ["exited", "vanished"]) {
       assert.equal(staleJobDisposition("verification", "close", status), "stale");
     }
+  });
+});
+
+describe("the tests a step's change runs", () => {
+  it("names the selecting suite's command for the tests named after the changed source, and nothing for a suite with no select or a change no test is named after", () => {
+    const repo = tempDir();
+    seed(repo, { "src/widget.py": "x\n", "tests/test_widget.py": "x\n", "tests/check_widget.py": "x\n" });
+    const config = {
+      testing: {
+        suites: [
+          { name: "unit", command: "node tests/run.mjs", covers: ["src/"], expensive: true, test_roots: ["tests"], test_glob: "test_*.py", test_name: "test_{name}.py", select: "node tests/run.mjs {paths}" },
+          { name: "integration", command: "node tests/all.mjs", covers: ["src/"], expensive: true, test_roots: ["tests"], test_glob: "check_*.py", test_name: "check_{name}.py" },
+        ],
+      },
+    };
+    assert.deepEqual(namedTestCommands(repo, config, ["src/widget.py"]), [
+      { suite: "unit", command: "node tests/run.mjs tests/test_widget.py" },
+    ]);
+    assert.deepEqual(namedTestCommands(repo, config, ["docs/notes.md"]), []);
   });
 });
 

@@ -1,6 +1,5 @@
 // One repository, walked through the verification loop over scripted
-// responses. Session 1 is the loop entire: the pre-verification gate, a
-// round that finds a Major, a dispute filed from the record, the fix at the
+// responses. Session 1 is the loop entire: a round that finds a Major, a dispute filed from the record, the fix at the
 // cited site, and the fix-delta round that presents the rebuttal, verifies,
 // and stamps the session. The framework allows one adjudication per session
 // and treats it as terminal, so the two adjudication branches -- UPHOLD
@@ -15,7 +14,6 @@ import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
 import { stringify as stringifyYaml } from "yaml";
 
-import { preverifyGate } from "../src/affected.ts";
 import { approvePlan, compareToEnvelope, needsAmendment, newPlan, writePlan } from "../src/approvedPlan.ts";
 import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { EXIT_BLOCKING } from "../src/contracts/exitCodes.ts";
@@ -70,8 +68,8 @@ async function captured(run: () => Promise<number> | number): Promise<{ code: nu
 }
 
 const TESTING = {
-  suites: [{ name: "unit", command: "python -m pytest", expensive: true, covers: ["src/", "tests/"], test_roots: ["tests"], test_glob: "test_*.py" }],
-  selection: { repo_wide: ["dabbler.yaml"], smoke: ["tests/test_widget.py"], rules: [{ when: "src/widget.py", select: ["tests/test_widget.py"] }] },
+  suites: [{ name: "unit", command: "python -m pytest", expensive: true, covers: ["src/", "tests/"], test_roots: ["tests"], test_glob: "test_*.py", test_name: "test_{name}.py" }],
+  selection: { smoke: ["tests/test_widget.py"] },
 };
 const UNIT: SuiteSpec = { name: "unit", command: "python -m pytest", covers: ["src/", "tests/"], expensive: true, runsWhole: false };
 const RED = "============ FAILURES ============\nsrc/widget.py:2: in widget\nE   assert 2 == 1\nFAILED tests/test_widget.py::test_widget - assert 2 == 1\n";
@@ -188,16 +186,6 @@ describe("a repository walked through the verification loop", () => {
     registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
     widget(3);
     assert.equal(readSessionState(sessionsDir)?.["currentSession"], 1);
-  });
-
-  milestone("the pre-verification gate refuses before evidence and passes once a targeted run is recorded against the change", () => {
-    const before = preverifyGate(repo, sessionsDir, config);
-    assert.equal(before.ok, false);
-    assert.match(before.reason, /no pre-verification run of unit is recorded/);
-    recordRun(sessionsDir, UNIT, "passed", { ...TARGETED, sessionNumber: 1 });
-    const after = preverifyGate(repo, sessionsDir, config);
-    assert.equal(after.ok, true, after.reason);
-    assert.deepEqual(after.accepted, [["unit", "python -m pytest tests/test_widget.py", "targeted"]]);
   });
 
   milestone("round 1 finds a Major, blocks, and records the finding with its evidence and the raw answer", async () => {

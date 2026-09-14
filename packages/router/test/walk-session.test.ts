@@ -65,6 +65,7 @@ const TESTING = {
       covers: ["src/", "tests/"],
       test_roots: ["tests"],
       test_glob: "test_*.py",
+      test_name: "test_{name}.py",
     },
     {
       name: "integration",
@@ -76,10 +77,21 @@ const TESTING = {
     },
   ],
   selection: {
-    repo_wide: ["dabbler.yaml"],
     smoke: ["tests/test_widget.py"],
-    rules: [{ when: "src/widget.py", select: ["tests/test_widget.py"] }],
   },
+};
+
+/**
+ * The same suites, the unit suite running the tests named after a changed
+ * file once a step's own checks pass. Only the walk from next to done uses
+ * it: the red run of record below needs a step whose breakage only the
+ * whole suite sees.
+ */
+const NAMED = {
+  ...TESTING,
+  suites: TESTING.suites.map((suite) =>
+    suite.name === "unit" ? { ...suite, select: "node tests/run.mjs {paths}" } : suite,
+  ),
 };
 
 const PLAN = {
@@ -199,7 +211,7 @@ describe("one session, walked from next to done", () => {
     resetRuntimeMode();
     const repo = makeRepo(SEED, { origin: true });
     const sessionsDir = join(repo, "docs", "sessions");
-    configure([VERIFIED]);
+    configure([VERIFIED], NAMED);
 
     const milestones: string[] = [];
 
@@ -253,17 +265,22 @@ describe("one session, walked from next to done", () => {
     );
     milestones.push("refused a report the tree does not bear out");
 
-    // --- work the step's own check refuses ----------------------------------
-    // The step is done, honestly reported, and the check the plan declared
-    // says no. That is the gate on the work rather than on the report.
-    writeFileSync(join(repo, "src", "widget.py"), WIDGET_V3, "utf8");
+    // --- work the test named after it refuses --------------------------------
+    // The step is done, honestly reported, and its own check passes -- the
+    // widget returns 2 -- but the test named after the changed file, run
+    // with the checks, says no. That is the gate on the work rather than on
+    // the report.
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2  # broken\n", "utf8");
     const checked = await answerStep(sessionsDir, rejection.instruction?.seq ?? 0, "widget", [
       "src/widget.py",
     ]);
     assert.equal(checked.code, EXIT_OK);
     const refusedCheck = await next(sessionsDir);
     assert.equal(refusedCheck.instruction?.kind, "rejection");
-    assert.match(String(refusedCheck.instruction?.reasons?.join(" ")), /check-failed/);
+    assert.match(
+      String(refusedCheck.instruction?.reasons?.join(" ")),
+      /\[check-failed\] named tests failed: node tests\/run\.mjs tests\/test_widget\.py -> exit 1/,
+    );
     milestones.push("refused the work its own check rejects");
 
     // --- a call with nothing new to judge reprints, and costs nothing -------
@@ -320,7 +337,9 @@ describe("one session, walked from next to done", () => {
     assert.match(String(folded[0]?.["reason"]), /the value the plan guessed/);
     milestones.push("amended the step it was refused under");
 
-    // --- the same report, now accepted, because the definition moved --------
+    // --- the work put right, and accepted under the amended definition -------
+    // The named test runs again with the checks, and is green now.
+    writeFileSync(join(repo, "src", "widget.py"), WIDGET_V3, "utf8");
     const right = await answerStep(
       sessionsDir,
       refusedCheck.instruction?.seq ?? 0,

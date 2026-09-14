@@ -79,8 +79,27 @@ the build files hold more than one project and the root has no solution file
 or parent POM, the framework writes the root build files once a session's work
 is done, before it is verified, and never rewrites them: for .NET the `.slnx`,
 `Directory.Build.props` and `Directory.Build.targets`, with `bin/` and `obj/`
-ignored; for Maven the parent POM, with `target/` ignored. Every expensive
-suite runs as a session's run of record.
+ignored; for Maven the parent POM, with `target/` ignored.
+
+**Tests are named after what they test.** A source file's tests are the test
+file named after it: `CsvSerializer.cs` and `CsvSerializerTests.cs`,
+`CsvSerializer.java` and `CsvSerializerTest.java`, `checks.ts` and
+`checks.test.ts`. A suite in `dabbler.yaml` says so with `test_name`
+(`{name}Tests.cs`) and runs a selection with `select` — `dotnet test --filter
+{names}` with `select_separator: "|"`, or `mvn -q test -Dtest={names}
+-Dsurefire.failIfNoSpecifiedTests=false` — and `dabbler bootstrap` writes both
+for a .NET or Maven root. After each step's checks the framework runs the
+tests named after the files the step changed; a changed source file with no
+test named after it is shown to the reviewer and refuses nothing. At the end
+of a session each expensive suite runs whole when its last whole run took no
+more than a minute or 5% of the median length of the last five closed
+sessions, whichever is longer; past that it runs the tests the session's
+changes select, plus every test of a project that references a changed one,
+recorded as `final-targeted`. A releasing session runs whole every suite that
+ran targeted before it packages; a red whole run holds the release, names the
+suite, and the session closes with the failure on its record. Hand-written
+selection maps are no longer read, and `smoke` still runs where a changed
+file has no test named after it.
 
 **A repository that declared modules keeps its files.** A `modules.yaml` under
 `docs/`, a `modules:` block in `dabbler.yaml` and a suite's `module` or
@@ -243,7 +262,7 @@ Both layers are config *sources*, not precedence tiers: they change what
 tier 3 says and nothing above it.
 
 `dabbler.yaml` is the repository's own, and it is **tracked**. It carries
-`testing` (suites, controls, selection rules), `packaging` and `paths` —
+`testing` (suites, controls, smoke tests), `packaging` and `paths` —
 the facts CI and the next machine have to read, behind a `schema_version`.
 Providers, models and roles stay in the packaged config: those are
 distribution facts, and a repository declaring how to run `mvn -q test`

@@ -294,8 +294,11 @@ that ships, whose publish runs between the push and the close. A session
 ships unless its plan held it, the repository declares no packaging, or
 its verdict is not VERIFIED; the close's `published_when_releasable` row
 says which. (The preverify phase runs nothing: the tests that run are each
-step's own checks and the complete suite as the run of record, and the
-Primary Reviewer reviews without writing or running one.) None
+step's own checks with the tests named after what the step changed, and the
+suites as the run of record — whole, or `final-targeted` where a whole run
+costs more than a session should spend, with the whole suite before a
+release — and the Primary Reviewer reviews without writing or running one.)
+None
 of them runs inside a `next` call. The framework starts each one detached
 and comes straight back:
 

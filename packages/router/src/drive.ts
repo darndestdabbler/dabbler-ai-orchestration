@@ -37,7 +37,10 @@ import { dirname, join, relative } from "node:path";
 
 import {
   checkRunGreen,
+  loadSelectionConfig,
   makeCheck,
+  selectTests,
+  targetedCommand,
   timeoutFor,
   execute as executeCheck,
 } from "./checks.ts";
@@ -141,7 +144,11 @@ import {
 } from "./session.ts";
 import {
   STAGE_FINAL_FULL,
+  STAGE_FINAL_TARGETED,
+  closedSessionSeconds,
   evaluateFreshness,
+  runsWholeAtClose,
+  wholeRunsOwedBeforeRelease,
   loadSuitesChecked,
   readRecords,
   suiteRequiredForClose,
@@ -589,6 +596,29 @@ const RULE = {
 /** One refusal, carrying the name of the rule that refused it. */
 function refusal(rule: string, reason: string): string {
   return `[${rule}] ${reason}`;
+}
+
+/**
+ * The command that runs the tests named after `changed`, one per suite that
+ * declares `select` and owns at least one of them. A declaration that does
+ * not parse names nothing here: the controls refuse it before a round.
+ */
+export function namedTestCommands(
+  repoRoot: string,
+  config: unknown,
+  changed: readonly string[],
+): Array<{ readonly suite: string; readonly command: string }> {
+  const selection = loadSelectionConfig(config);
+  const suites = loadSuitesChecked(config);
+  if (!selection.ok || !suites.ok) return [];
+  const result = selectTests(repoRoot, changed, selection.config);
+  return suites.suites
+    .filter((suite) => suite.select !== undefined)
+    .map((suite) => ({
+      suite: suite.name,
+      command: targetedCommand(suite.command, result.forSuite(suite.name), suite),
+    }))
+    .filter((entry) => entry.command !== "");
 }
 
 
@@ -1668,6 +1698,11 @@ class Driver {
       "a check. A step whose product is prose still has a mechanical " +
       "check. Keep steps small, one concern each; the files a step lists are exactly the " +
       "files it will touch, because its report is measured against them.\n" +
+      "Tests are named after what they test: a source file's tests are the test file named after " +
+      "it (CsvSerializer.cs and CsvSerializerTests.cs, checks.ts and checks.test.ts). A new public " +
+      "method gets a test named after it in that file, a changed one has its tests updated or " +
+      "confirmed, and a removed one takes its tests with it; the framework runs them after each " +
+      "step's checks.\n" +
       SIBLING_REFERENCE +
       this.suiteGap() +
       "One member is optional and is left out of a single-repository session:\n" +
@@ -2025,6 +2060,42 @@ class Driver {
         );
       }
     }
+    if (reasons.length === 0) reasons.push(...(await this.namedTestRefusals(spec.id, changed, current)));
+    return reasons;
+  }
+
+  /**
+   * The tests named after what the step changed, run once its own checks
+   * pass, for every suite that declares how to run a selection. A red run
+   * refuses the report the way a failed check does. A suite without `select`
+   * runs nothing here; the end of the session runs it.
+   */
+  private async namedTestRefusals(
+    stepId: string,
+    changed: readonly string[],
+    tree: string,
+  ): Promise<string[]> {
+    const reasons: string[] = [];
+    for (const { suite, command } of namedTestCommands(this.repoRoot, this.config, changed)) {
+      const declared = makeCheck({ name: `${stepId} named tests of ${suite}`, command });
+      const run = await executeCheck(this.repoRoot, declared, command, {
+        stage: "driver",
+        treeDigest: tree,
+        timeoutSeconds: timeoutFor(declared, this.config),
+      });
+      const green = checkRunGreen(run);
+      this.log(green ? "named-tests-passed" : RULE.checkFailed, { step: stepId, suite, command });
+      if (!green) {
+        reasons.push(
+          refusal(
+            RULE.checkFailed,
+            `named tests failed: ${command} -> exit ${run.exitCode === null ? "none (timed out)" : run.exitCode}` +
+              (run.treeMutated ? " (the run changed the tree)" : "") +
+              (run.output.trim() ? `\n${tail(run.output)}` : ""),
+          ),
+        );
+      }
+    }
     return reasons;
   }
 
@@ -2043,13 +2114,13 @@ class Driver {
   }
 
   /**
-   * No targeted suite runs here any more. Measured over sessions 70-77 the
-   * selection cost 353-625 s per session and twice cost MORE than the full
-   * suite it approximates; the testing that remains is each step's own
-   * checks and the complete suite as the run of record, which is unchanged.
-   * The verifier reviews without writing or running one, and has not since
-   * `testphase.ts` went with the six-step workflow. The phase name stays so
-   * an old record's `preverify` rows and stops still read as what they were.
+   * No targeted suite runs here. Measured over sessions 70-77 a session-wide
+   * selection before verification cost 353-625 s per session and twice cost
+   * MORE than the full suite it approximates; the tests named after what a
+   * step changed run with that step instead, and the suites run at the end.
+   * The verifier reviews without writing or running one. The phase name
+   * stays so an old record's `preverify` rows and stops still read as what
+   * they were.
    */
   private async phasePreverify(): Promise<void> {
     this.writeRootFiles();
@@ -2513,8 +2584,14 @@ class Driver {
     if (suites.length === 0) {
       this.log("run-of-record-none", { reason: "no suite declared; nothing to run" });
     }
+    const records = readRecords(this.repoRoot);
+    const sessionSeconds = closedSessionSeconds(readSessionState(this.sessionsDir));
     for (const suite of suites) {
       const jobName = `run of record: ${suite.name}`;
+      // Whole, or the tests the session's changes select: the same rule the
+      // close's freshness gate and the land read.
+      const owed = runsWholeAtClose(suite, records, sessionSeconds, this.sessionNumber);
+      const stage = owed.whole ? STAGE_FINAL_FULL : STAGE_FINAL_TARGETED;
       const standing = evaluateFreshness(this.sessionsDir, null, [suite], {
         repoRoot: this.repoRoot,
       }).find((verdict) => verdict.suite === suite.name);
@@ -2534,7 +2611,7 @@ class Driver {
         this.log("run-of-record-standing", { suite: suite.name, reason: standing.reason });
         continue;
       }
-      this.log("run-of-record", { suite: suite.name, command: suite.command });
+      this.log("run-of-record", { suite: suite.name, stage, why: owed.reason, command: suite.command });
       const code = await this.longWork({
         name: jobName,
         argv: [
@@ -2546,7 +2623,7 @@ class Driver {
           "--suite",
           suite.name,
           "--stage",
-          "final-full",
+          stage,
         ],
         retryAfterSeconds: suiteRetrySeconds(readRecords(this.repoRoot), suite.name),
         stopKind: "tests",
@@ -2556,9 +2633,11 @@ class Driver {
         throw new Stop("tests", `the run of record for ${suite.name} could not be recorded (exit ${code})`);
       }
       this.log("tests-failed", { command: suite.command });
+      const failed = readRecords(this.repoRoot).filter((row) => row.suite === suite.name && row.stage === stage).at(-1);
       await this.runSynthesisedStep(
         "fix-run-of-record",
-        `The run of record failed: \`${suite.command}\`, the complete ${suite.name} suite ` +
+        `The run of record failed: \`${failed?.command || suite.command}\`, the ` +
+          `${owed.whole ? "complete" : "targeted"} ${suite.name} suite ` +
           "against the verified tree. Fix the cause. The framework will run every step's " +
           "checks, verification and the suite again.",
         "preverify",
@@ -2596,8 +2675,12 @@ class Driver {
     }
     const owed = loaded.suites.filter((suite) => suite.expensive && suiteRequiredForClose(suite));
     const runs = readRecords(this.repoRoot);
+    const sessionSeconds = closedSessionSeconds(readSessionState(this.sessionsDir));
     const suites: LandSuiteFact[] = owed.map((suite) => {
-      const latest = runs.filter((row) => row.suite === suite.name && row.stage === STAGE_FINAL_FULL).at(-1);
+      const stage = runsWholeAtClose(suite, runs, sessionSeconds, this.sessionNumber).whole
+        ? STAGE_FINAL_FULL
+        : STAGE_FINAL_TARGETED;
+      const latest = runs.filter((row) => row.suite === suite.name && row.stage === stage).at(-1);
       return {
         name: suite.name,
         latest:
@@ -2821,6 +2904,10 @@ class Driver {
    * this is the phase that would break if it ever changed.
    */
   private async phasePublish(): Promise<void> {
+    // A session that would ship runs whole, first, every suite whose run of
+    // record was targeted. A red whole run holds the release rather than
+    // stopping the session, and the check below then reads the hold.
+    if (sessionIsReleasable(this.sessionsDir, this.sessionNumber)) await this.wholeRunsBeforeRelease();
     // The DECLARATION, which is what `packageSession` and the close gate
     // both read. The plan carries a `releasable` too and the engine writes
     // it, and `phasePlan` turns it into a declaration only when there is
@@ -2916,6 +3003,45 @@ class Driver {
     }
     this.log("published", { session: sessionDisplayNumber(this.sessionNumber) });
     this.setPhase("close");
+  }
+
+  /**
+   * The whole of every suite whose run of record this session was targeted,
+   * before anything is packaged. A red run stops nothing: `releasabilityOf`
+   * reads it as a hold naming the suite, the publish passes through, and
+   * the session closes with the failure on its record. CI's full run after
+   * the push is not this; it is unchanged.
+   */
+  private async wholeRunsBeforeRelease(): Promise<void> {
+    const declared = this.expensiveSuites();
+    for (const name of wholeRunsOwedBeforeRelease(readRecords(this.repoRoot), this.sessionNumber)) {
+      const suite = declared.find((entry) => entry.name === name);
+      if (suite === undefined) continue;
+      this.log("whole-run-before-release", { suite: name, command: suite.command });
+      const code = await this.longWork({
+        name: `whole run before release: ${name}`,
+        argv: [
+          ...selfArgv(),
+          "test-evidence",
+          "run",
+          "--sessions-dir",
+          this.sessionsDir,
+          "--suite",
+          name,
+          "--stage",
+          STAGE_FINAL_FULL,
+        ],
+        retryAfterSeconds: suiteRetrySeconds(readRecords(this.repoRoot), name),
+        stopKind: "tests",
+      });
+      if (code === 1) {
+        this.log("tests-failed", { command: suite.command, holds: "the release" });
+        continue;
+      }
+      if (code !== EXIT_OK) {
+        throw new Stop("tests", `the whole run of ${name} before the release could not be recorded (exit ${code})`);
+      }
+    }
   }
 
   private async phaseClose(): Promise<void> {

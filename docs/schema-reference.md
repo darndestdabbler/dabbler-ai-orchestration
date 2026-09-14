@@ -505,7 +505,7 @@ carries what the repository owns and nothing else:
 | Key | Contents |
 |---|---|
 | `schema_version` | required, currently `1`; a repository written to a later shape is refused with its version named rather than read as unknown keys |
-| `testing` | `suites` (each with its own `test_roots` and `test_glob`), `controls`, and the `selection` rules that map a changed path to the tests that answer for it |
+| `testing` | `suites` (each with its own `test_roots`, `test_glob`, `test_name` and `select`), `controls`, and `selection.smoke`, the tests that run where a changed source file has no test named after it |
 | `packaging` | step (f) of the lifecycle: either `pack` and `push`, or `release: tag` for a repository CI publishes from — one or the other, never both |
 | `paths` | `sensitive_paths`: which of this repository's paths escalate a run |
 
@@ -523,15 +523,34 @@ each, and one glob cannot say both `*Test.java` and `*Tests.cs`. A file
 is a test if any suite's declaration claims it, and the suite that claims
 it is the one handed it to run.
 
-Appending the selected paths to the suite command is a convention, not a
-universal: pytest, jest and `go test` take a file list; `mvn -q test`
-reads one as a lifecycle argument and `dotnet test` wants a project. A
-suite whose runner has no subset form declares **`runs_whole: true`** and
-is run complete at the pre-verification stage, recorded under the policy
-`suite-runs-whole` rather than `targeted` — so a reader can tell a run
-narrowed to the selected tests from one that could not be narrowed. The
-framework does not guess a narrowing syntax per ecosystem. The loaded config records
-the file as `_project_config_path` (null when there is none).
+A source file's tests are the tests named after it. `test_name` is the
+basename they take, `{name}` standing for the source file's stem —
+`{name}Tests.cs`, `{name}Test.java`, `{name}.test.ts` — and `select` is the
+command that runs a selection: `{paths}` becomes the selected test files and
+`{names}` their names without extension, joined by `select_separator` (a
+comma unless it says otherwise) and quoted where a shell would split them.
+.NET's form is `dotnet test --filter {names}` with separator `|`; Maven's is
+`mvn -q test -Dtest={names} -Dsurefire.failIfNoSpecifiedTests=false`.
+`dabbler bootstrap` writes both. A suite with no `select` whose runner has
+no subset form may still declare **`runs_whole: true`**. The framework does
+not guess a narrowing syntax per ecosystem.
+
+After each step's own checks the framework runs, for every suite that
+declares `select`, the tests named after the files the step changed, and a
+red run refuses the step. A changed source file with no test named after it
+runs `selection.smoke` and is listed for the reviewer. At the end of a
+session a suite runs whole, recorded as `final-full`, unless it declares
+`select` and its last whole run in an earlier session took longer than both
+a minute and 5% of the median wall-clock time of the last five closed
+sessions; then it runs the tests the session's changes select plus every
+test under a project that references a changed project, recorded as
+`final-targeted` with the command that ran and the tests it selected, and
+the freshness gate and the land accept that record over the same tree. A
+releasing session runs whole every suite that ran targeted before it
+packages; a red whole run holds the release and the session closes with the
+failure on its record. Hand-written selection maps are no longer read. The
+loaded config records the file as `_project_config_path` (null when there is
+none).
 
 ## Config overlay — `local-overrides.yaml`
 

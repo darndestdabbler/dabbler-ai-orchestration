@@ -96,14 +96,17 @@ export const SHARED_BODY =
   "\n" +
   "Everything the framework now does for itself happens inside those calls:\n" +
   "declaring the work, each step's own checks, cross-provider verification\n" +
-  "and its remediation rounds, the complete suite as the run of record, the\n" +
-  "commit, the push, and the close. The tests that run are each step's own\n" +
-  "checks and that complete suite: the Primary Reviewer reviews without\n" +
-  "writing or running one, and no other test run happens between a step and\n" +
-  "the round.\n" +
+  "and its remediation rounds, the suites as the run of record, the commit,\n" +
+  "the push, and the close. The tests that run are each step's own checks and\n" +
+  "the tests named after what it changed, then the suites — whole, or the\n" +
+  "tests the session selects where a whole run costs too much, and whole\n" +
+  "before a release. The Primary Reviewer reviews without writing or running one.\n" +
   "None of them is yours to run, and none of them is yours to skip ahead to\n" +
   "— the instruction in hand is the whole of what is asked. `dabbler\n" +
   "version` says which router this is; report it when you report a problem.\n" +
+  "A source file's tests are the file named after it (`checks.ts`,\n" +
+  "`checks.test.ts`): a new public method gets a test there, a changed one has\n" +
+  "its tests updated or confirmed, and a removed one takes its tests with it.\n" +
   "\n" +
   "**The framework owns the clock, the state and the sequencing.** An\n" +
   "instruction that names a command is answered by running that command —\n" +
@@ -411,15 +414,21 @@ export const PROJECT_CONFIG_TESTING_HEADER =
   "# a repository that is Java and .NET at once hands each runner its own\n" +
   "# tests. Check the command before you rely on it: it is read from what this\n" +
   "# repository already carries, and a repository can carry a runner it does\n" +
-  "# not actually use. Two fields are the scaffold's, not yours to keep:\n" +
+  "# not actually use. One field is the scaffold's, not yours to keep:\n" +
   "#\n" +
   "#   covers      claims the whole repository, because setup cannot know this\n" +
   "#               layout. The failure direction is fixed -- run a suite you\n" +
   "#               did not need rather than skip one you did -- so narrow it as\n" +
   "#               the layout settles.\n" +
-  "#   runs_whole  says the runner takes a filter rather than a list of test\n" +
-  "#               files, so there is no narrowed form of it to run, and a\n" +
-  "#               run of it is always the complete suite.\n" +
+  "#\n" +
+  "# A source file's tests are the tests named after it, and two fields say\n" +
+  "# how that reads here:\n" +
+  "#\n" +
+  "#   test_name   the name a source file's tests take, `{name}` standing for\n" +
+  "#               its stem: CsvSerializer.cs is tested by CsvSerializerTests.cs.\n" +
+  "#   select      the command that runs a selection: `{names}` the selected\n" +
+  "#               test classes joined by `select_separator`, `{paths}` their\n" +
+  "#               files. A suite without it runs whole.\n" +
   "#\n" +
   "# Beside the suites, `controls` are the deterministic checks that run\n" +
   "# before every verification round, one entry per kind -- compile,\n" +
@@ -436,30 +445,13 @@ export const PROJECT_CONFIG_TESTING_HEADER =
 
 export const PROJECT_CONFIG_SELECTION =
   "\n" +
-  "  # Which tests answer for which path.\n" +
+  "  # A source file with no test named after it is shown to the reviewer,\n" +
+  "  # and runs the smoke tests where the repository declares some -- a few\n" +
+  "  # broad tests that notice a structural break:\n" +
   "  #\n" +
-  "  # A scaffolded repository has declared no mapping yet, and the framework\n" +
-  "  # refuses to invent one: a path no rule covers is `selection_unknown`,\n" +
-  "  # and the record says so rather than let a mapping for half of a change\n" +
-  "  # read as covering the other half. So setup declares the only honest\n" +
-  "  # starting mapping there is -- every path is repository-wide, and every\n" +
-  "  # change is recorded as affecting every test.\n" +
-  "  #\n" +
-  "  # It is meant to be replaced. Narrow it as the repository takes shape:\n" +
-  "  # `repo_wide` for the few paths that really do change what every test\n" +
-  "  # does (the test config, the lockfile), `rules` mapping a source path to\n" +
-  "  # the tests that would notice it breaking, and `smoke` for what answers\n" +
-  "  # when a path maps to nothing. A rule's `when` is a PATH PREFIX anchored\n" +
-  "  # at the repository root -- `src/api/` covers everything under it, and a\n" +
-  "  # file name covers that file -- not a glob: `*` and `**` match nothing.\n" +
-  "  #\n" +
-  "  #   rules:\n" +
-  "  #     - when: src/api/\n" +
-  "  #       select:\n" +
-  "  #         - tests/api/test_routes.py\n" +
-  "  selection:\n" +
-  "    repo_wide:\n" +
-  "      - \".\"\n";
+  "  #   selection:\n" +
+  "  #     smoke:\n" +
+  "  #       - tests/Csv.Tests/SmokeTests.cs\n";
 
 export const PROJECT_CONFIG_NO_SUITES =
   "\n" +

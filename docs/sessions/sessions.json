@@ -3424,9 +3424,9 @@
     {
       "number": 173,
       "title": "Tests named after what they test",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-14T17:55:20.592000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-14T19:02:12.546000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

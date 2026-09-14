@@ -144,6 +144,7 @@ const TESTING = {
 const PLAN = {
   task: "Make the store real.",
   releasable: false,
+  non_goals: ["Anything the step does not name."],
   modules: ["persister"],
   steps: [
     {

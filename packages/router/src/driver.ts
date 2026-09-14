@@ -348,6 +348,24 @@ export function judgeWorkPlanModules(
 }
 
 /**
+ * A plan names what it will NOT do, and at least one thing.
+ *
+ * Judged here and not by the schema's `required`, because a plan already
+ * on the record is read as it was recorded, and a reader that refused its
+ * own record would strand the session that wrote it. What the schema can
+ * say -- a string, non-empty, at least one where present -- it says.
+ */
+export function judgeWorkPlanNonGoals(plan: DriverWorkPlan): string[] {
+  const named = (plan.non_goals ?? []).map((goal) => goal.trim()).filter((goal) => goal !== "");
+  if (named.length > 0) return [];
+  return [
+    "the plan names no non-goals: `non_goals` lists at least one thing this session will NOT " +
+      "do -- the exclusions its section of the session plan states, or the nearest concrete " +
+      "boundary of the task -- and the reviewer holds the work to the list",
+  ];
+}
+
+/**
  * The same judgment for any declaration of modules -- the driven plan and
  * the typed `session declare --module` alike, so neither path can persist a
  * module the other would refuse. `who` names the declaration in the words

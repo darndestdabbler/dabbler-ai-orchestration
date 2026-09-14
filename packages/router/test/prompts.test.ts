@@ -16,6 +16,7 @@ import {
   splitEvidenceRange,
   splitLines,
 } from "../src/verify/prompts.ts";
+import { writeWorkPlan } from "../src/driver.ts";
 import { buildVerificationPrompt } from "../src/verifyjob.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
@@ -95,6 +96,26 @@ describe("the task block a round opens with", () => {
     assert.ok(buildTaskBlock(tempDir(), 1, 1, []).includes("(session plan unavailable)"));
     const seat = grantForTransport("copilot-cli", { scope: ["src/widget.py"] });
     assert.notEqual(buildTaskBlock(sessionsDir, 1, 1, [], null, null, seat), block);
+  });
+
+  it("carries the accepted work plan's task and non-goals, and nothing for a session with no plan", () => {
+    // The reviewer holds the work to what the engine said it would and
+    // would NOT do; a typed session has no plan and the block is as before.
+    const repo = tempDir();
+    seed(repo, { "docs/sessions/session-plan.md": "### Session 1 of 1: First things\n1. Build the widget.\n" });
+    const sessionsDir = join(repo, "docs", "sessions");
+    assert.ok(!buildTaskBlock(sessionsDir, 1, 1, [], null, repo).includes("work plan"));
+    writeWorkPlan(repo, 1, {
+      schema_version: 1,
+      session_number: 1,
+      task: "Make the widget real.",
+      releasable: false,
+      non_goals: ["A second widget."],
+      recorded_at: "2026-09-14T05:00:00-04:00",
+      steps: [{ id: "widget", ask: "Make it.", files: ["src/w.ts"], checks: [{ argv: ["true"] }] }],
+    });
+    const block = buildTaskBlock(sessionsDir, 1, 1, [], null, repo);
+    assert.ok(block.includes("Task: Make the widget real.") && block.includes("- A second widget."));
   });
 });
 

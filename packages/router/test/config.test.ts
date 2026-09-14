@@ -11,7 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { stringify } from "yaml";
+import { parse, stringify } from "yaml";
 
 import {
   CRITIQUE_ENFORCE_SET,
@@ -565,6 +565,13 @@ describe("the round caps", () => {
       );
     });
   }
+
+  it("ships a cap of seven", () => {
+    // The ledger's answer, not a guess: of 159 sessions with a round count,
+    // 16 needed more than three rounds and 15 of those finished within
+    // seven, and every reopen a person was ever asked for was granted.
+    assert.equal(verificationRoundCap(parse(readFileSync(BUNDLED, "utf8"))), 7);
+  });
 
   it("meters the test phase separately", () => {
     // One number serving both loops would tune each against the other's cost.

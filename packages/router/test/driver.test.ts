@@ -31,6 +31,7 @@ import {
   validateReport,
   validateWorkPlan,
   judgeWorkPlanModules,
+  judgeWorkPlanNonGoals,
   watcherReading,
   writeDispositions,
   writeInstruction,
@@ -70,6 +71,7 @@ const PLAN = {
   session_number: 1,
   task: "Make the widget real.",
   releasable: false,
+  non_goals: ["Anything the step does not name."],
   steps: [
     {
       id: "widget",
@@ -206,6 +208,18 @@ describe("the four answer schemas", () => {
         }),
       /declares step 'widget' twice/,
     );
+  });
+
+  it("a plan names at least one non-goal, and the refusal names the member", () => {
+    // A plan that cannot say what it will NOT do has not understood its
+    // scope, and the reviewer is told to hold the work to the list.
+    const plan = validateWorkPlan(PLAN);
+    for (const non_goals of [undefined, [], [" "]]) {
+      assert.match(judgeWorkPlanNonGoals({ ...plan, non_goals })[0] ?? "", /non_goals/);
+    }
+    assert.deepEqual(judgeWorkPlanNonGoals({ ...plan, non_goals: ["A second widget."] }), []);
+    // An empty list is the schema's to refuse where the member is present.
+    assert.throws(() => validateWorkPlan({ ...PLAN, non_goals: [] }), /non_goals/);
   });
 
   it("a plan's modules are judged against the solution's shape: declared slugs, a reason for two, nothing for one", () => {

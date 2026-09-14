@@ -20,6 +20,10 @@ export type DriverWorkPlan = {
    */
   releasable: boolean;
   /**
+   * What this session will NOT do: the exclusions its section of the session plan states, or the nearest concrete boundary of the task where it states none. Judged at acceptance, where a plan without at least one is refused naming the member -- an engine that cannot name one has not understood the scope -- and the reviewer holds the work to the list. Optional here so that a plan recorded before the member existed is read as it was recorded: the record is never refused after the fact.
+   */
+  non_goals?: string[];
+  /**
    * Other repositories of this SOLUTION that the plan needs to exist. Each is placed when the plan is accepted -- created beside this one with a `solution-dependencies.json` declaring which solution it is in and its own id, and nothing else -- so that finishing this repository leaves the next one visible in the Solution Explorer instead of leaving the operator to remember it. One that already declares itself is left exactly as it is. It declares no dependency: what this repository takes is declared on the edge that takes it, and placing a repository never invents one. Optional, and absent in the ordinary single-repository session.
    */
   repositories?: {

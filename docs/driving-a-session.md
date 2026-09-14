@@ -139,9 +139,11 @@ one.
 ## Answering
 
 The first instruction asks for a work plan — the task in a paragraph,
-whether the session may publish, and the ordered steps, each with the
-files it will touch and at least one mechanical check that proves it. Write
-it as JSON somewhere outside the tracked tree and hand the file over:
+whether the session may publish, at least one non-goal (what the session
+will NOT do, which the reviewer holds the work to), and the ordered steps,
+each with the files it will touch and at least one mechanical check that
+proves it. Write it as JSON somewhere outside the tracked tree and hand
+the file over:
 
 ```
 dabbler session report --sessions-dir docs/sessions --seq 1 --answer-file /tmp/plan.json
@@ -158,7 +160,8 @@ dabbler [11:31:21] phase phase=work
 dabbler [11:31:22] instruction-issued seq=2 kind=step step=widget
 ```
 
-A step is answered with the files you actually changed:
+Every step's instruction repeats the plan's non-goals under its ask. A step
+is answered with the files you actually changed:
 
 ```
 dabbler session report --sessions-dir docs/sessions --seq 3 --step widget \

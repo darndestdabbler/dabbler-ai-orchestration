@@ -203,6 +203,9 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 163 | The questions nobody needs to answer | no | 2026-09-13 |
 | 164 | What the framework wrote is not the step's | no | 2026-09-13 |
 | 165 | The small things, and the walk | yes | 2026-09-13 |
+| 166 | The cap, the non-goals, and the sentence | no | 2026-09-14 |
+| 167 | Ship by default, and the one question that goes | — | not declared |
+| 168 | Nothing is owed | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2363,3 +2366,15 @@ Session 165 fixes the small things the sample's log recorded and walks the resul
 - 2026-09-13 — step 'no-suite-declared-logged': its files: the test walks a session with no suite to done, which is the walk suite's shape, not the drive suite's (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-13 — step 'plan-ask-names-dabbler': its files and checks: the shim folder reached terminals only: a driver the extension spawned handed checks a PATH without it, so the sentence was true in a terminal and false under the drive; the driver now puts the shim first on the child's PATH, with its test (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-13 — step 'the-walk': its files: the walk found a hand-written nuget.config lacking the committed packages source; documented in the README's central-pinning paragraph (claude-code (anthropic, claude-fable-5-1))
+
+### Session 166 — The cap, the non-goals, and the sentence
+
+**Releasable: no.**
+
+Session 166 raises the verification round cap to 7 and makes the work plan carry non-goals that both roles are held to. The cap: `verification.settings.max_rounds` in `packages/router/router-config.yaml` becomes 7, and the two documents that say three say seven; `verify reopen` is unchanged. The plan: `driver-work-plan.schema.json` gains `non_goals`, a required array of at least one non-empty string, with its generated type; `planAsk` names the member and carries the operator's sentence verbatim (over-engineering is strictly forbidden, and the value AI brings to a solution is measured as much by the simplicity and clarity of its design and implementation as by the alignment of the solution with the stated requirements and objectives); `stepAsk` repeats the plan's non-goals in one line under each step; every test fixture that writes a plan gains a non-goal. The reviewer: `buildTaskBlock` adds the accepted plan's task and non-goals after the session plan's excerpt, and `prompt-templates/verification.md` gains one criterion, Scope and simplicity, headed by the same sentence -- work a named non-goal covers is a blocking finding whose evidence quotes the non-goal, and work beyond the task that no non-goal names is a nit unless it clears the so-what test on its own. Nothing goes in the provider system prompts or the managed AGENTS.md body. Not releasable: 167 changes what a releasing session is and ships it.
+
+**Amended after acceptance:**
+
+- 2026-09-14 — step 'cap-is-seven': its files: the fallback constant is the same number as the shipped setting; two numbers for one cap drift (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'non-goals-in-the-plan': its files: the member is judged at acceptance in driver.ts beside the modules judge, so a recorded plan is read as recorded; drive.test.ts and triage.test.ts build steps, not plans (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'the-words': its checks: doc-paths refuses the placeholder paths this document has always carried; the check is that the sentences exist (claude-code (anthropic, claude-fable-5-1))

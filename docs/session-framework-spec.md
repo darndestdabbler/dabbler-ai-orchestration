@@ -93,7 +93,7 @@ Sessions are numbered. One session is one bounded piece of work.
   (a) Task list          →  what this session will do; releasable? yes/no
   (b) Develop            →  the author engine writes code
   (c) Verification       →  a different vendor, with limited agency
-        c.i   code review loop      ≤ 3 rounds
+        c.i   code review loop      ≤ 7 rounds
         c.ii  tests: verifier authors, framework runs   ≤ 7 rounds
   (d) Full suite         →  plus a scope-bounded fix loop
   (e) Commit and push
@@ -139,7 +139,7 @@ a message to be regenerated per session, and it is versioned with the release.
 
 `verify(verifier)` → `fix(author)`, repeating.
 
-- **Cap: 3 rounds.** At the cap the loop stops. It does not keep opening
+- **Cap: 7 rounds.** At the cap the loop stops. It does not keep opening
   rounds and it does not ask anyone whether it should.
 - **Stop early when only Minor findings remain.** A prose review has no bottom;
   grinding rounds against wording is the failure mode this prevents.

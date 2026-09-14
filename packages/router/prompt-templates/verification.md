@@ -48,7 +48,10 @@ Attack the response against these criteria, and report only defects you can subs
 
 1. **Correctness:** Are there factual errors, logical flaws, incorrect code, off-by-one / index miscounts, mishandled edge cases, fail-open/fail-closed mistakes, or wrong conclusions? Name the exact location.
 2. **Completeness:** Did the original response miss anything important the task required — a claimed deliverable with no implementation, a stated invariant nothing enforces, an edge case skipped? (Per **Review scope** above, the not-yet-created close-out artifacts/state are **not** "missing deliverables" — this is a pre-close review.)
-3. **False confidence / False positives:** (For reviews/audits) Did the original flag issues that aren't real, or assert a result the evidence does not actually support?
+3. **Scope and simplicity:** Over-engineering is strictly forbidden. The value AI brings to a solution is measured as much by the simplicity and clarity of its design and implementation as by the alignment of the solution with the stated requirements and objectives. Hold the work to the plan's goals AND its non-goals — the task block above lists both where the session has a work plan. Two halves, and they do not weigh the same:
+   - Work that a **named non-goal** covers is a blocking finding. Its **Evidence** quotes the non-goal beside the diff hunk that does it; its **failure scenario** is unreviewed surface nobody asked for — code no reviewer of the stated task read as part of it.
+   - Work beyond the task that **no non-goal names** — a needless abstraction, a generality nothing uses, an option nobody asked for, a layer between two things that could speak directly — is a **Nit** unless it clears the "so what?" test below on its own. It never opens a round by itself, and it never changes the verdict.
+4. **False confidence / False positives:** (For reviews/audits) Did the original flag issues that aren't real, or assert a result the evidence does not actually support?
 
 Where the response's claims about its own behavior disagree with what the task and evidence actually show, **the evidence wins** — call that out explicitly. Do not trust a flattering paraphrase.
 
@@ -108,7 +111,7 @@ Only **Critical or Major** findings justify the **ISSUES FOUND** verdict. If the
 
 If ISSUES FOUND, list each issue:
 - **Issue N:** [description]
-  - **Category:** Correctness / Completeness / False Positive
+  - **Category:** Correctness / Completeness / Scope / False Positive
   - **Severity:** Critical / Major (a blocking Issue is never Minor — Minor goes under NITS)
   - **Evidence paths:** MANDATORY — the repo-relative paths you actually opened that prove this Issue, comma-separated (e.g. `ai_router/verification.py, docs/quick-start.md`). A `:<line>` suffix is fine. Name only files you read: this is the finding's **provenance**, it is read mechanically, and a finding that cannot name one is a nit. An Issue whose evidence is **entirely** documentation prose (`.md` / `.rst` / `.txt`) is recorded as a Minor nit and does not open another review round — so if the defect is in code, name the code file.
   - **Failure scenario:** MANDATORY — the concrete scenario in which the consequence materializes for a real user of the deliverable, plus why that scenario is **probable rather than merely possible**. An Issue whose failure scenario you cannot state plausibly is Minor by definition and belongs under NITS, not here.

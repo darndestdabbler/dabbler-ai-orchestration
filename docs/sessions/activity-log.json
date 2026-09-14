@@ -11133,6 +11133,37 @@
       "what": "step 'the-walk': its files",
       "reason": "the walk found a hand-written nuget.config lacking the committed packages source; documented in the README's central-pinning paragraph",
       "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 166,
+      "dateTime": "2026-09-14T05:12:01.551000-04:00",
+      "task": "Session 166 raises the verification round cap to 7 and makes the work plan carry non-goals that both roles are held to. The cap: `verification.settings.max_rounds` in `packages/router/router-config.yaml` becomes 7, and the two documents that say three say seven; `verify reopen` is unchanged. The plan: `driver-work-plan.schema.json` gains `non_goals`, a required array of at least one non-empty string, with its generated type; `planAsk` names the member and carries the operator's sentence verbatim (over-engineering is strictly forbidden, and the value AI brings to a solution is measured as much by the simplicity and clarity of its design and implementation as by the alignment of the solution with the stated requirements and objectives); `stepAsk` repeats the plan's non-goals in one line under each step; every test fixture that writes a plan gains a non-goal. The reviewer: `buildTaskBlock` adds the accepted plan's task and non-goals after the session plan's excerpt, and `prompt-templates/verification.md` gains one criterion, Scope and simplicity, headed by the same sentence -- work a named non-goal covers is a blocking finding whose evidence quotes the non-goal, and work beyond the task that no non-goal names is a nit unless it clears the so-what test on its own. Nothing goes in the provider system prompts or the managed AGENTS.md body. Not releasable: 167 changes what a releasing session is and ships it.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 166,
+      "dateTime": "2026-09-14T05:12:57.308000-04:00",
+      "what": "step 'cap-is-seven': its files",
+      "reason": "the fallback constant is the same number as the shipped setting; two numbers for one cap drift",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 166,
+      "dateTime": "2026-09-14T05:17:25.428000-04:00",
+      "what": "step 'non-goals-in-the-plan': its files",
+      "reason": "the member is judged at acceptance in driver.ts beside the modules judge, so a recorded plan is read as recorded; drive.test.ts and triage.test.ts build steps, not plans",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 166,
+      "dateTime": "2026-09-14T05:23:06.503000-04:00",
+      "what": "step 'the-words': its checks",
+      "reason": "doc-paths refuses the placeholder paths this document has always carried; the check is that the sentences exist",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
     }
   ]
 }

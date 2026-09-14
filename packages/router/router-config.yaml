@@ -249,7 +249,7 @@ verification:
   settings:
     # The session-verification loop suspends at this bound. The closed
     # severity vocabulary is the primary control; the cap is the backstop.
-    max_rounds: 3
+    max_rounds: 7
     # The tests phase runs the authored tests at most this many times before
     # its loop terminates. Separate from max_rounds because a test round
     # runs a suite the framework already has, where a review round buys a

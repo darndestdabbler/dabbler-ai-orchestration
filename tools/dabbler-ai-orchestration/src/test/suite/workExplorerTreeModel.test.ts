@@ -1234,6 +1234,7 @@ suite("workExplorerTreeModel: the two surfaces over one record", () => {
         session_number: 1,
         task: "Do it.",
         releasable: false,
+        non_goals: ["Anything the step does not name."],
         recorded_at: "2026-09-09T11:00:00-04:00",
         steps: steps.map((id) => ({
           id,

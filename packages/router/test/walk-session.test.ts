@@ -92,6 +92,7 @@ const TESTING = {
 const PLAN = {
   task: "Make widget() return 2.",
   releasable: false,
+  non_goals: ["Anything the step does not name."],
   steps: [
     {
       id: "widget",

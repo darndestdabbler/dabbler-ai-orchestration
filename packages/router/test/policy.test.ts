@@ -112,6 +112,7 @@ describe("the module policy", () => {
       const accepted = await answer(sessionsDir, plan.instruction?.seq ?? 0, {
         task: "Make the store real.",
         releasable: false,
+        non_goals: ["Anything the step does not name."],
         modules: ["persister"],
         steps: [
           {
@@ -161,6 +162,7 @@ describe("the module policy", () => {
       const accepted = await answer(sessionsDir, plan.instruction?.seq ?? 0, {
         task: "Give Person a surname and store it.",
         releasable: false,
+        non_goals: ["Anything the step does not name."],
         modules: ["model", "persister"],
         reason: "the model's contract changes and the store must persist the new field",
         steps: [

@@ -72,6 +72,7 @@ import {
   readWorkPlan,
   isWorkPhase,
   judgeWorkPlanModules,
+  judgeWorkPlanNonGoals,
   planPath,
   takeInterrupt,
   transcriptPath,
@@ -633,6 +634,8 @@ const RULE = {
   noWorkPlan: "no-work-plan",
   /** The plan's modules do not fit the solution's shape. */
   planModules: "plan-modules",
+  /** The plan names nothing it will not do. */
+  planNonGoals: "plan-non-goals",
 } as const;
 
 /** One refusal, carrying the name of the rule that refused it. */
@@ -2097,11 +2100,17 @@ ${this.stopArtifacts()}`,
       "--- session plan ---\n" +
       (excerpt.trim() || "(the plan has no section for this session; plan from the repository)") +
       "\n--- end ---\n\n" +
+      // The operator's sentence, verbatim, and the reviewer reads the same one
+      // every round: the two roles are held to one rule.
+      "Over-engineering is strictly forbidden. The value AI brings to a solution is measured as " +
+      "much by the simplicity and clarity of its design and implementation as by the alignment " +
+      "of the solution with the stated requirements and objectives.\n\n" +
       "Answer with a work plan as JSON, written to a file outside the tracked tree " +
       "(for example .dabbler/scratch/plan.json), then run the answer command. The file " +
       "carries exactly these members and no other:\n" +
       "  task        one paragraph: what this session will do -- it becomes the declaration\n" +
       "  releasable  true only if this session may publish an artifact; otherwise false\n" +
+      "  non_goals   a list of at least one: what this session will NOT do -- the exclusions its section of the session plan states, or the nearest concrete boundary of the task where it states none. An engine that cannot name one has not understood the scope; the reviewer holds the work to the list\n" +
       '  steps       an ordered list; each step is {"id": "<lowercase-slug>", "ask": "<what ' +
       'to do, in words>", "files": ["<every repository-relative file the step creates or ' +
       'changes>"], "checks": [{"argv": ["<program>", "<argument>", ...]}]}\n' +
@@ -2167,15 +2176,18 @@ ${this.stopArtifacts()}`,
         // names an undeclared module, or two modules with no reason, is
         // handed back with the shape's own words, and the file is removed
         // so the next answer is judged afresh rather than re-read.
-        const shapeReasons = judgeWorkPlanModules(
-          plan,
-          solutionShape(this.repoRoot),
-          checkoutModuleOf(this.sessionsDir, this.sessionNumber),
-        );
-        if (shapeReasons.length === 0) break;
+        const planReasons = [
+          ...judgeWorkPlanModules(
+            plan,
+            solutionShape(this.repoRoot),
+            checkoutModuleOf(this.sessionsDir, this.sessionNumber),
+          ).map((reason) => refusal(RULE.planModules, reason)),
+          ...judgeWorkPlanNonGoals(plan).map((reason) => refusal(RULE.planNonGoals, reason)),
+        ];
+        if (planReasons.length === 0) break;
         unlinkSync(planPath(this.repoRoot, this.sessionNumber));
         plan = null;
-        reasons = shapeReasons.map((reason) => refusal(RULE.planModules, reason));
+        reasons = planReasons;
       } else {
         reasons = [
           refusal(
@@ -2196,7 +2208,11 @@ ${this.stopArtifacts()}`,
     }
     this.plan = plan;
     this.setRejections(0);
-    this.log("plan-accepted", { steps: plan.steps.map((step) => step.id), releasable: plan.releasable });
+    this.log("plan-accepted", {
+      steps: plan.steps.map((step) => step.id),
+      releasable: plan.releasable,
+      non_goals: (plan.non_goals ?? []).length,
+    });
     this.placePlannedRepositories(plan);
 
     if (readTaskDeclaration(this.sessionsDir, this.sessionNumber) === null) {
@@ -2311,9 +2327,21 @@ ${this.stopArtifacts()}`,
     return readPolicy(this.repoRoot, this.sessionNumber)?.allowed ?? null;
   }
 
+  /**
+   * The plan's non-goals under every step's ask, so the author holds them
+   * during the work and not only before it. A step asked before a plan is
+   * accepted -- there is none -- carries nothing.
+   */
+  private nonGoalsLine(): string {
+    const nonGoals = (this.plan ?? readWorkPlan(this.repoRoot, this.sessionNumber))?.non_goals ?? [];
+    if (nonGoals.length === 0) return "";
+    return `\n\nNon-goals of this session, which the reviewer holds the work to: ${nonGoals.join("; ")}`;
+  }
+
   private stepAsk(spec: StepSpec, rejected: boolean, scoped = false): string {
     return (
       spec.ask +
+      this.nonGoalsLine() +
       (scoped
         ? "\n\nThis instruction's `scope` member lists what this session may read and change: " +
           "its module's roots, its contract folder and its dependencies', the root build files " +

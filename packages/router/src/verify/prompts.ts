@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { briefing, type AgencyGrant } from "../agency.ts";
+import { readWorkPlan } from "../driver.ts";
 import { SESSION_PLAN_FILENAME } from "../evidence.ts";
 import { extractSpecExcerpt } from "../session.ts";
 import type { Row } from "../ledger.ts";
@@ -249,6 +250,35 @@ export function sliceCodePoints(text: string, limit: number): string {
   return points.length <= limit ? text : points.slice(0, limit).join("");
 }
 
+/**
+ * The accepted work plan's task and non-goals, after the session plan's
+ * excerpt: the plan is what the engine declared it would and would NOT do,
+ * and the reviewer holds the work to both. A session with no plan on its
+ * record -- a typed session -- adds nothing, and so does one whose plan
+ * cannot be read: the round is the reviewer's, not the record's.
+ */
+export function workPlanBlock(repoRoot: string | null, sessionNumber: number): string {
+  if (repoRoot === null) return "";
+  let plan;
+  try {
+    plan = readWorkPlan(repoRoot, sessionNumber);
+  } catch {
+    return "";
+  }
+  if (plan === null) return "";
+  const lines = ["#### The work plan the session was declared from", "", `Task: ${plan.task}`];
+  const nonGoals = plan.non_goals ?? [];
+  if (nonGoals.length > 0) {
+    lines.push(
+      "",
+      "Non-goals -- what this session will NOT do. Work that a named one covers is " +
+        "unreviewed surface nobody asked for:",
+    );
+    for (const goal of nonGoals) lines.push(`- ${goal}`);
+  }
+  return lines.join("\n");
+}
+
 export function buildTaskBlock(
   sessionsDir: string,
   sessionNumber: number,
@@ -267,6 +297,8 @@ export function buildTaskBlock(
       "session's plan, verbatim:\n\n" +
       specExcerpt(sessionsDir, sessionNumber),
   );
+  const plan = workPlanBlock(repoRoot, sessionNumber);
+  if (plan) parts.push(plan);
   const brief = grant !== null ? briefing(grant) : "";
   if (brief) parts.push(brief);
   return parts.join("\n\n");

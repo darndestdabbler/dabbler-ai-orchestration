@@ -247,6 +247,7 @@ export function writeDriverWorkPlan(
       `  session_number: ${sessionNumber},`,
       `  task: body.task,`,
       `  releasable: body.releasable,`,
+      `  non_goals: ["Anything the step does not name."],`,
       `  steps: body.steps.map((s) => ({ id: s.id, ask: s.ask, files: [\`src/\${s.id}.ts\`], checks: [{ argv: ["true"] }] })),`,
       `  recorded_at: new Date().toISOString(),`,
       `});`,

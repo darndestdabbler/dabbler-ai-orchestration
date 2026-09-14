@@ -125,7 +125,7 @@ export const TRANSPORT_ENV_VAR = "DABBLER_TRANSPORT";
 export const CONFIG_ENV_VAR = "AI_ROUTER_CONFIG";
 
 /** The backstop every review loop shares when the config names no bound. */
-export const DEFAULT_VERIFICATION_ROUNDS = 3;
+export const DEFAULT_VERIFICATION_ROUNDS = 7;
 
 /**
  * The backstop for the test loop. Higher than the review bound because the

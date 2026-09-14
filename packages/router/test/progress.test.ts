@@ -386,6 +386,7 @@ describe("the task rows", () => {
       session_number: 1,
       task: "Do it.",
       releasable: false,
+      non_goals: ["Anything the step does not name."],
       recorded_at: "2026-08-31T11:05:00-04:00",
       steps: [
         { id: "widget", ask: "Build the widget.", files: ["src/w.ts"], checks: [{ argv: ["true"] }] },
@@ -438,6 +439,7 @@ describe("the task rows", () => {
       session_number: 1,
       task: "Do it.",
       releasable: false,
+      non_goals: ["Anything the step does not name."],
       recorded_at: "2026-08-31T11:05:00-04:00",
       steps: [
         { id: "widget", ask: "Build the widget.", files: ["src/w.ts"], checks: [{ argv: ["true"] }] },

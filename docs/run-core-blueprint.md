@@ -835,7 +835,7 @@ Pending guidance remains visible until acknowledged by sequence.
   "output_contract": "verdict-v2",
   "timeout_seconds": 1200,
    "budget": {
-      "max_rounds": 3,
+      "max_rounds": 7,
       "model_dispatches_remaining": 2,
       "model_usd_remaining": 9.69,
       "elapsed_seconds_remaining": 5400

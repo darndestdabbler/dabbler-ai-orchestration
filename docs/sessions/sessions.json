@@ -3298,9 +3298,9 @@
     {
       "number": 167,
       "title": "Ship by default, and the one question that goes",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-14T05:32:04.757000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-14T06:14:17.678000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -197,8 +197,10 @@ export function setProviderKeys(): void {
 }
 
 /** The answers a state directory's writers ask for: the root, and a clean tree. */
-export function cleanRepoAnswers(repo: string): () => void {
+export function cleanRepoAnswers(repo: string, first: ReadonlyArray<AnswerRow> = []): () => void {
   return gitAnswers([
+    // Rows a test puts in front of the clean checkout's own answers.
+    ...first,
     [["rev-parse", "--show-toplevel"], { stdout: repo.split("\\").join("/") }],
     // The worktree snapshot asks which index entries a sparse cone keeps off
     // disk (skip-worktree); an answered checkout is not sparse and has none.
@@ -221,6 +223,8 @@ export function cleanRepoAnswers(repo: string): () => void {
     [(args) => args[0] === "cat-file" && args[1] === "-e", { code: 0 }],
     [["commit-tree"], { stdout: "c".repeat(40) }],
     [["update-ref"], { code: 0 }],
+    // No origin: a start asks whether one answers only where there is one.
+    [["remote", "get-url", "origin"], { code: 2, stderr: "error: No such remote 'origin'" }],
   ]);
 }
 
@@ -371,6 +375,8 @@ export function makeAnsweredRepo(
       (args) => (withOrigin && args[2] === "origin" ? { stdout: "../remote.git" } : { code: 2 }),
     ],
     [["remote"], { stdout: withOrigin ? "origin" : "" }],
+    // The answered origin answers: a start's reachability question is asked of it.
+    [["ls-remote", "--heads", "origin"], { stdout: `${HEAD_COMMIT}\trefs/heads/main` }],
     [
       ["rev-list", "--count", "@{u}..HEAD"],
       () => (withOrigin ? { stdout: String(state.ahead) } : { code: 128, stderr: "fatal: no upstream configured" }),

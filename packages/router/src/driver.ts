@@ -1295,7 +1295,6 @@ export interface StopRecord {
    */
   readonly code?: string | null;
   readonly reason: string;
-  readonly class?: "first" | "deadlock" | null;
   readonly step_id?: string | null;
   readonly at?: string;
 }
@@ -1329,7 +1328,7 @@ export interface StopChoice {
 }
 
 export interface StopRendering {
-  /** "Session 094 paused (verification, deadlock)". */
+  /** "Session 094 paused (verification)". */
   readonly headline: string;
   /** What happened in plain words, then the stop's own reason. */
   readonly happened: string;
@@ -1352,7 +1351,6 @@ export interface StopRendering {
   readonly ways: string;
   /** All of it, for a surface that renders one string. */
   readonly text: string;
-  readonly deadlock: boolean;
 }
 
 /** The engine name a pulled run records: nothing invokes the engine. */
@@ -1781,8 +1779,7 @@ export function renderAmendmentProposal(
  */
 export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
   const session = `Session ${String(run.session_number).padStart(3, "0")}`;
-  const deadlock = stop.class === "deadlock";
-  const headline = `${session} paused (${stop.kind}${deadlock ? ", deadlock" : ""})`;
+  const headline = `${session} paused (${stop.kind})`;
   const situation = situationFor(stop);
   const reason = asSentence(stop.reason);
   // The stop's own words first, the kind's sentence after: a toast shows
@@ -1797,12 +1794,7 @@ export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
     phase: run.phase,
     step: stop.step_id ? ` '${stop.step_id}'` : "",
   });
-  const next =
-    actorSentence(actor, resume) +
-    (deadlock
-      ? " It is a deadlock: running it again unchanged reaches this exact point again, " +
-        "so change something first."
-      : "");
+  const next = actorSentence(actor, resume);
   return {
     headline,
     happened,
@@ -1812,7 +1804,6 @@ export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
     choices,
     ways: choiceLines(choices),
     text: `${headline}. ${happened} ${ended} ${next}${choiceLines(choices)}`,
-    deadlock,
   };
 }
 

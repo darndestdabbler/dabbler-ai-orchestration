@@ -208,6 +208,11 @@ export function checkoutCone(
     }
     directories.add(dir);
   }
+  // The module's own contract folder, where its roots do not already hold
+  // it: a package module's notes page is the module's to keep, and a file
+  // outside the cone is one `git add` silently leaves uncommitted.
+  const own = contractDir(slug);
+  if (![...directories].some((dir) => own === dir || own.startsWith(`${dir}/`))) directories.add(own);
   for (const dependency of dependenciesOf(shape.modules, slug)) directories.add(contractDir(dependency));
   for (const consumer of consumersOf(shape.modules, slug)) directories.add(contractDir(consumer));
   for (const shared of sharedFiles) {

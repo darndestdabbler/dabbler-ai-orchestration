@@ -173,10 +173,9 @@ export function verdictTone(verdict: string): Tone {
  */
 export function lineTone(event: string, fields: Record<string, string> = {}): Tone {
   // A pause is amber: the loop met a bound and a person is told who acts
-  // next, which is not an alarm. A deadlock is red, because it is the one
-  // pause that says "running this again unchanged reaches this exact point
-  // again", and softening that word would cost the operator money.
-  if (event === "paused") return fields["class"] === "deadlock" ? "bad" : "warn";
+  // next, which is not an alarm. Every pause, whatever class a run written
+  // before 2.9.0 carries.
+  if (event === "paused") return "warn";
   // The one honest green event, and no second: the phase moved past a
   // pause with nothing in its place.
   if (event === "progress-resumed") return "good";
@@ -232,10 +231,9 @@ export function fieldTone(event: string, key: string, value: string): Tone {
   // same value wherever another line carries it. Every one of them, for the
   // reason `lineTone` gives above.
   if (key === "now" || key === "phase") return "milestone";
-  // On a pause the kind is amber and a deadlock class is red; the words
-  // themselves stay plain, because prose painted whole is a wall.
+  // On a pause the kind is amber; the words themselves stay plain, because
+  // prose painted whole is a wall.
   if (event === "paused" && key === "kind") return "warn";
-  if (event === "paused" && key === "class") return value === "deadlock" ? "bad" : "warn";
   return "plain";
 }
 
@@ -287,7 +285,6 @@ interface RunRecord {
      */
     code?: string | null;
     reason?: string;
-    class?: "first" | "deadlock";
     at?: string;
     step_id?: string | null;
   } | null;
@@ -1533,7 +1530,6 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
             kind,
             code: stop.code ?? null,
             reason: stop.reason ?? "",
-            class: stop.class ?? null,
             step_id: stop.step_id ?? null,
           },
           { session_number: run.session_number ?? 0, phase, engine: run.engine },
@@ -1548,7 +1544,6 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
         this.line("paused", {
           session: this.sessionLabel(run),
           kind,
-          class: stop.class ?? "",
           who: whoActs(words.actor),
           reason: stop.reason ?? "",
           // Every way on, with its cost and its command, as the router

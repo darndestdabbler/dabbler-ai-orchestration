@@ -81,7 +81,6 @@ import {
   writeRun,
   appendSupervision,
   progressResumed,
-  renderAmendmentProposal,
   renderStop,
 } from "./driver.ts";
 import { readRawSessionState } from "./sessionState.ts";
@@ -122,7 +121,6 @@ import type {
   DriverReport,
   DriverRun,
   DriverWorkPlan,
-  Triage,
 } from "./generated/index.ts";
 import { type Job, endJob, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
 import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
@@ -149,6 +147,7 @@ import {
 } from "./journal.ts";
 import {
   LedgerError,
+  OUTCOME_PUBLISHED,
   type Row,
   latestRound,
   readDisputes,
@@ -156,7 +155,6 @@ import {
   readRounds,
 } from "./ledger.ts";
 import { checkoutModuleOf, readSessionState, sessionDisplayNumber, stalledAfterSeconds } from "./progress.ts";
-import { TriageError, type TriageOutcome, triage } from "./triage.ts";
 import {
   EXIT_BOUNDARY,
   EXIT_GATE_FAILED,
@@ -237,6 +235,13 @@ export interface NextOptions {
   /** In a module session: ask the operator for this sibling's source, and wait on the answer. */
   readonly requestGrant?: string | null;
   readonly reason?: string | null;
+  /**
+   * How long this call waits on a running job before it answers `wait`; not
+   * at all when absent. The CLI passes `WAIT_IN_CALL_MS`. A walkthrough whose
+   * jobs run only when it settles them passes nothing, because a job in this
+   * process cannot end while this process waits on it.
+   */
+  readonly waitInCallMs?: number | null;
 }
 
 /**
@@ -248,6 +253,7 @@ interface DriverOptions extends Omit<DriveOptions, "engine" | "adapter"> {
   readonly engine: string | null;
   readonly adapter: Engine | null;
   readonly mode: "push" | "pull";
+  readonly waitInCallMs?: number | null;
 }
 
 export const MAX_REJECTIONS = 3;
@@ -301,8 +307,8 @@ export function landCommitMessage(
  * declares more than one, and the instruction listed the members a plan
  * carries without ever mentioning it -- so an engine answering exactly what
  * it was asked for was refused, every time, in the shape the modules block
- * exists for. Measured on the Java walk, 2026-09-07, where the second
- * identical refusal was a deadlock.
+ * exists for. Measured on the Java walk, 2026-09-07, where the session
+ * could not get past its plan.
  */
 export function planModulesMember(shape: SolutionShape): string {
   if (!shape.multi) return "";
@@ -550,6 +556,15 @@ export function candidateTrunk(
 
 /** How often the push loop looks at a running job; a pull call never waits. */
 const JOB_POLL_MS = 250;
+/**
+ * How long `session next` holds a call open on the framework's own job
+ * before it answers `wait`. Under the shell-call limit of the engines that
+ * run it (Claude Code's default is 120 seconds), so the call returns before
+ * the engine gives up on it; a job that ends inside it costs no sleep at all.
+ */
+export const WAIT_IN_CALL_MS = 45_000;
+/** What a `wait` asks for once the call has already waited: the next call waits again. */
+const WAIT_RETRY_SECONDS = 5;
 /** What a `wait` tells the engine to leave the framework's work alone for. */
 const VERIFY_RETRY_SECONDS = 60;
 const SUITE_RETRY_SECONDS = 60;
@@ -636,103 +651,6 @@ function refusal(rule: string, reason: string): string {
   return `[${rule}] ${reason}`;
 }
 
-/** How many advisers a deadlock is taken to before it is taken to a person. */
-const TRIAGE_RUNGS = 2;
-
-
-/** One stop, as the history remembers it and the ladder compares against it. */
-interface StopEntry {
-  readonly kind: StopKind;
-  readonly reason: string;
-  readonly at: string;
-  readonly step_id: string | null;
-}
-
-/** How far the ladder got. Null where none was climbed at all. */
-interface Ladder {
-  readonly advice: Advice | null;
-}
-
-/** What an adviser said, ready for the brief a person reads. */
-interface Advice {
-  readonly answer: Triage;
-  readonly adviser: string;
-  readonly brief: string;
-}
-
-/** The adviser's opinion, marked as one. */
-function adviceBrief(outcome: TriageOutcome): string {
-  return (
-    `A second opinion, from ${outcome.adviser.model} (${outcome.adviser.provider}) -- ` +
-    `${outcome.excluded.join(", ")} excluded` +
-    (outcome.simulated ? ", SIMULATED (served by a script, not a vendor)" : "") +
-    `.
-It calls this a ${outcome.answer.classification}: ${outcome.answer.reasoning}
-` +
-    `It recommends: ${outcome.answer.recommendation}
-` +
-    "It is an opinion. The framework has applied none of it."
-  );
-}
-
-/**
- * What identifies one impasse: the bound, the step, and the reason met
- * there. Loose in `step_id` because the run's own history writes the field
- * as absent where a phase has no step, and a stop is compared against rows
- * read back off disk as readily as against one just made.
- */
-export interface StopKey {
-  readonly kind: string;
-  readonly reason: string;
-  readonly step_id?: string | null;
-}
-
-/**
- * The same bound, on the same step, for the same reason as last time: the
- * loop is not making progress, and the next re-run reaches here again.
- *
- * Pure, and exported, because the whole of it is a comparison and because
- * what it compares has been wrong twice. It reads the UNDECORATED reason
- * the history keeps, so a third identical stop is recognised as readily as
- * the second -- a reason carrying its own note would never match again.
- *
- * **A phase that throws a string literal makes this true by construction.**
- * `previous.reason === entry.reason` reduces to `constant === constant`,
- * and every refusal after the first is an impasse whatever it was about.
- * Verification carried that bug and was fixed; publish and close carried it
- * until session 138, where session 137's record showed what it costs -- six
- * distinct publish refusals, seven of them labelled deadlock, while running
- * it again was exactly what moved it every time. The defence is not here:
- * it is that every phase's stop names the refusal it met.
- */
-export function judgeStopClass(
-  previous: StopKey | null | undefined,
-  entry: StopKey,
-): "first" | "deadlock" {
-  if (previous === undefined || previous === null) return "first";
-  const same =
-    previous.kind === entry.kind &&
-    (previous.step_id ?? null) === (entry.step_id ?? null) &&
-    previous.reason === entry.reason;
-  return same ? "deadlock" : "first";
-}
-
-/**
- * Whether this impasse has already been taken to an adviser.
- *
- * Keyed on the same pair the class is, and for the same reason: a re-run
- * that reaches the same impasse must not pay for the same answer twice,
- * and two unlike refusals must not share one triage. `climbLadder` runs
- * once per impasse, so a constant reason spends the session's only triage
- * on the first refusal and logs `triage-skipped` for every later one.
- */
-export function alreadyTriaged(
-  triage: { readonly for_reason?: string; readonly for_step?: string | null } | null | undefined,
-  entry: StopKey,
-): boolean {
-  if (!triage) return false;
-  return triage.for_reason === entry.reason && (triage.for_step ?? null) === (entry.step_id ?? null);
-}
 
 /**
  * Where a refused publish sends the run back to, read off the record rather
@@ -774,11 +692,6 @@ export function alreadyRewoundFor(
   if (!rewinds) return false;
   return rewinds.some((row) => row.reason === refusal);
 }
-
-/** What a `deadlock` adds to the stop's reason, for a reader who knows no field names. */
-const DEADLOCK_NOTE =
-  " -- DEADLOCK: the same stop, on the same step, for the same reason as the one before it. " +
-  "Running it again unchanged reaches this exact point again.";
 
 type StopKind = NonNullable<DriverRun["stop"]>["kind"];
 type StopCode = NonNullable<NonNullable<DriverRun["stop"]>["code"]>;
@@ -1402,82 +1315,6 @@ class Driver {
     return { max_rounds: maxRounds, transport };
   }
 
-  /**
-   * The ladder a deadlock climbs, unattended, and its floor.
-   *
-   * Under the PUSH mode only: an attended engine calls `dabbler triage`
-   * itself when it is stuck, and spending a provider call on behalf of
-   * somebody sitting at the keyboard is the framework deciding for them.
-   *
-   * Two rungs and then a person. Rung one asks an adviser outside the
-   * working engine's provider; rung two asks somebody outside that one too.
-   * No rung loops, no rung re-enters a phase, and the run record says what
-   * it found -- so a re-run that reaches the same impasse does not pay for
-   * the same answer twice.
-   */
-  private async climbLadder(entry: StopEntry): Promise<Ladder | null> {
-    const already = this.run.triage ?? null;
-    if (alreadyTriaged(already, entry)) {
-      this.log("triage-skipped", { why: "this impasse has already been triaged", rungs: already?.rungs });
-      return null;
-    }
-    const excluded: string[] = [];
-    let rungs = 0;
-    let advice: Advice | null = null;
-    for (let rung = 0; rung < TRIAGE_RUNGS; rung += 1) {
-      rungs += 1;
-      this.log("triage-asking", { rung: rungs, also_excluding: excluded });
-      try {
-        const outcome = await triage(this.sessionsDir, {
-          sessionNumber: this.sessionNumber,
-          alsoExclude: excluded,
-          transport: this.options.transport ?? null,
-        });
-        advice = {
-          answer: outcome.answer,
-          adviser: `${outcome.adviser.model} (${outcome.adviser.provider})`,
-          brief: adviceBrief(outcome),
-        };
-        this.log("triage-classified", {
-          rung: rungs,
-          classification: outcome.answer.classification,
-          adviser: `${outcome.adviser.model} (${outcome.adviser.provider})`,
-        });
-        break;
-      } catch (error) {
-        if (!(error instanceof TriageError)) throw error;
-        this.log("triage-failed", { rung: rungs, reason: error.message });
-        // An adviser that answered badly has still been asked; the next rung
-        // is somebody else. One that never answered leaves nobody to exclude,
-        // and asking again would be the same rung twice.
-        if (error.provider === null) break;
-        excluded.push(error.provider);
-      }
-    }
-    this.run = {
-      ...this.run,
-      triage: {
-        for_reason: entry.reason,
-        for_step: entry.step_id,
-        rungs,
-        classification: advice?.answer.classification ?? null,
-        adviser: advice?.adviser ?? null,
-        // Kept whole. The proposal lives in this process and the person who
-        // answers the decision is in another, so an option offering to amend
-        // a step without saying what the amendment is would be a menu item
-        // with nothing behind it.
-        amendment: advice?.answer.amendment ?? null,
-        at: nowIso(),
-      },
-    };
-    return { advice };
-  }
-
-  /** An adviser's proposal as the thing a person would type, for this repository's sessions directory. */
-  private amendmentProposal(amendment: NonNullable<Triage["amendment"]>): string {
-    return renderAmendmentProposal(amendment, relative(this.repoRoot, this.sessionsDir));
-  }
-
   // --- the conversation ------------------------------------------------------
 
   /** The answer command, rendered for the seq an instruction is issued under. */
@@ -1937,9 +1774,9 @@ class Driver {
       "files it will touch, because its report is measured against them.\n" +
       // The member a multi-module solution's declaration is refused
       // without. It went unsaid until the Java walk met it: an engine
-      // answering exactly what it was asked for was refused every time, and
-      // the second identical refusal is a deadlock. Said only where it is
-      // required, because a single-module repository IS the module.
+      // answering exactly what it was asked for was refused every time. Said
+      // only where it is required, because a single-module repository IS the
+      // module.
       this.modulesMember() +
       this.suiteGap() +
       "One member is optional and is left out of a single-repository session:\n" +
@@ -2437,6 +2274,7 @@ class Driver {
       this.save();
       this.log("job-started", { name: job.name, pid: job.pid, log: job.log });
     }
+    const waitingSince = Date.now();
     for (;;) {
       const state = pollJob(this.repoRoot, job);
       if (state.state === "exited") {
@@ -2465,11 +2303,19 @@ class Driver {
         );
       }
       if (this.pull) {
+        // Held open on the job rather than handed back at once: a job that
+        // ends inside the bound costs the engine no sleep. A stop asked for
+        // meanwhile is honoured here, and ends the job with the run.
+        if (Date.now() - waitingSince < (this.options.waitInCallMs ?? 0)) {
+          this.honourPendingStop();
+          await new Promise((resolve) => setTimeout(resolve, JOB_POLL_MS));
+          continue;
+        }
         throw new Awaiting(
           this.issue(
             this.withPendingRequest({
               kind: "wait",
-              retry_after_seconds: options.retryAfterSeconds,
+              retry_after_seconds: WAIT_RETRY_SECONDS,
               log: job.log,
               answer_command: () => this.nextCommand(),
             }),
@@ -2633,11 +2479,9 @@ class Driver {
       );
     }
 
-    // A stop, and it says WHICH refusal. The identical sentence two unlike
-    // refusals used to arrive in is what made the deadlock classifier -- it
-    // compares kind, step and reason -- call a red control and stale
-    // evidence the same impasse, and tell the operator that running it again
-    // would change nothing when running it again was exactly right.
+    // A stop, and it says WHICH refusal: a red control and stale evidence
+    // are different moves for a person, and one sentence for both hides
+    // which one to make.
     throw new Stop(
       "verification",
       `dabbler verify refused (exit ${code}): ` +
@@ -3331,6 +3175,17 @@ class Driver {
       this.setPhase("close");
       return;
     }
+    // Already published -- by `dabbler packaging` run directly, or by a job
+    // this run no longer holds -- is collected, never published again: a
+    // second push of the same version is refused by every feed, on every call.
+    if ((this.run.job ?? null) === null) {
+      const last = readPackaging(this.repoRoot, this.sessionNumber).at(-1);
+      if (last?.["outcome"] === OUTCOME_PUBLISHED) {
+        this.log("published", { session: sessionDisplayNumber(this.sessionNumber), collected: true });
+        this.setPhase("close");
+        return;
+      }
+    }
     const code = await this.longWork({
       name: "publish",
       argv: [...selfArgv(), "packaging", "--sessions-dir", this.sessionsDir],
@@ -3347,16 +3202,8 @@ class Driver {
       // reasoning is sound about AUTHORING a second sentence and wrong about
       // this: quoting the one source at throw time is not a copy of it.
       //
-      // The cost of the literal was not the wording. `judgeStopClass`
-      // compares kind, step and reason, so a constant reason made every
-      // publish refusal after the first identical to the one before it --
-      // and `climbLadder` is keyed on that same reason, so the first
-      // refusal consumed the session's one triage and every later,
-      // genuinely different one was logged `triage-skipped` and reached no
-      // adviser at all. Both follow from the reason being real; neither
-      // needed its own fix. Session 137 met six distinct refusals here and
-      // was told seven times that running it again would change nothing,
-      // while running it again was what moved it every time.
+      // The cost of the literal was not the wording: six distinct refusals
+      // read as one, and the rewind below keys on the refusal too.
       const refused = jobLogTail(this.repoRoot, this.sessionNumber, "publish");
 
       // Refused on an earlier phase's evidence: go back and make it, rather
@@ -3365,19 +3212,15 @@ class Driver {
       // which gate's evidence; this reads that, and states it nowhere.
       //
       // **A rewind is not a stop, and that is what has to be bounded here.**
-      // It throws nothing, so `stop_history` never sees it and
-      // `judgeStopClass` cannot classify it: a rewind that fixes nothing
-      // would come back to this line unchanged, rewind again, and go round
-      // for as long as anyone kept calling `next` -- paying for a
-      // verification round or a whole suite each time. The deadlock
-      // classifier is no defence against it, because it never gets a row.
+      // It throws nothing, so `stop_history` never sees it: a rewind that
+      // fixes nothing would come back to this line unchanged, rewind again,
+      // and go round for as long as anyone kept calling `next` -- paying for
+      // a verification round or a whole suite each time.
       //
-      // So the run remembers what it has already gone back for, and the
-      // bound is the same one the classifier uses: one rewind per distinct
-      // refusal. A refusal already in `rewinds` means going back did not fix
-      // it, and going back again would not either -- so the loop stops, with
-      // that refusal in the stop, where a person and the triage ladder can
-      // see it. A refusal not in the list is a different problem, and going
+      // So the run remembers what it has already gone back for: one rewind
+      // per distinct refusal. A refusal already in `rewinds` means going
+      // back did not fix it, and going back again would not either -- so the
+      // loop stops, with that refusal in the stop, where a person can see it. A refusal not in the list is a different problem, and going
       // back for it is progress by the same definition the classifier reads.
       const rewind = rewindFromPackaging(readPackaging(this.repoRoot, this.sessionNumber));
       const rewound = this.run.rewinds ?? [];
@@ -3414,6 +3257,22 @@ class Driver {
   }
 
   private async phaseClose(): Promise<void> {
+    // Already closed -- by `dabbler session close` run directly, or by a job
+    // this run no longer holds -- is collected, never closed again: the verb
+    // refuses a session that is not in flight, on every call.
+    if ((this.run.job ?? null) === null) {
+      const rows = readSessionState(this.sessionsDir)?.["sessions"];
+      const row = (Array.isArray(rows) ? rows : []).find(
+        (entry): entry is Record<string, unknown> =>
+          typeof entry === "object" && entry !== null && (entry as Record<string, unknown>)["number"] === this.sessionNumber,
+      );
+      if (row?.["status"] === "complete") {
+        this.log("close-collected", { session: sessionDisplayNumber(this.sessionNumber) });
+        this.issue({ kind: "done" });
+        this.setPhase("complete");
+        return;
+      }
+    }
     const code = await this.longWork({
       name: "close",
       argv: [...selfArgv(), "session", "close", "--sessions-dir", this.sessionsDir],
@@ -3543,18 +3402,14 @@ class Driver {
         step_id: this.currentStep,
       };
       const history = this.run.stop_history ?? [];
-      const previous = history.length > 0 ? history[history.length - 1] : null;
-      const deadlock = judgeStopClass(previous, entry) === "deadlock";
-      const reason = deadlock ? `${error.message}${DEADLOCK_NOTE}` : error.message;
       this.run = {
         ...this.run,
         stop: {
           kind: entry.kind,
           code: entry.code,
-          reason,
+          reason: entry.reason,
           at: entry.at,
           step_id: entry.step_id,
-          class: deadlock ? "deadlock" : "first",
         },
         stop_history: [...history, entry].slice(-STOP_HISTORY_CAP),
         // A stop landing before the phase moved on is the replacement that
@@ -3563,50 +3418,20 @@ class Driver {
         resumed_from: null,
       };
       this.save();
-      // A loop going nowhere is asked about before a person is. Only a
-      // deadlock, only unattended, and only once per impasse.
-      //
-      // Whatever happens in there, the human floor is reached: the try is
-      // what makes "the ladder always terminates at the human" true rather
-      // than aspirational. An outage, an expired key, a bug in the rung
-      // itself -- none of them may cost the operator the row that says the
-      // session stopped, because that row is the only thing standing
-      // between a halted session and nobody finding out.
-      let ladder: Ladder | null = null;
-      if (deadlock && !this.pull) {
-        try {
-          ladder = await this.climbLadder(entry);
-        } catch (failure) {
-          // A ladder that fell over classified nothing, which is the floor's
-          // own brief -- not the confident "run it again" that no ladder at
-          // all would have earned.
-          this.log("triage-abandoned", { reason: (failure as Error).message });
-          ladder = { advice: null };
-        }
-        this.save();
-      }
       // The words are the router's one rendering of a stop, shared with the
       // status row and the terminal; what is on disk is the record above.
       const words = renderStop(this.run.stop as NonNullable<DriverRun["stop"]>, this.run);
       // The whole rendering, ways on included. The command that met the
       // stop is the surface a person is already looking at, and printing
       // three of the four things it knows sent one operator to look for
-      // the fourth in a record they had no reason to know existed. Where
-      // triage proposed an amendment, the proposal is printed with the
-      // command that makes it, so an engine reading the stop can act.
-      const proposed = ladder?.advice?.answer.amendment ?? null;
+      // the fourth in a record they had no reason to know existed.
       writeErr(
         `dabbler: ${words.headline} in phase '${this.run.phase}' after ` +
           `${this.run.invocations} invocation(s).\n${words.happened}\n` +
           // The stop's own substance -- the findings a dispute stands over,
           // their grounds, what they cite -- printed where the person is.
           (error.brief ? `\n${error.brief}\n\n` : "") +
-          `${words.ended} ${words.next}${words.ways}\n` +
-          (proposed === null
-            ? ""
-            : `\nAn adviser proposed amending step '${proposed.step_id}'` +
-              `${proposed.relaxes_a_gate ? " -- IT RELAXES A GATE" : ""}: ${proposed.reason}\n` +
-              `${this.amendmentProposal(proposed)}\n`),
+          `${words.ended} ${words.next}${words.ways}\n`,
       );
       return EXIT_GATE_FAILED;
     }
@@ -3753,6 +3578,7 @@ export async function sessionNext(sessionsDir: string, options: NextOptions): Pr
         adapter: null,
         transport: options.transport ?? null,
         mode: "pull",
+        waitInCallMs: options.waitInCallMs ?? null,
       },
       async (driver) => {
         // Nothing in flight and nothing asked for: answer `done` without
@@ -3851,7 +3677,7 @@ export async function runWholeSession(
   });
   const threshold = 120;
   for (;;) {
-    const code = await sessionNext(sessionsDir, {});
+    const code = await sessionNext(sessionsDir, { waitInCallMs: WAIT_IN_CALL_MS });
     let instruction;
     try {
       instruction = readInstruction(repoRoot, sessionNumber);

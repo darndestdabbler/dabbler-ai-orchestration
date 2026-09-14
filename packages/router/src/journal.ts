@@ -53,7 +53,12 @@ export interface GitBinaryResult {
 export interface RunGitOptions {
   /** Extra environment for the child, merged over this process's own. */
   readonly env?: Record<string, string>;
+  /** How long the child may run before it is ended and answered as a timeout; no limit when absent. */
+  readonly timeoutMs?: number;
 }
+
+/** What a git call that ran past its `timeoutMs` exits with: the code `timeout(1)` uses. */
+export const EXIT_GIT_TIMED_OUT = 124;
 
 /**
  * What every child this router spawns is given, wherever it is spawned from.
@@ -85,12 +90,16 @@ function spawnGit(
     encoding: encoding === "utf8" ? "utf8" : undefined,
     env: options.env ? { ...process.env, ...options.env } : process.env,
     maxBuffer: 256 * 1024 * 1024,
+    timeout: options.timeoutMs,
   }));
   if (result.error) {
+    const timedOut = (result.error as NodeJS.ErrnoException).code === "ETIMEDOUT";
     return {
-      code: EXIT_GIT_MISSING,
+      code: timedOut ? EXIT_GIT_TIMED_OUT : EXIT_GIT_MISSING,
       stdout: encoding === "utf8" ? "" : Buffer.alloc(0),
-      stderr: "git not available on PATH",
+      stderr: timedOut
+        ? `git did not answer within ${Math.round((options.timeoutMs ?? 0) / 1000)} seconds`
+        : "git not available on PATH",
     };
   }
   const stderr =

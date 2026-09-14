@@ -15,7 +15,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { ModuleEntry, SolutionShape } from "./modules.ts";
@@ -766,7 +766,8 @@ function rootFilesDotnet(root: string, shape: SolutionShape): ScaffoldResult {
   // does. It is NOT the parent POM's rule: an artifactId is lowercase and
   // hyphenated by Maven convention, and a solution file has no such
   // convention to obey.
-  const solution = `${basename(root)}.slnx`;
+  // Resolved first: a root given as `.` has no name of its own to lend.
+  const solution = `${basename(resolve(root))}.slnx`;
   const projects = dotnetProjectFiles(root, shape);
   // `.slnx`, not `.sln`: it is plain XML a scaffold can write and a person
   // can read and edit, where `.sln` carries a per-project GUID that no
@@ -1826,7 +1827,7 @@ function rootFilesMaven(root: string, shape: SolutionShape): ScaffoldResult {
     moduleDirs.push(dir);
     groupId ??= pom.groupId;
   }
-  const parentArtifact = `${basename(root).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "solution"}-parent`;
+  const parentArtifact = `${basename(resolve(root)).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "solution"}-parent`;
   // The release the JDK doing the scaffolding can actually compile to. A
   // constant here targeted a version half the machines that run this do not
   // have, and every build then failed on a line the developer had to find

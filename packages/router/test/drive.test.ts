@@ -18,11 +18,9 @@ import {
   REGISTER_REFUSE_START,
   REGISTER_START,
   alreadyRewoundFor,
-  alreadyTriaged,
   disputedFindingsBrief,
   idleInstruction,
   judgeRegistration,
-  judgeStopClass,
   planModulesMember,
   rewindFromPackaging,
   COMMIT_SUBJECT_WIDTH,
@@ -38,7 +36,6 @@ import {
   unchangedStepFiles,
   type RegistrationFacts,
   type StepSpec,
-  type StopKey,
 } from "../src/drive.ts";
 import { judgeFreshness, rewindPhaseFor } from "../src/gates.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
@@ -511,68 +508,6 @@ describe("what the plan instruction asks for", () => {
   });
 });
 
-describe("what makes two stops one impasse", () => {
-  it("holds unlike publish refusals apart, and takes each of them to triage", () => {
-    // Session 137, from its own record. Its `stop_history` is eight rows
-    // whose reasons are byte-identical, because `phasePublish` threw a
-    // string literal; its packaging record, over the same eight attempts,
-    // carries seven refusals with six distinct causes. The classifier was
-    // reading the first list while the second was what actually happened.
-    const stop = (reason: string): StopKey => ({ kind: "publish", reason, step_id: null });
-    // The literal, as it stood: two attempts about entirely different
-    // things arrive here as the same stop.
-    const literal = stop(
-      "the packaging run did not publish; its reasons are in the publish job's own log " +
-        "and in the session's packaging record, and nothing here can answer them",
-    );
-    assert.equal(judgeStopClass(literal, literal), "deadlock");
-
-    // The refusals the record actually holds, in the order 137 met them.
-    const noBlock = stop(
-      "the packaging run did not publish: this repository declares no packaging block, " +
-        "so it publishes nothing.",
-    );
-    const staleEvidence = stop(
-      "the packaging run did not publish: step (f) runs after (e), and the evidence for " +
-        "the earlier steps is not there: verification_clean: the working tree changed " +
-        "after verification round 2",
-    );
-    const tagAbsent = stop(
-      "the packaging run did not publish: this repository releases by tag, and " +
-        "vsix-v2.0.15 is not on origin, so nothing has been published.",
-    );
-    for (const [previous, next] of [
-      [noBlock, staleEvidence],
-      [staleEvidence, tagAbsent],
-    ] as const) {
-      assert.equal(judgeStopClass(previous, next), "first");
-    }
-    // And the classifier has not simply stopped saying deadlock: the same
-    // refusal twice in a row still is one, which is the case the label is for.
-    assert.equal(judgeStopClass(tagAbsent, tagAbsent), "deadlock");
-    // A first stop has nothing to be identical to.
-    assert.equal(judgeStopClass(null, noBlock), "first");
-    // Same reason, different step: two steps failing the same way are two
-    // problems, and the step is part of the key.
-    assert.equal(
-      judgeStopClass({ ...staleEvidence, step_id: "widget" }, { ...staleEvidence, step_id: "gadget" }),
-      "first",
-    );
-
-    // The second-order cost, and the reason this is one fix rather than two:
-    // `climbLadder` is keyed on the same reason. Under the literal the first
-    // refusal consumed the session's only triage and every later one was
-    // skipped; under the real refusals each impasse is its own.
-    const triagedFor = (entry: StopKey) => ({ for_reason: entry.reason, for_step: entry.step_id ?? null });
-    assert.equal(alreadyTriaged(triagedFor(literal), literal), true);
-    assert.equal(alreadyTriaged(triagedFor(noBlock), staleEvidence), false);
-    assert.equal(alreadyTriaged(triagedFor(staleEvidence), tagAbsent), false);
-    // A re-run reaching the impasse it was already triaged for still pays nothing.
-    assert.equal(alreadyTriaged(triagedFor(tagAbsent), tagAbsent), true);
-    assert.equal(alreadyTriaged(null, tagAbsent), false);
-  });
-});
-
 describe("a publish refused on an earlier phase's evidence", () => {
   it("goes back to the phase that makes it, and stops when no phase can", () => {
     // Session 137's own packaging record, both shapes it holds. The second
@@ -647,9 +582,8 @@ describe("a publish refused on an earlier phase's evidence", () => {
   });
 
   it("goes back once per refusal, and stops rather than remaking the same evidence forever", () => {
-    // A rewind throws no Stop, so `stop_history` gains no row and
-    // `judgeStopClass` never sees it: the deadlock classifier is no defence
-    // against a rewind that fixes nothing. Without this bound the loop
+    // A rewind throws no Stop, so `stop_history` gains no row: nothing else
+    // notices a rewind that fixes nothing. Without this bound the loop
     // would return to the publish phase unchanged and go round for as long
     // as anyone kept calling `next`, paying for a verification round or a
     // whole suite each time.

@@ -20,7 +20,7 @@ import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { driveSession, sessionNext, type Engine } from "../src/drive.ts";
 import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
-import { readRounds } from "../src/ledger.ts";
+import { appendPackaging, readRounds } from "../src/ledger.ts";
 import { capture } from "../src/output.ts";
 import { readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
@@ -105,7 +105,11 @@ const PLAN = {
 };
 
 /** The verifier's scripted answers, and the transport that serves them. */
-function configure(responses: readonly string[], testing: unknown = TESTING): void {
+function configure(
+  responses: readonly string[],
+  testing: unknown = TESTING,
+  extra: Record<string, unknown> = {},
+): void {
   const dir = tempDir("responses-");
   const files: Record<string, string> = {};
   responses.forEach((text, index) => {
@@ -119,6 +123,7 @@ function configure(responses: readonly string[], testing: unknown = TESTING): vo
         transports: { offline: { responses_dir: dir } },
         transport: { profile: "offline" },
         testing,
+        ...extra,
       }),
     ),
   });
@@ -178,7 +183,7 @@ async function answerStep(
 // status file -- `settleJobs` is called where the loop below would have
 // slept, and runs the verb the driver asked for. `test/walk-jobs.test.ts`
 // keeps the real spawn, because that one IS about the child.
-const restoreJobs = useInProcessJobs();
+let restoreJobs = useInProcessJobs();
 
 after(() => {
   restoreJobs();
@@ -427,6 +432,22 @@ describe("one session, walked from next to done", () => {
     assert.equal(readInstruction(repo, 1)?.answer_command, undefined);
     assert.ok(existsSync(join(repo, ".dabbler", "runs", "s1", "driver", "run.json")));
 
+    // --- a run left standing at the close of a session already closed -------
+    // The state `dabbler session close` run directly leaves behind: the
+    // ledger says complete and the run still says close. The next call
+    // collects the close instead of running a close that would refuse.
+    const closed = readRun(repo, 1);
+    writeRun(repo, 1, { ...closed, phase: "close", job: null });
+    const collected = await next(sessionsDir);
+    assert.equal(collected.instruction?.kind, "done", collected.err);
+    assert.equal(readRun(repo, 1)?.phase, "complete");
+    assert.equal(
+      readFileSync(join(repo, ".dabbler", "runs", "s1", "driver", "jobs", "close.log"), "utf8"),
+      closeLog,
+      "no second close ran",
+    );
+    milestones.push("collected a close already made");
+
     assert.deepEqual(milestones, [
       "registered and asked to plan",
       "planned and declared",
@@ -436,7 +457,89 @@ describe("one session, walked from next to done", () => {
       "reported the step it did",
       "waited on the framework's own job",
       "done",
+      "collected a close already made",
     ]);
+  });
+});
+
+describe("a run left standing at the publish of a session already published", () => {
+  it("moves to the close without publishing a second time", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    // A tag release is packaging, so the plan below is declared releasable.
+    configure([VERIFIED], TESTING, { packaging: { release: "tag" } });
+    assert.equal(
+      (await capture(() =>
+        Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
+      )).value,
+      EXIT_OK,
+    );
+    const plan = await next(sessionsDir);
+    const releasable = Object.fromEntries(Object.entries(PLAN).filter(([key]) => key !== "hold_release"));
+    assert.equal(await answerPlan(sessionsDir, plan.instruction?.seq ?? 0, releasable), EXIT_OK);
+    assert.equal((await next(sessionsDir)).instruction?.step_id, "widget");
+
+    // The state `dabbler packaging` run directly leaves behind: the record
+    // says published and the run still says publish.
+    appendPackaging(repo, 1, {
+      outcome: "published",
+      session_number: 1,
+      releasable: true,
+      recorded_at: "2026-09-14T12:00:00-04:00",
+      feed: "../feed",
+      secret_name: "",
+      artifacts: ["widget-1.0.0.tgz"],
+      steps: [{ step: "pack", command: "pack", exit_code: 0, duration_seconds: 1 }],
+    });
+    writeRun(repo, 1, { ...readRun(repo, 1), phase: "publish", job: null });
+
+    const move = await next(sessionsDir);
+    assert.equal(readRun(repo, 1)?.phase, "close", move.err);
+    assert.equal(
+      existsSync(join(repo, ".dabbler", "runs", "s1", "driver", "jobs", "publish.status.json")),
+      false,
+      "no second publish ran",
+    );
+    // The close it moved to started a job; the walkthroughs share one job
+    // runner, so it is settled here rather than left for the next file's walk.
+    await settleJobs();
+  });
+});
+
+describe("a pulled session whose framework jobs end inside the call", () => {
+  it("answers with what comes after them, never a wait", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+    assert.equal(
+      (await capture(() =>
+        Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
+      )).value,
+      EXIT_OK,
+    );
+    const plan = await next(sessionsDir);
+    assert.equal(await answerPlan(sessionsDir, plan.instruction?.seq ?? 0, PLAN), EXIT_OK);
+    const step = await next(sessionsDir);
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+    assert.equal((await answerStep(sessionsDir, step.instruction?.seq ?? 0, "widget", ["src/widget.py"])).code, EXIT_OK);
+
+    // Real children, as an engine's own call meets them: verification, both
+    // suites and the close each end inside the bound, so one call carries
+    // the session from the accepted step to `done`.
+    restoreJobs();
+    try {
+      const collected = await capture(() => sessionNext(sessionsDir, { waitInCallMs: 120_000 }));
+      const instruction = JSON.parse(collected.stdout) as DriverInstruction;
+      assert.equal(instruction.kind, "done", collected.stderr);
+    } finally {
+      restoreJobs = useInProcessJobs();
+    }
   });
 });
 

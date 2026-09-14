@@ -632,52 +632,45 @@ describe("a stop, as a person reads it", () => {
   ];
 
   it("says what happened, that the command ended and the session did not, who acts, and every way on with its cost and its command", () => {
-    // Every kind, both classes, both modes: the four things a person needs
-    // are the same four things every time. What the words never say is that
-    // the engine is working on it -- under the pull the framework cannot see
-    // the engine, and a sentence that claimed otherwise would have a person
+    // Every kind, both modes: the four things a person needs are the same
+    // four things every time. What the words never say is that the engine
+    // is working on it -- under the pull the framework cannot see the
+    // engine, and a sentence that claimed otherwise would have a person
     // waiting on a process that is gone.
     for (const kind of KINDS) {
-      for (const klass of ["first", "deadlock"] as const) {
-        for (const engine of ["cli", "claude-code"]) {
-          const stop = { kind, reason: "the widget is load-bearing", class: klass, step_id: "widget" };
-          const words = renderStop(stop, { session_number: 7, phase: "verify", engine });
-          const label = `${kind}/${klass}/${engine}`;
-          assert.equal(
-            words.headline,
-            `Session 007 paused (${kind}${klass === "deadlock" ? ", deadlock" : ""})`,
-            label,
-          );
-          // The stop's own words open the sentence: a toast shows only the
-          // first one, and the kind's sentence is a category, not a reason.
-          assert.match(words.happened, /^The widget is load-bearing/, label);
-          assert.match(words.ended, /has ended/, label);
-          assert.match(words.ended, /remains in flight/, label);
-          assert.match(words.next, /^Next: /, label);
-          // A question with one answer is a notification, and every choice
-          // is a real move: something to do, what it costs, and the command.
-          assert.ok(words.choices.length >= 2, label);
-          for (const choice of words.choices) {
-            for (const part of [choice.label, choice.cost, choice.command]) {
-              assert.ok(part.trim().length > 0, `${label}: ${JSON.stringify(choice)}`);
-            }
-            assert.ok(words.text.includes(choice.command), label);
+      for (const engine of ["cli", "claude-code"]) {
+        const stop = { kind, reason: "the widget is load-bearing", step_id: "widget" };
+        const words = renderStop(stop, { session_number: 7, phase: "verify", engine });
+        const label = `${kind}/${engine}`;
+        assert.equal(words.headline, `Session 007 paused (${kind})`, label);
+        // The stop's own words open the sentence: a toast shows only the
+        // first one, and the kind's sentence is a category, not a reason.
+        assert.match(words.happened, /^The widget is load-bearing/, label);
+        assert.match(words.ended, /has ended/, label);
+        assert.match(words.ended, /remains in flight/, label);
+        assert.match(words.next, /^Next: /, label);
+        // A question with one answer is a notification, and every choice
+        // is a real move: something to do, what it costs, and the command.
+        assert.ok(words.choices.length >= 2, label);
+        for (const choice of words.choices) {
+          for (const part of [choice.label, choice.cost, choice.command]) {
+            assert.ok(part.trim().length > 0, `${label}: ${JSON.stringify(choice)}`);
           }
-          // Whatever the choices are, the mode's own resume verb is the only
-          // one offered: a session run one way must never be told the other
-          // way's command.
-          const commands = words.choices.map((choice) => choice.command).join(" ");
-          const otherMode = engine === "cli" ? /session drive/ : /session next/;
-          assert.doesNotMatch(commands, otherMode, label);
-          // Ending it is always on the table, and never the recommendation.
-          assert.match(commands, /session cancel/, label);
-          assert.doesNotMatch(words.choices[0]!.command, /session cancel/, label);
-          assert.doesNotMatch(words.text, /working on|is working|fixing it|STOPPED/, label);
-          assert.equal(words.deadlock, klass === "deadlock", label);
-          assert.equal(/deadlock/.test(words.next), klass === "deadlock", label);
-          for (const part of [words.headline, words.happened, words.ended, words.next]) {
-            assert.ok(words.text.includes(part), label);
-          }
+          assert.ok(words.text.includes(choice.command), label);
+        }
+        // Whatever the choices are, the mode's own resume verb is the only
+        // one offered: a session run one way must never be told the other
+        // way's command.
+        const commands = words.choices.map((choice) => choice.command).join(" ");
+        const otherMode = engine === "cli" ? /session drive/ : /session next/;
+        assert.doesNotMatch(commands, otherMode, label);
+        // Ending it is always on the table, and never the recommendation.
+        assert.match(commands, /session cancel/, label);
+        assert.doesNotMatch(words.choices[0]!.command, /session cancel/, label);
+        assert.doesNotMatch(words.text, /working on|is working|fixing it|STOPPED/, label);
+        assert.doesNotMatch(words.text, /deadlock/i, label);
+        for (const part of [words.headline, words.happened, words.ended, words.next]) {
+          assert.ok(words.text.includes(part), label);
         }
       }
     }

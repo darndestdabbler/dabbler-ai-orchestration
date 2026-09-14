@@ -1,8 +1,7 @@
 // `dabbler triage` -- a second opinion on a stopped session.
 //
-// Engine-facing. An engine that is stuck runs it and reads the answer; the
-// unattended loop calls the same function on a deadlock-class stop. Nothing
-// in the Work Explorer presses it, because triage spends a provider call
+// Engine-facing. An engine that is stuck runs it and reads the answer; no
+// loop calls it on its own. Nothing in the Work Explorer presses it, because triage spends a provider call
 // and a button that spends one is a button somebody presses to see what it
 // does.
 //

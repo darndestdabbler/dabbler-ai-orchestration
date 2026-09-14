@@ -13,7 +13,7 @@
 // `--not-releasable` that parsed as nothing would publish.
 
 import { shlexSplit } from "../checks.ts";
-import { driveSession, runWholeSession, sessionNext } from "../drive.ts";
+import { WAIT_IN_CALL_MS, driveSession, runWholeSession, sessionNext } from "../drive.ts";
 import {
   ENGINE_OUTPUT_MODES,
   type Engine,
@@ -572,6 +572,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       transport: values.get("--transport") ?? null,
       requestGrant,
       reason: values.get("--reason") ?? null,
+      waitInCallMs: WAIT_IN_CALL_MS,
     });
   }
 

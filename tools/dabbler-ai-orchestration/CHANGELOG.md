@@ -10,6 +10,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.9.0] — 2026-09-14
+
+**Nothing gets stuck, nothing waits.** The two stops a tutorial met that no
+number of `session next` calls could move are gone, and `next` no longer
+sends the engine to sleep for a minute behind a job that finished in
+seconds.
+
+### Changed
+
+- **A closed session is collected, not closed again.** `session next`
+  after `dabbler session close` was run directly answers `done`. Before,
+  every call re-ran a close that refused because nothing was in flight.
+- **A published session is not published twice.** A run standing at the
+  publish whose packaging record already says published moves to the close.
+- **`next` waits inside the call.** It holds the call on the framework's
+  own job for up to 45 seconds and answers the moment the job ends; a job
+  still running after that answers `wait` with 5 seconds, not 60.
+- **No DEADLOCK label, and no automatic triage.** A stop says what refused,
+  who acts and the command. `dabbler triage` is still there to ask for.
+- **A module's own contract folder is in its checkout**, where its code
+  roots do not already hold it, so its notes page can be edited and
+  committed there.
+- **`dabbler modules create .`** names the solution file after the
+  directory rather than `..slnx`, and a Maven parent's artifact id the same
+  way.
+- **Session 1's brief.** With no brief in the prompt or at
+  `docs/planning/brief.md`, the engine asks the person who started the
+  session and writes the answer there, instead of reporting a step the
+  report verb cannot accept.
+- **`session start` checks the origin.** When it does not answer as a git
+  remote, one line names its URL, git's reason and `git remote set-url
+  origin`, before any work rather than at the push.
+
 ## [2.8.0] — 2026-09-14
 
 **Nothing is owed.** The owed-decision module is gone: no `dabbler owed`,

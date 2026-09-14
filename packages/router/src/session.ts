@@ -844,6 +844,29 @@ function pullBeforeStart(repoRoot: string, sessionsDir: string): string | null {
 }
 
 /**
+ * One line when the origin does not answer as a git remote. A repository
+ * provisioned from a hosting page can carry the page's address instead of
+ * the clone's, and nothing else meets it before the land's push -- after the
+ * work. Never a refusal: the work can be done without the remote, and the
+ * push says the same at the land.
+ */
+function remoteUnansweredLine(repoRoot: string): string | null {
+  const url = runGit(repoRoot, ["remote", "get-url", "origin"]);
+  if (url.code !== 0 || url.stdout.trim() === "") return null;
+  const answered = runGit(repoRoot, ["ls-remote", "--heads", "origin"], {
+    // A credential prompt would hold the start open on a question nobody sees.
+    env: { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" },
+    timeoutMs: 15_000,
+  });
+  if (answered.code === 0) return null;
+  return (
+    `start: origin (${url.stdout.trim()}) did not answer as a git remote (${firstLine(answered.stderr)}); ` +
+    "the push at the end of this session fails the same way until it does: " +
+    "git remote set-url origin <the repository's clone URL>"
+  );
+}
+
+/**
  * A close run in a module's folder pulls the repository it was opened from
  * forward, after its own push, so the repository's window sees the session
  * closed without anyone remembering to pull. Only onto a clean tree, and
@@ -1389,8 +1412,16 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
         writeErr(`start: refused -- ${workBegunRefusal(requested, begun.paths)}\n`);
         return EXIT_USAGE;
       }
-      const pulled = pullBeforeStart(repoRootFromSessionsDir(sessionsDir), sessionsDir);
-      if (pulled !== null) writeOut(`${pulled}\n`);
+      // The origin is asked first, with no prompt and a bound: a pull from
+      // an origin that does not answer would wait on a credential nobody
+      // sees, and say the same thing a second time.
+      const unanswered = remoteUnansweredLine(repoRootFromSessionsDir(sessionsDir));
+      if (unanswered !== null) {
+        writeOut(`${unanswered}\n`);
+      } else {
+        const pulled = pullBeforeStart(repoRootFromSessionsDir(sessionsDir), sessionsDir);
+        if (pulled !== null) writeOut(`${pulled}\n`);
+      }
     }
     let moduleStart: ModuleStart | null = null;
     let shape: SolutionShape;

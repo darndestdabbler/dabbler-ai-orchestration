@@ -342,11 +342,11 @@ export const BOOTSTRAP_PLAN =
   "2. The brief is the prompt this session was started with, or\n" +
   "   `docs/planning/brief.md`: what the solution is — its purpose, who uses\n" +
   "   it, what it must do and what is out of scope, what success looks like,\n" +
-  "   and whether a plan or notes already exist. With neither, report this\n" +
-  "   step `blocked` naming that path, so the session stops here before any\n" +
-  "   work and a person supplies the brief where it will be read. The plan's\n" +
-  "   substance is theirs: do not search neighbouring directories for one,\n" +
-  "   and do not draft one from the folder name. Then create — or import —\n" +
+  "   and whether a plan or notes already exist. With neither, ask the person\n" +
+  "   who started the session for it and write their answer to that path\n" +
+  "   before any work. The plan's substance is theirs: do not search\n" +
+  "   neighbouring directories for one, and do not draft one from the folder\n" +
+  "   name. Then create — or import —\n" +
   "   `docs/planning/solution-plan.md`: the\n" +
   "   objective a reader can act on; the modules, with what each is\n" +
   "   responsible for, the contract each exposes (what must be true going\n" +

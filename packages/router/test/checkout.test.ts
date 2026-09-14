@@ -14,7 +14,7 @@ function shapeOf(doc: Record<string, unknown>): SolutionShape {
 }
 
 describe("the cone", () => {
-  it("names the middle module's roots, the feed, the record and its neighbours' contract folders, and no sibling source", () => {
+  it("names the middle module's roots and its own contract folder, the feed, the record and its neighbours' contract folders, and no sibling source", () => {
     const shape = shapeOf({
       modules: [
         { slug: "a", codeRoots: ["modules/a"], package: "A" },
@@ -29,6 +29,7 @@ describe("the cone", () => {
       "build",
       "docs",
       "modules/a/contract",
+      "modules/b/contract",
       "modules/b/src",
       "modules/b/tests",
       "modules/c/contract",

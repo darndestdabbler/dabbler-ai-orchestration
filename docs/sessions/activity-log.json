@@ -11266,6 +11266,53 @@
       "what": "step 'the-module-goes': its files",
       "reason": "the selection map and the boundaries declaration named the module and its test; both are what lint reads",
       "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 169,
+      "dateTime": "2026-09-14T11:20:27.888000-04:00",
+      "task": "Session 169 makes a stuck session and an idle wait impossible on the paths the CSV tutorial met, without deleting any module machinery. The close phase reads the ledger before it spawns anything, so a session already closed (by `dabbler session close` run directly, or by an uncollected close job) answers `done` instead of re-running a close that refuses; the publish phase reads the packaging record first, so a session already published moves to the close. The repeated-stop classifier, its DEADLOCK note and the automatic triage ladder it fed are deleted, and neither the stop's words nor the Dabbler Terminal say or paint deadlock; `triage.ts` and `dabbler triage` stay. Under the pull, `next` waits inside the call for up to 45 seconds and returns the next instruction the moment a job ends, returning a `wait` of 5 seconds only for a job still running at the bound. A module's own contract folder joins its checkout cone; `modules create .` names the solution after the resolved directory; the bootstrapped session-1 plan tells the engine to ask for a missing brief instead of reporting a step it cannot report; and `session start` prints one line with `git remote set-url` when the origin does not answer. The extension and router versions go to 2.9.0, a minor: the change adds a capability (the in-call wait) and removes a behaviour (the deadlock label).",
+      "releasable": true
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 169,
+      "dateTime": "2026-09-14T11:31:29.715000-04:00",
+      "what": "step 'no-deadlock-label': its files",
+      "reason": "the stop rendering and the triage prompt no longer carry the class, and two more tests asserted them",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 169,
+      "dateTime": "2026-09-14T11:35:47.370000-04:00",
+      "what": "step 'wait-inside-the-call': its files",
+      "reason": "the 45-second bound is passed by the CLI verb, which every engine calls; in-process callers whose jobs run only when settled pass none",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 169,
+      "dateTime": "2026-09-14T11:39:29.364000-04:00",
+      "what": "step 'the-tutorial-fixes': its files",
+      "reason": "bootstrap.test.ts asserts the session-1 sentence this step rewrites",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 169,
+      "dateTime": "2026-09-14T11:40:01.853000-04:00",
+      "what": "step 'the-tutorial-fixes': its files",
+      "reason": "runGit has no time limit; the 15-second bound on ls-remote needs one",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 169,
+      "dateTime": "2026-09-14T11:41:18.462000-04:00",
+      "what": "step 'the-tutorial-fixes': its files",
+      "reason": "the clean-checkout git answers must say there is no origin, and a test must be able to put a remote in front of them",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

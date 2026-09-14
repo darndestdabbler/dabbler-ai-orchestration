@@ -449,12 +449,10 @@ already carried changes when the declaration was made -- commit or revert
 them; `session start` asks the same question first, so this one is met only
 when the tree moved between the registration and the plan), `engine`.
 
-Beside the kind, `stop.class` says whether this has happened before.
-`deadlock` means the same kind, on the same step, for the same reason as
-the stop immediately before it — the loop is not moving, and running it
-again unchanged arrives back here. The stop says so in its own words too,
-so you do not have to know the field exists. `stop_history` keeps the last
-few stops, oldest first, if you want to see the shape of it.
+`stop_history` keeps the last few stops, oldest first, if you want to see
+the shape of a run. A close or a publish that has already happened is
+collected by the next call rather than made again, so running `next` after
+closing or packaging by hand moves the session on.
 
 If a job **vanished** — no process and no recorded result, which is what a
 machine restart leaves — that is a stop too, and deliberately: re-running
@@ -475,8 +473,8 @@ dabbler status --sessions-dir docs/sessions
 ```
 
 `status` says where the session is. `.dabbler/runs/s<N>/driver/run.json`
-carries the `stop` — its `kind`, its `reason` in words, the step it was on
-and its `class`. The outstanding `instruction.json` carries `reasons` when
+carries the `stop` — its `kind`, its `reason` in words, and the step it was
+on. A run written before 2.9.0 may also carry a `class`; nothing reads it. The outstanding `instruction.json` carries `reasons` when
 the last answer was refused, each one opening with the rule that refused
 it in brackets. The transcripts, `engine-NN.log` beside them, are what the
 engine actually did. The scrollback is what the engine *remembers*; these
@@ -498,7 +496,7 @@ that stalls a session:
   62 both did exactly that on the operator's word. This is written down
   because session 62's engine wrote a correct diagnosis of a framework
   defect and then waited, believing the change was somebody else's to
-  make; the session deadlocked on a gate that one edit would have moved.
+  make; the session stayed stopped on a gate that one edit would have moved.
 - **On a consumer repository, the framework is an installed package** the
   session did not write, and editing it there is a fix that vanishes at
   the next `npm i`. Report the step `blocked` with the diagnosis in

@@ -31,7 +31,7 @@ describe("what a stop cites", () => {
 });
 
 describe("the adviser's brief and answer", () => {
-  it("carries the stop with its class, the refusal, the rule as stated, the step, the report and the transcript tail", () => {
+  it("carries the stop, the refusal, the rule as stated, the step, the report and the transcript tail", () => {
     const prompt = buildTriagePrompt({
       sessionNumber: 1,
       instruction: { seq: 3, kind: "rejection", step_id: "widget" } as never,
@@ -43,7 +43,7 @@ describe("the adviser's brief and answer", () => {
       step: { id: "widget", ask: "Make widget() return 2.", files: ["src/widget.py"], checks: [] },
       transcriptTail: "",
     });
-    assert.ok(prompt.includes("class: deadlock") && prompt.includes("[files-changed-omits]") && prompt.includes("RULE.filesChangedOmits"));
+    assert.ok(prompt.includes("[files-changed-omits]") && prompt.includes("RULE.filesChangedOmits"));
     assert.ok(prompt.includes("verification on -: earlier") && prompt.includes("Make widget() return 2.") && prompt.includes("(none)"));
   });
 
@@ -88,7 +88,7 @@ describe("dabbler triage over a stopped session", () => {
       assert.equal(outcome.adviser.provider, "openai");
       assert.equal(outcome.answer.classification, "plan-defect");
       assert.equal(calls.length, 1);
-      assert.ok(calls[0].content.includes("class: deadlock") && calls[0].content.includes("[files-changed-omits]"));
+      assert.ok(calls[0].content.includes("[files-changed-omits]"));
       assert.deepEqual(calls[0].exclude, ["anthropic"]);
     } finally {
       restore();

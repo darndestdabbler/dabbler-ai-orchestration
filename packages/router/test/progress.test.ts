@@ -556,7 +556,7 @@ describe("the task rows", () => {
     // The row reads in the router's one rendering: paused, not stopped; the
     // deadlock named; the resume command the run's own mode (a push here).
     const intents = rows.map((row) => String(row["intent"])).join("\n");
-    assert.match(intents, /Session 001 paused \(blocked, deadlock\)\. .*The widget is load-bearing\./);
+    assert.match(intents, /Session 001 paused \(blocked\)\. .*The widget is load-bearing\./);
     assert.match(intents, /remains in flight/);
     assert.match(intents, /session drive/);
     assert.doesNotMatch(intents, /Driver stopped/);

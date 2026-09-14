@@ -546,10 +546,10 @@ suite("the Dabbler terminal", () => {
       assert.strictEqual(lineTone("phase", { now: phase }), "milestone", phase);
       assert.strictEqual(fieldTone("phase", "now", phase), "milestone", phase);
     }
-    // A pause is amber and a deadlock is red: the one word that says
-    // "running this again reaches this exact point" keeps its colour.
+    // A pause is amber, including one read off a run written before the
+    // deadlock class was retired.
     assert.strictEqual(lineTone("paused", {}), "warn");
-    assert.strictEqual(lineTone("paused", { class: "deadlock" }), "bad");
+    assert.strictEqual(lineTone("paused", { class: "deadlock" }), "warn");
     // The two honest green events, and no third.
     assert.strictEqual(lineTone("progress-resumed", {}), "good");
     // An unrecognised verdict warns rather than passing as clean, because

@@ -206,6 +206,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 166 | The cap, the non-goals, and the sentence | no | 2026-09-14 |
 | 167 | Ship by default, and the one question that goes | yes | 2026-09-14 |
 | 168 | Nothing is owed | yes | 2026-09-14 |
+| 169 | Nothing gets stuck, nothing waits | yes | 2026-09-14 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2407,3 +2408,17 @@ Session 168 deletes owed decisions. Nothing is owed a person: every question the
 - 2026-09-14 — step 'stops-and-owed-suites-on-the-run': its files: the one test sits in drive.test.ts beside the suite it already covers; gates.test needed nothing (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-14 — step 'the-module-goes': its files and checks: the verb table, the shipped-page list, the run schema's one phrase and eight more sentences named the inbox; commandFlows runs alone because three of its tests are order-sensitive beside the terminal's at HEAD too (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-14 — step 'the-module-goes': its files: the selection map and the boundaries declaration named the module and its test; both are what lint reads (claude-code (anthropic, claude-fable-5-1))
+
+### Session 169 — Nothing gets stuck, nothing waits
+
+**Releasable: yes.**
+
+Session 169 makes a stuck session and an idle wait impossible on the paths the CSV tutorial met, without deleting any module machinery. The close phase reads the ledger before it spawns anything, so a session already closed (by `dabbler session close` run directly, or by an uncollected close job) answers `done` instead of re-running a close that refuses; the publish phase reads the packaging record first, so a session already published moves to the close. The repeated-stop classifier, its DEADLOCK note and the automatic triage ladder it fed are deleted, and neither the stop's words nor the Dabbler Terminal say or paint deadlock; `triage.ts` and `dabbler triage` stay. Under the pull, `next` waits inside the call for up to 45 seconds and returns the next instruction the moment a job ends, returning a `wait` of 5 seconds only for a job still running at the bound. A module's own contract folder joins its checkout cone; `modules create .` names the solution after the resolved directory; the bootstrapped session-1 plan tells the engine to ask for a missing brief instead of reporting a step it cannot report; and `session start` prints one line with `git remote set-url` when the origin does not answer. The extension and router versions go to 2.9.0, a minor: the change adds a capability (the in-call wait) and removes a behaviour (the deadlock label).
+
+**Amended after acceptance:**
+
+- 2026-09-14 — step 'no-deadlock-label': its files: the stop rendering and the triage prompt no longer carry the class, and two more tests asserted them (claude-code (anthropic, claude-opus-5))
+- 2026-09-14 — step 'wait-inside-the-call': its files: the 45-second bound is passed by the CLI verb, which every engine calls; in-process callers whose jobs run only when settled pass none (claude-code (anthropic, claude-opus-5))
+- 2026-09-14 — step 'the-tutorial-fixes': its files: bootstrap.test.ts asserts the session-1 sentence this step rewrites (claude-code (anthropic, claude-opus-5))
+- 2026-09-14 — step 'the-tutorial-fixes': its files: runGit has no time limit; the 15-second bound on ls-remote needs one (claude-code (anthropic, claude-opus-5))
+- 2026-09-14 — step 'the-tutorial-fixes': its files: the clean-checkout git answers must say there is no origin, and a test must be able to put a remote in front of them (claude-code (anthropic, claude-opus-5))

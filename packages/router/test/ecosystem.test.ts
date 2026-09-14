@@ -294,6 +294,27 @@ describe("the Maven side of the seam", () => {
 });
 
 describe("the root build files", () => {
+  it("name the solution after the directory when the root is given as `.`", () => {
+    // `dabbler modules create .` wrote `..slnx`: the name was taken from the
+    // argument as typed, and `.` has no name of its own.
+    const root = tempDir("dot-");
+    seed(root, { "modules/model/src/CsvModel/CsvModel.csproj": "<Project />\n" });
+    const shape = {
+      multi: true,
+      implicit: false,
+      modules: ["model", "persister"].map((slug) => ({ slug, codeRoots: [`modules/${slug}`], dependsOn: [] })),
+    } as unknown as Parameters<typeof ensureRootFiles>[1];
+    const previous = process.cwd();
+    process.chdir(root);
+    try {
+      const written = ensureRootFiles(".", shape);
+      assert.ok(written?.written.includes(`${basename(root)}.slnx`), written?.written.join(", "));
+    } finally {
+      process.chdir(previous);
+    }
+    assert.ok(!readdirSync(root).includes("..slnx"), readdirSync(root).join(", "));
+  });
+
   it("appear with the second module, are never rewritten, and never appear for one", () => {
     const root = tempDir("roots-");
     seed(root, {

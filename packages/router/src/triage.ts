@@ -7,10 +7,8 @@
 // with its stop and its stop history, and the tail of the transcript -- and
 // asks a provider that is NOT the working engine's to classify it.
 //
-// **One verb, both modes.** An attended engine calls it when it is stuck; an
-// unattended `session drive` calls it on a deadlock-class stop. There is one
-// implementation because there is one question, and two would drift into two
-// answers to it.
+// **Asked for, never automatic.** An engine or a person calls it when a
+// session is stuck; no loop calls it on its own.
 //
 // **It is an opinion, and it acts on nothing.** Nothing here writes to
 // `.dabbler/runs/`, amends a plan, moves a gate or clears a stop. The caller
@@ -228,7 +226,7 @@ export function buildTriagePrompt(artifacts: TriageArtifacts): string {
   parts.push(
     stop === null
       ? "The run record carries no stop."
-      : `kind: ${stop.kind}\nclass: ${stop.class ?? "(unclassified)"}\nstep: ${
+      : `kind: ${stop.kind}\nstep: ${
           stop.step_id ?? "(not on a step)"
         }\nreason: ${stop.reason}`,
   );

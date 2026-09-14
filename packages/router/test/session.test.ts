@@ -268,6 +268,33 @@ describe("what a start refuses before a session exists", () => {
     }
   });
 
+  it("says in one line when the origin does not answer, and registers anyway", async () => {
+    // The tutorial's origin was a hosting page's address, and the push at
+    // the land was the first thing to meet it -- after all the work. With an
+    // upstream set, the pull is not attempted against it either.
+    const state = stateDir();
+    const unanswered = cleanRepoAnswers(state.repo, [
+      [["remote", "get-url", "origin"], { stdout: "https://dev.azure.com/org/project/_settings/repositories?repo=abc" }],
+      [["ls-remote", "--heads", "origin"], { code: 128, stderr: "fatal: unable to update url base from redirection" }],
+      [["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], { stdout: "origin/main" }],
+      [["pull"], { code: 1, stderr: "fatal: unable to update url base from redirection" }],
+    ]);
+    try {
+      const started = await run(() =>
+        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
+      );
+      assert.equal(started.code, EXIT_OK, started.err);
+      const lines = started.out.split("\n").filter((line) => line.includes("origin"));
+      assert.equal(lines.length, 1, started.out);
+      assert.match(lines[0] ?? "", /did not answer as a git remote \(fatal: unable to update url base from redirection\)/);
+      assert.match(lines[0] ?? "", /git remote set-url origin/);
+      assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
+    } finally {
+      unanswered();
+      state.restore();
+    }
+  });
+
   it("stops on a vehicle THIS CHECKOUT chose and cannot reach, naming the layer", async () => {
     // Before anything is billed and before the session is on the record.
     // Only a vehicle somebody CHOSE: a first-run machine with no seat and no

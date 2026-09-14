@@ -45,9 +45,7 @@ import {
   type ConfigureOptions,
   type LedgerVerbs,
   type ModuleCreateOptions,
-  type ModulePackOptions,
   type ModuleVerbs,
-  type OneModuleVerbs,
   type RepositoryTarget,
   type Router,
   type RouterResult,
@@ -348,19 +346,7 @@ export class InProcessRouter implements Router {
       optional(args, "--kind", o.kind);
       for (const dependency of o.dependsOn ?? []) args.push("--depends-on", dependency);
       optional(args, "--package", o.package);
-      optional(args, "--contract", o.contract);
       return this.text("modules", args, o.workspaceRoot);
-    },
-  };
-
-  // --- module ----------------------------------------------------------------
-
-  public readonly module: OneModuleVerbs = {
-    /** The committed package, out of band; the pack's own lines are the stdout. */
-    pack: (o: ModulePackOptions) => {
-      const args = ["pack", o.slug, "--workspace-root", o.workspaceRoot];
-      optional(args, "--session", o.session === undefined ? undefined : String(o.session));
-      return this.text("module", args, o.workspaceRoot);
     },
   };
 

@@ -1,22 +1,25 @@
 // A module session's run of record, walked end to end over a two-module
-// repository: the candidate is packed before any suite runs, only the suites
-// the impact plan reached run, and the close gate demands those and no
-// other. The suites and the pack are scripted programs; the verifier is the
-// offline transport's scripted answer, as walk-session's is.
+// repository whose modules reference each other as projects: only the suites
+// the impact plan reached run, the framework writes the root build files the
+// solution lacked before the work is verified, the session lands and closes
+// with no candidate job, and the close gate demands the reached suites and no
+// other.
+// The suites are scripted programs; the verifier is the offline transport's
+// scripted answer, as walk-session's is.
 //
 // A walkthrough, because the thing under test is the run-of-record phase
 // standing on a real repository and real jobs.
 
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { after, describe, it } from "node:test";
 
 import { CONFIG_ENV_VAR, loadConfig } from "../src/config.ts";
 import { sessionNext } from "../src/drive.ts";
 import { judgeFreshness } from "../src/gates.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
-import { candidatePathsAsWritten, demandedByPlan, readCandidateRecord, readImpactPlan } from "../src/impact.ts";
+import { demandedByPlan, readImpactPlan } from "../src/impact.ts";
 import { solutionShape } from "../src/modules.ts";
 import { capture } from "../src/output.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
@@ -24,7 +27,7 @@ import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
 import { EXIT_OK, report, start } from "../src/session.ts";
 import { TEST_RUNS_FILENAME, evaluateFreshness, loadSuitesChecked } from "../src/testEvidence.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
-import { makeRepo } from "./support/repo.ts";
+import { gitOut, makeRepo } from "./support/repo.ts";
 
 const NODE = process.execPath;
 const VERIFIED = "VERIFIED\n\nThe store is real.\n";
@@ -33,11 +36,9 @@ const MANIFEST = [
   "modules:",
   "- slug: model",
   "  kind: shared-types",
-  "  package: CsvModel",
   "  codeRoots:",
   "  - modules/model",
   "- slug: persister",
-  "  package: CsvPersister",
   "  dependsOn:",
   "  - model",
   "  codeRoots:",
@@ -51,56 +52,22 @@ const SEED: Record<string, string> = {
     "### Session 1 of 2: The store\n1. Register.\n2. Make the store real.\n3. Verify; close.\n\n" +
     "### Session 2 of 2: Later\n1. Polish.\n",
   "global.json": "{}\n",
-  // The root build files a multi-module solution has once its second
-  // module was declared (session 103): the candidate moves a pin in them,
-  // never makes them.
-  "nuget.config":
-    '<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n' +
-    '    <add key="modules" value="packages" />\n  </packageSources>\n</configuration>\n',
-  "Directory.Packages.props":
-    "<Project>\n  <PropertyGroup>\n    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>\n" +
-    '  </PropertyGroup>\n  <ItemGroup Label="Modules">\n    <PackageVersion Include="CsvModel" Version="0.1.0" />\n' +
-    "  </ItemGroup>\n</Project>\n",
-  "Directory.Build.props": "<Project />\n",
-  "Directory.Build.targets": "<Project />\n",
-  "packages/.gitattributes": "# *.nupkg filter=lfs diff=lfs merge=lfs -text\n",
-  "packages/README.md": "# packages\n",
-  "packages/CsvModel.0.1.0.nupkg": "stands in for the model's package\n",
   "modules/model/src/CsvModel/CsvModel.csproj": "<Project><PropertyGroup><Version>0.1.0</Version></PropertyGroup></Project>\n",
   "modules/model/src/CsvModel/Person.cs": "public sealed class Person {}\n",
-  "modules/model/contract/README.md": "# CsvModel\n",
-  "modules/persister/src/CsvPersister/CsvPersister.csproj": "<Project><PropertyGroup><Version>0.1.0</Version></PropertyGroup></Project>\n",
+  "modules/persister/src/CsvPersister/CsvPersister.csproj":
+    '<Project><ItemGroup><ProjectReference Include="../../../model/src/CsvModel/CsvModel.csproj" /></ItemGroup></Project>\n',
   "modules/persister/src/CsvPersister/Store.cs": "public sealed class Store { public int Count => 0; }\n",
-  "modules/persister/contract/README.md": "# CsvPersister\n",
   // Each suite appends its name: which ran, and in what order, is the record.
   "tests/run.mjs":
     "import { appendFileSync } from 'node:fs';\n" +
     "appendFileSync('tests/ran.log', process.argv[2] + '\\n');\n" +
     "process.exit(0);\n",
-  // The scripted pack: the artifact the framework expects, and nothing else.
-  "tests/pack.mjs":
-    "import { writeFileSync } from 'node:fs';\n" +
-    "import { join } from 'node:path';\n" +
-    "const [output, version, id] = process.argv.slice(2);\n" +
-    "writeFileSync(join(output, id + '.' + version + '.nupkg'), 'package bytes\\n');\n",
   ".gitignore": ".dabbler/\ntests/ran.log\n",
 };
 
-// The scripted suites and pack live under `tests/`, a root-level directory
-// no module's roots hold; each module declares them shared.
-function packaging(id: string): Record<string, unknown> {
-  return {
-    sharedFiles: ["tests/run.mjs", "tests/pack.mjs"],
-    packaging: {
-      pack: { argv: [NODE, "tests/pack.mjs", "{output}", "{version}", id] },
-      push: {
-        argv: [NODE, "-e", "process.exit(1)", "{artifact}", "{feed}", "{secret}"],
-        feed: "https://feed.example.invalid/v3/index.json",
-        secret: "DABBLER_TEST_FEED_PAT",
-      },
-    },
-  };
-}
+// The scripted suites live under `tests/`, a root-level directory no
+// module's roots hold; each module declares it shared.
+const SHARED = { sharedFiles: ["tests/run.mjs"] };
 
 const TESTING = {
   suites: [
@@ -154,13 +121,14 @@ const PLAN = {
   ],
 };
 
-// The repository's own declaration -- its suites and its modules' packaging --
-// lives in its dabbler.yaml, where the close's gates read it; JSON is YAML.
+// The repository's own declaration -- its suites and its modules' shared
+// files -- lives in its dabbler.yaml, where the close's gates read it; JSON
+// is YAML.
 const DABBLER_YAML = JSON.stringify(
   {
     schema_version: 1,
     testing: TESTING,
-    modules: { model: packaging("CsvModel"), persister: packaging("CsvPersister") },
+    modules: { model: SHARED, persister: SHARED },
   },
   null,
   2,
@@ -182,7 +150,7 @@ function configure(responses: readonly string[]): void {
         // The same declaration the repository carries, for the driver run
         // in this process, which reads its configuration where it stands.
         testing: TESTING,
-        modules: { model: packaging("CsvModel"), persister: packaging("CsvPersister") },
+        modules: { model: SHARED, persister: SHARED },
       }),
     ),
   });
@@ -214,7 +182,7 @@ const repo = makeRepo({ ...SEED, "dabbler.yaml": `${DABBLER_YAML}\n` }, { origin
 const sessions = join(repo, "docs", "sessions");
 
 describe("a module session's run of record", () => {
-  it("packs the changed module's candidate before any suite, runs the suites the plan reached and no other", async () => {
+  it("writes the root build files before the round, runs the suites the plan reached and no other, and lands and closes with no candidate job", async () => {
     setProviderKeys();
     resetRouter();
     resetRuntimeMode();
@@ -249,7 +217,8 @@ describe("a module session's run of record", () => {
     );
     assert.equal(reported.value, EXIT_OK, reported.stderr);
 
-    // The framework works; a call is a poll, on a clock.
+    // The framework works; a call is a poll, on a clock. `done` is the
+    // session landed and closed.
     const trail: string[] = [];
     const deadline = Date.now() + 180_000;
     let instruction: DriverInstruction | null = null;
@@ -278,12 +247,11 @@ describe("a module session's run of record", () => {
     }
     const log = trail.join("");
 
-    // The candidate job started before the run of record's first suite.
-    const candidateAt = log.indexOf("job-started name=candidate: persister");
-    const suiteAt = log.indexOf("job-started name=run of record: persister-unit");
-    assert.ok(candidateAt >= 0, "the candidate job ran");
-    assert.ok(suiteAt >= 0, "persister's unit suite ran");
-    assert.ok(candidateAt < suiteAt, "the candidate came first");
+    // The run of record ran and nothing was packed before it: a sibling is
+    // its project, so there is no candidate and no packages folder.
+    assert.ok(log.includes("job-started name=run of record: persister-unit"), "persister's unit suite ran");
+    assert.doesNotMatch(log, /job-started name=candidate/);
+    assert.equal(existsSync(join(repo, "packages")), false);
     assert.match(log, /run-of-record-skipped suite=model-unit/);
 
     // Only the reached suite ran: the persister's own. The model's did not,
@@ -291,14 +259,20 @@ describe("a module session's run of record", () => {
     // the model did not change.
     assert.deepEqual(readFileSync(join(repo, "tests", "ran.log"), "utf8").trim().split("\n"), ["persister-unit"]);
 
-    // The candidate: packed, pinned, recorded, and the plan beside the run.
-    const packages = readdirSync(join(repo, "packages"));
-    assert.ok(packages.some((name) => /^CsvPersister\.0\.1\.0-dev\.\d{8}\.1\.g[0-9a-f]{7}\.nupkg$/.test(name)), packages.join(", "));
-    assert.match(readFileSync(join(repo, "Directory.Packages.props"), "utf8"), /Include="CsvPersister" Version="0\.1\.0-dev\./);
     const impact = readImpactPlan(repo, 1);
     assert.deepEqual(impact?.changedModules, ["persister"]);
-    assert.deepEqual(impact?.candidates, ["persister"]);
     assert.deepEqual(impact?.suites.map((suite) => suite.name), ["persister-unit"]);
+
+    // The solution had no root build files: the framework wrote them before
+    // the round, and they landed with the work.
+    assert.match(log, /root-files/);
+    const solution = `${basename(repo)}.slnx`;
+    assert.match(readFileSync(join(repo, solution), "utf8"), /modules\/persister\/src\/CsvPersister\/CsvPersister\.csproj/);
+    assert.match(readFileSync(join(repo, ".gitignore"), "utf8"), /^bin\/$/m);
+    assert.deepEqual(
+      gitOut(repo, "ls-files", solution, "Directory.Build.props", "Directory.Build.targets").split("\n").filter(Boolean).sort(),
+      ["Directory.Build.props", "Directory.Build.targets", solution].sort(),
+    );
   });
 
   it("the gate demands the reached suites and no other: green with the model's suite unrecorded, red by name once the persister's record is gone", () => {
@@ -321,15 +295,5 @@ describe("a module session's run of record", () => {
     assert.equal(passed, false);
     assert.match(reason, /persister-unit/);
     assert.doesNotMatch(reason, /model-unit/);
-
-    // The candidate's paths are set aside by the verification gate only
-    // while their bytes are the candidate's: the pins as written are, and
-    // the pins edited since are not.
-    const candidate = readCandidateRecord(repo, 1);
-    assert.ok(candidate.paths.some((entry) => entry.path === "Directory.Packages.props"));
-    assert.ok(candidatePathsAsWritten(repo, candidate).has("Directory.Packages.props"));
-    const props = join(repo, "Directory.Packages.props");
-    writeFileSync(props, `${readFileSync(props, "utf8")}<!-- edited after the candidate -->\n`, "utf8");
-    assert.equal(candidatePathsAsWritten(repo, candidate).has("Directory.Packages.props"), false);
   });
 });

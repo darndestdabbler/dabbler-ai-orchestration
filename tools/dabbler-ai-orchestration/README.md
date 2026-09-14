@@ -48,9 +48,8 @@ No verdict a person can type exists anywhere in the product.
 **3. Modules, in the one repository you opened.**
 Declare your solution's modules once, in `docs/modules.yaml`. Every session
 runs in the repository itself, and a session's plan names the modules it
-touches, or none. The Solution Explorer shows each module with its package,
-its contract and its run of record, and offers Show Impact and Pack Module
-on every module row.
+touches, or none. The Solution Explorer shows each module with its package
+and its run of record, and offers Show Impact on every module row.
 
 **4. Works through a Copilot seat or direct API keys.**
 

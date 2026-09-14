@@ -593,15 +593,7 @@ testing:
       - when: packages/router/src/ecosystem.ts
         select:
           - packages/router/test/ecosystem.test.ts
-          - packages/router/test/contractdoc.test.ts
-          - packages/router/test/packages.test.ts
-          - packages/router/test/land.test.ts
           - packages/router/test/gates.test.ts
-      # Committed immutable packages: the dev version, the central pin and
-      # the correspondence record.
-      - when: packages/router/src/packages.ts
-        select:
-          - packages/router/test/packages.test.ts
       # The impact plan: what a change reaches, computed once for the
       # selector, the run of record and the close gate.
       - when: packages/router/src/impact.ts
@@ -609,8 +601,8 @@ testing:
           - packages/router/test/impact.test.ts
           - packages/router/test/checks.test.ts
           - packages/router/test/walk-impact.test.ts
-      # The atomic land: the judges the land and the close's module gates
-      # read, and the bundle record.
+      # The atomic land: the judge of whether the tested bytes are the
+      # landed bytes.
       - when: packages/router/src/land.ts
         select:
           - packages/router/test/land.test.ts

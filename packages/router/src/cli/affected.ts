@@ -199,11 +199,8 @@ export async function affectedVerb(argv: string[]): Promise<number> {
   // touched feed, and the declared ones nothing ships yet. Both are
   // statements about the solution's shape, and neither gates anything.
   for (const line of deployableLines(shape.deployables, result.modules)) lines.push(`${line}\n`);
-  // The rest of the plan: the candidates packed before the run of record,
-  // and the paths no module owns, which the plan reaches nothing for.
-  if (result.impact !== null && result.impact.candidates.length > 0) {
-    lines.push(`candidates: ${result.impact.candidates.join(", ")} (packed before the run of record)\n`);
-  }
+  // The rest of the plan: the paths no module owns, which the plan reaches
+  // nothing for.
   if (result.impact !== null && result.impact.unowned.length > 0) {
     lines.push(`unowned: ${result.impact.unowned.join(", ")} (no module's roots or shared files hold these)\n`);
   }

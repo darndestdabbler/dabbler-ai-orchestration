@@ -2,11 +2,11 @@
 //
 // The manifest is a YAML mapping with a `modules` list; each entry is
 // `{slug, title?, planPath?, codeRoots?, touches?, specSections?,
-// contextAssets?, kind?, dependsOn?, package?, contract?}`. `codeRoots`
+// contextAssets?, kind?, dependsOn?, package?}`. `codeRoots`
 // bounds the module on disk, `specSections` maps reference spec sections to
 // it, and `contextAssets` names its schemas/config/migrations. `kind`,
-// `dependsOn`, `package` and `contract` are the module vocabulary: what a
-// sibling consumes, in which direction, and what the seam is. Who depends
+// `dependsOn` and `package` are the module vocabulary: what a sibling
+// consumes, and in which direction. Who depends
 // on a module is DERIVED from `dependsOn` and never written -- two
 // directions kept by hand disagree eventually, and the disagreement is
 // silent. The extension's reader takes the keys it knows and ignores the
@@ -17,8 +17,8 @@
 // what was written, which is the failure this manifest exists to prevent.
 //
 // ONE MODULE IS THE DEFAULT SHAPE. An absent manifest, or one with a single
-// entry, is a single-module solution whose repository IS the module: no
-// packages folder, no contracts, the run of record the module's own suites. `solutionShape` is the one function that says which
+// entry, is a single-module solution whose repository IS the module, and
+// the run of record is the module's own suites. `solutionShape` is the one function that says which
 // shape a repository is in, and every multi-module code path asks it --
 // nothing switches on until a second entry is declared.
 //
@@ -35,11 +35,6 @@ import { writeErr, writeOut } from "./output.ts";
 import { writeTextLf } from "./journal.ts";
 import { dumps, pythonRepr } from "./pythonJson.ts";
 import { readText } from "./textfile.ts";
-
-/** Where a module's contract folder lives, relative to the root. */
-export function contractDirFor(slug: string): string {
-  return `modules/${slug}/contract`;
-}
 
 export const EXIT_OK = 0;
 export const EXIT_REFUSED = 1;
@@ -80,16 +75,6 @@ export const PACKAGE_NONE = "none";
 export const KINDS = ["shared-types", "library", "application"] as const;
 export type ModuleKind = (typeof KINDS)[number];
 
-/**
- * Where a module's contract lives. `designed`: an abstractions package and
- * a contract-test package beside the implementation. `package`: the public
- * package is its own abstraction (a value library, shared types).
- * `generated`: the surface is generated from the built assembly and marked
- * as such -- shape, not behaviour.
- */
-export const CONTRACT_MODES = ["designed", "package", "generated"] as const;
-export type ContractMode = (typeof CONTRACT_MODES)[number];
-
 export const KNOWN_ENTRY_KEYS: readonly string[] = [
   "slug",
   "title",
@@ -101,6 +86,8 @@ export const KNOWN_ENTRY_KEYS: readonly string[] = [
   "kind",
   "dependsOn",
   "package",
+  // Read and ignored: a module's contract was a seam this framework no
+  // longer keeps, and a manifest that still names one is not refused for it.
   "contract",
 ];
 
@@ -169,7 +156,6 @@ export interface ModuleEntry {
   readonly dependsOn: readonly string[];
   /** The artifact id a sibling consumes: a NuGet id, or Maven's `groupId:artifactId`. */
   readonly package: string | null;
-  readonly contract: ContractMode | null;
 }
 
 /** A manifest that refuses rather than being silently rewritten. */
@@ -351,7 +337,6 @@ export function parseEntries(
       LIST_KEYS.map((key) => [key, stringList(raw[key], where, key)]),
     ) as Record<(typeof LIST_KEYS)[number], string[]>;
     const pkg = optionalString(raw["package"], where, "package");
-    const contract = oneOf(raw["contract"], CONTRACT_MODES, where, "contract");
     entries.push({
       slug,
       title: (typeof title === "string" ? title : "").trim() || slug,
@@ -363,9 +348,6 @@ export function parseEntries(
       kind: oneOf(raw["kind"], KINDS, where, "kind") ?? "library",
       dependsOn: lists.dependsOn,
       package: pkg,
-      // A declared package is its own abstraction until somebody designs
-      // one; a module with no package has no seam to name a contract for.
-      contract: contract ?? (pkg === null ? null : "package"),
     });
   }
   checkGraph(entries, source);
@@ -599,7 +581,6 @@ export function implicitModule(workspaceRoot: string): ModuleEntry {
     kind: "application",
     dependsOn: [],
     package: null,
-    contract: null,
   };
 }
 
@@ -663,7 +644,6 @@ export interface CreateOptions {
   readonly kind?: string | null;
   readonly dependsOn?: readonly string[] | null;
   readonly package?: string | null;
-  readonly contract?: string | null;
 }
 
 /** The slug's words joined in PascalCase: `item-model` -> `ItemModel`. */
@@ -710,10 +690,8 @@ function defaultPackage(slug: string, existing: readonly ModuleEntry[]): string 
  *
  * The two values a module cannot work without are defaulted here rather
  * than asked for. The extension's New Module flow prompts for four -- slug,
- * title, kind, depends-on -- and a module missing the other two is refused
- * by both operations a multi-module solution exists for: an absent
- * `codeRoots` reads as the repository root, and an absent `package` is
- * what `module pack` refuses.
+ * title, kind, depends-on -- and a module missing `codeRoots` would read as
+ * the repository root.
  * This verb is the one writer behind both the button and the command line,
  * so the default belongs here: it fixes both at once, leaves the flow at
  * four boxes, and an explicit `--code-root` or `--package` still wins.
@@ -766,7 +744,6 @@ export function create(
   if (options.package !== PACKAGE_NONE) {
     entry["package"] = options.package || defaultPackage(slug, declared);
   }
-  if (options.contract) entry["contract"] = options.contract;
   modules.push(entry);
   try {
     parseEntries(doc, path);
@@ -789,8 +766,7 @@ export function create(
 
 /**
  * One module's entry under `modules:` in the root `dabbler.yaml`: how it
- * publishes, which shared files a session on it may change, and how its
- * surface is generated when its contract is the generated fallback. Every
+ * publishes, and which shared files a session on it may change. Every
  * member optional; the manifest says what the modules ARE, this says what
  * the repository declares about each.
  */
@@ -800,10 +776,10 @@ export interface ModuleConfig {
   readonly packaging: Record<string, unknown> | null;
   /** Repository-relative paths outside the module's roots a session on it may change. */
   readonly sharedFiles: readonly string[];
-  /** argv for the generated-surface fallback (`contract: generated`). */
-  readonly contractGenerate: readonly string[] | null;
 }
 
+// `contract` is read and ignored: the generated surface it declared is gone,
+// and a configuration that still carries it is not refused for it.
 const KNOWN_CONFIG_KEYS: readonly string[] = ["packaging", "sharedFiles", "contract"];
 
 /**
@@ -827,8 +803,8 @@ export function moduleConfigs(
   }
   const declared = new Set(entries.map((entry) => entry.slug));
   for (const [slug, value] of Object.entries(raw)) {
-    // `modules.packages` is the feed's own block, and `modules.checkout`
-    // configured a checkout that no longer exists; neither is a module's.
+    // `modules.packages` configured a committed feed and `modules.checkout` a
+    // checkout, and neither exists any more; neither is a module's.
     if (slug === "packages" || slug === "checkout") continue;
     const where = `dabbler.yaml: modules.${slug}`;
     if (!declared.has(slug)) {
@@ -850,50 +826,13 @@ export function moduleConfigs(
     if (packaging !== null && packaging !== undefined && !isRecord(packaging)) {
       throw new ManifestError(`${where}.packaging must be a mapping`);
     }
-    let contractGenerate: string[] | null = null;
-    const contract = value["contract"];
-    if (contract !== null && contract !== undefined) {
-      if (!isRecord(contract)) throw new ManifestError(`${where}.contract must be a mapping`);
-      const generate = contract["generate"];
-      if (generate !== null && generate !== undefined) {
-        contractGenerate = stringList(generate, where, "contract.generate");
-        if (contractGenerate.length === 0) {
-          throw new ManifestError(`${where}.contract.generate must name a program`);
-        }
-      }
-    }
     out.set(slug, {
       slug,
       packaging: isRecord(packaging) ? packaging : null,
       sharedFiles: stringList(value["sharedFiles"], where, "sharedFiles"),
-      contractGenerate,
     });
   }
   return out;
-}
-
-/** Five MiB: a committed package larger than this goes under LFS or is refused. */
-export const DEFAULT_PACKAGES_CEILING_BYTES = 5 * 1024 * 1024;
-
-/**
- * `modules.packages.ceilingBytes` from the configuration: the largest
- * package the committed feed takes without LFS. Absent is the default; a
- * value that is not a positive integer is refused by name rather than
- * read as zero or as no ceiling at all.
- */
-export function packagesCeiling(config: unknown): number {
-  if (!isRecord(config)) return DEFAULT_PACKAGES_CEILING_BYTES;
-  const modules = config["modules"];
-  if (!isRecord(modules)) return DEFAULT_PACKAGES_CEILING_BYTES;
-  const packages = modules["packages"];
-  if (packages === null || packages === undefined) return DEFAULT_PACKAGES_CEILING_BYTES;
-  if (!isRecord(packages)) throw new ManifestError("dabbler.yaml: modules.packages must be a mapping");
-  const ceiling = packages["ceilingBytes"];
-  if (ceiling === null || ceiling === undefined) return DEFAULT_PACKAGES_CEILING_BYTES;
-  if (typeof ceiling !== "number" || !Number.isInteger(ceiling) || ceiling < 1) {
-    throw new ManifestError("dabbler.yaml: modules.packages.ceilingBytes must be a positive integer");
-  }
-  return ceiling;
 }
 
 /** What `dabbler modules show` prints: the shape, with `usedBy` derived per module. */
@@ -907,7 +846,6 @@ export function shown(workspaceRoot: string): Record<string, unknown> {
       title: entry.title,
       kind: entry.kind,
       package: entry.package,
-      contract: entry.contract,
       codeRoots: [...entry.codeRoots],
       dependsOn: [...entry.dependsOn],
       usedBy: consumersOf(shape.modules, entry.slug),

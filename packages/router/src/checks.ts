@@ -535,7 +535,6 @@ export class SelectionResult {
         ? {
             impact: {
               changedModules: [...this.impact.changedModules],
-              candidates: [...this.impact.candidates],
               unowned: [...this.impact.unowned],
               suites: this.impact.suites.map((suite) => ({ ...suite })),
             },

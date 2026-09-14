@@ -190,8 +190,6 @@ export interface ModuleCreateOptions {
   readonly dependsOn?: readonly string[];
   /** The artifact id a sibling consumes. */
   readonly package?: string;
-  /** `designed`, `package` or `generated`. */
-  readonly contract?: string;
 }
 
 /**
@@ -209,23 +207,6 @@ export interface ModuleCreateOptions {
  */
 export interface ModuleVerbs {
   create(options: ModuleCreateOptions): Promise<RouterResult<RouterText>>;
-}
-
-export interface ModulePackOptions {
-  readonly workspaceRoot: string;
-  readonly slug: string;
-  /** The session the package's record names; none when packed out of band. */
-  readonly session?: number;
-}
-
-export interface OneModuleVerbs {
-  /**
-   * Build the module's committed package, move the central pin and write the
-   * record -- the same pack the framework runs at the candidate, asked for
-   * out of band so a sibling's next session can consume it. Its stdout is
-   * the pack's own lines: the version, each artefact, the pin, the record.
-   */
-  pack(options: ModulePackOptions): Promise<RouterResult<RouterText>>;
 }
 
 export interface VerifyRoundOptions extends RepositoryTarget {
@@ -449,8 +430,6 @@ export interface AffectedOptions extends RepositoryTarget {
 export interface Router {
   readonly session: SessionVerbs;
   readonly modules: ModuleVerbs;
-  /** One module of a multi-module solution: its contract and its package. */
-  readonly module: OneModuleVerbs;
   readonly verify: VerifyVerbs;
   readonly ledger: LedgerVerbs;
   readonly testEvidence: TestEvidenceVerbs;

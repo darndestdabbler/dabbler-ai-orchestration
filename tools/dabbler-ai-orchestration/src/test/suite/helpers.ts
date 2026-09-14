@@ -250,9 +250,6 @@ export function fakeRouter(
         },
       },
       modules: { create: text("modules create") },
-      module: {
-        pack: text("module pack"),
-      },
       verify: {
         round: text("verify"),
         dispute: text("verify dispute"),

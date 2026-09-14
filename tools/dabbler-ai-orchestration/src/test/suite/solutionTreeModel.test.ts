@@ -13,7 +13,6 @@ import {
   ProjectionConfiguration,
   ProjectionModule,
   childrenOf,
-  contractTarget,
   descriptorFor,
   externalLocation,
   repositoryPathOf,
@@ -36,23 +35,23 @@ function modules(): ProjectionModule[] {
   return [
     {
       slug: "model", title: "CSV model", kind: "shared-types", package: "CsvModel",
-      contract: "package", codeRoots: ["modules/model"], dependsOn: [],
-      usedBy: ["deserializer", "persister", "listener"], contractDir: "modules/model/contract",
+      codeRoots: ["modules/model"], dependsOn: [],
+      usedBy: ["deserializer", "persister", "listener"],
     },
     {
       slug: "deserializer", title: "CSV deserializer", kind: "library", package: "CsvDeserializer",
-      contract: "designed", codeRoots: ["modules/deserializer"], dependsOn: ["model"],
-      usedBy: ["listener"], contractDir: null,
+      codeRoots: ["modules/deserializer"], dependsOn: ["model"],
+      usedBy: ["listener"],
     },
     {
       slug: "persister", title: "EF Core persister", kind: "library", package: "CsvPersister",
-      contract: "designed", codeRoots: ["modules/persister"], dependsOn: ["model"],
-      usedBy: ["listener"], contractDir: null,
+      codeRoots: ["modules/persister"], dependsOn: ["model"],
+      usedBy: ["listener"],
     },
     {
       slug: "listener", title: "The listener", kind: "application", package: null,
-      contract: null, codeRoots: ["modules/listener"],
-      dependsOn: ["model", "deserializer", "persister"], usedBy: [], contractDir: null,
+      codeRoots: ["modules/listener"],
+      dependsOn: ["model", "deserializer", "persister"], usedBy: [],
     },
   ];
 }
@@ -72,8 +71,8 @@ function single(): Projection {
     solution: { name: "csv-model", title: "csv-model", multi: false, implicit: true, moduleCount: 1 },
     modules: [
       {
-        slug: "csv-model", title: "csv-model", kind: "application", package: null, contract: null,
-        codeRoots: ["."], dependsOn: [], usedBy: [], contractDir: null,
+        slug: "csv-model", title: "csv-model", kind: "application", package: null,
+        codeRoots: ["."], dependsOn: [], usedBy: [],
       },
     ],
   };
@@ -93,7 +92,7 @@ suite("solutionTreeModel: modules", () => {
     // The shared-types module at the bottom is used by everything above it,
     // and the row says so without anyone having written it down.
     const model = childrenOf({ kind: "module", slug: "model" }, p).map((n) => n.kind);
-    assert.deepStrictEqual(model, ["contract", "usedBy"]);
+    assert.deepStrictEqual(model, ["usedBy"]);
     assert.deepStrictEqual(
       childrenOf({ kind: "usedBy", slug: "model" }, p).map((n) => (n as { consumer: string }).consumer),
       ["deserializer", "persister", "listener"],
@@ -157,7 +156,7 @@ suite("solutionTreeModel: modules", () => {
     // repository is the module, and the Work Explorer is where its runs read.
     const single = descriptorFor({ kind: "module", slug: "csv-model" }, {
       solution: { name: "csv-model", title: "csv-model", multi: false, implicit: true, moduleCount: 1 },
-      modules: [{ slug: "csv-model", title: "csv-model", kind: "application", package: null, contract: null, codeRoots: ["."], dependsOn: [], usedBy: [], contractDir: null, runOfRecord: "none" }],
+      modules: [{ slug: "csv-model", title: "csv-model", kind: "application", package: null, codeRoots: ["."], dependsOn: [], usedBy: [], runOfRecord: "none" }],
     });
     assert.ok(!single.description?.includes("run of record"));
   });
@@ -186,16 +185,6 @@ suite("solutionTreeModel: modules", () => {
     assert.ok(row.tooltip?.includes("docs/modules.yaml"));
   });
 
-  test("the contract row opens the notes page when the router found the folder, and says so when it did not", () => {
-    const p = projection();
-    const has = descriptorFor({ kind: "contract", slug: "model" }, p);
-    assert.strictEqual(has.description, "open");
-    assert.strictEqual(contractTarget(p.modules[0]), "modules/model/contract/README.md");
-    const missing = descriptorFor({ kind: "contract", slug: "persister" }, p);
-    assert.strictEqual(missing.description, "not written yet");
-    assert.strictEqual(contractTarget(p.modules[2]), undefined);
-  });
-
   test("an unknown module yields no children rather than throwing", () => {
     assert.deepStrictEqual(childrenOf({ kind: "module", slug: "ghost" }, projection()), []);
   });
@@ -205,7 +194,6 @@ suite("solutionTreeModel: modules", () => {
     const nodes = [
       { kind: "solution" as const },
       { kind: "module" as const, slug: "model" },
-      { kind: "contract" as const, slug: "model" },
       { kind: "dependsOn" as const, slug: "listener" },
       { kind: "dependency" as const, slug: "listener", dependency: "model" },
       { kind: "usedBy" as const, slug: "model" },
@@ -431,76 +419,6 @@ suite("solutionTreeModel: what other repositories build", () => {
     });
     assert.strictEqual(target.path, null);
     assert.ok(target.reason.includes("not on this machine"));
-  });
-
-  test("the bundles node renders each bundle record with its dependencies, and a module reads where it shipped", () => {
-    const rows = modules().map((m) =>
-      m.slug === "model" || m.slug === "persister" || m.slug === "listener" ? { ...m, shippedIn: ["listener"] } : { ...m, shippedIn: [] },
-    );
-    const p = projection({
-      modules: rows,
-      bundles: [
-        {
-          bundle: "listener",
-          version: "2.0.0",
-          baseCommit: "abc123def456",
-          date: "2026-09-07",
-          session: 12,
-          dependencies: [
-            { module: "model", package: "CsvModel", version: "1.2.0", digest: "m-120" },
-            { module: "persister", package: "CsvPersister", version: "0.4.1", digest: null },
-          ],
-        },
-      ],
-    });
-    // Under the solution, after the modules: a bundles node with one row per record.
-    const top = childrenOf({ kind: "solution" }, p);
-    assert.ok(top.some((n) => n.kind === "bundleGroup"));
-    const group = descriptorFor({ kind: "bundleGroup" }, p);
-    assert.strictEqual(group.label, "Bundles");
-    assert.strictEqual(group.description, "1");
-    const bundles = childrenOf({ kind: "bundleGroup" }, p);
-    assert.deepStrictEqual(bundles, [{ kind: "bundle", bundle: "listener" }]);
-    const row = descriptorFor({ kind: "bundle", bundle: "listener" }, p);
-    assert.strictEqual(row.description, "2.0.0 · 2026-09-07");
-    assert.ok(row.tooltip?.includes("abc123def456"));
-    const deps = childrenOf({ kind: "bundle", bundle: "listener" }, p);
-    assert.deepStrictEqual(deps.map((n) => (n as { pkg: string }).pkg), ["CsvModel", "CsvPersister"]);
-    assert.strictEqual(descriptorFor({ kind: "bundleDependency", bundle: "listener", pkg: "CsvModel" }, p).description, "1.2.0 (model)");
-    // The module row says where it shipped; a solution with no record has no bundles node.
-    assert.ok(descriptorFor({ kind: "module", slug: "model" }, p).description?.includes("shipped in: listener"));
-    assert.ok(!childrenOf({ kind: "solution" }, projection()).some((n) => n.kind === "bundleGroup"));
-  });
-
-  test("a bundle row names the modules the deployable ships, and one with none reads as before", () => {
-    // A deployable can ship several application modules, so the row says
-    // which -- and a record written before deployables existed names none.
-    const p = projection({
-      modules: modules().map((m) => ({ ...m, shippedIn: m.slug === "listener" ? ["edge"] : [] })),
-      bundles: [
-        {
-          bundle: "edge",
-          from: ["listener", "tool"],
-          version: "3.1.0",
-          baseCommit: "abc123def456",
-          date: "2026-09-07",
-          session: 20,
-          dependencies: [{ module: "model", package: "CsvModel", version: "1.2.0", digest: "m-120" }],
-        },
-        {
-          bundle: "legacy",
-          version: "1.0.0",
-          date: "2026-09-01",
-          dependencies: [],
-        },
-      ],
-    });
-    const shipped = descriptorFor({ kind: "bundle", bundle: "edge" }, p);
-    assert.strictEqual(shipped.description, "3.1.0 · listener, tool");
-    assert.ok(shipped.tooltip?.includes("Ships listener, tool."));
-    const older = descriptorFor({ kind: "bundle", bundle: "legacy" }, p);
-    assert.strictEqual(older.description, "1.0.0 · 2026-09-01");
-    assert.ok(!older.tooltip?.includes("Ships"));
   });
 
   test("renders the consumers of a package as derived rows", () => {

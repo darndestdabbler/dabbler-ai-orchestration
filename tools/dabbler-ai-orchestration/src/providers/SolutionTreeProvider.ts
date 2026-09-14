@@ -18,7 +18,6 @@ import {
   Projection,
   SolutionNode,
   childrenOf,
-  contractTarget,
   descriptorFor,
   rootNodes,
 } from "./solutionTreeModel";
@@ -305,26 +304,6 @@ export class SolutionTreeProvider
     // and takes the node so the handler knows which row it was.
     if (d.command) {
       item.command = { command: d.command, title: d.label, arguments: [element] };
-    }
-    if (element.kind === "contract" && d.contextValue === "dabblerContract") {
-      const target = contractTarget(
-        p.modules.find((m) => m.slug === element.slug),
-      );
-      // The folder is the router's finding; the notes page inside it is
-      // what an editor can open, and only when it is there.
-      if (target && this.workspaceRoot) {
-        const file = path.join(this.workspaceRoot, target);
-        if (fs.existsSync(file)) {
-          item.command = {
-            command: "vscode.open",
-            title: "Open contract",
-            // An editor tab, not a popup: this is the one row that serves
-            // the module's consumers, and they read it beside their own
-            // code.
-            arguments: [vscode.Uri.file(file)],
-          };
-        }
-      }
     }
     return item;
   }

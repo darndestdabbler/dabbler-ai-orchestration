@@ -38,11 +38,10 @@ type Module = {
   kind: string;
   dependsOn: string[];
   usedBy: string[];
-  contractDir: string | null;
 };
 
 describe("the module projection", () => {
-  it("projects the manifest in dependency order with usedBy derived, and the contract folder when the tree has it", () => {
+  it("projects the manifest in dependency order with usedBy derived", () => {
     const root = tempDir("projection-");
     seed(root, {
       "docs/modules.yaml": [
@@ -63,7 +62,6 @@ describe("the module projection", () => {
         "",
       ].join("\n"),
     });
-    mkdirSync(join(root, "modules", "persister", "contract"), { recursive: true });
     const doc = project(root);
     const solution = doc.solution as { multi: boolean; implicit: boolean; moduleCount: number };
     assert.equal(solution.multi, true);
@@ -73,13 +71,11 @@ describe("the module projection", () => {
     assert.deepEqual(modules.map((m) => m.slug), ["model", "persister", "deserializer", "listener"]);
     assert.deepEqual(modules[0]?.usedBy, ["persister", "deserializer", "listener"]);
     assert.deepEqual(modules[3]?.usedBy, []);
-    // The folder is reported only where the tree has it and a seam is declared.
-    assert.equal(modules[1]?.contractDir, "modules/persister/contract");
-    assert.equal(modules[2]?.contractDir, null);
-    assert.equal(modules[3]?.contractDir, null);
+    // A contract the manifest still carries is read and projects nothing.
+    assert.equal("contractDir" in (modules[1] ?? {}), false);
   });
 
-  it("projects the deployables a solution declares, including one nothing ships yet, and reads a module's shipped-in from a bundle's from", () => {
+  it("projects the deployables a solution declares, including one nothing ships yet", () => {
     const root = tempDir("projection-");
     seed(root, {
       "docs/modules.yaml": [
@@ -104,21 +100,6 @@ describe("the module projection", () => {
         "  from: []",
         "",
       ].join("\n"),
-      // Written by a releasable session's candidate: the record names the
-      // modules it was built from, and the projection reads it rather than
-      // recomputing what shipped.
-      "release/edge/bundle.yaml": [
-        "bundle: edge",
-        "from:",
-        "  - api",
-        "  - tool",
-        "version: 1.0.0",
-        "baseCommit: abc123",
-        "date: '2026-09-07'",
-        "session: 20",
-        "dependencies: []",
-        "",
-      ].join("\n"),
     });
     const doc = project(root);
     const deployables = doc.deployables as { slug: string; from: string[]; kind: string | null; publish: string | null; declared: boolean }[];
@@ -129,11 +110,6 @@ describe("the module projection", () => {
         ["installer", [], "cli", null, true],
       ],
     );
-    // `tool` has no package and is not the bundle's name; it is shipped in
-    // `edge` because the record says the bundle was built from it.
-    const modules = doc.modules as { slug: string; shippedIn: string[] }[];
-    assert.deepEqual(modules.find((module) => module.slug === "tool")?.shippedIn, ["edge"]);
-    assert.deepEqual(modules.find((module) => module.slug === "core")?.shippedIn, []);
   });
 
   it("marks the in-flight session's modules from its declaration, and a retired checkout on the row marks nothing", () => {

@@ -4,7 +4,7 @@
 // This file renders; it never decides. The projection is written by the
 // router (`projection.ts`) from the module manifest and the sibling
 // repositories' declarations, and every derived fact -- dependency order,
-// who uses whom, whether a contract folder exists -- is derived there. Two
+// who uses whom -- is derived there. Two
 // implementations of one rule disagree eventually, and the disagreement
 // surfaces as a row nobody can explain.
 
@@ -22,28 +22,22 @@ export interface ProjectionSolution {
  * One module, as the manifest declares it and the router derives the rest.
  *
  * `usedBy` is derived from every other module's `dependsOn` and written
- * nowhere; `contractDir` is reported only when the tree has the folder and
- * the module declares a seam, so the Contract row can say "open" without
- * guessing.
+ * nowhere.
  */
 export interface ProjectionModule {
   slug: string;
   title: string;
   kind: string;
   package?: string | null;
-  contract?: string | null;
   codeRoots: string[];
   dependsOn: string[];
   usedBy: string[];
-  contractDir?: string | null;
   /** The session working in this module right now, or null. */
   inSession?: number | null;
   /** The latest run of record of the module's suites: green, red, or none recorded. */
   runOfRecord?: "green" | "red" | "none";
   /** Consumers whose contract suite against this module is red. */
   blocking?: string[];
-  /** The bundles that pin this module's package, or are its own. */
-  shippedIn?: string[];
 }
 
 export interface ProjectionExternal {
@@ -112,23 +106,6 @@ export interface ProjectionMember {
   /** It declares its membership and nothing else yet. */
   shell: boolean;
   reason?: string | null;
-}
-
-/** One bundle record under release/: what a deployable ships, at which pins. */
-export interface ProjectionBundle {
-  bundle: string;
-  /**
-   * The application modules the deployable was built from. A record written
-   * before deployables existed names none, and the row reads as it always
-   * did: the bundle IS the application module it is named after.
-   */
-  from?: string[];
-  version: string;
-  /** The commit the bundle was built on; the landed one is the gate receipt's. */
-  baseCommit?: string | null;
-  date: string;
-  session?: number | null;
-  dependencies: { module: string; package: string; version: string; digest?: string | null }[];
 }
 
 /** Which transport is effective, and which layer decided it. */
@@ -338,20 +315,8 @@ export interface Projection {
   modules: ProjectionModule[];
   external?: ProjectionExternal[];
   members?: ProjectionMember[];
-  /** The bundle records, as the router read them; recorded, never executed. */
-  bundles?: ProjectionBundle[];
   /** What a session is run with; absent in a projection written before it existed. */
   configuration?: ProjectionConfiguration;
-}
-
-/**
- * Which file the Contract row opens: the notes page inside the module's
- * contract folder, when the router reported the folder. The router derives
- * the folder; this only names the page inside it.
- */
-export function contractTarget(m: ProjectionModule | undefined): string | undefined {
-  if (!m || !m.contractDir) return undefined;
-  return `${m.contractDir}/README.md`;
 }
 
 export type IconSpec = { id: string; tone?: "attention" | "done" | "muted" | "milestone" };
@@ -365,15 +330,11 @@ export type ConfigRoleName = "authoring" | "primaryReviewer" | "auxiliaryReviewe
 export type SolutionNode =
   | { kind: "solution" }
   | { kind: "module"; slug: string }
-  | { kind: "contract"; slug: string }
   | { kind: "dependsOn"; slug: string }
   | { kind: "dependency"; slug: string; dependency: string }
   | { kind: "usedBy"; slug: string }
   | { kind: "consumer"; slug: string; consumer: string }
   | { kind: "externalGroup" }
-  | { kind: "bundleGroup" }
-  | { kind: "bundle"; bundle: string }
-  | { kind: "bundleDependency"; bundle: string; pkg: string }
   | { kind: "external"; id: string }
   | { kind: "externalUsedBy"; id: string }
   | { kind: "externalConsumer"; id: string; repository: string }
@@ -725,8 +686,6 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
       // consumes has no external row at all, and it is the one the operator
       // most needs to see -- the next repository the plan will need.
       if (members(p).length > 1) own.push({ kind: "memberGroup" });
-      // What ships, when something has: the bundle records under release/.
-      if ((p.bundles ?? []).length > 0) own.push({ kind: "bundleGroup" });
       return own;
     }
     case "configuration": {
@@ -763,16 +722,6 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
       return [];
     case "externalGroup":
       return externals(p).map((e) => ({ kind: "external" as const, id: e.id }));
-    case "bundleGroup":
-      return (p.bundles ?? []).map((b) => ({ kind: "bundle" as const, bundle: b.bundle }));
-    case "bundle":
-      return ((p.bundles ?? []).find((b) => b.bundle === node.bundle)?.dependencies ?? []).map((d) => ({
-        kind: "bundleDependency" as const,
-        bundle: node.bundle,
-        pkg: d.package,
-      }));
-    case "bundleDependency":
-      return [];
     case "memberGroup":
       return members(p).map((m) => ({ kind: "member" as const, id: m.id }));
     case "external": {
@@ -801,10 +750,9 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
       if (!m) return [];
       const out: SolutionNode[] = [];
       // Each child only when there is something to say. A single-module
-      // solution -- the repository as the module, no seam declared -- shows
-      // one row and nothing under it, which is the shape in which nothing
-      // module-shaped has switched on.
-      if (m.contract) out.push({ kind: "contract", slug: m.slug });
+      // solution -- the repository as the module -- shows one row and
+      // nothing under it, which is the shape in which nothing module-shaped
+      // has switched on.
       if (m.dependsOn.length > 0) out.push({ kind: "dependsOn", slug: m.slug });
       if (m.usedBy.length > 0) out.push({ kind: "usedBy", slug: m.slug });
       return out;
@@ -891,8 +839,6 @@ export function descriptorFor(
       // The run of record reads on the row, from the records and never from
       // a claim: green, red, or none where nothing has been recorded.
       if (m.runOfRecord !== undefined && p.solution.multi) bits.push(`run of record: ${m.runOfRecord}`);
-      // Where it shipped, from the bundle records and never from a claim.
-      if ((m.shippedIn ?? []).length > 0) bits.push(`shipped in: ${(m.shippedIn ?? []).join(", ")}`);
       const tone = active
         ? ("milestone" as const)
         : m.runOfRecord === "red"
@@ -912,22 +858,6 @@ export function descriptorFor(
         icon: { id: KIND_ICONS[m.kind] ?? "package", ...(tone === undefined ? {} : { tone }) },
         expandable: childrenOf(node, p).length > 0,
         contextValue: `dabblerModule:${m.kind}` + (active ? ";active" : ""),
-      };
-    }
-    case "contract": {
-      const m = find(p, node.slug);
-      const has = Boolean(contractTarget(m));
-      return {
-        id: `contract:${node.slug}`,
-        label: "Contract",
-        description: has ? "open" : "not written yet",
-        tooltip: has
-          ? "What this module promises. Opens the notes page in an editor tab."
-          : "No contract yet — what this module promises, once someone writes it " +
-            "under modules/<slug>/contract/.",
-        icon: { id: "file-text", tone: has ? undefined : "muted" },
-        expandable: false,
-        contextValue: has ? "dabblerContract" : "dabblerContractMissing",
       };
     }
     case "dependsOn": {
@@ -966,55 +896,13 @@ export function descriptorFor(
     }
     case "consumer": {
       // A consumer whose contract suite against this producer is red is
-      // blocked by the producer's candidate, and says so on the row.
+      // blocked by the producer, and says so on the row.
       const blocked = (find(p, node.slug)?.blocking ?? []).includes(node.consumer);
       return {
         id: `consumer:${node.slug}:${node.consumer}`,
         label: node.consumer,
         ...(blocked ? { description: "blocking", tooltip: `${node.consumer}'s contract suite against ${node.slug} is red.` } : {}),
         icon: { id: blocked ? "warning" : "arrow-small-right", tone: blocked ? "attention" : "muted" },
-        expandable: false,
-      };
-    }
-    case "bundleGroup": {
-      const rows = p.bundles ?? [];
-      return {
-        id: "bundles",
-        label: "Bundles",
-        description: `${rows.length}`,
-        tooltip: "What the applications ship, at the versions their pins name. Recorded by a releasable session, never executed.",
-        icon: { id: "package" },
-        expandable: rows.length > 0,
-        contextValue: "dabblerBundles",
-      };
-    }
-    case "bundle": {
-      const b = (p.bundles ?? []).find((row) => row.bundle === node.bundle);
-      if (!b) return { id: `bundle:${node.bundle}`, label: node.bundle, expandable: false };
-      // What a bundle is made of, not only what it pins: a deployable can
-      // ship several application modules, and the row says which.
-      const ships = (b.from ?? []).join(", ");
-      return {
-        id: `bundle:${b.bundle}`,
-        label: b.bundle,
-        description: ships ? `${b.version} · ${ships}` : `${b.version} · ${b.date}`,
-        tooltip:
-          `${b.bundle} ${b.version}, recorded ${b.date}` +
-          (b.baseCommit ? ` on ${b.baseCommit.slice(0, 12)}` : "") +
-          (ships ? `. Ships ${ships}.` : ""),
-        icon: { id: "archive" },
-        expandable: b.dependencies.length > 0,
-        contextValue: "dabblerBundle",
-      };
-    }
-    case "bundleDependency": {
-      const d = (p.bundles ?? []).find((row) => row.bundle === node.bundle)?.dependencies.find((dep) => dep.package === node.pkg);
-      return {
-        id: `bundleDependency:${node.bundle}:${node.pkg}`,
-        label: node.pkg,
-        description: d ? `${d.version} (${d.module})` : undefined,
-        tooltip: d?.digest ? `source digest ${d.digest}` : undefined,
-        icon: { id: "arrow-small-right", tone: "muted" },
         expandable: false,
       };
     }

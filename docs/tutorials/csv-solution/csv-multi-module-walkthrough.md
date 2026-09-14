@@ -13,11 +13,10 @@ touches.
 | `persister` | library | `Person` objects into a database | `CsvPersister` |
 | `app` | application | Watches the folder and composes the other three | `CsvWatcher` |
 
-**Siblings are consumed as packages, never as project references.** That is the
-point of the decomposition: a module's package is a committed artifact its
-siblings restore, so a change to one module cannot silently recompile the
-others. There is deliberately **no solution file spanning all four** — one
-would re-couple exactly what the manifest just separated.
+**A sibling is a project reference.** Each module's project references the
+projects of the modules it depends on, and one solution file at the root lists
+all four, so `dotnet test` there builds and tests the whole solution in one
+pass.
 
 **`examples/csv-walkthrough/` is not this tutorial.** It is Python, built on
 the six-step component workflow session 100 deleted, and this document
@@ -62,8 +61,8 @@ Or declare them from a terminal, which is faster for four:
 
 ```
 dabbler modules create . --slug model         --title "Person model"        --kind shared-types --code-root modules/model         --package CsvModel
-dabbler modules create . --slug deserializer  --title "CSV deserializer"    --kind library      --code-root modules/deserializer  --package CsvDeserializer --depends-on model --contract designed
-dabbler modules create . --slug persister     --title "Person persistence"  --kind library      --code-root modules/persister     --package CsvPersister    --depends-on model --contract designed
+dabbler modules create . --slug deserializer  --title "CSV deserializer"    --kind library      --code-root modules/deserializer  --package CsvDeserializer --depends-on model
+dabbler modules create . --slug persister     --title "Person persistence"  --kind library      --code-root modules/persister     --package CsvPersister    --depends-on model
 dabbler modules create . --slug app           --title "CSV watcher"         --kind application  --code-root modules/app           --package CsvWatcher      --depends-on model --depends-on deserializer --depends-on persister
 ```
 
@@ -80,13 +79,15 @@ kept by hand disagree eventually and the disagreement is silent.
 
 > **The manifest rejects an unknown key rather than ignoring it.** The keys are
 > `slug`, `title`, `planPath`, `codeRoots`, `touches`, `specSections`,
-> `contextAssets`, `kind`, `dependsOn`, `package`, `contract`.
+> `contextAssets`, `kind`, `dependsOn`, `package`.
 
-When the manifest first becomes multi-module, the framework writes the root
-build files where they are absent and **never rewrites them**: `nuget.config`
-with the packages source by relative path, `Directory.Packages.props` with
-central package management on, `Directory.Build.props`,
-`Directory.Build.targets`, `packages/.gitattributes` and `packages/README.md`.
+When the manifest becomes multi-module and a module already holds a project
+file, the framework writes the root build files where they are absent and
+**never rewrites them**: a solution file listing the modules' projects,
+`Directory.Build.props` and `Directory.Build.targets`, with `bin/` and
+`obj/` added to `.gitignore`. Declared before any code, as here, the modules
+get none yet: the framework writes them once the first session's work is done,
+before it is verified.
 
 **A shortcut for a quick look, rather than typing all four `modules create`
 calls:** `node tools/dabbler-ai-orchestration/scripts/stage-csv-solution.mjs
@@ -135,7 +136,7 @@ Collapse the Work Explorer and expand the Solution Explorer's repository row, th
 - Four modules: **model**, **deserializer**, **persister** and **app**.
 - `model` is a **shared-types** module and is **used by 3** siblings — every other module references the `Person` type.
 - `deserializer` and `persister` each depend on the model and are used by `app`.
-- Each module names the package its siblings restore: `CsvModel`, `CsvDeserializer`, `CsvPersister`, `CsvWatcher`.
+- Each module names its package: `CsvModel`, `CsvDeserializer`, `CsvPersister`, `CsvWatcher`.
 
 ![Read what the solution is built from](media/02-decomposition.png)
 
@@ -169,7 +170,7 @@ Run **Dabbler: Show Framework Terminal** from the command palette.
 
 ## 5. Work the model module first
 
-`model` is first because every other module restores its package.
+`model` is first because every other module references its project.
 
 Press **Start Session**. Choose your engine, and the
 extension opens two editor tabs side by side — your **AI CLI on the left** and
@@ -198,56 +199,7 @@ steps.
 
 ---
 
-## 6. Pack the model, so its siblings have something to restore
-
-```
-dabbler module pack model
-```
-
-**You should see:**
-
-```
-wrote Directory.Build.targets
-wrote packages/.gitattributes
-packed model 0.1.0-dev.20260907.1.g1015ba9
-  packages/CsvModel.0.1.0-dev.20260907.1.g1015ba9.nupkg
-pinned CsvModel in Directory.Packages.props
-recorded packages/CsvModel.0.1.0-dev.20260907.1.g1015ba9.json
-```
-
-The version has the form
-`0.1.0-dev.<yyyymmdd>.<n>.g<digest>` — the digest is the first seven hex
-characters of the module's source tree, so two packs of one tree produce **one**
-version and a changed tree produces the next. It writes the package into
-`packages/`, moves the single unconditioned `PackageVersion` pin in
-`Directory.Packages.props`, and records
-`packages/<Package>.<version>.json` holding the source digest, the contract
-digest, the session number and the base commit — so source, contract and
-package correspond exactly.
-
-> A package larger than `modules.packages.ceilingBytes` (5 MB by default) is
-> refused unless `packages/.gitattributes` tracks `*.nupkg` with LFS. The
-> refusal names both ways out.
-
----
-
-## 7. Design the contract for a module its siblings depend on
-
-`deserializer` and `persister` were declared `contract: designed`, which means
-their promise is written down rather than inferred:
-
-```
-dabbler module contract deserializer
-```
-
-**You should see:** `<Package>.Abstractions` and `<Package>.ContractTests`
-created where absent, the test project wired up, and a notes page under
-`modules/deserializer/contract/`. In the Solution Explorer the module's
-**Contract** row stops saying *not written yet*.
-
----
-
-## 8. Change the model, and see who breaks
+## 6. Change the model, and see who breaks
 
 Once all four modules exist, change something in `modules/model` and ask:
 
@@ -257,25 +209,26 @@ dabbler affected
 
 Or right-click the module and choose **Show Impact**.
 
-**You should see** the plan for that change, and it is narrower than you might
-expect:
+**You should see** the plan for that change:
 
 ```
 scope: a hypothetical change of modules/model/src/CsvModel/Person.cs
 modules: model
-candidates: model (packed before the run of record)
-no tests affected by this change set
+  repository-wide        suite dotnet ()  <-
+
+dotnet test --nologo
 ```
 
-**It names `model` alone, not all four.** That is the decomposition working
-rather than failing: the siblings consume the model as a **package**, so
-editing the model's source does not rebuild them. They are reached when the new
-package is produced and the pin moves — which is why `model` is listed as a
-**candidate**, packed before the run of record.
+**The change reaches `model`, and the one suite this solution declares.** That
+suite names no module, so it answers for the whole repository and any change
+reaches it — and because every module references the model's project, one
+`dotnet test` at the root is what proves the siblings still build against the
+change.
 
 The run of record for a session is **only the suites its change reaches**, not
-every suite in the repository. A module with no declared test root contributes
-no tests, and the plan says so plainly rather than quietly running everything.
+every suite in the repository. A solution that declares a suite per module sees
+a change to `model` reach each consumer's suites as well, because `model` is
+shared types.
 
 A session that changes two modules names both:
 
@@ -285,15 +238,11 @@ dabbler session declare --module model --module persister
 
 ---
 
-## 9. Build and run the whole thing
+## 7. Build and run the whole thing
 
-Pack the three libraries in dependency order, then build the application, which
-restores all three from `packages/`:
+Run the application. Its project references build the other three with it:
 
 ```
-dotnet pack modules/model/src/CsvModel/CsvModel.csproj                   -c Release -o packages
-dotnet pack modules/deserializer/src/CsvDeserializer/CsvDeserializer.csproj -c Release -o packages
-dotnet pack modules/persister/src/CsvPersister/CsvPersister.csproj       -c Release -o packages
 dotnet run --project modules/app/src/CsvWatcher -- ./inbox ./people.db
 ```
 
@@ -319,8 +268,8 @@ never half-stored.
   you have a `docs/modules.yaml`.** The projection under
   `.dabbler/solution/solution.json` has not been derived. Touch the manifest
   or a `.csproj`, or run the explicit refresh, and it fills in.
-- **The module context menu items are missing.** `Show Impact` and
-  `Pack Module` are right-click only, on every module row.
+- **The module context menu item is missing.** `Show Impact` is right-click
+  only, on every module row.
 - **The framework stopped.** Read its own account first —
   `dabbler status`, the `stop` on `.dabbler/runs/s<N>/driver/run.json`, and the
   outstanding instruction's `reasons`. Never edit a record, a verdict or a gate

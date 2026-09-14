@@ -11345,6 +11345,46 @@
       "what": "step 'the-words': its files",
       "reason": "dabbler.yaml's focused-checkout comments went with the selection rules in delete-the-checkout, so this step leaves it unchanged",
       "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 171,
+      "dateTime": "2026-09-14T14:19:49.809000-04:00",
+      "task": "Session 171 makes a sibling module a project reference: a .NET module reaches its sibling with <ProjectReference> and the solution file lists both; a Maven parent pom.xml lists both under <modules> and one depends on the other at ${project.version}, built in one reactor run. The router loses the in-repository package machinery: packages.ts and its test; the module verb with all three of its subcommands (pack, candidate, contract), modules create --contract and contractdoc --module (the file form of contractdoc stays); the candidate job in phaseRunOfRecord, bundleCandidates, the candidate record in impact.ts with the impact plan's candidates and the Show Impact line that prints them, and the candidate's paths subtracted from a step's changes (drive.ts), from a repair (session.ts) and from the verified tree (gates.ts); in land.ts the module facts of judgeLandReadiness, judgePins, candidatesFromRecord, receiptCorrespondence, bundleRecord and the bundle readers and writers, so a gate receipt carries neither correspondence nor bundles; the pins_current gate (six close gates); in ecosystem.ts every package, pin, contract and API-surface member of the .NET and Maven seam, pinPackageVersion, pinManagedDependency, PACKAGES_DIR, contractNotesPage, readCSharpSurface, readJavaSurface and both contract scaffolds; the module form of contractdoc.ts, CONTRACT_MODES and the manifest's contract member, contractDirFor, packagesCeiling and the contract.generate declaration, the contract folder added to a suite's covers, and the projection's contract, contractDir, bundles and shippedIn. A manifest entry that still says contract:, and a dabbler.yaml that still carries modules.<slug>.contract or modules.packages, is read and ignored rather than refused. The .NET root files become the .slnx, Directory.Build.props, Directory.Build.targets and the bin/ and obj/ ignore rules; the Maven root files become the parent POM with its properties, compiler release and <modules>, and the target/ ignore rule. A module session's verifier scope takes each named module's roots and every transitive dependency's roots instead of contract folders and the packages folder. The extension loses Pack Module with its contribution and test, the Solution Explorer's Contract, Bundles and bundle rows and the shipped-in text, the Router contract's module.pack and the modules create contract option. The plan ask, the solution-plan prompt, the README, the quick start, the CSV tutorial with its staging and rendering scripts, and the .NET and Java UAT walkthroughs say how siblings are referenced instead. The release (packaging.pack and push, packageSession, the tag release, published_when_releasable) and the CI merge gate (candidateTrunk, gateIsCandidate, the candidate/s<N> push) stay exactly as they are. The steps take the section's list in a different order -- the contract member before the ecosystem seam -- because the module contract renderer reads the seam's surface members, so each step leaves a tree that compiles. No version bump: the release is held.",
+      "releasable": false,
+      "holdReason": "The module machinery's removal ships whole in session 172 (3.0.0); sessions 170 and 171 publish nothing, so a half-removed module model never reaches the operator's staff."
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 171,
+      "dateTime": "2026-09-14T14:25:30.872000-04:00",
+      "what": "step 'candidate-job-land-gate': its files",
+      "reason": "checks.ts carries the impact plan's candidates into the affected payload, so deleting the member touches it (and its test, if it asserts the payload)",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 171,
+      "dateTime": "2026-09-14T14:32:27.251000-04:00",
+      "what": "step 'the-contract-member': its files",
+      "reason": "ecosystem.ts reads entry.contract to tell a .NET solution with no project yet from a Maven one, so deleting the manifest's contract member changes that line in this step",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 171,
+      "dateTime": "2026-09-14T14:37:30.704000-04:00",
+      "what": "step 'the-contract-member': its files",
+      "reason": "contractdoc.test.ts no longer imports ecosystem.ts once the module form is gone, so the selection map's ecosystem rule must stop naming it",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 171,
+      "dateTime": "2026-09-14T14:56:51.990000-04:00",
+      "what": "step 'the-words': its files",
+      "reason": "the CSV walk's step list, which the tutorial renders, says each module names the package its siblings restore; siblings no longer restore packages",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
     }
   ]
 }

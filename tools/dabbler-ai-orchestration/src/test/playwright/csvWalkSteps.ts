@@ -103,7 +103,7 @@ export const WALK_STEPS: readonly WalkStep[] = [
       "Four modules: **model**, **deserializer**, **persister** and **app**.",
       "`model` is a **shared-types** module and is **used by 3** siblings — every other module references the `Person` type.",
       "`deserializer` and `persister` each depend on the model and are used by `app`.",
-      "Each module names the package its siblings restore: `CsvModel`, `CsvDeserializer`, `CsvPersister`, `CsvWatcher`.",
+      "Each module names its package: `CsvModel`, `CsvDeserializer`, `CsvPersister`, `CsvWatcher`.",
     ],
     async drive(ctx) {
       const { expandAllRows, rowTexts, setPaneExpanded } = await browser();

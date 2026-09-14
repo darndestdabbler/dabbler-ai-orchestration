@@ -9,10 +9,9 @@
 //   persister     Person objects -> a database
 //   app           the watcher that wires the three together
 //
-// Siblings are consumed as PACKAGES, not project references, because that is
-// what the modules feature is for: a module's package is a committed
-// artifact its siblings restore. So there is deliberately no solution file
-// spanning all four -- one would re-couple what the manifest just decoupled.
+// A sibling is a project reference: each module's project references the
+// projects it depends on, and the solution file at the root lists all of
+// them, so one `dotnet test` there builds and tests the whole solution.
 //
 // The corpus is written as files first and built only on --build, because
 // the UI walk needs the tree to exist on disk and does not need it compiled.
@@ -117,50 +116,6 @@ write(
 );
 
 write(
-  "Directory.Packages.props",
-  `<Project>
-  <PropertyGroup>
-    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-  </PropertyGroup>
-
-  <!-- Sibling modules, restored from the committed ./packages folder. One
-       unconditioned PackageVersion per module: the session that lands a
-       change to a module bumps its pin in the same commit as the package. -->
-  <ItemGroup Label="Modules">
-    <PackageVersion Include="CsvModel" Version="0.1.0" />
-    <PackageVersion Include="CsvDeserializer" Version="0.1.0" />
-    <PackageVersion Include="CsvPersister" Version="0.1.0" />
-  </ItemGroup>
-
-  <ItemGroup Label="Storage">
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="9.0.3" />
-  </ItemGroup>
-
-  <ItemGroup Label="Testing">
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
-    <PackageVersion Include="xunit.v3" Version="3.2.2" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-  </ItemGroup>
-</Project>
-`,
-);
-
-write(
-  "nuget.config",
-  `<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <clear />
-    <!-- The committed sibling packages, by relative path so every clone
-         resolves them the same way. -->
-    <add key="modules" value="./packages" />
-    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-  </packageSources>
-</configuration>
-`,
-);
-
-write(
   ".gitignore",
   `bin/
 obj/
@@ -170,16 +125,18 @@ inbox/
 `,
 );
 
+// The solution file lists every project, so one `dotnet test` at the root
+// builds and tests the whole solution.
 write(
-  "packages/README.md",
-  `# Committed module packages
-
-Each sibling module is consumed from here as a package, never as a project
-reference. \`dabbler module pack <slug>\` produces one, and the pin in
-\`Directory.Packages.props\` moves in the same commit.
-
-A package here is immutable: two packs of one source tree produce one
-version, and a changed tree produces the next.
+  `${path.basename(ROOT)}.slnx`,
+  `<Solution>
+  <Project Path="modules/model/src/CsvModel/CsvModel.csproj" />
+  <Project Path="modules/deserializer/src/CsvDeserializer/CsvDeserializer.csproj" />
+  <Project Path="modules/deserializer/tests/CsvDeserializer.Tests/CsvDeserializer.Tests.csproj" />
+  <Project Path="modules/persister/src/CsvPersister/CsvPersister.csproj" />
+  <Project Path="modules/persister/tests/CsvPersister.Tests/CsvPersister.Tests.csproj" />
+  <Project Path="modules/app/src/CsvWatcher/CsvWatcher.csproj" />
+</Solution>
 `,
 );
 
@@ -203,21 +160,18 @@ modules:
     kind: shared-types
     codeRoots: ['modules/model']
     package: CsvModel
-    contract: package
   - slug: deserializer
     title: CSV deserializer
     kind: library
     codeRoots: ['modules/deserializer']
     dependsOn: ['model']
     package: CsvDeserializer
-    contract: designed
   - slug: persister
     title: Person persistence
     kind: library
     codeRoots: ['modules/persister']
     dependsOn: ['model']
     package: CsvPersister
-    contract: designed
   - slug: app
     title: CSV watcher application
     kind: application
@@ -239,18 +193,11 @@ testing:
       expensive: true
       covers:
         - modules/
-        - Directory.Packages.props
         - Directory.Build.props
       test_roots:
         - modules/deserializer/tests
         - modules/persister/tests
       test_glob: '*Tests.cs'
-
-modules:
-  packages:
-    # A produced package over this is refused unless packages/.gitattributes
-    # tracks *.nupkg with LFS.
-    ceilingBytes: 5242880
 `,
 );
 
@@ -299,8 +246,8 @@ write(
   `# Session plan -- the CSV solution
 
 Each session names the one module it works in. A session that must change two
-modules says so and gives a reason, and the framework runs both modules'
-suites as its run of record.
+modules names both, and the framework runs both modules' suites as its run of
+record.
 
 ### Session 1 of 4: The Person model
 
@@ -308,8 +255,7 @@ suites as its run of record.
 
 1. Declare \`Person\`: the four fields a CSV row carries, and the database
    identity a stored row gains.
-2. Pack it, so its siblings have something to restore.
-3. Close out.
+2. Close out.
 
 ### Session 2 of 4: Reading a CSV file
 
@@ -396,8 +342,8 @@ write(
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <!-- The sibling as a package, restored from ./packages. -->
-    <PackageReference Include="CsvModel" />
+    <!-- The sibling, by project reference. -->
+    <ProjectReference Include="../../../model/src/CsvModel/CsvModel.csproj" />
   </ItemGroup>
 </Project>
 `,
@@ -518,12 +464,11 @@ write(
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Inside one module a project reference is the normal thing. -->
     <ProjectReference Include="../../src/CsvDeserializer/CsvDeserializer.csproj" />
   </ItemGroup>
 </Project>
@@ -638,8 +583,8 @@ write(
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CsvModel" />
-    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <ProjectReference Include="../../../model/src/CsvModel/CsvModel.csproj" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.3" />
   </ItemGroup>
 </Project>
 `,
@@ -757,9 +702,9 @@ write(
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/CsvPersister/CsvPersister.csproj" />
@@ -866,11 +811,11 @@ write(
     <Description>Watches a folder for CSV files and stores the people in them.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <!-- All three siblings as packages: the application composes them and
-         owns none of them. -->
-    <PackageReference Include="CsvModel" />
-    <PackageReference Include="CsvDeserializer" />
-    <PackageReference Include="CsvPersister" />
+    <!-- All three siblings by project reference: the application composes
+         them and owns none of them. -->
+    <ProjectReference Include="../../../model/src/CsvModel/CsvModel.csproj" />
+    <ProjectReference Include="../../../deserializer/src/CsvDeserializer/CsvDeserializer.csproj" />
+    <ProjectReference Include="../../../persister/src/CsvPersister/CsvPersister.csproj" />
   </ItemGroup>
 </Project>
 `,
@@ -993,43 +938,13 @@ git.push(run("git", ["add", "-A"]));
 git.push(run("git", ["commit", "-m", "The CSV solution, staged: four modules, one repository"]));
 
 // ---------------------------------------------------------------------------
-// Optionally build it: pack the three libraries, then restore the app
+// Optionally build it: one test run over the solution file
 // ---------------------------------------------------------------------------
 
 const build = [];
 if (BUILD) {
-  const packagesDir = path.join(ROOT, "packages");
-  fs.mkdirSync(packagesDir, { recursive: true });
-  // Order matters: a module can only be packed once everything it references
-  // is already a package on disk.
-  let packingFailed = false;
-  for (const project of [
-    "modules/model/src/CsvModel/CsvModel.csproj",
-    "modules/deserializer/src/CsvDeserializer/CsvDeserializer.csproj",
-    "modules/persister/src/CsvPersister/CsvPersister.csproj",
-  ]) {
-    const packed = run("dotnet", ["pack", project, "-c", "Release", "-o", "packages", "--nologo"]);
-    build.push({ step: `pack ${path.basename(project)}`, ok: packed.ok, tail: packed.out.slice(-600) });
-    if (!packed.ok) {
-      packingFailed = true;
-      break;
-    }
-  }
-  // Named per test project, not a bare `dotnet test` at ROOT: this root
-  // deliberately has no solution or project file of its own (that is the
-  // whole point of siblings-as-packages), so an unscoped `dotnet test` here
-  // always fails on MSBuild's own project/solution selection -- a fault in
-  // the invocation, not in the corpus, and round 1's verifier (GPT Terra)
-  // named it as a nit that this script should not have exited 0 over.
-  if (!packingFailed) {
-    for (const testProject of [
-      "modules/deserializer/tests/CsvDeserializer.Tests/CsvDeserializer.Tests.csproj",
-      "modules/persister/tests/CsvPersister.Tests/CsvPersister.Tests.csproj",
-    ]) {
-      const tested = run("dotnet", ["test", testProject, "--nologo"]);
-      build.push({ step: `test ${path.basename(testProject)}`, ok: tested.ok, tail: tested.out.slice(-1200) });
-    }
-  }
+  const tested = run("dotnet", ["test", "--nologo"]);
+  build.push({ step: "dotnet test", ok: tested.ok, tail: tested.out.slice(-1200) });
 }
 
 const buildOk = !BUILD || build.every((b) => b.ok);

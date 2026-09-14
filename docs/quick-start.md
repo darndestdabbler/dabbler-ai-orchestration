@@ -94,7 +94,9 @@ session's plan section may name the modules it touches with
 `Module: <slug>` — as many as it touches, or none — and every session
 runs in the repository itself.
 
-The verbs for one module are `dabbler module contract | pack`. A
+A module reaches a sibling by project reference — a `<ProjectReference>`
+listed in the root solution file for .NET, a dependency at
+`${project.version}` listed in the parent `pom.xml` for Maven. A
 single-module repository needs none of this: with no manifest the
 repository is one implicit module.
 

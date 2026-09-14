@@ -306,20 +306,10 @@ configure` set. Name the vehicle for THIS checkout with `dabbler configure
   dabbler modules create . --slug app --title "JSON loader" --kind application --depends-on model --depends-on store
   ```
 
-**Now the part the button cannot do.** New Module asks for four of a module's
-six values. The two it does not ask for — the **code root** and the
-**package** — are exactly the two that a pack cannot do without, and a module
-made from the four honest answers refuses it:
-
-```
-dabbler module pack model
-  -> module pack: refused -- module 'model' declares no package; give it one in docs\modules.yaml
-```
-
-That is walk finding 1, and it is the **UI**'s to close (two more prompts) or
-the framework's (default them from the slug). Until it is, open
-`docs\modules.yaml` and add the two lines per module yourself, so the file
-reads:
+**Then make the file say what the projects will be called.** New Module asks
+four of a module's values and defaults the code root to `modules/<slug>` and
+the package to the slug. Open `docs\modules.yaml` and set each `package`, so
+the file reads:
 
 ```yaml
 modules:
@@ -432,7 +422,7 @@ thing this framework refuses outright.
   said how tests run, found nothing (there was no project file yet) and told
   you so rather than emitting a command that would fail on first use. It does
   not come back to ask later. That it does not is walk finding 10 — the
-  moment it *could* is the first pack, when the ecosystem becomes known.
+  moment it *could* is when the first project file appears.
 - **No UI register —** nothing offers this. It is constant-with-parameters
   and it has a lifecycle moment, so it is the **framework**'s to close.
 - **No command underneath —** you edit `dabbler.yaml`.
@@ -570,85 +560,51 @@ your doing anything.
 
 ---
 
-## Step 8 — Publish the module so the others can use it
+## Step 8 — Reference the model from the modules that use it
 
-- **Framework —** two things, at two moments. At the **candidate**, before
-  the run of record, the session packed the module itself — that is where a
-  package comes from in the normal course of things. At the **close**, after
-  its push, it pulled your repository forward (`git pull --ff-only`) so the
-  window you started in sees the session closed. You used to have to remember
-  that pull; you no longer do — *unless* your repository has uncommitted
-  changes, and step 9 explains why on .NET it will have.
-- **You —** **Dabbler: Pack Module** on the `model` row, to pack out of band
-  so the *next* session can consume the package. It reports one line:
-  `model: packed model 0.1.0-dev.20260908.1.gc2a1199`.
-- **Underneath —**
-  ```
-  dabbler module pack model
-  ```
+- **Framework —** at the **close**, after its push, the session pulled your
+  repository forward (`git pull --ff-only`) so the window you started in sees
+  the session closed. Nothing is packed or published between modules: a
+  sibling is its project, and the next session builds against its source.
+- **No UI register —** there is nothing to press, and no gap: which projects a
+  module references is the session's **judgement**, written with its code.
+- **No command underneath —** a reference is a line in a project file.
 
-**Expect ten lines the first time, not four** — the root build files appear
-at the first pack in a repository, because until a module holds a project file
-Dabbler cannot tell a .NET solution from a Java one:
+**Expect** session 1 to have written the model's project, and the framework to
+have written the root build files beside it once the work was done and before
+it was verified: `uat-json.slnx` listing the project, `Directory.Build.props`,
+`Directory.Build.targets`, and `bin/` and `obj/` in `.gitignore`. Each later
+session adds its module's projects to the solution file.
 
-```
-wrote nuget.config
-wrote Directory.Packages.props
-wrote Directory.Build.props
-wrote Directory.Build.targets
-wrote packages/.gitattributes
-wrote packages/README.md
-packed model 0.1.0-dev.20260908.1.gc2a1199
-  packages/JsonModel.0.1.0-dev.20260908.1.gc2a1199.nupkg
-pinned JsonModel in Directory.Packages.props
-recorded packages/JsonModel.0.1.0-dev.20260908.1.gc2a1199.json
+A consuming module references its sibling's project, and the solution file
+lists both. In the store's project file:
+
+```xml
+<ProjectReference Include="..\..\..\model\src\JsonModel\JsonModel.csproj" />
 ```
 
-The button shows only the `packed` line; the CLI shows all ten.
-
-**What must be true regardless of the version:** it begins `0.1.0-dev.`, then
-today's date, then a number, then `g` and seven characters.
-
-**What is meant to be true and is not yet.** Packing an unchanged module
-twice is meant to give the same version back — that is what the version
-record is for. On .NET it does not, and the reason is step 9's.
+`dotnet test` at the root then builds and tests the whole solution in one pass.
 
 ---
 
-## Step 9 — Ignore the build output, by hand
+## Step 9 — Check that the build output is ignored
 
-- **Framework —** at the first pack it wrote the root build files for this
-  ecosystem. On a **Maven** solution it also appends `target/` to
-  `.gitignore`, with the reason in the file: *"a module's source digest is
-  taken over its code roots, so an unignored target/ makes the same source
-  pack to a new dev version every time."* On .NET it writes no such rule, and
-  everything that comment predicts happens. Walk finding 3 — the
-  **framework**'s to close, with the fix already written for the other
-  ecosystem.
-- **No UI register —** nothing offers it, and nothing should: this belongs
-  to the framework at the same moment it writes the other root files.
-- **No command underneath —** add two lines to `.gitignore`:
+- **Framework —** before session 1's work was verified, it added `bin/` and
+  `obj/` to `.gitignore` with the other root build files, and they landed with
+  the session.
+- **No UI register —** there is nothing to press: the **framework** did it at
+  the moment the ecosystem became known.
+- **No command underneath —** open `.gitignore` and read it. Expect:
   ```
   bin/
   obj/
   ```
 
-**Do this before anything else builds.** `dotnet pack` writes `bin\` and
-`obj\` inside the module it built, the module's source digest is taken over
-every non-ignored file under its code roots, and so the pack's own output
-becomes its next input. Four packs with nothing changed between them:
-
-```
-packed model 0.1.0-dev.20260908.1.gc2a1199
-packed model 0.1.0-dev.20260908.2.g90deeb9
-packed model 0.1.0-dev.20260908.3.gc53e704
-packed model 0.1.0-dev.20260908.4.gb27c782
-```
-
-Three things break together, and this one edit fixes all three: the pack
-stops being repeatable; the next `session start` is refused, because
-untracked build output is a change the declaration counts; and the close's
-pull of your repository refuses too, handing you back
+**If they are missing, add them before anything else builds.** `dotnet build` and `dotnet test`
+write `bin\` and `obj\` inside every project they build. Two things break
+together, and this one edit fixes both: the next `session start` is refused,
+because untracked build output is a change the declaration counts; and the
+close's pull of your repository refuses too, handing you back
 `git -C C:\temp\uat-json pull --ff-only` to run yourself.
 
 Commit the `.gitignore` and push it.
@@ -660,19 +616,12 @@ Commit the `.gitignore` and push it.
 - **Framework —** as step 7, once per module: the plan's `Module:` line for
   session 2 is `store` and for session 3 is `app`.
 - **You —** **Dabbler: Start Session** on session 2's row, then on session
-  3's row when session 2 has closed. **Dabbler: Pack Module** on each
-  when its session is done, as in step 8.
+  3's row when session 2 has closed.
 - **Underneath —** the same two commands as step 7, per module.
 
-Two differences from the first module:
-
-- The store and the app take their siblings as **packages**, not project
-  references. In the project file that is `<PackageReference Include="JsonModel" />`
-  with no version — the version comes from the pin that step 8 moved.
-- Each module needs a short `modules\<slug>\contract\README.md`. Declaring
-  `contract: package` does **not** skip this; without it the session refuses
-  near the end with `module '<slug>' declares contract: package and has no
-  notes page`.
+**One difference from the first module:** the store and the app reference
+their siblings' **projects**, as step 8 showed, and each session adds its
+module's projects to the solution file.
 
 ---
 
@@ -727,7 +676,6 @@ written up in `docs/uat/uat-walk-findings.md` with its reproduction.
 
 - **New Module asks four of a module's six values** (step 3). Finding 1.
 - **Bootstrap does not commit the modules manifest** (step 6). Finding 2.
-- **No `bin/` or `obj/` ignore rule on .NET** (step 9). Finding 3.
 - **Nothing in the UI sets the remote or the upstream** (steps 2 and 6).
   Finding 5.
 - **Troubleshoot runs no toolchain checks** (prerequisites). Finding 6.

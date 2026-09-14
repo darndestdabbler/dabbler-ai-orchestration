@@ -259,8 +259,8 @@ export function writeInstructionFiles(
  * One module, named for the repository, whose roots are the repository. It
  * is a real declaration rather than a placeholder -- a repository nobody
  * has decomposed yet IS one module, and that is the shape every session
- * runs in until a second entry is declared: no packages folder, no
- * contracts, the run of record the module's own suites. Session
+ * runs in until a second entry is declared, with the run of record the
+ * module's own suites. Session
  * 1 writes the solution plan and decides whether there are several. Left
  * exactly as it is when a manifest already exists.
  */
@@ -275,8 +275,8 @@ export function scaffoldModuleManifest(projectDir: string): string | null {
     "#",
     "# One module, because a repository nobody has decomposed yet IS one",
     "# module -- and that is the shape every session runs in until a second",
-    "# entry is declared here: no packages folder, no contracts, the run of",
-    "# record the module's own suites. Session 1 writes",
+    "# entry is declared here, with the run of record the module's own",
+    "# suites. Session 1 writes",
     "# the solution plan and decides whether there are several; a second",
     "# entry is what switches the module machinery on.",
     "modules:",

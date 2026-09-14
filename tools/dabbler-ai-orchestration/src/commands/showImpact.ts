@@ -2,9 +2,9 @@
 //
 // The row says which module; the router plans a hypothetical change under
 // its roots (`dabbler affected --path <root>...`), and the plan is shown:
-// the modules reached, the candidates to pack, the suites that would run
-// and why. The whole answer goes to the Dabbler Commands channel, where a
-// developer can read it at length; the message carries its first lines.
+// the modules reached and the suites that would run and why. The whole
+// answer goes to the Dabbler Commands channel, where a developer can read it
+// at length; the message carries its first lines.
 // Nothing is computed here -- the plan is the router's, and the Explorer
 // shows it.
 

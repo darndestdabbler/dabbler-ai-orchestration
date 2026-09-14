@@ -58,8 +58,8 @@ corrected version, with each surviving gap labelled in the register it
 belongs to.
 
 **Where your findings are worth most now:** step 9 — the second and third
-modules, a module consuming a sibling as a package, and running the loader
-twice. The consumer side of a Maven solution has still never been driven by a
+modules, a module depending on a sibling in the same reactor, and running the
+loader twice. The consumer side of a Maven solution has still never been driven by a
 session.
 
 ---
@@ -297,20 +297,11 @@ Maven module publishes through its own lifecycle.
   dabbler modules create . --slug app --title "JSON loader" --kind application --code-root modules/app --package com.example:json-loader --depends-on model --depends-on store
   ```
 
-**The CLI form carries two values the button does not ask for**, and they are
-the two a module cannot work without: the **code root** and the **package**.
-A module made from New Module's four answers refuses the operation that makes
-it a module:
-
-```
-dabbler module pack model
-  -> module pack: refused -- module 'model' declares no package; give it one in docs\modules.yaml
-```
-
-That is walk finding 1 — the **UI**'s to close with two more prompts, or the
-framework's to default from the slug. Until then, if you used the button,
-open `docs\modules.yaml` and add `codeRoots` and `package` per module by
-hand. **Java package names are `groupId:artifactId`, with a colon.**
+**The CLI form carries two values the button does not ask for**: the **code
+root**, which the button defaults to `modules/<slug>`, and the **package**,
+which it defaults to the slug. If you used the button, open
+`docs\modules.yaml` and set each `package` by hand. **Java package names are
+`groupId:artifactId`, with a colon.**
 
 **Expect the last create to print exactly:**
 
@@ -321,8 +312,9 @@ note: no module holds a project file yet, so the root build files wait for the f
 
 That note is the important part. Dabbler decides whether this is a .NET or a
 Java solution by looking for a project file — a `.csproj` or a `pom.xml`.
-Until one exists it writes no root files at all, which is why the next step
-comes before anything else.
+Until one exists it writes no root files at all. A session writes them once
+its work is done, but session 1 needs the parent POM to build, so step 5 is
+where you write it.
 
 **Check what it recorded** in the **Solution Explorer**: three module rows,
 each with its kind, its *Depends on* and its *Used by*. The CLI form of the
@@ -334,8 +326,7 @@ same view is `dabbler modules show .`.
 
 - **No framework register —** and no gap: the POM's three load-bearing lines
   are a person's judgement, and this walkthrough wants you to see them.
-  (`dabbler module contract` scaffolds the `-api` and `-contract-tests` POMs
-  for a *designed* contract; nothing scaffolds a module's own POM.)
+  Nothing scaffolds a module's own POM.
 - **No UI register —** for the same reason. Writing a POM is a **person's**
   judgement.
 - **No command underneath —** this is a file you author.
@@ -352,7 +343,7 @@ Create `modules\model\pom.xml` with exactly this:
   <parent>
     <groupId>com.example</groupId>
     <artifactId>solution-parent</artifactId>
-    <version>${revision}</version>
+    <version>0.1.0-SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
@@ -361,24 +352,14 @@ Create `modules\model\pom.xml` with exactly this:
 </project>
 ```
 
-**Three things about this file are load-bearing. Copy it exactly.**
+**Two things about this file are load-bearing. Copy it exactly.**
 
 1. It has a `<parent>` reached by `relativePath`.
-2. It has **no `<version>` of its own**. The version comes from the parent's
-   `${revision}`.
-3. `${revision}` is what `dabbler module pack` replaces with the dev version.
-
-**If you give the module a literal version instead**, packing fails with:
-
-```
-module pack: refused -- the pack of modules/model/pom.xml left no
-com/example/json-model/0.1.0-dev.../json-model-0.1.0-dev....jar in packages/
-```
-
-which is Maven building the version you wrote rather than the one asked for.
+2. It has **no `<version>` of its own**. It takes the parent's, which is what
+   lets a sibling depend on it at `${project.version}` in the same reactor.
 
 **That is the whole step: the POM and nothing else.** A Maven module with no
-Java source packs perfectly well, and the `Item` class is what session 1
+Java source builds perfectly well, and the `Item` class is what session 1
 writes — its plan says so. Writing it here instead means session 1's own diff
 contains no `Item`, and the model that checks the session's work reads the
 diff: on the reference run it reported the session's only deliverable
@@ -386,93 +367,61 @@ missing, as a blocking fault, and the round was spent disputing it.
 
 ---
 
-## Step 5 — Pack the module, and check the three lines it writes
+## Step 5 — Write the parent POM
 
-- **Framework —** this is a moment the framework already owns. At the
-  **candidate** of every session, before the run of record, it packs the
-  module itself; **Dabbler: Pack Module** is the same operation out of band,
-  so the *next* session can consume the package. The first pack in a
-  repository is also where the ecosystem becomes known, so it writes the root
-  build files then — the root `pom.xml`, the feed's files, and the
-  `.gitignore` rule for Maven's own output.
-- **You —** **Dabbler: Pack Module** on the `model` row in the Solution
-  Explorer. It reports one line: `model: packed model 0.1.0-dev.…`.
-- **Underneath —**
-  ```
-  dabbler module pack model
-  ```
+- **No framework register —** and this is a gap the **framework** should
+  close. It writes the parent POM where a module already holds a POM: from
+  `dabbler modules create`, or once a session's work is done. Here the
+  modules were declared first and no session has run, and session 1 needs the
+  parent to build.
+- **No UI register —** nothing offers it; the **framework**'s to close, for
+  the reason above.
+- **No command underneath —** this is a file you author.
 
-**Expect it to write four things first, then pack:**
-
-```
-wrote pom.xml
-wrote packages/.gitattributes
-wrote packages/README.md
-updated .gitignore
-packed model 0.1.0-dev.20260908.1.ga6aac5f
-  packages/com/example/json-model/0.1.0-dev.20260908.1.ga6aac5f/json-model-0.1.0-dev.20260908.1.ga6aac5f.jar
-pinned com.example:json-model in pom.xml
-recorded packages/com.example+json-model.0.1.0-dev.20260908.1.ga6aac5f.json
-```
-
-The button shows only the `packed` line; the CLI shows all eight.
-
-**Check three things, in this order.**
-
-**One — the compiler release in the root `pom.xml` it just wrote:**
+Create `pom.xml` at the root with exactly this:
 
 ```xml
-<maven.compiler.release>17</maven.compiler.release>
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example</groupId>
+  <artifactId>solution-parent</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>17</maven.compiler.release>
+  </properties>
+
+  <modules>
+    <module>modules/model</module>
+  </modules>
+</project>
 ```
 
-**The number must be your own JDK's** — what `java -version` printed in the
-prerequisites — and above it a comment saying it came from that JDK. Dabbler
-asks the JDK doing the scaffolding, because a release your compiler cannot
-produce fails every build afterwards. If no JDK could be run at all the
-comment says so and the file takes a stated default of 17. This file is
-written once and never rewritten, so raising it later is your edit to make.
+**Check two things.**
 
-**Two — what `updated .gitignore` appended:**
+**One — the compiler release.** Set `maven.compiler.release` to your own
+JDK's major release — what `java -version` printed in the prerequisites. A
+release your compiler cannot produce fails every build afterwards.
+
+**Two — Maven's output is ignored.** Add one line to `.gitignore`:
 
 ```
-# Maven's own output, which lands inside the module it built. A module's source
-# digest is taken over its code roots, so an unignored target/ makes the same
-# source pack to a new dev version every time.
 target/
-.flattened-pom.xml
 ```
 
-That rule is why the next check passes. (The .NET walkthrough has no
-equivalent line, and its step 9 is the whole cost of not having it — walk
-finding 3.)
+Untracked build output is a change the declaration counts, so without it the
+next `session start` is refused.
 
-**Three — the pack is repeatable.** Run `dabbler module pack model` twice
-more with nothing changed and expect the **same version** all three times.
-Then check the pin really moved, in the file line three named:
-
-```
-findstr /C:"json-model" pom.xml
-```
-
-**Expect** it inside `<dependencyManagement>` in the root `pom.xml`, at that
-version. A message naming any other file — the .NET
-`Directory.Packages.props`, say — is worth reporting.
-
-**Also expect,** on Windows and node 22 or newer, a line of noise after the
-pack:
-
-```
-(node:55824) [DEP0190] DeprecationWarning: Passing args to a child process with
-shell option true can lead to security vulnerabilities...
-```
-
-`mvn` is a batch file, so the router takes a shell path node has deprecated.
-It is walk finding 9 and it is harmless today; **do not report it as new.**
-
-**The jar's layout is worth a glance too:** a normal Maven repository layout
-under `packages\`, with the group id as folders, and the record filename
-carrying a **plus sign** where the package name has a colon, because a colon
-is not allowed in a Windows filename.
+**The parent lists every module.** Add `<module>modules/store</module>` and
+`<module>modules/app</module>` when their POMs exist. A module depends on a
+sibling at `${project.version}`, and one `mvn -B test` at the root builds
+all of them in one reactor run.
 
 ---
 
@@ -481,8 +430,8 @@ is not allowed in a Windows filename.
 - **Framework —** at bootstrap it read the folder for something that said how
   tests run, found nothing — there was no POM yet — and told you so rather
   than emitting a command that would fail on first use. It does not come back
-  to ask, and the moment it could is the pack you just ran, when the
-  ecosystem became known. That it does not is walk finding 10.
+  to ask, and the moment it could is when the first POM appears. That it does
+  not is walk finding 10.
 - **No UI register —** nothing offers this. It is constant-with-parameters
   and lifecycle-timed, so it is the **framework**'s to close.
 - **No command underneath —** you edit `dabbler.yaml`.
@@ -545,8 +494,8 @@ module's roots.
   declaration. `session start` refuses a working tree that carries changes,
   and steps 3 to 6 have written files nobody has committed — including
   `docs\modules.yaml`, which bootstrap did not commit because `modules
-  create` wrote it after bootstrap ran, and the root `pom.xml` and
-  `packages\` the pack wrote. Walk finding 2.
+  create` wrote it after bootstrap ran, and the POMs and the `.gitignore`
+  line you wrote. Walk finding 2.
 - **No UI register —** Start Session does not offer the commit, and nothing
   sets the upstream that the land's bare `git push` needs. It is the
   framework's to close, at the same moment it refuses the tree.
@@ -621,13 +570,12 @@ and the Work Explorer's attention row.
 - **Framework —** as step 8, once per module: the plan's `Module:` line for
   session 2 is `store` and for session 3 is `app`.
 - **You —** **Dabbler: Start Session** on session 2's row, then on session
-  3's row when session 2 has closed; **Dabbler: Pack Module** on each
-  when its session is done.
+  3's row when session 2 has closed.
 - **Underneath —** the same two commands as step 8, per module.
 
-Each module needs a short `modules\<slug>\contract\README.md`; declaring
-`contract: package` does not skip it, and without one the session refuses
-near the end.
+The store and the app reach their siblings in the same reactor: the store's
+POM depends on `com.example:json-model` at `${project.version}`, and the
+parent POM lists all three modules.
 
 ---
 
@@ -676,11 +624,7 @@ in `docs/uat/uat-walk-findings.md` with its reproduction.
 - **Nothing in the UI sets the remote or the upstream** (steps 2 and 7).
   Finding 5.
 - **Troubleshoot runs no toolchain checks** (prerequisites). Finding 6.
-- **The node deprecation warning after a Maven pack** (step 5). Finding 9.
+- **The node deprecation warning when Dabbler runs `mvn`**. Finding 9.
 - **No test suite is ever declared for you** (step 6). Finding 10.
 - **The Chat panel** takes the right-hand side of the window. Close it with
   **View: Close Secondary Side Bar**; it is not part of Dabbler.
-
-The two defects this document used to list here — the pack message naming a
-.NET file, and the root POM targeting Java 21 on every machine — were fixed in
-session 113 and are checks in step 5 now. Report them if you see them.

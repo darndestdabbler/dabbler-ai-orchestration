@@ -29,7 +29,7 @@ const SUITES = [
 ];
 
 describe("the impact plan", () => {
-  it("reaches a changed module's own suites and its consumers' contract suites against it, and names it the candidate", () => {
+  it("reaches a changed module's own suites and its consumers' contract suites against it", () => {
     const plan = planImpact(threeModules(), SUITES, ["modules/persister/src/Store.cs"]);
     assert.equal(plan.multi, true);
     assert.deepEqual(plan.changedModules, ["persister"]);
@@ -41,7 +41,6 @@ describe("the impact plan", () => {
         ["listener-against-persister", REACH_CONSUMER_CONTRACT, "persister"],
       ],
     );
-    assert.deepEqual(plan.candidates, ["persister"]);
     assert.deepEqual(plan.unowned, []);
   });
 
@@ -67,7 +66,6 @@ describe("the impact plan", () => {
         ["listener-against-persister", REACH_SHARED_TYPES],
       ],
     );
-    assert.deepEqual(plan.candidates, ["model"]);
     assert.deepEqual(plan.unowned, ["README.md"]);
     // A shared file is every naming module's change.
     assert.deepEqual(
@@ -83,7 +81,6 @@ describe("the impact plan", () => {
     ], ["src/anything.py"]);
     assert.equal(own.multi, false);
     assert.deepEqual(own.suites.map((suite) => [suite.name, suite.reason]), [["unit", REACH_REQUIRED]]);
-    assert.deepEqual(own.candidates, []);
     assert.deepEqual(own.unowned, []);
   });
 

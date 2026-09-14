@@ -5,7 +5,7 @@
 // A changed module owes its own suites -- its unit tests and the contract
 // tests its abstractions are run against -- and every transitive consumer
 // owes the compatibility suite it runs against that module, because the
-// candidate package the change produces is what the consumer will restore.
+// consumer builds against the changed module's source by project reference.
 // A changed shared-types module reaches every transitive consumer whole: a
 // type they all compile against moved, and a consumer's own suite is the
 // only thing that says its code still does. What the change reaches is the
@@ -16,7 +16,6 @@
 // run-of-record phase and the close gate all read the one plan, so no two
 // of them can disagree about what a change owes.
 
-import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -74,8 +73,6 @@ export interface ImpactPlan {
   readonly changedModules: readonly string[];
   /** The suites the change owes, one entry per suite, in the order reached. */
   readonly suites: readonly ReachedSuite[];
-  /** The changed modules that declare a package: their candidate is packed before the suites run. */
-  readonly candidates: readonly string[];
   /** The changed paths no module's roots or shared files hold. */
   readonly unowned: readonly string[];
   /** When the plan was written beside a run; absent on a plan not yet written. */
@@ -95,8 +92,8 @@ function under(rel: string, prefix: string): boolean {
 
 /**
  * The modules a changed path belongs to: the one whose roots hold it, and
- * every one whose shared files name it. A shared file is shared -- the
- * central pins, the packages folder -- so a change to it is every naming
+ * every one whose shared files name it. A shared file is shared -- a root
+ * build file every module reads -- so a change to it is every naming
  * module's change.
  */
 export function modulesReachedBy(
@@ -183,8 +180,8 @@ export function reachModules(
 }
 
 /**
- * The plan for a change: the modules it reached, the suites they owe, the
- * candidates to pack first, and the paths nothing owns. A single-module
+ * The plan for a change: the modules it reached, the suites they owe, and
+ * the paths nothing owns. A single-module
  * solution's plan is every suite the close requires, unchanged by the
  * paths.
  */
@@ -208,7 +205,6 @@ export function planImpact(
           reason: REACH_REQUIRED,
           via: "",
         })),
-      candidates: [],
       unowned: [],
     };
   }
@@ -228,9 +224,6 @@ export function planImpact(
     multi: true,
     changedModules,
     suites: reachModules(shape, suites, changedModules),
-    candidates: changedModules.filter(
-      (slug) => shape.modules.find((entry) => entry.slug === slug)?.package !== null,
-    ),
     unowned: [...unowned].sort(),
   };
 }
@@ -246,8 +239,7 @@ export function impactPath(root: string, session: number): string {
 /**
  * The plan the run of record was selected by, written beside the run once
  * per verified tree: the close gate reads it, and so does the phase itself
- * when it is re-entered, because a plan recomputed after the candidate job
- * moved the shared files it writes would reach modules the change did not.
+ * when it is re-entered, so the suites it demands are the ones the phase ran.
  */
 export function writeImpactPlan(root: string, session: number, plan: ImpactPlan): ImpactPlan {
   mkdirSync(sessionRunDir(root, session), { recursive: true });
@@ -267,7 +259,6 @@ export function readImpactPlan(root: string, session: number): ImpactPlan | null
       multi: record["multi"] === true,
       changedModules: Array.isArray(record["changedModules"]) ? record["changedModules"].map(String) : [],
       suites: Array.isArray(record["suites"]) ? (record["suites"] as ReachedSuite[]) : [],
-      candidates: Array.isArray(record["candidates"]) ? record["candidates"].map(String) : [],
       unowned: Array.isArray(record["unowned"]) ? record["unowned"].map(String) : [],
       ...(typeof record["writtenAt"] === "string" ? { writtenAt: record["writtenAt"] } : {}),
     };
@@ -282,82 +273,6 @@ export function standsSince(writtenAt: string | null | undefined, verifiedAt: st
   const written = Date.parse(writtenAt);
   const verified = Date.parse(verifiedAt);
   return Number.isFinite(written) && Number.isFinite(verified) && written >= verified;
-}
-
-export const CANDIDATE_FILENAME = "candidate.json";
-
-export function candidatePath(root: string, session: number): string {
-  return join(sessionRunDir(root, session), CANDIDATE_FILENAME);
-}
-
-/** One path the candidate wrote, with the digest of the bytes it left. */
-export interface CandidatePath {
-  readonly path: string;
-  /** Hex sha256 of the file as written; null where the path was not a file. */
-  readonly sha256: string | null;
-}
-
-function digestOfFile(root: string, path: string): string | null {
-  try {
-    return createHash("sha256").update(readFileSync(join(root, ...path.split("/")))).digest("hex");
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The paths the candidate job wrote -- the packages, their records, the
- * central pins, the contract pages -- recorded beside the run with the
- * digest of each as written. They are the framework's derivation of the
- * verified source, made after verification and before the run of record on
- * purpose, and the gate that refuses a tree moved after verification reads
- * this to know them from a change: a path is the candidate's only while its
- * bytes are the ones the candidate left.
- */
-export function writeCandidateRecord(root: string, session: number, paths: readonly string[]): void {
-  mkdirSync(sessionRunDir(root, session), { recursive: true });
-  atomicWriteJson(candidatePath(root, session), {
-    schema_version: 1,
-    writtenAt: new Date().toISOString(),
-    paths: paths.map((path) => ({ path, sha256: digestOfFile(root, path) })),
-  });
-}
-
-export interface CandidateRecord {
-  /** When the candidate was written; null where no record stands. */
-  readonly writtenAt: string | null;
-  readonly paths: readonly CandidatePath[];
-}
-
-export function readCandidateRecord(root: string, session: number): CandidateRecord {
-  const path = candidatePath(root, session);
-  if (!existsSync(path)) return { writtenAt: null, paths: [] };
-  try {
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as { writtenAt?: unknown; paths?: unknown };
-    const paths = Array.isArray(parsed.paths)
-      ? parsed.paths.map((entry): CandidatePath =>
-          typeof entry === "string"
-            ? { path: entry, sha256: null }
-            : { path: String((entry as { path?: unknown }).path ?? ""), sha256: typeof (entry as { sha256?: unknown }).sha256 === "string" ? (entry as { sha256: string }).sha256 : null },
-        )
-      : [];
-    return { writtenAt: typeof parsed.writtenAt === "string" ? parsed.writtenAt : null, paths };
-  } catch {
-    return { writtenAt: null, paths: [] };
-  }
-}
-
-/**
- * The candidate's paths whose bytes are still the ones it wrote: what the
- * verification gate may set aside. A path edited since -- by a person, an
- * engine, anything -- has a different digest and is a change like any other.
- */
-export function candidatePathsAsWritten(root: string, record: CandidateRecord): Set<string> {
-  const out = new Set<string>();
-  for (const entry of record.paths) {
-    if (entry.sha256 !== null && digestOfFile(root, entry.path) === entry.sha256) out.add(entry.path);
-  }
-  return out;
 }
 
 /**

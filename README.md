@@ -44,7 +44,7 @@ There is one implementation, in TypeScript, and it runs two ways:
    record). There is no waiver and no verdict a person can type.
 4. `dabbler session close` runs the gates `GATE_CHECKS` declares —
    verification clean, working tree clean, pushed to remote, test run
-   fresh, pins current, published when releasable, and verdict
+   fresh, published when releasable, and verdict
    vocabulary — then flips the
    state. The verification gate reads the ledger; there is no stamp, no
    override, no hand-writable record.
@@ -80,58 +80,25 @@ modules:
 ```
 
 Declare it under each module whose sessions must reach it. A change to a
-shared file reaches every module that names it, and every reached module
-with a package becomes a candidate of the run of record; a module with no
-project file under its roots yet is skipped. A changed path that no
+shared file reaches every module that names it. A changed path that no
 module's roots or shared files hold is *unowned*: it reaches no module, so
 it selects only the suites bound to no module — a suite declared with no
 `module` answers for the whole repository whatever changed — and the
 `impact-plan` line says so when it lists one.
 
-**Module packages are pinned centrally.** The run of record packs each
-changed module's candidate into `packages/` under an immutable dev version
-and pins it where the ecosystem keeps pins: for .NET, a root
-`Directory.Packages.props` with `ManagePackageVersionsCentrally` on, which
-puts the whole solution under central package management — so every
-`PackageReference` takes its version from a `PackageVersion` entry there,
-in a group of your own beside the framework's `Modules` group, and not
-from a `Version` attribute. A solution with a package-contract module
-manages package versions centrally from its first project: `dabbler
-modules create` writes the file before any project exists, so no project
-is ever built under the old rule and then moved. The pin names a build
-that exists only in the committed `packages/` folder, so `nuget.config`
-must list that folder as a source — the one the framework writes does,
-and one written by hand must add `<add key="modules" value="packages" />`
-itself, because the framework never rewrites a file it did not write. For Maven it is the root
-`pom.xml`'s `dependencyManagement`. A module with `contract: package` also needs its
-notes page, `modules/<slug>/contract/README.md`, before its first
-candidate: the page is what a sibling's session reads instead of the code.
+**A sibling is a project reference.** A .NET module reaches a sibling with
+a `<ProjectReference>` to its project, and the solution file at the root
+lists both; a Maven module depends on a sibling at `${project.version}`, and
+the parent `pom.xml` lists both under `<modules>`, built in one reactor run.
+When the manifest becomes multi-module and a module already holds a project
+file, `dabbler modules create` writes the root build files where they are
+absent and never rewrites them: for .NET the `.slnx`, `Directory.Build.props`
+and `Directory.Build.targets`, with `bin/` and `obj/` ignored; for Maven the
+parent POM, with `target/` ignored. Where no module holds a project yet, the
+framework writes them once the work of the session that adds the first
+project is done, before that work is verified.
 
-**The three contract modes.** `contract:` in `docs/modules.yaml` says where
-a sibling reads this module's promise from:
-
-- `package` — the published package is its own abstraction: a value library
-  or shared types, consumed as the package it ships. The default when a
-  package is declared.
-- `designed` — an abstractions project written by hand beside the
-  implementation (`<Package>.Abstractions`, and a `<Package>.ContractTests`
-  the implementation's tests inherit); `dabbler module contract <slug>`
-  scaffolds it, and the surface page is read from that project's source.
-- `generated` — a surface derived from the built assembly by the argv
-  `modules.<slug>.contract.generate` in `dabbler.yaml` names: shape, not
-  behaviour, so the notes page beside it carries the promises.
-
-**Building against a sibling whose package was never published.** A
-package reference nothing has published does not resolve. There are two
-ways on, and both are decided in the plan before the work. The session that
-completes the sibling ships it — a session publishes unless its plan holds
-it — to a feed: a folder on disk is a feed, takes no credential, and is
-enough for the next module to build against. Or one session changes both,
-naming both modules.
-
-The verbs are `dabbler modules create` and `modules show` for the
-manifest, and `dabbler module contract | pack` for one module — its
-designed seam and its committed package. Worked end to end in the two UAT
+The verbs are `dabbler modules create` and `modules show`. Worked end to end in the two UAT
 walkthroughs above and, module by module across a four-module solution,
 in
 [docs/tutorials/csv-solution/csv-multi-module-walkthrough.md](docs/tutorials/csv-solution/csv-multi-module-walkthrough.md).

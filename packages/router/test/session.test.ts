@@ -566,11 +566,11 @@ describe("what a restoration puts back", () => {
 });
 
 describe("a repair made while the run was stopped", () => {
-  it("lists only the repaired files, never the framework's bookkeeping or the candidate", () => {
+  it("lists only the repaired files, never the framework's bookkeeping", () => {
     // The proof of 2026-09-08: seven paths for a two-file repair.
     const state = stateDir();
     try {
-      const repaired = repairedPaths(state.repo, state.sessionsDir, 1, [
+      const repaired = repairedPaths(state.repo, state.sessionsDir, [
         "src/widget.ts",
         "tests/widget.test.ts",
         ".dabbler/runs/s1/driver/run.json",
@@ -894,17 +894,14 @@ describe("the module manifest", () => {
     const [model, persister] = parseEntries({
       modules: [
         { slug: "model", kind: "shared-types", package: "CsvModel" },
+        // A contract the manifest still carries is read and ignored, never refused.
         { slug: "persister", dependsOn: ["model"], package: "CsvPersister", contract: "designed" },
       ],
     });
     assert.equal(model?.kind, "shared-types");
-    // A declared package is its own abstraction until somebody designs one.
-    assert.equal(model?.contract, "package");
     assert.equal(persister?.kind, "library");
     assert.deepEqual(persister?.dependsOn, ["model"]);
-    assert.equal(persister?.contract, "designed");
-    // A module with no package has no seam to name a contract for.
-    assert.equal(parseEntries({ modules: [{ slug: "app" }] })[0]?.contract, null);
+    assert.equal("contract" in (persister ?? {}), false);
     assert.throws(
       () => parseEntries({ modules: [{ slug: "a", kind: "service" }] }),
       /'kind' must be one of shared-types, library, application/,
@@ -950,6 +947,8 @@ describe("the module manifest", () => {
     const configs = moduleConfigs(
       {
         modules: {
+          // A retired feed block is read and ignored, never taken for a module.
+          packages: { ceilingBytes: 5242880 },
           persister: {
             sharedFiles: ["Directory.Packages.props", "packages/"],
             contract: { generate: ["dotnet", "genapi", "modules/persister"] },
@@ -960,7 +959,9 @@ describe("the module manifest", () => {
       entries,
     );
     assert.deepEqual(configs.get("persister")?.sharedFiles, ["Directory.Packages.props", "packages/"]);
-    assert.deepEqual(configs.get("persister")?.contractGenerate, ["dotnet", "genapi", "modules/persister"]);
+    // A contract block it still carries is read and ignored, never refused.
+    assert.equal("contractGenerate" in (configs.get("persister") ?? {}), false);
+    assert.equal(configs.has("packages"), false);
     assert.equal(configs.get("persister")?.packaging, null);
     assert.deepEqual(configs.get("model")?.sharedFiles, []);
     assert.ok(configs.get("model")?.packaging);

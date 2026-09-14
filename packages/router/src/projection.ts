@@ -5,14 +5,14 @@
 // manifest or the sibling repositories itself, because two implementations
 // of one rule disagree eventually and the disagreement shows up as a wrong
 // row nobody can explain. Everything here is DERIVED: dependency order and
-// `usedBy` from `dependsOn`, the contract folder from the disk, the drift
-// rows from build files read on every projection.
+// `usedBy` from `dependsOn`, the drift rows from build files read on every
+// projection.
 //
 // A single-module solution -- an absent manifest, or one entry -- projects
 // one module row and nothing module-shaped beyond it, which is the shape of
 // every repository that predates the manifest.
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
 import {
@@ -47,8 +47,7 @@ import { sessionsDirFor } from "./evidence.ts";
 import { platformNewlines } from "./journal.ts";
 import { PREFERENCES_FILENAME, chosenEngine } from "./preferences.ts";
 import { dumps } from "./pythonJson.ts";
-import { readBundleRecords } from "./land.ts";
-import { type ModuleEntry, type SolutionShape, consumersOf, contractDirFor, ManifestError, solutionShape } from "./modules.ts";
+import { type SolutionShape, consumersOf, ManifestError, solutionShape } from "./modules.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import {
   OUTCOME_PASSED,
@@ -1077,35 +1076,16 @@ export function project(root: string): Record<string, unknown> {
   const name = basename(resolve(root)) || "solution";
   const inPlay = modulesInSession(root);
   const runs = runsOfRecord(root, shape);
-  // What ships: every bundle record under release/, and per module the
-  // bundles that pin its package or are its own.
-  const bundles = readBundleRecords(root);
-  const shippedIn = (entry: ModuleEntry): string[] =>
-    bundles
-      .filter(
-        (bundle) =>
-          bundle.bundle === entry.slug ||
-          bundle.from.includes(entry.slug) ||
-          (entry.package !== null && bundle.dependencies.some((dependency) => dependency.package === entry.package)),
-      )
-      .map((bundle) => bundle.bundle);
   const modules: Node[] = shape.modules.map((entry) => {
-    const contractDir = contractDirFor(entry.slug);
     return {
       slug: entry.slug,
       title: entry.title,
       kind: entry.kind,
       package: entry.package,
-      contract: entry.contract,
       codeRoots: [...entry.codeRoots],
       dependsOn: [...entry.dependsOn],
       // Derived on every projection, declared nowhere.
       usedBy: consumersOf(shape.modules, entry.slug),
-      // The folder, when the tree has it; the Explorer opens it and says
-      // "not written yet" otherwise. Never claimed for a module that has
-      // not declared a seam.
-      contractDir:
-        entry.contract !== null && existsSync(join(root, contractDir)) ? contractDir : null,
       // The session working in this module right now, or null: the Explorer
       // marks the row.
       inSession: inPlay !== null && inPlay.modules.has(entry.slug) ? inPlay.session : null,
@@ -1113,7 +1093,6 @@ export function project(root: string): Record<string, unknown> {
       // whose contract suite against it is red.
       runOfRecord: runs.get(entry.slug)?.state ?? "none",
       blocking: [...(runs.get(entry.slug)?.blocking ?? [])],
-      shippedIn: shippedIn(entry),
     } satisfies Node;
   });
   const doc: Node = {
@@ -1137,17 +1116,6 @@ export function project(root: string): Record<string, unknown> {
       runtime: deployable.runtime,
       publish: deployable.publish,
       declared: deployable.declared,
-    })),
-    // What ships, as the bundle records under release/ say it; recorded,
-    // never executed, and read here rather than restated.
-    bundles: bundles.map((bundle) => ({
-      bundle: bundle.bundle,
-      from: [...bundle.from],
-      version: bundle.version,
-      baseCommit: bundle.baseCommit,
-      date: bundle.date,
-      session: bundle.session,
-      dependencies: bundle.dependencies.map((dependency) => ({ ...dependency })),
     })),
   };
   // One assembly for both halves of the cross-repository graph. It reads

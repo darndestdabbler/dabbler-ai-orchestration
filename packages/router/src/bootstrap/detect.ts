@@ -190,8 +190,8 @@ function whyNoSuite(): string {
 
 /**
  * The root build files a multi-module solution needs, and the test suite the
- * ecosystem they belong to names: what a first `module pack` or a second
- * `modules create` leaves behind.
+ * ecosystem they belong to names: what a second `modules create` leaves
+ * behind.
  *
  * The suite is declared HERE, at the moment the ecosystem becomes known,
  * because there is no later moment. Bootstrap runs before any project file

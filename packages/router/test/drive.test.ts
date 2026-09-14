@@ -185,19 +185,6 @@ describe("what belongs to a step and what does not", () => {
     ]);
   });
 
-  it("subtracts what the candidate job packed, by provenance", () => {
-    // The sample's fix step was refused for a package and its record the
-    // framework's own candidate job wrote before the step was issued. The
-    // candidate record names them; a step never accounts for them.
-    const diff = [
-      "src/widget.py",
-      "packages/CsvParser.Person.1.0.0-dev.20260913.1.g57c4688.nupkg",
-      "packages/CsvParser.Person.1.0.0-dev.20260913.1.g57c4688.json",
-    ];
-    const packed = new Set(diff.slice(1));
-    assert.deepEqual(stepChangedPaths(diff, "docs/sessions", packed), ["src/widget.py"]);
-  });
-
   it("keeps a bookkeeping basename that lives somewhere else", () => {
     // The rule is a path under the sessions directory, not a file name: a
     // repository with its own `sessions.json` elsewhere still owns it.

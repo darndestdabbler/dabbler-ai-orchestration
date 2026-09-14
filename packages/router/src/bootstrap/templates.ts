@@ -248,12 +248,16 @@ export const PLAN_PROMPT =
   "  to a handful of focused AI sessions.\n" +
   "\n" +
   "Then declare the modules in `docs/modules.yaml` through `dabbler modules\n" +
-  "create` (`--kind`, `--depends-on`, `--package`, `--contract`), one entry\n" +
+  "create` (`--kind`, `--depends-on`, `--package`), one entry\n" +
   "per module. The bootstrapped manifest already carries one entry naming\n" +
   "the repository as the module: leave it when one module is the answer.\n" +
   "When there are several, declare each with `create` and remove the\n" +
   "placeholder entry by hand -- no verb removes one. Who depends on a\n" +
-  "module is derived from `dependsOn`, never written.\n" +
+  "module is derived from `dependsOn`, never written. A module reaches a\n" +
+  "sibling by project reference: a `<ProjectReference>` with both projects\n" +
+  "listed in the root solution file for .NET, a dependency at\n" +
+  "`${project.version}` with both modules listed in the parent `pom.xml`\n" +
+  "for Maven.\n" +
   "\n" +
   "- **Import:** if the operator points you at an existing plan (a doc, a\n" +
   "  ticket, notes), bring its content into that path in this same shape,\n" +
@@ -352,7 +356,11 @@ export const BOOTSTRAP_PLAN =
   "   create`. The manifest already names this repository as its one\n" +
   "   module: leave it when one module is the answer; when there are\n" +
   "   several, declare each and remove the placeholder entry by hand. Who\n" +
-  "   depends on a module is derived, never written.\n" +
+  "   depends on a module is derived, never written. A module reaches a\n" +
+  "   sibling by project reference: a `<ProjectReference>` with both projects\n" +
+  "   listed in the root solution file for .NET, a dependency at\n" +
+  "   `${project.version}` with both modules listed in the parent `pom.xml`\n" +
+  "   for Maven.\n" +
   "4. Cross-provider verification.\n" +
   "5. Full test suite, recorded as the run of record.\n" +
   "6. Close-out.\n" +

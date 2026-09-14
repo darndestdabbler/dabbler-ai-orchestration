@@ -82,18 +82,9 @@ import {
 } from "./driver.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
-import { hasProjectFile } from "./ecosystem.ts";
-import {
-  type LandFacts,
-  type LandModuleFact,
-  type LandSuiteFact,
-  judgeLandReadiness,
-  readBundleRecords,
-  receiptBundles,
-  receiptCorrespondence,
-} from "./land.ts";
-import { readRecords as readCorrespondence } from "./packages.ts";
+import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
+import { EcosystemError, type ScaffoldResult, ensureRootFiles } from "./ecosystem.ts";
 import { BUILT_IN_ENGINES, builtInEngine, engineAliases } from "./engines.ts";
 import type { Engine, EngineOutcome, EngineOutput } from "./engines.ts";
 import {
@@ -119,12 +110,10 @@ import type {
 import { type Job, endJob, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
 import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
 import { tryWriteProjection } from "./projection.ts";
-import { ManifestError, type SolutionShape, contractDirFor, moduleConfigs, solutionShape } from "./modules.ts";
+import { ManifestError, type SolutionShape, moduleConfigs, solutionShape } from "./modules.ts";
 import {
   type ImpactPlan,
-  candidatePathsAsWritten,
   planImpact,
-  readCandidateRecord,
   readImpactPlan,
   standsSince,
   writeImpactPlan,
@@ -305,7 +294,8 @@ export function planModulesMember(shape: SolutionShape): string {
   return (
     "This solution declares more than one module, so one further member is optional:\n" +
     '  modules     the module(s) this session works in, by slug from docs/modules.yaml: ' +
-    `["<slug>", ...]. Declared here: ${slugs}. Name as many as the work touches, or leave it out.\n`
+    `["<slug>", ...]. Declared here: ${slugs}. Name as many as the work touches, or leave it out.\n` +
+    "A module reaches a sibling by project reference: in .NET a <ProjectReference> to the sibling's project, with both projects listed in the solution file at the root; in Maven a <dependency> on the sibling at ${project.version}, with both modules listed under <modules> in the parent pom.xml and built in one reactor run. A step that writes a module's project adds it to that root file; where there is none yet, the framework writes the root build files once the work is done, before it is verified.\n"
   );
 }
 
@@ -332,24 +322,13 @@ export function nextLeaseEpoch(existing: number | null | undefined): number {
  *
  * The ledger's own bookkeeping is not a step's work: it is written by the
  * lifecycle on the way past, and counting it would make every step's report
- * omit a file it never touched. Neither is what the candidate job packed:
- * the packages, their records and the pin file it moved are the framework's
- * derivation of the verified source, subtracted by provenance -- the paths
- * the candidate record names whose bytes are still the ones it wrote -- and
- * never by a list of names. A candidate path edited since has a different
- * digest, is not in the set, and is a change like any other. Canonical on
- * both sides, because git answers with its own spelling of the root while
- * the sessions directory and the record are whatever the caller was handed.
+ * omit a file it never touched. Canonical, because git answers with its own
+ * spelling of the root while the sessions directory is whatever the caller
+ * was handed.
  */
-export function stepChangedPaths(
-  diff: readonly string[],
-  sessionsRel: string,
-  candidate: ReadonlySet<string> = new Set(),
-): string[] {
-  const packed = new Set([...candidate].map((path) => path.split("\\").join("/")));
+export function stepChangedPaths(diff: readonly string[], sessionsRel: string): string[] {
   return diff.filter((path) => {
     const canonical = path.split("\\").join("/");
-    if (packed.has(canonical)) return false;
     const name = canonical.split("/").pop() ?? canonical;
     return !(canonical.startsWith(`${sessionsRel}/`) && SET_BOOKKEEPING_COMMIT_BASENAMES.includes(name));
   });
@@ -2074,11 +2053,7 @@ class Driver {
     if (current === null) throw new Stop("engine", "could not snapshot the working tree");
     const diff = changedPathsBetween(this.repoRoot, String(this.run.baseline_tree), current);
     if (diff === null) throw new Stop("engine", "could not diff the working tree against the last accepted step");
-    const changed = stepChangedPaths(
-      diff,
-      repoRelativePath(this.repoRoot, this.sessionsDir),
-      candidatePathsAsWritten(this.repoRoot, readCandidateRecord(this.repoRoot, this.sessionNumber)),
-    );
+    const changed = stepChangedPaths(diff, repoRelativePath(this.repoRoot, this.sessionsDir));
     const reasons = judgeReportFiles(answered, changed, (file) =>
       existsSync(join(this.repoRoot, file)),
     );
@@ -2138,7 +2113,34 @@ class Driver {
    * an old record's `preverify` rows and stops still read as what they were.
    */
   private async phasePreverify(): Promise<void> {
+    this.writeRootFiles();
     this.setPhase("verify");
+  }
+
+  /**
+   * The root build files a multi-module solution needs, written where absent
+   * once the work is done and before it is verified -- the one moment every
+   * path into a round passes. `modules create` writes them only when a module
+   * already holds a project file, so a solution declared before its code gets
+   * them here, from the session that wrote its first project. They are part
+   * of the tree the round reviews and the land commits, and the step baseline
+   * moves past them, so no later step has to account for what the framework
+   * wrote.
+   */
+  private writeRootFiles(): void {
+    let written: ScaffoldResult | null;
+    try {
+      written = ensureRootFiles(this.repoRoot, solutionShape(this.repoRoot));
+    } catch (error) {
+      if (error instanceof ManifestError || error instanceof EcosystemError) return;
+      throw error;
+    }
+    const wrote = [...(written?.written ?? []), ...(written?.changed ?? [])];
+    if (wrote.length === 0) return;
+    const tree = snapshotWorktreeTree(this.repoRoot);
+    if (tree !== null) this.run = { ...this.run, baseline_tree: tree };
+    this.save();
+    this.log("root-files", { wrote });
   }
 
   // --- the framework's own long work -----------------------------------------
@@ -2614,37 +2616,12 @@ class Driver {
     );
   }
 
-  /** The application module(s) a releasable session ships, for the bundle record. */
-  private bundleCandidates(plan: ImpactPlan): string[] {
-    if (!sessionIsReleasable(this.sessionsDir, this.sessionNumber)) return [];
-    let shape: SolutionShape;
-    try {
-      shape = solutionShape(this.repoRoot);
-    } catch (error) {
-      if (error instanceof ManifestError) return [];
-      throw error;
-    }
-    // Any application, packaged or not: a packaged one already in the plan's
-    // candidates is bundled by the same job, and is not named twice.
-    return sessionModulesOf(this.sessionsDir, this.sessionNumber).filter((slug) => {
-      const entry = shape.modules.find((module) => module.slug === slug);
-      return entry !== undefined && entry.kind === "application" && !plan.candidates.includes(slug);
-    });
-  }
-
   private async phaseRunOfRecord(): Promise<void> {
-    // A module session tests against candidate bytes: each changed module
-    // is packed and its contract page regenerated first, as one job on the
-    // record, and only the suites the plan reached run. The plan is written
-    // beside the run so the close gate demands the same suites. Every other
-    // session runs every expensive suite, exactly as before.
-    // One plan and one candidate per verified tree. Both stand once written
-    // after the latest round: the phase re-entered -- after a stop, or
-    // while a suite's job runs -- reads them back rather than recomputing,
-    // because the candidate job moves the shared files it writes (the
-    // central pins, the feed) and a plan recomputed over them would reach
-    // modules the change never touched, and a re-pack would rewrite the
-    // record and move the tree under the suite's green run.
+    // A module session runs only the suites its impact plan reached; the plan
+    // is written beside the run so the close gate demands the same suites.
+    // Every other session runs every expensive suite. One plan per verified
+    // tree: the phase re-entered -- after a stop, or while a suite's job runs
+    // -- reads it back rather than recomputing it.
     const verifiedAt = String(latestRound(this.repoRoot, this.sessionNumber)?.["recorded_at"] ?? "");
     const recorded = readImpactPlan(this.repoRoot, this.sessionNumber);
     const plan =
@@ -2659,7 +2636,6 @@ class Driver {
         this.log("impact-plan", {
           modules: plan.changedModules,
           suites: plan.suites.map((suite) => suite.name),
-          candidates: plan.candidates,
           unowned: plan.unowned,
           // An unowned path reaches no module, so it selects only the suites
           // bound to none. Said on the line, because the sample's operator
@@ -2667,38 +2643,6 @@ class Driver {
           // every suite, no suite, or was refused.
           unownedSelects: plan.unowned.length === 0 ? undefined : "only the suites bound to no module",
         });
-      }
-      const standing = readCandidateRecord(this.repoRoot, this.sessionNumber).writtenAt;
-      const candidateStands = standsSince(standing, verifiedAt);
-      // A releasable session on an application module has a candidate too:
-      // the bundle record of what it ships, written before the run of
-      // record so the land carries it.
-      const candidates = [...plan.candidates, ...this.bundleCandidates(plan)];
-      if (candidates.length > 0 && candidateStands) {
-        this.log("candidate-standing", { modules: candidates, written: standing });
-      } else if (candidates.length > 0) {
-        const code = await this.longWork({
-          name: `candidate: ${candidates.join(", ")}`,
-          argv: [
-            ...selfArgv(),
-            "module",
-            "candidate",
-            "--session",
-            String(this.sessionNumber),
-            "--workspace-root",
-            this.repoRoot,
-            ...candidates,
-          ],
-          retryAfterSeconds: 30,
-          stopKind: "tests",
-        });
-        if (code !== EXIT_OK) {
-          throw new Stop(
-            "tests",
-            `the candidate of ${candidates.join(", ")} could not be made (exit ${code}); ` +
-              "the job's log says why",
-          );
-        }
       }
     }
     const reached = plan === null ? null : new Set(plan.suites.map((suite) => suite.name));
@@ -2786,8 +2730,7 @@ class Driver {
   /**
    * What the land judges: the suites it owes with their latest run of
    * record and their surfaces now, the whole tree now, the paths that moved
-   * since the verified tree (the candidate's own writes set aside), and each
-   * changed module's candidate record beside the tree's digests.
+   * since the verified tree.
    */
   private landFacts(): LandFacts {
     const plan = readImpactPlan(this.repoRoot, this.sessionNumber);
@@ -2821,41 +2764,12 @@ class Driver {
     const verifiedTree = typeof round?.["completion_tree"] === "string" ? round["completion_tree"] : null;
     const now = snapshotWorktreeTree(this.repoRoot);
     if (verifiedTree !== null && now !== null) {
-      const candidate = candidatePathsAsWritten(this.repoRoot, readCandidateRecord(this.repoRoot, this.sessionNumber));
-      const diff = changedPathsBetween(this.repoRoot, verifiedTree, now);
-      moved = diff === null ? null : diff.filter((path) => !candidate.has(path.split("\\").join("/")));
-    }
-    const modules: LandModuleFact[] = [];
-    if (plan !== null && plan.multi && plan.changedModules.length > 0) {
-      const shape = solutionShape(this.repoRoot);
-      const records = readCorrespondence(this.repoRoot);
-      for (const slug of plan.changedModules) {
-        const entry = shape.modules.find((module) => module.slug === slug);
-        if (entry === undefined || entry.package === null) continue;
-        // The candidate skips a module with no project file under its roots
-        // -- nothing to pack -- so the land expects no candidate of it. One
-        // rule, read by both through `hasProjectFile`.
-        if (!hasProjectFile(this.repoRoot, entry)) continue;
-        const record = records.filter((row) => row.package === entry.package && row.session === this.sessionNumber).at(-1);
-        const contract = `${contractDirFor(slug)}/`;
-        modules.push({
-          slug,
-          package: entry.package,
-          record:
-            record === undefined
-              ? null
-              : { version: record.version, sourceDigest: record.sourceDigest, contractDigest: record.contractDigest },
-          // The same digests the pack took: the roots, and the contract folder when the tree has it.
-          sourceDigestNow: surfaceDigest(this.repoRoot, entry.codeRoots.length > 0 ? entry.codeRoots : ["."]),
-          contractDigestNow: existsSync(join(this.repoRoot, contract)) ? surfaceDigest(this.repoRoot, [contract]) : null,
-        });
-      }
+      moved = changedPathsBetween(this.repoRoot, verifiedTree, now);
     }
     return {
       treeNow: treeDigest(this.repoRoot, { sessionsDir: this.sessionsDir }),
       suites,
       moved,
-      modules,
     };
   }
 
@@ -2872,8 +2786,7 @@ class Driver {
     );
     // Tested bytes are the landed bytes: judged before anything is added or
     // committed, and refused by name -- the suite whose run the tree moved
-    // after, the paths that moved, the module whose package was built from
-    // source that moved since.
+    // after, and the paths that moved.
     const refusal = judgeLandReadiness(this.landFacts());
     if (refusal !== null) {
       throw new Stop("land", `the tree is not the tree the run of record tested: ${refusal}`);
@@ -2936,11 +2849,7 @@ class Driver {
           tested_sha: tested,
           executor: "ci",
           pushed_at: nowIso(),
-          // The landed commit, and each package this session packed with the
-          // record that binds it to the source and contract it was built from.
           landed_sha: tested,
-          correspondence: receiptCorrespondence(readCorrespondence(this.repoRoot), this.sessionNumber),
-          bundles: receiptBundles(readBundleRecords(this.repoRoot), this.sessionNumber),
         };
         const receiptPath = join(
           this.repoRoot, ".dabbler", "runs", `s${this.sessionNumber}`, "driver", "gate-receipt.json",
@@ -2967,10 +2876,6 @@ class Driver {
     const localReceipt = {
       ...local.receipt,
       landed_sha: local.receipt["tested_sha"],
-      correspondence: receiptCorrespondence(readCorrespondence(this.repoRoot), this.sessionNumber),
-      // The bundle records this session made, mapped to the landed commit:
-      // the record itself names only the commit it was built on.
-      bundles: receiptBundles(readBundleRecords(this.repoRoot), this.sessionNumber),
     };
     const localReceiptPath = join(
       this.repoRoot, ".dabbler", "runs", `s${this.sessionNumber}`, "driver", "gate-receipt.json",

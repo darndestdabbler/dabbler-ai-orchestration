@@ -9,12 +9,11 @@
 // delete and reorganization stay manual edits to the manifest.
 
 import { ensureRootFilesWithSuite } from "../bootstrap/detect.ts";
-import { EcosystemError, contractNotesPage } from "../ecosystem.ts";
+import { EcosystemError } from "../ecosystem.ts";
 import { EXIT_OK as CREATED, create, show, solutionShape } from "../modules.ts";
 import { tryWriteProjection } from "../projection.ts";
 import { writeErr, writeOut } from "./output.ts";
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { statSync } from "node:fs";
 
 const EXIT_OK = 0;
 const EXIT_USAGE = 2;
@@ -33,7 +32,6 @@ const SINGLE = new Set([
   "--plan-path",
   "--kind",
   "--package",
-  "--contract",
 ]);
 
 function usage(): string {
@@ -44,7 +42,6 @@ function usage(): string {
     "                              [--kind {shared-types,library,application}]",
     "                              [--depends-on SLUG]",
     "                              [--package PACKAGE]",
-    "                              [--contract {designed,package,generated}]",
     "                              [--spec-section SPEC_SECTIONS]",
     "                              [--context-asset CONTEXT_ASSETS]",
     "                              workspace_root",
@@ -71,16 +68,6 @@ function usage(): string {
     "                        `none` declares a module no sibling consumes -- an",
     "                        application that is run rather than packed -- and",
     "                        writes no package line",
-    "  --contract MODE       where a sibling reads this module's promise from:",
-    "                          package    the published package is its own",
-    "                                     abstraction (the default when a",
-    "                                     package is declared)",
-    "                          designed   an abstractions project written by",
-    "                                     hand beside the implementation, its",
-    "                                     surface page read from that source",
-    "                          generated  a surface derived from the built",
-    "                                     assembly by the argv dabbler.yaml's",
-    "                                     modules.<slug>.contract.generate names",
     "  --spec-section SPEC_SECTIONS",
     "                        reference spec section as PATH or PATH#anchor",
     "                        (repeatable)",
@@ -194,7 +181,6 @@ export async function modulesVerb(argv: string[]): Promise<number> {
     kind: single.get("--kind") ?? null,
     dependsOn: repeated.get("dependsOn") ?? null,
     package: single.get("--package") ?? null,
-    contract: single.get("--contract") ?? null,
   });
   // The manifest moved, so the projection the Solution Explorer reads is
   // rewritten here, by the verb that moved it -- the same rule every other
@@ -204,8 +190,7 @@ export async function modulesVerb(argv: string[]): Promise<number> {
   if (code === CREATED) {
     tryWriteProjection(workspaceRoot);
     // The second entry is what makes the solution multi-module, and the
-    // root build files appear with it -- the committed feed, the central
-    // pins, the build properties and targets -- where absent.
+    // root build files appear with it where absent.
     const shape = solutionShape(workspaceRoot);
     try {
       const files = ensureRootFilesWithSuite(workspaceRoot, shape);
@@ -215,20 +200,6 @@ export async function modulesVerb(argv: string[]): Promise<number> {
     } catch (error) {
       if (!(error instanceof EcosystemError)) throw error;
       writeErr(`modules create: the root build files were not written -- ${error.message}\n`);
-    }
-    // A package module's contract is the package, and the notes page is
-    // the whole of what a sibling reads beside it; the candidate refuses
-    // without one. Written here, where the module is declared, so nothing
-    // between this and the first run of record has to know to write it.
-    const entry = shape.modules.find((module) => module.slug === single.get("--slug"));
-    if (entry !== undefined && entry.contract === "package") {
-      const rel = `modules/${entry.slug}/contract/README.md`;
-      const page = join(workspaceRoot, rel);
-      if (!existsSync(page)) {
-        mkdirSync(dirname(page), { recursive: true });
-        writeFileSync(page, contractNotesPage(entry.slug, entry.package ?? entry.slug), "utf8");
-        writeOut(`wrote ${rel}\n`);
-      }
     }
   }
   return code;

@@ -89,7 +89,6 @@ import {
   configurationNode,
   tryWriteProjection,
 } from "./projection.ts";
-import { candidatePathsAsWritten, readCandidateRecord } from "./impact.ts";
 import { isFrameworkInstalledPath, materialPaths } from "./checks.ts";
 import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
@@ -1772,24 +1771,20 @@ export interface RebaselineCliOptions {
 /**
  * The repair, and only the repair, out of everything that moved since the
  * baseline: not the framework's bookkeeping under the sessions directory
- * or the machine's directory, not the engine's settings the registration
- * edited, and not the candidate the framework packed -- so a two-file
- * repair lists two paths.
+ * or the machine's directory, and not the engine's settings the
+ * registration edited -- so a two-file repair lists two paths.
  */
 export function repairedPaths(
   repoRoot: string,
   sessionsDir: string,
-  session: number,
   changed: readonly string[],
 ): string[] {
-  const candidate = candidatePathsAsWritten(repoRoot, readCandidateRecord(repoRoot, session));
   const setRel = relative(repoRoot, resolve(sessionsDir)).split("\\").join("/");
   return changed.filter((path) => {
     const rel = path.split("\\").join("/");
     return (
       rel !== ".dabbler" &&
       !rel.startsWith(".dabbler/") &&
-      !candidate.has(rel) &&
       !isFrameworkInstalledPath(rel) &&
       !isSessionBookkeeping(rel, setRel)
     );
@@ -1849,7 +1844,6 @@ export function rebaseline(sessionsDir: string, options: RebaselineCliOptions): 
   const paths = repairedPaths(
     repoRoot,
     sessionsDir,
-    target,
     run.baseline_tree ? (changedPathsBetween(repoRoot, run.baseline_tree, tree) ?? []) : [],
   );
   const by = (options.by ?? "").trim() || "the operator";

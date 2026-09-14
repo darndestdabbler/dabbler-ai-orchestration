@@ -38,7 +38,6 @@
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative } from "node:path";
 
-import { PACKAGES_DIR } from "./ecosystem.ts";
 import {
   type SelectionConfig,
   type SuiteScope,
@@ -48,7 +47,7 @@ import {
   selectionTestRoots,
 } from "./checks.ts";
 import { canonicalPath } from "./journal.ts";
-import { type SolutionShape, contractDirFor, dependenciesOf } from "./modules.ts";
+import { type SolutionShape, dependenciesOf } from "./modules.ts";
 import { pythonRepr } from "./pythonJson.ts";
 
 /**
@@ -312,11 +311,11 @@ const SOLUTION_FILE = /\.slnx?$/i;
 
 /**
  * The module form of the scope, for a session that names its module(s) in a
- * multi-module solution: each named module's `codeRoots`, its own contract
- * folder and every transitive dependency's, the root build files and the
+ * multi-module solution: each named module's `codeRoots` and every
+ * transitive dependency's -- a dependency is a project reference, and its
+ * source is what the module builds against -- the root build files and the
  * solution file present at the root, its shared files, and the sessions
- * directory. Never a sibling's `codeRoots`: what the session may change is
- * what the verifier may read, and a sibling is a package to both.
+ * directory. Never a module the named ones do not reach.
  */
 export function moduleScope(
   repoRoot: string,
@@ -329,19 +328,17 @@ export function moduleScope(
   for (const slug of slugs) {
     const entry = shape.modules.find((module) => module.slug === slug);
     if (entry === undefined) continue;
-    for (const codeRoot of entry.codeRoots.length > 0 ? entry.codeRoots : ["."]) {
-      const rel = posix(codeRoot).replace(/^\.\/+/, "").replace(/\/+$/, "");
-      if (rel !== "" && rel !== ".") scope.add(rel);
+    const reached = [entry, ...dependenciesOf(shape.modules, slug).map((dependency) => shape.modules.find((module) => module.slug === dependency))];
+    for (const module of reached) {
+      if (module === undefined) continue;
+      for (const codeRoot of module.codeRoots.length > 0 ? module.codeRoots : ["."]) {
+        const rel = posix(codeRoot).replace(/^\.\/+/, "").replace(/\/+$/, "");
+        if (rel !== "" && rel !== ".") scope.add(rel);
+      }
     }
-    scope.add(contractDirFor(slug));
-    for (const dependency of dependenciesOf(shape.modules, slug)) scope.add(contractDirFor(dependency));
     for (const shared of sharedFiles.get(slug) ?? []) scope.add(posix(shared));
   }
   for (const name of ROOT_BUILD_FILES) if (isFile(join(repoRoot, name))) scope.add(name);
-  // The committed feed: where this module's own package lands when the run
-  // of record packs its candidate. A pack of the session's own module is the
-  // session's work, not a change outside it.
-  scope.add(PACKAGES_DIR);
   try {
     for (const name of readdirSync(repoRoot)) {
       if (SOLUTION_FILE.test(name) && isFile(join(repoRoot, name))) scope.add(name);
@@ -603,11 +600,9 @@ function readBriefing(grant: AgencyGrant): string[] {
       "\n\n" +
       "**Scope** — what this round is confined to, not the " +
       `repository:\n\n${listed}\n\n` +
-      "A path outside the scope may not be in this checkout at all: a " +
-      "sibling module is present as its package and its contract folder, " +
-      "never as source, and a read of its source is refused by the disk. " +
-      "A refused read is recorded as such and is not a finding against " +
-      "the tree; do not report what you could not open as a defect.\n\n" +
+      "A path outside the scope is not this round's to read. A refused read " +
+      "is recorded as such and is not a finding against the tree; do not " +
+      "report what you could not open as a defect.\n\n" +
       `**Budget** — at most ${grant.readBudget} reads this round.\n\n` +
       "**Log** — every list, search and read is recorded on the round, " +
       "confined to the scope or not. Confine a search or a listing by " +
@@ -665,9 +660,7 @@ function requestBriefing(grant: AgencyGrant): string {
     `repository:\n\n${listed}\n\n` +
     "A path outside it is refused before any file is opened, and the " +
     "refusal is recorded on the round. This is a boundary, not a request. " +
-    "A path outside the scope may also not be in this checkout at all: a " +
-    "sibling module is present as its package and its contract folder, " +
-    "never as source. A refused path is not a finding against the tree.\n\n" +
+    "A refused path is not a finding against the tree.\n\n" +
     `**Budget** — at most ${grant.readBudget} files this round; anything ` +
     "past that is refused and recorded.\n\n" +
     "**Log** — every path you name is recorded, delivered or refused. " +

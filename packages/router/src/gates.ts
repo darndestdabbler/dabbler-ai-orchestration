@@ -47,19 +47,10 @@ import {
 } from "./checks.ts";
 import type { RouterConfig } from "./config.ts";
 import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
-import { EcosystemError, ecosystemOf } from "./ecosystem.ts";
 import { readRun } from "./driver.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
-import { type PackageReferenceFact, candidatesFromRecord, judgePins } from "./land.ts";
-import { ManifestError, type ModuleEntry, consumersOf, solutionShape } from "./modules.ts";
-import {
-  type ImpactPlan,
-  candidatePathsAsWritten,
-  demandedByPlan,
-  readCandidateRecord,
-  readImpactPlan,
-} from "./impact.ts";
+import { type ImpactPlan, demandedByPlan, readImpactPlan } from "./impact.ts";
 import {
   repoRelativePath,
   repoRootFor,
@@ -120,8 +111,6 @@ export const EVIDENCE_GATES: ReadonlySet<string> = new Set([
   "verification_clean",
   "verdict_vocabulary",
   GATE_PUBLISHED_WHEN_RELEASABLE,
-  // The pins are evidence of what landed, not bookkeeping.
-  "pins_current",
 ]);
 
 /** One gate's row: the name, the answer, and what to do about a `false`. */
@@ -340,18 +329,7 @@ export function readVerificationFacts(sessionsDir: string): VerificationFacts {
   // is shown, and fatal here, where the question is whether the tree still IS
   // the verified one. Without that object there is no answer, and the diff
   // fails closed rather than substituting a tree nobody verified.
-  const changed = changedPathsBetween(root, pythonStr(latest["completion_tree"]), facts.currentTree);
-  // The candidate a module session's run of record tested against -- the
-  // packages, their records, the central pins, the contract pages -- is
-  // written after verification by design and recorded beside the run by
-  // the job that wrote it. Those paths are the framework's derivation of
-  // the verified source, not a change to it, and the land binds them to
-  // the run of record; everything else that moved is still a move.
-  // Only while its bytes are the candidate's: a candidate path edited since
-  // is a change to the verified tree like any other, and is not set aside.
-  const candidate = candidatePathsAsWritten(root, readCandidateRecord(root, facts.current as number));
-  facts.changedSinceLatest =
-    changed === null ? null : changed.filter((path) => !candidate.has(path.split("\\").join("/")));
+  facts.changedSinceLatest = changedPathsBetween(root, pythonStr(latest["completion_tree"]), facts.currentTree);
   return facts;
 }
 
@@ -797,74 +775,6 @@ function planForGate(sessionsDir: string): ImpactPlan | null {
   return readImpactPlan(root, current);
 }
 
-// --- pins_current -----------------------------------------------------------------
-
-/**
- * Every consumer on the candidate's pin, and pinning nowhere else. Read for
- * the changed modules the session's impact plan names that carry a package
- * and were packed this session; a single-module solution, or a session that
- * packed nothing, has no pin to hold and the row says so rather than
- * passing in silence.
- */
-export function checkPinsCurrent(sessionsDir: string): Check {
-  const root = repoRootFor(sessionsDir);
-  const current = currentSession(sessionsDir);
-  if (root === null || typeof current !== "number") return [true, "no session in flight: no pins to hold", true];
-  let shape;
-  try {
-    shape = solutionShape(root);
-  } catch (error) {
-    if (!(error instanceof ManifestError)) throw error;
-    return [false, `docs/modules.yaml is refused: ${error.message}`];
-  }
-  if (!shape.multi) return [true, "single-module solution: the repository is the module, and there is no pin to hold", true];
-  const plan = readImpactPlan(root, current);
-  if (plan === null || !plan.multi) return [true, "no impact plan on the record: nothing was packed this session", true];
-  // What this session packed, from the candidate job's own record of what
-  // it wrote: the correspondence records under packages/ name the version.
-  const packed = candidatesFromRecord(readCandidateRecord(root, current).paths.map((entry) => entry.path));
-  const candidates = plan.changedModules
-    .map((slug) => shape.modules.find((entry) => entry.slug === slug))
-    .filter((entry): entry is ModuleEntry => entry !== undefined && entry.package !== null)
-    .map((entry) => {
-      const record = packed.filter((row) => row.package === entry.package).at(-1);
-      return record === undefined ? null : { package: entry.package as string, version: record.version, slug: entry.slug };
-    })
-    .filter((candidate): candidate is { package: string; version: string; slug: string } => candidate !== null);
-  if (candidates.length === 0) return [true, "this session packed no candidate: no pin to hold", true];
-  // The pins and the references through the seam of the candidate's own
-  // ecosystem: where the pin lives and what a consumer's reference looks
-  // like are its to say, and a consumer's project files are listed by the
-  // same seam whether or not the consumer's source is on this disk.
-  const pins = new Map<string, string>();
-  const references: PackageReferenceFact[] = [];
-  for (const candidate of candidates) {
-    const packed = shape.modules.find((module) => module.slug === candidate.slug);
-    if (packed === undefined) continue;
-    let ecosystem;
-    try {
-      ecosystem = ecosystemOf(root, packed);
-    } catch (error) {
-      if (!(error instanceof EcosystemError)) throw error;
-      return [false, `the ecosystem of module '${candidate.slug}' cannot be told: ${error.message}`];
-    }
-    for (const [id, version] of ecosystem.centralPins(root)) pins.set(id, version);
-    for (const consumer of consumersOf(shape.modules, candidate.slug)) {
-      const entry = shape.modules.find((module) => module.slug === consumer);
-      if (entry === undefined) continue;
-      for (const project of ecosystem.projectFiles(root, entry)) {
-        try {
-          references.push(...ecosystem.packageReferences(root, project));
-        } catch {
-          // A project file that cannot be read pins nothing this gate can see.
-        }
-      }
-    }
-  }
-  const refusal = judgePins({ candidates, pins, references });
-  return refusal === null ? [true, ""] : [false, refusal];
-}
-
 // --- published_when_releasable ------------------------------------------------
 
 /**
@@ -1019,7 +929,6 @@ export const GATE_CHECKS: readonly (readonly [string, Predicate])[] = [
   ["working_tree_clean", checkWorkingTreeClean],
   ["pushed_to_remote", checkPushedToRemote],
   ["test_run_fresh", checkTestRunFresh],
-  ["pins_current", checkPinsCurrent],
   [GATE_PUBLISHED_WHEN_RELEASABLE, checkPublishedWhenReleasable],
   ["verdict_vocabulary", checkVerdictVocabulary],
 ];

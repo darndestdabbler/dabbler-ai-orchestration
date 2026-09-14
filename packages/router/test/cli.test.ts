@@ -12,9 +12,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { depsVerb } from "../src/cli/deps.ts";
-import { MANIFEST_HEADER, loadEntries, solutionShape } from "../src/modules.ts";
-import { packModule } from "../src/packages.ts";
-import { moduleVerb } from "../src/cli/module.ts";
+import { MANIFEST_HEADER, loadEntries } from "../src/modules.ts";
 import { modulesVerb } from "../src/cli/modules.ts";
 import { packagingVerb } from "../src/cli/packaging.ts";
 import { HANDLERS } from "../src/cli/registry.ts";
@@ -25,117 +23,12 @@ import { extensionAbove, versionVerb } from "../src/cli/version.ts";
 import { VERBS } from "../src/contracts/verbs.ts";
 import { GATE_FAIL_MARK, GATE_PASS_MARK } from "../src/gates.ts";
 import { VERSION } from "../src/version.ts";
-import { readCandidateRecord } from "../src/impact.ts";
-import { readBundleRecord } from "../src/land.ts";
 import { capture } from "../src/output.ts";
 import { CREDENTIALS_FILENAME, setCredentialsPath, storeKind } from "../src/credentials.ts";
 import { writePreferences } from "../src/preferences.ts";
 import { readRawSessionState } from "../src/progress.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
-import { makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
-
-/** A two-module manifest: a library an application depends on, no package of its own. */
-const APPLICATION_MANIFEST = [
-  "modules:",
-  "  - slug: lib",
-  "    kind: library",
-  "    codeRoots: [modules/lib]",
-  "    package: SomeLib",
-  "  - slug: app",
-  "    kind: application",
-  "    codeRoots: [modules/app]",
-  "    dependsOn: [lib]",
-  "",
-].join("\n");
-
-/** The same two modules as a Maven solution: the model as a jar, an application over it. */
-const MAVEN_MANIFEST = [
-  "modules:",
-  "  - slug: model",
-  "    kind: shared-types",
-  "    codeRoots: [modules/model]",
-  "    package: com.example:json-model",
-  "  - slug: app",
-  "    kind: application",
-  "    codeRoots: [modules/app]",
-  "    dependsOn: [model]",
-  "",
-].join("\n");
-
-const DOTNET_MANIFEST = [
-  "modules:",
-  "  - slug: model",
-  "    kind: shared-types",
-  "    codeRoots: [modules/model]",
-  "    package: JsonModel",
-  "  - slug: app",
-  "    kind: application",
-  "    codeRoots: [modules/app]",
-  "    dependsOn: [model]",
-  "",
-].join("\n");
-
-/** The pin file as `modules create` writes it with the first package module. */
-const CPM_PROPS =
-  "<Project>\n  <PropertyGroup>\n    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>\n  </PropertyGroup>\n</Project>\n";
-
-const MAVEN_PARENT_POM = [
-  "<project>",
-  "  <groupId>com.example</groupId>",
-  "  <artifactId>solution-parent</artifactId>",
-  "  <version>${revision}</version>",
-  "  <packaging>pom</packaging>",
-  "  <dependencyManagement>",
-  "    <dependencies>",
-  "    </dependencies>",
-  "  </dependencyManagement>",
-  "</project>",
-  "",
-].join("\n");
-
-const mavenModulePom = (artifactId: string): string =>
-  [
-    "<project>",
-    "  <parent>",
-    "    <groupId>com.example</groupId>",
-    "    <artifactId>solution-parent</artifactId>",
-    "    <version>${revision}</version>",
-    "    <relativePath>../../pom.xml</relativePath>",
-    "  </parent>",
-    `  <artifactId>${artifactId}</artifactId>`,
-    "</project>",
-    "",
-  ].join("\n");
-
-/**
- * A pack that leaves exactly the artifact the ecosystem looks for, so the
- * CLI's own path can be exercised on a machine with neither dotnet nor mvn:
- * the third argument is where to write it, under the output folder.
- */
-const FAKE_PACK = [
-  "import { mkdirSync, writeFileSync } from 'node:fs';",
-  "import { dirname, join } from 'node:path';",
-  "const [output, version, template] = process.argv.slice(2);",
-  "const artifact = join(output, ...template.split('{v}').join(version).split('/'));",
-  "mkdirSync(dirname(artifact), { recursive: true });",
-  "writeFileSync(artifact, 'bytes');",
-  "",
-].join("\n");
-
-/** `modules.<slug>.packaging` naming that pack, and the push it is never without. */
-const packDeclaration = (slug: string, artifact: string): string =>
-  [
-    "schema_version: 1",
-    "modules:",
-    `  ${slug}:`,
-    "    packaging:",
-    "      pack:",
-    `        argv: [node, tools/fake-pack.mjs, "{output}", "{version}", "${artifact}"]`,
-    "      push:",
-    '        argv: [node, tools/fake-pack.mjs, "{artifact}", "{feed}"]',
-    "        feed: /feeds/local",
-    "",
-  ].join("\n");
+import { makeAnsweredSandbox, tempDir } from "./support/answers.ts";
 
 async function run(
   verb: () => Promise<number> | number,
@@ -477,17 +370,6 @@ describe("dabbler modules", () => {
     assert.match(result.err, /is not a subcommand/);
   });
 
-  it("says what each of the three contract modes is, in the help", async () => {
-    // A developer choosing `--contract` was told the three names and nothing
-    // else; the sample's second session met the modes with no page saying
-    // what `designed` or `generated` meant. The help is the one line each.
-    const help = await run(() => modulesVerb(["--help"]));
-    assert.equal(help.code, 0);
-    assert.match(help.out, /package\s+the published package is its own/);
-    assert.match(help.out, /designed\s+an abstractions project written by/);
-    assert.match(help.out, /generated\s+a surface derived from the built/);
-  });
-
   it("creates with the module vocabulary and shows it back with usedBy derived", async () => {
     const root = tempDir("cli-");
     const model = await run(() =>
@@ -500,7 +382,7 @@ describe("dabbler modules", () => {
     const persister = await run(() =>
       modulesVerb([
         "create", root, "--slug", "persister", "--title", "Persister",
-        "--depends-on", "model", "--package", "CsvPersister", "--contract", "designed",
+        "--depends-on", "model", "--package", "CsvPersister",
       ]),
     );
     assert.equal(persister.code, 0);
@@ -508,17 +390,16 @@ describe("dabbler modules", () => {
     assert.equal(shown.code, 0);
     const doc = JSON.parse(shown.out) as {
       multi: boolean;
-      modules: { slug: string; kind: string; contract: string | null; usedBy: string[] }[];
+      modules: { slug: string; kind: string; usedBy: string[] }[];
     };
     assert.equal(doc.multi, true);
     assert.deepEqual(doc.modules.map((m) => m.slug), ["model", "persister"]);
     assert.deepEqual(doc.modules[0], {
       slug: "model", title: "Model", kind: "shared-types", package: "CsvModel",
-      contract: "package", codeRoots: ["modules/model"], dependsOn: [], usedBy: ["persister"],
+      codeRoots: ["modules/model"], dependsOn: [], usedBy: ["persister"],
       // Neither module is an application, so nothing here ships on its own.
       shipsIn: [],
     });
-    assert.equal(doc.modules[1]?.contract, "designed");
     // The verb that moved the manifest rewrote the projection the Solution
     // Explorer reads, so a terminal `create` shows up in the tree.
     const projected = JSON.parse(
@@ -533,28 +414,11 @@ describe("dabbler modules", () => {
     assert.match(dangling.err, /does not declare/);
   });
 
-  it("defaults the code root and the package, so a module made from the button's four answers packs and opens", async () => {
+  it("defaults the code root and the package, so a module made from the button's four answers opens", async () => {
     // The New Module flow asks slug, title, kind and depends-on. Both
     // operations a multi-module solution exists for used to refuse what
     // those four answers produced, and the walk met both in its first
     // twenty minutes.
-    // A package module's notes page is written with the module: the
-    // candidate refuses without it, and the command that refusal used to
-    // name could not write it. An existing page is left alone.
-    const born = tempDir("cli-notes-");
-    seed(born, { "modules/kept/contract/README.md": "# mine\n" });
-    const kept = await run(() =>
-      modulesVerb(["create", born, "--slug", "kept", "--title", "Kept", "--contract", "package"]),
-    );
-    assert.equal(kept.code, 0, kept.err);
-    assert.equal(readFileSync(join(born, "modules/kept/contract/README.md"), "utf8"), "# mine\n");
-    const made = await run(() =>
-      modulesVerb(["create", born, "--slug", "person", "--title", "Person", "--contract", "package"]),
-    );
-    assert.equal(made.code, 0, made.err);
-    assert.match(made.out, /wrote modules\/person\/contract\/README\.md/);
-    assert.match(readFileSync(join(born, "modules/person/contract/README.md"), "utf8"), /^# \S+ — what it promises/);
-
     const root = tempDir("cli-");
     for (const [slug, title] of [["model", "Model"], ["reports", "Reports"]]) {
       const made = await run(() =>
@@ -565,16 +429,6 @@ describe("dabbler modules", () => {
     const entries = loadEntries(root);
     assert.deepEqual(entries.map((entry) => entry.codeRoots), [["modules/model"], ["modules/reports"]]);
     assert.deepEqual(entries.map((entry) => entry.package), ["model", "reports"]);
-
-    const shape = solutionShape(root);
-    // The pack: past `declares no package` and past `is not on this disk`,
-    // as far as the ecosystem, which is what an empty module folder is.
-    mkdirSync(join(root, "modules", "model"), { recursive: true });
-    writeFileSync(join(root, "modules", "model", "Item.cs"), "class Item {}\n");
-    assert.throws(
-      () => packModule(root, shape, "model", { digestOf: () => "abc1234" }),
-      /no project file the framework knows/,
-    );
 
     // The casing is the repository's, taken from a sibling that declares
     // one: a groupId is shared and the artifactId is the module's.
@@ -648,144 +502,6 @@ describe("dabbler modules", () => {
     );
     assert.equal(result.code, 2);
     assert.match(result.err, /not a directory/);
-  });
-});
-
-describe("dabbler module", () => {
-  it("refuses a subcommand it does not have, and a contract in a single-module solution", async () => {
-    const unknown = await run(() => moduleVerb(["retire", tempDir("cli-")]));
-    assert.equal(unknown.code, 2);
-    assert.match(unknown.err, /is not a subcommand/);
-    // The repository is the module: there is no seam to scaffold.
-    const single = tempDir("cli-");
-    const refused = await run(() => moduleVerb(["contract", "whole", "--workspace-root", single]));
-    assert.equal(refused.code, 1);
-    assert.match(refused.err, /single-module solution/);
-  });
-
-  it("packs a not-releasable session's application module and writes no bundle", async () => {
-    // `module pack` only ever writes dev versions, and a bundle names
-    // released ones; a solution that never publishes to a feed must still
-    // be able to close a session that only touches an application module.
-    const { repo, sessionsDir } = makeAnsweredSandbox({ "docs/modules.yaml": APPLICATION_MANIFEST });
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "touch the app", releasable: false });
-    const result = await run(() =>
-      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "app"]),
-    );
-    assert.equal(result.code, 0, result.err);
-    assert.doesNotMatch(result.out, /bundled/);
-    assert.equal(readBundleRecord(repo, "app"), null);
-  });
-
-  it("bundles a releasable session's application module, and still refuses a dev-versioned dependency", async () => {
-    const { repo, sessionsDir } = makeAnsweredSandbox({
-      "docs/modules.yaml": APPLICATION_MANIFEST,
-      "modules/app/App.sln": "",
-      "Directory.Packages.props":
-        '<Project><ItemGroup><PackageVersion Include="SomeLib" ' +
-        'Version="1.0.0-dev.20260907.1.gabc1234" /></ItemGroup></Project>\n',
-    });
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship the app", releasable: true });
-    const devPinned = await run(() =>
-      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "app"]),
-    );
-    assert.equal(devPinned.code, 1);
-    assert.match(devPinned.err, /SomeLib is pinned at 1\.0\.0-dev\.20260907\.1\.gabc1234, a dev version/);
-    assert.equal(readBundleRecord(repo, "app"), null);
-
-    writeFileSync(
-      join(repo, "Directory.Packages.props"),
-      '<Project><ItemGroup><PackageVersion Include="SomeLib" Version="1.0.0" /></ItemGroup></Project>\n',
-      "utf8",
-    );
-    const released = await run(() =>
-      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "app"]),
-    );
-    assert.equal(released.code, 0, released.err);
-    assert.match(released.out, /bundled app/);
-    assert.equal(readBundleRecord(repo, "app")?.dependencies[0]?.package, "SomeLib");
-    assert.equal(readBundleRecord(repo, "app")?.dependencies[0]?.version, "1.0.0");
-  });
-
-  it("names the pin file the Maven seam wrote, and records it as the candidate's", async () => {
-    // The message and the candidate record used to hold the literal
-    // `Directory.Packages.props`, which does not exist in a Maven solution:
-    // the pin moves the root pom.xml, so the record named a file that was
-    // never written and left the one that was unaccounted for -- and the
-    // land's verification gate reads that record to tell the framework's
-    // own derivation from a tree that moved.
-    const { repo, sessionsDir } = makeAnsweredSandbox({
-      "docs/modules.yaml": MAVEN_MANIFEST,
-      "pom.xml": MAVEN_PARENT_POM,
-      "modules/model/pom.xml": mavenModulePom("json-model"),
-      "modules/model/contract/README.md": "# json-model\n",
-      "modules/app/pom.xml": mavenModulePom("json-app"),
-      "dabbler.yaml": packDeclaration("model", "com/example/json-model/{v}/json-model-{v}.jar"),
-      "tools/fake-pack.mjs": FAKE_PACK,
-    });
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "pack the model", releasable: false });
-    const result = await run(() =>
-      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "model"]),
-    );
-    assert.equal(result.code, 0, result.err);
-    assert.match(result.out, /pinned com\.example:json-model in pom\.xml/);
-    assert.doesNotMatch(result.out, /Directory\.Packages\.props/);
-    const recorded = readCandidateRecord(repo, 1).paths.map((entry) => entry.path);
-    assert.ok(recorded.includes("pom.xml"), recorded.join(", "));
-    assert.ok(!recorded.includes("Directory.Packages.props"), recorded.join(", "));
-  });
-
-  it("names Directory.Packages.props for a .NET module, and records that", async () => {
-    const { repo, sessionsDir } = makeAnsweredSandbox({
-      "docs/modules.yaml": DOTNET_MANIFEST,
-      // Born with the package module, as `modules create` writes it; the
-      // pin writer pins into it and never creates it.
-      "Directory.Packages.props": CPM_PROPS,
-      "modules/model/JsonModel/JsonModel.csproj": '<Project Sdk="Microsoft.NET.Sdk" />\n',
-      "modules/model/contract/README.md": "# JsonModel\n",
-      "modules/app/App/App.csproj": '<Project Sdk="Microsoft.NET.Sdk" />\n',
-      "dabbler.yaml": packDeclaration("model", "JsonModel.{v}.nupkg"),
-      "tools/fake-pack.mjs": FAKE_PACK,
-    });
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "pack the model", releasable: false });
-    const result = await run(() =>
-      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "model"]),
-    );
-    assert.equal(result.code, 0, result.err);
-    assert.match(result.out, /pinned JsonModel in Directory\.Packages\.props/);
-    assert.ok(readCandidateRecord(repo, 1).paths.some((entry) => entry.path === "Directory.Packages.props"));
-  });
-
-  it("skips a module that has no project file yet rather than refusing the candidate", async () => {
-    // A shared file every module names reaches every module, and a solution
-    // planned before its code exists has modules with nothing under their
-    // roots. The sample's first run of record stopped on the first of three
-    // such modules; a candidate of a module with nothing to pack is nothing.
-    const manifest = DOTNET_MANIFEST.replace(
-      "  - slug: app",
-      "  - slug: store\n    kind: library\n    codeRoots: [modules/store]\n    package: JsonStore\n    dependsOn: [model]\n  - slug: app",
-    );
-    const { repo, sessionsDir } = makeAnsweredSandbox({
-      "docs/modules.yaml": manifest,
-      "Directory.Packages.props": CPM_PROPS,
-      "modules/model/JsonModel/JsonModel.csproj": '<Project Sdk="Microsoft.NET.Sdk" />\n',
-      "modules/model/contract/README.md": "# JsonModel\n",
-      "modules/store/contract/README.md": "# JsonStore\n",
-      "dabbler.yaml": packDeclaration("model", "JsonModel.{v}.nupkg"),
-      "tools/fake-pack.mjs": FAKE_PACK,
-    });
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "pack the model", releasable: false });
-    const result = await run(() =>
-      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "model", "store"]),
-    );
-    assert.equal(result.code, 0, result.err);
-    assert.match(result.out, /packed model/);
-    assert.match(result.out, /skipped store: no project file/);
   });
 });
 

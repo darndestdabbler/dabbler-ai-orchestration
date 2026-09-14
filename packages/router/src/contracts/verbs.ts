@@ -48,13 +48,6 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "create and show the modules of a workspace",
   },
   {
-    // The things done TO one module, beside the manifest they are declared
-    // in: its designed seam and its package.
-    verb: "module",
-    extensionFacing: true,
-    summary: "one module: scaffold its designed contract, pack its committed package",
-  },
-  {
     verb: "affected",
     extensionFacing: false,
     summary: "the tests this change makes necessary, and the command to run",

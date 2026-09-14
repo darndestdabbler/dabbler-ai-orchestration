@@ -113,7 +113,7 @@
     "reason": {
       "type": "string",
       "minLength": 1,
-      "description": "Why this session must change more than one module, recorded verbatim on the declaration. Required exactly when `modules` names two or more: a cross-module session is rare, and the reason is what makes it reviewable."
+      "description": "Why this session touches the modules it names. Optional and read by nothing: a session names as many modules as its work touches without giving a reason, and the member stays so a plan recorded while it was required is still read."
     }
   }
 }

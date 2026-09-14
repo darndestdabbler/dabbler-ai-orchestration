@@ -5,14 +5,13 @@
 // offline transport's scripted answer, as walk-session's is.
 //
 // A walkthrough, because the thing under test is the run-of-record phase
-// standing on a real repository, a real clone and real jobs.
+// standing on a real repository and real jobs.
 
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
-import { defaultClonePath } from "../src/checkout.ts";
 import { CONFIG_ENV_VAR, loadConfig } from "../src/config.ts";
 import { sessionNext } from "../src/drive.ts";
 import { judgeFreshness } from "../src/gates.ts";
@@ -88,8 +87,7 @@ const SEED: Record<string, string> = {
 };
 
 // The scripted suites and pack live under `tests/`, a root-level directory
-// that no module's cone holds by itself; each module declares them shared,
-// which is what puts the folder in its focused checkout.
+// no module's roots hold; each module declares them shared.
 function packaging(id: string): Record<string, unknown> {
   return {
     sharedFiles: ["tests/run.mjs", "tests/pack.mjs"],
@@ -213,8 +211,7 @@ after(() => {
 });
 
 const repo = makeRepo({ ...SEED, "dabbler.yaml": `${DABBLER_YAML}\n` }, { origin: true });
-const clone = defaultClonePath(repo, "persister", null);
-const cloneSessions = join(clone, "docs", "sessions");
+const sessions = join(repo, "docs", "sessions");
 
 describe("a module session's run of record", () => {
   it("packs the changed module's candidate before any suite, runs the suites the plan reached and no other", async () => {
@@ -224,24 +221,23 @@ describe("a module session's run of record", () => {
     configure([VERIFIED]);
 
     const started = await capture(() =>
-      Promise.resolve(start(join(repo, "docs", "sessions"), { engine: "claude-code", provider: "anthropic", module: "persister" })),
+      Promise.resolve(start(sessions, { engine: "claude-code", provider: "anthropic" })),
     );
     assert.equal(started.value, EXIT_OK, started.stderr);
-    assert.ok(existsSync(join(clone, "modules", "persister")));
 
-    const plan = await next(cloneSessions);
+    const plan = await next(sessions);
     assert.equal(plan.instruction?.step_id, "plan", plan.err);
-    assert.equal(await answer(cloneSessions, plan.instruction?.seq ?? 0, PLAN), EXIT_OK);
-    const step = await next(cloneSessions);
+    assert.equal(await answer(sessions, plan.instruction?.seq ?? 0, PLAN), EXIT_OK);
+    const step = await next(sessions);
     assert.equal(step.instruction?.step_id, "store", `${step.err}\n${JSON.stringify(step.instruction, null, 1)}`);
     writeFileSync(
-      join(clone, "modules", "persister", "src", "CsvPersister", "Store.cs"),
+      join(repo, "modules", "persister", "src", "CsvPersister", "Store.cs"),
       "public sealed class Store { public int Count => 1; }\n",
       "utf8",
     );
     const reported = await capture(() =>
       Promise.resolve(
-        report(cloneSessions, {
+        report(sessions, {
           seq: step.instruction?.seq ?? 0,
           stepId: "store",
           status: "done",
@@ -258,12 +254,12 @@ describe("a module session's run of record", () => {
     const deadline = Date.now() + 180_000;
     let instruction: DriverInstruction | null = null;
     for (;;) {
-      const move = await next(cloneSessions);
+      const move = await next(sessions);
       trail.push(move.err);
       instruction = move.instruction;
       if (instruction === null) {
         // The framework's own jobs say why they stopped; the walk shows them.
-        const jobs = join(clone, ".dabbler", "runs", "s1", "driver", "jobs");
+        const jobs = join(repo, ".dabbler", "runs", "s1", "driver", "jobs");
         const logs = existsSync(jobs)
           ? readdirSync(jobs)
               .filter((name) => name.endsWith(".log"))
@@ -293,35 +289,35 @@ describe("a module session's run of record", () => {
     // Only the reached suite ran: the persister's own. The model's did not,
     // and the compatibility suite against the model did not either, because
     // the model did not change.
-    assert.deepEqual(readFileSync(join(clone, "tests", "ran.log"), "utf8").trim().split("\n"), ["persister-unit"]);
+    assert.deepEqual(readFileSync(join(repo, "tests", "ran.log"), "utf8").trim().split("\n"), ["persister-unit"]);
 
     // The candidate: packed, pinned, recorded, and the plan beside the run.
-    const packages = readdirSync(join(clone, "packages"));
+    const packages = readdirSync(join(repo, "packages"));
     assert.ok(packages.some((name) => /^CsvPersister\.0\.1\.0-dev\.\d{8}\.1\.g[0-9a-f]{7}\.nupkg$/.test(name)), packages.join(", "));
-    assert.match(readFileSync(join(clone, "Directory.Packages.props"), "utf8"), /Include="CsvPersister" Version="0\.1\.0-dev\./);
-    const impact = readImpactPlan(clone, 1);
+    assert.match(readFileSync(join(repo, "Directory.Packages.props"), "utf8"), /Include="CsvPersister" Version="0\.1\.0-dev\./);
+    const impact = readImpactPlan(repo, 1);
     assert.deepEqual(impact?.changedModules, ["persister"]);
     assert.deepEqual(impact?.candidates, ["persister"]);
     assert.deepEqual(impact?.suites.map((suite) => suite.name), ["persister-unit"]);
   });
 
   it("the gate demands the reached suites and no other: green with the model's suite unrecorded, red by name once the persister's record is gone", () => {
-    const suites = loadSuitesChecked(loadConfig(undefined, clone), { shape: solutionShape(clone) }).suites;
-    const plan = readImpactPlan(clone, 1);
+    const suites = loadSuitesChecked(loadConfig(undefined, repo), { shape: solutionShape(repo) }).suites;
+    const plan = readImpactPlan(repo, 1);
     assert.ok(plan !== null);
-    const verdicts = evaluateFreshness(cloneSessions, null, suites);
+    const verdicts = evaluateFreshness(sessions, null, suites);
     // Without the plan, the model's suite is demanded and has no record.
     assert.match(judgeFreshness(verdicts)[1], /model-unit/);
     // Under the plan, only what the plan reached is demanded, and it is green.
     assert.deepEqual(judgeFreshness(demandedByPlan(verdicts, plan)), [true, ""]);
 
     // Take the persister's own record away: the plan's demand is refused by name.
-    const records = join(clone, ".dabbler", "runs", TEST_RUNS_FILENAME);
+    const records = join(repo, ".dabbler", "runs", TEST_RUNS_FILENAME);
     const kept = readFileSync(records, "utf8")
       .split(/\r?\n/)
       .filter((line) => line.trim() !== "" && !line.includes('"suite": "persister-unit"') && !line.includes('"suite":"persister-unit"'));
     writeFileSync(records, `${kept.join("\n")}\n`, "utf8");
-    const [passed, reason] = judgeFreshness(demandedByPlan(evaluateFreshness(cloneSessions, null, suites), plan));
+    const [passed, reason] = judgeFreshness(demandedByPlan(evaluateFreshness(sessions, null, suites), plan));
     assert.equal(passed, false);
     assert.match(reason, /persister-unit/);
     assert.doesNotMatch(reason, /model-unit/);
@@ -329,11 +325,11 @@ describe("a module session's run of record", () => {
     // The candidate's paths are set aside by the verification gate only
     // while their bytes are the candidate's: the pins as written are, and
     // the pins edited since are not.
-    const candidate = readCandidateRecord(clone, 1);
+    const candidate = readCandidateRecord(repo, 1);
     assert.ok(candidate.paths.some((entry) => entry.path === "Directory.Packages.props"));
-    assert.ok(candidatePathsAsWritten(clone, candidate).has("Directory.Packages.props"));
-    const props = join(clone, "Directory.Packages.props");
+    assert.ok(candidatePathsAsWritten(repo, candidate).has("Directory.Packages.props"));
+    const props = join(repo, "Directory.Packages.props");
     writeFileSync(props, `${readFileSync(props, "utf8")}<!-- edited after the candidate -->\n`, "utf8");
-    assert.equal(candidatePathsAsWritten(clone, candidate).has("Directory.Packages.props"), false);
+    assert.equal(candidatePathsAsWritten(repo, candidate).has("Directory.Packages.props"), false);
   });
 });

@@ -32,18 +32,15 @@ import {
   suiteRetrySeconds,
   staleJobDisposition,
   stepChangedPaths,
-  suiteOwedElsewhere,
   unchangedStepFiles,
   type RegistrationFacts,
   type StepSpec,
 } from "../src/drive.ts";
-import { judgeFreshness, rewindPhaseFor } from "../src/gates.ts";
+import { rewindPhaseFor } from "../src/gates.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
-import type { DriverInstruction, DriverReport, DriverRun } from "../src/generated/index.ts";
-import { type ImpactPlan, demandedByPlan } from "../src/impact.ts";
+import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
 import { dependencyOrder, impliedDeployables, parseEntries } from "../src/modules.ts";
-import { suitesOwedElsewhere } from "../src/driver.ts";
-import { gitAnswers, seed, tempDir } from "./support/answers.ts";
+import { gitAnswers } from "./support/answers.ts";
 
 const INSTRUCTION = {
   schema_version: 1,
@@ -426,57 +423,6 @@ describe("what the local gate receipt names", () => {
   // real origin, beside the receipt's deliberate exception.
 });
 
-describe("a reached suite whose tests are not in this folder", () => {
-  it("is owed to its module's session rather than run, and the close here is not held to it", () => {
-    // The proof of 2026-09-08: the run of record ran app's suite in model's
-    // folder, where app's tests are not, and handed the AI a fix step it
-    // could only refuse, twice, into a deadlock.
-    const root = tempDir("owed-");
-    seed(root, {
-      ".dabbler/checkout.json": JSON.stringify({ slug: "persister", origin: "../remote.git", cone: [], madeAt: "now" }),
-      "modules/persister/tests/Store.Tests.cs": "",
-    });
-    const plan = {
-      multi: true,
-      changedModules: ["persister"],
-      suites: [
-        { name: "persister-unit", module: "persister", role: "unit", against: null, reason: "module-changed", via: "persister" },
-        { name: "listener-against-persister", module: "listener", role: "consumer-contract", against: "persister", reason: "consumer-contract", via: "persister" },
-      ],
-      candidates: ["persister"],
-      unowned: [],
-    } as unknown as ImpactPlan;
-    const scopes = [
-      { suite: "persister-unit", roots: ["modules/persister/tests"], glob: "*.Tests.cs" },
-      { suite: "listener-against-persister", roots: ["modules/listener/tests"], glob: "*.cs" },
-    ];
-    const own = { name: "persister-unit", module: "persister" };
-    const sibling = { name: "listener-against-persister", module: "listener" };
-    // The folder's own suite runs here; the sibling's, whose tests are not
-    // on this disk, is owed to the sibling's session.
-    assert.equal(suiteOwedElsewhere(root, own, plan, scopes), null);
-    assert.equal(suiteOwedElsewhere(root, sibling, plan, scopes), "listener");
-    // Not in a focused folder, and not a suite that declares no test roots.
-    assert.equal(suiteOwedElsewhere(tempDir("repo-"), sibling, plan, scopes), null);
-    assert.equal(suiteOwedElsewhere(root, sibling, plan, []), null);
-    // With the tests on this disk after all, it runs here.
-    seed(root, { "modules/listener/tests/Compatibility.cs": "" });
-    assert.equal(suiteOwedElsewhere(root, sibling, plan, scopes), null);
-
-    // Recorded on the session's own run, and the close here does not demand
-    // a record that cannot exist here; without the record it would.
-    const run = { suites_owed_elsewhere: [{ suite: sibling.name, module: "listener" }] } as unknown as DriverRun;
-    assert.deepEqual([...suitesOwedElsewhere(run)], [sibling.name]);
-    assert.deepEqual([...suitesOwedElsewhere(null)], []);
-    const verdicts = [
-      { suite: own.name, required: true, passed: true, reason: "fresh", changedInputs: [] },
-      { suite: sibling.name, required: true, passed: false, reason: "no record", changedInputs: [] },
-    ];
-    assert.deepEqual(judgeFreshness(demandedByPlan(verdicts, plan, suitesOwedElsewhere(run))), [true, ""]);
-    assert.match(judgeFreshness(demandedByPlan(verdicts, plan))[1], /listener-against-persister/);
-  });
-});
-
 describe("what the plan instruction asks for", () => {
   it("names the modules member in a multi-module solution, and nothing in a single-module one", () => {
     // The Java walk: driver.ts refuses a declaration that names no module,
@@ -496,9 +442,10 @@ describe("what the plan instruction asks for", () => {
       modules: dependencyOrder(entries),
       deployables: impliedDeployables(entries),
     });
+    assert.match(many, /one further member is optional/);
     assert.match(many, /modules {5}the module\(s\) this session works in/);
     assert.match(many, /Declared here: model, store, app/);
-    assert.match(many, /reason {6}why this session must change more than one module/);
+    assert.doesNotMatch(many, /reason {6}/);
 
     const one = parseEntries({ modules: [{ slug: "only" }] });
     assert.equal(

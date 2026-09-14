@@ -8,7 +8,7 @@
 // `expect` sentences this script prints. Everything around it is prose,
 // each command verified by hand against the staged corpus (see the session
 // record); it is not automated because it is not what csv-module-walk.spec.ts
-// tests -- declaring modules, packing, contracts and grants are commands a
+// tests -- declaring modules, packing and contracts are commands a
 // person runs in their own terminal, not surfaces a screenshot proves.
 //
 // Run with no arguments; it prints the whole document to stdout. Nothing
@@ -42,8 +42,8 @@ const doc = `# Building the CSV solution: four modules, one repository
 You are going to build a .NET solution that watches a folder for CSV files,
 reads each one into \`Person\` objects, and stores them in a database. You will
 build it as **four modules**, because that is the unit this framework works in:
-one module is one developer's unit of work, and a session runs in one module's
-checkout.
+one module is one developer's unit of work, and a session names the modules it
+touches.
 
 | Module | Kind | What it is | Package |
 | --- | --- | --- | --- |
@@ -160,46 +160,7 @@ ${walkSection}
 
 \`model\` is first because every other module restores its package.
 
-**First, the repository needs an \`origin\`.** A focused clone is made from the
-origin, not from your working tree. Without one you get:
-
-> \`module open: refused -- the repository has no 'origin' remote: a focused
-> clone is made from the origin, not from this working tree, so add one first\`
-
-Then open the module's own checkout:
-
-\`\`\`
-dabbler module open model
-\`\`\`
-
-**You should see** JSON naming the clone, the branch, and the **cone** — the
-only paths that exist on disk:
-
-\`\`\`json
-{
-  "slug": "model",
-  "path": "C:\\\\temp\\\\csv-solution.model",
-  "branch": "master",
-  "cone": ["docs", "modules/app/contract", "modules/deserializer/contract",
-           "modules/model", "modules/persister/contract", "packages"],
-  "convenienceFile": "model.slnx",
-  "filtered": false
-}
-\`\`\`
-
-and a new VS Code window on it. Look in \`modules/\` and you will find **only
-\`model\`** — \`modules/deserializer/\` does not exist. That is the point: the
-session cannot read what it was not given. The siblings are present only as
-their **contracts** and their **packages**.
-
-> **Check \`filtered\`.** If it says \`false\`, the clone carries every sibling's
-> bytes in its local object store even though none are on disk, because the
-> origin did not honour \`--filter\` (\`uploadpack.allowFilter\` is off). The
-> framework says so in \`notes\` rather than letting you assume otherwise. Turn
-> the setting on at the origin if the repository is large enough for it to
-> matter.
-
-In the new window, press **Start Session**. Choose your engine, and the
+Press **Start Session**. Choose your engine, and the
 extension opens two editor tabs side by side — your **AI CLI on the left** and
 the **Dabbler terminal on the right**, exactly the layout Section 4 showed —
 that is the default; set \`dabbler.terminalLocation\` to \`panel\` if you would
@@ -275,44 +236,7 @@ created where absent, the test project wired up, and a notes page under
 
 ---
 
-## 8. When a session needs to read a sibling's source
-
-It will happen: you are in the persister's checkout and you need to see how the
-model actually behaves. The clone does not contain it, and that is deliberate.
-Ask for it:
-
-\`\`\`
-dabbler module grant model --reason "reading Person's date handling to match it"
-\`\`\`
-
-Or right-click the module in the Solution Explorer and choose **Widen for
-Debugging**.
-
-**You should see:** an **owed decision** appear at the top of the Work
-Explorer, phrased as a question, with **grant** and **deny** — and *deny*
-recommended. Answer it:
-
-\`\`\`
-dabbler owed answer --id module-grant:model --choice grant --note "just this session"
-\`\`\`
-
-When you are finished with it:
-
-\`\`\`
-dabbler module revoke model
-\`\`\`
-
-Or **End Grant** on the row. A revoke is refused while the sibling's roots hold
-changes — you cannot quietly edit a module you only asked to read.
-
-**Why this exists:** the metric the decomposition optimises is **exposure** —
-how much of the solution any one session could have changed. A grant widens it
-deliberately and on the record, which is the opposite of a checkout that was
-always wide.
-
----
-
-## 9. Change the model, and see who breaks
+## 8. Change the model, and see who breaks
 
 Once all four modules exist, change something in \`modules/model\` and ask:
 
@@ -342,20 +266,15 @@ The run of record for a session is **only the suites its change reaches**, not
 every suite in the repository. A module with no declared test root contributes
 no tests, and the plan says so plainly rather than quietly running everything.
 
-A session that must change two modules has to say so before it starts, and give
-a reason:
+A session that changes two modules names both:
 
 \`\`\`
-dabbler session declare --module model --module persister --reason contract-change
+dabbler session declare --module model --module persister
 \`\`\`
-
-**You should see:** a session declaring one module runs in that module's
-focused clone; a session declaring two runs in the **full checkout**, because
-there is no one clone that holds both.
 
 ---
 
-## 10. Build and run the whole thing
+## 9. Build and run the whole thing
 
 Pack the three libraries in dependency order, then build the application, which
 restores all three from \`packages/\`:
@@ -389,12 +308,8 @@ never half-stored.
   you have a \`docs/modules.yaml\`.** The projection under
   \`.dabbler/solution/solution.json\` has not been derived. Touch the manifest
   or a \`.csproj\`, or run the explicit refresh, and it fills in.
-- **The module context menu items are missing.** \`Open Module\`, \`Widen for
-  Debugging\`, \`End Grant\` and \`Show Impact\` are right-click only, and they are
-  invisible on a **single-module** solution. Declare a second module and they
-  appear.
-- **\`dabbler module open\` is refused.** Same reason: a single-module solution
-  has nothing to focus on, and that is a declaration rather than a gap.
+- **The module context menu items are missing.** \`Show Impact\` and
+  \`Pack Module\` are right-click only, on every module row.
 - **The framework stopped.** Read its own account first —
   \`dabbler status\`, the \`stop\` on \`.dabbler/runs/s<N>/driver/run.json\`, and the
   outstanding instruction's \`reasons\`. Never edit a record, a verdict or a gate

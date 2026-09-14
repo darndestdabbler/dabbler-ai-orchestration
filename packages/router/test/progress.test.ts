@@ -22,7 +22,6 @@ import {
   buildProjection,
   buildTaskRows,
   buildVerificationView,
-  extractSessionKindsFromPlan,
   healStaleTitles,
   lastActivityAt,
   ledgerExists,
@@ -268,53 +267,6 @@ describe("the source of a projection's sessions", () => {
     assert.equal(rows[1]["title"], "Second things renamed");
   });
 
-  it("reads where each session runs from its Module: or Scope: line, Scope winning wherever it appears, and the rows carry it", () => {
-    const { sessionsDir } = makeStateDirs();
-    start(sessionsDir);
-    writeFileSync(
-      join(sessionsDir, "session-plan.md"),
-      [
-        "### Session 1 of 4: First things",
-        "1. Register.",
-        "",
-        "### Session 2 of 4: Persist things",
-        "",
-        "**Module:** `persister`",
-        "",
-        "1. Store a person.",
-        "",
-        "### Session 3 of 4: Wire it all",
-        "Scope: whole repository",
-        "1. Assemble.",
-        "",
-        "### Session 4 of 4: Rename the person everywhere",
-        "",
-        "Module: person",
-        "",
-        "Runs: global, because the store and the report both read the name.",
-        "",
-        "Scope: whole repository",
-        "1. Rename.",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    const kinds = extractSessionKindsFromPlan(join(sessionsDir, "session-plan.md"));
-    assert.equal(kinds.has(1), false, "a section that says neither states no kind");
-    assert.deepEqual(kinds.get(2), { kind: "focused", module: "persister" });
-    assert.deepEqual(kinds.get(3), { kind: "global", module: null });
-    // The sample's session 3: a `Module:` line first and the `Scope:` line
-    // after it. Global -- the line wins wherever it appears -- and about
-    // `person`, so the Explorer files it there.
-    assert.deepEqual(kinds.get(4), { kind: "global", module: "person" });
-    // The registered row and the planned rows all carry it; the first
-    // section's row carries nothing, as every single-module row does.
-    const rows = sessions(sessionsDir);
-    assert.equal(rows[0]["kind"], undefined);
-    assert.deepEqual([rows[1]["kind"], rows[1]["module"]], ["focused", "persister"]);
-    assert.deepEqual([rows[2]["status"], rows[2]["kind"], rows[2]["module"]], ["planned", "global", undefined]);
-    assert.deepEqual([rows[3]["status"], rows[3]["kind"], rows[3]["module"]], ["planned", "global", "person"]);
-  });
 });
 
 describe("the task rows", () => {

@@ -7,7 +7,6 @@ import {
   runRestoreSessionFlow,
 } from "../../commands/cancelLifecycleCommands";
 import { NewModuleUi, runNewModuleFlow } from "../../commands/newModule";
-import { OpenModuleUi, openModule } from "../../commands/openModule";
 import { ShowImpactUi, showImpact } from "../../commands/showImpact";
 import { PackModuleUi, packModule } from "../../commands/packModule";
 import {
@@ -26,7 +25,6 @@ import {
   DEFAULT_STOP_REASON,
   Drives,
   ENGINES,
-  START_REQUEST_REL,
   type DriveLauncher,
   type EngineTerminal,
   type SessionRunUi,
@@ -36,14 +34,10 @@ import {
   repositoryOf,
   runResumeSession,
   runSendToEngine,
-  runStartFocusedSession,
   runStartSession,
   runStartUnattendedSession,
   runStopDrive,
-  startFromRequest,
-  writeStartRequest,
 } from "../../commands/sessionCommands";
-import * as fs from "fs";
 import { ROUTER_VERSION } from "dabbler-ai-router";
 import { prerequisiteReport, type ToolProbe } from "../../commands/troubleshoot";
 import {
@@ -455,15 +449,12 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
   errors: string[];
   infos: string[];
   engine: string[];
-  /** Every folder the UI was asked to open in a new window. */
-  opened: string[];
   /** Every terminal the UI was asked to open. */
   terminals: EngineTerminal[];
 } {
   const errors: string[] = [];
   const infos: string[] = [];
   const engine: string[] = [];
-  const opened: string[] = [];
   const terminals: EngineTerminal[] = [];
   const ui: SessionRunUi = {
     // Answers "it did not refuse" unless a test says otherwise. A suite that
@@ -471,9 +462,6 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     // on every flow test -- passing here and meaning nothing anywhere else.
     engineKnowsModel: async () => null,
     showTerminalNamed: () => false,
-    openFolder: async (folder) => {
-      opened.push(folder);
-    },
     pickEngine: async () => ENGINES[0],
     askModel: async () => "haiku",
     askText: async (_title, _prompt, value) => value ?? "look at src/widget.py again",
@@ -490,7 +478,7 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     withProgress: (_title, work) => work(),
     ...overrides,
   };
-  return { ui, errors, infos, engine, opened, terminals };
+  return { ui, errors, infos, engine, terminals };
 }
 
 function launcherOf(drives: Map<string, FakeDrive>): DriveLauncher & { launched: Array<{ root: string; args: string[] }> } {
@@ -532,12 +520,11 @@ suite("Start opens the person's own CLI", () => {
     settings.__clearConfig();
   });
 
-  test("a model the engine's own list does not name stops both launches, before anything opens", async () => {
+  test("a model the engine's own list does not name stops the launch, before anything opens", async () => {
     // Round 2's blocking finding, and the reason it is asserted at the FLOW
     // rather than only at the helper: a check that is written and not wired
     // is the shape this whole session exists to delete. The repository's own
-    // Start must open no terminal, and the focused one must not clone a
-    // module, which is the more expensive half.
+    // Start must open no terminal.
     //
     // The catalog this suite runs against is a throwaway with no block in
     // it, so the engine's list is EMPTY here and nothing may be refused --
@@ -561,30 +548,6 @@ suite("Start opens the person's own CLI", () => {
         row.errors.some((line) => line.includes("a-model-nothing-lists")),
         row.errors.join(" | "),
       );
-
-      // The focused flow stops before the module is cloned, which is the
-      // half that costs a checkout.
-      const focused = makeRepository({
-        root,
-        currentSession: null,
-        nextSession: 2,
-        checkoutModule: null,
-        sessions: [
-          makeSession({ number: 1, status: "complete" }),
-          makeSession({ number: 2, status: "not-started", kind: "focused", module: "persister" }),
-        ],
-      });
-      const second = driveUi({
-        askModel: async () => "a-model-nothing-lists",
-        engineKnowsModel: async (_choice, model) => model,
-      });
-      const answered = fakeRouter(0, JSON.stringify({ slug: "persister", path: "D:/clone" }));
-      assert.strictEqual(
-        await runStartFocusedSession(focused, "persister", second.ui, answered.router),
-        false,
-      );
-      assert.deepStrictEqual(answered.asked, [], "a module was opened for a refused model");
-      assert.deepStrictEqual(second.opened, []);
 
       // And a CLI that says nothing does not stop anybody: "it did not
       // refuse" covers no CLI, no answer and an engine with no pre-flight,
@@ -1082,88 +1045,7 @@ suite("placing a repository the Explorer cannot reach", () => {
   });
 });
 
-suite("one click starts a focused session", () => {
-  const focusedNext = (root: string, checkoutModule: string | null) =>
-    makeRepository({
-      root,
-      currentSession: null,
-      nextSession: 2,
-      checkoutModule,
-      sessions: [
-        makeSession({ number: 1, status: "complete" }),
-        makeSession({ number: 2, status: "not-started", kind: "focused", module: "persister" }),
-      ],
-    });
-
-  test("Start Focused Session on a module row opens the module and writes the start request, and Start Session in the repository does the same", async () => {
-    const clone = makeTempDir("focused-clone-");
-    try {
-      const repository = focusedNext("D:\\ws\\csv-pipeline", null);
-      const answered = fakeRouter(0, JSON.stringify({ slug: "persister", path: clone, branch: "main" }));
-      const row = driveUi({ askModel: async () => "haiku" });
-      assert.strictEqual(await runStartFocusedSession(repository, "persister", row.ui, answered.router), true);
-      assert.deepStrictEqual(answered.asked, ["module open"]);
-      assert.deepStrictEqual(row.opened, [clone]);
-      // Nothing typed here: the window that opens on the clone does that.
-      assert.deepStrictEqual(row.terminals, []);
-      const request = JSON.parse(fs.readFileSync(path.join(clone, START_REQUEST_REL), "utf8")) as Record<string, unknown>;
-      assert.strictEqual(request.engine, "claude-code");
-      assert.strictEqual(request.provider, "anthropic");
-      assert.strictEqual(request.model, "haiku");
-      assert.strictEqual(request.unattended, false);
-      assert.strictEqual(typeof request.writtenAt, "string");
-
-      // The repository row's Start Session routes the same way when the next
-      // session is focused and this is the repository -- and not in the
-      // module's own folder, where it opens the AI here.
-      const button = driveUi();
-      assert.strictEqual(await runStartSession(repository, button.ui, answered.router), true);
-      assert.deepStrictEqual(button.opened, [clone]);
-      const inFolder = driveUi();
-      assert.strictEqual(await runStartSession(focusedNext(clone, "persister"), inFolder.ui, answered.router), true);
-      assert.deepStrictEqual(inFolder.opened, []);
-      assert.strictEqual(inFolder.terminals.length, 1);
-    } finally {
-      rmrf(clone);
-    }
-  });
-
-  test("a window activating on a fresh request opens the AI's terminal with the sentence, and a stale one is dropped", async () => {
-    const clone = makeTempDir("focused-clone-");
-    try {
-      const repository = focusedNext(clone, "persister");
-      const launcher = launcherOf(new Map());
-      writeStartRequest(clone, {
-        engine: "claude-code",
-        provider: "anthropic",
-        model: "",
-        unattended: false,
-        writtenAt: new Date().toISOString(),
-      });
-      const fresh = driveUi({ pickEngine: async () => undefined, askModel: async () => undefined });
-      assert.strictEqual(await startFromRequest(repository, fresh.ui, launcher, new Drives()), true);
-      assert.strictEqual(fresh.terminals.length, 1);
-      assert.strictEqual(fresh.terminals[0].program, "claude");
-      assert.match(fresh.terminals[0].args[0] ?? "", /dabbler session start .* --engine claude-code --provider anthropic/);
-      assert.strictEqual(fs.existsSync(path.join(clone, START_REQUEST_REL)), false, "consumed");
-
-      writeStartRequest(clone, {
-        engine: "claude-code",
-        provider: "anthropic",
-        model: "",
-        unattended: false,
-        writtenAt: new Date(Date.now() - 11 * 60 * 1000).toISOString(),
-      });
-      const stale = driveUi();
-      assert.strictEqual(await startFromRequest(repository, stale.ui, launcher, new Drives()), false);
-      assert.strictEqual(stale.terminals.length, 0);
-      assert.strictEqual(fs.existsSync(path.join(clone, START_REQUEST_REL)), false, "dropped");
-      assert.strictEqual(await startFromRequest(repository, stale.ui, launcher, new Drives()), false);
-    } finally {
-      rmrf(clone);
-    }
-  });
-
+suite("Resume Session", () => {
   test("Resume Session shows the engine's terminal by name, or opens one running session run on the in-flight row", async () => {
     const repository = makeRepository({
       root: "D:\\ws\\csv-pipeline",
@@ -1190,7 +1072,7 @@ suite("one click starts a focused session", () => {
   });
 });
 
-suite("Open Module", () => {
+suite("Show Impact and Pack Module", () => {
   const multi: Projection = {
     solution: { name: "csv-pipeline", title: "csv-pipeline", multi: true, implicit: false, moduleCount: 2 },
     modules: [
@@ -1198,39 +1080,6 @@ suite("Open Module", () => {
       { slug: "persister", title: "persister", kind: "library", package: "CsvPersister", contract: "package", codeRoots: ["modules/persister"], dependsOn: ["model"], usedBy: [], contractDir: null },
     ],
   };
-  function ui(): { ui: OpenModuleUi; opened: string[]; warnings: string[] } {
-    const opened: string[] = [];
-    const warnings: string[] = [];
-    return {
-      opened,
-      warnings,
-      ui: {
-        openFolder: (path: string) => {
-          opened.push(path);
-          return Promise.resolve(undefined);
-        },
-        showWarningMessage: (m: string) => warnings.push(m),
-        workspaceRoot: () => "D:\\ws\\csv-pipeline",
-      },
-    };
-  }
-
-  test("opens the path the router answered in a new window, and shows a refusal in the router's sentence", async () => {
-    // The router's JSON is the source of the path; nothing here derives it.
-    const answered = fakeRouter(0, JSON.stringify({ slug: "persister", path: "D:\\ws\\csv-pipeline.persister", branch: "main" }));
-    const good = ui();
-    await openModule(answered.router, { node: { kind: "module", slug: "persister" }, projection: multi }, good.ui);
-    assert.deepStrictEqual(answered.asked, ["module open"]);
-    assert.deepStrictEqual(good.opened, ["D:\\ws\\csv-pipeline.persister"]);
-    assert.deepStrictEqual(good.warnings, []);
-
-    // Refused: the router's own words, and no window.
-    const refused = fakeRouter(1, "module open: refused -- D:\\ws\\csv-pipeline.persister already exists: pass --reset");
-    const bad = ui();
-    await openModule(refused.router, { node: { kind: "module", slug: "persister" }, projection: multi }, bad.ui);
-    assert.deepStrictEqual(bad.opened, []);
-    assert.deepStrictEqual(bad.warnings, ["module open: refused -- D:\\ws\\csv-pipeline.persister already exists: pass --reset"]);
-  });
 
   test("Show Impact plans a hypothetical change under the module's roots and shows the router's plan, or its refusal", async () => {
     const plan =

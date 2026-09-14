@@ -150,7 +150,7 @@ export type DriverRun = {
     at: string;
   }[];
   /**
-   * Suites the impact plan reached whose tests are not in this focused folder: skipped here, recorded so the freshness gate does not demand a record that cannot exist here, and run by the named module's own session.
+   * Retired with the focused checkout: nothing writes or reads it now. Kept optional so a run recorded before the retirement is still read.
    */
   suites_owed_elsewhere?: {
     suite: string;

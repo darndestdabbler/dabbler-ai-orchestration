@@ -122,61 +122,6 @@ suite("ActionRegistry: session actions", () => {
     }
   });
 
-  test("Start Session is withheld in a module's folder unless the next session is focused on that module", () => {
-    // The proof of 2026-09-08: Start Session in the model window registered
-    // a session whose plan named app, and nothing said no. `session start`
-    // now refuses it by name, and the launcher is not offered for a refusal.
-    const sessions = [
-      makeSession({ number: 1, status: "complete" }),
-      makeSession({ number: 2, status: "not-started", kind: "focused", module: "app" }),
-      makeSession({ number: 3, status: "planned", iconKey: "not-started", kind: "global" }),
-    ];
-    // Under either title: in the repository itself a focused next session
-    // is offered as Start Session in a New Window, and it is still Start.
-    const isStart = (id: string) =>
-      id === "dabblerSessionSets.startSession" || id === "dabblerSessionSets.startSessionInNewWindow";
-    const starts = (repository: ReturnType<typeof makeRepository>) => ({
-      repository: applicableRepositoryActions(repository).map((a) => a.id).some(isStart),
-      row: applicableSessionActions(repository, sessions[1]).map((a) => a.id).some(isStart),
-    });
-    const inApp = makeRepository({ currentSession: null, nextSession: 2, sessions, checkoutModule: "app" });
-    assert.deepStrictEqual(starts(inApp), { repository: true, row: true });
-    const inModel = makeRepository({ currentSession: null, nextSession: 2, sessions, checkoutModule: "model" });
-    assert.deepStrictEqual(starts(inModel), { repository: false, row: false });
-    // The repository itself starts anything; a module's folder never starts
-    // a global session.
-    const inRepository = makeRepository({ currentSession: null, nextSession: 2, sessions, checkoutModule: null });
-    assert.strictEqual(starts(inRepository).repository, true);
-    const globalNext = makeRepository({ currentSession: null, nextSession: 3, sessions, checkoutModule: "app" });
-    assert.strictEqual(starts(globalNext).repository, false);
-  });
-
-  test("a launcher that opens a window says so in its title, and only then", () => {
-    // The sample's developer saw Start Session on the next session's row and
-    // Start Focused Session on the module, and neither said that pressing
-    // it opens a new window on a clone. Same command, and the title is the
-    // only difference: offered under the window title exactly when the next
-    // session is focused and this checkout is the repository itself.
-    const plain = "dabblerSessionSets.startSession";
-    const window = "dabblerSessionSets.startSessionInNewWindow";
-    const sessions = [
-      makeSession({ number: 1, status: "complete" }),
-      makeSession({ number: 2, status: "not-started", kind: "focused", module: "app" }),
-      makeSession({ number: 3, status: "planned", iconKey: "not-started", kind: "global" }),
-    ];
-    const offered = (repository: ReturnType<typeof makeRepository>, row: number) => ({
-      repository: applicableRepositoryActions(repository).map((a) => a.id).filter((id) => id === plain || id === window),
-      row: applicableSessionActions(repository, sessions[row]!).map((a) => a.id).filter((id) => id === plain || id === window),
-    });
-    const focusedNext = makeRepository({ currentSession: null, nextSession: 2, sessions, checkoutModule: null });
-    assert.deepStrictEqual(offered(focusedNext, 1), { repository: [window], row: [window] });
-    const globalNext = makeRepository({ currentSession: null, nextSession: 3, sessions, checkoutModule: null });
-    assert.deepStrictEqual(offered(globalNext, 2), { repository: [plain], row: [plain] });
-    // In the module's own folder the same button opens the AI here.
-    const inApp = makeRepository({ currentSession: null, nextSession: 2, sessions, checkoutModule: "app" });
-    assert.deepStrictEqual(offered(inApp, 1), { repository: [plain], row: [plain] });
-  });
-
   test("cancel and restore are mutually exclusive on one row", () => {
     const cancelled = makeSession({ number: 1, status: "cancelled" });
     const ids = applicableSessionActions(
@@ -348,8 +293,8 @@ function whenHolds(when: string, view: string, viewItem: string): boolean {
  *
  * Rich deliberately: the reverse assertion below is only as strong as the
  * rows these draw, so every `contextValue` the manifest gates on has to be
- * producible here -- a focused module, a granted one, the module the next
- * session names, and a producer in each of its three locations.
+ * producible here -- a module of each kind, and a producer in each of its
+ * three locations.
  */
 const FIXTURES: Array<{
   from: string;
@@ -447,7 +392,6 @@ const FIXTURES: Array<{
         dependsOn: [],
         usedBy: ["app"],
         contractDir: "modules/model/contract",
-        granted: true,
       },
       {
         slug: "app",
@@ -504,7 +448,7 @@ const FIXTURES: Array<{
     configuration,
   };
   return [
-    { from: "a solution of two modules", projection: multi, context: { nextSessionModule: "app" } },
+    { from: "a solution of two modules", projection: multi, context: {} },
     { from: "the repository as its module", projection: single, context: {} },
   ];
 })();

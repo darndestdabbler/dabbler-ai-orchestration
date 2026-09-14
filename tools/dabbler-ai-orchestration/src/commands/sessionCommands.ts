@@ -25,7 +25,6 @@
 // The driver is a child process rather than an in-process call, and the
 // reason is stated once in `router/driveProcess.ts`.
 
-import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import {
@@ -39,7 +38,6 @@ import { routerOutputChannel } from "../router/commandLog";
 import { type DriveHandle, launchDriver } from "../router/driveProcess";
 import { resolveRouterCli } from "../router/terminalShim";
 import { ensureDabblerTerminal, terminalLocation } from "../router/dabblerTerminal";
-import { clonePathIn } from "./openModule";
 import { asRepositoryNode, asSessionNode } from "./workExplorerTreeCommands";
 
 /**
@@ -365,8 +363,6 @@ export interface SessionRunUi {
   engineKnowsModel: (choice: EngineChoice, model: string) => Thenable<string | null>;
   /** Show an open terminal carrying one of these names; false when none is. */
   showTerminalNamed: (names: readonly string[]) => boolean;
-  /** Open `path` in a new window, keeping this one. */
-  openFolder: (path: string) => Thenable<unknown>;
   /**
    * Show the framework's own terminal for this repository, split off the
    * one just opened.
@@ -562,7 +558,6 @@ export function defaultSessionRunUi(
       open.show();
       return true;
     },
-    openFolder: (folder) => vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(folder), true),
     showFrameworkTerminal: (repoRoot, beside) =>
       ensureDabblerTerminal(repoRoot, beside as vscode.Terminal | undefined),
     withProgress: <T,>(title: string, work: () => Promise<T>): Promise<T> =>
@@ -598,164 +593,6 @@ export function driveArguments(choice: EngineChoice, model: string): string[] | 
   const args = ["session", "drive", "--engine", choice.engine, "--provider", choice.provider];
   if (trimmed !== "") args.push("--model", trimmed);
   return args;
-}
-
-// --- The focused start: one click opens the module's window with its AI in it ---
-
-/** Where a focused start leaves its choices for the window that opens on the clone. */
-export const START_REQUEST_REL = path.join(".dabbler", "start-request.json");
-/** A request older than this was written for a window that never came; it is dropped. */
-export const START_REQUEST_FRESH_MS = 10 * 60 * 1000;
-
-/** The choices a person made in the repository's window, carried to the module's. */
-export interface StartRequest {
-  readonly engine: string;
-  readonly provider: string;
-  readonly model: string;
-  readonly unattended: boolean;
-  readonly writtenAt: string;
-}
-
-export function writeStartRequest(root: string, request: StartRequest): void {
-  const file = path.join(root, START_REQUEST_REL);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify(request, null, 2)}\n`, "utf8");
-}
-
-/**
- * Consume the request in `root`: read it and delete it, whatever it says.
- * Null when there is none, when it cannot be read, or when it is stale --
- * a window that opens on a request written ten minutes ago is not the
- * window that request was for, and starting a session nobody is sitting
- * in front of is the one thing this must never do.
- */
-export function takeStartRequest(root: string, now: number = Date.now()): StartRequest | null {
-  const file = path.join(root, START_REQUEST_REL);
-  if (!fs.existsSync(file)) return null;
-  let parsed: unknown = null;
-  try {
-    parsed = JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch {
-    parsed = null;
-  }
-  try {
-    fs.rmSync(file, { force: true });
-  } catch {
-    // Consumed either way: a request that cannot be deleted is still read once.
-  }
-  if (parsed === null || typeof parsed !== "object") return null;
-  const record = parsed as Partial<StartRequest>;
-  if (typeof record.engine !== "string" || typeof record.provider !== "string" || typeof record.writtenAt !== "string") {
-    return null;
-  }
-  const age = now - Date.parse(record.writtenAt);
-  if (!Number.isFinite(age) || age < 0 || age > START_REQUEST_FRESH_MS) return null;
-  return {
-    engine: record.engine,
-    provider: record.provider,
-    model: typeof record.model === "string" ? record.model : "",
-    unattended: record.unattended === true,
-    writtenAt: record.writtenAt,
-  };
-}
-
-/**
- * The next session's module when the plan says it is focused, else null.
- * Read from the projection's row, which carries what the plan's section
- * says; nothing here reads the plan.
- */
-export function nextFocusedModule(repository: SessionsRepository): string | null {
-  const next = repository.sessions.find((session) => session.number === repository.nextSession);
-  return next?.kind === "focused" && typeof next.module === "string" && next.module !== "" ? next.module : null;
-}
-
-/**
- * Whether Start, pressed in THIS window, opens the module's window instead:
- * the next session is focused and this is the repository, not the module's
- * folder. In the module's own folder the same button opens the AI here.
- */
-function opensModuleWindow(repository: SessionsRepository): string | null {
-  return repository.checkoutModule === null ? nextFocusedModule(repository) : null;
-}
-
-/** The same UI with the engine and the model already decided: the request's. */
-export function presetChoices(ui: SessionRunUi, request: StartRequest): SessionRunUi {
-  const choice =
-    ENGINES.find((entry) => entry.engine === request.engine && entry.provider === request.provider) ??
-    ENGINES.find((entry) => entry.engine === request.engine);
-  return { ...ui, pickEngine: async () => choice, askModel: async () => request.model };
-}
-
-/**
- * Start Focused Session: the engine and the model are asked here, the
- * module's folder is opened (or refreshed) by the router in-process, the
- * choices are written into it, and its window opens. Nothing is typed in
- * this window: the window that opens on the folder reads the request and
- * opens the AI's terminal there, with the sentence typed.
- */
-export async function runStartFocusedSession(
-  repository: SessionsRepository,
-  slug: string,
-  ui: SessionRunUi,
-  router: Pick<Router, "module">,
-  unattended = false,
-): Promise<boolean> {
-  const picked = await ui.pickEngine();
-  if (!picked) return false;
-  const model = await ui.askModel(picked, chosenAuthoringModel(repository.root));
-  if (model === undefined) return false;
-  if (picked.modelRequired && model.trim() === "") {
-    ui.showErrorMessage(`${picked.label} is a seat and needs a model; nothing was opened.`);
-    return false;
-  }
-  // The same check the repository's own window makes: this path writes the
-  // choice into a module's folder for another window to launch from, so a
-  // model refused there would be refused one window later, after a clone.
-  const impossible =
-    engineModelRefusal(repository, picked, model) ??
-    (await engineRefusesModel(ui, picked, model));
-  if (impossible !== null) {
-    ui.showErrorMessage(impossible);
-    return false;
-  }
-  const result = await router.module.open({ workspaceRoot: repository.root, slug });
-  if (!result.ok) {
-    ui.showErrorMessage((result.message ?? result.outcome).trim() || "Dabbler refused that.");
-    return false;
-  }
-  const clone = clonePathIn(result.value.stdout ?? "");
-  if (clone === null) {
-    ui.showErrorMessage((result.value.stdout ?? "").trim() || "The router answered without a folder to open.");
-    return false;
-  }
-  writeStartRequest(clone, {
-    engine: picked.engine,
-    provider: picked.provider,
-    model: model.trim(),
-    unattended,
-    writtenAt: new Date().toISOString(),
-  });
-  await ui.openFolder(clone);
-  return true;
-}
-
-/**
- * A window activating on a folder that holds a fresh request starts the
- * session it asked for, with the choices it carries; a stale request is
- * dropped. Returns whether a start was made.
- */
-export async function startFromRequest(
-  repository: SessionsRepository,
-  ui: SessionRunUi,
-  launcher: DriveLauncher,
-  drives: Drives,
-): Promise<boolean> {
-  const request = takeStartRequest(repository.root);
-  if (request === null) return false;
-  const preset = presetChoices(ui, request);
-  return request.unattended
-    ? runStartUnattendedSession(repository, preset, launcher, drives)
-    : runStartSession(repository, preset);
 }
 
 /**
@@ -795,16 +632,12 @@ export async function runResumeSession(
  * The engine is the decision -- asked as one, in a pick -- and everything
  * after it belongs to the person: their terminal, their chat, their Esc.
  * A cancelled pick cancels the command, which is what cancelling a
- * decision should do. When the next session is focused and this is the
- * repository's window, the launch is the module's window instead.
+ * decision should do.
  */
 export async function runStartSession(
   repository: SessionsRepository,
   ui: SessionRunUi,
-  router: Pick<Router, "module"> | null = null,
 ): Promise<boolean> {
-  const focused = opensModuleWindow(repository);
-  if (focused !== null) return runStartFocusedSession(repository, focused, ui, router ?? productionRouter());
   const picked = await ui.pickEngine();
   if (!picked) return false;
   const model = await ui.askModel(picked, chosenAuthoringModel(repository.root));
@@ -845,7 +678,6 @@ export async function runStartUnattendedSession(
   ui: SessionRunUi,
   launcher: DriveLauncher,
   drives: Drives,
-  router: Pick<Router, "module"> | null = null,
 ): Promise<boolean> {
   if (drives.running(repository.root)) {
     ui.showErrorMessage(
@@ -853,8 +685,6 @@ export async function runStartUnattendedSession(
     );
     return false;
   }
-  const focused = opensModuleWindow(repository);
-  if (focused !== null) return runStartFocusedSession(repository, focused, ui, router ?? productionRouter(), true);
   const picked = await ui.pickEngine();
   if (!picked) return false;
   const model = await ui.askModel(picked, chosenAuthoringModel(repository.root));
@@ -1049,25 +879,20 @@ export function registerSessionCommands(
 ): Drives {
   context.subscriptions.push(
     drives,
-    // One launcher under two titles: the registry offers the second id
-    // when pressing Start opens a window on the module's clone, so the
-    // title says so; what runs is the same command.
-    ...["dabblerSessionSets.startSession", "dabblerSessionSets.startSessionInNewWindow"].map((id) =>
-      vscode.commands.registerCommand(id, async (arg: unknown) => {
-        const repository = repositoryOf(arg);
-        if (!repository) return;
-        // No channel is shown: the engine is in the terminal that just
-        // opened, and the framework's own work goes to the Dabbler
-        // terminal rather than here.
-        await runStartSession(repository, ui, router);
-      }),
-    ),
+    vscode.commands.registerCommand("dabblerSessionSets.startSession", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      // No channel is shown: the engine is in the terminal that just
+      // opened, and the framework's own work goes to the Dabbler
+      // terminal rather than here.
+      await runStartSession(repository, ui);
+    }),
     vscode.commands.registerCommand(
       "dabbler.startUnattendedSession",
       async (arg: unknown) => {
         const node = asRepositoryNode(arg);
         if (!node) return;
-        if (await runStartUnattendedSession(node.repository, ui, launcher, drives, router)) {
+        if (await runStartUnattendedSession(node.repository, ui, launcher, drives)) {
           engineOutputChannel().show(true);
         }
       },

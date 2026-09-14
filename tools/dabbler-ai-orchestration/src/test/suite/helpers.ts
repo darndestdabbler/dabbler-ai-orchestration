@@ -120,8 +120,6 @@ export function makeRepository(
     sessionsCompleted: 0,
     currentSession: null,
     nextSession: null,
-    checkoutModule: null,
-    focusedSession: null,
     forceClosed: false,
     schemaVersionOnDisk: null,
     sessionsSource: "ledger",
@@ -253,9 +251,6 @@ export function fakeRouter(
       },
       modules: { create: text("modules create") },
       module: {
-        open: text("module open"),
-        grant: text("module grant"),
-        revoke: text("module revoke"),
         pack: text("module pack"),
       },
       verify: {

@@ -113,11 +113,6 @@ export interface SessionStartOptions extends RepositoryTarget {
   /** Required for a seat whose label does not resolve an identity. */
   readonly model?: string;
   readonly effort?: string;
-  /**
-   * The module the session works in, for a multi-module solution: the
-   * session is registered in the module's focused clone and works there.
-   */
-  readonly module?: string;
 }
 
 export interface SessionDeclareOptions extends RepositoryTarget {
@@ -216,33 +211,6 @@ export interface ModuleVerbs {
   create(options: ModuleCreateOptions): Promise<RouterResult<RouterText>>;
 }
 
-export interface ModuleOpenOptions {
-  readonly workspaceRoot: string;
-  readonly slug: string;
-  /** The session branch; the trunk when absent. */
-  readonly branch?: string;
-  /** Fetch, reset to the trunk and re-narrow an existing clone. */
-  readonly reset?: boolean;
-}
-
-/**
- * The things done TO one module, beside the manifest it is declared in.
- * `open` answers with JSON on stdout -- the clone's path, branch and cone --
- * because the extension's next move is to open a window at that path, and a
- * path parsed out of prose is a path that eventually parses wrong.
- */
-export interface ModuleGrantOptions {
-  readonly workspaceRoot: string;
-  /** The sibling whose source the session asks for. */
-  readonly slug: string;
-  readonly reason: string;
-}
-
-export interface ModuleRevokeOptions {
-  readonly workspaceRoot: string;
-  readonly slug: string;
-}
-
 export interface ModulePackOptions {
   readonly workspaceRoot: string;
   readonly slug: string;
@@ -251,11 +219,6 @@ export interface ModulePackOptions {
 }
 
 export interface OneModuleVerbs {
-  open(options: ModuleOpenOptions): Promise<RouterResult<RouterText>>;
-  /** Widen the checkout to a sibling's source, recorded with the reason. */
-  grant(options: ModuleGrantOptions): Promise<RouterResult<RouterText>>;
-  /** End a grant: narrow the checkout again. */
-  revoke(options: ModuleRevokeOptions): Promise<RouterResult<RouterText>>;
   /**
    * Build the module's committed package, move the central pin and write the
    * record -- the same pack the framework runs at the candidate, asked for
@@ -417,9 +380,8 @@ export interface BootstrapOptions {
    * Where this project pushes: the one parameter the framework cannot
    * determine for itself.
    *
-   * The close pushes, the close pulls the repository forward, and a focused
-   * checkout is CLONED from the origin, so a project with no remote cannot
-   * close its first session. Absent is a real answer -- the project is set
+   * The close pushes, so a project with no remote cannot close its first
+   * session. Absent is a real answer -- the project is set
    * up without one, local-only until a remote is added.
    */
   readonly remote?: string;
@@ -487,7 +449,7 @@ export interface AffectedOptions extends RepositoryTarget {
 export interface Router {
   readonly session: SessionVerbs;
   readonly modules: ModuleVerbs;
-  /** One module of a multi-module solution: its focused checkout. */
+  /** One module of a multi-module solution: its contract and its package. */
   readonly module: OneModuleVerbs;
   readonly verify: VerifyVerbs;
   readonly ledger: LedgerVerbs;

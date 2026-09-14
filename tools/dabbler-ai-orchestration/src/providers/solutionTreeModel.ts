@@ -36,8 +36,6 @@ export interface ProjectionModule {
   dependsOn: string[];
   usedBy: string[];
   contractDir?: string | null;
-  /** A grant of this module's source is in force in the in-flight session's checkout. */
-  granted?: boolean;
   /** The session working in this module right now, or null. */
   inSession?: number | null;
   /** The latest run of record of the module's suites: green, red, or none recorded. */
@@ -658,11 +656,9 @@ export const PROJECTION_SOURCE_GLOBS: readonly string[] = [
   "solution-dependencies.json",
   "**/*.csproj",
   "**/pom.xml",
-  // The modules in play: the in-flight row of this root's ledger, and the
-  // marker a focused session leaves in the repository. Both move the
-  // module rows' mark, and neither touches the projection file itself.
+  // The modules in play: the in-flight row of this root's ledger moves the
+  // module rows' mark, and never touches the projection file itself.
   "docs/sessions/sessions.json",
-  ".dabbler/module-session.json",
 ];
 
 /** Where a producing repository is, as three states rather than two. */
@@ -842,14 +838,8 @@ const KIND_ICONS: Record<string, string> = {
   library: "package",
 };
 
-/**
- * What the Work Explorer knows that the solution projection does not: the
- * module the next session's plan names, when that session is focused and
- * this window is the repository's. The module's row is where one click
- * starts it, so the row carries `;next-session` and nothing else does.
- */
+/** What the extension knows that the solution projection does not. */
 export interface SolutionContext {
-  readonly nextSessionModule?: string | null;
   /**
    * The engine the operator chose for the next session, which is a setting
    * of this extension rather than of the router: `session start` takes the
@@ -901,14 +891,11 @@ export function descriptorFor(
       // The run of record reads on the row, from the records and never from
       // a claim: green, red, or none where nothing has been recorded.
       if (m.runOfRecord !== undefined && p.solution.multi) bits.push(`run of record: ${m.runOfRecord}`);
-      // A grant in force reads on the row: this checkout holds the module's
-      // source, which the wall says it should not, and somebody signed for it.
-      if (m.granted === true) bits.push("widened");
       // Where it shipped, from the bundle records and never from a claim.
       if ((m.shippedIn ?? []).length > 0) bits.push(`shipped in: ${(m.shippedIn ?? []).join(", ")}`);
       const tone = active
         ? ("milestone" as const)
-        : m.granted === true || m.runOfRecord === "red"
+        : m.runOfRecord === "red"
           ? ("attention" as const)
           : m.runOfRecord === "green"
             ? ("done" as const)
@@ -919,26 +906,12 @@ export function descriptorFor(
         description: bits.join(" · "),
         tooltip: active
           ? `${m.title} — session ${m.inSession} is working here.`
-          : m.granted === true
-            ? `${m.title} — a grant widened this checkout to its source; End grant narrows it again.`
-            : m.runOfRecord === "red"
-              ? `${m.title} — its latest run of record is red.`
-              : m.title,
+          : m.runOfRecord === "red"
+            ? `${m.title} — its latest run of record is red.`
+            : m.title,
         icon: { id: KIND_ICONS[m.kind] ?? "package", ...(tone === undefined ? {} : { tone }) },
         expandable: childrenOf(node, p).length > 0,
-        // `;focused` is what Open Module and Widen for debugging are gated
-        // on: only a module of a multi-module solution has a focused
-        // checkout. `;granted` is what End grant is gated on. A
-        // single-module repository is its module, and this window is it.
-        contextValue:
-          `dabblerModule:${m.kind}` +
-          (p.solution.multi ? ";focused" : "") +
-          (m.granted === true ? ";granted" : "") +
-          (active ? ";active" : "") +
-          // `;next-session` is what Start Focused Session is gated on: the
-          // one module the next session's plan names, in the repository's
-          // own window.
-          (p.solution.multi && context.nextSessionModule === m.slug ? ";next-session" : ""),
+        contextValue: `dabblerModule:${m.kind}` + (active ? ";active" : ""),
       };
     }
     case "contract": {

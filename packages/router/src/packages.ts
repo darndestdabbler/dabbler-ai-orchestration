@@ -263,8 +263,7 @@ function sourceOnDisk(root: string, entry: ModuleEntry): boolean {
  *
  * Refused for a single-module solution (the repository is the module, and
  * there is no sibling to pack for), for a module with no package, and for
- * a module whose source is not on disk -- which is what a sibling looks
- * like from a focused checkout, and the grant is the way to it. A declared
+ * a module whose source is not on disk. A declared
  * `packaging.pack` for the module runs once with `{output}` and
  * `{version}`; otherwise the ecosystem's default packs every packable
  * project. Every target must leave its package behind, or nothing is
@@ -289,9 +288,7 @@ export function packModule(
   }
   if (!sourceOnDisk(root, entry)) {
     throw new PackagesError(
-      `module '${slug}' is not on this disk (${entry.codeRoots.join(", ")}): in a focused ` +
-        "checkout a sibling is a package, not source, and `dabbler module grant " +
-        `${slug} --reason ...\` is the way to its source`,
+      `module '${slug}' is not on this disk (${entry.codeRoots.join(", ")}), so there is no source to pack`,
     );
   }
   const digestOf = options.digestOf ?? ((covers: readonly string[]) => surfaceDigest(root, covers));

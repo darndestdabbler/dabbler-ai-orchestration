@@ -202,13 +202,10 @@ export function cleanRepoAnswers(repo: string, first: ReadonlyArray<AnswerRow> =
     // Rows a test puts in front of the clean checkout's own answers.
     ...first,
     [["rev-parse", "--show-toplevel"], { stdout: repo.split("\\").join("/") }],
-    // The worktree snapshot asks which index entries a sparse cone keeps off
-    // disk (skip-worktree); an answered checkout is not sparse and has none.
-    // The rest of the snapshot is answered too -- it reads HEAD into a
-    // throwaway index, stages the disk over it and writes the tree -- so a
-    // verb that records which tree a decision was taken against gets a
-    // digest that moves with the files, the way the sandbox's does.
-    [["ls-files", "-v", "-z"], { stdout: "" }],
+    // The worktree snapshot is answered -- it reads HEAD into a throwaway
+    // index, stages the disk over it and writes the tree -- so a verb that
+    // records which tree a decision was taken against gets a digest that
+    // moves with the files, the way the sandbox's does.
     [["read-tree"], { code: 0 }],
     [["add"], { code: 0 }],
     [["rm", "--cached"], { code: 0 }],
@@ -350,9 +347,6 @@ export function makeAnsweredRepo(
     [["rev-parse", "--show-toplevel"], { stdout: posixRepo }],
     [["rev-parse", "--verify", "HEAD"], { stdout: HEAD_COMMIT }],
     [["rev-parse", "--short", "HEAD"], { stdout: HEAD_COMMIT.slice(0, 7) }],
-    // The worktree snapshot asks which index entries a sparse cone keeps off
-    // disk (skip-worktree); this checkout is not sparse and has none.
-    [["ls-files", "-v", "-z"], { stdout: "" }],
     // The tracked files a surface digest enumerates: everything seeded, the
     // same listing `ls-tree` answers with, so a digest over this repository
     // is a digest over what the test wrote.

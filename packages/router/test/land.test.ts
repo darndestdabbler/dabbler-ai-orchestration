@@ -11,7 +11,6 @@ import {
   type LandFacts,
   bundleRecord,
   centralPins,
-  judgeExposure,
   judgeLandReadiness,
   judgePins,
   packageReferencesOf,
@@ -116,45 +115,6 @@ describe("the close's module gates", () => {
     assert.match(refusal, /modules\/listener\/src\/Listener\/Listener\.csproj references CsvModel with its own version 0\.0\.9/);
   });
 
-  it("exposure_within_ceiling passes a clean manifest, and names bytes outside a grant and a path outside the scope", () => {
-    const clean = {
-      schema_version: 1 as const,
-      session: 4,
-      modules: ["persister"],
-      phase: "close" as const,
-      writtenAt: "2026-09-07T00:00:00Z",
-      siblings: [{ slug: "model", bytes: 0, files: [] }],
-      grants: [],
-      outsideScope: [],
-    };
-    assert.equal(judgeExposure(clean), null);
-    // Widened under a recorded grant: the bytes are signed for.
-    assert.equal(
-      judgeExposure({
-        ...clean,
-        siblings: [{ slug: "model", bytes: 512, files: ["modules/model/src/CsvModel/Person.cs"] }],
-        grants: [{ sibling: "model", reason: "debugging the mapper", grantedAt: "2026-09-07T00:00:00Z" }],
-      }),
-      null,
-    );
-    // Ungranted bytes are recorded on the manifest and said beside the row,
-    // never refused: the changed paths are the gate.
-    assert.equal(
-      judgeExposure({
-        ...clean,
-        siblings: [{ slug: "model", bytes: 512, files: ["modules/model/src/CsvModel/Person.cs"] }],
-        siblingBytes: ["module 'model' has 512 byte(s) of implementation in this checkout under no recorded grant"],
-      }),
-      null,
-    );
-    const leaking = judgeExposure({
-      ...clean,
-      siblings: [{ slug: "model", bytes: 512, files: ["modules/model/src/CsvModel/Person.cs"] }],
-      outsideScope: ["README.md"],
-    }) ?? "";
-    assert.doesNotMatch(leaking, /under no recorded grant/);
-    assert.match(leaking, /1 path\(s\) changed outside the session's scope: README\.md/);
-  });
 });
 
 describe("the bundle record", () => {

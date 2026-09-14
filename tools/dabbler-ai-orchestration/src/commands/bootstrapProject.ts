@@ -45,9 +45,8 @@ export interface SetUpProjectUi {
    * Where this project pushes, asked once, here.
    *
    * It is the one parameter the framework cannot determine, and set-up used
-   * not to ask for it at all: the close pushes, the close pulls the
-   * repository forward, and a focused checkout is CLONED from the origin,
-   * so a project with no remote cannot close its first session. Skipping is
+   * not to ask for it at all: the close pushes, so a project with no
+   * remote cannot close its first session. Skipping is
    * a real answer -- the project is set up without one, local-only until a
    * remote is added, and the push gate says so at every close.
    */
@@ -309,7 +308,7 @@ async function askRemote(): Promise<string | undefined> {
     title: "New Dabbler project — where does it push? (optional)",
     prompt:
       "The URL of an empty repository, recorded as `origin` and pushed to. " +
-      "The close pushes there and a focused checkout is cloned from it. " +
+      "The close pushes there. " +
       "Leave blank to set up without one.",
     placeHolder: "https://github.com/you/your-project.git",
     ignoreFocusOut: true,

@@ -207,6 +207,12 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 167 | Ship by default, and the one question that goes | yes | 2026-09-14 |
 | 168 | Nothing is owed | yes | 2026-09-14 |
 | 169 | Nothing gets stuck, nothing waits | yes | 2026-09-14 |
+| 170 | One checkout | no | 2026-09-14 |
+| 171 | Project references | — | not declared |
+| 172 | The build files are the solution | — | not declared |
+| 173 | Tests named after what they test | — | not declared |
+| 174 | What planning asks, and when a session releases | — | not declared |
+| 175 | The walk, timed | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2422,3 +2428,15 @@ Session 169 makes a stuck session and an idle wait impossible on the paths the C
 - 2026-09-14 — step 'the-tutorial-fixes': its files: bootstrap.test.ts asserts the session-1 sentence this step rewrites (claude-code (anthropic, claude-opus-5))
 - 2026-09-14 — step 'the-tutorial-fixes': its files: runGit has no time limit; the 15-second bound on ls-remote needs one (claude-code (anthropic, claude-opus-5))
 - 2026-09-14 — step 'the-tutorial-fixes': its files: the clean-checkout git answers must say there is no origin, and a test must be able to put a remote in front of them (claude-code (anthropic, claude-opus-5))
+
+### Session 170 — One checkout
+
+**Releasable: no — held: The module machinery's removal ships whole in session 172 (3.0.0); a half-removed module model is not handed to the operator's staff, so sessions 170 and 171 publish nothing..**
+
+Session 170 makes every session run in the repository the developer opened. The router loses the focused checkout: checkout.ts, exposure.ts and policy.ts with their tests and the walk-checkout walkthrough (the walkthrough list and the count dabbler.yaml states go to seven); the verbs module open, preflight, grant and revoke and session scope; the flags session start --module, --focused and --global and session next --request-grant with its --reason; the focused branches of start, declare and close (the session kind ruling, the clone, the policy, the exposure manifest, the pull forward); in the drive loop the module-session marker refusal, the grant request, the per-step scope sentence, the suites-owed-elsewhere skip and the land's --sparse; the exposure_within_ceiling gate; and the Module:/Scope: plan lines' meaning as a session kind. contractDir, ROOT_BUILD_FILES and SOLUTION_FILE move into agency.ts, the one file that keeps using them. The schema members that existed only for the checkout (suites_owed_elsewhere on a run, checkout on a ledger row, exposure, checkoutModule, focusedSession and the session kind on the progress projection) stay optional and are no longer written or read, so a recorded run or row that carries one is still read. A multi-module session may name the modules it touches or none; an undeclared name is still refused at acceptance. The extension loses Open Module, Start Focused Session in a New Window, End Grant, Start Session in a New Window, the start-request file, the kind labels, the focused, granted and next-session row tokens (Show Impact and Pack Module appear on every module row) and the terminal's kind and marker lines. The managed body, the plan templates, the READMEs, the quick start, the CSV walkthrough, the two UAT walkthroughs and the register check's self-test stop describing any of it. Two things owed by session 169: a provider's failure message carries the error text the provider parsed out of its JSON body (never the raw body, which can echo request headers), and the start test asserts exactly one line about the remote. No version bump: the release is held.
+
+**Amended after acceptance:**
+
+- 2026-09-14 — step 'delete-the-checkout': its files: The worktree snapshot's skip-worktree copy was deleted with the sparse checkout, so the answered git tables lose the ls-files -v row and its comment (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'no-module-named': its files: Naming two modules needs no reason, so the reason rule's words go too: the plan ask's reason member and its test, declare's --reason help and parsing, and the work plan schema's description with its generated type (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'the-words': its files: dabbler.yaml's focused-checkout comments went with the selection rules in delete-the-checkout, so this step leaves it unchanged (claude-code (anthropic, claude-fable-5-1))

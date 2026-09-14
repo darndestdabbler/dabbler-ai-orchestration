@@ -44,8 +44,8 @@ There is one implementation, in TypeScript, and it runs two ways:
    record). There is no waiver and no verdict a person can type.
 4. `dabbler session close` runs the gates `GATE_CHECKS` declares —
    verification clean, working tree clean, pushed to remote, test run
-   fresh, pins current, exposure within ceiling, published when
-   releasable, and verdict vocabulary — then flips the
+   fresh, pins current, published when releasable, and verdict
+   vocabulary — then flips the
    state. The verification gate reads the ledger; there is no stamp, no
    override, no hand-writable record.
 
@@ -61,63 +61,16 @@ a real run: [docs/uat/uat-dotnet-json-solution.md](docs/uat/uat-dotnet-json-solu
 (.NET) and [docs/uat/uat-java-json-solution.md](docs/uat/uat-java-json-solution.md)
 (Java, Maven and Spring).
 
-## Modules: a checkout the size of the work
+## Modules
 
 A solution is declared as **modules** in `docs/modules.yaml` — a slug, a
-kind, the code roots it owns, and the siblings it depends on. A session's
-section of the plan names the module it is for, and the framework then
-builds that module its own **git-enabled partial working tree** for the
-session: the module's own source, plus its siblings' *contracts* and
-*published packages* rather than their code. It is a real clone with a
-real branch, made on the fly and discarded when the session closes.
+kind, the code roots it owns, and the siblings it depends on. Every session
+runs in the repository you opened, and a session's plan may name the
+modules it touches, as many as that is, or none.
 
-**The point is not tidiness — it is what the engine reads.** A focused
-session sees a codebase the size of the work rather than the size of the
-repository, which is less context bought on every call, less for a model
-to wander into, and less room to change a module nobody asked it to
-touch. And it is measured rather than asserted: a focused session writes
-an **exposure manifest**, the close runs the `exposure_within_ceiling`
-gate over it, and a session that finds it cannot do the work without a
-sibling's source has to ask —
-
-```
-dabbler session next --request-grant <slug> --reason <why>
-```
-
-— which waits for a person's answer and records it. Taking it is not one
-of the options. A session that genuinely spans the solution is declared
-**global** instead, at the moment it starts, and runs in the repository
-with no wall and no exposure gate: the choice is made once, before the
-work, and never rediscovered afterwards.
-
-One line under the session's heading in the plan decides which, and
-`session start` and every launcher read it the same way:
-
-| Line in the plan section | What it does |
-| --- | --- |
-| `Module: <slug>` | The session runs **focused**, in that module's own checkout. |
-| `Scope: whole repository` | The session runs **global**, in the repository itself, wherever the line appears in the section. A `Module:` line beside it only says which module the session is about, and the Work Explorer files it there. |
-
-### Before your first focused session
-
-**What the focused checkout holds.** It is a sparse clone made from
-`origin` beside the repository, as `<repo>.<slug>`, and it holds: the
-module's own code roots; the committed packages under `packages/`; the
-framework's record under `docs/`; the `modules/<sibling>/contract/` folder
-of every module this one depends on, directly or transitively, so it
-compiles against what they promise; the same folder of every module that
-consumes it, so their consumer-contract suites can run against it; and the
-directory of each `sharedFiles` entry. A sibling's code is never in it —
-that is the point: the engine reads the module, and the siblings as the
-promises they publish.
-
-**What a session on it may change.** Anything in the module's own roots,
-and every file at the repository root — build files, the solution file,
-the `.sln` or the root `pom.xml` — because the root's files come with every
-cone. What it may not change is a sibling's code. A file outside the
-module's roots that the module's sessions must nevertheless change — a
-changelog, a notes file, a shared props file in a subdirectory — is
-declared once, in `dabbler.yaml`, and its directory is then in the cone:
+**Files outside a module's roots.** A file outside the module's roots that
+the module's sessions change — a changelog, a notes file, a shared props
+file in a subdirectory — is declared once, in `dabbler.yaml`:
 
 ```yaml
 modules:
@@ -126,15 +79,14 @@ modules:
       - docs/notes/dabbler-issues.md
 ```
 
-Use `sharedFiles` when a file outside the module's roots is one the
-module's sessions must change; declare it under each module whose sessions
-must reach it. A change to a shared file reaches every module that names
-it, and every reached module with a package becomes a candidate of the run
-of record; a module with no project file under its roots yet is skipped.
-A changed path that no module's roots or shared files hold is *unowned*:
-it reaches no module, so it selects only the suites bound to no module —
-a suite declared with no `module` answers for the whole repository
-whatever changed — and the `impact-plan` line says so when it lists one.
+Declare it under each module whose sessions must reach it. A change to a
+shared file reaches every module that names it, and every reached module
+with a package becomes a candidate of the run of record; a module with no
+project file under its roots yet is skipped. A changed path that no
+module's roots or shared files hold is *unowned*: it reaches no module, so
+it selects only the suites bound to no module — a suite declared with no
+`module` answers for the whole repository whatever changed — and the
+`impact-plan` line says so when it lists one.
 
 **Module packages are pinned centrally.** The run of record packs each
 changed module's candidate into `packages/` under an immutable dev version
@@ -155,11 +107,6 @@ itself, because the framework never rewrites a file it did not write. For Maven 
 notes page, `modules/<slug>/contract/README.md`, before its first
 candidate: the page is what a sibling's session reads instead of the code.
 
-**What is not pushed is not in it.** The clone is made from `origin`, not
-from your working tree, so a commit you have not pushed is absent from the
-focused checkout. `session start` refuses a tree with uncommitted changes
-or with commits ahead of its upstream, and names which, before it clones.
-
 **The three contract modes.** `contract:` in `docs/modules.yaml` says where
 a sibling reads this module's promise from:
 
@@ -175,19 +122,16 @@ a sibling reads this module's promise from:
   behaviour, so the notes page beside it carries the promises.
 
 **Building against a sibling whose package was never published.** A
-focused session cannot: its checkout holds the sibling's contract folder and
-published package, never its source, so a package reference nothing has
-published does not resolve. There are two ways on, and both are decided in
-the plan before the work. The session that completes the sibling ships it —
-a session publishes unless its plan holds it — to a feed: a folder on disk is a feed,
-takes no credential, and is enough for the next module to build against.
-Or the session that needs both runs global, with `Scope: whole repository`
-under its heading, and builds the solution in the repository itself.
+package reference nothing has published does not resolve. There are two
+ways on, and both are decided in the plan before the work. The session that
+completes the sibling ships it — a session publishes unless its plan holds
+it — to a feed: a folder on disk is a feed, takes no credential, and is
+enough for the next module to build against. Or one session changes both,
+naming both modules.
 
 The verbs are `dabbler modules create` and `modules show` for the
-manifest, and `dabbler module contract | pack | open | grant | revoke`
-for one module — its designed seam, its committed package, its focused
-checkout, and the grants that widen it. Worked end to end in the two UAT
+manifest, and `dabbler module contract | pack` for one module — its
+designed seam and its committed package. Worked end to end in the two UAT
 walkthroughs above and, module by module across a four-module solution,
 in
 [docs/tutorials/csv-solution/csv-multi-module-walkthrough.md](docs/tutorials/csv-solution/csv-multi-module-walkthrough.md).

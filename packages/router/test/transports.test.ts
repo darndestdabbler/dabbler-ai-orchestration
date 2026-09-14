@@ -298,6 +298,24 @@ describe("calling a provider API", () => {
     );
   });
 
+  it("carries the provider's own error words to the failure, and never the rest of the body", async () => {
+    // OpenAI's exhausted credit balance read "HTTP 429 Too Many Requests",
+    // which looks transient; the code in its body is what says it is not.
+    answerWith(() =>
+      jsonResponse(429, {
+        error: { message: "You exceeded your current quota.", type: "insufficient_quota", code: "credit_balance_exhausted" },
+        echoed: "Authorization: Bearer sk-not-a-key",
+      }),
+    );
+    await assert.rejects(
+      () => callModel("anthropic", "a-sonnet", "s", "u", 100, providerConfig("anthropic")),
+      (error: unknown) =>
+        error instanceof Error &&
+        /HTTP 429 .*credit_balance_exhausted: insufficient_quota: You exceeded your current quota\./.test(error.message) &&
+        !error.message.includes("sk-not-a-key"),
+    );
+  });
+
   it("classifies an error status as retryable and a decode failure as not", async () => {
     // The two httpx classes Python retries are status and timeout, and
     // nothing else. A body that is not JSON must reach the caller on the

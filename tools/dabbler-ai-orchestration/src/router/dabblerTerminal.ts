@@ -205,8 +205,6 @@ export function lineTone(event: string, fields: Record<string, string> = {}): To
   // the engine is told why and answers again.
   if (event === "step") return "milestone";
   if (event === "rejected") return "warn";
-  // The session's kind, said once under its banner: read, not scanned for.
-  if (event === "focused" || event === "global") return "plain";
   return "muted";
 }
 
@@ -847,14 +845,12 @@ function readRun(runPath: string): RunRecord | null {
 /** The ledger row in flight, as far as this terminal reads it. */
 interface LedgerInFlight {
   readonly number: number;
-  /** The focused checkout `session start --module` wrote onto the row, or null for a global session. */
-  readonly checkout: { readonly module: string; readonly path: string } | null;
 }
 
 /**
  * The session the ledger says is in progress, or null.
  *
- * Read here, and only for the banner and the kind line: a session exists
+ * Read here, and only for the banner: a session exists
  * from its registration, and the run record it will be driven under is
  * born at the first `next` -- which used to be the first this terminal
  * heard of it. Which session is in flight stays the projection's rule for
@@ -869,44 +865,9 @@ function readLedgerInFlight(repoRoot: string): LedgerInFlight | null {
     if (!Array.isArray(sessions)) return null;
     const row = sessions.find(
       (entry: unknown) => (entry as { status?: unknown }).status === "in-progress",
-    ) as { number?: unknown; checkout?: unknown } | undefined;
+    ) as { number?: unknown } | undefined;
     if (row === undefined || typeof row.number !== "number") return null;
-    const checkout = row.checkout as { module?: unknown; path?: unknown } | undefined;
-    return {
-      number: row.number,
-      checkout:
-        checkout && typeof checkout.module === "string" && typeof checkout.path === "string"
-          ? { module: checkout.module, path: checkout.path }
-          : null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/** What the session's policy allows it to touch, as the router wrote it, or null when there is none. */
-function readPolicyScope(repoRoot: string, session: number): string[] | null {
-  try {
-    const raw: unknown = JSON.parse(
-      fs.readFileSync(path.join(repoRoot, RUNS_REL, `s${session}`, "policy.json"), "utf8"),
-    );
-    const allowed = (raw as { allowed?: unknown }).allowed;
-    return Array.isArray(allowed) ? allowed.map(String) : null;
-  } catch {
-    return null;
-  }
-}
-
-/** The marker `session start --module` leaves in the full checkout while the session runs in its clone. */
-function readModuleSessionMarker(repoRoot: string): { module: string; path: string } | null {
-  try {
-    const raw: unknown = JSON.parse(
-      fs.readFileSync(path.join(repoRoot, ".dabbler", "module-session.json"), "utf8"),
-    );
-    const marker = raw as { module?: unknown; path?: unknown };
-    return typeof marker.module === "string" && typeof marker.path === "string"
-      ? { module: marker.module, path: marker.path }
-      : null;
+    return { number: row.number };
   } catch {
     return null;
   }
@@ -990,9 +951,6 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
 
   /** The instruction seq whose step or rejection line was said, so it is said once. */
   private saidSeq: number | undefined = undefined;
-
-  /** The module-session marker last spoken of, so the line is said once per session. */
-  private saidMarker: string | null = null;
 
   /** The session the last phase line named, so the next names it only on a change. */
   private saidSession: number | null = null;
@@ -1194,28 +1152,16 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   }
 
   /**
-   * A session's banner and, beneath it, its kind: said once per session,
-   * from whichever record named the session first. The ledger row exists
-   * from registration and carries the focused checkout; the run record is
+   * A session's banner: said once per session, from whichever record named
+   * the session first. The ledger row exists from registration; the run record is
    * born at the first `next`. A terminal that learned of sessions only
    * from the run record said nothing until the engine had already been
    * asked to declare, which is the silence the operator saw.
    */
-  private openSession(number: number, ledger: LedgerInFlight | null): void {
+  private openSession(number: number): void {
     if (this.bannered === number) return;
     this.bannered = number;
     this.sayBanner(`SESSION ${String(number).padStart(3, "0")}`);
-    if (ledger === null || ledger.number !== number) return;
-    if (ledger.checkout === null) {
-      // The whole repository and no wall: no exposure manifest is written
-      // and no exposure gate runs, which is what `session start` said too.
-      this.line("global", { scope: "the whole repository, no wall" });
-    } else {
-      this.line("focused", {
-        module: ledger.checkout.module,
-        scope: (readPolicyScope(this.repoRoot, number) ?? []).join(", "),
-      });
-    }
   }
 
   /** A replay once the resize that asks for it has settled. */
@@ -1387,17 +1333,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     // The ledger first: a session exists from its registration, before any
     // run record does, and its banner belongs at the very beginning.
     const ledger = readLedgerInFlight(this.repoRoot);
-    if (ledger !== null) this.openSession(ledger.number, ledger);
-
-    // The repository's own window while a focused session runs in the
-    // module's folder: the marker is all this window holds of it, and one
-    // line says where the work is. Its output is in that folder's terminal.
-    const marker = readModuleSessionMarker(this.repoRoot);
-    const markerKey = marker === null ? null : `${marker.module}\0${marker.path}`;
-    if (markerKey !== null && markerKey !== this.saidMarker) {
-      this.line("focused", { module: marker!.module, folder: path.basename(marker!.path) });
-    }
-    this.saidMarker = markerKey;
+    if (ledger !== null) this.openSession(ledger.number);
 
     const runPath = liveRunPath(this.repoRoot);
     if (runPath === null) return;
@@ -1416,7 +1352,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       // Under its own banner, whether it is starting now or was already
       // there when the terminal first looked: what follows is one session's.
       // Said already if the ledger row named it; not said twice.
-      this.openSession(run.session_number, ledger);
+      this.openSession(run.session_number);
       if (startedAfter(run.started_at, this.since)) this.started.fire(run.session_number);
     }
 

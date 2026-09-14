@@ -27,10 +27,8 @@ import {
   solutionShape,
 } from "../src/modules.ts";
 import { capture } from "../src/output.ts";
-import { readExposure } from "../src/exposure.ts";
 import { platformNewlines } from "../src/journal.ts";
 import { checkPublishedWhenReleasable } from "../src/gates.ts";
-import { readPolicy } from "../src/policy.ts";
 import { TRANSPORT_COPILOT_CLI, resetProjectRootCache } from "../src/config.ts";
 import {
   SETTING_AUTHORING_MODEL,
@@ -50,7 +48,6 @@ import {
   identityClash,
   judgeCancellation,
   judgeRestoration,
-  judgeSessionKind,
   judgeStartBoundary,
   declare,
   plan,
@@ -284,7 +281,9 @@ describe("what a start refuses before a session exists", () => {
         start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
       );
       assert.equal(started.code, EXIT_OK, started.err);
-      const lines = started.out.split("\n").filter((line) => line.includes("origin"));
+      // Exactly one line about the remote: the origin's, and no pull line
+      // after it, whatever words a pull line would use.
+      const lines = started.out.split("\n").filter((line) => /origin|remote|pull/i.test(line));
       assert.equal(lines.length, 1, started.out);
       assert.match(lines[0] ?? "", /did not answer as a git remote \(fatal: unable to update url base from redirection\)/);
       assert.match(lines[0] ?? "", /git remote set-url origin/);
@@ -695,80 +694,37 @@ describe("recording the plan prose", () => {
       state.restore();
     }
   });
-});
 
-// --- Focused or global ----------------------------------------------------------
-
-describe("which kind of session a start registers", () => {
-  type Shape = Parameters<typeof judgeSessionKind>[0]["shape"];
-  const shape = (multi: boolean, ...slugs: string[]): Shape =>
-    ({ multi, implicit: false, modules: slugs.map((slug) => ({ slug })) }) as unknown as Shape;
-  const many = shape(true, "model", "persister");
-  const one = shape(false, "csv-model");
-  const facts = (over: Partial<Parameters<typeof judgeSessionKind>[0]>) => ({
-    session: 2,
-    shape: many,
-    planned: { kind: "focused" as const, module: "persister" },
-    flag: null,
-    module: null,
-    cloneModule: null,
-    ...over,
-  });
-  const focused = { kind: "focused", module: "persister" };
-  const global = { kind: "global", module: null };
-
-  it("takes the kind from the plan, lets the flags override it, and refuses what cannot apply by name", () => {
-    assert.deepEqual(judgeSessionKind(facts({})), focused);
-    assert.deepEqual(judgeSessionKind(facts({ flag: "global" })), global);
-    // A plan that names no module is a global session; --focused then has
-    // nothing to focus on, and a single-module solution never has.
-    assert.deepEqual(judgeSessionKind(facts({ planned: null })), global);
-    assert.match(String(judgeSessionKind(facts({ planned: null, flag: "focused" }))), /nothing to focus on/);
-    assert.match(String(judgeSessionKind(facts({ shape: one, flag: "focused" }))), /single-module solution/);
-    // --module agrees with the plan or is refused; alone, it decides.
-    assert.deepEqual(judgeSessionKind(facts({ module: "persister" })), focused);
-    assert.match(String(judgeSessionKind(facts({ module: "model" }))), /plan and the flag must agree/);
-    assert.deepEqual(judgeSessionKind(facts({ planned: null, module: "model" })), { kind: "focused", module: "model" });
-    // A plan that says global is not overturned by --module alone; with
-    // --focused the two flags override it out loud.
-    const wide = { kind: "global" as const, module: null };
-    assert.match(
-      String(judgeSessionKind(facts({ planned: wide, module: "model" }))),
-      /Scope: whole repository.*pass --focused with --module/,
-    );
-    assert.deepEqual(judgeSessionKind(facts({ planned: wide, module: "model", flag: "focused" })), { kind: "focused", module: "model" });
-    // The wrong folder, by name: another module's, or any module's for a
-    // global session.
-    assert.match(
-      String(judgeSessionKind(facts({ cloneModule: "model" }))),
-      /module 'model's focused folder and session 002's plan names module 'persister'/,
-    );
-    assert.match(
-      String(judgeSessionKind(facts({ cloneModule: "persister", flag: "global" }))),
-      /a global session starts in the repository itself/,
-    );
-    assert.deepEqual(judgeSessionKind(facts({ cloneModule: "persister" })), focused);
-  });
-
-  it("registers a global session of a multi-module solution with no manifest and no policy, says so, and accepts a declaration naming no module", async () => {
+  it("declares a session of a multi-module solution that names no module", async () => {
     const state = stateDir();
     seed(state.repo, {
       "docs/modules.yaml":
         "modules:\n- slug: model\n  codeRoots:\n  - modules/model\n- slug: persister\n  dependsOn:\n  - model\n  codeRoots:\n  - modules/persister\n",
-      "docs/sessions/session-plan.md":
-        "### Session 1 of 2: First things\nModule: persister\n1. Register.\n\n### Session 2 of 2: Second things\n1. Register.\n",
     });
     try {
-      const started = await run(() =>
-        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic", kind: "global" }),
-      );
-      assert.equal(started.code, EXIT_OK, started.err);
-      assert.match(started.out, /global -- no wall: the whole repository, no exposure manifest, no exposure gate/);
-      assert.equal(sessionOf(state.sessionsDir)["checkout"], undefined);
-      assert.equal(readExposure(state.repo, 1), null);
-      assert.equal(readPolicy(state.repo, 1), null);
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
       const declared = await run(() => declare(state.sessionsDir, { task: "Do it.", releasable: false }));
       assert.equal(declared.code, EXIT_OK, declared.err);
+    } finally {
+      state.restore();
+    }
+  });
+});
+
+// --- A row the focused checkout wrote ----------------------------------------
+
+describe("a ledger row the retired focused checkout wrote", () => {
+  it("is still read: a row carrying its checkout declares like any other", async () => {
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      const path = join(state.sessionsDir, "sessions.json");
+      const raw = JSON.parse(readFileSync(path, "utf8")) as { sessions: Record<string, unknown>[] };
+      raw.sessions[0]!["checkout"] = { module: "persister", path: join(state.repo, "..", "repo.persister") };
+      writeFileSync(path, JSON.stringify(raw, null, 2), "utf8");
+      const declared = await run(() => declare(state.sessionsDir, { task: "Do it.", releasable: false }));
+      assert.equal(declared.code, EXIT_OK, declared.err);
+      assert.notEqual(readTaskDeclaration(state.sessionsDir, 1), null);
     } finally {
       state.restore();
     }

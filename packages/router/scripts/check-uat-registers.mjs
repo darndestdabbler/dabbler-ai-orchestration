@@ -218,8 +218,8 @@ const GOOD_STEP = [
   "## Step 1 — Do the thing",
   "",
   "- **Framework —** at registration, the ledger row is written.",
-  "- **You —** **Start Focused Session** on the module row.",
-  "- **Underneath —** `dabbler module open model`.",
+  "- **You —** **Start Session** on the repository row.",
+  "- **Underneath —** `dabbler session start`.",
   "",
 ].join("\n");
 
@@ -227,14 +227,14 @@ const SELF_TESTS = [
   {
     name: "a step missing a register is refused",
     registers: true,
-    text: GOOD_STEP.replace("- **Underneath —** `dabbler module open model`.\n", ""),
+    text: GOOD_STEP.replace("- **Underneath —** `dabbler session start`.\n", ""),
     expect: "carries neither",
   },
   {
     name: "a gap with no bucket is refused",
     registers: true,
     text: GOOD_STEP.replace(
-      "- **You —** **Start Focused Session** on the module row.",
+      "- **You —** **Start Session** on the repository row.",
       "- **No UI register —** nothing offers it.",
     ),
     expect: "names no bucket",
@@ -243,7 +243,7 @@ const SELF_TESTS = [
     name: "a third-register absence needs a reason and not a bucket",
     registers: true,
     text: GOOD_STEP.replace(
-      "- **Underneath —** `dabbler module open model`.",
+      "- **Underneath —** `dabbler session start`.",
       "- **No command underneath —** nothing runs here.",
     ),
     expect: null,
@@ -252,7 +252,7 @@ const SELF_TESTS = [
     name: "an absence with no reason at all is refused",
     registers: true,
     text: GOOD_STEP.replace(
-      "- **Underneath —** `dabbler module open model`.",
+      "- **Underneath —** `dabbler session start`.",
       "- **No command underneath —**",
     ),
     expect: "with no reason",
@@ -260,7 +260,7 @@ const SELF_TESTS = [
   {
     name: "a button that does not exist is refused",
     registers: true,
-    text: GOOD_STEP.replace("**Start Focused Session**", "**Start Module Session**"),
+    text: GOOD_STEP.replace("**Start Session**", "**Start Module Session**"),
     expect: "no contributed command is titled",
   },
   {
@@ -274,7 +274,7 @@ const SELF_TESTS = [
     name: "an answered absence passes",
     registers: true,
     text: GOOD_STEP.replace(
-      "- **You —** **Start Focused Session** on the module row.",
+      "- **You —** **Start Session** on the repository row.",
       "- **No UI register —** writing the POM is a person's judgement.",
     ),
     expect: null,

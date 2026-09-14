@@ -188,7 +188,7 @@
           "module": { "type": "string", "minLength": 1, "description": "The module whose own session runs it." }
         }
       },
-      "description": "Suites the impact plan reached whose tests are not in this focused folder: skipped here, recorded so the freshness gate does not demand a record that cannot exist here, and run by the named module's own session."
+      "description": "Retired with the focused checkout: nothing writes or reads it now. Kept optional so a run recorded before the retirement is still read."
     },
     "resumed_from": {
       "type": ["object", "null"],

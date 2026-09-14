@@ -161,7 +161,7 @@ that was:
 | `scope`, `scope_size` | array, integer | what the round was confined to (the list is truncated at 200; `scope_size` is the true count) |
 | `reads`, `listings`, `searches` | integer | operations by kind |
 | `out_of_scope` | integer | operations not confined to the scope |
-| `refused_reads` | integer | of those, the ones the checkout could not deliver — a sibling's source is absent in a focused clone, which is the wall holding rather than a defect in the tree |
+| `refused_reads` | integer | of those, the ones the checkout could not deliver — counted for rounds recorded while a session could run in a module's own checkout, and zero otherwise |
 | `over_budget` | integer | reads past `read_budget`. On the seat this is reads *performed*, which is all it can be: the CLI executes its own tools. On the API path it is paths *asked for*, because there the budget is enforced and nothing past it is opened |
 | `transformed_reads` | integer | reads whose shown lines did not match the bytes on disk |
 | `fidelity_measurable` | boolean | present once the round read anything: whether the comparison could be made at all |

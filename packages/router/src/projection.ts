@@ -15,7 +15,6 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
-import { readModuleSessionMarker } from "./checkout.ts";
 import {
   CREDENTIAL_LAYER_KEY,
   CREDENTIAL_REFERENCE_KEY,
@@ -45,12 +44,11 @@ import {
 } from "./discovery.ts";
 import { engineAliases, installedEngines } from "./engines.ts";
 import { sessionsDirFor } from "./evidence.ts";
-import { readExposure } from "./exposure.ts";
 import { platformNewlines } from "./journal.ts";
 import { PREFERENCES_FILENAME, chosenEngine } from "./preferences.ts";
 import { dumps } from "./pythonJson.ts";
 import { readBundleRecords } from "./land.ts";
-import { type ModuleEntry, type SolutionShape, consumersOf, ManifestError, solutionShape } from "./modules.ts";
+import { type ModuleEntry, type SolutionShape, consumersOf, contractDirFor, ManifestError, solutionShape } from "./modules.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import {
   OUTCOME_PASSED,
@@ -101,61 +99,22 @@ export function projectionPath(root: string): string {
   return join(root, PROJECTION_RELPATH);
 }
 
-/** Where a module's contract bundle lives, relative to the root. */
-export function contractDirFor(slug: string): string {
-  return `modules/${slug}/contract`;
-}
-
-/** What the Explorer reads: the manifest, joined to the tree. */
 /**
- * The siblings a grant has widened the in-flight session's checkout to, from
- * that session's exposure manifest in this root. Empty where nothing is in
- * flight, or the session is not a module session, or this is not a clone.
- */
-function grantedSiblings(root: string): Set<string> {
-  try {
-    const raw = readRawSessionState(sessionsDirFor(root));
-    const sessions = Array.isArray(raw?.["sessions"]) ? (raw?.["sessions"] as Record<string, unknown>[]) : [];
-    const current = sessions.find((row) => row["status"] === "in-progress");
-    if (current === undefined || typeof current["number"] !== "number") return new Set();
-    return new Set((readExposure(root, current["number"])?.grants ?? []).map((grant) => grant.sibling));
-  } catch {
-    return new Set();
-  }
-}
-
-/**
- * The modules the in-flight session names, and which session: from this
- * root's ledger row (`checkout.module` in a module's folder, the declared
- * `modules` in a global session), or -- in the repository while a focused
- * session runs in its module's folder -- from the module-session marker,
- * which is the only record the repository holds of it. Null when nothing
- * is in flight here.
+ * The modules the in-flight session's declaration names, and which session.
+ * Null when nothing is in flight here.
  */
 function modulesInSession(root: string): { readonly session: number; readonly modules: ReadonlySet<string> } | null {
   try {
     const raw = readRawSessionState(sessionsDirFor(root));
     const sessions = Array.isArray(raw?.["sessions"]) ? (raw?.["sessions"] as Record<string, unknown>[]) : [];
     const current = sessions.find((row) => row["status"] === "in-progress");
-    if (current !== undefined && typeof current["number"] === "number") {
-      const checkout = current["checkout"];
-      const checkoutModule =
-        typeof checkout === "object" && checkout !== null && !Array.isArray(checkout)
-          ? (checkout as Record<string, unknown>)["module"]
-          : null;
-      const named =
-        typeof checkoutModule === "string" && checkoutModule.trim() !== ""
-          ? [checkoutModule.trim()]
-          : Array.isArray(current["modules"])
-            ? (current["modules"] as unknown[]).map(String)
-            : [];
-      return { session: current["number"], modules: new Set(named) };
-    }
+    if (current === undefined || typeof current["number"] !== "number") return null;
+    const named = Array.isArray(current["modules"]) ? (current["modules"] as unknown[]).map(String) : [];
+    return { session: current["number"], modules: new Set(named) };
   } catch {
-    // An unreadable ledger marks nothing; the marker below may still.
+    // An unreadable ledger marks nothing.
+    return null;
   }
-  const marker = readModuleSessionMarker(root);
-  return marker === null ? null : { session: marker.session, modules: new Set([marker.module]) };
 }
 
 export type RunOfRecordState = "green" | "red" | "none";
@@ -1116,7 +1075,6 @@ export function configurationNode(
 export function project(root: string): Record<string, unknown> {
   const shape = solutionShape(root);
   const name = basename(resolve(root)) || "solution";
-  const granted = grantedSiblings(root);
   const inPlay = modulesInSession(root);
   const runs = runsOfRecord(root, shape);
   // What ships: every bundle record under release/, and per module the
@@ -1148,11 +1106,8 @@ export function project(root: string): Record<string, unknown> {
       // not declared a seam.
       contractDir:
         entry.contract !== null && existsSync(join(root, contractDir)) ? contractDir : null,
-      // A grant in force for this module in the in-flight session: the
-      // Explorer badges the row, and offers to end it.
-      granted: granted.has(entry.slug),
       // The session working in this module right now, or null: the Explorer
-      // marks the row in both windows, the module's and the repository's.
+      // marks the row.
       inSession: inPlay !== null && inPlay.modules.has(entry.slug) ? inPlay.session : null,
       // The latest run of record of the module's suites, and the consumers
       // whose contract suite against it is red.

@@ -45,33 +45,12 @@ cap left the fix unreviewed, so the work lands labelled unreviewed; or
 *unresolved*, where findings still stand and nothing lands but the record.
 No verdict a person can type exists anywhere in the product.
 
-**3. Modules: a focused checkout, built for the session and thrown away.**
-This is the feature a .NET or Java team is really buying. Declare your
-solution's modules once; a session's plan says which module it is for; and
-the framework builds that module its own **git-enabled partial working
-tree** on the fly — the module's own source, plus its siblings' contracts
-and published packages rather than their code — and discards it when the
-session closes.
-
-The reason is not tidiness. **The AI reads a codebase the size of the work
-instead of the size of the repository.** That is less context to buy on
-every call, less for the model to wander into, and less room to quietly
-change a module nobody asked it to touch — and it is measured, not
-assumed: the close runs an **exposure** gate over what the session
-actually saw and changed, and a session that needs a sibling's source has
-to ask for it (`session next --request-grant <module> --reason <why>`) and
-wait for a person's answer. Taking it is not one of the options. Sessions
-that genuinely span the solution are declared **global** instead, with one
-click, and run in the repository itself.
-
-| | **Focused session** | **Global session** |
-|---|---|---|
-| Works in | the module's own partial checkout | the repository |
-| Sees | its module's source; siblings as contracts and packages | everything |
-| Widening | requested and granted on the record | not applicable |
-| At the close | an exposure gate measures what it saw and changed | no exposure gate |
-
-![The same panel over a four-module solution. The Solution Explorer is collapsed; under the Work Explorer the csv-solution repository stands at 0 of 4 sessions, all under one Not Started bucket, and beneath it four module rows — model, deserializer, persister and app — each holding the one session planned for it: 001 The Person model, 002 Reading a CSV file, 003 Storing a person, 004 The watcher](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/work-explorer-modules.png)
+**3. Modules, in the one repository you opened.**
+Declare your solution's modules once, in `docs/modules.yaml`. Every session
+runs in the repository itself, and a session's plan names the modules it
+touches, or none. The Solution Explorer shows each module with its package,
+its contract and its run of record, and offers Show Impact and Pack Module
+on every module row.
 
 **4. Works through a Copilot seat or direct API keys.**
 
@@ -93,10 +72,9 @@ cross-provider round and its remediation, the complete test suite as the
 run of record, the commit, the push and the close are all the framework's
 — not a checklist anyone has to remember.
 
-**6. Eight gates at the close, each one earned.** `session close` runs
+**6. Seven gates at the close, each one earned.** `session close` runs
 verification clean, working tree clean, pushed to remote, test run fresh,
-pins current, exposure within ceiling, published when releasable, and
-verdict vocabulary — and only then flips the state
+pins current, published when releasable, and verdict vocabulary — and only then flips the state
 and commits its own bookkeeping. Every one of them exists because a real
 incident got past a weaker check; none guards a hypothetical.
 

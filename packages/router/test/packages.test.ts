@@ -219,12 +219,12 @@ describe("the pack", () => {
     assert.throws(() => packagesCeiling({ modules: { packages: { ceilingBytes: "big" } } }), /positive integer/);
   });
 
-  it("refuses a module whose source is not on this disk, naming the grant, and a single-module solution", () => {
+  it("refuses a module whose source is not on this disk, and a single-module solution", () => {
     const { root, shape } = solution();
     rmSync(join(root, "modules", "model"), { recursive: true, force: true });
     assert.throws(
       () => packModule(root, shape, "model", { runPack: scriptedDotnet([]), digestOf: () => "x", baseCommit: null }),
-      (error: unknown) => error instanceof PackagesError && /module 'model' is not on this disk .* `dabbler module grant model --reason/.test(error.message),
+      (error: unknown) => error instanceof PackagesError && /module 'model' is not on this disk .*no source to pack/.test(error.message),
     );
     const single = { ...shape, multi: false };
     assert.throws(() => packModule(root, single, "persister", { digestOf: () => "x" }), /single-module solution/);

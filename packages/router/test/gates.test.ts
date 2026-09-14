@@ -320,24 +320,23 @@ describe("the driver", () => {
     assert.equal(row.inapplicable, true);
   });
 
-  it("keeps the evidence gates to exactly the five that read the record", () => {
-    // The wall and the pins joined the three in session 107: what a module
-    // session's checkout exposed and what its consumers pin are evidence of
-    // what landed, and --force bypasses bookkeeping, never evidence.
+  it("keeps the evidence gates to exactly the four that read the record", () => {
+    // The pins joined the three in session 107: what a module's consumers
+    // pin is evidence of what landed, and --force bypasses bookkeeping,
+    // never evidence.
     assert.deepEqual(
       [...EVIDENCE_GATES].sort(),
-      ["exposure_within_ceiling", "pins_current", "published_when_releasable", "verdict_vocabulary", "verification_clean"],
+      ["pins_current", "published_when_releasable", "verdict_vocabulary", "verification_clean"],
     );
   });
 
-  it("runs the eight in the order the close prints them", () => {
+  it("runs the seven in the order the close prints them", () => {
     assert.deepEqual(GATE_CHECKS.map(([name]) => name), [
       "verification_clean",
       "working_tree_clean",
       "pushed_to_remote",
       "test_run_fresh",
       "pins_current",
-      "exposure_within_ceiling",
       "published_when_releasable",
       "verdict_vocabulary",
     ]);
@@ -357,12 +356,11 @@ describe("which phase makes a gate's evidence", () => {
       assert.ok(registered.has(name), `${name} is mapped to a phase and is not a gate`);
     }
     // The unmapped ones are unmapped deliberately: a verdict's vocabulary is
-    // the verifier's, and the remaining three are about what landed rather
+    // the verifier's, and the remaining two are about what landed rather
     // than about evidence a phase remakes. A publish refused on any of them
     // stops.
     const unmapped = [...registered].filter((name) => !GATE_EVIDENCE_PHASE.has(name));
     assert.deepEqual(unmapped.sort(), [
-      "exposure_within_ceiling",
       "pins_current",
       "published_when_releasable",
       "verdict_vocabulary",
@@ -404,7 +402,7 @@ describe("the gate row every screen shows", () => {
     // A gate that could not see its own precondition is saying "not
     // applicable"; WHY it could not is the longest text on the busiest
     // screen and it explains something that did not happen.
-    assert.ok(!renderGateRow(row({ inapplicable: true, remediation: "no exposure manifest" })).includes("manifest"));
+    assert.ok(!renderGateRow(row({ inapplicable: true, remediation: "no impact plan on the record" })).includes("plan"));
     // A remediation on a gate that DID judge is kept. On a failure it is the
     // operator's next action; on a pass it appears only under `--force`,
     // where it is the forensic note saying a bookkeeping gate was stepped

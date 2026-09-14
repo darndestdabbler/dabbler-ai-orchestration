@@ -315,36 +315,8 @@ export function validateWorkPlan(
 export function judgeWorkPlanModules(
   plan: DriverWorkPlan,
   shape: SolutionShape,
-  checkout: string | null = null,
 ): string[] {
-  // No checkout in a multi-module solution is a global session: the whole
-  // repository, which names any declared modules or none.
-  const reasons = judgeModulesForShape(
-    plan.modules ?? [],
-    plan.reason ?? null,
-    shape,
-    "the plan",
-    shape.multi && checkout === null,
-  );
-  // A session started in a module's focused checkout IS that module's: the
-  // clone holds no other module's source, so a plan naming another one
-  // would scope the verifier, the manifest and the Explorer to work the
-  // checkout cannot hold. The checkout is the authority; the plan agrees
-  // with it or is refused. A session that must change two modules runs in
-  // the full checkout, started without --module.
-  if (checkout !== null) {
-    const named = (plan.modules ?? []).map((slug) => slug.trim()).filter((slug) => slug !== "");
-    const others = named.filter((slug) => slug !== checkout);
-    if (named.length === 0 || others.length > 0) {
-      reasons.push(
-        `the plan names ${named.length === 0 ? "no module" : `module(s) ${named.join(", ")}`}, and this ` +
-          `session runs in module '${checkout}'s focused checkout, which holds that module's source ` +
-          `and no other's: the plan names '${checkout}' and nothing else. A session that must change ` +
-          "two modules runs in the full checkout, started without --module.",
-      );
-    }
-  }
-  return reasons;
+  return judgeModulesForShape(plan.modules ?? [], shape, "the plan");
 }
 
 /**
@@ -387,10 +359,8 @@ export function judgeWorkPlanHold(plan: DriverWorkPlan): string[] {
  */
 export function judgeModulesForShape(
   modules: readonly string[],
-  reason: string | null,
   shape: SolutionShape,
   who = "the declaration",
-  global = false,
 ): string[] {
   const named = modules.map((slug) => slug.trim()).filter((slug) => slug !== "");
   const declared = new Set(shape.modules.map((module) => module.slug));
@@ -407,25 +377,12 @@ export function judgeModulesForShape(
     }
     return reasons;
   }
-  // A global session is the whole repository and need name no module; a
-  // focused one names its own, and the checkout clause holds it to that.
-  if (named.length === 0 && !global) {
-    reasons.push(
-      `${who} names no module, and docs/modules.yaml declares ${declared.size}: a session ` +
-        "in a multi-module solution says which module(s) it works in",
-    );
-    return reasons;
-  }
+  // Every session runs in the whole repository, so a declaration names the
+  // modules it touches, as many as that is, or none.
   for (const slug of named) {
     if (!declared.has(slug)) {
       reasons.push(`${who} names module '${slug}', which docs/modules.yaml does not declare`);
     }
-  }
-  if (named.length > 1 && !(reason ?? "").trim()) {
-    reasons.push(
-      `${who} names ${named.length} modules (${named.join(", ")}) and gives no reason; ` +
-        "a cross-module session says why in `reason`",
-    );
   }
   return reasons;
 }
@@ -553,16 +510,6 @@ export function readDispositions(
 
 export function readRun(repoRoot: string, sessionNumber: number): DriverRun | null {
   return readArtifact(runPath(repoRoot, sessionNumber), validateRun);
-}
-
-/**
- * The suites a run recorded as owed to another module's session, by name:
- * reached by the impact plan, with no test of theirs on this disk. The
- * freshness gate excuses them here and demands them nowhere else, because
- * the module whose tests they are runs them in its own session.
- */
-export function suitesOwedElsewhere(run: DriverRun | null): Set<string> {
-  return new Set((run?.suites_owed_elsewhere ?? []).map((row) => row.suite));
 }
 
 // --- Whole-file writes -------------------------------------------------------

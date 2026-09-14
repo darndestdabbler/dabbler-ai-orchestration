@@ -11,7 +11,6 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { checkoutCone } from "../src/checkout.ts";
 import { depsVerb } from "../src/cli/deps.ts";
 import { MANIFEST_HEADER, loadEntries, solutionShape } from "../src/modules.ts";
 import { packModule } from "../src/packages.ts";
@@ -568,9 +567,6 @@ describe("dabbler modules", () => {
     assert.deepEqual(entries.map((entry) => entry.package), ["model", "reports"]);
 
     const shape = solutionShape(root);
-    // The focused checkout: a cone of the module's own root, not the
-    // repository root that an absent codeRoots used to read as.
-    assert.ok(checkoutCone(shape, "model").includes("modules/model"));
     // The pack: past `declares no package` and past `is not on this disk`,
     // as far as the ecosystem, which is what an empty module folder is.
     mkdirSync(join(root, "modules", "model"), { recursive: true });

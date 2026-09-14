@@ -18,8 +18,7 @@
 //
 // ONE MODULE IS THE DEFAULT SHAPE. An absent manifest, or one with a single
 // entry, is a single-module solution whose repository IS the module: no
-// focused clone, no packages folder, no contracts, the run of record the
-// module's own suites. `solutionShape` is the one function that says which
+// packages folder, no contracts, the run of record the module's own suites. `solutionShape` is the one function that says which
 // shape a repository is in, and every multi-module code path asks it --
 // nothing switches on until a second entry is declared.
 //
@@ -36,6 +35,11 @@ import { writeErr, writeOut } from "./output.ts";
 import { writeTextLf } from "./journal.ts";
 import { dumps, pythonRepr } from "./pythonJson.ts";
 import { readText } from "./textfile.ts";
+
+/** Where a module's contract folder lives, relative to the root. */
+export function contractDirFor(slug: string): string {
+  return `modules/${slug}/contract`;
+}
 
 export const EXIT_OK = 0;
 export const EXIT_REFUSED = 1;
@@ -708,8 +712,8 @@ function defaultPackage(slug: string, existing: readonly ModuleEntry[]): string 
  * than asked for. The extension's New Module flow prompts for four -- slug,
  * title, kind, depends-on -- and a module missing the other two is refused
  * by both operations a multi-module solution exists for: an absent
- * `codeRoots` reads as the repository root, which is the full checkout and
- * not a focused one, and an absent `package` is what `module pack` refuses.
+ * `codeRoots` reads as the repository root, and an absent `package` is
+ * what `module pack` refuses.
  * This verb is the one writer behind both the button and the command line,
  * so the default belongs here: it fixes both at once, leaves the flow at
  * four boxes, and an explicit `--code-root` or `--package` still wins.
@@ -747,7 +751,7 @@ export function create(
   for (const [key, values] of [
     // `modules/<slug>` is where every other verb already looks for a
     // module that declares no root of its own; the default says out loud
-    // what they assume, so a focused checkout can be taken of it.
+    // what they assume.
     ["codeRoots", options.codeRoots ?? [`modules/${slug}`]],
     ["dependsOn", options.dependsOn],
     ["specSections", options.specSections],
@@ -823,8 +827,8 @@ export function moduleConfigs(
   }
   const declared = new Set(entries.map((entry) => entry.slug));
   for (const [slug, value] of Object.entries(raw)) {
-    // `modules.packages` is the feed's own block and `modules.checkout` the
-    // focused checkout's; neither is a module's.
+    // `modules.packages` is the feed's own block, and `modules.checkout`
+    // configured a checkout that no longer exists; neither is a module's.
     if (slug === "packages" || slug === "checkout") continue;
     const where = `dabbler.yaml: modules.${slug}`;
     if (!declared.has(slug)) {
@@ -890,26 +894,6 @@ export function packagesCeiling(config: unknown): number {
     throw new ManifestError("dabbler.yaml: modules.packages.ceilingBytes must be a positive integer");
   }
   return ceiling;
-}
-
-/**
- * `modules.checkout.parent` from the configuration: the directory a module's
- * focused clone is made under. Absent means beside the repository; anything
- * but a non-empty string is refused by name rather than read as a path.
- */
-export function checkoutParent(config: unknown): string | null {
-  if (!isRecord(config)) return null;
-  const modules = config["modules"];
-  if (!isRecord(modules)) return null;
-  const checkout = modules["checkout"];
-  if (checkout === null || checkout === undefined) return null;
-  if (!isRecord(checkout)) throw new ManifestError("dabbler.yaml: modules.checkout must be a mapping");
-  const parent = checkout["parent"];
-  if (parent === null || parent === undefined) return null;
-  if (typeof parent !== "string" || parent.trim() === "") {
-    throw new ManifestError("dabbler.yaml: modules.checkout.parent must be a non-empty string");
-  }
-  return parent.trim();
 }
 
 /** What `dabbler modules show` prints: the shape, with `usedBy` derived per module. */

@@ -275,21 +275,10 @@ export class SolutionTreeProvider
     return element ? childrenOf(element, p) : rootNodes();
   }
 
-  /** The module the next session's plan names, from the Work Explorer's scan; null when none or not here. */
-  private nextSessionModule: string | null = null;
-
-  /** Told by the Work Explorer on every scan; the module row moves only when the answer does. */
-  public setNextSessionModule(slug: string | null): void {
-    if (slug === this.nextSessionModule) return;
-    this.nextSessionModule = slug;
-    this.onDidChangeEmitter.fire(undefined);
-  }
-
   public getTreeItem(element: SolutionNode): vscode.TreeItem {
     const p = this.projection();
     if (!p) return new vscode.TreeItem("");
     const d = descriptorFor(element, p, {
-      nextSessionModule: this.nextSessionModule,
       // Read at paint time rather than cached: it is a setting, and a
       // setting changed in the settings editor must not need a window
       // reload to reach the row that reports it.

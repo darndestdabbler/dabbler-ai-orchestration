@@ -127,16 +127,6 @@ suite("solutionTreeModel: modules", () => {
     assert.ok(!idle.contextValue?.includes(";active"));
   });
 
-  test("the module the next session's plan names carries ;next-session, and no other row does", () => {
-    // Start Focused Session is gated on it: one click on that row opens the
-    // module's window with its AI in it, and the button is nowhere else.
-    const p = projection();
-    const context = { nextSessionModule: "persister" };
-    assert.ok(descriptorFor({ kind: "module", slug: "persister" }, p, context).contextValue?.includes(";next-session"));
-    assert.ok(!descriptorFor({ kind: "module", slug: "model" }, p, context).contextValue?.includes(";next-session"));
-    assert.ok(!descriptorFor({ kind: "module", slug: "persister" }, p).contextValue?.includes(";next-session"));
-  });
-
   test("the module row reads its run of record, and a consumer whose contract suite against it is red reads blocking", () => {
     // Both are readings of the records beside the run, projected by the
     // router; the row restates them and computes nothing.

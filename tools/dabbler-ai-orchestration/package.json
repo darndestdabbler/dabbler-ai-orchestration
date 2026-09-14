@@ -95,11 +95,6 @@
         "category": "Dabbler"
       },
       {
-        "command": "dabblerSessionSets.startSessionInNewWindow",
-        "title": "Start Session in a New Window",
-        "category": "Dabbler"
-      },
-      {
         "command": "dabbler.startUnattendedSession",
         "title": "Start Unattended Session",
         "category": "Dabbler"
@@ -163,24 +158,6 @@
         "title": "Open in New Window",
         "category": "Dabbler",
         "icon": "$(empty-window)"
-      },
-      {
-        "command": "dabblerSolution.openModule",
-        "title": "Open Module",
-        "category": "Dabbler",
-        "icon": "$(empty-window)"
-      },
-      {
-        "command": "dabblerSolution.startFocusedSession",
-        "title": "Start Focused Session in a New Window",
-        "category": "Dabbler",
-        "icon": "$(play)"
-      },
-      {
-        "command": "dabblerSolution.revokeModule",
-        "title": "End Grant",
-        "category": "Dabbler",
-        "icon": "$(lock)"
       },
       {
         "command": "dabblerSolution.setEngine",
@@ -308,19 +285,7 @@
           "when": "false"
         },
         {
-          "command": "dabblerSolution.openModule",
-          "when": "false"
-        },
-        {
-          "command": "dabblerSolution.startFocusedSession",
-          "when": "false"
-        },
-        {
           "command": "dabblerSessionSets.resumeSession",
-          "when": "false"
-        },
-        {
-          "command": "dabblerSolution.revokeModule",
           "when": "false"
         },
         {
@@ -405,11 +370,6 @@
           "group": "6_session@601"
         },
         {
-          "command": "dabblerSessionSets.startSessionInNewWindow",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-startSessionInNewWindow;/",
-          "group": "6_session@601"
-        },
-        {
           "command": "dabbler.startUnattendedSession",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-startUnattendedSession;/",
           "group": "6_session@603"
@@ -435,29 +395,14 @@
           "group": "9_lifecycle@902"
         },
         {
-          "command": "dabblerSolution.startFocusedSession",
-          "when": "view == dabblerSolutionTree && viewItem =~ /;next-session/",
-          "group": "1_open@0"
-        },
-        {
-          "command": "dabblerSolution.openModule",
-          "when": "view == dabblerSolutionTree && viewItem =~ /;focused/",
-          "group": "1_open@1"
-        },
-        {
           "command": "dabblerSolution.showImpact",
-          "when": "view == dabblerSolutionTree && viewItem =~ /;focused/ && viewItem =~ /^dabblerModule:/",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerModule:/",
           "group": "1_open@2"
         },
         {
           "command": "dabblerSolution.packModule",
-          "when": "view == dabblerSolutionTree && viewItem =~ /;focused/ && viewItem =~ /^dabblerModule:/",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerModule:/",
           "group": "1_open@3"
-        },
-        {
-          "command": "dabblerSolution.revokeModule",
-          "when": "view == dabblerSolutionTree && viewItem =~ /;granted/",
-          "group": "2_grant@2"
         },
         {
           "command": "dabblerSolution.setEngine",

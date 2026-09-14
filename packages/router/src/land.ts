@@ -6,9 +6,8 @@
 // asks three things of the tree it is about to commit: that every suite it
 // owes has a green run of record taken against exactly this tree; that a
 // changed module's package was built from exactly this source and this
-// contract; and that nothing it owes went stale. The close asks two more:
-// that every consumer is on the candidate's pin and pins nowhere else, and
-// that the checkout exposed nothing of a sibling that nobody signed for.
+// contract; and that nothing it owes went stale. The close asks one more:
+// that every consumer is on the candidate's pin and pins nowhere else.
 // A releasable application session records what it ships as a bundle, and
 // a bundle names released packages only.
 
@@ -17,7 +16,6 @@ import { dirname, join } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import { type PackageReferenceFact, fileStem, packageIdOfStem } from "./ecosystem.ts";
-import type { ExposureManifest } from "./exposure.ts";
 import { type Deployable, type ModuleEntry, type SolutionShape, dependenciesOf } from "./modules.ts";
 
 // The pure parsers of the .NET pin and reference files live on the seam;
@@ -220,26 +218,6 @@ export function candidatesFromRecord(paths: readonly string[]): { package: strin
   }
   return out;
 }
-
-// --- exposure_within_ceiling -------------------------------------------------------
-
-/**
- * Nothing changed outside the scope: a path outside it is work the session
- * was not scoped to, and that is the gate. A sibling's bytes under no
- * grant are recorded on the close manifest (`siblingBytes`) and said
- * beside the row, not refused: the wall exists to keep a session's work on
- * its own module, not to be foolproof, and the changed paths are what
- * measure the work.
- */
-export function judgeExposure(manifest: ExposureManifest): string | null {
-  if (manifest.outsideScope.length === 0) return null;
-  return (
-    `${manifest.outsideScope.length} path(s) changed outside the session's scope: ` +
-    manifest.outsideScope.slice(0, 5).join(", ") +
-    (manifest.outsideScope.length > 5 ? ` (+${manifest.outsideScope.length - 5} more)` : "")
-  );
-}
-
 
 // --- The bundle record ----------------------------------------------------------------
 

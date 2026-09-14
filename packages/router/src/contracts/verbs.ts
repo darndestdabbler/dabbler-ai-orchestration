@@ -49,12 +49,10 @@ export const VERBS: readonly VerbSpec[] = [
   },
   {
     // The things done TO one module, beside the manifest they are declared
-    // in: its designed seam, its package and its focused checkout now -- the
-    // extension's Open Module reaches `open` -- and its grants as the block
-    // adds them.
+    // in: its designed seam and its package.
     verb: "module",
     extensionFacing: true,
-    summary: "one module: scaffold its designed contract, pack its committed package, open its focused checkout",
+    summary: "one module: scaffold its designed contract, pack its committed package",
   },
   {
     verb: "affected",

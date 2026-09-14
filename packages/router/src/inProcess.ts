@@ -45,10 +45,7 @@ import {
   type ConfigureOptions,
   type LedgerVerbs,
   type ModuleCreateOptions,
-  type ModuleGrantOptions,
-  type ModuleOpenOptions,
   type ModulePackOptions,
-  type ModuleRevokeOptions,
   type ModuleVerbs,
   type OneModuleVerbs,
   type RepositoryTarget,
@@ -261,7 +258,6 @@ export class InProcessRouter implements Router {
       const args = ["start", "--engine", o.engine, "--provider", o.provider];
       optional(args, "--model", o.model);
       optional(args, "--effort", o.effort);
-      optional(args, "--module", o.module);
       return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
     },
     declare: (o: SessionDeclareOptions) =>
@@ -360,17 +356,6 @@ export class InProcessRouter implements Router {
   // --- module ----------------------------------------------------------------
 
   public readonly module: OneModuleVerbs = {
-    /** The focused clone; its JSON is the verb's stdout, handed through whole. */
-    open: (o: ModuleOpenOptions) => {
-      const args = ["open", o.slug, "--workspace-root", o.workspaceRoot];
-      optional(args, "--branch", o.branch);
-      if (o.reset === true) args.push("--reset");
-      return this.text("module", args, o.workspaceRoot);
-    },
-    grant: (o: ModuleGrantOptions) =>
-      this.text("module", ["grant", o.slug, "--reason", o.reason, "--workspace-root", o.workspaceRoot], o.workspaceRoot),
-    revoke: (o: ModuleRevokeOptions) =>
-      this.text("module", ["revoke", o.slug, "--workspace-root", o.workspaceRoot], o.workspaceRoot),
     /** The committed package, out of band; the pack's own lines are the stdout. */
     pack: (o: ModulePackOptions) => {
       const args = ["pack", o.slug, "--workspace-root", o.workspaceRoot];

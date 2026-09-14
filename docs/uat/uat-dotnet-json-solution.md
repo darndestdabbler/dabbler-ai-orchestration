@@ -262,9 +262,8 @@ configure` set. Name the vehicle for THIS checkout with `dabbler configure
 ## Step 2 — Give the repository a remote
 
 - **No framework register —** and this is a gap the **framework** should
-  close. The land runs a bare `git push`, the close reads
-  `pushed_to_remote`, and a focused checkout is cloned *from the origin*, so
-  the very first session cannot start or close without one. That makes it
+  close. The land runs a bare `git push` and the close reads
+  `pushed_to_remote`, so the very first session cannot close without one. That makes it
   lifecycle-timed, at set-up; the URL is the one parameter Dabbler cannot
   determine, which under the principle is a prompt, not four lines of shell.
   Set Up New Project asks no such question today. Walk finding 5.
@@ -309,16 +308,12 @@ configure` set. Name the vehicle for THIS checkout with `dabbler configure
 
 **Now the part the button cannot do.** New Module asks for four of a module's
 six values. The two it does not ask for — the **code root** and the
-**package** — are exactly the two that a focused session and a pack cannot do
-without, and a module made from the four honest answers refuses both:
+**package** — are exactly the two that a pack cannot do without, and a module
+made from the four honest answers refuses it:
 
 ```
 dabbler module pack model
   -> module pack: refused -- module 'model' declares no package; give it one in docs\modules.yaml
-
-dabbler session start --sessions-dir docs/sessions --engine claude-code --provider anthropic
-  -> start: refused -- module 'model' declares the repository root as a code root;
-     a focused checkout of everything is the full checkout, so open the repository itself
 ```
 
 That is walk finding 1, and it is the **UI**'s to close (two more prompts) or
@@ -413,12 +408,9 @@ deliberately under-engineered, and that is a specification, not an oversight.
 2. Close out.
 ```
 
-**The `**Module:**` line under each heading is load-bearing.** It is what
-makes each session *focused* — run in that module's own folder, with the
-other modules present as packages and contract folders rather than source.
-Dabbler reads it, the Work Explorer's yet-to-run rows say `focused: model`,
-and Start Session needs no further question. A session whose section says
-`Scope: whole repository` instead is global, and runs in the repository.
+**The `**Module:**` line under each heading names the module that session
+touches.** A section may name every module its session touches, or none, and
+every session runs in the repository you opened.
 
 **The simplicity rule is not decoration.** A different AI model checks each
 session's work, and it does not share your intentions. If the plan does not
@@ -513,9 +505,10 @@ that module's roots.
 **If you skip this, the next step refuses,** and says so plainly:
 
 ```
-start: refused -- the working tree carries 3 change(s)
-       (docs/sessions/session-plan.md, docs/modules.yaml, items.json); the module's
-       clone is made from the origin, so commit and push them before starting the session
+start: refused -- session 1 cannot declare its task list now: the working tree already
+         carries 3 change(s) (docs/sessions/session-plan.md, docs/modules.yaml, items.json).
+         The declaration comes before the work -- one made after it is a model deciding in
+         hindsight what may be published. Commit or revert, then declare.
 ```
 
 The `-u` is not optional either: it sets the upstream that every later push
@@ -526,13 +519,9 @@ uses.
 ## Step 7 — Run session 1
 
 - **Framework —** at registration it pulls your checkout forward from
-  `origin/master`, reads the plan's `Module: model` line, decides the session
-  is **focused**, makes the module's own folder by cloning the origin into
-  it, writes the exposure manifest there, and registers session 001 in that
-  folder's ledger. You do not run `module open` first — the registration is
-  what makes the folder.
-- **You —** in the Solution Explorer, **Dabbler: Start Focused Session in a New Window** on
-  the `model` row (the row the plan names for the next session). Two prompts:
+  `origin/master` and registers session 001 in the repository's ledger.
+- **You —** in the Work Explorer, **Dabbler: Start Session** on the
+  repository row or on session 1's row. Two prompts:
   *`Start session — which engine runs it?`* — pick `Claude Code`
   (`anthropic`) or `GitHub Copilot` (`openai — a seat also needs a
   model`). Those two are what Start launches: an engine whose CLI has not
@@ -540,11 +529,9 @@ uses.
   session next` in a terminal of your own instead.
   *`Start session — model for <engine>`* — leave blank for the engine's own
   default; on a Copilot seat type the model, e.g. `gpt-5.4`.
-  The module's window opens with the AI's terminal already running, and the
-  opening sentence already typed into it.
-  From the repository row, **Dabbler: Start Session** does the same thing
-  when the next session is focused. **Dabbler: Resume Session** brings the
-  AI's terminal back if you lose it.
+  The AI's terminal opens already running, with the opening sentence already
+  typed into it. **Dabbler: Resume Session** brings the AI's terminal back if
+  you lose it.
 - **Underneath —**
   ```
   dabbler session start --sessions-dir docs/sessions --engine claude-code --provider anthropic
@@ -557,12 +544,11 @@ uses.
   identity, because the session is in flight and its identity is on the
   record.
 
-**Expect the start to say where it put the session:**
+**Expect the start to say it registered the session:**
 
 ```
 start: pulled from origin/master (git pull --ff-only) before registering.
-start: session 001 of sessions registered (claude-code) in module 'model's focused
-       checkout at C:\temp\uat-json.model; the exposure manifest is written there.
+start: session 001 of sessions registered (claude-code).
 ```
 
 **Then the AI keeps running `dabbler session next` and doing what each answer
@@ -578,14 +564,8 @@ the Dabbler terminal's silence watcher and the Work Explorer's attention row.
 and Close filling in as it goes; and the `model` row in the Solution Explorer
 leading with `● session 1`.
 
-**Do not press Start Focused Session in a New Window again while it runs.** It refuses over
-`docs/sessions/sessions.json` — the ledger the framework itself just wrote —
-and tells you to commit or discard it. Do neither: that file is the router's,
-and never yours. Walk finding 4.
-
 **When it finishes, expect** the session's ledger row to read `complete` with
-`"verificationVerdict": "VERIFIED"`, and the repository window's Work
-Explorer to agree — see step 8's first register for why it agrees without
+`"verificationVerdict": "VERIFIED"`, and the Work Explorer to agree — see step 8's first register for why it agrees without
 your doing anything.
 
 ---
@@ -678,10 +658,9 @@ Commit the `.gitignore` and push it.
 ## Step 10 — Repeat for the other two modules
 
 - **Framework —** as step 7, once per module: the plan's `Module:` line for
-  session 2 is `store` and for session 3 is `app`, so each start makes that
-  module's folder and registers there.
-- **You —** **Dabbler: Start Focused Session in a New Window** on the `store` row, then on
-  the `app` row when session 2 has closed. **Dabbler: Pack Module** on each
+  session 2 is `store` and for session 3 is `app`.
+- **You —** **Dabbler: Start Session** on session 2's row, then on session
+  3's row when session 2 has closed. **Dabbler: Pack Module** on each
   when its session is done, as in step 8.
 - **Underneath —** the same two commands as step 7, per module.
 
@@ -749,7 +728,6 @@ written up in `docs/uat/uat-walk-findings.md` with its reproduction.
 - **New Module asks four of a module's six values** (step 3). Finding 1.
 - **Bootstrap does not commit the modules manifest** (step 6). Finding 2.
 - **No `bin/` or `obj/` ignore rule on .NET** (step 9). Finding 3.
-- **Re-opening a module refuses over `sessions.json`** (step 7). Finding 4.
 - **Nothing in the UI sets the remote or the upstream** (steps 2 and 6).
   Finding 5.
 - **Troubleshoot runs no toolchain checks** (prerequisites). Finding 6.

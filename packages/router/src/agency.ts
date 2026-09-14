@@ -38,7 +38,6 @@
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative } from "node:path";
 
-import { ROOT_BUILD_FILES, SOLUTION_FILE, contractDir } from "./checkout.ts";
 import { PACKAGES_DIR } from "./ecosystem.ts";
 import {
   type SelectionConfig,
@@ -49,7 +48,7 @@ import {
   selectionTestRoots,
 } from "./checks.ts";
 import { canonicalPath } from "./journal.ts";
-import { type SolutionShape, dependenciesOf } from "./modules.ts";
+import { type SolutionShape, contractDirFor, dependenciesOf } from "./modules.ts";
 import { pythonRepr } from "./pythonJson.ts";
 
 /**
@@ -299,6 +298,18 @@ export function sessionScope(
   return [...scope].sort();
 }
 
+/** The build files a solution keeps at its root, which every module's build reads. */
+const ROOT_BUILD_FILES: readonly string[] = [
+  "global.json",
+  "Directory.Build.props",
+  "Directory.Build.targets",
+  "Directory.Packages.props",
+  "nuget.config",
+];
+
+/** A .NET solution file, in either format. */
+const SOLUTION_FILE = /\.slnx?$/i;
+
 /**
  * The module form of the scope, for a session that names its module(s) in a
  * multi-module solution: each named module's `codeRoots`, its own contract
@@ -322,15 +333,14 @@ export function moduleScope(
       const rel = posix(codeRoot).replace(/^\.\/+/, "").replace(/\/+$/, "");
       if (rel !== "" && rel !== ".") scope.add(rel);
     }
-    scope.add(contractDir(slug));
-    for (const dependency of dependenciesOf(shape.modules, slug)) scope.add(contractDir(dependency));
+    scope.add(contractDirFor(slug));
+    for (const dependency of dependenciesOf(shape.modules, slug)) scope.add(contractDirFor(dependency));
     for (const shared of sharedFiles.get(slug) ?? []) scope.add(posix(shared));
   }
   for (const name of ROOT_BUILD_FILES) if (isFile(join(repoRoot, name))) scope.add(name);
   // The committed feed: where this module's own package lands when the run
-  // of record packs its candidate, and what the focused checkout's cone
-  // already carries. A pack of the session's own module is the session's
-  // work, not a change outside it.
+  // of record packs its candidate. A pack of the session's own module is the
+  // session's work, not a change outside it.
   scope.add(PACKAGES_DIR);
   try {
     for (const name of readdirSync(repoRoot)) {

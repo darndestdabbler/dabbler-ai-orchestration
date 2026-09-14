@@ -400,27 +400,6 @@ export function registerSessionStart(
 }
 
 /**
- * The focused checkout a module session runs in, written onto its row by
- * `session start --module` and by nothing else. The path is the clone's,
- * on this machine: the one place the ledger carries machine state, because
- * the clone is where the session's own record lives from here on.
- */
-export function recordSessionCheckout(
-  sessionsDir: string,
-  sessionNumber: number,
-  checkout: { readonly module: string; readonly path: string },
-): void {
-  const raw = readRawSessionState(sessionsDir);
-  if (!isRecord(raw) || !Array.isArray(raw["sessions"])) return;
-  for (const record of raw["sessions"]) {
-    if (isRecord(record) && record["number"] === sessionNumber) {
-      record["checkout"] = { module: checkout.module, path: checkout.path };
-    }
-  }
-  validateAndWriteState(sessionsDir, raw);
-}
-
-/**
  * The registration removed the framework's Stop hook from
  * `.claude/settings.json`: written onto the row's orchestrator block, so
  * the declaration gate can exempt exactly that edit and no other change

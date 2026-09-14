@@ -63,10 +63,7 @@
         "solutionDeps",
         "contractdoc",
         "ecosystem",
-        "packages",
-        "checkout",
-        "exposure",
-        "policy"
+        "packages"
       ]
     },
     "workflow-instruction": {

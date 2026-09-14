@@ -19,9 +19,8 @@
 //   `in-progress` / `not-started` / `cancelled`.
 
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 
-import { readCloneMarker, readModuleSessionMarker } from "./checkout.ts";
 import { loadConfig, verificationRoundCap } from "./config.ts";
 import {
   ACTIVITY_LOG_FILENAME,
@@ -47,7 +46,6 @@ import {
   ROW_REMEDIATED_AT_CAP,
   readRounds,
 } from "./ledger.ts";
-import { readExposure } from "./exposure.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
 import {
   OUTCOME_PASSED,
@@ -160,47 +158,10 @@ const SESSION_HEADING_RE =
   /^###\s+Session\s+(\d+)(?:\s+of\s+\d+)?\s*:\s*(.+?)\s*$/gm;
 const GENERIC_TITLE_RE = /^Session\s+(\d+)$/;
 
-/**
- * Where a session runs, as its plan section states it: a `Scope: whole
- * repository` line anywhere under the heading makes it global (the
- * repository itself), and otherwise a `Module: <slug>` line makes it
- * focused (that module's folder). Beside a `Scope:` line, a `Module:` line
- * only says which module the session is about. Bold or code marks around
- * either half are tolerated, because the plan is prose. A section that
- * says neither states no kind, and `session start` derives global from
- * that.
- */
-export interface PlannedSessionKind {
-  readonly kind: "focused" | "global";
-  /**
-   * A focused session's own module, or the one a global session is about
-   * when a `Module:` line stands beside its `Scope:` line; null otherwise.
-   */
-  readonly module: string | null;
-}
-
-// `**Module:** persister`, `Module: \`persister\``, `Module: persister` --
-// the marks may close before or after the colon, so both sides allow them.
-const SESSION_MODULE_LINE_RE =
-  /^[ \t]*[*_`]*Module[*_`]*[ \t]*:[*_`]*[ \t]*[*_`]*([A-Za-z0-9_.-]+)[*_`]*[ \t]*$/m;
-const SESSION_SCOPE_LINE_RE =
-  /^[ \t]*[*_`]*Scope[*_`]*[ \t]*:[*_`]*[ \t]*[*_`]*whole repository[*_`]*[ \t.]*$/im;
-
-/** One session section of the plan: its heading and what the section says of its kind. */
+/** One session section of the plan: its number and its title. */
 interface PlanSection {
   readonly number: number;
   readonly title: string;
-  readonly kind: PlannedSessionKind | null;
-}
-
-function kindOfSection(body: string): PlannedSessionKind | null {
-  const moduleLine = SESSION_MODULE_LINE_RE.exec(body);
-  const scopeLine = SESSION_SCOPE_LINE_RE.exec(body);
-  // `Scope:` wins wherever it appears: a section that says both is a global
-  // session ABOUT the module -- filed under it, run in the repository.
-  if (scopeLine !== null) return { kind: "global", module: moduleLine?.[1] ?? null };
-  if (moduleLine !== null) return { kind: "focused", module: moduleLine[1] };
-  return null;
 }
 
 function planSections(planPath: string): PlanSection[] {
@@ -211,15 +172,10 @@ function planSections(planPath: string): PlanSection[] {
     return [];
   }
   const headings = [...text.matchAll(SESSION_HEADING_RE)];
-  return headings.map((match, index) => {
-    const bodyStart = (match.index ?? 0) + match[0].length;
-    const bodyEnd = headings[index + 1]?.index ?? text.length;
-    return {
-      number: Number.parseInt(match[1], 10),
-      title: match[2].trim(),
-      kind: kindOfSection(text.slice(bodyStart, bodyEnd)),
-    };
-  });
+  return headings.map((match) => ({
+    number: Number.parseInt(match[1], 10),
+    title: match[2].trim(),
+  }));
 }
 
 /**
@@ -244,24 +200,6 @@ export function extractSessionTitlesFromPlan(
           : 0
       : left[0] - right[0],
   );
-}
-
-/**
- * The kind each session's plan section states, by number; a section that
- * states none is absent. The first section for a repeated number wins, as
- * the planned rows take the first heading.
- */
-export function extractSessionKindsFromPlan(planPath: string): Map<number, PlannedSessionKind> {
-  const kinds = new Map<number, PlannedSessionKind>();
-  for (const section of planSections(planPath)) {
-    if (section.kind !== null && !kinds.has(section.number)) kinds.set(section.number, section.kind);
-  }
-  return kinds;
-}
-
-/** The kind the plan states for one session, or null where it states none. */
-export function plannedKindOf(sessionsDir: string, sessionNumber: number): PlannedSessionKind | null {
-  return extractSessionKindsFromPlan(sessionPlanPath(sessionsDir)).get(sessionNumber) ?? null;
 }
 
 /**
@@ -1656,10 +1594,6 @@ export function buildProjection(
       ? Math.trunc(options.stalledAfterSeconds)
       : stalledAfterSeconds(repoRoot);
   const movedAt = lastActivityAt(sessionsDir, repoRoot, view["currentSession"]);
-  // Read once per projection: the plan says where each session runs, and a
-  // registered row that carries a checkout says it for itself.
-  const planKinds = extractSessionKindsFromPlan(sessionPlanPath(sessionsDir));
-
   const sessionsOut: Record<string, unknown>[] = [];
   for (const entry of viewSessions) {
     if (!isRecord(entry)) continue;
@@ -1693,10 +1627,6 @@ export function buildProjection(
       ...(Array.isArray(entry["modules"]) && entry["modules"].length > 0
         ? { modules: [...(entry["modules"] as string[])] }
         : {}),
-      ...sessionKindMembers(
-        entry["checkout"],
-        Number.isInteger(number) ? planKinds.get(number as number) ?? null : null,
-      ),
       tasks: [] as unknown[],
       tasksRefused: null as string | null,
       // The rounds ledger folded for reading at planning time, for every
@@ -1764,7 +1694,6 @@ export function buildProjection(
       startedAt: null,
       completedAt: null,
       verificationVerdict: null,
-      ...sessionKindMembers(null, planKinds.get(row["number"] as number) ?? null),
       tasks: [] as unknown[],
       tasksRefused: null,
       verification: null,
@@ -1822,77 +1751,9 @@ export function buildProjection(
       forceClosed: Boolean(view["forceClosed"]),
       orchestrator: view["orchestrator"] ?? null,
       invariantViolation,
-      // What the in-flight session's checkout holds of its siblings. Null
-      // is the ordinary answer: a single-module repository has no siblings,
-      // and a session that has not started has no manifest.
-      exposure: exposureForProjection(repoRoot, view["currentSession"] ?? null),
-      // The module whose focused folder this root is, or null in the
-      // repository itself. A launcher reads it beside the next session's
-      // kind: a focused session starts only in its own module's folder, and
-      // a global one only in the repository.
-      checkoutModule: repoRoot === null ? null : (readCloneMarker(repoRoot)?.slug ?? null),
-      // The focused session running in a module's folder while this root
-      // is the repository: the only thing the repository knows of it is
-      // the marker, and the repository's own rows would otherwise say
-      // nothing is happening.
-      focusedSession: focusedSessionOf(repoRoot),
     },
     sessions: sessionsOut,
   };
-}
-
-function focusedSessionOf(
-  repoRoot: string | null,
-): { session: number; module: string; folder: string } | null {
-  const marker = repoRoot === null ? null : readModuleSessionMarker(repoRoot);
-  if (marker === null || typeof marker.session !== "number" || typeof marker.module !== "string") return null;
-  return { session: marker.session, module: marker.module, folder: basename(String(marker.path ?? "")) };
-}
-
-/**
- * The module a session's row says it is checked out in, or null: for a
- * session in a multi-module solution that is the whole difference between
- * focused and global, and both the driver and the close read it here.
- */
-export function checkoutModuleOf(sessionsDir: string, sessionNumber: number): string | null {
-  const rows = readSessionState(sessionsDir)?.["sessions"];
-  for (const row of Array.isArray(rows) ? rows : []) {
-    if (!isRecord(row)) continue;
-    if (Number(row["number"]) !== sessionNumber) continue;
-    const checkout = row["checkout"];
-    if (!isRecord(checkout)) return null;
-    const module = checkout["module"];
-    return typeof module === "string" && module.trim() !== "" ? module.trim() : null;
-  }
-  return null;
-}
-
-/**
- * A session row's `kind` and `module`: from the checkout `session start`
- * wrote on the row when there is one (focused, in that module), else from
- * what the plan states -- a global session carries the module it is about
- * when its section names one -- else nothing, so a single-module
- * repository's rows project exactly what they always have.
- */
-function sessionKindMembers(
-  checkout: unknown,
-  planned: PlannedSessionKind | null,
-): { kind?: "focused" | "global"; module?: string } {
-  const checkoutModule = isRecord(checkout) ? checkout["module"] : null;
-  if (typeof checkoutModule === "string" && checkoutModule.trim() !== "") {
-    return { kind: "focused", module: checkoutModule.trim() };
-  }
-  if (planned === null) return {};
-  return planned.module !== null ? { kind: planned.kind, module: planned.module } : { kind: planned.kind };
-}
-
-function exposureForProjection(repoRoot: string | null, current: unknown): unknown {
-  if (repoRoot === null || typeof current !== "number") return null;
-  try {
-    return readExposure(repoRoot, current);
-  } catch {
-    return null;
-  }
 }
 
 // `repr(x)` for the values that reach an invariant message. It lives beside

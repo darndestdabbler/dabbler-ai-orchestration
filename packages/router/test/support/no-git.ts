@@ -42,7 +42,6 @@ import { basename } from "node:path";
  */
 const WALKTHROUGHS: readonly string[] = [
   "walk-bootstrap.test.ts",
-  "walk-checkout.test.ts",
   "walk-git-states.test.ts",
   "walk-impact.test.ts",
   "walk-jobs.test.ts",

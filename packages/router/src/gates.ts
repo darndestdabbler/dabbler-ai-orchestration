@@ -48,11 +48,10 @@ import {
 import type { RouterConfig } from "./config.ts";
 import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
 import { EcosystemError, ecosystemOf } from "./ecosystem.ts";
-import { readRun, suitesOwedElsewhere } from "./driver.ts";
+import { readRun } from "./driver.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
-import { readExposure } from "./exposure.ts";
-import { type PackageReferenceFact, candidatesFromRecord, judgeExposure, judgePins } from "./land.ts";
+import { type PackageReferenceFact, candidatesFromRecord, judgePins } from "./land.ts";
 import { ManifestError, type ModuleEntry, consumersOf, solutionShape } from "./modules.ts";
 import {
   type ImpactPlan,
@@ -121,9 +120,8 @@ export const EVIDENCE_GATES: ReadonlySet<string> = new Set([
   "verification_clean",
   "verdict_vocabulary",
   GATE_PUBLISHED_WHEN_RELEASABLE,
-  // The wall and the pins are evidence of what landed, not bookkeeping.
+  // The pins are evidence of what landed, not bookkeeping.
   "pins_current",
-  "exposure_within_ceiling",
 ]);
 
 /** One gate's row: the name, the answer, and what to do about a `false`. */
@@ -788,7 +786,6 @@ export function checkTestRunFresh(
     demandedByPlan(
       evaluateFreshness(sessionsDir, null, loaded.suites, { driven }),
       planForGate(sessionsDir),
-      inFlight ? suitesOwedElsewhere(readRun(root, current)) : new Set(),
     ),
   );
 }
@@ -800,7 +797,7 @@ function planForGate(sessionsDir: string): ImpactPlan | null {
   return readImpactPlan(root, current);
 }
 
-// --- pins_current and exposure_within_ceiling ---------------------------------------
+// --- pins_current -----------------------------------------------------------------
 
 /**
  * Every consumer on the candidate's pin, and pinning nowhere else. Read for
@@ -866,44 +863,6 @@ export function checkPinsCurrent(sessionsDir: string): Check {
   }
   const refusal = judgePins({ candidates, pins, references });
   return refusal === null ? [true, ""] : [false, refusal];
-}
-
-/**
- * The wall held: the closing exposure manifest shows nothing of a sibling
- * that nobody signed for, and nothing changed outside the scope. Read for a
- * module session's manifest; a session with none -- a single-module
- * solution, or a session not started on a module -- has no wall to measure
- * and the row says so.
- */
-export function checkExposureWithinCeiling(sessionsDir: string): Check {
-  const root = repoRootFor(sessionsDir);
-  const current = currentSession(sessionsDir);
-  if (root === null || typeof current !== "number") return [true, "no session in flight: no exposure to measure", true];
-  const manifest = readExposure(root, current);
-  if (manifest === null) {
-    // No manifest is either a single-module repository or a global session
-    // of a multi-module one, and the row says which: a global session is
-    // the whole repository, and its close runs no exposure gate.
-    let multi = false;
-    try {
-      multi = solutionShape(root).multi;
-    } catch {
-      multi = false;
-    }
-    return [
-      true,
-      multi
-        ? "a global session: the whole repository, no wall to measure"
-        : "no exposure manifest: not a module session, so there is no wall to measure",
-      true,
-    ];
-  }
-  const refusal = judgeExposure(manifest);
-  if (refusal !== null) return [false, refusal];
-  // Held, and what the wall let through is said beside the row: the
-  // manifest records it, the row names it, nothing refuses on it.
-  const noted = manifest.siblingBytes ?? [];
-  return [true, noted.length === 0 ? "" : `held; noted, not refused: ${noted.join("; ")}`];
 }
 
 // --- published_when_releasable ------------------------------------------------
@@ -1061,7 +1020,6 @@ export const GATE_CHECKS: readonly (readonly [string, Predicate])[] = [
   ["pushed_to_remote", checkPushedToRemote],
   ["test_run_fresh", checkTestRunFresh],
   ["pins_current", checkPinsCurrent],
-  ["exposure_within_ceiling", checkExposureWithinCeiling],
   [GATE_PUBLISHED_WHEN_RELEASABLE, checkPublishedWhenReleasable],
   ["verdict_vocabulary", checkVerdictVocabulary],
 ];

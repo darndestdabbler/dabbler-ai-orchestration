@@ -89,25 +89,14 @@ dabbler bootstrap --print-decomposition-prompt
 
 A solution is declared as modules in `docs/modules.yaml` — a slug, a kind,
 the code roots it owns, and the siblings it depends on. `dabbler modules
-create` writes one and `dabbler modules show` reads them back. The reason
-to bother is what it does to a session: a session whose plan section says
-`Module: <slug>` runs **focused**, in a git-enabled partial checkout of
-that module built for the session and discarded after — its own source,
-its siblings' contracts and packages, and not their code. The engine then
-reads a codebase the size of the work rather than the size of the
-repository.
+create` writes one and `dabbler modules show` reads them back. A
+session's plan section may name the modules it touches with
+`Module: <slug>` — as many as it touches, or none — and every session
+runs in the repository itself.
 
-That wall is measured, not assumed: a focused session writes an exposure
-manifest and the close runs the `exposure_within_ceiling` gate over it. A
-session that cannot proceed without a sibling's source asks with `dabbler
-session next --request-grant <slug> --reason <why>` and waits for the
-answer; it never takes it. A session that must change two modules is
-declared **global** at the start and runs in the repository itself.
-
-The verbs for one module are `dabbler module contract | pack | open |
-preflight | grant | revoke`. A single-module repository needs none of
-this: with no manifest the repository is one implicit module and every
-session is global.
+The verbs for one module are `dabbler module contract | pack`. A
+single-module repository needs none of this: with no manifest the
+repository is one implicit module.
 
 ## 2. Start a session
 

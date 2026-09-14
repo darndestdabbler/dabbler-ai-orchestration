@@ -36,10 +36,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeF
 import { dirname, join, relative } from "node:path";
 
 import {
-  type SuiteScope,
-  anyTestFileUnder,
   checkRunGreen,
-  loadTestScopes,
   makeCheck,
   materialPaths,
   timeoutFor,
@@ -86,7 +83,6 @@ import {
 import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
 import { hasProjectFile } from "./ecosystem.ts";
-import { clearModuleSessionMarker, contractDir, readCloneMarker, readModuleSessionMarker } from "./checkout.ts";
 import {
   type LandFacts,
   type LandModuleFact,
@@ -97,9 +93,7 @@ import {
   receiptCorrespondence,
 } from "./land.ts";
 import { readRecords as readCorrespondence } from "./packages.ts";
-import { ExposureError, makeGrant } from "./exposure.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
-import { readPolicy } from "./policy.ts";
 import { BUILT_IN_ENGINES, builtInEngine, engineAliases } from "./engines.ts";
 import type { Engine, EngineOutcome, EngineOutput } from "./engines.ts";
 import {
@@ -125,7 +119,7 @@ import type {
 import { type Job, endJob, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
 import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
 import { tryWriteProjection } from "./projection.ts";
-import { ManifestError, type SolutionShape, moduleConfigs, solutionShape } from "./modules.ts";
+import { ManifestError, type SolutionShape, contractDirFor, moduleConfigs, solutionShape } from "./modules.ts";
 import {
   type ImpactPlan,
   candidatePathsAsWritten,
@@ -154,7 +148,7 @@ import {
   readPackaging,
   readRounds,
 } from "./ledger.ts";
-import { checkoutModuleOf, readSessionState, sessionDisplayNumber, stalledAfterSeconds } from "./progress.ts";
+import { readSessionState, sessionDisplayNumber, stalledAfterSeconds } from "./progress.ts";
 import {
   EXIT_BOUNDARY,
   EXIT_GATE_FAILED,
@@ -220,8 +214,6 @@ export interface DriveOptions {
   /** Overrides `driver.max_invocations`; a re-run past a budget stop passes a larger one. */
   readonly maxInvocations?: number | null;
   readonly transport?: string | null;
-  /** `--focused` / `--global`, handed to the registration; null lets the plan say. */
-  readonly kind?: "focused" | "global" | null;
 }
 
 /** What `dabbler session next` takes: no adapter, because there is no engine to invoke. */
@@ -232,9 +224,6 @@ export interface NextOptions {
   readonly model?: string | null;
   readonly effort?: string | null;
   readonly transport?: string | null;
-  /** In a module session: ask the operator for this sibling's source, and wait on the answer. */
-  readonly requestGrant?: string | null;
-  readonly reason?: string | null;
   /**
    * How long this call waits on a running job before it answers `wait`; not
    * at all when absent. The CLI passes `WAIT_IN_CALL_MS`. A walkthrough whose
@@ -314,12 +303,9 @@ export function planModulesMember(shape: SolutionShape): string {
   if (!shape.multi) return "";
   const slugs = shape.modules.map((entry) => entry.slug).join(", ");
   return (
-    "This solution declares more than one module, so one further member is required:\n" +
+    "This solution declares more than one module, so one further member is optional:\n" +
     '  modules     the module(s) this session works in, by slug from docs/modules.yaml: ' +
-    `["<slug>"]. Declared here: ${slugs}. The declaration is refused without it.\n` +
-    "  reason      why this session must change more than one module -- required exactly " +
-    "when `modules` names two or more, because a cross-module session is rare and the " +
-    "reason is what makes it reviewable.\n"
+    `["<slug>", ...]. Declared here: ${slugs}. Name as many as the work touches, or leave it out.\n`
   );
 }
 
@@ -899,15 +885,8 @@ export function judgeRegistration(facts: RegistrationFacts): RegistrationOutcome
  * a real one; this is the only instruction that can honestly name none, and a
  * reader that treats 0 as a session will find no record for it.
  */
-/**
- * The module whose focused checkout the session runs in, from its ledger
- * row, or null for a session that was not started with `--module`. The
- * plan is judged against it: the checkout holds that module and no other.
- */
-/** The module(s) a session is on: the checkout's, else the declaration's, else none. */
+/** The module(s) a session's declaration names, or none. */
 function sessionModulesOf(sessionsDir: string, sessionNumber: number): string[] {
-  const checkout = checkoutModuleOf(sessionsDir, sessionNumber);
-  if (checkout !== null) return [checkout];
   const rows = readSessionState(sessionsDir)?.["sessions"];
   for (const row of Array.isArray(rows) ? rows : []) {
     if (typeof row !== "object" || row === null || Array.isArray(row)) continue;
@@ -917,29 +896,6 @@ function sessionModulesOf(sessionsDir: string, sessionNumber: number): string[] 
     return Array.isArray(modules) ? modules.map(String).filter((slug) => slug.trim() !== "") : [];
   }
   return [];
-}
-
-/**
- * Which module's session owes a reached suite instead of this checkout, or
- * null when the suite runs here. Only in a focused folder, only for a
- * suite of another module, and only when none of that suite's test roots
- * holds a test file on this disk -- a suite that declares no test roots
- * cannot be judged and runs as it always did.
- */
-export function suiteOwedElsewhere(
-  repoRoot: string,
-  suite: { readonly name: string; readonly module?: string | null },
-  plan: ImpactPlan | null,
-  scopes: readonly SuiteScope[],
-): string | null {
-  if (plan === null || !plan.multi) return null;
-  const marker = readCloneMarker(repoRoot);
-  if (marker === null) return null;
-  const owner = suite.module ?? null;
-  if (owner === null || owner === marker.slug) return null;
-  const scope = scopes.find((entry) => entry.suite === suite.name);
-  if (scope === undefined || scope.roots.length === 0) return null;
-  return scope.roots.some((root) => anyTestFileUnder(join(repoRoot, root), scope.glob)) ? null : owner;
 }
 
 export function idleInstruction(now: string): DriverInstruction {
@@ -1180,7 +1136,6 @@ class Driver {
         provider: this.options.provider ?? null,
         model: this.options.model ?? null,
         effort: this.options.effort ?? null,
-        kind: this.options.kind ?? null,
       });
       if (code !== EXIT_OK) return code;
     }
@@ -1823,15 +1778,11 @@ class Driver {
       plan = readWorkPlan(this.repoRoot, this.sessionNumber);
       if (plan !== null) {
         // The schema accepted it; the solution's shape may not. A plan that
-        // names an undeclared module, or two modules with no reason, is
+        // names an undeclared module is
         // handed back with the shape's own words, and the file is removed
         // so the next answer is judged afresh rather than re-read.
         const planReasons = [
-          ...judgeWorkPlanModules(
-            plan,
-            solutionShape(this.repoRoot),
-            checkoutModuleOf(this.sessionsDir, this.sessionNumber),
-          ).map((reason) => refusal(RULE.planModules, reason)),
+          ...judgeWorkPlanModules(plan, solutionShape(this.repoRoot)).map((reason) => refusal(RULE.planModules, reason)),
           ...judgeWorkPlanNonGoals(plan).map((reason) => refusal(RULE.planNonGoals, reason)),
           ...judgeWorkPlanHold(plan).map((reason) => refusal(RULE.planHold, reason)),
         ];
@@ -1882,7 +1833,6 @@ class Driver {
         holdReason: plan.hold_release ?? null,
         sessionNumber: this.sessionNumber,
         modules: shape.multi ? (plan.modules ?? null) : null,
-        reason: plan.reason ?? null,
         onRefusal: (message, cause) => {
           refused.message = message;
           refused.cause = cause;
@@ -1966,20 +1916,6 @@ class Driver {
   }
 
   /**
-   * The allowed list, on the first step of a module session's plan and on
-   * nothing else: handed to the engine before it can hit the wall, because
-   * an engine that knows what it may read rarely meets a denial at all.
-   * Null where the session has no policy -- a one-module solution, or a
-   * global session, whose declaration names modules as what it is about
-   * and never as a wall -- and on every later step, which the engine
-   * reaches knowing it.
-   */
-  private scopeForStep(spec: StepSpec): readonly string[] | null {
-    if (!spec.fromPlan || this.requirePlan().steps[0]?.id !== spec.id) return null;
-    return readPolicy(this.repoRoot, this.sessionNumber)?.allowed ?? null;
-  }
-
-  /**
    * The plan's non-goals under every step's ask, so the author holds them
    * during the work and not only before it. A step asked before a plan is
    * accepted -- there is none -- carries nothing.
@@ -1990,18 +1926,10 @@ class Driver {
     return `\n\nNon-goals of this session, which the reviewer holds the work to: ${nonGoals.join("; ")}`;
   }
 
-  private stepAsk(spec: StepSpec, rejected: boolean, scoped = false): string {
+  private stepAsk(spec: StepSpec, rejected: boolean): string {
     return (
       spec.ask +
       this.nonGoalsLine() +
-      (scoped
-        ? "\n\nThis instruction's `scope` member lists what this session may read and change: " +
-          "its module's roots, its contract folder and its dependencies', the root build files " +
-          "and the sessions directory; `dabbler session scope` prints the list again. The other " +
-          "modules are here as packages and contract folders, not source. If the work cannot be " +
-          "done without a sibling's source, ask with `dabbler session next --request-grant <slug> " +
-          "--reason <why>` and wait for the answer; never take it."
-        : "") +
       "\n\nWhen the step is done, report with the answer command. --files names every " +
       "file you created, changed or deleted in this step and nothing else -- a deleted " +
       "file is a change to name. Use --status blocked only if the step cannot be done, " +
@@ -2081,13 +2009,11 @@ class Driver {
       // the step that was refused, forever. Re-read by id; a step the plan
       // no longer declares keeps the spec it was issued with.
       spec = this.amendedSpec(spec);
-      const scope = this.scopeForStep(spec);
       const instruction = await this.converse({
         kind: reasons.length > 0 ? "rejection" : "step",
         step_id: spec.id,
-        ask: this.stepAsk(spec, reasons.length > 0, scope !== null),
+        ask: this.stepAsk(spec, reasons.length > 0),
         ...(reasons.length > 0 ? { reasons } : {}),
-        ...(scope !== null ? { scope } : {}),
         answer_schema: REPORT_SCHEMA,
         answer_command: this.answerCommand("step", spec.id),
       });
@@ -2776,7 +2702,6 @@ class Driver {
       }
     }
     const reached = plan === null ? null : new Set(plan.suites.map((suite) => suite.name));
-    const scopes = loadTestScopes(this.config).scopes;
     const suites = this.expensiveSuites();
     // Said, rather than left to a gate's N/A: a reader of the record could
     // not otherwise tell a suite that was skipped from one that was green.
@@ -2786,24 +2711,6 @@ class Driver {
     for (const suite of suites) {
       if (reached !== null && !reached.has(suite.name)) {
         this.log("run-of-record-skipped", { suite: suite.name, reason: "not reached by the impact plan" });
-        continue;
-      }
-      // A focused folder holds its own module's tests and no sibling's: a
-      // reached suite whose tests are not here is owed to its module's own
-      // session, never run and failed into a fix step nobody can do.
-      const owedTo = suiteOwedElsewhere(this.repoRoot, suite, plan, scopes);
-      if (owedTo !== null) {
-        this.log("run-of-record-skipped", { suite: suite.name, reason: "tests-not-on-disk", module: owedTo });
-        // On the session's own run, where the freshness gate reads it: the
-        // close here must not demand a record that cannot exist here.
-        this.run = {
-          ...this.run,
-          suites_owed_elsewhere: [
-            ...(this.run.suites_owed_elsewhere ?? []).filter((row) => row.suite !== suite.name),
-            { suite: suite.name, module: owedTo },
-          ],
-        };
-        this.save();
         continue;
       }
       const jobName = `run of record: ${suite.name}`;
@@ -2930,7 +2837,7 @@ class Driver {
         // rule, read by both through `hasProjectFile`.
         if (!hasProjectFile(this.repoRoot, entry)) continue;
         const record = records.filter((row) => row.package === entry.package && row.session === this.sessionNumber).at(-1);
-        const contract = `${contractDir(slug)}/`;
+        const contract = `${contractDirFor(slug)}/`;
         modules.push({
           slug,
           package: entry.package,
@@ -2971,10 +2878,7 @@ class Driver {
     if (refusal !== null) {
       throw new Stop("land", `the tree is not the tree the run of record tested: ${refusal}`);
     }
-    // `--sparse`, so a focused checkout lands what the full checkout would:
-    // a file outside the cone (the engine's settings under `.claude/`) is
-    // otherwise left behind untracked, and the clone stays dirty.
-    runGit(this.repoRoot, ["add", "-A", "--sparse", "--", "."]);
+    runGit(this.repoRoot, ["add", "-A", "--", "."]);
     // Two `-m`s: git joins them with the blank line a subject and a body
     // are separated by, and quotes nothing on the way.
     const committed = runGit(this.repoRoot, ["commit", "-m", message.subject, "-m", message.body]);
@@ -3527,45 +3431,6 @@ export async function driveSession(sessionsDir: string, options: DriveOptions): 
  * that one is about an answer that is not getting better.
  */
 export async function sessionNext(sessionsDir: string, options: NextOptions): Promise<number> {
-  // A module session works in its focused clone, and the full checkout it
-  // was started from keeps a marker saying so. While that session is in
-  // flight there, a `next` here would advance nothing and register nothing
-  // -- it is refused by name, with the place to run it. A marker whose
-  // session has closed, or whose clone is gone, has said all it had to.
-  const fullCheckout = repoRootFromSessionsDir(sessionsDir);
-  const marker = readModuleSessionMarker(fullCheckout);
-  if (marker !== null) {
-    const inFlight =
-      existsSync(marker.path) &&
-      readSessionState(marker.sessionsDir)?.["currentSession"] === marker.session;
-    if (inFlight) {
-      writeErr(
-        `next: refused -- session ${sessionDisplayNumber(marker.session)} works in module ` +
-          `'${marker.module}'s focused checkout at ${marker.path}; run it there: ` +
-          `dabbler session next --sessions-dir ${marker.sessionsDir}\n`,
-      );
-      return EXIT_BOUNDARY;
-    }
-    clearModuleSessionMarker(fullCheckout);
-  }
-  // In a module session's clone, a grant the engine asks for here is made
-  // at once and recorded with its reason: nothing waits on a person, and
-  // the permanent form is printed beside it.
-  const current = readSessionState(sessionsDir)?.["currentSession"];
-  if (typeof current === "number" && readCloneMarker(fullCheckout) !== null && options.requestGrant) {
-    try {
-      const shape = solutionShape(fullCheckout);
-      const made = makeGrant(fullCheckout, shape, current, options.requestGrant, options.reason ?? "");
-      writeErr(
-        `dabbler: granted -- the checkout now holds module '${made.grant.sibling}'s source, ` +
-          `recorded with the reason. ${made.permanentForm}\n`,
-      );
-    } catch (error) {
-      if (!(error instanceof ExposureError)) throw error;
-      writeErr(`next: refused -- ${error.message}\n`);
-      return EXIT_BOUNDARY;
-    }
-  }
   let instruction: DriverInstruction | null = null;
   const code = await divertOut(() =>
     withDriver(

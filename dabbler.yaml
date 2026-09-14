@@ -75,7 +75,7 @@ testing:
     # `<command> packages/router/test/x.test.ts` is one more pattern (D116).
     #
     # The `--import` preload is part of the run of record. Git is spawned by
-    # the eight `walk-*` files and nowhere else: every other test feeds git's
+    # the seven `walk-*` files and nowhere else: every other test feeds git's
     # answers through `journal.setGitSource` (test/support/answers.ts), and
     # `test/support/no-git.ts` fails a worker outside a walkthrough the
     # moment it spawns git, naming the test file. That seam made each storm
@@ -542,11 +542,9 @@ testing:
           - packages/router/test/copilot.test.ts
           - packages/router/test/engines.test.ts
           # `materialPaths` lives here too -- what in a porcelain status is
-          # the operator's work -- and its readers are walked against real
-          # repositories: the close's states, and the clone the focused
-          # checkout refuses to reset over somebody's changes.
+          # the operator's work -- and its readers are walked against a real
+          # repository: the close's states.
           - packages/router/test/walk-git-states.test.ts
-          - packages/router/test/walk-checkout.test.ts
       - when: packages/router/src/testEvidence.ts
         select:
           - packages/router/test/testEvidence.test.ts
@@ -597,7 +595,6 @@ testing:
           - packages/router/test/ecosystem.test.ts
           - packages/router/test/contractdoc.test.ts
           - packages/router/test/packages.test.ts
-          - packages/router/test/exposure.test.ts
           - packages/router/test/land.test.ts
           - packages/router/test/gates.test.ts
       # Committed immutable packages: the dev version, the central pin and
@@ -605,22 +602,6 @@ testing:
       - when: packages/router/src/packages.ts
         select:
           - packages/router/test/packages.test.ts
-      # The focused checkout: the cone derived from the manifest, and the
-      # disposable clone narrowed to it.
-      - when: packages/router/src/checkout.ts
-        select:
-          - packages/router/test/checkout.test.ts
-          - packages/router/test/walk-checkout.test.ts
-      # The exposure manifest: what a module session's checkout holds of its
-      # siblings, the grants in force, and what changed outside the scope.
-      - when: packages/router/src/exposure.ts
-        select:
-          - packages/router/test/exposure.test.ts
-      # The policy: what a module session may touch, written once when its
-      # modules reach the record, and the decision the hooks read it through.
-      - when: packages/router/src/policy.ts
-        select:
-          - packages/router/test/policy.test.ts
       # The impact plan: what a change reaches, computed once for the
       # selector, the run of record and the close gate.
       - when: packages/router/src/impact.ts

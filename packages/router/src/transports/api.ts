@@ -96,17 +96,40 @@ function isTimeout(error: unknown): boolean {
 }
 
 /**
+ * The provider's own words for a failure: the string fields of its body's
+ * `error` member (OpenAI's code and type, Anthropic's type, Gemini's status,
+ * and each one's message), bounded. Never the body itself, which can echo
+ * the request headers. Empty when the body names nothing.
+ */
+export function providerErrorWords(body: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return "";
+  }
+  const error = isRecord(parsed) ? parsed["error"] : null;
+  if (!isRecord(error)) return "";
+  const words = ["code", "type", "status", "message"]
+    .map((key) => error[key])
+    .filter((value): value is string => typeof value === "string" && value.trim() !== "");
+  return [...new Set(words)].join(": ").slice(0, 300);
+}
+
+/**
  * `raise_for_status()` then `.json()`.
  *
- * The URL and the status, and never the body: a vendor error body can echo
- * the request headers, and this string reaches operator-visible output.
+ * The URL, the status and the provider's own words for the failure: a 429
+ * that is an exhausted credit balance reads as a transient rate limit
+ * without them. The words and never the body, which can echo the request
+ * headers, because this string reaches operator-visible output.
  */
 async function readJson(response: Response, url: string): Promise<Json> {
   if (!response.ok) {
-    // Drain the body so the socket is released; nothing reads it.
-    await response.text().catch(() => "");
+    const words = providerErrorWords(await response.text().catch(() => ""));
     throw new HttpStatusError(
-      `HTTP ${response.status} ${response.statusText} for url '${url}'`,
+      `HTTP ${response.status} ${response.statusText} for url '${url}'` +
+        (words === "" ? "" : `: ${words}`),
     );
   }
   const data: unknown = await response.json();

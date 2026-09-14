@@ -41,7 +41,7 @@ export type SessionsSessionRecord = {
    */
   modules?: string[];
   /**
-   * The focused checkout a module session runs in: the module, and the clone's absolute path on the machine that registered it. Written by `session start --module` for a multi-module solution only; absent on every other row. A path is machine state and this is the one place the ledger carries one, because the clone is where the session's own record lives.
+   * Retired with the focused checkout: `session start --module` wrote the module and the clone's path, and nothing writes or reads it now. Kept optional so a row recorded before the retirement is still read.
    */
   checkout?: {
     module: string;

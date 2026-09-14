@@ -51,15 +51,13 @@ in sessions 113, 115 and 116.
 
 **Re-walked on 8 September 2026** for everything an operator touches —
 set-up, the manifest, bootstrap, the POM, the first pack and its
-`.gitignore`, the pin, the plan's `Module:` line, a real focused
-registration, `mvn -B test` inside the focused checkout, and the re-open of a
-kept folder. That walk did not re-run the AI's own work, and it found ten
+`.gitignore`, the pin and the plan's `Module:` line. That walk did not re-run the AI's own work, and it found ten
 product defects and eight document errors across both walkthroughs;
 `docs/uat/uat-walk-findings.md` is its record. What you are reading is the
 corrected version, with each surviving gap labelled in the register it
 belongs to.
 
-**Where your findings are worth most now:** step 10 — the second and third
+**Where your findings are worth most now:** step 9 — the second and third
 modules, a module consuming a sibling as a package, and running the loader
 twice. The consumer side of a Maven solution has still never been driven by a
 session.
@@ -258,9 +256,8 @@ Maven module publishes through its own lifecycle.
 ## Step 2 — Give the repository a remote
 
 - **No framework register —** a gap the **framework** should close, at
-  set-up. The land runs a bare `git push`, the close reads
-  `pushed_to_remote`, and a focused checkout is cloned *from the origin*, so
-  the first session can neither start nor close without one. The URL is the
+  set-up. The land runs a bare `git push` and the close reads
+  `pushed_to_remote`, so the first session cannot close without one. The URL is the
   one parameter Dabbler cannot determine, which is a prompt rather than four
   lines of shell. Walk finding 5.
 - **No UI register —** and it is the framework's rather than the UI's, for
@@ -302,16 +299,12 @@ Maven module publishes through its own lifecycle.
 
 **The CLI form carries two values the button does not ask for**, and they are
 the two a module cannot work without: the **code root** and the **package**.
-A module made from New Module's four answers refuses both of the operations
-that make it a module:
+A module made from New Module's four answers refuses the operation that makes
+it a module:
 
 ```
 dabbler module pack model
   -> module pack: refused -- module 'model' declares no package; give it one in docs\modules.yaml
-
-dabbler session start --sessions-dir docs/sessions --engine claude-code --provider anthropic
-  -> start: refused -- module 'model' declares the repository root as a code root;
-     a focused checkout of everything is the full checkout, so open the repository itself
 ```
 
 That is walk finding 1 — the **UI**'s to close with two more prompts, or the
@@ -370,8 +363,7 @@ Create `modules\model\pom.xml` with exactly this:
 
 **Three things about this file are load-bearing. Copy it exactly.**
 
-1. It has a `<parent>` reached by `relativePath`. That is how a focused
-   checkout holding only this module still builds.
+1. It has a `<parent>` reached by `relativePath`.
 2. It has **no `<version>` of its own**. The version comes from the parent's
    `${revision}`.
 3. `${revision}` is what `dabbler module pack` replaces with the dev version.
@@ -569,11 +561,9 @@ Write the session plan first — copy the whole `docs\sessions\session-plan.md`
 block from `docs/uat/uat-dotnet-json-solution.md` step 4, which includes the
 simplicity rule and the `**Module:**` line under each session heading.
 
-**That `Module:` line is load-bearing.** It is what makes each session
-*focused* — run in that module's own folder, with the other modules present
-as packages and contract folders rather than source. Dabbler reads it, the
-Work Explorer's yet-to-run rows say `focused: model`, and Start Session needs
-no further question.
+**That `Module:` line names the module each session touches.** A section may
+name every module its session touches, or none, and every session runs in the
+repository you opened.
 
 **The simplicity rule is not decoration either.** A different AI model checks
 each session's work and does not share your intentions. Without the rule
@@ -583,8 +573,9 @@ and the session argues with itself for rounds.
 **If you skip the commit, the next step refuses:**
 
 ```
-start: refused -- the working tree carries N change(s) (...); the module's clone is
-       made from the origin, so commit and push them before starting the session
+start: refused -- session 1 cannot declare its task list now: the working tree already
+         carries N change(s) (...). The declaration comes before the work -- one made after
+         it is a model deciding in hindsight what may be published. Commit or revert, then declare.
 ```
 
 ---
@@ -592,13 +583,9 @@ start: refused -- the working tree carries N change(s) (...); the module's clone
 ## Step 8 — Run session 1
 
 - **Framework —** at registration it pulls your checkout forward from
-  `origin/master`, reads the plan's `Module: model` line, decides the session
-  is **focused**, makes the module's own folder by cloning the origin into
-  it, writes the exposure manifest there, and registers session 001 in that
-  folder's ledger. You do not run `module open` first — the registration is
-  what makes the folder.
-- **You —** in the Solution Explorer, **Dabbler: Start Focused Session in a New Window** on
-  the `model` row. Two prompts:
+  `origin/master` and registers session 001 in the repository's ledger.
+- **You —** in the Work Explorer, **Dabbler: Start Session** on the
+  repository row or on session 1's row. Two prompts:
   *`Start session — which engine runs it?`* — pick `Claude Code`
   (`anthropic`) or `GitHub Copilot` (`openai — a seat also needs a
   model`). Those two are what Start launches: an engine whose CLI has not
@@ -606,22 +593,19 @@ start: refused -- the working tree carries N change(s) (...); the module's clone
   session next` in a terminal of your own instead.
   *`Start session — model for <engine>`* — blank for the engine's default;
   on a seat, the model, e.g. `gpt-5.4`.
-  The module's window opens with the AI's terminal running and the opening
-  sentence typed. From the repository row, **Dabbler: Start Session** does
-  the same when the next session is focused, and **Dabbler: Resume Session**
-  brings the terminal back if you lose it.
+  The AI's terminal opens running, with the opening sentence typed.
+  **Dabbler: Resume Session** brings the terminal back if you lose it.
 - **Underneath —**
   ```
   dabbler session start --sessions-dir docs/sessions --engine claude-code --provider anthropic
   dabbler session next --sessions-dir docs/sessions
   ```
 
-**Expect the start to say where it put the session:**
+**Expect the start to say it registered the session:**
 
 ```
 start: pulled from origin/master (git pull --ff-only) before registering.
-start: session 001 of sessions registered (claude-code) in module 'model's focused
-       checkout at C:\temp\uat-java.model; the exposure manifest is written there.
+start: session 001 of sessions registered (claude-code).
 ```
 
 **Then the AI keeps running `dabbler session next` until it answers `done`.**
@@ -630,58 +614,14 @@ calls `next` again itself; nothing notifies it and no timer runs. What tells
 **you** the call is not being made is the Dabbler terminal's silence watcher
 and the Work Explorer's attention row.
 
-**Do not press Start Focused Session in a New Window again while it runs.** It refuses over
-`docs/sessions/sessions.json` — the ledger the framework itself just wrote —
-and tells you to commit or discard it. Do neither: that file is the router's
-and never yours. Walk finding 4.
-
 ---
 
-## Step 9 — Check the checkout the session is working in
-
-- **Framework —** it made this folder at the registration and wrote the
-  exposure manifest into it, and at the **close** it will push from here and
-  pull your repository forward (`git pull --ff-only`) so the window you
-  started in sees the session closed. You no longer run that pull yourself —
-  unless your repository holds uncommitted changes, in which case the close
-  prints the command for you to run instead.
-- **You —** **Dabbler: Open Module** on a module row opens the same folder
-  without starting anything, for when you want to look at a module rather
-  than work in one.
-- **Underneath —**
-  ```
-  dir C:\temp\uat-java.model\modules
-  type C:\temp\uat-java.model\.mvn\maven.config
-  mvn -B test
-  ```
-
-**Expect** the first to show only `model` — the siblings are here as their
-contracts and their packages, never as source; the second to contain exactly
-
-```
--f
-modules/model/pom.xml
-```
-
-and the third to build and exit `0` from the folder's root, because that
-config file tells Maven which POM to use and it resolves
-`com.example:json-model` out of `packages\` rather than compiling it.
-
-**Expect the folder to stay clean after the build**, because step 5's
-`.gitignore` rule keeps `target/` out of it. The one thing `git status` shows
-is `docs/sessions/sessions.json`, the ledger — see step 8's last paragraph.
-
----
-
-## Step 10 — Repeat for the other two modules
+## Step 9 — Repeat for the other two modules
 
 - **Framework —** as step 8, once per module: the plan's `Module:` line for
-  session 2 is `store` and for session 3 is `app`, so each start makes that
-  module's folder and registers there. The folder is kept between sessions —
-  a clean one is fetched and reset, a dirty one is refused by name, and
-  nothing is ever deleted.
-- **You —** **Dabbler: Start Focused Session in a New Window** on the `store` row, then on
-  the `app` row when session 2 has closed; **Dabbler: Pack Module** on each
+  session 2 is `store` and for session 3 is `app`.
+- **You —** **Dabbler: Start Session** on session 2's row, then on session
+  3's row when session 2 has closed; **Dabbler: Pack Module** on each
   when its session is done.
 - **Underneath —** the same two commands as step 8, per module.
 
@@ -691,7 +631,7 @@ near the end.
 
 ---
 
-## Step 11 — Run what you built
+## Step 10 — Run what you built
 
 - **No framework register —** running the program you built to see whether it
   works is a **person's** judgement, and the last thing that should be
@@ -723,7 +663,7 @@ plain ones, which is also the honest shape for a solution this size.
 For each step: whether the expected output matched, and if not, exactly what
 you saw. **Say which register was wrong** — the framework did something it
 was not said to do, a button was not where it was said to be, or the command
-underneath did not match what the button ran. Steps 10 and 11 are the ones
+underneath did not match what the button ran. Steps 9 and 10 are the ones
 nobody has run against Maven yet, so detail there is worth most.
 
 ## Known issues — do not report these as new
@@ -733,7 +673,6 @@ in `docs/uat/uat-walk-findings.md` with its reproduction.
 
 - **New Module asks four of a module's six values** (step 3). Finding 1.
 - **Bootstrap does not commit the modules manifest** (step 7). Finding 2.
-- **Re-opening a module refuses over `sessions.json`** (step 8). Finding 4.
 - **Nothing in the UI sets the remote or the upstream** (steps 2 and 7).
   Finding 5.
 - **Troubleshoot runs no toolchain checks** (prerequisites). Finding 6.

@@ -62,15 +62,15 @@ export type ProgressProjectionRepository = {
    */
   invariantViolation: string | null;
   /**
-   * The in-flight session's exposure manifest -- what its working directory holds of its sibling modules, the grants in force and what changed outside its scope -- or null for a single-module repository, a session with none, or nothing in flight.
+   * Retired with the focused checkout: nothing projects it now.
    */
   exposure?: ProgressProjectionExposure | null;
   /**
-   * The module whose focused folder this root is, by slug, or null in the repository itself. A launcher reads it beside the next session's kind: a focused session starts only in its own module's folder, a global one only in the repository, and a start anywhere else is refused by name.
+   * Retired with the focused checkout: nothing projects it now.
    */
   checkoutModule?: string | null;
   /**
-   * The focused session running in a module's folder while this root is the repository, from the module-session marker: which session, which module, and the folder's name. Null in the module's own folder, in a single-module repository, and when nothing is in flight elsewhere.
+   * Retired with the focused checkout: nothing projects it now.
    */
   focusedSession?: {
     session: number;
@@ -217,11 +217,11 @@ export type ProgressProjectionSession = {
    */
   modules?: string[];
   /**
-   * Where the session runs: 'focused' in one module's own folder, 'global' in the repository itself. From the checkout `session start` wrote on the row when there is one, else from the plan's `Module: <slug>` or `Scope: whole repository` line under the session's heading. Absent where neither says -- every row of a single-module repository.
+   * Retired with the focused checkout: nothing projects it now, and the Work Explorer lists sessions by status.
    */
   kind?: "focused" | "global";
   /**
-   * The module a session is filed under, by slug: a focused session's own, or the one a global session's plan section names beside its `Scope: whole repository` line. Present on every focused row, and on a global row only when its section names one.
+   * Retired with the focused checkout's session kind: nothing projects it now.
    */
   module?: string;
   /**

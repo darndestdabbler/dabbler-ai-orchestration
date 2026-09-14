@@ -580,45 +580,22 @@ suite("the session from its registration, and each step as it starts", () => {
     return { root, written, terminal };
   }
 
-  test("says the banner and the kind line from the in-progress ledger row, before any run record, and once", () => {
-    // A focused session: the row carries the checkout `start --module`
-    // wrote, and the policy says what it may touch.
-    const focused = registeredRepo({ checkout: { module: "persister", path: "C:/work/Shop.persister" } });
-    fs.mkdirSync(path.join(focused.root, ".dabbler", "runs", "s7"), { recursive: true });
-    fs.writeFileSync(
-      path.join(focused.root, ".dabbler", "runs", "s7", "policy.json"),
-      JSON.stringify({ allowed: ["modules/persister", "modules/model/contract", "docs"] }),
-      "utf8",
-    );
-    // Wide enough that the kind line is not wrapped under its indent.
-    focused.terminal.open({ columns: 160, rows: 20 });
-    focused.terminal.poll();
-    const said = plain(focused.written.join(""));
+  test("says the banner from the in-progress ledger row, before any run record, and once", () => {
+    const registered = registeredRepo({});
+    registered.terminal.open({ columns: 80, rows: 20 });
+    registered.terminal.poll();
+    const said = plain(registered.written.join(""));
     assert.ok(said.includes("SESSION 007"), said);
-    assert.ok(
-      said.includes("focused module=persister scope=modules/persister, modules/model/contract, docs"),
-      said,
-    );
     // The run record arriving for the same session adds no second banner.
-    const driver = path.join(focused.root, ".dabbler", "runs", "s7", "driver");
+    const driver = path.join(registered.root, ".dabbler", "runs", "s7", "driver");
     fs.mkdirSync(path.join(driver, "jobs"), { recursive: true });
     writeRun(driver, { session_number: 7, phase: "plan", job: null, stop: null });
-    focused.terminal.poll();
-    const all = plain(focused.written.join(""));
+    registered.terminal.poll();
+    const all = plain(registered.written.join(""));
     assert.strictEqual(all.split("SESSION 007").length - 1, 1, all);
-    assert.strictEqual(all.split("focused module=persister").length - 1, 1, all);
-    focused.terminal.dispose();
-    rmrf(focused.root);
-
-    // A global session: no checkout on the row, and the whole repository.
-    const global = registeredRepo({});
-    global.terminal.open({ columns: 80, rows: 20 });
-    global.terminal.poll();
-    const globalSaid = plain(global.written.join(""));
-    assert.ok(globalSaid.includes("SESSION 007"), globalSaid);
-    assert.ok(globalSaid.includes("global scope=the whole repository"), globalSaid);
-    global.terminal.dispose();
-    rmrf(global.root);
+    assert.ok(!all.includes("global scope="), all);
+    registered.terminal.dispose();
+    rmrf(registered.root);
   });
 
   test("says a step once when seq moves onto it, a rejection with its first reason, and nothing for a wait", () => {

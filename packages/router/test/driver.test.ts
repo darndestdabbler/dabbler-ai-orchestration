@@ -233,39 +233,31 @@ describe("the four answer schemas", () => {
     assert.throws(() => validateWorkPlan({ ...PLAN, non_goals: [] }), /non_goals/);
   });
 
-  it("a plan's modules are judged against the solution's shape: declared slugs, a reason for two, nothing for one", () => {
+  it("a plan's modules are judged against the solution's shape: declared slugs, any number or none, nothing for one", () => {
     const shape = (multi: boolean, ...slugs: string[]) =>
       ({ multi, implicit: false, modules: slugs.map((slug) => ({ slug })) }) as unknown as Parameters<
         typeof judgeWorkPlanModules
       >[1];
     const many = shape(true, "model", "persister", "listener");
     const plan = validateWorkPlan(PLAN);
-    // Two modules without a reason is refused; with one, accepted.
-    const two = { ...plan, modules: ["model", "persister"] };
-    assert.match(judgeWorkPlanModules(two, many)[0] ?? "", /names 2 modules .* and gives no reason/);
-    assert.deepEqual(judgeWorkPlanModules({ ...two, reason: "the model's contract changed" }, many), []);
-    // An undeclared slug is refused by name; one module needs no reason.
+    // Two modules need no reason.
+    assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["model", "persister"] }, many), []);
+    // An undeclared slug is refused by name.
     assert.match(judgeWorkPlanModules({ ...plan, modules: ["ghost"] }, many)[0] ?? "", /module 'ghost', which docs\/modules\.yaml does not declare/);
     assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["persister"] }, many), []);
-    // No checkout in a multi-module solution is a global session -- the
-    // whole repository -- whose plan names any declared modules or none.
+    // A multi-module plan may name no module: the whole repository.
     assert.deepEqual(judgeWorkPlanModules(plan, many), []);
-    // A session in a module's focused checkout names that module and no
-    // other: the checkout is the authority, whatever reason a second module
-    // is given.
-    assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["persister"] }, many, "persister"), []);
-    assert.match(
-      judgeWorkPlanModules({ ...two, reason: "the model's contract changed" }, many, "persister")[0] ?? "",
-      /runs in module 'persister's focused checkout.*names 'persister' and nothing else/,
-    );
-    assert.match(judgeWorkPlanModules({ ...plan, modules: ["model"] }, many, "persister")[0] ?? "", /focused checkout/);
-    assert.match(judgeWorkPlanModules(plan, many, "persister").join(" "), /focused checkout/);
     // A single-module solution: absent is right, its own module is
     // tolerated, another name is refused.
     const one = shape(false, "csv-model");
     assert.deepEqual(judgeWorkPlanModules(plan, one), []);
     assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["csv-model"] }, one), []);
     assert.match(judgeWorkPlanModules({ ...plan, modules: ["other"] }, one)[0] ?? "", /single-module/);
+  });
+
+  it("reads a run the focused checkout wrote, suites owed elsewhere and all", () => {
+    const recorded = { ...RUN, suites_owed_elsewhere: [{ suite: "listener-against-persister", module: "listener" }] };
+    assert.equal(validateRun(recorded).phase, RUN.phase);
   });
 
   it("a disposition fixes or rejects, and a rejection carries its evidence", () => {

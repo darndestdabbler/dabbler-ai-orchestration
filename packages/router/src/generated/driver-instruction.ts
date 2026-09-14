@@ -42,7 +42,7 @@ export type DriverInstruction = {
    */
   log?: string;
   /**
-   * On the first `step` of a module session's plan, and on its rejections: the repository-relative paths the session may read and change -- its module's roots, its own contract folder and its dependencies', the root build files, the sessions directory -- as the session's policy states them. A sibling module's implementation is not among them and is reached through its contract folder. Absent on every other instruction and in a single-module solution; `dabbler session scope` prints the same list on demand.
+   * Retired with the focused checkout: nothing writes it now. Kept optional so an instruction recorded before the retirement is still read.
    */
   scope?: string[];
   /**

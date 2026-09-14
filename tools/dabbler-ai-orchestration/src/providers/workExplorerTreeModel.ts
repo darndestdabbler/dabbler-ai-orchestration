@@ -37,11 +37,8 @@ import {
 } from "./ActionRegistry";
 import {
   ICON_FILES,
-  moduleOf,
   progressText,
-  sessionKindLabel,
   sessionRowLabel,
-  sessionsHere,
   sessionsInOrder,
   verdictIsUnclean,
 } from "./sessionsModel";
@@ -59,7 +56,6 @@ import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 export type WorkExplorerNode =
   | RepositoryNode
   | BucketNode
-  | ModuleGroupNode
   | SessionNode
   | VerificationNode
   | FindingNode
@@ -89,19 +85,6 @@ export interface BucketNode {
   readonly bucket: BucketKey;
   readonly sessions: readonly SessionRecord[];
   readonly notes: readonly AttentionNode[];
-}
-
-/**
- * A module's sessions inside one lifecycle bucket: the level that appears
- * between a bucket and its sessions once the record names modules, and
- * never for a single-module solution.
- */
-export interface ModuleGroupNode {
-  readonly kind: "moduleGroup";
-  readonly repository: SessionsRepository;
-  readonly bucket: BucketKey;
-  readonly module: string;
-  readonly sessions: readonly SessionRecord[];
 }
 
 export interface SessionNode {
@@ -200,7 +183,7 @@ function bucketFor(session: SessionRecord): SessionStatus {
  * why RepositoryNode reports itself collapsible only when it has sessions.
  */
 export function bucketNodes(node: RepositoryNode): BucketNode[] {
-  const ordered = sessionsInOrder(sessionsHere(node.repository));
+  const ordered = sessionsInOrder(node.repository.sessions);
   const notes = informationNodes(node);
   const buckets: BucketNode[] = [];
   for (const spec of BUCKETS) {
@@ -239,51 +222,6 @@ export function sessionNodes(node: BucketNode): SessionNode[] {
   }));
 }
 
-/**
- * A bucket's sessions grouped under their module, when the record names
- * one -- a multi-module solution, whose sessions are each on a module. The
- * groups read in order of first appearance within the bucket's own order,
- * and a session that runs on the repository rather than a module sits under
- * the bucket after the groups. A repository whose rows name none -- a
- * single-module solution -- is grouped by nothing and reads exactly as it
- * always has.
- *
- * A module's own checkout shows only its own sessions, so the one group
- * would restate the folder's name at every level: there, they read flat.
- */
-export function moduleGroupNodes(node: BucketNode): (ModuleGroupNode | SessionNode)[] {
-  if (node.repository.checkoutModule !== null) return sessionNodes(node);
-  if (!node.sessions.some((session) => moduleOf(session) !== null)) return sessionNodes(node);
-  const groups = new Map<string, SessionRecord[]>();
-  const ungrouped: SessionRecord[] = [];
-  for (const session of node.sessions) {
-    const slug = moduleOf(session);
-    if (slug === null) {
-      ungrouped.push(session);
-      continue;
-    }
-    const members = groups.get(slug);
-    if (members === undefined) groups.set(slug, [session]);
-    else members.push(session);
-  }
-  return [
-    ...[...groups.entries()].map(
-      ([module, sessions]): ModuleGroupNode => ({
-        kind: "moduleGroup",
-        repository: node.repository,
-        bucket: node.bucket,
-        module,
-        sessions,
-      }),
-    ),
-    ...ungrouped.map((session): SessionNode => ({ kind: "session", repository: node.repository, session })),
-  ];
-}
-
-/** A module group's sessions, in the bucket's order. */
-export function moduleGroupSessionNodes(node: ModuleGroupNode): SessionNode[] {
-  return node.sessions.map((session) => ({ kind: "session", repository: node.repository, session }));
-}
 
 /**
  * The third level: the in-flight session's tasks, exactly as the
@@ -390,9 +328,7 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
       // reason they opened the view, and it reads first.
       return [...attentionNodes(node), ...bucketNodes(node)];
     case "bucket":
-      return node.bucket === "information" ? [...node.notes] : moduleGroupNodes(node);
-    case "moduleGroup":
-      return moduleGroupSessionNodes(node);
+      return node.bucket === "information" ? [...node.notes] : sessionNodes(node);
     case "session":
       // What stopped it, above what it was doing: the verification row,
       // then the tasks.
@@ -470,7 +406,6 @@ export function hasToken(contextValue: string, token: string): boolean {
 export const NODE_TOKEN = {
   repository: "dabblerRepository",
   bucket: "dabblerBucket",
-  moduleGroup: "dabblerModuleGroup",
   session: "dabblerSession",
   verification: "dabblerVerification",
   finding: "dabblerFinding",
@@ -552,9 +487,6 @@ export function repositoryTooltip(repository: SessionsRepository): string {
     // the message says which. The label must not claim the first.
     markers.push(`Record fault: ${repository.invariantViolation}`);
   }
-  if (repository.focusedSession) {
-    markers.push(focusedSessionText(repository.focusedSession));
-  }
   if (repository.forceClosed) {
     markers.push("A session here closed via the --force bypass, not the gate.");
   }
@@ -576,16 +508,6 @@ export function repositoryTooltip(repository: SessionsRepository): string {
   return lines.join("\n");
 }
 
-/**
- * What the repository's own window says of a focused session running in a
- * module's folder: the session, and the folder to look in. Without it the
- * repository's rows say nothing is happening, which is what the proof of
- * 2026-09-08 saw.
- */
-function focusedSessionText(focused: { session: number; module: string; folder: string }): string {
-  return `focused session ${String(focused.session).padStart(3, "0")} running in ${focused.folder}`;
-}
-
 export function repositoryDescriptor(node: RepositoryNode): RowDescriptor {
   const { repository } = node;
   const tokens: string[] = [NODE_TOKEN.repository];
@@ -597,9 +519,7 @@ export function repositoryDescriptor(node: RepositoryNode): RowDescriptor {
     // two rows, and only the path tells them apart.
     id: `repository:${repository.root}`,
     label: repository.label,
-    description: repository.focusedSession
-      ? `${progressText(repository)} · ${focusedSessionText(repository.focusedSession)}`
-      : progressText(repository),
+    description: progressText(repository),
     tooltip: repositoryTooltip(repository),
     // The repository row is structural. Lifecycle glyphs belong to the
     // session rows rather than competing with the repository's name, and
@@ -671,17 +591,12 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
     // distinguishes the two and it has to be on the row. A finished session
     // carries the date it closed, so "when was that done" is read at a
     // glance rather than from the tooltip.
-    // A session yet to run also says where it will run -- `focused:
-    // persister` or `global` -- when the plan says, so the kind is read
-    // from the row before the start rather than discovered by a refusal.
     description:
       session.status === "in-progress"
         ? "in flight"
         : session.status === "planned"
-          ? ["planned", sessionKindLabel(session)].filter(Boolean).join(" · ")
-          : session.status === "not-started"
-            ? sessionKindLabel(session) ?? closeDateLabel(session.completedAt)
-            : closeDateLabel(session.completedAt),
+          ? "planned"
+          : closeDateLabel(session.completedAt),
     tooltip: sessionTooltip(node),
     icon: sessionIcon(session.iconKey),
     contextValue: tokenString(tokens),
@@ -1051,8 +966,6 @@ export function descriptorFor(node: WorkExplorerNode): RowDescriptor {
       return repositoryDescriptor(node);
     case "bucket":
       return bucketDescriptor(node);
-    case "moduleGroup":
-      return moduleGroupDescriptor(node);
     case "attention":
       return attentionDescriptor(node);
     case "session":
@@ -1178,24 +1091,7 @@ export function attentionNodes(node: RepositoryNode): AttentionNode[] {
 export function informationNodes(node: RepositoryNode): AttentionNode[] {
   const repository = node.repository;
   const rows: AttentionNode[] = [];
-  // What this folder does NOT show, said once. A checkout that has finished
-  // its module's work would otherwise render an empty tree, which reads as a
-  // broken view rather than as work that belongs somewhere else.
-  const slug = repository.checkoutModule;
-  if (slug !== null) {
-    const hidden = repository.sessions.length - sessionsHere(repository).length;
-    if (hidden > 0) {
-      rows.push({
-        kind: "attention",
-        repository,
-        subject: "unresolved",
-        label: `${hidden} session${hidden === 1 ? "" : "s"} run outside this checkout`,
-        detail: `This folder runs ${slug}'s sessions; open the repository for the rest.`,
-        urgent: false,
-      });
-    }
-  }
-  for (const session of sessionsInOrder(sessionsHere(repository)).reverse()) {
+  for (const session of sessionsInOrder(repository.sessions).reverse()) {
     const view = session.verification;
     if (!view || view.clean || !view.terminal) continue;
     if (session.status === "in-progress") continue;
@@ -1255,21 +1151,6 @@ export function bucketDescriptor(node: BucketNode): RowDescriptor {
   };
 }
 
-/** A module's sessions in a bucket: the slug, and how many of them. */
-export function moduleGroupDescriptor(node: ModuleGroupNode): RowDescriptor {
-  const count = node.sessions.length;
-  return {
-    id: `module:${node.repository.root}/${node.bucket}/${node.module}`,
-    label: node.module,
-    description: String(count),
-    tooltip: `**${node.module}**\n\n${count} session${count === 1 ? "" : "s"} on this module`,
-    icon: { kind: "theme", id: "package" },
-    contextValue: tokenString([NODE_TOKEN.moduleGroup, `module-${node.module}`]),
-    // Open where the work is: the live bucket's groups read expanded, as
-    // the bucket itself does; a finished module folds.
-    collapsible: node.bucket === "in-progress" ? "expanded" : "collapsed",
-  };
-}
 
 /** An attention row, which is a leaf and carries no menu of its own. */
 export function attentionDescriptor(node: AttentionNode): RowDescriptor {

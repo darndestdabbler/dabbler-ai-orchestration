@@ -39,7 +39,6 @@ import {
   report,
   restore,
   start,
-  sessionScope,
   callerIsEngine,
 } from "../session.ts";
 import { writeErr, writeOut } from "./output.ts";
@@ -51,7 +50,6 @@ const SUMMARY: Record<string, string> = {
   declare: "declare the session's task list and releasability",
   next: "advance the session one move and print the instruction to answer",
   run: "drive the in-flight session to done in one command, identity from the record",
-  scope: "print what the session in flight may read and change: its module scope, one path per line",
   drive: "run the next session end to end: the framework drives, the engine answers",
   interrupt: "end the engine's running invocation under a driven session, with a reason",
   rebaseline: "record a repair made while the run was stopped, and move the baseline",
@@ -85,15 +83,6 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           the model registry rather than the seat label",
     "  --effort EFFORT          optional reasoning effort, recorded with the identity",
     "  --total-sessions N       optional; the ledger otherwise grows to the plan",
-    "  --focused                run in one module's own folder; the default when the",
-    "                           plan's section says `Module: <slug>` in a multi-module",
-    "                           solution, and refused where there is nothing to focus on",
-    "  --global                 run in the repository itself, no wall; the default",
-    "                           otherwise. A global session writes no exposure manifest",
-    "                           and no policy, and its close runs no exposure gate",
-    "  --module SLUG            the focused session's module, where the plan does not",
-    "                           say or to agree with what it says; a session that must",
-    "                           change two modules is global",
   ],
   decision: [
     "  --decider WHO            required: operator | orchestrator | verifier | framework",
@@ -112,15 +101,10 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           the session ships once it is verified",
     "  --module SLUG            the module this session works in (repeatable);",
     "                           for a multi-module solution only",
-    "  --reason TEXT            why the session must change more than one module;",
-    "                           required with two or more --module",
   ],
   next: [
     "  --transport T            the verification transport, as `dabbler verify` takes it;",
     "                           kept on the run, so naming it again changes it",
-    "  --request-grant SLUG     in a module session: ask the operator for the sibling's",
-    "                           source (with --reason); answers a wait on the decision",
-    "  --reason TEXT            why the session needs it; recorded with the request",
     "",
     "  `session start --engine ... --provider ...` registers a session; `next` never",
     "  does. It advances the one in flight, carrying no identity -- the record holds",
@@ -132,12 +116,6 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  its `ask` says, run its `answer_command`, then call this again -- until it says",
     "  `done`. A `wait` means the framework is running something long: leave it",
     "  `retry_after_seconds`, read its `log` if you like, and call this again.",
-  ],
-  scope: [
-    "  Takes no options. Prints the module scope of the session in flight, one",
-    "  repository-relative path per line: the list the first step instruction carried",
-    "  as `scope`. A sibling module's implementation is not in it and is reached through",
-    "  its contract folder. A session of a single-module solution has none, and says so.",
   ],
   run: [
     "  --show-engine MODE       stream | quiet, for a registered built-in engine",
@@ -153,8 +131,6 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --provider PROVIDER      anthropic | openai | google; required for a fresh registration",
     "  --model MODEL            required for a Copilot seat",
     "  --effort EFFORT          optional reasoning effort, recorded with the identity",
-    "  --focused | --global     where the session runs, as `session start` takes them;",
-    "                           the plan's section says which when neither is passed",
     '  --engine-argv "PROG A B" the command invoked once per instruction instead of the',
     "                           engine's own CLI; {instruction} in any element is the",
     "                           instruction's path, and DABBLER_DRIVER_INSTRUCTION carries",
@@ -273,23 +249,8 @@ const SWITCHES = new Set([
   "--dry-run",
   "--force",
   "--stop",
-  "--focused",
-  "--global",
 ]);
 
-/**
- * `--focused` / `--global` as `start` and `drive` take them: one, the other,
- * or neither -- both is refused, because the plan cannot be overridden two
- * ways at once.
- */
-function kindFlag(switches: ReadonlySet<string>, verb: string): "focused" | "global" | null | string {
-  const focused = switches.has("--focused");
-  const global = switches.has("--global");
-  if (focused && global) {
-    return `dabbler session ${verb}: --focused and --global contradict each other; pass one, or neither and let the plan say`;
-  }
-  return focused ? "focused" : global ? "global" : null;
-}
 const REPEATABLE_MODULE = "--module";
 
 /** The flag three verbs once required, and the sentence that says why they no longer take it. */
@@ -529,19 +490,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(`dabbler session start: ${totalSessions}\n`);
       return EXIT_USAGE;
     }
-    if (parsed.modules.length > 1) {
-      writeErr(
-        "dabbler session start: one --module per start -- a session runs in ONE module's " +
-          "focused clone, and its plan names that module and no other; a session that must " +
-          "change two modules is global, started without --module\n",
-      );
-      return EXIT_USAGE;
-    }
-    const kind = kindFlag(switches, "start");
-    if (kind !== null && kind !== "focused" && kind !== "global") {
-      writeErr(`${kind}\n`);
-      return EXIT_USAGE;
-    }
     return await start(sessionsDir, {
       engine,
       provider: values.get("--provider") ?? null,
@@ -549,8 +497,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       effort: values.get("--effort") ?? null,
       sessionNumber,
       totalSessions,
-      module: parsed.modules[0] ?? null,
-      kind,
     });
   }
 
@@ -559,25 +505,14 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(`dabbler session next: ${CAP_NOT_TYPEABLE}\n`);
       return EXIT_USAGE;
     }
-    const requestGrant = values.get("--request-grant") ?? null;
-    if (requestGrant !== null && (values.get("--reason") ?? "").trim() === "") {
-      writeErr("dabbler session next: --request-grant needs --reason; the reason is recorded\n");
-      return EXIT_USAGE;
-    }
     return sessionNext(sessionsDir, {
       engine: values.get("--engine") ?? null,
       provider: values.get("--provider") ?? null,
       model: values.get("--model") ?? null,
       effort: values.get("--effort") ?? null,
       transport: values.get("--transport") ?? null,
-      requestGrant,
-      reason: values.get("--reason") ?? null,
       waitInCallMs: WAIT_IN_CALL_MS,
     });
-  }
-
-  if (subcommand === "scope") {
-    return sessionScope(sessionsDir);
   }
 
   if (subcommand === "run") {
@@ -639,11 +574,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       }
       adapter = built;
     }
-    const kind = kindFlag(switches, "drive");
-    if (kind !== null && kind !== "focused" && kind !== "global") {
-      writeErr(`${kind}\n`);
-      return EXIT_USAGE;
-    }
     return driveSession(sessionsDir, {
       engine,
       provider: values.get("--provider") ?? null,
@@ -653,7 +583,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       engineOutput: (showEngine as EngineOutput | undefined) ?? null,
       maxInvocations,
       transport: values.get("--transport") ?? null,
-      kind,
     });
   }
 
@@ -793,7 +722,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     holdReason,
     sessionNumber,
     modules: parsed.modules,
-    reason: values.get("--reason") ?? null,
   });
 }
 

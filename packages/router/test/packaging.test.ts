@@ -410,13 +410,14 @@ describe("a release that is a tag", () => {
 
   const TAG_CONFIG = () => makeConfig({ packaging: { release: "tag" } });
 
-  it("refuses, and names the verb, while the tag is not on origin", () => {
+  it("makes the tag when origin has none, and records published", () => {
+    // Nobody is asked: a session ships unless its plan held it, and the
+    // publish phase makes the tag itself once the session verified and landed.
     const { sessionsDir, restore } = taggable();
     try {
       const run = packageSession(sessionsDir, { config: TAG_CONFIG() });
-      assert.equal(run.outcome, OUTCOME_REFUSED);
-      assert.match(String(run.refusal), new RegExp(`vsix-v${RELEASING}`));
-      assert.match(String(run.refusal), /dabbler release/);
+      assert.equal(run.outcome, OUTCOME_PUBLISHED, String(run.refusal));
+      assert.deepEqual(run.artifacts, [`vsix-v${RELEASING}`]);
     } finally {
       restore();
     }

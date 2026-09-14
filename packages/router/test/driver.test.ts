@@ -31,6 +31,7 @@ import {
   validateReport,
   validateWorkPlan,
   judgeWorkPlanModules,
+  judgeWorkPlanHold,
   judgeWorkPlanNonGoals,
   watcherReading,
   writeDispositions,
@@ -70,7 +71,6 @@ const PLAN = {
   schema_version: 1,
   session_number: 1,
   task: "Make the widget real.",
-  releasable: false,
   non_goals: ["Anything the step does not name."],
   steps: [
     {
@@ -208,6 +208,17 @@ describe("the four answer schemas", () => {
         }),
       /declares step 'widget' twice/,
     );
+  });
+
+  it("a plan holds its release with a reason or ships, and never says releasable", () => {
+    // A session ships unless held; the hold is declared before the work and
+    // carries the one reason. An older plan's `releasable` is read as recorded.
+    assert.equal(validateWorkPlan({ ...PLAN, hold_release: "session 2 lands the consumer" }).hold_release, "session 2 lands the consumer");
+    assert.equal(validateWorkPlan(PLAN).hold_release, undefined);
+    assert.throws(() => validateWorkPlan({ ...PLAN, hold_release: "" }), /hold_release/);
+    // A blank hold passes the schema and is refused at acceptance instead.
+    assert.match(judgeWorkPlanHold({ ...validateWorkPlan(PLAN), hold_release: "  " })[0] ?? "", /hold_release/);
+    assert.deepEqual(judgeWorkPlanHold(validateWorkPlan(PLAN)), []);
   });
 
   it("a plan names at least one non-goal, and the refusal names the member", () => {

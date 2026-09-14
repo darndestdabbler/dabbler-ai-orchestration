@@ -204,7 +204,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 164 | What the framework wrote is not the step's | no | 2026-09-13 |
 | 165 | The small things, and the walk | yes | 2026-09-13 |
 | 166 | The cap, the non-goals, and the sentence | no | 2026-09-14 |
-| 167 | Ship by default, and the one question that goes | — | not declared |
+| 167 | Ship by default, and the one question that goes | yes | 2026-09-14 |
 | 168 | Nothing is owed | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -2378,3 +2378,17 @@ Session 166 raises the verification round cap to 7 and makes the work plan carry
 - 2026-09-14 — step 'cap-is-seven': its files: the fallback constant is the same number as the shipped setting; two numbers for one cap drift (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-14 — step 'non-goals-in-the-plan': its files: the member is judged at acceptance in driver.ts beside the modules judge, so a recorded plan is read as recorded; drive.test.ts and triage.test.ts build steps, not plans (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-14 — step 'the-words': its checks: doc-paths refuses the placeholder paths this document has always carried; the check is that the sentences exist (claude-code (anthropic, claude-fable-5-1))
+
+### Session 167 — Ship by default, and the one question that goes
+
+**Releasable: yes.**
+
+Session 167 makes a session ship by default. A hold with a reason replaces the releasable boolean: the work plan's optional `hold_release` names what the work waits on and a plan without it publishes, `session declare` takes `--hold-release "<reason>"` in place of `--releasable`/`--not-releasable`, and the declaration record carries the hold's reason. No publish without a verdict: a session whose last verification round is not VERIFIED runs no publish job and the close's gate row says the verdict held it. The publication question goes: `raisePublicationDecision` and `publication:<version>` are deleted, `dabbler release` tags without an answer and `--reask` goes with it, and a tag release makes its tag inside the packaging run instead of refusing until a person runs the verb -- the CI environment's own approval is the one consent the framework cannot and does not remove. `session withdraw-release` and its record are deleted: a session that must not ship is a session with a hold, declared before the work. `published_when_releasable` reads the hold and the verdict and refuses a session with neither and no published row. The words follow in the managed body, the docs and the README, and the session releases 2.7.0 as a minor: the first session released under its own rule.
+
+**Amended after acceptance:**
+
+- 2026-09-14 — step 'hold-in-the-plan': its files: the playwright spec passes the plan helper a releasable it no longer takes; drive.test.ts builds steps, not plans (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'declare-takes-a-hold': its files: the in-process router and its contract pass the declare flags too; session.test.ts types no flag (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'no-publish-without-a-verdict': its files: the one test lives beside the releasability tests in session.test.ts, which already holds the fixture; gates.test's rows are pure (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'the-question-goes': its files: the withdrawal's record lived in ledger.ts and the driver's skip reason named it; the git fake learns tag; gates.test and bootstrap.test needed nothing (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-14 — step 'the-words': its files and checks: the words met a rule that had to be made true first: a repository that declares no packaging has nothing to publish, so declare holds the session and says so; the schema reference carries the word withdraw in an unrelated row (claude-code (anthropic, claude-fable-5-1))

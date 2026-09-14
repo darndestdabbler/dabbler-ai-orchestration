@@ -16,9 +16,13 @@ export type DriverWorkPlan = {
    */
   task: string;
   /**
-   * Whether the session may publish, decided here before any edit -- the same rule `session declare` enforces on a typed session.
+   * An older plan's member, read as it was recorded and never written now: a plan says `hold_release` or nothing, and a session ships unless held.
    */
-  releasable: boolean;
+  releasable?: boolean;
+  /**
+   * The one reason this session publishes nothing: the later session, sibling module or first release's go-live the work waits on. Absent, the session ships -- once new or fixed functionality can be delivered, it is delivered. Declared here, before the work, and never decided afterwards.
+   */
+  hold_release?: string;
   /**
    * What this session will NOT do: the exclusions its section of the session plan states, or the nearest concrete boundary of the task where it states none. Judged at acceptance, where a plan without at least one is refused naming the member -- an engine that cannot name one has not understood the scope -- and the reviewer holds the work to the list. Optional here so that a plan recorded before the member existed is read as it was recorded: the record is never refused after the fact.
    */

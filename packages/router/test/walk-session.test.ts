@@ -91,7 +91,7 @@ const TESTING = {
 
 const PLAN = {
   task: "Make widget() return 2.",
-  releasable: false,
+  hold_release: "the walk ships nothing",
   non_goals: ["Anything the step does not name."],
   steps: [
     {
@@ -239,6 +239,7 @@ describe("one session, walked from next to done", () => {
     // Accepting a plan declares the session's task: the record says what this
     // session is for before any of it is done.
     assert.equal(readTaskDeclaration(sessionsDir, 1)?.["task"], PLAN.task);
+    assert.equal(readTaskDeclaration(sessionsDir, 1)?.["holdReason"], PLAN.hold_release);
     milestones.push("planned and declared");
 
     // A signoff an earlier version of `rebaseline` raised, left open on

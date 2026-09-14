@@ -139,23 +139,25 @@ one.
 ## Answering
 
 The first instruction asks for a work plan — the task in a paragraph,
-whether the session may publish, at least one non-goal (what the session
-will NOT do, which the reviewer holds the work to), and the ordered steps,
+a hold on the release only where the work must wait (`hold_release`, with
+its one reason; without it the session ships), at least one non-goal
+(what the session will NOT do, which the reviewer holds the work to), and
+the ordered steps,
 each with the files it will touch and at least one mechanical check that
 proves it. Write it as JSON somewhere outside the tracked tree and hand
 the file over:
 
 ```
 dabbler session report --sessions-dir docs/sessions --seq 1 --answer-file /tmp/plan.json
-report: session 001 seq 1 answered; work plan (1 step(s), releasable=no) written to .dabbler/runs/s1/driver/plan.json; the driver reads it next.
+report: session 001 seq 1 answered; work plan (1 step(s), ships) written to .dabbler/runs/s1/driver/plan.json; the driver reads it next.
 ```
 
 The next call accepts it, declares the session from it, and asks for the
 first step:
 
 ```
-dabbler [11:31:21] plan-accepted steps=["widget"] releasable=false
-declare: session 001 declared; releasable=no.
+dabbler [11:31:21] plan-accepted steps=["widget"] hold=null non_goals=1
+declare: session 001 declared; releasable=no; held: this repository declares no packaging, so there is nothing to publish.
 dabbler [11:31:21] phase phase=work
 dabbler [11:31:22] instruction-issued seq=2 kind=step step=widget
 ```
@@ -288,8 +290,10 @@ it inside the verification job.
 
 Three things take longer than a tool call: a verification round, the
 complete suite as the run of record, and the close — four, for a session
-that declared itself releasable, whose publish runs between the push and
-the close. (The preverify phase runs nothing: the tests that run are each
+that ships, whose publish runs between the push and the close. A session
+ships unless its plan held it, the repository declares no packaging, or
+its verdict is not VERIFIED; the close's `published_when_releasable` row
+says which. (The preverify phase runs nothing: the tests that run are each
 step's own checks and the complete suite as the run of record, and the
 Primary Reviewer reviews without writing or running one.) None
 of them runs inside a `next` call. The framework starts each one detached
@@ -563,36 +567,6 @@ for the waiver this framework does not have:
   `session start` says it — there is no `--approver`, because a name an
   engine types proves nothing — and no gate reads either. What the row
   buys is that the reason exists, beside the rounds it authorised.
-
-### The other stop with no forward exit: a releasable session that must not ship
-
-The same shape, one phase later. A session declares whether it may publish
-at step (a), before the work; `published_when_releasable` refuses a close
-where a releasable session has no packaging run on its record; and that gate
-is *evidence*, so `close --force` does not answer it either. There is no
-re-declaration — a session that could decide afterwards whether it was
-supposed to ship could always decide it had not been — so a releasable
-session whose artifact must not go out had one exit, `cancel`, which throws
-away work that verified and landed.
-
-```
-dabbler session withdraw-release --reason "<why>"
-```
-
-That records a row in
-`.dabbler/runs/s<N>/releasability-withdrawals.jsonl`, and what it does is
-narrow on purpose:
-
-- **It does not rewrite the declaration.** The declaration stands and the
-  withdrawal stands beside it, so the close *reports* a session that was
-  supposed to ship and did not, and on whose word. A session quietly
-  re-declared not-releasable would read like one that was never going to
-  publish, which is the difference the row exists to keep.
-- **It changes nothing else.** No other gate reads it. The verification
-  round, the run of record and the close judge the session on exactly the
-  evidence they would have.
-- **The reason is permanent**, beside who was working as the record from
-  `session start` says it, and one per session, ever.
 
 ## The end
 

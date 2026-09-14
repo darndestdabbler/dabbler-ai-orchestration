@@ -366,6 +366,20 @@ export function judgeWorkPlanNonGoals(plan: DriverWorkPlan): string[] {
 }
 
 /**
+ * A hold, where the plan declares one, carries its reason. The schema's
+ * `minLength` counts whitespace, and a blank hold would be recorded as a
+ * held session with nothing to say for itself -- refused here instead,
+ * beside the other judgments a schema cannot make.
+ */
+export function judgeWorkPlanHold(plan: DriverWorkPlan): string[] {
+  if (plan.hold_release === undefined || plan.hold_release.trim() !== "") return [];
+  return [
+    "the plan's `hold_release` is blank: a hold carries the one reason the session publishes " +
+      "nothing, or is left out so the session ships",
+  ];
+}
+
+/**
  * The same judgment for any declaration of modules -- the driven plan and
  * the typed `session declare --module` alike, so neither path can persist a
  * module the other would refuse. `who` names the declaration in the words

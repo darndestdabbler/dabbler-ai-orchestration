@@ -139,12 +139,13 @@ export interface PushStep {
  * reaches, and the record would say a session published when a workflow
  * did.
  *
- * **The framework's act is the tag**, and `dabbler release` is the verb
- * that makes it: it holds the version, refuses a dirty tree, and waits on
- * the operator's own `publication` decision, because a tag is the one act
- * here that cannot be taken back. The publish phase runs it and records
- * what it did. Nothing about the `published_when_releasable` gate moves --
- * it still asks for a `published` row and this still has to earn one.
+ * **The framework's act is the tag**, and the publish phase makes it once
+ * the session has verified and landed: publication is preapproved after
+ * the first release, a hold is declared before the work and never decided
+ * here, and the CI environment's own approval is the consent this
+ * framework does not remove. `dabbler release` is the same act by hand.
+ * Nothing about the `published_when_releasable` gate moves -- it still
+ * asks for a `published` row and this still has to earn one.
  */
 export interface TagRelease {
   readonly kind: "tag";
@@ -992,22 +993,39 @@ export function taggedCommit(lsRemote: string, tag: string): string | null {
 }
 
 /**
- * Step (f) where the release is a tag: the run RECORDS it, and never makes
- * it.
+ * Make the release tag and push it: the one act that publishes, done by the
+ * run once the session has verified and landed. A local tag that exists
+ * already is pushed as it is, so a run that made the tag and lost the push
+ * finishes on the next call; a push that fails takes the local tag with
+ * it, so a retry is not refused by its own half-finished attempt. Returns
+ * null when the tag is on origin, else why it is not.
+ */
+export function pushReleaseTag(root: string, tag: string): string | null {
+  const already = runGit(root, ["tag", "--list", tag]).stdout.trim() === tag;
+  if (!already) {
+    const made = runGit(root, ["tag", "-a", tag, "-m", `Release ${tag}`]);
+    if (made.code !== 0) return `could not create ${tag}: ${made.stderr.trim()}`;
+  }
+  const pushed = runGit(root, ["push", "origin", tag]);
+  if (pushed.code !== 0) {
+    if (!already) runGit(root, ["tag", "-d", tag]);
+    return `could not push ${tag}: ${pushed.stderr.trim()}`;
+  }
+  return null;
+}
+
+/**
+ * Step (f) where the release is a tag: the run makes the tag where origin
+ * has none, and records `published` once origin carries it at the commit
+ * this session landed.
  *
- * The division is the point, and it is not squeamishness. A tag push
- * publishes to everyone the moment CI sees it, and `dabbler release` is
- * where that act lives precisely so it waits on the operator's own
- * `publication` decision rather than on a phase advancing. If this ran
- * `git tag` itself, a session would publish by reaching step (f), which is
- * the opposite of what the verb was built to prevent.
- *
- * So this asks one question -- is the tag for this repository's version on
- * the remote? -- and answers it as `published` or `refused`. The refusal
- * names the verb, because the operator reading it is one command away.
- * `published_when_releasable` is untouched: it still wants a `published`
- * row, and a session that was supposed to ship and did not still cannot
- * close as one that did.
+ * A tag push publishes to everyone the moment CI sees it, and that is the
+ * rule rather than the risk: once new or fixed functionality can be
+ * delivered it is delivered, publication is preapproved after the first
+ * release, and a session that must not ship says so in its plan before
+ * the work -- never here. `published_when_releasable` is untouched: it
+ * still wants a `published` row, and a session that was supposed to ship
+ * and did not still cannot close as one that did.
  */
 function tagReleaseRun(
   sessionsDir: string,
@@ -1044,19 +1062,20 @@ function tagReleaseRun(
       gates,
     );
   }
-  const tagged = taggedCommit(onRemote.stdout, tag);
+  let tagged = taggedCommit(onRemote.stdout, tag);
   if (tagged === null) {
-    return refusal(
-      sessionNumber,
-      true,
-      `this repository releases by tag, and ${tag} is not on origin, so ` +
-        "nothing has been published. The tag is the one act here that " +
-        "cannot be taken back, so it is not made by a phase advancing: run " +
-        "`dabbler release`, which states what would ship and waits for the " +
-        "`publication` decision (`dabbler owed list`) before it tags. Then " +
-        "resume, and this records what the tag did.",
-      gates,
-    );
+    // Not on origin: make it, at HEAD, which the land has already pushed.
+    const why = pushReleaseTag(root, tag);
+    if (why !== null) {
+      return refusal(sessionNumber, true, `${tag} is not on origin and could not be made: ${why}`, gates);
+    }
+    // The commit the tag NAMES, not HEAD: a local tag that already existed
+    // may point elsewhere, and the ancestry check below judges it.
+    const named = runGit(root, ["rev-list", "-n", "1", tag]);
+    if (named.code !== 0) {
+      return refusal(sessionNumber, true, `could not read what ${tag} names: ${named.stderr.trim()}`, gates);
+    }
+    tagged = named.stdout.trim();
   }
   // The NAME is not the evidence; the commit under it is. A session whose
   // version bump was missed still declares a version that was released

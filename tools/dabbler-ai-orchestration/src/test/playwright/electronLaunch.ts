@@ -232,7 +232,6 @@ export function writeDriverWorkPlan(
   sessionNumber: number,
   options: {
     task: string;
-    releasable: boolean;
     steps: readonly { id: string; ask: string }[];
   },
 ): void {
@@ -246,7 +245,6 @@ export function writeDriverWorkPlan(
       `  schema_version: 1,`,
       `  session_number: ${sessionNumber},`,
       `  task: body.task,`,
-      `  releasable: body.releasable,`,
       `  non_goals: ["Anything the step does not name."],`,
       `  steps: body.steps.map((s) => ({ id: s.id, ask: s.ask, files: [\`src/\${s.id}.ts\`], checks: [{ argv: ["true"] }] })),`,
       `  recorded_at: new Date().toISOString(),`,

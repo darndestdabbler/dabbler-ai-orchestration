@@ -273,38 +273,6 @@ terminal, ever; a second for the same `after_round` is refused.
 reached and is refused once a terminal row stands, because the terminal is
 read ahead of the cap and a raised number there changes nothing.
 
-## Releasability-withdrawal ledger — `.dabbler/runs/s<N>/releasability-withdrawals.jsonl`
-
-One row per operator withdrawal of a session's declared releasability,
-written **only** by `dabbler session withdraw-release`; schema-validated on
-read (`packages/router/schemas/releasability-withdrawal.schema.json`).
-
-Releasability is declared at step (a), before the work, and
-`published_when_releasable` is an **evidence** gate — so `close --force`
-cannot answer it, and there is no re-declaration, because a session that
-could decide afterwards whether it was supposed to ship could always decide
-it had not been. A releasable session that must not ship after all was
-therefore closable only by `cancel`, which throws away work that verified
-and landed. This row is the other exit.
-
-| Field | Type | Meaning |
-|---|---|---|
-| `schema_version` | integer ≥ 1 | |
-| `session_number` | integer ≥ 1 | |
-| `reason` | string | why the declared artifact must not ship — permanent, read beside the declaration it withdraws |
-| `by` | string | who was working, from the session record; **never** read as a verdict |
-| `tree_at_withdrawal` | string | the worktree snapshot at the withdrawal, when one could be taken |
-| `recorded_at` | string | timestamp |
-| `framework_version` | string | the router that recorded it |
-
-It does **not** rewrite the declaration. The declaration stands on the
-record and this stands beside it, so the close reports a session that was
-supposed to ship and did not, and on whose word — which is exactly what a
-session quietly re-declared not-releasable would not say. One per session,
-ever; a second is refused. Nothing else about the session's judgement moves:
-the verification round, the run of record and every other gate judge it as
-they would have.
-
 ## Step execution ledger — `.dabbler/runs/s<N>/step-execution.jsonl`
 
 Two rows per step of the session's approved plan — one `opened`, one
@@ -345,7 +313,7 @@ cannot be read as a history of what was released.
 |---|---|---|
 | `outcome` | `published` \| `refused` \| `failed` | `refused` means a gate said no and nothing ran; `failed` means a declared command ran and did not succeed |
 | `session_number` | integer ≥ 1 | the session that attempted it |
-| `releasable` | boolean | what step (a) declared, read from `activity-log.json`. False includes the session that never declared: `session_is_releasable` fails closed |
+| `releasable` | boolean | whether the session ships, read from `activity-log.json` and the session record: false for a session held by its plan (`holdReason` on the declaration), by a repository that declares no packaging, or by a verdict that is not VERIFIED, and for the session that never declared — `sessionIsReleasable` fails closed |
 | `refusal` | string | required when `outcome` is `refused` |
 | `feed` | string | the feed that was substituted into the command that ran, not a caption beside it |
 | `secret_name` | string | the **name** of the credential, never its value |

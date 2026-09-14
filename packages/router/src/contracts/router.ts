@@ -122,7 +122,8 @@ export interface SessionStartOptions extends RepositoryTarget {
 
 export interface SessionDeclareOptions extends RepositoryTarget {
   readonly taskFile: string;
-  readonly releasable: boolean;
+  /** The one reason the session publishes nothing; absent, it ships once verified. */
+  readonly holdRelease?: string;
 }
 
 export interface SessionCloseOptions extends RepositoryTarget {

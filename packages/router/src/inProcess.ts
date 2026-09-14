@@ -273,7 +273,7 @@ export class InProcessRouter implements Router {
           "declare",
           "--task-file",
           o.taskFile,
-          o.releasable ? "--releasable" : "--not-releasable",
+          ...(o.holdRelease ? ["--hold-release", o.holdRelease] : []),
           ...targetArgs(o),
         ],
         o.repoRoot,

@@ -72,6 +72,7 @@ import {
   readWorkPlan,
   isWorkPhase,
   judgeWorkPlanModules,
+  judgeWorkPlanHold,
   judgeWorkPlanNonGoals,
   planPath,
   takeInterrupt,
@@ -201,7 +202,7 @@ import {
   capDisputedRefusal,
   noRoundReason,
 } from "./verify/rounds.ts";
-import { readTaskDeclaration, sessionIsReleasable } from "./writers.ts";
+import { readTaskDeclaration, releasabilityOf, sessionIsReleasable } from "./writers.ts";
 
 // --- The engine --------------------------------------------------------------
 
@@ -636,6 +637,8 @@ const RULE = {
   planModules: "plan-modules",
   /** The plan names nothing it will not do. */
   planNonGoals: "plan-non-goals",
+  /** The plan holds its release with no reason. */
+  planHold: "plan-hold",
 } as const;
 
 /** One refusal, carrying the name of the rule that refused it. */
@@ -2109,7 +2112,7 @@ ${this.stopArtifacts()}`,
       "(for example .dabbler/scratch/plan.json), then run the answer command. The file " +
       "carries exactly these members and no other:\n" +
       "  task        one paragraph: what this session will do -- it becomes the declaration\n" +
-      "  releasable  true only if this session may publish an artifact; otherwise false\n" +
+      "  hold_release  optional: the ONE reason this session publishes nothing -- the later session, sibling module or first release's go-live the work waits on. Once new or fixed functionality can be delivered, it is delivered: hold only for the first release or a stated dependency, and say which. A releasing session bumps the version in the manifest as part of its work -- patch unless the change adds a capability (minor) or breaks a consumer (major) -- and its task paragraph says which\n" +
       "  non_goals   a list of at least one: what this session will NOT do -- the exclusions its section of the session plan states, or the nearest concrete boundary of the task where it states none. An engine that cannot name one has not understood the scope; the reviewer holds the work to the list\n" +
       '  steps       an ordered list; each step is {"id": "<lowercase-slug>", "ask": "<what ' +
       'to do, in words>", "files": ["<every repository-relative file the step creates or ' +
@@ -2183,6 +2186,7 @@ ${this.stopArtifacts()}`,
             checkoutModuleOf(this.sessionsDir, this.sessionNumber),
           ).map((reason) => refusal(RULE.planModules, reason)),
           ...judgeWorkPlanNonGoals(plan).map((reason) => refusal(RULE.planNonGoals, reason)),
+          ...judgeWorkPlanHold(plan).map((reason) => refusal(RULE.planHold, reason)),
         ];
         if (planReasons.length === 0) break;
         unlinkSync(planPath(this.repoRoot, this.sessionNumber));
@@ -2210,7 +2214,7 @@ ${this.stopArtifacts()}`,
     this.setRejections(0);
     this.log("plan-accepted", {
       steps: plan.steps.map((step) => step.id),
-      releasable: plan.releasable,
+      hold: plan.hold_release ?? null,
       non_goals: (plan.non_goals ?? []).length,
     });
     this.placePlannedRepositories(plan);
@@ -2227,7 +2231,8 @@ ${this.stopArtifacts()}`,
       const refused: { message: string; cause: DeclareRefusalCause } = { message: "", cause: "other" };
       const code = declare(this.sessionsDir, {
         task: plan.task,
-        releasable: plan.releasable,
+        releasable: plan.hold_release === undefined,
+        holdReason: plan.hold_release ?? null,
         sessionNumber: this.sessionNumber,
         modules: shape.multi ? (plan.modules ?? null) : null,
         reason: plan.reason ?? null,
@@ -3500,6 +3505,10 @@ ${this.stopArtifacts()}`,
     // declared not-releasable, or skips a publish the close then demands a
     // packaging row for. The plan may PROPOSE it; the declaration decides.
     if (!sessionIsReleasable(this.sessionsDir, this.sessionNumber)) {
+      const releasability = releasabilityOf(this.sessionsDir, this.sessionNumber);
+      this.log("publish-skipped", {
+        reason: releasability.hold ?? "not declared releasable",
+      });
       this.setPhase("close");
       return;
     }

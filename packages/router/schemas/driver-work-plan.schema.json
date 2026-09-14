@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "driver/plan.json (the engine's answer to \"plan this session\")",
-  "description": "The work plan a driven session runs, under .dabbler/runs/s<N>/driver/plan.json: what the session will do, whether it may publish, and the ordered steps -- each with an id, the files it expects to touch, and at least one check that proves it. The driver declares the session from `task` and `releasable`, then issues the steps one at a time and measures each report against its step. A check is argv, never a shell string, and the driver runs it rather than reading it: code and tests are compiled and run, never interpreted. Validated before it is written; a file that fails validation on read is refused.",
+  "description": "The work plan a driven session runs, under .dabbler/runs/s<N>/driver/plan.json: what the session will do, whether a hold keeps it from publishing, and the ordered steps -- each with an id, the files it expects to touch, and at least one check that proves it. The driver declares the session from `task` and `hold_release`, then issues the steps one at a time and measures each report against its step. A check is argv, never a shell string, and the driver runs it rather than reading it: code and tests are compiled and run, never interpreted. Validated before it is written; a file that fails validation on read is refused.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "session_number", "task", "releasable", "steps", "recorded_at"],
+  "required": ["schema_version", "session_number", "task", "steps", "recorded_at"],
   "properties": {
     "schema_version": {
       "const": 1,
@@ -18,7 +18,12 @@
     },
     "releasable": {
       "type": "boolean",
-      "description": "Whether the session may publish, decided here before any edit -- the same rule `session declare` enforces on a typed session."
+      "description": "An older plan's member, read as it was recorded and never written now: a plan says `hold_release` or nothing, and a session ships unless held."
+    },
+    "hold_release": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The one reason this session publishes nothing: the later session, sibling module or first release's go-live the work waits on. Absent, the session ships -- once new or fixed functionality can be delivered, it is delivered. Declared here, before the work, and never decided afterwards."
     },
     "non_goals": {
       "type": "array",

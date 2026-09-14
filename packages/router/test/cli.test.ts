@@ -275,11 +275,6 @@ describe("dabbler session, the whole surface", () => {
     assert.equal(amend.code, 2);
     assert.match(amend.err, /--approver is gone/);
     assert.match(amend.err, /session start/);
-    const withdrawn = await run(() =>
-      sessionVerb(["withdraw-release", "--sessions-dir", sessionsDir, "--reason", "r", "--approver", "me"]),
-    );
-    assert.equal(withdrawn.code, 2);
-    assert.match(withdrawn.err, /--approver is gone/);
   });
 
   it("refuses a subcommand that does not exist, and says so differently", async () => {
@@ -295,7 +290,7 @@ describe("dabbler session, the whole surface", () => {
     // optional.
     for (const [subcommand, flag, expected] of [
       ["start", "--help", "--engine"],
-      ["declare", "-h", "--releasable"],
+      ["declare", "-h", "--hold-release"],
       ["plan", "--help", "--max-rounds"],
     ] as const) {
       const result = await run(() => sessionVerb([subcommand, flag]));
@@ -303,6 +298,33 @@ describe("dabbler session, the whole surface", () => {
       assert.ok(result.out.includes(expected), `${subcommand} ${expected}`);
       assert.ok(!result.err.includes("expected one argument"));
     }
+  });
+
+  it("declares a hold with its reason, ships without one, and refuses the flags that are gone", async () => {
+    // A session ships unless held. The two old flags are refused with the
+    // rule rather than read as a flag expecting a value: silence would publish.
+    const held = makeAnsweredSandbox();
+    registerSessionStart(held.sessionsDir, 1, { engine: "claude-code" });
+    const heldResult = await run(() =>
+      sessionVerb(["declare", "--sessions-dir", held.sessionsDir, "--task", "Do it.", "--hold-release", "session 2 lands the consumer"]),
+    );
+    assert.equal(heldResult.code, 0, heldResult.err);
+    assert.match(heldResult.out, /releasable=no; held: session 2 lands the consumer/);
+    // Ships where the repository declares packaging; held, in its own words,
+    // where it declares none -- there is nothing to publish there.
+    const ships = makeAnsweredSandbox({ "dabbler.yaml": "schema_version: 1\npackaging:\n  release: tag\n" });
+    registerSessionStart(ships.sessionsDir, 1, { engine: "claude-code" });
+    const shipsResult = await run(() => sessionVerb(["declare", "--sessions-dir", ships.sessionsDir, "--task", "Do it."]));
+    assert.equal(shipsResult.code, 0, shipsResult.err);
+    assert.match(shipsResult.out, /releasable=yes/);
+    const bare = makeAnsweredSandbox();
+    registerSessionStart(bare.sessionsDir, 1, { engine: "claude-code" });
+    const nothing = await run(() => sessionVerb(["declare", "--sessions-dir", bare.sessionsDir, "--task", "Do it."]));
+    assert.equal(nothing.code, 0, nothing.err);
+    assert.match(nothing.out, /releasable=no; held: this repository declares no packaging/);
+    const gone = await run(() => sessionVerb(["declare", "--sessions-dir", ships.sessionsDir, "--task", "Do it.", "--not-releasable"]));
+    assert.equal(gone.code, 2);
+    assert.match(gone.err, /--not-releasable: gone/);
   });
 
   it("runs the close read-only under --dry-run", async () => {

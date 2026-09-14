@@ -23,11 +23,9 @@ import {
   SESSION_PLAN_FILENAME,
   STATE_FILENAME,
   recordStateWrite,
-  repoRootFor,
 } from "./evidence.ts";
 import { materialWorktreeChanges, previewPaths } from "./gates.ts";
 import { MINE_FLAG, SETTINGS_RELPATH } from "./settings.ts";
-import { type ReleasabilityWithdrawn, standingWithdrawal } from "./ledger.ts";
 import { nowIso, platformNewlines } from "./journal.ts";
 import {
   KIND_TASK_DECLARATION,
@@ -50,7 +48,7 @@ import {
 } from "./progress.ts";
 import { dumps } from "./pythonJson.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
-import { validateSessionVerdict } from "./verdict.ts";
+import { VERDICT_VERIFIED, validateSessionVerdict } from "./verdict.ts";
 import { VERSION } from "./version.ts";
 
 export { SCHEMA_VERSION } from "./progress.ts";
@@ -858,6 +856,8 @@ export function declareSessionTask(
     readonly sessionNumber: number;
     readonly task: string;
     readonly releasable: boolean;
+    /** Why a held session publishes nothing; written beside `releasable` when given. */
+    readonly holdReason?: string | null;
     /**
      * The module(s) the session works in. Given for a multi-module solution
      * and written onto the declaration and the session record; absent or
@@ -910,6 +910,7 @@ export function declareSessionTask(
     dateTime: nowIsoFull(),
     task,
     releasable: options.releasable,
+    ...(options.holdReason ? { holdReason: options.holdReason } : {}),
     ...(modules.length > 0 ? { modules } : {}),
   };
   pushEntry(log, entry);
@@ -1061,47 +1062,65 @@ export function commitBeforeDeclaring(session: number, what: string): string {
  *
  * The declaration is made at step (a), before the work, and is never
  * decided afterwards; that is what makes a releasable session's close
- * demand a packaging run. A withdrawal does not rewrite it. It stands
- * beside it, so the record says a session that was supposed to ship did
- * not, and on whose word -- which is exactly what a session silently
- * re-declared not-releasable would not say.
+ * demand a packaging run. A session ships unless held, and two things
+ * hold it: the reason its own plan declared, and a verdict that is not
+ * VERIFIED. Both are reported in their own words, so the close reads as
+ * held rather than as shipped or as never going to.
  */
 export function releasabilityOf(
   sessionsDir: string,
   sessionNumber: number,
-): { readonly declared: boolean; readonly withdrawn: ReleasabilityWithdrawn | null } {
+): {
+  readonly declared: boolean;
+  /** Why a session publishes nothing, in the words of what holds it; null where nothing does. */
+  readonly hold: string | null;
+} {
   const declaration = readTaskDeclaration(sessionsDir, sessionNumber);
   const declared = Boolean(declaration && declaration["releasable"] === true);
-  if (!declared) return { declared, withdrawn: null };
-  const root = repoRootFor(sessionsDir);
-  if (root === null) return { declared, withdrawn: null };
-  let withdrawn: ReleasabilityWithdrawn | null = null;
-  try {
-    withdrawn = standingWithdrawal(root, sessionNumber);
-  } catch {
-    // An unreadable withdrawal is not a withdrawal. The gate reads the same
-    // record and refuses on it, which is where an unreadable one is a fault
-    // rather than an absence; here it must not turn into a silent skip of
-    // the publish phase.
-    withdrawn = null;
+  if (!declared) {
+    const reason = declaration?.["holdReason"];
+    const hold =
+      typeof reason === "string" && reason.trim() !== ""
+        ? `held by its declaration: ${reason.trim()}`
+        : null;
+    return { declared, hold };
   }
-  return { declared, withdrawn };
+  return { declared, hold: verdictHold(sessionsDir, sessionNumber) };
+}
+
+/**
+ * A session publishes only what verified. The last round's verdict is on
+ * the session record, written by every round; a session with no round yet
+ * is held by nothing here, because the publish phase runs after the
+ * verification phase and a typed `packaging` runs the close's gates first.
+ */
+function verdictHold(sessionsDir: string, sessionNumber: number): string | null {
+  const raw = readRawSessionState(sessionsDir);
+  const sessions = Array.isArray(raw?.["sessions"]) ? (raw["sessions"] as unknown[]) : [];
+  const record = sessions.find(
+    (entry): entry is Record<string, unknown> =>
+      typeof entry === "object" && entry !== null && (entry as Record<string, unknown>)["number"] === sessionNumber,
+  );
+  const verdict = record?.["verificationVerdict"];
+  if (verdict === null || verdict === undefined) return null;
+  if (String(verdict) === VERDICT_VERIFIED) return null;
+  return `held by its verdict: the last verification round said ${String(verdict)}, and a session publishes only what verified`;
 }
 
 /**
  * Whether this session still ships something.
  *
  * Fails closed. Packaging asks this question, and the absence of a
- * declaration is a refusal, never a default yes. A withdrawn declaration
- * answers no as well: the publish phase passes straight through, and the
- * close says why rather than saying nothing.
+ * declaration is a refusal, never a default yes. A held session answers
+ * no as well: the publish phase passes straight through, and the close
+ * says what held it rather than saying nothing.
  */
 export function sessionIsReleasable(
   sessionsDir: string,
   sessionNumber: number,
 ): boolean {
   const releasability = releasabilityOf(sessionsDir, sessionNumber);
-  return releasability.declared && releasability.withdrawn === null;
+  return releasability.declared && releasability.hold === null;
 }
 
 // --- The two rendered files ---------------------------------------------------
@@ -1250,7 +1269,8 @@ export function renderProjectWorkPlan(sessionsDir: string): string {
       "",
       `### Session ${number} — ${title}`,
       "",
-      `**Releasable: ${declared["releasable"] ? "yes" : "no"}.**`,
+      `**Releasable: ${declared["releasable"] ? "yes" : "no"}` +
+        `${declared["holdReason"] ? ` — held: ${String(declared["holdReason"])}` : ""}.**`,
       "",
       String(declared["task"] ?? "").trim(),
     );

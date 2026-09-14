@@ -10,6 +10,74 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [2.7.0] — 2026-09-14
+
+**The judgment calls nobody needs to be asked.** Two sessions on the rule
+that any judgment call the framework or the AI can make from a rule is
+made, recorded and never asked: the verification cap a person always
+raised, the non-goals a plan never stated, and the release a person was
+asked to approve every time and never declined. A session now ships unless
+its own plan holds it, and a hold is a reason, declared before the work.
+
+### Added
+
+- **Non-goals in every work plan.** The plan the engine answers with
+  carries `non_goals`, at least one: what the session will NOT do, drawn
+  from the session plan's own exclusions or the nearest concrete boundary
+  of the task. A plan without one is refused at acceptance naming the
+  member; every step's instruction repeats the list; and the reviewer is
+  handed the plan's task and non-goals with the session plan's excerpt.
+- **The reviewer judges scope and simplicity.** The verification template
+  gains one criterion, headed by the operator's sentence: over-engineering
+  is strictly forbidden, and the value AI brings to a solution is measured
+  as much by the simplicity and clarity of its design and implementation
+  as by the alignment of the solution with the stated requirements and
+  objectives. Work a named non-goal covers is a blocking finding whose
+  evidence quotes the non-goal; work beyond the task that no non-goal
+  names is a nit, and never opens a round by itself.
+- **`hold_release` in the work plan, and `session declare --hold-release`.**
+  The one reason a session publishes nothing: the first release's go-live,
+  or work a later session must land first. Absent, the session ships. The
+  declaration carries the reason, the close reports it, and a repository
+  that declares no packaging holds every session in its own words: there
+  is nothing to publish.
+- **The publish phase makes the tag.** A repository that releases by tag
+  no longer stops at the publish phase until a person runs `dabbler
+  release`: the packaging run makes the tag at the commit the session
+  landed, pushes it, and records `published`. `dabbler release` is the
+  same act by hand.
+
+### Changed
+
+- **The verification round cap is 7, not 3.** Of 159 sessions with a round
+  count, 16 needed more than three rounds and 15 of those finished within
+  seven; every `verify reopen` a person was ever asked for was granted. The
+  reviewer's rubric is what keeps the extra rounds from grinding, and
+  `verify reopen` stays for the eighth.
+- **No publish without a verdict.** A session whose last verification
+  round is not VERIFIED publishes nothing; the publish phase skips it with
+  the reason on the run, and the close's `published_when_releasable` row
+  says the verdict held it. That row now reports a hold by declaration, by
+  verdict, or by a repository that declares no packaging, and still refuses
+  a session with no hold and no packaging run on its record.
+- **Work plan and declaration.** `releasable` leaves the work plan (an
+  older plan's member is read as recorded); the declaration keeps its
+  `releasable` and gains `holdReason`.
+
+### Removed
+
+- **The publication decision.** `publication:<version>` is no longer
+  raised, `dabbler release` reads no answer, and `release --reask` is gone:
+  publication is preapproved once a session has verified and landed, and
+  the `marketplace` environment's own approval in CI is the consent the
+  framework does not remove.
+- **`session declare --releasable` / `--not-releasable`.** Refused with the
+  rule that replaced them: a session ships unless its plan holds it, and
+  `--hold-release "<reason>"` is the hold.
+- **`session withdraw-release`** and `releasability-withdrawals.jsonl`. A
+  session that must not ship is a session with a hold, declared before the
+  work; there is no re-declaration afterwards.
+
 ## [2.6.0] — 2026-09-13
 
 **The questions nobody needs to answer, the files the framework wrote, and

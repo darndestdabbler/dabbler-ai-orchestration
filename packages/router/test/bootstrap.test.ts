@@ -245,8 +245,8 @@ describe("the instruction files", () => {
     const project = tempDir("bootstrap-");
     writeInstructionFiles(project, "acme-app");
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
-    assert.match(agents, /releasable/);
-    assert.match(agents, /not-releasable/);
+    assert.match(agents, /ships unless its plan holds it/);
+    assert.match(agents, /hold_release/);
     assert.match(agents.toLowerCase(), /the close refuses/);
   });
 

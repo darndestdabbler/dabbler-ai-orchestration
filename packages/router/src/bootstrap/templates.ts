@@ -111,13 +111,13 @@ export const SHARED_BODY =
   "A `wait` answered by watching `run.json` for its job to clear waits\n" +
   "forever: only the `next` you did not call clears it.\n" +
   "\n" +
-  "**A session that declared itself releasable also publishes**, between the\n" +
-  "push and the close, and the framework does that for itself too. A session\n" +
-  "that declared `--not-releasable` publishes nothing, which is most of them:\n" +
-  "releasability is declared at the start, before the work, and is never\n" +
-  "decided afterwards. If a releasable session reaches the close with no\n" +
-  "packaging run on its record, the close refuses — a session that was\n" +
-  "supposed to ship and did not must not read as one that shipped.\n" +
+  "**A session ships unless its plan holds it**, and the framework publishes\n" +
+  "between the push and the close for itself. A plan holds a release with\n" +
+  "`hold_release` and one reason — the first release's go-live, or work a\n" +
+  "later session must land first — declared before the work and never\n" +
+  "decided afterwards; a held session publishes nothing, and no session\n" +
+  "publishes without a VERIFIED verdict. A session with no hold and no\n" +
+  "packaging run on its record cannot close: the close refuses.\n" +
   "\n" +
   "## When the framework stops\n" +
   "\n" +

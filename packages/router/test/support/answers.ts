@@ -410,6 +410,11 @@ export function makeAnsweredRepo(
         return { stdout: (state.landed.get(from) ?? []).join("\n") };
       },
     ],
+    // A tag made locally: none exists until the run makes one, and making
+    // one is the act the publish phase records.
+    [["tag", "--list"], { stdout: "" }],
+    [["tag", "-a"], { code: 0 }],
+    [["rev-list", "-n"], () => ({ stdout: HEAD_COMMIT })],
     [["push"], { code: 0 }],
     // A pushed, clean checkout with an upstream pulls forward to itself.
     [["pull"], { code: 0 }],

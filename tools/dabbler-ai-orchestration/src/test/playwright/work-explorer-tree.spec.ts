@@ -47,7 +47,6 @@ test.beforeAll(async () => {
   writeTaskDeclaration(workspace, 3, { task: "Build the thing.", releasable: false });
   writeDriverWorkPlan(workspace, 3, {
     task: "Build the thing.",
-    releasable: false,
     steps: [
       { id: "build-the-widget", ask: "Build the widget." },
       { id: "smooth-the-edges", ask: "Smooth the edges." },
@@ -178,7 +177,6 @@ test("a step added to the plan appears on the driver/plan.json watcher, not the 
   // next record write, ten seconds later, or for the poll.
   writeDriverWorkPlan(workspace, 3, {
     task: "Build the thing.",
-    releasable: false,
     steps: [
       { id: "build-the-widget", ask: "Build the widget." },
       { id: "smooth-the-edges", ask: "Smooth the edges." },

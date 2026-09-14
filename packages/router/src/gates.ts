@@ -1001,13 +1001,9 @@ export function checkPublishedWhenReleasable(sessionsDir: string): Check {
   const current = currentSession(sessionsDir);
   if (typeof current !== "number") return [true, ""];
   const releasability = releasabilityOf(sessionsDir, current);
-  // A session that declared `not-releasable` passes with nothing to say.
-  if (!releasability.declared) return [true, ""];
-  // A withdrawn one passes and is REPORTED. Absorbing it -- passing the way
-  // a not-releasable session passes -- would make the close's account of a
-  // session that was supposed to ship and did not identical to its account
-  // of one that never was, which is the whole thing this gate exists to
-  // keep apart.
+  // A session held by its declaration passes and SAYS so; one that never
+  // declared passes with nothing to say.
+  if (!releasability.declared) return [true, releasability.hold ?? ""];
   let rows;
   try {
     rows = readPackaging(root, current);
@@ -1021,22 +1017,10 @@ export function checkPublishedWhenReleasable(sessionsDir: string): Check {
       }`,
     ];
   }
-  // The record is read BEFORE the withdrawal is reported, so this gate can
-  // never say "nothing was published" over a record that says a version
-  // shipped. `withdraw-release` refuses after a publication for the same
-  // reason, and the two together mean the contradiction has to be
-  // hand-written into the ledger to exist at all -- at which point what the
-  // close reports is the packaging record, which is the one that describes
-  // something that actually left this machine.
-  const withdrawn = releasability.withdrawn;
-  if (withdrawn !== null && !rows.some((row) => row["outcome"] === OUTCOME_PUBLISHED)) {
-    return [
-      true,
-      `declared releasable, and its releasability was WITHDRAWN by ${withdrawn.by} ` +
-        `on ${withdrawn.recordedAt}: ${withdrawn.reason}. Nothing was published, and the ` +
-        "declaration stands on the record beside the withdrawal rather than being " +
-        "rewritten by it.",
-    ];
+  // Held by its verdict: nothing was published and the row says why, so a
+  // close after a cap terminal reads as held rather than as shipped.
+  if (releasability.hold !== null && !rows.some((row) => row["outcome"] === OUTCOME_PUBLISHED)) {
+    return [true, `${releasability.hold}. Nothing was published.`];
   }
   return judgePackagingRecord(rows);
 }

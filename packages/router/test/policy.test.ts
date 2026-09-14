@@ -111,7 +111,7 @@ describe("the module policy", () => {
       assert.equal(plan.instruction?.scope, undefined);
       const accepted = await answer(sessionsDir, plan.instruction?.seq ?? 0, {
         task: "Make the store real.",
-        releasable: false,
+        hold_release: "the walk ships nothing",
         non_goals: ["Anything the step does not name."],
         modules: ["persister"],
         steps: [
@@ -161,7 +161,7 @@ describe("the module policy", () => {
       assert.equal(plan.instruction?.step_id, "plan", plan.err);
       const accepted = await answer(sessionsDir, plan.instruction?.seq ?? 0, {
         task: "Give Person a surname and store it.",
-        releasable: false,
+        hold_release: "the walk ships nothing",
         non_goals: ["Anything the step does not name."],
         modules: ["model", "persister"],
         reason: "the model's contract changes and the store must persist the new field",

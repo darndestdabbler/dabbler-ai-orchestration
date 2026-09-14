@@ -143,7 +143,7 @@ const TESTING = {
 
 const PLAN = {
   task: "Make the store real.",
-  releasable: false,
+  hold_release: "the walk ships nothing",
   non_goals: ["Anything the step does not name."],
   modules: ["persister"],
   steps: [

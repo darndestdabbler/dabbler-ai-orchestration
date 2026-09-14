@@ -109,7 +109,6 @@ describe("the task block a round opens with", () => {
       schema_version: 1,
       session_number: 1,
       task: "Make the widget real.",
-      releasable: false,
       non_goals: ["A second widget."],
       recorded_at: "2026-09-14T05:00:00-04:00",
       steps: [{ id: "widget", ask: "Make it.", files: ["src/w.ts"], checks: [{ argv: ["true"] }] }],

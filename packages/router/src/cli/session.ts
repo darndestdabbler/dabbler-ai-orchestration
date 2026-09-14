@@ -33,7 +33,6 @@ import {
   decision,
   interrupt,
   rebaseline,
-  withdrawRelease,
   migrate,
   plan,
   planAmend,
@@ -56,7 +55,6 @@ const SUMMARY: Record<string, string> = {
   drive: "run the next session end to end: the framework drives, the engine answers",
   interrupt: "end the engine's running invocation under a driven session, with a reason",
   rebaseline: "record a repair made while the run was stopped, and move the baseline",
-  "withdraw-release": "withdraw a releasable session's releasability, with a reason",
   report: "answer the driver's outstanding instruction",
   plan: "record the plan prose in project-work-plan.md; `plan amend` changes a driven step",
   close: "run gates and close the session",
@@ -110,8 +108,8 @@ const OPTIONS: Record<string, readonly string[]> = {
   declare: [
     "  --task TEXT              the task list; mutually exclusive with --task-file",
     "  --task-file PATH         the task list, read from a file",
-    "  --releasable             this session may publish",
-    "  --not-releasable         it may not; one of the two is required",
+    "  --hold-release TEXT      the one reason this session publishes nothing; absent,",
+    "                           the session ships once it is verified",
     "  --module SLUG            the module this session works in (repeatable);",
     "                           for a multi-module solution only",
     "  --reason TEXT            why the session must change more than one module;",
@@ -178,18 +176,6 @@ const OPTIONS: Record<string, readonly string[]> = {
   rebaseline: [
     "  --reason TEXT            required: what was repaired while the loop was halted",
     "  --by WHO                 who made it; defaults to the operator",
-  ],
-  "withdraw-release": [
-    "  --reason TEXT            required: why the artifact this session was declared to",
-    "                           ship must not ship. Who was working is on the record",
-    "                           from `session start` and is written into the row",
-    "",
-    "  Releasability is declared at step (a) and `published_when_releasable` is an",
-    "  evidence gate, so `close --force` cannot answer it and a releasable session that",
-    "  must not ship had no exit but `cancel`. This is that exit. The declaration is not",
-    "  rewritten: it stands on the record and the withdrawal stands beside it, so the",
-    "  close reports a session that was supposed to ship and did not, and on whose word.",
-    "  One per session, ever, and nothing else about the session's judgement moves.",
   ],
   report: [
     "  --seq N                  required: the seq of the instruction being answered",
@@ -271,9 +257,19 @@ interface Parsed {
   readonly modules: string[];
 }
 
+/**
+ * Flags a session no longer takes, refused with the rule that replaced them.
+ * Refused rather than read as `--flag value`: a dropped flag that parsed as
+ * nothing would publish, and a misspelled one is a usage error already.
+ */
+const RETIRED_FLAGS: ReadonlyMap<string, string> = new Map(
+  ["--releasable", "--not-releasable"].map((flag) => [
+    flag,
+    `argument ${flag}: gone -- a session ships unless its plan holds it, and \`--hold-release "<reason>"\` is the hold`,
+  ]),
+);
+
 const SWITCHES = new Set([
-  "--releasable",
-  "--not-releasable",
   "--dry-run",
   "--force",
   "--stop",
@@ -329,6 +325,8 @@ function parseArgs(argv: readonly string[]): Parsed | string {
       continue;
     }
     const equals = token.indexOf("=");
+    const retired = RETIRED_FLAGS.get(equals === -1 ? token : token.slice(0, equals));
+    if (retired !== undefined) return retired;
     if (equals !== -1) {
       const flag = token.slice(0, equals);
       if (flag === REPEATABLE_MODULE) modules.push(token.slice(equals + 1));
@@ -678,19 +676,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     return rebaseline(sessionsDir, { reason, by: values.get("--by") ?? null, sessionNumber });
   }
 
-  if (subcommand === "withdraw-release") {
-    if (!values.has("--reason")) {
-      writeErr(
-        "dabbler session withdraw-release: the following arguments are required: --reason\n",
-      );
-      return EXIT_USAGE;
-    }
-    return withdrawRelease(sessionsDir, {
-      reason: values.get("--reason") ?? "",
-      sessionNumber,
-    });
-  }
-
   if (subcommand === "report") {
     const answerFile = values.get("--answer-file");
     const required =
@@ -794,24 +779,17 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     writeErr("dabbler session declare: one of the arguments --task --task-file is required\n");
     return EXIT_USAGE;
   }
-  const releasable = switches.has("--releasable");
-  const notReleasable = switches.has("--not-releasable");
-  if (releasable && notReleasable) {
-    writeErr(
-      "dabbler session declare: argument --not-releasable: not allowed with argument --releasable\n",
-    );
-    return EXIT_USAGE;
-  }
-  if (!releasable && !notReleasable) {
-    writeErr(
-      "dabbler session declare: one of the arguments --releasable --not-releasable is required\n",
-    );
+  // A session ships unless held; the flag carries the one reason it does not.
+  const holdReason = values.get("--hold-release") ?? null;
+  if (holdReason !== null && holdReason.trim() === "") {
+    writeErr("dabbler session declare: --hold-release carries the reason the session publishes nothing\n");
     return EXIT_USAGE;
   }
   return declare(sessionsDir, {
     task: task ?? null,
     taskFile: taskFile ?? null,
-    releasable,
+    releasable: holdReason === null,
+    holdReason,
     sessionNumber,
     modules: parsed.modules,
     reason: values.get("--reason") ?? null,

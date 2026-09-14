@@ -178,8 +178,8 @@ a sibling reads this module's promise from:
 focused session cannot: its checkout holds the sibling's contract folder and
 published package, never its source, so a package reference nothing has
 published does not resolve. There are two ways on, and both are decided in
-the plan before the work. The session that completes the sibling declares
-itself releasable and publishes to a feed — a folder on disk is a feed,
+the plan before the work. The session that completes the sibling ships it —
+a session publishes unless its plan holds it — to a feed: a folder on disk is a feed,
 takes no credential, and is enough for the next module to build against.
 Or the session that needs both runs global, with `Scope: whole repository`
 under its heading, and builds the solution in the repository itself.

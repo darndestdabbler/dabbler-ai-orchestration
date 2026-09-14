@@ -385,7 +385,6 @@ describe("the task rows", () => {
       schema_version: 1,
       session_number: 1,
       task: "Do it.",
-      releasable: false,
       non_goals: ["Anything the step does not name."],
       recorded_at: "2026-08-31T11:05:00-04:00",
       steps: [
@@ -438,7 +437,6 @@ describe("the task rows", () => {
       schema_version: 1,
       session_number: 1,
       task: "Do it.",
-      releasable: false,
       non_goals: ["Anything the step does not name."],
       recorded_at: "2026-08-31T11:05:00-04:00",
       steps: [

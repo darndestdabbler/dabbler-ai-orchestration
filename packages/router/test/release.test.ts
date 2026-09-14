@@ -1,28 +1,15 @@
-// The one act that cannot be taken back.
-//
-// The property worth pinning is that nothing here decides. A version pushed
-// to a public registry is downloadable by everyone from that moment, npm
-// refuses `unpublish` after 72 hours, and a Marketplace version slot is never
-// reusable -- so the framework states what would ship and waits, and does the
-// typing only once there is an answer.
+// The release tag: what an answer means, what would ship, and what the
+// Marketplace says it serves. Nobody is asked: a session ships unless its
+// plan held it, and the tag is made by the publish phase or by this verb.
 
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { reaskPublication, servedVersions } from "../src/cli/release.ts";
-import { capture } from "../src/output.ts";
+import { servedVersions } from "../src/cli/release.ts";
 import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/packaging.ts";
-import {
-  answerOwed,
-  blockingDecisions,
-  currentDecisions,
-  publicationDecisionId,
-  raisePublicationDecision,
-  readOwed,
-} from "../src/owedDecisions.ts";
-import { makeAnsweredSandbox, tempDir } from "./support/answers.ts";
+import { tempDir } from "./support/answers.ts";
 
 const VERSION = "2.0.0";
 
@@ -176,157 +163,5 @@ describe("what the Marketplace says it serves", () => {
     // A recognised shape whose version entries are not versions is empty,
     // not unreadable: the rows are there and none of them names one.
     assert.deepEqual(servedVersions({ results: [{ extensions: [{ versions: [{}, 3] }] }] }), []);
-  });
-});
-
-describe("the brief the operator answers", () => {
-  it("states the cost of a wrong answer, not only the choices", () => {
-    // The whole reason this is a brief and not a prompt: the reader has to
-    // be able to tell what they cannot take back.
-    const { repo } = makeAnsweredSandbox();
-    const row = raisePublicationDecision(repo, { version: "2.0.0" });
-    assert.match(String(row?.["determined"]), /cannot be recalled/);
-    assert.deepEqual(
-      (row?.["options"] as Array<{ label: string }>).map((option) => option.label),
-      ["publish", "release-candidate", "not yet"],
-    );
-  });
-
-  it("does not recommend the answer that defeats the session", () => {
-    // This session exists BECAUSE the product is uninstallable, so the answer
-    // leaving it uninstallable cannot be the recommended one. An earlier
-    // draft recommended the release candidate and called it "the whole
-    // path", which was false -- it never touches the Marketplace -- and was
-    // a recommendation to not do the thing.
-    const { repo } = makeAnsweredSandbox();
-    const row = raisePublicationDecision(repo, { version: "2.0.0" });
-    assert.deepEqual(row?.["recommendation"], "publish");
-    const rc = (row?.["options"] as { label: string; consequence: string }[]).find(
-      (option) => option.label === "release-candidate",
-    );
-    // And it says so of itself: a build that publishes nothing.
-    assert.match(String(rc?.consequence), /BUILDS and does/);
-    assert.match(String(rc?.consequence), /not publish/);
-  });
-
-  it("does not block a close, because an unpublished product is not unverified", () => {
-    const { repo } = makeAnsweredSandbox();
-    raisePublicationDecision(repo, { version: "2.0.0" });
-    assert.deepEqual(blockingDecisions(repo), []);
-  });
-
-  it("asks once, however often the verb runs", () => {
-    const { repo } = makeAnsweredSandbox();
-    raisePublicationDecision(repo, { version: "2.0.0" });
-    assert.equal(raisePublicationDecision(repo, { version: "2.0.0" }), null);
-  });
-
-  it("carries the operator's answer, and nobody else's", () => {
-    // `answeredBy` is "operator" and there is no other value: a verdict a
-    // model can write is a verdict a model can be wrong about.
-    const { repo } = makeAnsweredSandbox();
-    raisePublicationDecision(repo, { version: "2.0.0" });
-    answerOwed(repo, publicationDecisionId("2.0.0"), "not yet");
-    const row = currentDecisions(repo).find(
-      (r) => String(r["id"]) === publicationDecisionId("2.0.0"),
-    );
-    assert.equal(row?.["answer"], "not yet");
-    assert.equal(row?.["answeredBy"], "operator");
-  });
-
-  it("settles the version it names, and leaves the next release to ask again", () => {
-    // The loop, not the single refusal. `raiseDisposition` returns null for
-    // an id whose row is answered -- answered is settled -- so under one id
-    // for every release the first answer settles them all. The answer this
-    // repository holds was given on 2026-09-02 for 2.8.0, to npm and the
-    // Marketplace, and npm was retired that same day; it went on to
-    // authorise vsix-v2.0.15, 2.0.16, 2.0.17 and 2.0.18 with nobody asked.
-    const { repo } = makeAnsweredSandbox();
-    raisePublicationDecision(repo, { version: "2.0.0" });
-    answerOwed(repo, publicationDecisionId("2.0.0"), "publish");
-
-    // Read back off disk, never off a return value: the row is the record.
-    const decided = () =>
-      currentDecisions(repo).filter((r) => String(r["id"]).startsWith("publication:"));
-    const first = decided().find((r) => String(r["id"]) === publicationDecisionId("2.0.0"));
-    assert.equal(first?.["answer"], "publish");
-
-    // The next version is a new question. It is raised rather than folded
-    // away, it is open, and nothing has authorised it.
-    const next = raisePublicationDecision(repo, { version: "2.0.1" });
-    assert.equal(next?.["id"], publicationDecisionId("2.0.1"));
-    const onDisk = decided().find((r) => String(r["id"]) === publicationDecisionId("2.0.1"));
-    assert.equal(onDisk?.["state"], "open");
-    assert.equal(onDisk?.["answer"], undefined);
-    // The brief says which version this answer settles, so the reader is not
-    // relying on the id to know it.
-    assert.match(String(onDisk?.["determined"]), /This answer settles 2\.0\.1 and nothing else/);
-    // And the first version's answer is untouched by any of it.
-    assert.equal(decided().find((r) => String(r["id"]) === publicationDecisionId("2.0.0"))?.["answer"], "publish");
-    // Still asked once per version, however often the verb runs.
-    assert.equal(raisePublicationDecision(repo, { version: "2.0.1" }), null);
-  });
-});
-
-describe("a version that was held until something was true", () => {
-  const HELD = "2.1.0";
-
-  /** The current row for the held version, off disk. */
-  function row(repo: string): Record<string, unknown> | undefined {
-    return currentDecisions(repo).find(
-      (candidate) => String(candidate["id"]) === publicationDecisionId(HELD),
-    );
-  }
-
-  async function reask(repo: string, reason: string | undefined): Promise<number> {
-    return (
-      await capture(() =>
-        Promise.resolve(
-          reaskPublication(repo, HELD, publicationDecisionId(HELD), reason),
-        ),
-      )
-    ).value;
-  }
-
-  it("is put back to the operator when it becomes true, and authorises nothing by being asked", async () => {
-    // The stop this closes: an answer is settled, so a release held for a
-    // defect stayed held after the defect was fixed with nothing but a
-    // person remembering it. 2.1.0 was held at the close of 145 because the
-    // pane was wrong on a seat.
-    const { repo } = makeAnsweredSandbox();
-    raisePublicationDecision(repo, { version: HELD });
-    answerOwed(repo, publicationDecisionId(HELD), "not yet", null, "the pane is wrong on a seat");
-
-    // A re-ask with no reason is refused: the operator is being asked again
-    // because something happened, and the record has to say what.
-    assert.equal(await reask(repo, undefined), 2);
-    assert.equal(row(repo)?.["answer"], "not yet");
-
-    assert.equal(await reask(repo, "the pane now reads the seat's own catalog"), 0);
-    const asked = row(repo);
-    assert.equal(asked?.["state"], "open");
-    assert.equal(asked?.["answer"], undefined);
-    // Both halves are on the record: what was held, and what changed.
-    const superseded = readOwed(repo).filter(
-      (candidate) =>
-        String(candidate["id"]) === publicationDecisionId(HELD) &&
-        candidate["event"] === "superseded",
-    );
-    assert.match(String(superseded.at(-1)?.["note"]), /answered 'not yet'/);
-    assert.match(String(superseded.at(-1)?.["note"]), /reads the seat's own catalog/);
-    // An open question is not an authorisation, and it still does not block
-    // a close: an unpublished product is not an unverified one.
-    assert.deepEqual(blockingDecisions(repo), []);
-  });
-
-  it("never re-asks an answer that already authorised a tag", async () => {
-    // Asking a person to consent twice to the same publication is pressure,
-    // not process -- and the answer that carries it out is already on the
-    // record for `dabbler release` to act on.
-    const { repo } = makeAnsweredSandbox();
-    raisePublicationDecision(repo, { version: HELD });
-    answerOwed(repo, publicationDecisionId(HELD), "publish");
-    assert.equal(await reask(repo, "I would like to be asked again"), 1);
-    assert.equal(row(repo)?.["answer"], "publish");
   });
 });

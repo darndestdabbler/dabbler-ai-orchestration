@@ -11164,6 +11164,53 @@
       "what": "step 'the-words': its checks",
       "reason": "doc-paths refuses the placeholder paths this document has always carried; the check is that the sentences exist",
       "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 167,
+      "dateTime": "2026-09-14T05:32:08.023000-04:00",
+      "task": "Session 167 makes a session ship by default. A hold with a reason replaces the releasable boolean: the work plan's optional `hold_release` names what the work waits on and a plan without it publishes, `session declare` takes `--hold-release \"<reason>\"` in place of `--releasable`/`--not-releasable`, and the declaration record carries the hold's reason. No publish without a verdict: a session whose last verification round is not VERIFIED runs no publish job and the close's gate row says the verdict held it. The publication question goes: `raisePublicationDecision` and `publication:<version>` are deleted, `dabbler release` tags without an answer and `--reask` goes with it, and a tag release makes its tag inside the packaging run instead of refusing until a person runs the verb -- the CI environment's own approval is the one consent the framework cannot and does not remove. `session withdraw-release` and its record are deleted: a session that must not ship is a session with a hold, declared before the work. `published_when_releasable` reads the hold and the verdict and refuses a session with neither and no published row. The words follow in the managed body, the docs and the README, and the session releases 2.7.0 as a minor: the first session released under its own rule.",
+      "releasable": true
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 167,
+      "dateTime": "2026-09-14T05:35:11.389000-04:00",
+      "what": "step 'hold-in-the-plan': its files",
+      "reason": "the playwright spec passes the plan helper a releasable it no longer takes; drive.test.ts builds steps, not plans",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 167,
+      "dateTime": "2026-09-14T05:38:42.736000-04:00",
+      "what": "step 'declare-takes-a-hold': its files",
+      "reason": "the in-process router and its contract pass the declare flags too; session.test.ts types no flag",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 167,
+      "dateTime": "2026-09-14T05:43:22.516000-04:00",
+      "what": "step 'no-publish-without-a-verdict': its files",
+      "reason": "the one test lives beside the releasability tests in session.test.ts, which already holds the fixture; gates.test's rows are pure",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 167,
+      "dateTime": "2026-09-14T05:51:37.412000-04:00",
+      "what": "step 'the-question-goes': its files",
+      "reason": "the withdrawal's record lived in ledger.ts and the driver's skip reason named it; the git fake learns tag; gates.test and bootstrap.test needed nothing",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 167,
+      "dateTime": "2026-09-14T05:58:50.649000-04:00",
+      "what": "step 'the-words': its files and checks",
+      "reason": "the words met a rule that had to be made true first: a repository that declares no packaging has nothing to publish, so declare holds the session and says so; the schema reference carries the word withdraw in an unrelated row",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
     }
   ]
 }

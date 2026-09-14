@@ -297,13 +297,13 @@ never by waiting on a condition that your own next call is what causes.
 A `wait` answered by watching `run.json` for its job to clear waits
 forever: only the `next` you did not call clears it.
 
-**A session that declared itself releasable also publishes**, between the
-push and the close, and the framework does that for itself too. A session
-that declared `--not-releasable` publishes nothing, which is most of them:
-releasability is declared at the start, before the work, and is never
-decided afterwards. If a releasable session reaches the close with no
-packaging run on its record, the close refuses — a session that was
-supposed to ship and did not must not read as one that shipped.
+**A session ships unless its plan holds it**, and the framework publishes
+between the push and the close for itself. A plan holds a release with
+`hold_release` and one reason — the first release's go-live, or work a
+later session must land first — declared before the work and never
+decided afterwards; a held session publishes nothing, and no session
+publishes without a VERIFIED verdict. A session with no hold and no
+packaging run on its record cannot close: the close refuses.
 
 ## When the framework stops
 

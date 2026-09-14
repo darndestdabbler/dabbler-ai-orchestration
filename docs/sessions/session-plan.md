@@ -10334,3 +10334,104 @@ suite count falls by the owed module's own tests.
 
 **Releasable.** Yes, as a **minor**: the notes name the deleted verb and
 command, the automatic grant, and the refusals that replace the questions.
+
+## Why session 169 exists: nothing gets stuck, nothing waits
+
+The operator's staff watched the CSV tutorial deadlock twice
+(`docs/framework-issues-log.md`), and the operator ruled on 2026-09-14:
+**zero deadlock tolerance** — "my developers won't use it if there are any
+more deadlocks." The same tutorial took about fifteen minutes to write one
+`Person` class; measured on the sample at `D:\Projects\csv-parser`, the
+engine's own work was about four of them, and a job that finished in three
+seconds still cost the engine a sixty-second sleep. Consult round 15
+(`docs/design/consults/round15-brief.md`, `-sol.md`, `-gemini.md`; the
+decision is `round15-synthesis.md` and `docs/operator-decisions.md`)
+agreed on the principle: **a phase checks what already exists before it
+acts, so running it again is always safe.**
+
+The operator's order: fix the deadlocks and the other logged issues first,
+commit and push them, and only then remove the module machinery — this
+session is the point it can be brought back from, so it deletes none of it.
+
+### Session 169 of 169: Nothing gets stuck, nothing waits
+
+Scope: whole repository
+
+**A closed session collects `done`.** `phaseClose` in
+`packages/router/src/drive.ts` reads the ledger before it spawns anything:
+when this session's row in `docs/sessions/sessions.json` is already
+`complete` — closed directly with `dabbler session close`, or by a close
+job whose result nobody collected — it issues `done` and moves the run to
+`complete` without starting a close job. That is deadlock 1 of the issues
+log, where every `next` re-ran a close that answered "no session is in
+flight".
+
+**A published session does not publish twice.** `phasePublish` reads the
+session's packaging record (`readPackaging`) first: when its last row is
+published, the run moves to the close without a new job.
+
+**No DEADLOCK label, and no automatic triage.** Delete `judgeStopClass`,
+`alreadyTriaged`, `DEADLOCK_NOTE` and `climbLadder` from `drive.ts`, and
+stop writing `stop.class`; `renderStop` in `driver.ts` and the Dabbler
+Terminal (`dabblerTerminal.ts`) no longer say or paint "deadlock". The
+schema member `class` stays optional, so a run written before this session
+still reads. `triage.ts` and `dabbler triage` stay for a person or an
+engine to call. A stop is what refused, who acts, and the command.
+
+**`next` waits inside the call.** Under the pull, `longWork` polls the job
+inside the call for up to 45 seconds and returns the next instruction the
+moment the job ends; only a job still running at that bound returns a
+`wait`, and its `retry_after_seconds` is 5. The bound sits below the
+engines' own shell-call limits (Claude Code's default is 120 seconds). A
+`session interrupt --stop` is still honoured while it waits. The bound is a
+driver option, so a test passes a short one.
+
+**The module's own contract folder is in its checkout.** `checkoutCone` in
+`packages/router/src/checkout.ts` adds `contractDir(slug)` for the module
+itself, beside its dependencies' and consumers'. That is deadlock 2, where
+the module's own notes page sat outside the checkout, `git add` skipped the
+rewritten file, and the land refused on every run.
+
+**`dabbler modules create .`** names the solution file after the resolved
+directory — `basename(resolve(root))` in `packages/router/src/ecosystem.ts`
+— rather than writing `..slnx`.
+
+**Session 1's brief.** `BOOTSTRAP_PLAN` in
+`packages/router/src/bootstrap/templates.ts` no longer tells the engine to
+report the plan step `blocked`, which the report verb cannot accept for a
+plan step: with no brief in the prompt or at `docs/planning/brief.md`, the
+engine asks the person who started the session, writes their answer to
+`docs/planning/brief.md`, and never invents one.
+
+**The remote is checked at start.** `session start` runs `git ls-remote
+--heads origin` with git's credential prompt disabled and a 15-second
+limit. When it fails, start prints one line — the remote's URL, git's
+reason, and `git remote set-url origin <url>` — and carries on; the work can
+still be done, and the land says the same if the push fails. The tutorial's
+`origin` was an Azure DevOps web page, found only at the push.
+
+**Non-goals.** Deleting the module folder, the in-repository packages or
+`docs/modules.yaml` (the sessions after this one); any change to which
+tests run; the project-level release setting; auditing or rewording the
+driver's other stops; a replacement for the automatic triage.
+
+**Steps.** (1) The close and the publish collect what already exists. (2)
+The classifier, its note, the triage ladder and the `class` writes deleted,
+with the terminal's tone. (3) The in-call wait. (4) The cone, the solution
+file name, the session-1 text and the remote line. (5) The extension's
+`package.json` bumped to 2.9.0 with the notes.
+
+**Tests.** A run standing at `close` whose ledger row is `complete` answers
+`done` and starts no job. A run at `publish` whose packaging record is
+published moves to `close` with no job. Under the pull, a job that ends
+inside the bound returns the next instruction rather than a `wait`. The
+cone of a module holds its own contract folder. `modules create .` writes
+the solution file named after the directory. `session start` prints the
+`set-url` line when `ls-remote` fails, fed through the git answers seam
+rather than a live remote. Six router tests, one per behaviour; the
+classifier's and the ladder's own tests are deleted, and the terminal's
+tone test changes with it.
+
+**Releasable.** Yes, as a **minor** (2.9.0): the notes name the collected
+close, the removed deadlock label, the in-call wait and the four fixes from
+the tutorial's issues log.

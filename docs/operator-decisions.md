@@ -14,6 +14,48 @@ kept by hand, and it is not a substitute for anything under `.dabbler/runs/`.
 
 ---
 
+## 2026-09-14 — Zero deadlocks first; then the module machinery goes, and the solution is planned by tier
+
+**In force.** Given after the operator's staff watched the CSV tutorial
+deadlock twice (`docs/framework-issues-log.md`), and after consult round 15
+(`docs/design/consults/round15-brief.md`, `-sol.md`, `-gemini.md`,
+`-synthesis.md`).
+
+> There is a ZERO DEADLOCK TOLERANCE. No more. My developers won't use it if
+> there are any more deadlocks.
+
+1. **Order.** Fix the deadlocks and the other logged issues first, commit
+   and push them — a point the module machinery can be brought back from.
+   After that, deleting the module folder (the focused checkout), the
+   in-repository packages and `docs/modules.yaml` is approved: sessions run
+   in the developer's own checkout, siblings are project references
+   (.NET `ProjectReference`, the Maven reactor), and the Solution Explorer
+   is read from the solution's own build files.
+2. **Releasing is a project-level setting, defaulting to on request.** A
+   developer turns it to ship by default by right-clicking the solution and
+   choosing *Ship by Default*. This repository ships by default (its
+   Marketplace listing needs the updated code); a .NET or Java solution does
+   not until its team adopts continuous delivery. This narrows the morning's
+   ship-by-default ruling to the repositories that choose it.
+3. **Deployment artifacts.** Real .NET solutions will want an IIS artifact
+   or a Windows Service, depending on the deployable, and Java the
+   analogous forms. A tutorial deploys nothing: it produces whatever
+   artifact is easiest to test now — containers are acceptable — provided
+   the framework or the AI knows how to produce the real forms later.
+4. **The shop's default production split** is three tiers: an application
+   tier that talks to an API tier (.NET or Java, per the solution), which
+   talks to the database. Planning asks the developer and offers this as
+   the default.
+5. **Which tests run.** The whole suite runs at a session's end while it
+   costs no more than about 5% of the session's time — 60 seconds for a
+   20-minute session, 120 seconds for a 40-minute one. Past that, the tests
+   named after the changed files run, with the tests of the projects that
+   depend on them. Tests are named after what they test.
+6. **Whole-suite runs at a large project's release** need no ruling of
+   their own: releasing is the developer's setting (2).
+
+---
+
 ## 2026-08-29 — Future enhancement: session numbers should be decimals, so a session can be inserted
 
 **Raised by the operator. Not in force — this is a direction for a later

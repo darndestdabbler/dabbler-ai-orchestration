@@ -10861,7 +10861,170 @@ release.
 **Releasable.** Yes: a **patch** when the walk finds defects, and nothing to
 publish when it finds none (the plan holds, naming the clean walk).
 
-### Session 176 of 176: The round names what it cost
+### Why sessions 176–183 exist
+
+On 2026-09-15 the operator set three principles: everything deterministic is
+the framework's, including sequencing the work; the AI does the
+non-deterministic work; the operator sees everything, can interrupt and
+override any rule, and has final authority on plan, architecture and
+acceptance. Calling `session next` after a `wait` is deterministic work the AI
+does today. A POC (`C:\temp\s176-messaging-poc`) measured a messaging design on
+both engine CLIs — the framework and the AI wait on each other, the AI keeps a
+background waiter so its chat stays free — and consult round 16 recommended
+building it with pending-until-answered instructions, an overdue alert to the
+operator (never a typed nudge) and no keep-alives. The operator approved it and
+wants it delivered today. Every session through 179 is held; 180 releases once a
+two-hour soak of both engines, run beside the build, is recorded.
+
+### Session 176 of 183: Record the research
+
+Scope: whole repository
+
+**What.** `docs/design/messaging-design.md` records what 2026-09-15 established:
+the operator's three principles; the messaging design; every POC measurement
+from `results/FINDINGS.md` on both CLIs (wakes from idle, mid-turn questions,
+killed waiters, 16-minute idle, cost per message); the prompt-cache findings
+(Claude's one-hour cache; Copilot's best-effort cache in 512-token blocks, hits
+and misses at 4.3, 7.8, 11.75 and 16 minutes); the keep-alive A/B (22.20 against
+19.73 credits, three calls per keep-alive, break-even ~15 minutes); the cost
+model and why it is not built — it would rest on Copilot's internal caching,
+which can change without notice and leave a fitted model costing more than it
+saves; the launch pitfalls; and consult round 16's recommendation with where Sol
+and Gemini split. The consult brief, both answers and the synthesis go under
+`docs/design/consults/` as round 16. The POC harness (driver, stand-in
+framework, waiter, analyzer, protocol) goes under
+`docs/design/messaging-poc/` so the soak and any later measurement are
+reproducible.
+
+**Non-goals.** No framework change; no keep-alive; no fitted cost model.
+
+**Steps.** (1) The design record. (2) The consult files and the harness.
+
+**Tests.** None: the record's paths are checked.
+
+**Releasable.** Held for session 180: the release waits on the soak.
+
+### Session 177 of 183: The framework drives
+
+Scope: whole repository
+
+**What.** The framework's drive loop answers to the AI through the existing
+instruction and report files instead of being polled. `dabbler session wait
+--sessions-dir <dir>` blocks until the in-flight session has an instruction
+with no accepted report, prints it and exits; it consumes nothing, so an
+instruction stays pending until its report is accepted, and a second `wait`
+prints the same one. The drive loop (`session run` for an engine the framework
+does not invoke) waits on the report file instead of sleeping and re-calling
+`next`, runs every deterministic phase between reports itself, and never issues
+`wait`. An AI step outstanding past a fixed time (default 20 minutes,
+`driver.overdue_minutes`) is recorded as overdue on the supervision log and the
+run, once, for the extension to show; nothing types into the AI's chat. A report
+may omit `--files`: the framework takes the step's files from the diff it
+already computes, less what it wrote itself; a report that names files is still
+judged as today.
+
+**Non-goals.** No change to `session next` (it keeps working, untaught); no
+keep-alive; no ETA on the plan; no automated wake of the AI; no override
+verification.
+
+**Steps.** (1) `session wait`. (2) The drive loop waits on reports and issues no
+`wait`. (3) The overdue record. (4) `--files` derived when omitted.
+
+**Tests.** One per behavior, in the test file named after each changed source.
+
+**Releasable.** Held for session 180.
+
+### Session 178 of 183: The extension and the words
+
+Scope: whole repository
+
+**What.** Start Session registers the session and starts the drive loop in the
+Dabbler terminal, so neither the operator nor the AI types `session start` or
+`session next`. The opening sentence the extension gives the AI becomes: keep
+`dabbler session wait --sessions-dir docs/sessions` running in the background,
+do what each instruction says and answer with its command, re-arm the waiter,
+until an instruction says `done`. The Dabbler terminal and a notification show
+an overdue step. The managed instruction body (`bootstrap/templates.ts` and
+this repository's `AGENTS.md`), README, quick start and `driving-a-session.md`
+teach this one loop and say what to do when a step is overdue.
+
+**Non-goals.** No change to how the AI's work is judged; `session next` is not
+deleted.
+
+**Steps.** (1) Start Session starts the loop. (2) The opening sentence. (3) The
+overdue surface. (4) The managed body and the docs.
+
+**Tests.** One per behavior; the managed body stays inside its 150-line budget.
+
+**Releasable.** Held for session 180.
+
+### Session 179 of 183: The walk
+
+Scope: whole repository
+
+**What.** The VSIX this tree builds, installed into a scratch VS Code, drives a
+scratch repository on Claude Code CLI and on Copilot CLI with the POC harness
+playing the operator: Start Session, the waiter, two steps, a question
+mid-wait and mid-turn, verification, the run of record, the close. Every
+deterministic action taken by anyone but the framework is counted; each is a
+defect. Defects are fixed here with their tests; a larger one is written up as a
+later session.
+
+**Non-goals.** No new capability.
+
+**Steps.** (1) Build and install; the scratch repository. (2) The Claude walk.
+(3) The Copilot walk. (4) The fixes. (5) The record in
+`docs/uat/uat-messaging-walk.md`.
+
+**Tests.** One per defect the walk finds.
+
+**Releasable.** Held for session 180.
+
+### Session 180 of 183: The soak, and 3.3.0
+
+Scope: whole repository
+
+**What.** The two-hour soak of both engines, run beside sessions 176–179 with
+the harness in `docs/design/messaging-poc/`, is recorded in
+`docs/design/messaging-design.md`: messages at gaps of 1–20 minutes, operator
+questions every ~15 minutes including mid-turn, two killed waiters per engine,
+and every message left unanswered past its deadline counted. If the soak shows a
+failure the overdue alert cannot surface, sessions 177–179 are reverted before
+anything is published and the finding is written up; otherwise the release is
+3.3.0, a minor: the framework drives, the AI waits in the background.
+
+**Non-goals.** No new capability.
+
+**Steps.** (1) The soak record. (2) The release: version, stamp, CHANGELOG.
+
+**Tests.** None beyond the release checks.
+
+**Releasable.** Yes, a minor, 3.3.0.
+
+### Session 182 of 183: Overrides the operator provably made
+
+Scope: whole repository
+
+**What.** The AI proposes an override or skip with an ID; the operator approves
+it in the chat; the framework verifies the approval against the engine's own
+log entry marked human (Claude Code `queued_command`/user entries, Copilot
+`user.message`) before applying it, and records the proposal, the operator's
+words, the log entry, and every rule overridden or process skipped.
+
+**Releasable.** Yes, a minor.
+
+### Session 183 of 183: Gemini CLI retired
+
+Scope: whole repository
+
+**What.** Gemini CLI is no longer an engine: bootstrap stops writing `GEMINI.md`
+and removes one it wrote, `--engine gemini` is refused with a sentence, the
+managed body and the docs stop offering it, and this repository's `GEMINI.md` is
+deleted. Google stays a reviewer provider over the direct API.
+
+**Releasable.** Yes, a patch.
+
+### Session 181 of 183: The round names what it cost
 
 Scope: whole repository
 

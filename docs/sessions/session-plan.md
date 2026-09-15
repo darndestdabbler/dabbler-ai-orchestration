@@ -11024,7 +11024,47 @@ deleted. Google stays a reviewer provider over the direct API.
 
 **Releasable.** Yes, a patch.
 
-### Session 181 of 183: The round names what it cost
+### Session 181 of 186: Copilot's sentence submitted, and the host's first commit
+
+Scope: whole repository
+
+**Why.** Three defects an operator met on 2026-09-15 driving a first session
+on an Azure DevOps repository through Copilot CLI, the first two urgent. (1)
+Start Session types the waiter sentence at Copilot's prompt and leaves it for
+the operator's Enter. (2) The host initialised the repository with a README
+commit, so bootstrap's `push -u` was refused, no upstream was ever set, the
+pull before `session start` skipped itself for want of one, and the land's
+push failed after the work. (3) is Resume, session 186. And remediation of the
+framework is the framework's own work: the managed body does not tell an
+engine that a fix is done through a session inserted into the plan, so an
+engine asked for a fix edits the code outside any session and nothing reviews
+it.
+
+**What.** Start Session launches Copilot with the sentence as `-i <prompt>`
+("Start interactive mode and automatically execute this prompt", Copilot CLI
+1.0.83), so nothing is typed and no Enter is owed; this replaces session 185's
+typed-sentence plan. Before registering, `session start` fetches origin's
+branch of the same name: a history that shares an ancestor fast-forwards; one
+that shares none and holds only `README.md` is merged unasked (this checkout's
+README kept) and the upstream is set; one holding more is refused with its
+files named and `--merge-origin` to merge it (this checkout's copy kept where
+a file is on both sides), and Start Session asks the person before running it.
+Bootstrap's refused first push merges a README-only commit the same way and
+pushes again. The managed body tells an engine that fixing the framework or a
+project's code is done through a session, inserting one into the plan when
+none covers the fix.
+
+**Non-goals.** Resume (session 186). No merge of a diverged shared history; no
+change for Claude Code's launch.
+
+**Tests.** The Copilot launch carries `-i` and types nothing; the README-only
+merge leaves a pushable branch; a fuller unrelated origin is held and names
+its files, and merges when told; Start asks and re-registers with
+`--merge-origin` only on yes; the managed body stays inside its budget.
+
+**Releasable.** Yes, a patch, 3.3.1: released before session 186.
+
+### Session 185 of 186: The round names what it cost
 
 Scope: whole repository
 
@@ -11051,7 +11091,7 @@ tokens, and one that the close's line prices them.
 
 **Releasable.** Yes, a minor.
 
-### Session 184 of 185: The loop's own commands, approved at launch
+### Session 184 of 186: The loop's own commands, approved at launch
 
 Scope: whole repository
 
@@ -11076,22 +11116,31 @@ the walk repeated on both CLIs with the approvals counted.
 
 **Releasable.** Yes, a patch.
 
-### Session 185 of 185: The typed sentence, submitted
+### Session 186 of 186: Resume brings the AI back
 
 Scope: whole repository
 
-**Why.** Copilot CLI has no argument for an opening prompt, so Start types
-the waiter sentence at its prompt and leaves it for the operator's Enter — a
-deterministic action on every Copilot start. Session 179's walk pressed it
-twice, because the first press landed while the CLI was still starting.
+**Why.** An operator stopped a Copilot session in flight on 2026-09-15 and
+chose Resume Session; nothing happened. Resume trusts terminal names: a loop
+terminal and a CLI terminal still open under their names are shown and the
+command returns, so a CLI whose background waiter was interrupted (Esc,
+Ctrl+C) is shown sitting at its prompt with nothing waiting and nothing
+restarted. And a session driven without Start Session -- an engine opened by
+hand -- can register with no loop running, where `session wait` polls forever
+and nothing is overdue, because only the loop raises the alert.
 
-**What.** The sentence is submitted without a keypress once the CLI is ready
-to take it, and a start whose sentence did not arrive says so instead of
-leaving a CLI that looks ready and is not waiting on anything.
+**What.** Resume leaves the session with a live loop and an AI waiting on it:
+the loop restarted unless one holds the run, the recorded engine's CLI opened
+with the waiter sentence as its argument when none is open, and an open one
+given the sentence again, or the operator told the one sentence to give it.
+`session wait` with no loop driving the session says so, with the command that
+starts one, instead of waiting on nothing.
 
-**Non-goals.** No change for Claude Code, whose sentence is an argument.
+**Non-goals.** No change to how an answer is judged; no second loop beside a
+live one.
 
-**Tests.** One that a start submits the sentence it types; the Copilot walk
-repeated with no Enter.
+**Tests.** Resume with the CLI open and its waiter gone gets the AI waiting
+again; Resume with neither terminal open opens both; `session wait` with no
+loop says so.
 
 **Releasable.** Yes, a patch.

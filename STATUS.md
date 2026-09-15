@@ -2,6 +2,18 @@
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSIONS 176–180 CLOSED, 2026-09-15 — the framework drives, the AI waits in the background; 3.3.0 tagged
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 176 | The research recorded: `docs/design/messaging-design.md`, the proof-of-concept harness in `docs/design/messaging-poc/`, consult round 16 with Sol and Gemini, keep-alives measured and not built | CLOSED VERIFIED |
+> | 177 | `dabbler session wait` (prints the owed instruction, consumes nothing); `session run --mailbox` drives everything deterministic between answers; an `instruction-overdue` supervision record; a report may leave out `--files` | CLOSED VERIFIED |
+> | 178 | Start Session registers and starts the loop, and opens the CLI with the waiter sentence; Resume restarts the loop; the Dabbler terminal says an overdue step once, with a warning; the managed body and the docs teach the one loop | CLOSED VERIFIED r2 |
+> | 179 | The VSIX walked on Claude Code and Copilot CLI with `walk-vsix.cjs` playing the operator (`docs/uat/uat-messaging-walk.md`). Both closed a whole session from one Start: Claude 2 m 25 s with 0 deterministic actions (auto mode), Copilot 3 m 35 s with 8 (an Enter on the typed sentence and seven approvals of `session wait`/`session report`); neither AI called `session next`. Fixed: the loop terminal ran `Code.exe` without `ELECTRON_RUN_AS_NODE`; `session start` checked a seat's model before its free refresh; `sonnet` refused once the catalog was read; bootstrap's stale next step | CLOSED VERIFIED r5, `a0bf3760` |
+> | 180 | The two-hour soak recorded: 16/16 tasks on both engines, 8/8 questions answered, both killed waiters re-armed unaided, 0 past deadline, Copilot 120.11 AI credits. 3.3.0 released | CLOSED VERIFIED r1, landed `b38fddd1`. **`vsix-v3.3.0` tagged by the publish phase, on origin** |
+>
+> **181 is next** (the round names what it cost), then 182 (verified overrides), 183 (Gemini CLI retired), 184 (the loop's two commands approved at launch, narrowly) and 185 (Copilot's typed sentence submitted).
+>
 > ## SESSION 175 CLOSED, 2026-09-15 — the walk, timed; 3.2.1 tagged
 >
 > | session | what | state |

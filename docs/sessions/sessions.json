@@ -3487,9 +3487,9 @@
     {
       "number": 176,
       "title": "Record the research",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-15T06:53:39.128000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-15T07:03:06.252000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

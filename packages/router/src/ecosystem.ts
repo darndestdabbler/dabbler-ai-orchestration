@@ -54,6 +54,26 @@ export function ensureRootFiles(root: string, graph: ProjectGraph): ScaffoldResu
   return null;
 }
 
+/** What a build writes inside the projects it builds, by ecosystem, with the line that says why it is ignored. */
+const BUILD_OUTPUT: Readonly<Record<string, readonly [readonly string[], string]>> = {
+  dotnet: [["bin/", "obj/"], "# MSBuild's own output, which lands inside the project it built."],
+  maven: [["target/"], "# Maven's own output, which lands inside the module it built."],
+};
+
+/**
+ * Ignore what the ecosystem's build writes inside the repository, for a
+ * solution of any size and whoever wrote its root build files. A step's own
+ * check builds, and output nothing ignores is a check that changed the tree it
+ * was measuring. `.gitignore` when it gained a line, else nothing.
+ */
+export function ignoreBuildOutput(root: string, graph: ProjectGraph): string[] {
+  const output = graph.ecosystem === null ? undefined : BUILD_OUTPUT[graph.ecosystem];
+  if (output === undefined) return [];
+  const result = { written: [] as string[], skipped: [] as string[], changed: [] as string[] };
+  ensureIgnoreRules(root, output[0], output[1], result);
+  return [...result.written, ...result.changed];
+}
+
 function posix(path: string): string {
   return path.split("\\").join("/");
 }
@@ -176,12 +196,8 @@ function rootFilesDotnet(root: string, graph: ProjectGraph): ScaffoldResult {
         `${SLNX_SDK_FLOOR} onward; below that release it is not a solution file at all.`,
     );
   }
-  ensureIgnoreRules(
-    root,
-    ["bin/", "obj/"],
-    "# MSBuild's own output, which lands inside the project it built.",
-    result,
-  );
+  const [rules, why] = BUILD_OUTPUT["dotnet"]!;
+  ensureIgnoreRules(root, rules, why, result);
   return result;
 }
 
@@ -332,7 +348,8 @@ function rootFilesMaven(root: string, graph: ProjectGraph): ScaffoldResult {
     ].join("\n"),
     result,
   );
-  ensureIgnoreRules(root, ["target/"], "# Maven's own output, which lands inside the module it built.", result);
+  const [rules, why] = BUILD_OUTPUT["maven"]!;
+  ensureIgnoreRules(root, rules, why, result);
   // Only when the parent POM is this scaffold's: an existing one carries
   // whatever release its team chose, and saying anything about it here
   // would be a claim about a file nothing wrote.

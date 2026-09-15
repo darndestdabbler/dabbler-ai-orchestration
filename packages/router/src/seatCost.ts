@@ -100,9 +100,11 @@ export const STATUSES = [STATUS_MEASURED, STATUS_FLOOR, STATUS_UNMEASURED] as co
 /**
  * Store schema versions this reader has been verified against. Anything else
  * is refused (unmeasured) rather than assumed compatible -- the columns belong
- * to a private store and can change without notice.
+ * to a private store and can change without notice. Version 7 (Copilot CLI
+ * 1.0.83) still carries `assistant_usage_events.session_id` and
+ * `total_nano_aiu`, the two columns read.
  */
-export const SUPPORTED_SCHEMA_VERSIONS: readonly number[] = [6];
+export const SUPPORTED_SCHEMA_VERSIONS: readonly number[] = [6, 7];
 
 const USAGE_TABLE = "assistant_usage_events";
 const SESSIONS_TABLE = "sessions";

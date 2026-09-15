@@ -139,8 +139,8 @@ export const SHARED_BODY =
   "- State files (`docs/sessions/sessions.json`) and everything under\n" +
   "  `.dabbler/runs/`\n" +
   "  are written by the router only — never by hand, never \"fixed up\".\n" +
-  "  The router commits its own `docs/sessions/*` files at the land and the\n" +
-  "  close; a step's report never names them.\n" +
+  "  The router commits the state files it writes at the land and the close,\n" +
+  "  and a report never names those; it names `session-plan.md` if it edits it.\n" +
   "- Verdicts come from the **Primary Reviewer** -- *not the author* -- and\n" +
   "  a disputed impasse from the **Auxiliary Reviewer** -- *not the author\n" +
   "  and not the primary*, so a third voice is the role's own definition. A\n" +

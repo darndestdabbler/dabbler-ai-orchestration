@@ -87,7 +87,7 @@ import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
 import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
-import { ensureRootFiles } from "./ecosystem.ts";
+import { ensureRootFiles, ignoreBuildOutput } from "./ecosystem.ts";
 import { readProjectGraph } from "./projectGraph.ts";
 import { BUILT_IN_ENGINES, builtInEngine, engineAliases } from "./engines.ts";
 import type { Engine, EngineOutcome, EngineOutput } from "./engines.ts";
@@ -121,6 +121,7 @@ import {
   resolveTrunk,
   runGit,
   snapshotWorktreeTree,
+  treeWithPaths,
 } from "./journal.ts";
 import {
   LedgerError,
@@ -283,7 +284,7 @@ export function landCommitMessage(
 export const SIBLING_REFERENCE =
   "A project reaches a sibling by project reference: in .NET a <ProjectReference> to the sibling's project, with both projects listed in the solution file at the root; " +
   "in Maven a <dependency> on the sibling at ${project.version}, with both modules listed under <modules> in the parent pom.xml and built in one reactor run. " +
-  "A step that writes a project adds it to that root file; where there is none yet, the framework writes the root build files once the work is done, before it is verified.\n";
+  "A step that writes a project adds it to that root file; where there is none yet, the framework writes the root build files, and ignores what the build writes, before the step's checks run.\n";
 
 export function judgeLease(mine: number, onDisk: number): { readonly refusal: string | null } {
   if (onDisk <= mine) return { refusal: null };
@@ -2047,6 +2048,9 @@ class Driver {
     if (shape !== "ok") return shape;
     const answered = report as DriverReport;
 
+    // Before the checks, which build: output nothing ignores is a check that
+    // changed the tree it was measuring.
+    this.writeRootFiles();
     const current = snapshotWorktreeTree(this.repoRoot);
     if (current === null) throw new Stop("engine", "could not snapshot the working tree");
     const diff = changedPathsBetween(this.repoRoot, String(this.run.baseline_tree), current);
@@ -2153,17 +2157,23 @@ class Driver {
 
   /**
    * The root build files a solution of several projects needs, written where
-   * absent once the work is done and before it is verified -- the one moment
-   * every path into a round passes, so a solution gets them from the session
-   * that wrote its projects. They are part of the tree the round reviews and
-   * the land commits, and the step baseline moves past them, so no later
-   * step has to account for what the framework wrote.
+   * absent, and the output its ecosystem's build writes ignored -- before a
+   * step's checks, which build, and before a round, the one moment every path
+   * into one passes. They are part of the tree the round reviews and the land
+   * commits, and the step baseline moves past exactly them, so no step has to
+   * account for what the framework wrote.
    */
   private writeRootFiles(): void {
-    const written = ensureRootFiles(this.repoRoot, readProjectGraph(this.repoRoot));
-    const wrote = [...(written?.written ?? []), ...(written?.changed ?? [])];
+    const graph = readProjectGraph(this.repoRoot);
+    const written = ensureRootFiles(this.repoRoot, graph);
+    const wrote = [
+      ...new Set([...(written?.written ?? []), ...(written?.changed ?? []), ...ignoreBuildOutput(this.repoRoot, graph)]),
+    ];
     if (wrote.length === 0) return;
-    const tree = snapshotWorktreeTree(this.repoRoot);
+    const tree =
+      this.run.baseline_tree === null
+        ? snapshotWorktreeTree(this.repoRoot)
+        : treeWithPaths(this.repoRoot, String(this.run.baseline_tree), wrote);
     if (tree !== null) this.run = { ...this.run, baseline_tree: tree };
     this.save();
     this.log("root-files", { wrote });

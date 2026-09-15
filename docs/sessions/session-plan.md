@@ -10860,3 +10860,30 @@ release.
 
 **Releasable.** Yes: a **patch** when the walk finds defects, and nothing to
 publish when it finds none (the plan holds, naming the clean walk).
+
+### Session 176 of 176: The round names what it cost
+
+Scope: whole repository
+
+**Why.** Session 175's walk priced its five review rounds only by searching
+the Copilot seat's store for conversations opened in its scratch
+repositories. No round record names its conversation, and every
+`rounds.jsonl` row over the seat reads `input_tokens: null`,
+`output_tokens: 0`. `dabbler seat-cost` attributes by conversation id and
+never by clock, so the one verb that answers what a session spent cannot be
+pointed at a session from its own record.
+
+**What changes.** A round dispatched over the seat records, on its
+`rounds.jsonl` row, the conversation id its transport already reads
+(`metadata.session_id`) and the tokens the seat reported; the close prices
+the session's rounds through `seat-cost` and prints the number with its
+billing platform, or says it is unmeasured and why.
+
+**Non-goals.** No new billing source; no estimate where the store holds no
+row; nothing for the direct-API transport beyond the usage it already
+returns.
+
+**Tests.** One that a seat round's row carries its conversation id and
+tokens, and one that the close's line prices them.
+
+**Releasable.** Yes, a minor.

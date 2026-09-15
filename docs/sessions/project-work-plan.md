@@ -212,7 +212,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 172 | The build files are the solution | yes | 2026-09-14 |
 | 173 | Tests named after what they test | yes | 2026-09-14 |
 | 174 | What planning asks, and when a session releases | yes | 2026-09-14 |
-| 175 | The walk, timed | — | not declared |
+| 175 | The walk, timed | yes | 2026-09-15 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2490,3 +2490,14 @@ Make releasing a project setting and make planning ask how production is split. 
 **Amended after acceptance:**
 
 - 2026-09-14 — step 'the-words': its files: check-shipped-docs refuses a dabbler.* id the extension does not contribute; dabbler.release is a real workspace setting, so the extension contributes it rather than the pages avoiding its name (claude-code (anthropic, claude-fable-5-1))
+
+### Session 175 — The walk, timed
+
+**Releasable: yes.**
+
+Session 175 walks what sessions 170-174 left: the extension this tree builds, packaged as a VSIX and installed into a scratch VS Code with its own extensions and user data directories the way a developer installs it, driving two new solutions in scratch repositories under C:/temp, each with a bare origin. The first is the CSV tutorial in .NET -- a console application tier that parses CSV into `Person` objects and sends them to an API tier that alone writes them to SQLite -- from `dabbler bootstrap` through its session 3, the `Person` class; the second is a two-project Maven reactor through its session 1. Every scratch session is driven with `dabbler session next` through the shim the VSIX installs and is timed from its `supervision.jsonl`, its job logs and its ledger row: registration, planning, the engine's authoring, each review round, the run of record, the land, the release and the close. The walk passes when no stop needs more than one `session next` or one named command, a one-class session's framework time (all but authoring and review) is under two minutes and the session under six, `packaging.pack` produces the handoff artifacts, the Solution Explorer shows the projects the build files declare, and the provider bill for the walk is read from `dabbler seat-cost` and the API usage and written down. The record is docs/uat/uat-simplified-walk.md. A defect the walk finds is fixed in this session with one test named after the file it fixes; a finding that is a larger change is written into the session plan as a later session and the record names it. docs/tutorials/csv-solution/ is rewritten from what the walk did -- its renderer's prose, its walk steps and its screenshots -- as the three-tier solution with project references rather than four modules. The release is a patch, 3.2.1: version.json bumped and stamped, and the CHANGELOG entry naming each defect fixed and the rewritten tutorial.
+
+**Amended after acceptance:**
+
+- 2026-09-15 — step 'walk-fixes': its files: the six defects the walks found, each fixed with its test; README and the plan ask now say when the root files arrive (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-15 — step 'walk-fixes': its files: session 176 is written into the session plan, which a report names; the managed body said no docs/sessions file is ever named, which cost this step a refusal (claude-code (anthropic, claude-fable-5-1))

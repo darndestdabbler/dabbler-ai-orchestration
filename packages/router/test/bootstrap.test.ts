@@ -35,6 +35,7 @@ import { capture } from "../src/output.ts";
 import { writePreferences } from "../src/preferences.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
 import { makeAnsweredRepo, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
+import { parse as parseYaml } from "yaml";
 
 const savedTransport = process.env[TRANSPORT_ENV_VAR];
 afterEach(() => {
@@ -543,6 +544,10 @@ describe("what a repository declares about its tests", () => {
     assert.match(config, /test_name: "\{name\}Tests\.cs"\n {6}select: dotnet test --filter \{names\}\n {6}select_separator: "\|"/);
     assert.match(config, /test_name: "\{name\}Test\.java"\n {6}select: mvn -q test -Dtest=\{names\} -Dsurefire\.failIfNoSpecifiedTests=false/);
     assert.doesNotMatch(config, /repo_wide|runs_whole/);
+    // Loaded the way the router loads it: YAML 1.1 reads a bare `.` as null,
+    // and a null test root selected no named test in any Maven repository.
+    const suites = (parseYaml(config, { version: "1.1" }) as { testing: { suites: Array<{ name: string; test_roots: unknown }> } }).testing.suites;
+    assert.deepEqual(suites.find((suite) => suite.name === "maven")?.test_roots, ["."]);
   });
 
   it("declares no suite for a repository that says nothing", () => {
@@ -648,5 +653,12 @@ describe("what the Solution Explorer has to render", () => {
     const repo = emptyRepo();
     await bootstrapVerb(["--project-dir", repo]);
     assert.ok(existsSync(join(repo, ".dabbler", "solution", "solution.json")));
+  });
+
+  it("describes the remote without the focused checkout it no longer clones", async () => {
+    const run = await capture(() => bootstrapVerb(["--help"]));
+    assert.equal(run.value, 0, run.stderr);
+    assert.match(run.stdout, /--remote URL/);
+    assert.doesNotMatch(run.stdout, /focused checkout/);
   });
 });

@@ -69,10 +69,10 @@ function usage(): string {
     "                        consumer project root (default: cwd)",
     "  --remote URL          where this project pushes: recorded as `origin`,",
     "                        and the branch is pushed with an upstream so it",
-    "                        tracks. The close pushes and a focused checkout",
-    "                        is cloned from the origin, so a project without",
-    "                        one cannot close its first session. An existing",
-    "                        remote is left exactly as it is.",
+    "                        tracks. The close pushes to the origin, so a",
+    "                        project without one cannot close its first",
+    "                        session. An existing remote is left exactly as",
+    "                        it is.",
     "  --transport {" + CHOICES.join(",") + "}",
     `                        how a provider is reached from this checkout,`,
     `                        written to ${SETTINGS_RELPATH}. Nothing outside`,
@@ -405,7 +405,7 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     if (pushed.error === "") {
       writeOut(
         `bootstrap: pushed ${pushed.branch} to origin and set it to track there, ` +
-          "which is what the close's push and a focused checkout's clone both read.\n",
+          "which is what the close's push reads.\n",
       );
       const mismatch = defaultBranchMismatch(project, pushed.branch);
       if (mismatch !== null) writeErr(mismatch);
@@ -568,7 +568,7 @@ function defaultBranchMismatch(projectDir: string, pushedBranch: string): string
     (unrelated === true
       ? ` and the two share no history -- '${hosted}' is a placeholder the host created, not an earlier state of this work`
       : "") +
-    `. A focused checkout clones origin's default, so it would arrive on '${hosted}'.\n` +
+    `. A clone of origin checks out its default, so it would arrive on '${hosted}'.\n` +
     "bootstrap: which branch is this repository's trunk? Both answers are yours to make, " +
     "and they are not the same act:\n" +
     `  '${pushedBranch}' -- the branch your work is on. It stays, and '${hosted}' is deleted ` +

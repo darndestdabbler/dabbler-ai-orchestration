@@ -177,7 +177,7 @@ function layerLines(label: string, reading: Node): string[] {
   return lines;
 }
 
-function renderExplain(configuration: Node): string {
+export function renderExplain(configuration: Node): string {
   const unavailable = text(configuration["unavailable"]);
   if (unavailable !== null) {
     return `configuration: this configuration could not be read: ${unavailable}\n`;
@@ -185,9 +185,13 @@ function renderExplain(configuration: Node): string {
   const lines: string[] = [];
   lines.push(...layerLines("machine vehicle", node(configuration["transport"])));
   const engines = node(configuration["engines"]);
-  lines.push(
-    `engine: ${text(engines["chosen"]) ?? "none installed"} — ${text(engines["reason"]) ?? ""}`,
-  );
+  const installed = Array.isArray(engines["installed"])
+    ? engines["installed"].filter((entry) => text(node(entry)["path"]) !== null).length
+    : 0;
+  // The Configuration pane's words for the same reading: a machine with engines
+  // and no choice has not got "none installed".
+  const engine = text(engines["chosen"]) ?? (installed > 0 ? `${installed} installed, none chosen` : "none installed");
+  lines.push(`engine: ${engine} — ${text(engines["reason"]) ?? ""}`);
   for (const [key, label] of PARTICIPANTS) {
     const participant = node(configuration[key]);
     lines.push(...layerLines(`${label} vehicle`, node(participant["vehicle"])));

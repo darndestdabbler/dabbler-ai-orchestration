@@ -465,6 +465,24 @@ function snapshotWorktreeTreeOnce(repoRoot: string): string | null {
 }
 
 /**
+ * `tree` with `paths` taken from the working tree, or null when git refuses:
+ * a baseline moved past the files the framework wrote and past nothing else,
+ * so a step is still measured against everything it changed itself.
+ */
+export function treeWithPaths(repoRoot: string, tree: string, paths: readonly string[]): string | null {
+  const tempIndex = join(tmpdir(), `dabbler-verify-index-${uniqueSuffix()}`);
+  const env = { GIT_INDEX_FILE: tempIndex };
+  try {
+    if (runGit(repoRoot, ["read-tree", tree], { env }).code !== 0) return null;
+    if (runGit(repoRoot, ["add", "--", ...paths], { env }).code !== 0) return null;
+    const written = runGit(repoRoot, ["write-tree"], { env });
+    return written.code === 0 && written.stdout ? written.stdout : null;
+  } finally {
+    rmSync(tempIndex, { force: true });
+  }
+}
+
+/**
  * Repository-relative paths differing between two trees, or null on a git
  * failure -- callers fail closed.
  */

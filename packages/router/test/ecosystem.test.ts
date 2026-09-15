@@ -7,7 +7,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { describe, it } from "node:test";
 
-import { ensureRootFiles, javaReleaseOf, setJavaSource } from "../src/ecosystem.ts";
+import { ensureRootFiles, ignoreBuildOutput, javaReleaseOf, setJavaSource } from "../src/ecosystem.ts";
 import { readProjectGraph } from "../src/projectGraph.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
@@ -159,5 +159,25 @@ describe("the root build files", () => {
     assert.match(ignore, /^obj\/$/m);
     // Theirs is still there, and still first.
     assert.ok(ignore.startsWith(bootstrapped), ignore);
+  });
+});
+
+describe("the build output a step's check writes", () => {
+  it("is ignored where the parent POM already exists, which writes no root files", () => {
+    // The walk's reactor: a developer's own parent POM, so the first
+    // `mvn test` a check ran wrote target/ and nothing had ignored it.
+    const root = tempDir("maven-");
+    seed(root, {
+      "pom.xml":
+        "<project>\n  <groupId>com.example</groupId>\n  <artifactId>greeting-parent</artifactId>\n" +
+        "  <packaging>pom</packaging>\n  <modules>\n    <module>greeting-lib</module>\n    <module>greeting-app</module>\n  </modules>\n</project>\n",
+      "greeting-lib/pom.xml": "<project>\n  <artifactId>greeting-lib</artifactId>\n</project>\n",
+      "greeting-app/pom.xml": "<project>\n  <artifactId>greeting-app</artifactId>\n</project>\n",
+    });
+    const graph = readProjectGraph(root);
+    assert.equal(ensureRootFiles(root, graph), null);
+    assert.deepEqual(ignoreBuildOutput(root, graph), [".gitignore"]);
+    assert.match(readFileSync(join(root, ".gitignore"), "utf8"), /^target\/$/m);
+    assert.deepEqual(ignoreBuildOutput(root, graph), []);
   });
 });

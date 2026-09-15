@@ -33,7 +33,9 @@ import {
   redact,
   runAsRecord,
   taggedCommit,
+  type PackagingRun,
 } from "../src/packaging.ts";
+import { renderRun } from "../src/cli/packaging.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
 import { EARLIER_COMMIT, makeAnsweredSandbox, makeConfig } from "./support/answers.ts";
 
@@ -769,5 +771,33 @@ describe("the record", () => {
     const attempted = packageSession(sessionsDir, { config: packagingConfig(pushLog) });
     assert.equal(attempted.declared, false);
     assert.equal(existsSync(pushLog), false);
+  });
+});
+
+describe("the heading a packaging run prints", () => {
+  it("names a real run by its outcome, and only a rehearsal as a dry run", () => {
+    // A pack-only publish, as the walk's CSV session 3 recorded it.
+    const run: PackagingRun = {
+      outcome: OUTCOME_PUBLISHED,
+      sessionNumber: 3,
+      releasable: true,
+      refusal: "",
+      feed: "origin",
+      secretName: "",
+      treeDigest: null,
+      postTreeDigest: null,
+      treeMutated: false,
+      artifacts: ["people-api/People.Api.dll", "v0.1.0"],
+      gates: [],
+      steps: [],
+      recordedAt: "2026-09-15T00:51:33.000-04:00",
+      ready: false,
+      declared: true,
+      notes: [],
+    };
+    const real = renderRun(run, false);
+    assert.match(real, new RegExp(`^packaging: ${OUTCOME_PUBLISHED}`));
+    assert.doesNotMatch(real, /dry run/);
+    assert.match(renderRun(run, true), /^packaging: dry run/);
   });
 });

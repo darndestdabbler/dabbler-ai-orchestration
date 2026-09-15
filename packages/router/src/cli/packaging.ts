@@ -182,8 +182,9 @@ function rehearsalHeading(run: PackagingRun): string {
     : `dry run: the declaration loads; ${failed} gate(s) would refuse a real publish now`;
 }
 
-function render(run: PackagingRun): string {
-  const lines = [`packaging: ${rehearsalHeading(run)}`];
+/** A run as the verb prints it: a real one headed by what it did, a rehearsal by what a real one would meet. */
+export function renderRun(run: PackagingRun, dryRun: boolean): string {
+  const lines = [`packaging: ${dryRun ? rehearsalHeading(run) : run.outcome}`];
   // The same row the close prints, from the same function -- which is what
   // this comment used to claim while spelling its own marks a line below.
   const width = Math.max(0, ...run.gates.map((gate) => gate.name.length));
@@ -271,8 +272,8 @@ export async function packagingVerb(argv: string[]): Promise<number> {
     (parsed.json
       ? dumps(runAsRecord(run), { indent: 2 })
       : parsed.dryRun
-        ? `${explain(sessionsDir, run)}\n\n${render(run)}`
-        : render(run)) + "\n",
+        ? `${explain(sessionsDir, run)}\n\n${renderRun(run, true)}`
+        : renderRun(run, false)) + "\n",
   );
   // A rehearsal that reached the point of packing, or one that proved the
   // declaration in a session that may not publish, both answer 0: each is

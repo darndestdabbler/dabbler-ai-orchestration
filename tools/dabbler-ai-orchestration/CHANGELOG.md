@@ -10,6 +10,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.2.1] — 2026-09-15
+
+**The walk, timed.** The CSV tutorial's three-tier .NET solution and a
+two-project Maven reactor were built through the packaged extension, every
+session timed from its own record. A one-class session took 2 minutes 24
+seconds from registration to close, about 45 seconds of it the framework's own
+work. These are what the walk found.
+
+### Fixed
+
+- **A step whose check builds is no longer refused for changing the tree.**
+  The framework writes the root build files, and ignores what the build writes
+  — `bin/` and `obj/` for .NET, `target/` for Maven — before a step's checks
+  run, and the step is measured past exactly those files. The output is now
+  ignored where the developer's own solution file or parent POM already
+  exists, which before this never happened at all.
+- **A Maven suite bootstrap declares runs the tests named after what a step
+  changed.** Its test root was written as a bare `.`, which the configuration
+  loader reads as null, so no named test ran in any Maven repository. It is
+  written quoted. A repository bootstrapped on 3.1.0 or 3.2.0 quotes it by
+  hand: `test_roots: ["."]`.
+- **`dabbler seat-cost` measures the version 7 store** Copilot CLI 1.0.83
+  writes, rather than refusing it as unverified.
+- **A real publish is headed by its outcome.** Its output began *dry run*
+  above the pack and the tag it had just made.
+- **`dabbler configuration explain` counts the engines installed** when none is
+  chosen, the Configuration pane's own words, instead of *none installed*.
+- **`dabbler bootstrap` no longer describes the per-module clone** the
+  framework stopped making in 3.0.0, in its help or its messages.
+- **The managed instructions say a report names `session-plan.md`** when a
+  step edits it: they said no file under `docs/sessions` is ever named.
+
+### Changed
+
+- **The CSV tutorial is rewritten from the walk**: a console importer, an API,
+  and SQLite behind the API alone, as six projects in one solution; sessions 1
+  to 3 as they ran, with their times and the screens they showed.
+
 ## [3.2.0] — 2026-09-14
 
 **When a session publishes is the solution's setting.** Release on request,

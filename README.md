@@ -76,10 +76,11 @@ in the repository you opened, and its plan names the files each step changes.
 both; a Maven module depends on a sibling at `${project.version}`, and the
 parent `pom.xml` lists both under `<modules>`, built in one reactor run. Where
 the build files hold more than one project and the root has no solution file
-or parent POM, the framework writes the root build files once a session's work
-is done, before it is verified, and never rewrites them: for .NET the `.slnx`,
-`Directory.Build.props` and `Directory.Build.targets`, with `bin/` and `obj/`
-ignored; for Maven the parent POM, with `target/` ignored.
+or parent POM, the framework writes the root build files before a step's checks
+run, and never rewrites them: for .NET the `.slnx`, `Directory.Build.props` and
+`Directory.Build.targets`; for Maven the parent POM. Whoever wrote the root
+files, a .NET solution's `bin/` and `obj/` and a Maven reactor's `target/` are
+ignored before the first check builds.
 
 **Tests are named after what they test.** A source file's tests are the test
 file named after it: `CsvSerializer.cs` and `CsvSerializerTests.cs`,

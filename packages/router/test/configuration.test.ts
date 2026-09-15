@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { SOURCE_API, TRANSPORT_API, writeBlock, type CatalogModel } from "../src/catalog.ts";
-import { configurationVerb } from "../src/cli/configuration.ts";
+import { configurationVerb, renderExplain } from "../src/cli/configuration.ts";
 import { configure } from "../src/cli/configure.ts";
 import { currentCredentialsPath, setCredentialsPath } from "../src/credentials.ts";
 import { configurationNode } from "../src/projection.ts";
@@ -183,6 +183,24 @@ describe("what may be chosen, and what decided what is", () => {
     const run = await capture(() => configurationVerb(["explainn"]));
     assert.equal(run.value, 2);
     assert.match(run.stderr, /unknown command/);
+  });
+
+  it("counts the engines a machine has when none is chosen, rather than saying none is installed", () => {
+    // The walk's two-CLI machine: the pane read "2 installed, none chosen"
+    // while this line read "none installed" beside a reason naming both.
+    const rendered = renderExplain({
+      engines: {
+        chosen: null,
+        reason: "`claude` and `copilot` are on PATH, so which one runs a session is a choice rather than a default.",
+        installed: [
+          { engine: "claude-code", program: "claude", path: "C:/bin/claude.exe" },
+          { engine: "copilot", program: "copilot", path: "C:/bin/copilot.exe" },
+          { engine: "gemini", program: "gemini", path: null },
+        ],
+      },
+    });
+    const line = rendered.split("\n").find((row) => row.startsWith("engine:")) as string;
+    assert.match(line, /^engine: 2 installed, none chosen — /);
   });
 });
 

@@ -251,7 +251,8 @@ function suiteBlock(eco: Ecosystem): string {
   ];
   if (eco.runsWhole) lines.push("      runs_whole: true");
   lines.push("      test_roots:");
-  for (const root of eco.testRoots) lines.push(`        - ${root}`);
+  // Quoted: the loader reads YAML 1.1, where a bare `.` -- Maven's test root -- is null.
+  for (const root of eco.testRoots) lines.push(`        - "${root}"`);
   lines.push(`      test_glob: "${eco.testGlob}"`);
   if (eco.testName) lines.push(`      test_name: "${eco.testName}"`);
   if (eco.select) lines.push(`      select: ${eco.select}`);

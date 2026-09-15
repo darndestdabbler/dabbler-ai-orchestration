@@ -52,16 +52,22 @@ async function browser() {
   return import("./electronLaunch.ts");
 }
 
-/** The module slugs the staged manifest declares, in dependency order. */
-export const MODULES = ["model", "deserializer", "persister", "app"] as const;
-
-/** The planned sessions, one per module, as the corpus declares them. */
-export const PLANNED_SESSIONS = [
-  "001 · The Person model",
-  "002 · Reading a CSV file",
-  "003 · Storing a person",
-  "004 · The watcher",
+/** The source projects the solution file lists, each with the kind the Solution Explorer reads from its build file. */
+export const PROJECTS = [
+  ["Csv.Model", "library"],
+  ["Csv.Importer", "application"],
+  ["People.Api", "service"],
 ] as const;
+
+/** The sessions the walked solution has, by the bucket the Work Explorer files them under. */
+export const SESSIONS = {
+  complete: [
+    "001 · Author or import the solution plan",
+    "002 · Challenge the plan, then break it into numbered sessions",
+    "003 · The Person model",
+  ],
+  notStarted: ["004 · The CSV parser", "005 · The API's store", "006 · The importer sends"],
+} as const;
 
 export const WALK_STEPS: readonly WalkStep[] = [
   {
@@ -73,7 +79,7 @@ export const WALK_STEPS: readonly WalkStep[] = [
     ],
     expect: [
       "Two panes appear: **Solution Explorer** and **Work Explorer**.",
-      "The Solution Explorer names the repository and says **4 modules**.",
+      "The Solution Explorer names the repository and says **6 projects** — the three tiers' projects and their three test projects, read from the solution file.",
     ],
     async drive(ctx) {
       const { openDabblerContainer, rowTexts } = await browser();
@@ -85,8 +91,8 @@ export const WALK_STEPS: readonly WalkStep[] = [
         .waitFor({ state: "visible", timeout: 60_000 });
       const rows = await rowTexts(solution);
       ctx.check(
-        "the repository row counts four modules",
-        rows.some((r) => /4 modules/.test(r)),
+        "the repository row counts six projects",
+        rows.some((r) => /6 projects/.test(r)),
         rows[0] ?? "no rows",
       );
       await ctx.shoot("01-solution-opened");
@@ -97,97 +103,53 @@ export const WALK_STEPS: readonly WalkStep[] = [
     id: "read-the-decomposition",
     title: "Read what the solution is built from",
     operator: [
-      "Collapse the Work Explorer and expand the Solution Explorer's repository row, then expand each module.",
+      "Collapse the Work Explorer and expand the Solution Explorer's repository row, then expand each project.",
     ],
     expect: [
-      "Four modules: **model**, **deserializer**, **persister** and **app**.",
-      "`model` is a **shared-types** module and is **used by 3** siblings — every other module references the `Person` type.",
-      "`deserializer` and `persister` each depend on the model and are used by `app`.",
-      "Each module names its package: `CsvModel`, `CsvDeserializer`, `CsvPersister`, `CsvWatcher`.",
+      "`Csv.Model` is a **library**, **used by 5**: `Csv.Importer`, `People.Api` and the three test projects.",
+      "`Csv.Importer` is an **application** and `People.Api` a **service**; each **depends on 1**, `Csv.Model`, and neither references the other.",
+      "Each project row names its path, and each test project **depends on** the project it tests. Nothing here was declared: every row is read from the `.slnx` and the `<ProjectReference>` elements.",
     ],
     async drive(ctx) {
       const { expandAllRows, rowTexts, setPaneExpanded } = await browser();
-      // The Work Explorer is collapsed for this shot so the whole module
-      // tree fits in one viewport -- a virtualized list only renders the
-      // rows on screen, so "all four modules" is a statement about layout
-      // as much as about data.
+      // The Work Explorer is collapsed so the whole project tree fits in one
+      // viewport: a virtualized list only renders the rows on screen.
       await setPaneExpanded(ctx.page, "Work Explorer", false);
       const solution = await ctx.paneOf("Solution Explorer");
       await expandAllRows(solution);
       const rows = await rowTexts(solution);
 
-      // Every dependency claim below is checked against its OWN module's
-      // segment of the row list, not against the tree as a whole: a
-      // sibling's name also renders as a bare leaf under another module's
-      // "Depends on"/"Used by" list (e.g. "app" under model's "Used by 3"),
-      // so a global `rows.some(...)` cannot tell "app depends on 3" from
-      // "app is one of the three model is used by". A module's own row is
-      // the one that carries its kind label (only the top-level row does;
-      // a bare sibling reference is just the slug) -- round 1's verifier
-      // (GPT Terra) found the version before this checked only a global
-      // "Used by 3", the package strings, and three of four group prefixes,
-      // none of which is scoped to the module the tutorial claims it of.
-      const KIND_OF: Record<(typeof MODULES)[number], string> = {
-        model: "shared-types",
-        deserializer: "library",
-        persister: "library",
-        app: "application",
-      };
-      // No space between the label and the description in the rendered
-      // text (VS Code concatenates them as adjacent nodes, e.g.
-      // "modelshared-types · package: CsvModel"), so the prefix check is
-      // bare and the kind text is what disambiguates a module's own row
-      // from a bare sibling-name leaf that merely starts the same way.
-      const topIndex = new Map(
-        MODULES.map((slug) => [
-          slug,
-          rows.findIndex((r) => r.startsWith(slug) && r.includes(KIND_OF[slug])),
-        ]),
+      // A project's own row carries its kind and path; a sibling's name also
+      // renders as a bare leaf under another project's "Depends on"/"Used by",
+      // so each claim is checked against its own project's segment of rows.
+      const topIndex = new Map<string, number>(
+        PROJECTS.map(([name, kind]) => [name, rows.findIndex((r) => r.startsWith(name) && r.includes(`${kind} ·`))]),
       );
-      const byPosition = [...MODULES].sort((a, b) => topIndex.get(a)! - topIndex.get(b)!);
-      const segmentOf = (slug: (typeof MODULES)[number]): string[] => {
-        const start = topIndex.get(slug)!;
-        const next = byPosition[byPosition.indexOf(slug) + 1];
-        const end = next ? topIndex.get(next)! : rows.length;
-        return start < 0 ? [] : rows.slice(start, end);
+      const starts = [...topIndex.values()].filter((index) => index >= 0).sort((a, b) => a - b);
+      const segmentOf = (name: string): string[] => {
+        const start = topIndex.get(name) ?? -1;
+        if (start < 0) return [];
+        const next = starts.find((index) => index > start) ?? rows.length;
+        return rows.slice(start, next);
       };
 
-      for (const slug of MODULES) {
-        ctx.check(`the ${slug} module is listed`, topIndex.get(slug)! >= 0, rows.join(" | "));
+      for (const [name, kind] of PROJECTS) {
+        ctx.check(`${name} is listed as ${kind}`, (topIndex.get(name) ?? -1) >= 0, rows.join(" | "));
       }
       ctx.check(
-        "model is shared-types and used by its three siblings",
-        segmentOf("model").some((r) => r.includes("shared-types")) &&
-          segmentOf("model").some((r) => /^Used by\s*3$/.test(r)) &&
-          ["deserializer", "persister", "app"].every((s) => segmentOf("model").includes(s)),
-        segmentOf("model").join(" | "),
+        "Csv.Model is used by both tiers and the three test projects",
+        segmentOf("Csv.Model").some((r) => /^Used by\s*5$/.test(r)) &&
+          ["Csv.Importer", "People.Api"].every((s) => segmentOf("Csv.Model").includes(s)),
+        segmentOf("Csv.Model").join(" | "),
       );
-      for (const slug of ["deserializer", "persister"] as const) {
+      for (const tier of ["Csv.Importer", "People.Api"] as const) {
+        const other = tier === "Csv.Importer" ? "People.Api" : "Csv.Importer";
         ctx.check(
-          `${slug} depends on the model and is used by app`,
-          segmentOf(slug).some((r) => /^Depends on\s*1$/.test(r)) &&
-            segmentOf(slug).includes("model") &&
-            segmentOf(slug).some((r) => /^Used by\s*1$/.test(r)) &&
-            segmentOf(slug).includes("app"),
-          segmentOf(slug).join(" | "),
-        );
-      }
-      ctx.check(
-        "app depends on all three siblings",
-        segmentOf("app").some((r) => /^Depends on\s*3$/.test(r)) &&
-          ["model", "deserializer", "persister"].every((s) => segmentOf("app").includes(s)),
-        segmentOf("app").join(" | "),
-      );
-      for (const [slug, pkg] of [
-        ["model", "CsvModel"],
-        ["deserializer", "CsvDeserializer"],
-        ["persister", "CsvPersister"],
-        ["app", "CsvWatcher"],
-      ] as const) {
-        ctx.check(
-          `${slug}'s own row names its package (${pkg})`,
-          rows[topIndex.get(slug)!]?.includes(pkg) ?? false,
-          rows[topIndex.get(slug)!] ?? "absent",
+          `${tier} depends on the model alone`,
+          segmentOf(tier).some((r) => /^Depends on\s*1$/.test(r)) &&
+            segmentOf(tier).includes("Csv.Model") &&
+            !segmentOf(tier).includes(other),
+          segmentOf(tier).join(" | "),
         );
       }
       await ctx.shoot("02-decomposition");
@@ -199,12 +161,12 @@ export const WALK_STEPS: readonly WalkStep[] = [
     title: "Read what work is planned",
     operator: [
       "Collapse the Solution Explorer and expand the **Work Explorer**.",
-      "Expand the repository row, then the **Not Started** bucket.",
+      "Expand the repository row, then the **Not Started** and **Complete** buckets.",
     ],
     expect: [
-      "The repository shows **0/4** — none of the four sessions has run.",
-      "The sessions are grouped **by module**, one session per module.",
-      "Each session's title says what that module is for.",
+      "The repository shows **3/6** — three of the six sessions have closed.",
+      "**Not Started** holds sessions 004 to 006, the phases session 2 planned; **Complete** holds 001 to 003, each with the day it closed.",
+      "Each session's title is its heading in `docs/sessions/session-plan.md`.",
     ],
     async drive(ctx) {
       const { expandAllRows, rowTexts, setPaneExpanded } = await browser();
@@ -217,23 +179,16 @@ export const WALK_STEPS: readonly WalkStep[] = [
       await expandAllRows(work);
       const rows = await rowTexts(work);
       ctx.check(
-        "no session has run yet",
-        rows.some((r) => /0\/4/.test(r)),
+        "three of six sessions have closed",
+        rows.some((r) => /3\/6/.test(r)),
         rows[0] ?? "no rows",
       );
-      ctx.check(
-        // All four, including app: round 2's verifier (GPT Terra) found the
-        // previous version checked only three of the four module groups,
-        // silently leaving the app session's own grouping unproved.
-        "the sessions are grouped by module, all four including app",
-        MODULES.every((m) => rows.some((r) => new RegExp(`^${m}\\s*\\d`).test(r))),
-        rows.join(" | "),
-      );
-      ctx.check(
-        "the four planned sessions are listed",
-        PLANNED_SESSIONS.every((title) => rows.some((r) => r.includes(title.slice(6)))),
-        rows.join(" | "),
-      );
+      const bucket = (label: string, titles: readonly string[]) => {
+        const start = rows.findIndex((r) => new RegExp(`^${label}\\s*${titles.length}$`).test(r));
+        return start >= 0 && titles.every((title) => rows.slice(start + 1).some((r) => r.startsWith(title)));
+      };
+      ctx.check("Not Started holds sessions 004 to 006", bucket("Not Started", SESSIONS.notStarted), rows.join(" | "));
+      ctx.check("Complete holds sessions 001 to 003", bucket("Complete", SESSIONS.complete), rows.join(" | "));
       await ctx.shoot("03-work-planned");
     },
   },

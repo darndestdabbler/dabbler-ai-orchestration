@@ -325,8 +325,8 @@ run on its record cannot close: the close refuses.
 - State files (`docs/sessions/sessions.json`) and everything under
   `.dabbler/runs/`
   are written by the router only — never by hand, never "fixed up".
-  The router commits its own `docs/sessions/*` files at the land and the
-  close; a step's report never names them.
+  The router commits the state files it writes at the land and the close,
+  and a report never names those; it names `session-plan.md` if it edits it.
 - Verdicts come from the **Primary Reviewer** -- *not the author* -- and
   a disputed impasse from the **Auxiliary Reviewer** -- *not the author
   and not the primary*, so a third voice is the role's own definition. A

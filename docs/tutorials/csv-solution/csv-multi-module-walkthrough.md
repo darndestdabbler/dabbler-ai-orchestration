@@ -1,33 +1,33 @@
-# Building the CSV solution: four modules, one repository
+# Building the CSV solution: three tiers, one repository
 
-You are going to build a .NET solution that watches a folder for CSV files,
-reads each one into `Person` objects, and stores them in a database. You will
-build it as **four modules**, each a project and its tests in one solution:
-one module is one developer's unit of work.
+You are going to build a .NET solution that imports CSV files of people into a
+SQLite database. It runs as **three tiers**: a console application that reads
+the files and sends the people over HTTP, an API that is the only thing allowed
+to touch the database, and the database itself.
 
-| Module | Kind | What it is | Package |
+| Project | Kind | What it is | References |
 | --- | --- | --- | --- |
-| `model` | shared-types | The `Person` type every other module references | `CsvModel` |
-| `deserializer` | library | CSV text into `Person` objects | `CsvDeserializer` |
-| `persister` | library | `Person` objects into a database | `CsvPersister` |
-| `app` | application | Watches the folder and composes the other three | `CsvWatcher` |
+| `Csv.Model` | library | The `Person` record both tiers agree on | nothing |
+| `Csv.Importer` | application | Reads a CSV file into people and sends them to the API | `Csv.Model` |
+| `People.Api` | service | Validates people and stores them in SQLite, by email | `Csv.Model` |
 
-**A sibling is a project reference.** Each module's project references the
-projects of the modules it depends on, and one solution file at the root lists
-all four, so `dotnet test` there builds and tests the whole solution in one
-pass.
+Each has an xUnit test project beside it under `tests/`, named
+`<Project>.Tests`, whose test files are named after the source files they test.
 
-**`examples/csv-walkthrough/` is not this tutorial.** It is Python, built on
-the six-step component workflow session 100 deleted, and this document
-supersedes it.
+**A sibling is a project reference.** Each project reaches the ones it uses
+with a `<ProjectReference>`, and one solution file at the root lists all six,
+so `dotnet test` there builds and tests the whole solution in one pass. The
+two tiers never reference each other: they meet over HTTP, which is what keeps
+the database behind the API.
 
-Everything below is what you type or click. The framework does the rest.
+Everything below is what you type or click, and how long it took when this
+tutorial was walked. The framework does the rest.
 
 ---
 
 ## Before you start
 
-You need .NET 10 or newer, git, and VS Code with the Dabbler extension
+You need the .NET 10 SDK, git, and VS Code with the Dabbler extension
 installed. Check the SDK:
 
 ```
@@ -35,7 +35,7 @@ dotnet --list-sdks
 ```
 
 The `dabbler` command is on `PATH` in any VS Code terminal once the extension
-has installed its shim. Everywhere else, run
+has activated and installed its shim. Everywhere else, run
 `node "<extension dir>/dist/dabbler.cjs" <verb>`. If you see
 "dabbler: command not found", that is a `PATH` problem, not a keys problem.
 
@@ -43,49 +43,105 @@ has installed its shim. Everywhere else, run
 
 ## 1. Set the repository up
 
-Make an empty folder, open it in VS Code, and click **Set Up New Project** in
-the Solution Explorer. It runs `git init` and then `dabbler bootstrap`.
+Make an empty folder with a remote to push to, open it in VS Code, and click
+**Set Up New Project** in the Solution Explorer. It runs `git init` and then
+`dabbler bootstrap`, which writes the instruction files, `dabbler.yaml` and
+the first two sessions, and commits them. It took 4 seconds.
 
-**You should see:** the Solution Explorer changes from its welcome text to a
-repository row, and `docs/sessions/session-plan.md` appears.
+```
+git init -b master
+git remote add origin <your remote>
+dabbler bootstrap
+```
+
+**You should see** bootstrap say that it declares no test suite and no
+packaging: an empty folder has nothing that says how its tests run or what a
+package is built from. Session 2 declares both. Every session's close pushes,
+so the repository needs its remote before session 1 can finish.
 
 ---
 
-## 2. The four modules are projects
+## 2. Session 1: the plan
 
-There is nothing to declare. The solution is its build files: each module is a
-project under `modules/<name>/src`, with its tests in a project under
-`modules/<name>/tests`, and one `.slnx` at the root lists them all. The
-Solution Explorer reads them and shows each project with its kind, what it
-references and — derived, never typed — what references it.
+Press **Start Session**, choose your engine, and tell it what you are building.
+Session 1 asks for the brief and, before any project is proposed, **how
+production is split**: what runs separately, and which part may talk to the
+database. The default it offers is this solution's answer — an application tier
+that calls an API tier, and only the API tier talks to the database.
 
-The sessions write the projects. Once the build files hold more than one
-project and the root has no solution file, the framework writes the root build
-files as that session's work is done, before it is verified, and **never
-rewrites them**: the `.slnx` listing the projects, `Directory.Build.props`
-and `Directory.Build.targets`, with `bin/` and `obj/` added to
-`.gitignore`.
+The engine writes `brief.md` and `solution-plan.md` under `docs/planning`:
+the objective, the *Production split*, the
+*Handoff artifacts* each tier is handed over as with the command that makes
+it, the projects with their contracts, and the phases later sessions build.
 
-**A shortcut for a quick look:** `node tools/dabbler-ai-orchestration/scripts/stage-csv-solution.mjs
---root <a folder under C:/temp> --reset` writes the sources and projects for
-all four modules, the solution file, and a planned four-session
-`docs/sessions/session-plan.md`, in one call. It is what stages the corpus
-Section 4 below is a tour of.
+Then let the framework drive. In the CLI, run what the terminal tells you:
+
+```
+dabbler session start --sessions-dir docs/sessions --engine <your engine> --provider <your provider>
+dabbler session next --sessions-dir docs/sessions
+```
+
+and keep calling `next`, doing what each instruction says, until it says
+`done`. **One call, one move.** You never run the review, the tests, the
+commit or the close yourself.
+
+**You should see:** after the last step, one `next` that reviews the plan
+with a model from another provider, finds no suite to run yet, lands the
+commit, skips publishing — this solution releases on request, and a plan is
+not a release — and closes. Walked: 2 minutes 22 seconds, the review 21 of them.
 
 ---
 
-## 3. Plan one session per module
+## 3. Session 2: the projects, the suite and the pack
 
-Append one entry per module to `docs/sessions/session-plan.md`, each naming the
-module it works in. The heading form is load-bearing — a session's title is
-healed from it, and clicking a row in the Work Explorer lands on it:
+Session 2 challenges the plan's cuts, then creates what the production split
+names. Write the six projects, each `.csproj` referencing its siblings, and a
+`global.json` pinning the SDK. **Do not write the solution file:** before the
+step's checks run, the framework writes `<folder>.slnx` listing every project,
+`Directory.Build.props` and `Directory.Build.targets`, and adds `bin/` and
+`obj/` to `.gitignore`, and it never rewrites them. Add each project you
+create later to the `.slnx` yourself.
+
+Declare the suite in `dabbler.yaml`. A source file's tests are the test file
+named after it, so the framework runs `PersonTests` whenever `Person.cs`
+changes:
 
 ```
-### Session 1 of 4: The Person model
+testing:
+  suites:
+    - name: dotnet
+      command: dotnet test
+      expensive: true
+      covers: ["."]
+      test_roots: ["tests"]
+      test_glob: "*Tests.cs"
+      test_name: "{name}Tests.cs"
+      select: dotnet test --filter {names}
+      select_separator: "|"
 ```
 
-**You should see:** the Work Explorer showing the repository at **0/4**, with
-the sessions under a **Not Started** bucket.
+Declare how the tiers are handed over. The pack runs one MSBuild file that
+publishes the API and the importer into the folder the framework gives it,
+and pushes nothing: the release is the tag it makes.
+
+```
+packaging:
+  pack:
+    argv: ["dotnet", "msbuild", "build/Handoff.proj", "-p:HandoffDir={output}"]
+```
+
+**Keep that file under `build/`.** The root must hold one project or solution
+file: with `Handoff.proj` beside the `.slnx`, `dotnet test` refuses with
+*MSB1011* and the session's run of record fails. The walk met exactly that,
+and the framework handed back a *fix-run-of-record* step to move it.
+
+Add the architecture test — one test in `People.Api.Tests` that only
+`People.Api` references `Microsoft.Data.Sqlite` — and append sessions 3 to 6
+to `docs/sessions/session-plan.md`, one per phase.
+
+**You should see:** each step's build accepted, the `.slnx` appear before the
+review, and the run of record run `dotnet test` whole. Walked: 9 minutes,
+including the run of record the misplaced pack file broke.
 
 ---
 
@@ -99,33 +155,32 @@ Click the **Dabbler AI Orchestration** icon in the activity bar.
 **You should see:**
 
 - Two panes appear: **Solution Explorer** and **Work Explorer**.
-- The Solution Explorer names the repository and says **4 modules**.
+- The Solution Explorer names the repository and says **6 projects** — the three tiers' projects and their three test projects, read from the solution file.
 
 ![Open the solution](media/01-solution-opened.png)
 
 ### Read what the solution is built from
 
-Collapse the Work Explorer and expand the Solution Explorer's repository row, then expand each module.
+Collapse the Work Explorer and expand the Solution Explorer's repository row, then expand each project.
 
 **You should see:**
 
-- Four modules: **model**, **deserializer**, **persister** and **app**.
-- `model` is a **shared-types** module and is **used by 3** siblings — every other module references the `Person` type.
-- `deserializer` and `persister` each depend on the model and are used by `app`.
-- Each module names its package: `CsvModel`, `CsvDeserializer`, `CsvPersister`, `CsvWatcher`.
+- `Csv.Model` is a **library**, **used by 5**: `Csv.Importer`, `People.Api` and the three test projects.
+- `Csv.Importer` is an **application** and `People.Api` a **service**; each **depends on 1**, `Csv.Model`, and neither references the other.
+- Each project row names its path, and each test project **depends on** the project it tests. Nothing here was declared: every row is read from the `.slnx` and the `<ProjectReference>` elements.
 
 ![Read what the solution is built from](media/02-decomposition.png)
 
 ### Read what work is planned
 
 Collapse the Solution Explorer and expand the **Work Explorer**.
-Expand the repository row, then the **Not Started** bucket.
+Expand the repository row, then the **Not Started** and **Complete** buckets.
 
 **You should see:**
 
-- The repository shows **0/4** — none of the four sessions has run.
-- The sessions are grouped **by module**, one session per module.
-- Each session's title says what that module is for.
+- The repository shows **3/6** — three of the six sessions have closed.
+- **Not Started** holds sessions 004 to 006, the phases session 2 planned; **Complete** holds 001 to 003, each with the day it closed.
+- Each session's title is its heading in `docs/sessions/session-plan.md`.
 
 ![Read what work is planned](media/03-work-planned.png)
 
@@ -144,85 +199,66 @@ Run **Dabbler: Show Framework Terminal** from the command palette.
 
 ---
 
-## 5. Work the model module first
+## 5. Session 3: the Person model, released
 
-`model` is first because every other module references its project.
+Session 3 adds `Person` to `Csv.Model` — a record that refuses a blank name or
+email with an `ArgumentException` naming the field — with its tests in
+`PersonTests.cs`, in the model's test project. It is the first functionality both
+tiers build on, so its plan carries `release` with that reason, and the
+session creates `version.json` at `0.1.0`.
 
-Press **Start Session**. Choose your engine, and the
-extension opens two editor tabs side by side — your **AI CLI on the left** and
-the **Dabbler terminal on the right**, exactly the layout Section 4 showed —
-that is the default; set `dabbler.terminalLocation` to `panel` if you would
-rather they were panel terminals.
+**You should see:**
 
-Then let the framework drive. In the CLI, run what the sentence in the terminal
-tells you, once:
+- After the step's own check, the framework runs the tests named after what
+  changed: `dotnet test --filter PersonTests`.
+- After the last step, one `next` that reviews, runs the whole suite as the
+  run of record (it took under a minute last time, so it runs whole), lands,
+  publishes and closes.
+- The publish writes `people-api/` and `csv-importer/` — each a runnable
+  published folder — under `.dabbler/runs/s3/package/`, and pushes the tag
+  `v0.1.0`.
 
-```
-dabbler session start --sessions-dir docs/sessions --engine <your engine> --provider <your provider>
-dabbler session next --sessions-dir docs/sessions
-```
-
-and keep calling `next`, doing what each instruction says, until it says
-`done`. **One call, one move.** You never run the tests, the verification, the
-commit or the close yourself — the framework does each of those between your
-calls, and the Dabbler terminal narrates them.
-
-**You should see:** in the Work Explorer, session 001 moving into an **In
-Progress** bucket with six lifecycle rows underneath it — Register, Plan,
-Work, Verify, Test, Close — and the Dabbler terminal printing each phase as it
-starts. The engine's own plan for the session nests under **Work**, as its own
-steps.
+Walked: 2 minutes 24 seconds from registration to close, of which about 45
+seconds was the framework's own work and 22 the review.
 
 ---
 
-## 6. Change the model, and see who breaks
+## 6. Sessions 4 to 6
 
-Once all four modules exist, expand **CsvModel** in the Solution Explorer and
-open **Used by**.
-
-**You should see** every project that references it, directly or through
-another: `CsvDeserializer`, `CsvPersister`, their test projects and
-`CsvWatcher`. Nobody typed that list. It is read from the
-`<ProjectReference>` elements, and it is the list a change to `Person` can
-break.
-
-One `dotnet test` at the root proves they still build against the change,
-because the solution file lists every project, and it is the session's run of
-record: every expensive suite runs once the session's work is verified.
+Each is the same loop — start, `next` until `done` — over the phases session
+2 planned: the CSV parser in `Csv.Importer`, the API's store in `People.Api`,
+and the importer posting to the API and printing `<file>: read N, stored M`.
+Name each new class's tests after it, and the framework runs exactly those
+with the step that changes it.
 
 ---
 
-## 7. Build and run the whole thing
+## 7. Change the model, and see who breaks
 
-Run the application. Its project references build the other three with it:
+Expand **Csv.Model** in the Solution Explorer and open **Used by**.
 
-```
-dotnet run --project modules/app/src/CsvWatcher -- ./inbox ./people.db
-```
-
-Drop a CSV into `./inbox`:
-
-```
-FirstName,LastName,Email,HiredOn
-Ada,Lovelace,ada@example.com,1843-01-05
-Grace,Hopper,grace@example.com,1944-07-02
-```
-
-**You should see:** `people-clean.csv: read 2, stored 2, total 2`. Copy the same
-file in again and you should see `read 2, stored 0, total 2` — email is the
-natural key, so re-reading one file does not duplicate anyone. A file with a
-header the reader does not recognise is **refused by name and left alone**,
-never half-stored.
+**You should see** every project that references it: `Csv.Importer`,
+`People.Api` and the three test projects. Nobody typed that list. It is read
+from the `<ProjectReference>` elements, and it is the list a change to
+`Person` can break. The run of record's `dotnet test` at the root proves they
+still build against the change, because the solution file lists every project.
 
 ---
 
 ## What to check when something looks wrong
 
+- **A step whose check builds is refused with "the check changed the tree".**
+  The build wrote output nothing ignores. The framework adds `bin/` and
+  `obj/` to `.gitignore` before a step's checks from 3.2.1 on; on an earlier
+  version, add them and name `.gitignore` in the step with
+  `dabbler session plan amend`.
+- **The run of record fails with MSB1011.** More than one project or solution
+  file sits at the root. Keep the `.slnx` there alone.
 - **The Solution Explorer says "It fills in once the repository is set up" but
   you have project files.** The projection under
   `.dabbler/solution/solution.json` has not been derived. Touch a `.csproj`
   or the `.slnx`, or run the explicit refresh, and it fills in.
 - **The framework stopped.** Read its own account first —
-  `dabbler status`, the `stop` on `.dabbler/runs/s<N>/driver/run.json`, and the
-  outstanding instruction's `reasons`. Never edit a record, a verdict or a gate
+  `dabbler status`, the `stop` in the session's `run.json` under
+  `.dabbler/runs`, and the outstanding instruction's `reasons`. Never edit a record, a verdict or a gate
   to get past a stop.

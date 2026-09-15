@@ -133,12 +133,16 @@ describe("looking at the store before trusting a number out of it", () => {
     assert.deepEqual(checkStoreShape(store()), [true, null]);
   });
 
+  it("accepts the version 7 store Copilot CLI 1.0.83 writes", () => {
+    assert.deepEqual(checkStoreShape(store({ version: 7 })), [true, null]);
+  });
+
   it("refuses a schema version it has not been verified against", () => {
     // The columns belong to a private store and can change without notice.
     const [ok, reason] = checkStoreShape(store({ version: 99 }));
     assert.equal(ok, false);
     assert.match(String(reason), /schema_version 99/);
-    assert.match(String(reason), /\(6,\)/);
+    assert.match(String(reason), /\(6, 7\)/);
   });
 
   it("refuses a store that is not there rather than pricing against nothing", () => {

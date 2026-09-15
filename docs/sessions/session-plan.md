@@ -11161,6 +11161,17 @@ session that has not begun. Session 162 gave that refusal better words -- it
 names the file and the two ways on -- and both ways are still work the person
 must do before anything will register.
 
+The same hour, on this repository, the framework prescribed the step that
+blocks it. `session start` refused because `local-overrides.yaml` carried the
+retired `transport.profile`, and named the command that moves it: `dabbler
+configure --transport copilot-cli`. That command writes
+`.vscode/settings.json`. The next `session start` refused because the working
+tree carried `.vscode/settings.json`. Two refusals, each correct on its own
+terms, and between them a stop with no forward move that the framework itself
+walked the operator into. `--mine` is no way out where a checkout commits the
+setting: user preferences sit below `.vscode/settings.json`, so the choice
+lands where nothing reads it.
+
 **What.** `.vscode/settings.json` joins `.claude/settings.json` as a path the
 framework touches in a repository on a session's behalf: the before-work gate
 exempts it, and the session's land commits it with the work, so a choice made

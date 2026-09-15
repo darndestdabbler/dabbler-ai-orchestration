@@ -146,6 +146,13 @@ export function runPath(repoRoot: string, sessionNumber: number): string {
   return join(driverDir(repoRoot, sessionNumber), RUN_FILENAME);
 }
 
+/** The heartbeat `session run --mailbox` refreshes while it drives the session. */
+export const LOOP_FILENAME = "loop.json";
+
+export function loopPath(repoRoot: string, sessionNumber: number): string {
+  return join(driverDir(repoRoot, sessionNumber), LOOP_FILENAME);
+}
+
 export function amendmentsPath(repoRoot: string, sessionNumber: number): string {
   return join(driverDir(repoRoot, sessionNumber), AMENDMENTS_FILENAME);
 }

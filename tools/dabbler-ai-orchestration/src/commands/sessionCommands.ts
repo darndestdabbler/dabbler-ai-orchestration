@@ -32,6 +32,7 @@ import * as vscode from "vscode";
 import {
   ENUMERATION_CLI_ALIASES,
   MERGE_ORIGIN_FLAG,
+  loopAlive,
   preflightRefusedModel,
   type Router,
 } from "dabbler-ai-router";
@@ -379,6 +380,26 @@ export function engineTerminalFor(
   };
 }
 
+/**
+ * Whether an open terminal is the CLI `spec` would open: the same engine name,
+ * program and repository root. A name alone is not enough -- two repositories
+ * open the same engine under the same label -- and the options a terminal was
+ * created with are what say where it was launched.
+ */
+export function isEngineTerminalOf(
+  terminal: {
+    readonly name: string;
+    readonly creationOptions: Readonly<vscode.TerminalOptions | vscode.ExtensionTerminalOptions>;
+  },
+  spec: EngineTerminal,
+): boolean {
+  const options = terminal.creationOptions as vscode.TerminalOptions;
+  const cwd = typeof options.cwd === "string" ? options.cwd : options.cwd?.fsPath;
+  if (terminal.name !== spec.name || options.shellPath !== spec.program || cwd === undefined) return false;
+  const [left, right] = [path.resolve(cwd), path.resolve(spec.cwd)];
+  return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
+
 export interface SessionRunUi {
   pickEngine: () => Thenable<EngineChoice | undefined>;
   /**
@@ -417,8 +438,8 @@ export interface SessionRunUi {
    * never do -- it would pass here and mean nothing anywhere else.
    */
   engineKnowsModel: (choice: EngineChoice, model: string) => Thenable<string | null>;
-  /** Show an open terminal carrying one of these names; false when none is. */
-  showTerminalNamed: (names: readonly string[]) => boolean;
+  /** Close every open terminal that is the CLI `spec` would open, in its repository. */
+  closeEngineTerminals: (spec: EngineTerminal) => void;
   /**
    * Show the framework's own terminal for this repository, split off the
    * one just opened.
@@ -611,14 +632,10 @@ export function defaultSessionRunUi(
       if (spec.typed !== null) terminal.sendText(spec.typed, false);
       return terminal;
     },
-    showTerminalNamed: (names) => {
-      // A terminal whose process has exited is not the loop or the CLI it is named for.
-      const open = (vscode.window.terminals ?? []).find(
-        (terminal) => names.includes(terminal.name) && terminal.exitStatus === undefined,
-      );
-      if (!open) return false;
-      open.show();
-      return true;
+    closeEngineTerminals: (spec) => {
+      for (const terminal of vscode.window.terminals ?? []) {
+        if (isEngineTerminalOf(terminal, spec)) terminal.dispose();
+      }
     },
     showFrameworkTerminal: (repoRoot, beside) =>
       ensureDabblerTerminal(repoRoot, beside as vscode.Terminal | undefined),
@@ -658,19 +675,25 @@ export function driveArguments(choice: EngineChoice, model: string): string[] | 
 }
 
 /**
- * Resume Session: the session's loop and the AI's terminal back, for a
- * session in flight. The loop is restarted unless its terminal is open and
- * running -- an engine terminal left open without it is an AI waiting on
- * instructions nobody writes. The engine's own terminal is shown by its name
- * when it is still open; otherwise the operator is told the sentence a new
- * CLI needs.
+ * Resume Session: a session in flight left with a loop driving it and an AI
+ * waiting on it.
+ *
+ * The loop is restarted unless its heartbeat says one is driving: a terminal
+ * still open under the loop's name can be a process that has exited. The AI
+ * is not trusted by name either -- a CLI whose background waiter was
+ * interrupted sits at its prompt waiting on nothing -- so the recorded
+ * engine's terminal is replaced by a fresh one carrying the waiter sentence.
+ * The framework holds the session's state, so nothing the old chat knew is
+ * needed. With no recorded engine the operator is told the sentence.
  */
 export async function runResumeSession(
   repository: SessionsRepository,
   ui: SessionRunUi,
   cli: string | null = resolveRouterCli(),
+  alive: (repoRoot: string, sessionNumber: number) => boolean = loopAlive,
 ): Promise<boolean> {
-  if (repository.currentSession === null) {
+  const session = repository.currentSession;
+  if (session === null) {
     ui.showInformationMessage(`Nothing is in flight in ${repository.label}; Start Session is the way in.`);
     return false;
   }
@@ -678,13 +701,24 @@ export async function runResumeSession(
     ui.showErrorMessage("The bundled `dabbler` command was not found beside the extension; nothing was resumed.");
     return false;
   }
-  const loop = loopTerminalFor(repository, cli);
-  const opened = ui.showTerminalNamed([loop.name]) ? undefined : ui.openTerminal(loop);
-  if (ui.showTerminalNamed(ENGINES.map((entry) => entry.label))) return true;
+  const restarted = !alive(repository.root, session);
+  const loop = restarted ? ui.openTerminal(loopTerminalFor(repository, cli)) : undefined;
+  const number = String(session).padStart(3, "0");
+  const recorded = ENGINES.find((entry) => entry.engine === repository.orchestrator?.engine);
+  const terminal = recorded ? engineTerminalFor(repository, recorded, repository.orchestrator?.model ?? "") : null;
+  if (recorded === undefined || terminal === null || typeof terminal === "string") {
+    ui.showFrameworkTerminal(repository.root, loop);
+    ui.showInformationMessage(
+      `Session ${number}'s loop is running. Open your AI's CLI in ${repository.label} and give it: ${openingSentence()}`,
+    );
+    return true;
+  }
+  ui.closeEngineTerminals(terminal);
+  const opened = ui.openTerminal(terminal);
   ui.showFrameworkTerminal(repository.root, opened);
   ui.showInformationMessage(
-    `Session ${String(repository.currentSession).padStart(3, "0")}'s loop is running. ` +
-      `Open your AI's CLI in ${repository.label} and give it: ${openingSentence()}`,
+    `Session ${number} resumed: ${restarted ? "its loop was restarted" : "its loop was still running"}, ` +
+      `and ${recorded.label} was reopened waiting on it.`,
   );
   return true;
 }

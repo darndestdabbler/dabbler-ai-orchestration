@@ -10,6 +10,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.3.2] — 2026-09-15
+
+**Resume brings the AI back.** A session stopped in flight could not be
+resumed: Resume Session showed the terminals still open under their names and
+did nothing else.
+
+### Fixed
+
+- **Resume Session leaves the session with a loop driving it and an AI
+  waiting on it.** The framework's loop now keeps a heartbeat while it runs,
+  and Resume restarts the loop unless that heartbeat says one is driving --
+  a terminal still open under the loop's name is no longer taken as proof.
+  The session's recorded engine is reopened with the waiter sentence, replacing
+  a CLI whose background waiter was interrupted; the framework holds the
+  session's state, so nothing in the old chat is needed.
+- **A waiter with no loop behind it says so.** `dabbler session wait` used to
+  wait forever when nothing was driving the session. After a short grace it
+  now says no loop is driving, and names Resume Session and the command that
+  starts one.
+
 ## [3.3.1] — 2026-09-15
 
 **A first session on a new host, started without a keypress.** Two defects an

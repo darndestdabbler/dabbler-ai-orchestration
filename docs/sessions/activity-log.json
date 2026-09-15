@@ -11587,6 +11587,13 @@
       "what": "step 'origin-before-start': its files",
       "reason": "The two reconcileWithOrigin tests build real repositories, and the suite permits real git only in the listed walkthroughs; they move from journal.test.ts to walk-bootstrap.test.ts, which already walks a host that seeded a README",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 182,
+      "dateTime": "2026-09-15T12:08:04.333000-04:00",
+      "task": "Session 182 makes Resume Session leave a stopped session with a live loop and an AI waiting on it, makes a waiter with no loop behind it say so instead of waiting forever, and releases 3.3.2, a patch. Nothing today says whether the framework's loop is alive: Resume trusts terminal names, so a loop or CLI terminal still open under its name is shown and nothing is restarted, and a CLI whose background waiter was interrupted sits at its prompt waiting on nothing. The loop (`session run --mailbox`) refreshes a heartbeat beside run.json while it runs; one router rule, `loopAlive`, reads it and is exported for the extension. `session wait` that finds no live loop within a short grace prints that no loop is driving the session, with the command that starts one, and exits. Resume starts the loop unless `loopAlive` says one is driving, and replaces the recorded engine's open CLI terminal with a fresh one carrying the waiter sentence as its argument (Claude Code's positional, Copilot's `-i`), saying what it did; with no recorded engine it tells the operator the sentence, as today. version.json goes to 3.3.2 with a CHANGELOG entry.",
+      "releasable": true
     }
   ]
 }

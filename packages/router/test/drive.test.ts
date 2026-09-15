@@ -11,8 +11,9 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { describe, it } from "node:test";
 
-import { instructionPath, reportPath } from "../src/driver.ts";
+import { instructionPath, loopPath, reportPath } from "../src/driver.ts";
 import {
+  LOOP_STALE_MS,
   MAX_REJECTIONS,
   REFUSE_START_REASON,
   REGISTER_COLLECT,
@@ -31,6 +32,7 @@ import {
   judgeReportShape,
   reportIsSpent,
   localGateReceipt,
+  loopAlive,
   namedTestCommands,
   overdueMultiple,
   owedInstruction,
@@ -39,6 +41,7 @@ import {
   staleJobDisposition,
   stepChangedPaths,
   unchangedStepFiles,
+  waiterReading,
   type RegistrationFacts,
   type StepSpec,
 } from "../src/drive.ts";
@@ -78,6 +81,28 @@ describe("the instruction owed an answer, which `session wait` prints", () => {
     assert.equal(owedInstruction(root, 1), null);
     writeInstruction(root, { ...INSTRUCTION, seq: 5 });
     assert.equal(owedInstruction(root, 1)?.seq, 5);
+  });
+});
+
+describe("whether a loop is driving the session", () => {
+  const now = Date.parse("2026-09-15T12:00:00Z");
+
+  it("is a heartbeat younger than the staleness bound, and nothing else", () => {
+    const root = tempDir("loop-");
+    assert.equal(loopAlive(root, 1, now), false);
+    mkdirSync(dirname(loopPath(root, 1)), { recursive: true });
+    writeFileSync(loopPath(root, 1), JSON.stringify({ pid: 1, at: new Date(now - 5000).toISOString() }));
+    assert.equal(loopAlive(root, 1, now), true);
+    assert.equal(loopAlive(root, 1, now + LOOP_STALE_MS), false);
+  });
+
+  it("tells a waiter with nothing owed and no loop that none is coming once the grace is spent, and prints what is owed regardless", () => {
+    const root = tempDir("noloop-");
+    assert.equal(waiterReading(root, 1, now, now + 1000), null);
+    assert.equal(waiterReading(root, 1, now, now + LOOP_STALE_MS), "no-loop");
+    mkdirSync(dirname(instructionPath(root, 1)), { recursive: true });
+    writeFileSync(instructionPath(root, 1), JSON.stringify(INSTRUCTION));
+    assert.equal((waiterReading(root, 1, now, now + LOOP_STALE_MS) as DriverInstruction).seq, 4);
   });
 });
 

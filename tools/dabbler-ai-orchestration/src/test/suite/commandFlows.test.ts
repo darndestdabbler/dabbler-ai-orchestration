@@ -29,6 +29,7 @@ import {
   defaultSessionRunUi,
   engineOutputChannel,
   engineTerminalFor,
+  isEngineTerminalOf,
   repositoryOf,
   runResumeSession,
   runSendToEngine,
@@ -409,7 +410,7 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     // let this reach the real `claude` would spawn the developer's own CLI
     // on every flow test -- passing here and meaning nothing anywhere else.
     engineKnowsModel: async () => null,
-    showTerminalNamed: () => false,
+    closeEngineTerminals: () => undefined,
     pickEngine: async () => ENGINES[0],
     askModel: async () => "haiku",
     askText: async (_title, _prompt, value) => value ?? "look at src/widget.py again",
@@ -1045,41 +1046,67 @@ suite("placing a repository the Explorer cannot reach", () => {
 });
 
 suite("Resume Session", () => {
-  test("Resume Session restarts the loop unless its terminal is open, and shows the engine's terminal or says what a new one needs", async () => {
+  test("Resume Session restarts the loop only when no heartbeat says one is driving, and reopens the recorded engine waiting on it", async () => {
     const repository = makeRepository({
       root: "D:\\ws\\csv-pipeline",
       currentSession: 2,
       nextSession: 2,
       sessions: [makeSession({ number: 2, status: "in-progress" })],
+      orchestrator: { engine: "copilot", provider: "openai", model: "gpt-5-6-luna" },
     });
+    const cli = "D:\\ext\\dabbler.cjs";
     const loopArgs = ["session", "run", "--mailbox", "--sessions-dir", "docs/sessions"];
 
-    // Both open: both shown, nothing opened.
-    const shown: string[][] = [];
-    const found = driveUi({ showTerminalNamed: (names) => { shown.push([...names]); return true; } });
-    assert.strictEqual(await runResumeSession(repository, found.ui, "D:\\ext\\dabbler.cjs"), true);
-    assert.ok(shown[0][0].startsWith("Framework loop"));
-    assert.ok(shown[1].includes("Claude Code"));
-    assert.strictEqual(found.terminals.length, 0);
+    // A live loop is left alone; the open CLI, whose waiter may be gone, is
+    // replaced by one carrying the sentence.
+    const closed: EngineTerminal[] = [];
+    const live = driveUi({ closeEngineTerminals: (spec) => { closed.push(spec); } });
+    assert.strictEqual(await runResumeSession(repository, live.ui, cli, () => true), true);
+    // What is closed is exactly the CLI being reopened, in this repository.
+    assert.deepStrictEqual(closed, [live.terminals[0]]);
+    assert.strictEqual(live.terminals.length, 1);
+    assert.strictEqual(live.terminals[0].program, "copilot");
+    assert.deepStrictEqual(live.terminals[0].args.slice(0, 3), ["--model", "gpt-5-6-luna", "-i"]);
+    assert.match(live.terminals[0].args[3], /dabbler session wait/);
 
-    // The CLI still open and the loop gone: the loop comes back, or the AI
-    // waits on instructions nobody writes.
-    const cliOnly = driveUi({ showTerminalNamed: (names) => names.includes("Claude Code") });
-    assert.strictEqual(await runResumeSession(repository, cliOnly.ui, "D:\\ext\\dabbler.cjs"), true);
-    assert.strictEqual(cliOnly.terminals.length, 1);
-    assert.deepStrictEqual(cliOnly.terminals[0].args.slice(1), loopArgs);
+    // No heartbeat: the loop is restarted, whatever terminals are open.
+    const dead = driveUi();
+    assert.strictEqual(await runResumeSession(repository, dead.ui, cli, () => false), true);
+    assert.deepStrictEqual(dead.terminals[0].args.slice(1), loopArgs);
+    assert.strictEqual(dead.terminals[0].cwd, repository.root);
+    assert.strictEqual(dead.terminals[1].program, "copilot");
 
-    // Neither open: the loop, and the sentence a new CLI needs.
-    const gone = driveUi();
-    assert.strictEqual(await runResumeSession(repository, gone.ui, "D:\\ext\\dabbler.cjs"), true);
-    assert.strictEqual(gone.terminals.length, 1);
-    assert.strictEqual(gone.terminals[0].cwd, repository.root);
-    assert.deepStrictEqual(gone.terminals[0].args.slice(1), loopArgs);
-    assert.match(gone.infos[0], /dabbler session wait/);
+    // No recorded engine: the loop, and the sentence in a message.
+    const unknown = driveUi();
+    assert.strictEqual(await runResumeSession({ ...repository, orchestrator: null }, unknown.ui, cli, () => false), true);
+    assert.strictEqual(unknown.terminals.length, 1);
+    assert.match(unknown.infos[0], /dabbler session wait/);
 
     const idle = driveUi();
-    assert.strictEqual(await runResumeSession({ ...repository, currentSession: null }, idle.ui, "D:\\ext\\dabbler.cjs"), false);
+    assert.strictEqual(await runResumeSession({ ...repository, currentSession: null }, idle.ui, cli, () => false), false);
     assert.strictEqual(idle.terminals.length, 0);
+  });
+
+  test("Resume closes only its own repository's CLI, beside another repository of the same name", () => {
+    const copilot = ENGINES.find((e) => e.engine === "copilot")!;
+    const mine = engineTerminalFor(makeRepository({ root: "D:\\ws\\a\\app" }), copilot, "gpt-5-6-luna") as EngineTerminal;
+    const theirs = engineTerminalFor(makeRepository({ root: "D:\\ws\\b\\app" }), copilot, "gpt-5-6-luna") as EngineTerminal;
+    // Same label, same engine: the name alone cannot tell them apart.
+    assert.strictEqual(mine.name, theirs.name);
+    const open = (spec: EngineTerminal, cwd: string | vscode.Uri = spec.cwd, shellPath = spec.program) => ({
+      name: spec.name,
+      creationOptions: { shellPath, cwd },
+    });
+    const window = [
+      open(mine),
+      open(theirs),
+      open(mine, { fsPath: mine.cwd } as unknown as vscode.Uri),
+      open(mine, mine.cwd, "pwsh"),
+    ];
+    // Disposing what matches leaves the other repository's CLI and a shell
+    // that merely shares the name.
+    const left = window.filter((terminal) => !isEngineTerminalOf(terminal, mine));
+    assert.deepStrictEqual(left, [window[1], window[3]]);
   });
 });
 

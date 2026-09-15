@@ -62,6 +62,7 @@ import {
   WATCHER_OUTSTANDING,
   WORK_PLAN_SCHEMA,
   instructionPath,
+  loopPath,
   clearDispositions,
   readDispositions,
   readInstruction,
@@ -3475,10 +3476,54 @@ export function owedInstruction(repoRoot: string, sessionNumber: number): Driver
   return instructionAnswered(repoRoot, sessionNumber, instruction) ? null : instruction;
 }
 
+/** How often the mailbox loop refreshes its heartbeat. */
+export const LOOP_HEARTBEAT_MS = 5000;
+
+/**
+ * How old a heartbeat may be and still say a loop is driving. Well past the
+ * refresh, because the loop's short synchronous git calls can delay a beat.
+ */
+export const LOOP_STALE_MS = 60_000;
+
+/**
+ * Whether a loop is driving this session: its heartbeat is younger than
+ * LOOP_STALE_MS. A terminal's name is not an answer -- one can outlive its
+ * process or be a different run's.
+ */
+export function loopAlive(repoRoot: string, sessionNumber: number, now: number = Date.now()): boolean {
+  try {
+    const beat = JSON.parse(readFileSync(loopPath(repoRoot, sessionNumber), "utf8")) as { at?: unknown };
+    const at = typeof beat.at === "string" ? Date.parse(beat.at) : Number.NaN;
+    return Number.isFinite(at) && now - at < LOOP_STALE_MS;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What a waiter that began at `since` reads now: the instruction owed, or
+ * `no-loop` once the grace is spent with no loop driving -- nothing will
+ * write an instruction then, and waiting on would wait forever -- or null to
+ * keep waiting.
+ */
+export function waiterReading(
+  repoRoot: string,
+  sessionNumber: number,
+  since: number,
+  now: number = Date.now(),
+  graceMs: number = LOOP_STALE_MS,
+): DriverInstruction | "no-loop" | null {
+  const owed = owedInstruction(repoRoot, sessionNumber);
+  if (owed !== null) return owed;
+  return now - since >= graceMs && !loopAlive(repoRoot, sessionNumber, now) ? "no-loop" : null;
+}
+
 /**
  * Wait for the instruction owed an answer, print it as JSON, and return. The AI
  * runs this in the background, so its chat stays free while it waits, and runs
- * it again after each answer. With nothing in flight it prints the idle `done`.
+ * it again after each answer. With nothing in flight it prints the idle `done`;
+ * with no loop driving the session it says so and names the command that
+ * starts one.
  */
 export async function sessionWait(
   sessionsDir: string,
@@ -3489,15 +3534,24 @@ export async function sessionWait(
     writeErr(`dabbler: not inside a git repository: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
+  const since = Date.now();
   for (;;) {
     const current = readSessionState(sessionsDir)?.["currentSession"];
     if (typeof current !== "number") {
       writeOut(`${JSON.stringify(idleInstruction(nowIso()), null, 2)}\n`);
       return EXIT_OK;
     }
-    const owed = owedInstruction(repoRoot, current);
-    if (owed !== null) {
-      writeOut(`${JSON.stringify(owed, null, 2)}\n`);
+    const reading = waiterReading(repoRoot, current, since);
+    if (reading === "no-loop") {
+      writeErr(
+        `wait: no loop is driving session ${sessionDisplayNumber(current)}, so no instruction is coming. ` +
+          "Tell the operator; Resume Session starts it, or in a terminal of its own: " +
+          `dabbler session run --mailbox --sessions-dir ${sessionsDir}\n`,
+      );
+      return EXIT_BOUNDARY;
+    }
+    if (reading !== null) {
+      writeOut(`${JSON.stringify(reading, null, 2)}\n`);
       return EXIT_OK;
     }
     await new Promise((resolve) => setTimeout(resolve, pollMs));
@@ -3555,14 +3609,36 @@ export async function runWholeSession(
     const adapter = mailboxEngine((invocation) =>
       instructionAnswered(invocation.repoRoot, invocation.sessionNumber, invocation.instruction),
     );
-    return driveSession(sessionsDir, {
-      engine,
-      provider: typeof orchestrator["provider"] === "string" ? orchestrator["provider"] : null,
-      model: typeof orchestrator["model"] === "string" ? orchestrator["model"] : null,
-      effort: typeof orchestrator["effort"] === "string" ? orchestrator["effort"] : null,
-      adapter,
-      maxInvocations: options.maxInvocations,
-    });
+    // The heartbeat is how a waiter and Resume know a loop is driving.
+    const heartbeat = loopPath(repoRoot, sessionNumber);
+    const beat = (): void => {
+      try {
+        mkdirSync(dirname(heartbeat), { recursive: true });
+        writeFileSync(heartbeat, `${JSON.stringify({ pid: process.pid, at: new Date().toISOString() })}\n`, "utf8");
+      } catch {
+        // A missed beat reads as a stale heartbeat, which is what it is.
+      }
+    };
+    beat();
+    const timer = setInterval(beat, LOOP_HEARTBEAT_MS);
+    timer.unref();
+    try {
+      return await driveSession(sessionsDir, {
+        engine,
+        provider: typeof orchestrator["provider"] === "string" ? orchestrator["provider"] : null,
+        model: typeof orchestrator["model"] === "string" ? orchestrator["model"] : null,
+        effort: typeof orchestrator["effort"] === "string" ? orchestrator["effort"] : null,
+        adapter,
+        maxInvocations: options.maxInvocations,
+      });
+    } finally {
+      clearInterval(timer);
+      try {
+        unlinkSync(heartbeat);
+      } catch {
+        // Already gone.
+      }
+    }
   }
 
   if ((BUILT_IN_ENGINES as readonly string[]).includes(engine)) {

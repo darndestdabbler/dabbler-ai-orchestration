@@ -219,11 +219,11 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 179 | The walk | no | 2026-09-15 |
 | 180 | The soak, and 3.3.0 | yes | 2026-09-15 |
 | 181 | Copilot's sentence submitted, and the host's first commit | yes | 2026-09-15 |
-| 182 | Overrides the operator provably made | — | not declared |
+| 182 | Resume brings the AI back | yes | 2026-09-15 |
 | 183 | Gemini CLI retired | — | not declared |
 | 184 | The loop's own commands, approved at launch | — | not declared |
 | 185 | The round names what it cost | — | not declared |
-| 186 | Resume brings the AI back | — | not declared |
+| 186 | Overrides the operator provably made | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2561,3 +2561,9 @@ Session 181 fixes the two defects that stopped an operator's first Copilot sessi
 **Amended after acceptance:**
 
 - 2026-09-15 — step 'origin-before-start': its files: The two reconcileWithOrigin tests build real repositories, and the suite permits real git only in the listed walkthroughs; they move from journal.test.ts to walk-bootstrap.test.ts, which already walks a host that seeded a README (claude-code (anthropic, claude-opus-5))
+
+### Session 182 — Resume brings the AI back
+
+**Releasable: yes.**
+
+Session 182 makes Resume Session leave a stopped session with a live loop and an AI waiting on it, makes a waiter with no loop behind it say so instead of waiting forever, and releases 3.3.2, a patch. Nothing today says whether the framework's loop is alive: Resume trusts terminal names, so a loop or CLI terminal still open under its name is shown and nothing is restarted, and a CLI whose background waiter was interrupted sits at its prompt waiting on nothing. The loop (`session run --mailbox`) refreshes a heartbeat beside run.json while it runs; one router rule, `loopAlive`, reads it and is exported for the extension. `session wait` that finds no live loop within a short grace prints that no loop is driving the session, with the command that starts one, and exits. Resume starts the loop unless `loopAlive` says one is driving, and replaces the recorded engine's open CLI terminal with a fresh one carrying the waiter sentence as its argument (Claude Code's positional, Copilot's `-i`), saying what it did; with no recorded engine it tells the operator the sentence, as today. version.json goes to 3.3.2 with a CHANGELOG entry.

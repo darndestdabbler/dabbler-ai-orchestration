@@ -3550,9 +3550,9 @@
     {
       "number": 179,
       "title": "The walk",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-15T07:55:07.860000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-15T08:52:36.666000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

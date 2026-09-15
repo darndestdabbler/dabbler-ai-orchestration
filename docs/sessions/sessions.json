@@ -3508,9 +3508,9 @@
     {
       "number": 177,
       "title": "The framework drives",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-15T07:03:29.028000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-15T07:26:29.078000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

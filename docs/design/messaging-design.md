@@ -92,6 +92,45 @@ completion like any other. A nudge is a safety net, not the mechanism.
 | a human message | a `user` entry, or a `queued_command` with `origin.kind: "human"` when typed mid-turn | a `user.message` event |
 | cost per call | token counts on each assistant message | `assistant_usage_events` in its session store: input, cache read, cache write, AI credits |
 
+## The two-hour soak
+
+Run on 2026-09-15 beside sessions 176–179, one engine per scratch folder and per
+VS Code profile, with the proof of concept's harness: the stand-in framework,
+the inbox waiter and Playwright as the operator. It soaks the protocol the
+product is built on — a background waiter, a wake-up on completion, a reply, a
+re-armed waiter — rather than the packaged loop, which session 179 walked
+through the VSIX.
+
+**The schedule.** 16 tasks over 7,007 seconds, at gaps of one to fifteen minutes
+(60, 180, 60, 600, 60, 540, 600, 60, 540, 900, 100, 800, 900, 60, 840 and 700
+seconds). 8 operator questions per engine, two of them timed to land while the
+AI was working. Each engine's armed waiter killed twice, at 1,800 and 4,200
+seconds. A task counted as failed if its reply was wrong or never came.
+
+| | Claude Code CLI | Copilot CLI |
+| --- | --- | --- |
+| tasks answered, and correct | 16 / 16 | 16 / 16 |
+| waiter fired after a task was posted | 0.0–0.5 s | 0.0–0.5 s |
+| reply after the task landed | 7.7–10.4 s | 6.4–13.1 s |
+| operator questions answered, waiter kept | 8 / 8, in 1.4–5.4 s | 8 / 8, in 2.3–3.2 s |
+| questions typed mid-turn | answered in 5.4 s, the task still correct | answered in 2.6 s, the task still correct |
+| waiter killed at 1,800 s | noticed in 0.2 s, re-armed 8.9 s later | noticed in 0.7 s, re-armed 8.4 s later |
+| waiter killed at 4,200 s | noticed in 0.1 s, re-armed 7.3 s later | noticed in 0.2 s, re-armed 4.9 s later |
+| longest idle wait | 887 s, one AI action during it | 888 s, one AI action and one model call during it |
+| waiter runs | 19 in the background, 1 in the foreground | 19 in the background |
+| tasks left past their deadline | 0 | 0 |
+| cost | subscription | 120.11 AI credits over 96 model calls; the first call of a wake-up 0.86–1.80 credits |
+
+**Every wake-up came from the waiter's own completion**, including the two a
+killed waiter delivered, and no one typed a nudge. The one foreground waiter run
+on Claude Code held its chat for that wait; the chat stayed free for the other
+19, and nothing the operator asked went unanswered because of it.
+
+**What it decides.** Nothing the soak showed is a failure the overdue alert
+cannot surface. A waiter that dies is noticed by the AI itself within a second,
+and a lost wake-up — which the soak never produced — is what the alert exists
+for. Sessions 177–179 stand, and the release is 3.3.0.
+
 ## The prompt cache
 
 **Claude Code caches the prompt for an hour.** Its first call after the
@@ -181,7 +220,7 @@ server.
 | 177 | `dabbler session wait`; the drive loop waits on reports and runs everything deterministic between them; an overdue record; a report's files taken from the diff when it names none |
 | 178 | Start Session registers and starts the drive loop; the opening sentence; the overdue alert; the managed instructions and the docs teach one loop |
 | 179 | the walk on both CLIs through the built VSIX |
-| 180 | the two-hour soak of both engines, recorded, and the 3.3.0 release |
+| 180 | the two-hour soak of both engines, recorded above — 16 of 16 tasks on each, every question answered, both killed waiters re-armed unaided — and the 3.3.0 release |
 | 181 | each verification round records its conversation and cost |
 | 182 | overrides the operator provably made |
 | 183 | Gemini CLI retired as an engine; Google stays a reviewer provider |

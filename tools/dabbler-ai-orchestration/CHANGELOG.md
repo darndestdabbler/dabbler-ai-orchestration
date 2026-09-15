@@ -10,6 +10,60 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.3.0] — 2026-09-15
+
+**The framework drives; the AI waits in the background.** Start Session hands
+the session to the framework, and the AI answers it from its own chat, which
+stays free for you the whole time. Walked through this VSIX on Claude Code CLI
+and Copilot CLI, and soaked for two hours on both.
+
+### Changed
+
+- **Start Session registers the session and starts the framework's loop**
+  (`dabbler session run --mailbox`) in a terminal of its own, then opens your
+  AI's CLI with one sentence: keep `dabbler session wait` running in the
+  background, do what each instruction says, answer with the command it names,
+  and run the waiter again until it prints `done`. Nobody types `session start`
+  or `session next`, and nothing calls `next` after a wait: the loop runs every
+  check, review, run of record, land and close between answers. A registration
+  the router refuses opens nothing and says why. Resume Session restarts the
+  loop unless its terminal is open and running.
+- **A step's report may leave out its files.** The framework takes them from
+  what changed since the last accepted step, less what it wrote itself; a
+  report that names files is judged on the files it names.
+- **The managed instructions teach the one loop.** `AGENTS.md`'s managed body,
+  the quick start, *Driving a session* and this README describe Start Session,
+  the loop and the background waiter; the pull is no longer taught.
+
+### Added
+
+- **A step left unanswered is said.** When an instruction has waited past the
+  threshold, the loop records it, and the Dabbler terminal shows it once with a
+  VS Code warning suggesting you ask the AI whether its waiter is still running.
+  Nothing is typed into the AI's chat for you.
+
+### Fixed
+
+- **The loop terminal started a second editor instead of the loop.** It ran the
+  editor's own executable without `ELECTRON_RUN_AS_NODE`, so the session
+  registered and no instruction was ever issued. Resume had the same defect.
+- **A machine that had never read its model catalog could not start a Copilot
+  session.** `session start` checked the seat's model before its own free
+  catalog refresh, and told you to run the refresh by hand. The refresh now
+  runs first.
+- **`session start` refused `sonnet`, `opus` and `haiku`** once the catalog had
+  read your Anthropic key's dated model ids. A name the engine's CLI always
+  accepts is no longer held to that list.
+- **Bootstrap, the quick start and the README** told you to tell your AI to
+  "start the next session"; they name Start Session on the repository's row.
+
+### Known
+
+- **Copilot CLI asks you to approve each `dabbler session wait` and
+  `dabbler session report`**, and Start types its sentence at Copilot's prompt
+  for your Enter. Both are owed to later sessions; the walk that found them is
+  in `docs/uat/uat-messaging-walk.md`.
+
 ## [3.2.1] — 2026-09-15
 
 **The walk, timed.** The CSV tutorial's three-tier .NET solution and a

@@ -11565,6 +11565,13 @@
       "what": "step 'walk-fixes': its files",
       "reason": "Every defect that blocked a walk was fixed inside walk-claude, where it blocked; what is left are two defects whose fix changes what the AI may run unasked, and those are written up as later sessions in the session plan with the account of each defect in the walk record",
       "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 180,
+      "dateTime": "2026-09-15T08:55:03.119000-04:00",
+      "task": "Session 180 records the two-hour soak of both engines and releases 3.3.0, a minor. The soak ran beside sessions 176\u2013179 with the harness in docs/design/messaging-poc/: Claude Code CLI and Copilot CLI each kept a background waiter armed for 7,007 seconds while a stand-in framework posted 16 tasks at gaps of one to fifteen minutes, Playwright typed 8 operator questions per engine (two of them mid-turn) and killed each engine's armed waiter twice. Every task was answered correctly and none was left past its deadline; every question was answered with the waiter kept; each killed waiter was noticed within a second and re-armed within nine seconds with nobody's help. The record goes into docs/design/messaging-design.md beside what the proof of concept measured, with Copilot's 120 AI credits for the run. Nothing the soak showed is a failure the overdue alert cannot surface, so sessions 177\u2013179 stand, and the release is 3.3.0: version.json bumped and stamped into both package.json files and the lockfile, and a CHANGELOG entry saying the framework now drives the session and the AI waits in the background, with the walk's four fixes.",
+      "releasable": true
     }
   ]
 }

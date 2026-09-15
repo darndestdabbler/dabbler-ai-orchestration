@@ -217,10 +217,12 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 177 | The framework drives | no | 2026-09-15 |
 | 178 | The extension and the words | no | 2026-09-15 |
 | 179 | The walk | no | 2026-09-15 |
-| 180 | The soak, and 3.3.0 | — | not declared |
+| 180 | The soak, and 3.3.0 | yes | 2026-09-15 |
 | 181 | The round names what it cost | — | not declared |
 | 182 | Overrides the operator provably made | — | not declared |
 | 183 | Gemini CLI retired | — | not declared |
+| 184 | The loop's own commands, approved at launch | — | not declared |
+| 185 | The typed sentence, submitted | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2542,3 +2544,9 @@ Session 179 walks the messaging loop through the VSIX this tree builds, on Claud
 
 - 2026-09-15 — step 'walk-claude': its files and checks: The Claude walk could not proceed past three product defects (the loop terminal ran the editor, start refused before its free refresh, the sonnet alias refused) and the harness needed fixes to reach the prompts; each was fixed where it blocked the walk, with its test, so this step's files and checks now name them (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-15 — step 'walk-fixes': its files: Every defect that blocked a walk was fixed inside walk-claude, where it blocked; what is left are two defects whose fix changes what the AI may run unasked, and those are written up as later sessions in the session plan with the account of each defect in the walk record (claude-code (anthropic, claude-fable-5-1))
+
+### Session 180 — The soak, and 3.3.0
+
+**Releasable: yes.**
+
+Session 180 records the two-hour soak of both engines and releases 3.3.0, a minor. The soak ran beside sessions 176–179 with the harness in docs/design/messaging-poc/: Claude Code CLI and Copilot CLI each kept a background waiter armed for 7,007 seconds while a stand-in framework posted 16 tasks at gaps of one to fifteen minutes, Playwright typed 8 operator questions per engine (two of them mid-turn) and killed each engine's armed waiter twice. Every task was answered correctly and none was left past its deadline; every question was answered with the waiter kept; each killed waiter was noticed within a second and re-armed within nine seconds with nobody's help. The record goes into docs/design/messaging-design.md beside what the proof of concept measured, with Copilot's 120 AI credits for the run. Nothing the soak showed is a failure the overdue alert cannot surface, so sessions 177–179 stand, and the release is 3.3.0: version.json bumped and stamped into both package.json files and the lockfile, and a CHANGELOG entry saying the framework now drives the session and the AI waits in the background, with the walk's four fixes.

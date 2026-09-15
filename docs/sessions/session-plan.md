@@ -11001,7 +11001,7 @@ anything is published and the finding is written up; otherwise the release is
 
 **Releasable.** Yes, a minor, 3.3.0.
 
-### Session 186 of 186: Overrides the operator provably made
+### Session 187 of 187: Overrides the operator provably made
 
 Scope: whole repository
 
@@ -11013,7 +11013,7 @@ words, the log entry, and every rule overridden or process skipped.
 
 **Releasable.** Yes, a minor.
 
-### Session 183 of 183: Gemini CLI retired
+### Session 184 of 187: Gemini CLI retired
 
 Scope: whole repository
 
@@ -11064,7 +11064,7 @@ its files, and merges when told; Start asks and re-registers with
 
 **Releasable.** Yes, a patch, 3.3.1: released before session 186.
 
-### Session 185 of 186: The round names what it cost
+### Session 186 of 187: The round names what it cost
 
 Scope: whole repository
 
@@ -11091,7 +11091,7 @@ tokens, and one that the close's line prices them.
 
 **Releasable.** Yes, a minor.
 
-### Session 184 of 186: The loop's own commands, approved at launch
+### Session 185 of 187: The loop's own commands, approved at launch
 
 Scope: whole repository
 
@@ -11144,3 +11144,36 @@ again; Resume with neither terminal open opens both; `session wait` with no
 loop says so.
 
 **Releasable.** Yes, a patch.
+
+### Session 183 of 187: The settings the pane wrote are not work
+
+Scope: whole repository
+
+**Why.** An operator driving the CSV tutorial on 2026-09-15 could not start
+its session 5. `dabbler session start` refused -- "the working tree carries
+.vscode/settings.json" -- exited 2, and registered nothing. The extension had
+written that file itself minutes earlier, one line of it, when the operator
+chose the authoring model in the Configuration pane; `dabbler configure
+--transport copilot-cli`, which the managed body tells a Copilot session to
+run, writes the same file. So the framework's own write is what its own start
+refuses, and the operator is stopped by a change they did not make on a
+session that has not begun. Session 162 gave that refusal better words -- it
+names the file and the two ways on -- and both ways are still work the person
+must do before anything will register.
+
+**What.** `.vscode/settings.json` joins `.claude/settings.json` as a path the
+framework touches in a repository on a session's behalf: the before-work gate
+exempts it, and the session's land commits it with the work, so a choice made
+in the pane rides with the session it configures instead of blocking it.
+Exempt before the work only -- at the close the file counts however it got
+there, exactly as the hook's file does -- and exempt by that path alone, so
+any other change under `.vscode/` still stops the start.
+
+**Non-goals.** No change to what the file holds, to who may write it, or to
+the four layers that decide a vehicle. No commit made on the operator's
+behalf outside a session.
+
+**Tests.** One that `session start` registers with `.vscode/settings.json`
+the only change in the tree, and one that the land commits it.
+
+**Releasable.** Yes, a patch, 3.3.3.

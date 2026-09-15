@@ -454,7 +454,7 @@ export function judgeReportFiles(
  * The step files the tree left byte-identical, which is not a refusal.
  *
  * The work can be done and the diff empty -- session 62's managed body,
- * where bootstrap rewrote CLAUDE.md and GEMINI.md with content identical to
+ * where bootstrap rewrote CLAUDE.md with content identical to
  * what stood. Refusing made the step unanswerable: omitting the file failed
  * a must-include while naming it failed the unchanged rule. A declared file
  * that DID change and is missing from the report is still refused, and the

@@ -10,6 +10,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.3.4] — 2026-09-15
+
+**Gemini CLI is no longer an engine.** VS Code no longer supports it, and a
+`GEMINI.md` in every project made it look like a supported choice. Google
+stays a reviewer: Gemini models keep reviewing over the direct API, with
+`DABBLER_GEMINI_API_KEY`.
+
+### Removed
+
+- **`GEMINI.md` is not written.** `dabbler bootstrap` writes `AGENTS.md` and
+  `CLAUDE.md`, and takes the managed section out of a `GEMINI.md` an earlier
+  bootstrap wrote -- deleting the file when nothing else was in it, and
+  keeping any text a person added.
+- **`dabbler session start --engine gemini` is refused** before anything is
+  written, with a sentence naming the engines that remain. A `gemini` left
+  in a machine's preferences is refused the same way.
+
 ## [3.3.3] — 2026-09-15
 
 **The settings the pane wrote are not work.** Choosing the authoring model in

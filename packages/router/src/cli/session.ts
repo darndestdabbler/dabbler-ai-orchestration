@@ -75,7 +75,7 @@ const IMPLEMENTED = Object.keys(SUMMARY);
  */
 const OPTIONS: Record<string, readonly string[]> = {
   start: [
-    "  --engine ENGINE          claude-code | gemini | copilot. Required unless this",
+    "  --engine ENGINE          claude-code | copilot | codex. Required unless this",
     "                           machine has chosen one with `dabbler configure",
     "                           --engine`, which a terminal reads and an editor",
     "                           setting could not; the flag wins over the choice",
@@ -136,7 +136,7 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  to watcher-only -- the loop waits, and the clock readings say what is owed.",
   ],
   drive: [
-    "  --engine ENGINE          required: claude-code | gemini | copilot -- who",
+    "  --engine ENGINE          required: claude-code | copilot | codex -- who",
     "                           is registered as the session's orchestrator",
     "  --provider PROVIDER      anthropic | openai | google; required for a fresh registration",
     "  --model MODEL            required for a Copilot seat",
@@ -488,7 +488,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
         "dabbler session start: the following arguments are required: --engine\n" +
           "  This machine has chosen no engine either. Set one once, and every\n" +
           "  start here is offered it:\n" +
-          "    dabbler configure --engine <claude-code|gemini|copilot>\n",
+          "    dabbler configure --engine <claude-code|copilot|codex>\n",
       );
       return EXIT_USAGE;
     }

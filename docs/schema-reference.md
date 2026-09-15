@@ -59,7 +59,7 @@ are valid, `null` values are not):
 
 | Field | Type | Meaning |
 |---|---|---|
-| `engine` | string | e.g. `claude-code`, `copilot`, `gemini`; any name is recorded as given |
+| `engine` | string | e.g. `claude-code`, `copilot`, `codex`; any name is recorded as given |
 | `provider` | string | seat descriptor; the *effective* provider is derived by registry lookup on `model` (`identity.ts`) |
 | `model` | string | registry alias or catalog id |
 | `effort` | string | |

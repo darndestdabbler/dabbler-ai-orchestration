@@ -11601,6 +11601,21 @@
       "dateTime": "2026-09-15T13:34:50.858000-04:00",
       "task": "Stop the framework's own write to .vscode/settings.json from blocking a session's start. The worktree gate's 'has the work begun?' question (materialPaths under beforeWork, asked by session start, the pre-start pull and the task declaration) exempts .vscode/settings.json exactly, beside the .claude/settings.json exemption, so a model or vehicle chosen in the Configuration pane or with `dabbler configure` no longer refuses the registration; the land's `git add -A` then commits the file with the session's work. The exemption is before the work only and by that one path: at the close the file counts however it got there, and any other change under .vscode/ still stops the start. The settings-only wording in workBegunRefusal (commit it, or --mine and revert) becomes unreachable and is removed with its test. Releasable as a patch: version.json and the manifests it stamps move to 3.3.3, with a CHANGELOG entry.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 184,
+      "dateTime": "2026-09-15T16:10:58.581000-04:00",
+      "task": "Retire Gemini CLI as an engine while Google stays a reviewer provider over the direct API. Bootstrap writes two instruction files instead of three: AGENTS.md carries the managed body and CLAUDE.md imports it; the Gemini engine tail goes from the templates, the managed body and the Copilot tail stop naming GEMINI.md, and a GEMINI.md an earlier bootstrap wrote has its managed fence removed (the file is deleted when nothing but the fence was in it, and text a person wrote outside the fence is kept). `dabbler session start --engine gemini` (and so `session drive`, which registers through start, and a stale `gemini` preference) is refused before anything is written, with one sentence that names the engines that remain and says Google models still review over the API; `dabbler configure --engine` already refuses any engine without a launch. The help text, the engine-to-provider table and the docs stop offering gemini, this repository's AGENTS.md fence is brought to the new template text, and its GEMINI.md is deleted. Releasable as a patch: version.json and the manifests it stamps move to 3.3.4, with a CHANGELOG entry.",
+      "releasable": true
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 184,
+      "dateTime": "2026-09-15T16:18:42.689000-04:00",
+      "what": "step 'docs-and-this-repo': its checks",
+      "reason": "doc-paths on README.md fails on a path that predates this session (line 157, .dabbler/runs/s<N>/rounds.jsonl, a placeholder for a gitignored machine file, present at HEAD); this step does not touch that line, so doc-paths runs on docs/quick-start.md, the file whose paths this step edits",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

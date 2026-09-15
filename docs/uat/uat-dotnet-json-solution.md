@@ -233,14 +233,13 @@ Two things follow for the rest of this walkthrough:
 ```
 bootstrap: wrote managed section in AGENTS.md
 bootstrap: wrote managed section in CLAUDE.md
-bootstrap: wrote managed section in GEMINI.md
 bootstrap: added .dabbler/ to .gitignore
 bootstrap: installed the step-execution commit guard at .git\hooks\pre-commit
 bootstrap: scaffolded dabbler.yaml
 bootstrap: it declares no test suite, because nothing at the root of this repository
            says how its tests run; declare one before the first session that writes code
 bootstrap: scaffolded docs\sessions\session-plan.md
-bootstrap: committed 6 file(s) it wrote; the declaration a session makes comes before
+bootstrap: committed 5 file(s) it wrote; the declaration a session makes comes before
            its work, so session 1 would be refused while they sat uncommitted.
 ```
 

@@ -226,6 +226,22 @@ describe("the identity a session in flight was registered under", () => {
 });
 
 describe("what a start refuses before a session exists", () => {
+  it("refuses Gemini CLI as an engine, names the ones that remain, and writes nothing", async () => {
+    const state = stateDir();
+    try {
+      const refused = await run(() =>
+        start(state.sessionsDir, { engine: "gemini", provider: "google" }),
+      );
+      assert.equal(refused.code, EXIT_USAGE);
+      assert.match(refused.err, /Gemini CLI is no longer a supported engine/);
+      assert.match(refused.err, /claude-code or copilot/);
+      assert.match(refused.err, /Google models still review/);
+      assert.equal(readRawSessionState(state.sessionsDir), null);
+    } finally {
+      state.restore();
+    }
+  });
+
   it("refuses a tree that already carries work, in the declaration's own words", async () => {
     // The sample's session 1 registered over a change, answered its plan,
     // and was paused inside the same `next` when the declaration refused the

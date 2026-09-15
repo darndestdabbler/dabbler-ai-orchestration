@@ -232,7 +232,6 @@ offer a model the command would refuse.
 ```
 bootstrap: wrote managed section in AGENTS.md
 bootstrap: wrote managed section in CLAUDE.md
-bootstrap: wrote managed section in GEMINI.md
 bootstrap: added .dabbler/ to .gitignore
 bootstrap: installed the step-execution commit guard at .git\hooks\pre-commit
 bootstrap: scaffolded dabbler.yaml
@@ -241,7 +240,7 @@ bootstrap: it declares no test suite, because nothing at the root of this reposi
 bootstrap: no packaging declared -- no .csproj or pom.xml at the repository root, so
            there is nothing here that says what a package would be built from.
 bootstrap: scaffolded docs\sessions\session-plan.md
-bootstrap: committed 6 file(s) it wrote; the declaration a session makes comes before
+bootstrap: committed 5 file(s) it wrote; the declaration a session makes comes before
            its work, so session 1 would be refused while they sat uncommitted.
 ```
 

@@ -112,8 +112,8 @@ verdict.
   `DABBLER_*_API_KEY` variables (the normal provider-issued keys from
   Anthropic, OpenAI, and Google; Dabbler only prefixes the names), or an
   authenticated GitHub Copilot CLI seat exposing two provider families
-- **One orchestrator AI agent** in VS Code (Claude Code, GitHub Copilot,
-  or Gemini — the framework is agent-agnostic)
+- **One orchestrator AI agent** in VS Code (Claude Code or GitHub Copilot
+  — the framework is agent-agnostic)
 
 ## Get started
 

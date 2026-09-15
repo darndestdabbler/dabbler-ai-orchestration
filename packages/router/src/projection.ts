@@ -386,8 +386,8 @@ function roleNode(
  *
  * A provider-specific CLI constraint, and one the code has known since
  * identity was written without a single surface reading it: Claude Code runs
- * Anthropic models and nothing else, the Gemini CLI runs Google's, and a
- * Copilot seat fronts whatever its seat lists. Null means "every provider
+ * Anthropic models and nothing else, and a Copilot seat fronts whatever its
+ * seat lists. Null means "every provider
  * this transport lists", which is the seat's answer.
  *
  * The VERIFIER is not narrowed by any of this: it is dispatched by the
@@ -396,7 +396,6 @@ function roleNode(
  */
 const ENGINE_PROVIDERS: Readonly<Record<string, string>> = {
   "claude-code": "anthropic",
-  gemini: "google",
 };
 
 /**

@@ -91,17 +91,15 @@ describe("a project on its first day", () => {
     milestones.push("bootstrapped");
 
     // --- what the engines read ---------------------------------------------
-    // One body, in AGENTS.md, imported by the other two: Copilot loads all
-    // three at once and de-duplicates nothing.
-    for (const name of ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]) {
+    // One body, in AGENTS.md, imported by CLAUDE.md: Copilot loads both at
+    // once and de-duplicates nothing.
+    for (const name of ["AGENTS.md", "CLAUDE.md"]) {
       assert.ok(existsSync(join(repo, name)), name);
       assert.ok(readFileSync(join(repo, name), "utf8").includes(MANAGED_START), name);
     }
     const agents = readFileSync(join(repo, "AGENTS.md"), "utf8");
     assert.match(agents, /dabbler session wait/);
-    for (const name of ["CLAUDE.md", "GEMINI.md"]) {
-      assert.match(readFileSync(join(repo, name), "utf8"), /@AGENTS\.md/);
-    }
+    assert.match(readFileSync(join(repo, "CLAUDE.md"), "utf8"), /@AGENTS\.md/);
     // And the operator's own file is exactly as they left it.
     assert.equal(
       readFileSync(join(repo, "README.md"), "utf8"),

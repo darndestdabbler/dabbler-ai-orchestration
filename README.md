@@ -23,9 +23,8 @@ There is one implementation, in TypeScript, and it runs two ways:
 
 1. `dabbler session start` registers the session in `sessions.json` and
    seeds the plan's step list into `activity-log.json`, once.
-2. The orchestrating AI (Claude Code, Copilot, Gemini — any engine that
-   reads `AGENTS.md` or the `CLAUDE.md`/`GEMINI.md` that import it) does
-   the work.
+2. The orchestrating AI (Claude Code, Copilot — any engine that reads
+   `AGENTS.md` or the `CLAUDE.md` that imports it) does the work.
 3. `dabbler verify` runs the verification loop **before commit**: round 1
    reviews the full working-tree diff; rounds ≥ 2 review only the fix
    delta. The **Primary Reviewer** is defined as *not the author*, and

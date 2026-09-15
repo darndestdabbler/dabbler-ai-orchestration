@@ -227,9 +227,9 @@ it was restored from the later commit and re-rendered with
 <!-- dabbler:managed:start -->
 # AI orchestrator instructions — `dabbler-ai-orchestration`
 
-> `AGENTS.md` is the single source of this managed body; `CLAUDE.md` and
-> `GEMINI.md` import it and add only their engine tail. Do not hand-edit
-> inside the fence; re-run `dabbler bootstrap` to refresh it.
+> `AGENTS.md` is the single source of this managed body; `CLAUDE.md`
+> imports it and adds only its engine tail. Do not hand-edit inside the
+> fence; re-run `dabbler bootstrap` to refresh it.
 
 ## Your role
 
@@ -362,10 +362,10 @@ wait for the next instruction before starting the next step.
 
 ## Engine tail (GitHub Copilot)
 
-You read this `AGENTS.md` directly. `CLAUDE.md` and `GEMINI.md` import
-it rather than repeating it, so this file is the one place the body
-exists. GitHub Copilot loads all three files at once and de-duplicates
-nothing, which is exactly why only this one carries the body.
+You read this `AGENTS.md` directly. `CLAUDE.md` imports it rather than
+repeating it, so this file is the one place the body exists. GitHub
+Copilot loads both files at once and de-duplicates nothing, which is
+exactly why only this one carries the body.
 
 Copilot seats: declare `--model` on the first call, the one that
 registers, and set the vehicle with `dabbler configure --transport

@@ -37,7 +37,7 @@ import {
   IdentityResolutionError,
   resolveOrchestratorIdentity,
 } from "./identity.ts";
-import { engineAliases } from "./engines.ts";
+import { GEMINI_RETIRED, engineAliases } from "./engines.ts";
 import {
   CHOSEN_VEHICLE_LAYERS,
   explainAuthoringModel,
@@ -973,6 +973,12 @@ export function configuredModelRefusal(
 }
 
 export async function start(sessionsDir: string, options: StartOptions): Promise<number> {
+  // Named at the flag or left in a machine's preferences from before, a
+  // retired engine is refused before anything is read or written.
+  if (options.engine === "gemini") {
+    writeErr(`start: refused -- ${GEMINI_RETIRED}\n`);
+    return EXIT_USAGE;
+  }
   if (!isDirectory(sessionsDir)) {
     writeErr(`start: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;

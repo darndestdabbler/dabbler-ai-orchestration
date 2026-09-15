@@ -26,7 +26,7 @@
 // the guard has to exist in the clone before the first step does, and a guard
 // installed by the thing it guards is installed too late.
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 import { SESSIONS_DIRNAME, SESSION_PLAN_FILENAME } from "../evidence.ts";
@@ -36,7 +36,6 @@ import {
   AGENTS_TAIL,
   BOOTSTRAP_PLAN,
   CLAUDE_TAIL,
-  GEMINI_TAIL,
   HOOK_MARKER,
   IGNORE_RULE,
   IMPORT_LINE,
@@ -216,14 +215,12 @@ function replaceAll(text: string, needle: string, value: string): string {
 }
 
 /**
- * Write the three engine files. `AGENTS.md` carries the body; `CLAUDE.md` and
- * `GEMINI.md` import it.
+ * Write the two engine files. `AGENTS.md` carries the body; `CLAUDE.md`
+ * imports it.
  *
- * All three are written because no engine reads all three: Codex and Copilot
- * read `AGENTS.md`, Claude Code reads only `CLAUDE.md`, and Gemini CLI reads
- * only `GEMINI.md` unless its `context.fileName` is reconfigured. Copilot
- * reads every one of them and de-duplicates nothing, so only one may carry the
- * body.
+ * Both are written because no engine reads both: Codex and Copilot read
+ * `AGENTS.md`, and Claude Code reads only `CLAUDE.md`. Copilot reads each of
+ * them and de-duplicates nothing, so only one may carry the body.
  */
 export function writeInstructionFiles(
   projectDir: string,
@@ -234,7 +231,6 @@ export function writeInstructionFiles(
   for (const [filename, tail, body] of [
     ["AGENTS.md", AGENTS_TAIL, null],
     ["CLAUDE.md", CLAUDE_TAIL, IMPORT_LINE],
-    ["GEMINI.md", GEMINI_TAIL, IMPORT_LINE],
   ] as const) {
     const path = join(projectDir, filename);
     let existing = "";
@@ -247,6 +243,39 @@ export function writeInstructionFiles(
     written.push(path);
   }
   return written;
+}
+
+/**
+ * Take the managed section out of a `GEMINI.md` bootstrap once wrote; return
+ * the path when the file changed, or null when it carries no fence.
+ *
+ * Gemini CLI is not an engine, and a file still carrying the fence reads as
+ * one that is. Only the fence goes: text a person wrote around it stays, and
+ * a file with nothing else in it is deleted.
+ */
+export function removeGeminiInstructions(projectDir: string): string | null {
+  const path = join(projectDir, "GEMINI.md");
+  let existing: string;
+  try {
+    existing = readText(path);
+  } catch {
+    return null;
+  }
+  const startAt = existing.indexOf(MANAGED_START);
+  const endAt = startAt === -1 ? -1 : existing.indexOf(MANAGED_END, startAt);
+  if (endAt === -1) return null;
+  // Blank lines around the fence go with it; nothing inside a line does, so
+  // indentation and trailing spaces a person wrote survive.
+  const head = existing.slice(0, startAt).replace(/(\r?\n)+$/, "");
+  const tail = existing.slice(endAt + MANAGED_END.length).replace(/^(\r?\n)+/, "");
+  const kept = head !== "" && tail !== "" ? `${head}\n\n${tail}` : head || tail;
+  try {
+    if (kept.trim() === "") unlinkSync(path);
+    else writeFileSync(path, /\n$/.test(kept) ? kept : `${kept}\n`, "utf8");
+  } catch {
+    return null;
+  }
+  return path;
 }
 
 /**

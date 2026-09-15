@@ -280,7 +280,7 @@ describe("the argv each engine is measured to take", () => {
   });
 
   it("has no built-in command for an engine nobody measured", () => {
-    assert.match(String(engineShape("gemini", null)), /--engine-argv/);
+    assert.match(String(engineShape("aider", null)), /--engine-argv/);
   });
 
   it("tells the engine to read the instruction and run its answer command", () => {
@@ -614,9 +614,15 @@ describe("what the command line refuses", () => {
     const usage = async (...args: string[]) =>
       capture(() => sessionVerb(["drive", "--sessions-dir", sessionsDir, ...args]));
 
+    const aider = await usage("--engine", "aider");
+    assert.equal(aider.value, EXIT_USAGE);
+    assert.match(aider.stderr, /no built-in command for 'aider'; pass --engine-argv/);
+
+    // A retired engine is told it is retired, not how to launch it anyway.
     const gemini = await usage("--engine", "gemini");
     assert.equal(gemini.value, EXIT_USAGE);
-    assert.match(gemini.stderr, /no built-in command for 'gemini'; pass --engine-argv/);
+    assert.match(gemini.stderr, /Gemini CLI is no longer a supported engine/);
+    assert.doesNotMatch(gemini.stderr, /--engine-argv/);
 
     const seat = await usage("--engine", "copilot");
     assert.equal(seat.value, EXIT_USAGE);

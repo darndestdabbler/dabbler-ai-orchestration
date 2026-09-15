@@ -195,7 +195,7 @@ describe("what may be chosen, and what decided what is", () => {
         installed: [
           { engine: "claude-code", program: "claude", path: "C:/bin/claude.exe" },
           { engine: "copilot", program: "copilot", path: "C:/bin/copilot.exe" },
-          { engine: "gemini", program: "gemini", path: null },
+          { engine: "codex", program: "codex", path: null },
         ],
       },
     });

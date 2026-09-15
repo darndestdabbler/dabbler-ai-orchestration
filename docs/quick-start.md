@@ -41,15 +41,13 @@ From your project root:
 dabbler bootstrap --project-dir .
 ```
 
-This writes a fenced managed block into `AGENTS.md`, `CLAUDE.md` and
-`GEMINI.md`. `AGENTS.md` carries the body; the other two carry a
-one-line `@AGENTS.md` import plus their engine tail, so the instructions
-exist in exactly one place. All three are written because no single
-engine reads all three: Copilot reads `AGENTS.md`, Claude Code
-reads only `CLAUDE.md`, and Gemini CLI reads only `GEMINI.md` unless its
-`context.fileName` setting is changed — while Copilot reads every one of
-them and de-duplicates nothing, which is why only one may hold the body.
-Claude Code and Gemini CLI both expand `@file` imports at load time.
+This writes a fenced managed block into `AGENTS.md` and `CLAUDE.md`.
+`AGENTS.md` carries the body; `CLAUDE.md` carries a one-line
+`@AGENTS.md` import plus its engine tail, so the instructions exist in
+exactly one place. Both are written because no single engine reads both:
+Copilot reads `AGENTS.md` and Claude Code reads only `CLAUDE.md` — while
+Copilot reads each of them and de-duplicates nothing, which is why only
+one may hold the body. Claude Code expands `@file` imports at load time.
 Existing files keep their user content; only the fenced section is
 refreshed. Re-run the command any time to refresh it.
 
@@ -104,7 +102,7 @@ dabbler session start --engine <engine>
 
 No command names a sessions root: there is one per repository and it is
 derived from the working directory.
-`--engine` is required — `claude-code`, `gemini` or `copilot`;
+`--engine` is required — `claude-code` or `copilot`;
 `--provider`, `--model`, and `--effort` record the seat identity
 (Copilot seats must pass `--model` — the seat label is not trusted).
 `codex` is accepted and recorded like any other name, and is left

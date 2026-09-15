@@ -2,9 +2,9 @@
 //
 // One canonical instruction block carries the whole session workflow; it is
 // written into `AGENTS.md` (Copilot, and every other orchestrator that reads
-// that convention) and `CLAUDE.md` (Claude Code), differing only in a
-// short engine tail. Copilot loads all three at once and de-duplicates
-// nothing, which is why exactly one of them may carry the body.
+// that convention) and imported by `CLAUDE.md` (Claude Code), each with a
+// short engine tail. Copilot loads both at once and de-duplicates nothing,
+// which is why exactly one of them may carry the body.
 //
 // Every command in the body names `dabbler <verb>`. The router ships as one
 // command on PATH, so an instruction naming an interpreter would be an
@@ -13,7 +13,7 @@
 // goes for the commit guard: it invokes the router by name.
 //
 // It is written one source line per rendered line and nothing is reflowed:
-// the fence lands in three files a person then reads and edits around, so a
+// the fence lands in two files a person then reads and edits around, so a
 // change to it should read as a change to the text rather than as a reflow
 // of the whole block.
 
@@ -24,10 +24,10 @@ export const MANAGED_END = "<!-- dabbler:managed:end -->";
 export const IGNORE_RULE = ".dabbler/";
 
 /**
- * `CLAUDE.md` and `GEMINI.md` carry this instead of the body. Both engines
- * expand `@file` at load time, so the import is a loader directive rather
- * than a request the model may decline. Neither reads `AGENTS.md` natively,
- * which is why the file cannot simply be deleted.
+ * `CLAUDE.md` carries this instead of the body. Claude Code expands `@file`
+ * at load time, so the import is a loader directive rather than a request
+ * the model may decline. It does not read `AGENTS.md` natively, which is why
+ * the file cannot simply be deleted.
  */
 export const IMPORT_LINE = "@AGENTS.md";
 
@@ -41,9 +41,9 @@ export const HOOK_MARKER = "# dabbler-ai-router: step-execution commit guard";
 export const SHARED_BODY =
   "# AI orchestrator instructions — `{repo_name}`\n" +
   "\n" +
-  "> `AGENTS.md` is the single source of this managed body; `CLAUDE.md` and\n" +
-  "> `GEMINI.md` import it and add only their engine tail. Do not hand-edit\n" +
-  "> inside the fence; re-run `dabbler bootstrap` to refresh it.\n" +
+  "> `AGENTS.md` is the single source of this managed body; `CLAUDE.md`\n" +
+  "> imports it and adds only its engine tail. Do not hand-edit inside the\n" +
+  "> fence; re-run `dabbler bootstrap` to refresh it.\n" +
   "\n" +
   "## Your role\n" +
   "\n" +
@@ -190,27 +190,16 @@ export const CLAUDE_TAIL =
 export const AGENTS_TAIL =
   "## Engine tail (GitHub Copilot)\n" +
   "\n" +
-  "You read this `AGENTS.md` directly. `CLAUDE.md` and `GEMINI.md` import\n" +
-  "it rather than repeating it, so this file is the one place the body\n" +
-  "exists. GitHub Copilot loads all three files at once and de-duplicates\n" +
-  "nothing, which is exactly why only this one carries the body.\n" +
+  "You read this `AGENTS.md` directly. `CLAUDE.md` imports it rather than\n" +
+  "repeating it, so this file is the one place the body exists. GitHub\n" +
+  "Copilot loads both files at once and de-duplicates nothing, which is\n" +
+  "exactly why only this one carries the body.\n" +
   "\n" +
   "Copilot seats: declare `--model` on the first call, the one that\n" +
   "registers, and set the vehicle with `dabbler configure --transport\n" +
   "copilot-cli` when routing through the seat. If `DABBLER_TRANSPORT` is still\n" +
   "set in your environment, unset it: nothing reads it. Review stays\n" +
   "cross-provider on every transport.\n";
-
-/**
- * Gemini CLI reads `GEMINI.md` unless `context.fileName` says otherwise.
- */
-export const GEMINI_TAIL =
-  "## Engine tail (Gemini CLI)\n" +
-  "\n" +
-  "You are **Gemini CLI**. The managed body above arrived through the\n" +
-  "`@AGENTS.md` import, expanded by the memory import processor —\n" +
-  "`AGENTS.md` is the one copy. If your seat is configured with\n" +
-  "`context.fileName`, keep `AGENTS.md` in the list.\n";
 
 /**
  * A scaffolded repository's session 1, for running the same work untracked.

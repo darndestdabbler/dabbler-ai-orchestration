@@ -20,6 +20,7 @@ import {
   detectEcosystems,
   ensureCommitGuard,
   ensureGitignore,
+  removeGeminiInstructions,
   renderProjectConfig,
   scaffoldBootstrapSessions,
   scaffoldProjectConfig,
@@ -172,12 +173,12 @@ describe("the ignore rule", () => {
 });
 
 describe("the instruction files", () => {
-  it("writes three files, each with a managed section inside its budget", () => {
+  it("writes two files, each with a managed section inside its budget", () => {
     const project = tempDir("bootstrap-");
     const written = writeInstructionFiles(project, "acme-app");
     assert.deepEqual(
       written.map((path) => path.split(/[\\/]/).pop()),
-      ["AGENTS.md", "CLAUDE.md", "GEMINI.md"],
+      ["AGENTS.md", "CLAUDE.md"],
     );
     for (const path of written) {
       const text = readFileSync(path, "utf8");
@@ -189,19 +190,34 @@ describe("the instruction files", () => {
     }
   });
 
-  it("puts the body in AGENTS.md alone and imports it from the others", () => {
-    // Copilot loads all three at once and de-duplicates nothing, so exactly
-    // one file may hold the body.
+  it("puts the body in AGENTS.md alone and imports it from CLAUDE.md", () => {
+    // Copilot loads both at once and de-duplicates nothing, so exactly one
+    // file may hold the body.
     const project = tempDir("bootstrap-");
     writeInstructionFiles(project, "acme-app");
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
     assert.match(agents, /`acme-app`/);
     assert.match(agents, /dabbler session wait/);
-    for (const name of ["CLAUDE.md", "GEMINI.md"]) {
-      const text = readFileSync(join(project, name), "utf8");
-      assert.match(text, /@AGENTS\.md/);
-      assert.ok(!text.includes("dabbler session wait"));
-    }
+    const claude = readFileSync(join(project, "CLAUDE.md"), "utf8");
+    assert.match(claude, /@AGENTS\.md/);
+    assert.ok(!claude.includes("dabbler session wait"));
+  });
+
+  it("takes the retired Gemini fence out, deleting a file that held nothing else", () => {
+    const fence = `${MANAGED_START}\n@AGENTS.md\n\n---\n\n## Engine tail (Gemini CLI)\n${MANAGED_END}\n`;
+    const bare = tempDir("bootstrap-");
+    seed(bare, { "GEMINI.md": fence });
+    assert.equal(removeGeminiInstructions(bare), join(bare, "GEMINI.md"));
+    assert.ok(!existsSync(join(bare, "GEMINI.md")));
+
+    const mine = tempDir("bootstrap-");
+    seed(mine, { "GEMINI.md": `# My notes\nKeep this line.\n\n${fence}    indented code\n` });
+    assert.equal(removeGeminiInstructions(mine), join(mine, "GEMINI.md"));
+    const left = readFileSync(join(mine, "GEMINI.md"), "utf8");
+    assert.equal(left, "# My notes\nKeep this line.\n\n    indented code\n");
+    assert.ok(!left.includes(MANAGED_START) && !left.includes("Gemini CLI"));
+    // Nothing of ours is left, so a second run changes nothing.
+    assert.equal(removeGeminiInstructions(mine), null);
   });
 
   it("tells the engine to call the framework rather than typing the lifecycle out", () => {
@@ -275,7 +291,7 @@ describe("the instruction files", () => {
     writeInstructionFiles(project, "x");
     assert.match(readFileSync(join(project, "CLAUDE.md"), "utf8"), /Claude Code/);
     assert.match(readFileSync(join(project, "AGENTS.md"), "utf8"), /Copilot/);
-    assert.match(readFileSync(join(project, "GEMINI.md"), "utf8"), /Gemini CLI/);
+    assert.ok(!existsSync(join(project, "GEMINI.md")));
   });
 
   it("never touches user content outside the fence, and replaces only the fence", () => {

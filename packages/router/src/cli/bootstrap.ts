@@ -15,7 +15,7 @@
 // checkout's own `.vscode/settings.json`, which is where a choice about a
 // checkout belongs: committed, visible, and one command from changed.
 
-import { statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -45,6 +45,7 @@ import {
   scaffoldBootstrapSessions,
   scaffoldProjectConfig,
   writeInstructionFiles,
+  removeGeminiInstructions,
   removeStopGate,
 } from "../bootstrap/index.ts";
 import { SETTINGS_RELPATH } from "../settings.ts";
@@ -237,6 +238,19 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   for (const path of writeInstructionFiles(project, parsed.repoName)) {
     writeOut(`bootstrap: wrote managed section in ${path}\n`);
     written.push(path);
+  }
+  {
+    // A deleted file is committed only where git tracks it: naming a path
+    // git never knew fails the add, and the commit with it.
+    const retired = removeGeminiInstructions(project);
+    if (retired !== null) {
+      writeOut(`bootstrap: removed the retired GEMINI.md managed section from ${retired}\n`);
+      const root = repoRootFor(project);
+      const tracked =
+        root !== null &&
+        runGit(root, ["ls-files", "--error-unmatch", "--", repoRelativePath(root, retired)]).code === 0;
+      if (existsSync(retired) || tracked) written.push(retired);
+    }
   }
   if (ensureGitignore(project)) {
     const path = join(project, ".gitignore");

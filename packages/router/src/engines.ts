@@ -182,6 +182,11 @@ export { DEFAULT_ENGINE_OUTPUT, ENGINE_OUTPUT_MODES, type EngineOutput } from ".
 /** The engines `session start` registers that have a built-in argv here. */
 export const BUILT_IN_ENGINES = ["claude-code", "copilot", "codex"] as const;
 
+/** Why `gemini` is refused wherever an engine is named to run a session. */
+export const GEMINI_RETIRED =
+  "Gemini CLI is no longer a supported engine: start the session with claude-code or copilot " +
+  "(codex has a launch too); Google models still review the work over the direct API.";
+
 /**
  * The program each built-in engine is launched as.
  *
@@ -506,6 +511,8 @@ export function engineShape(engine: string, model: string | null): EngineShape |
         refusedModel: () => null,
         servedModel: () => null,
       };
+    case "gemini":
+      return GEMINI_RETIRED;
     default:
       return `no built-in command for '${engine}'; pass --engine-argv`;
   }

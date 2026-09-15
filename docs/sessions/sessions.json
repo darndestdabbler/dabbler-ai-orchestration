@@ -3529,9 +3529,9 @@
     {
       "number": 178,
       "title": "The extension and the words",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-15T07:26:54-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-15T07:54:16.208000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

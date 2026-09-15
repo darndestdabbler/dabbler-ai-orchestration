@@ -319,9 +319,9 @@ cannot be read as a history of what was released.
 | `secret_name` | string | the **name** of the credential, never its value |
 | `tree_digest` | string \| null | the worktree tree the artifacts were built from |
 | `post_tree_digest`, `tree_mutated` | string \| null, boolean | present when a declared command changed the repository while it ran |
-| `artifacts` | array | what `pack` produced, relative to the run's own output directory |
+| `artifacts` | array | what `pack` produced, relative to the run's own output directory; a block with no `push` adds the release tag it made after them |
 | `gates` | array | the five close gates as packaging found them: `name`, `passed`, `remediation` |
-| `steps` | array | `pack` once then `push` per artifact: `step`, `command`, `artifact`, `exit_code`, `duration_seconds`, `timed_out`, `output` |
+| `steps` | array | `pack` once then `push` per artifact (none for a block with no `push`): `step`, `command`, `artifact`, `exit_code`, `duration_seconds`, `timed_out`, `output` |
 | `recorded_at` | string | timestamp |
 
 **No field here ever holds a credential.** `command` is recorded with the
@@ -423,9 +423,14 @@ the step it asked for, the files the tree actually changed, the step's own
 check) and answers with a `rejection` when it disagrees.
 
 **`plan.json`** (required: `schema_version`, `session_number`, `task`,
-`releasable`, `steps`, `recorded_at`): the driver declares the session
-from `task` and `releasable` before any edit — the same rule `session
-declare` enforces on a typed session. Each step has a unique slug `id`, an
+`steps`, `recorded_at`): the driver declares the session from `task` and
+the release member before any edit — the same rule `session declare`
+enforces on a typed session. Which member is read is the checkout's
+`dabbler.release` setting: `on-request` (the default) reads `release`, the
+one reason the session publishes now, and holds a plan without it;
+`ship-by-default` reads `hold_release`, the one reason it waits, and ships
+a plan without it. A plan carrying the other member is accepted, and an
+older plan's `releasable` is read as recorded. Each step has a unique slug `id`, an
 `ask`, the `files` it expects to touch (a report for the step must list
 each) and `checks` — at least one, each an `argv` spawned with no shell; a
 check is run, never read, and a step with none would be closed on the
@@ -506,7 +511,7 @@ carries what the repository owns and nothing else:
 |---|---|
 | `schema_version` | required, currently `1`; a repository written to a later shape is refused with its version named rather than read as unknown keys |
 | `testing` | `suites` (each with its own `test_roots`, `test_glob`, `test_name` and `select`), `controls`, and `selection.smoke`, the tests that run where a changed source file has no test named after it |
-| `packaging` | step (f) of the lifecycle: either `pack` and `push`, or `release: tag` for a repository CI publishes from — one or the other, never both |
+| `packaging` | step (f) of the lifecycle: `pack` with a `push`, `pack` alone for artifacts handed over from the run's package folder, or `release: tag` for a repository CI publishes from — one of them, never `release: tag` beside a pack. *Whether* a session publishes is not here: it is `dabbler.release` in `.vscode/settings.json` |
 | `paths` | `sensitive_paths`: which of this repository's paths escalate a run |
 
 Tracked because CI reads these, the next machine reads them, and
@@ -605,6 +610,23 @@ Both commands are `argv`, never shell strings, so nothing can re-split
 the element the credential lands in; both are spawned with the child
 environment allowlist, so the credential is inherited by nothing.
 
+**A `pack` with no `push`** hands its artifacts over from
+`.dabbler/runs/s<N>/package/` — an IIS site package, a runnable jar, a SQL
+migration script — and pushes nothing. The release is still a tag: the run
+makes `v<version>` where `version.json` declares one and `session-<NNN>`
+otherwise, pushes it to origin, and records `published` with the artifacts
+and the tag.
+
+```yaml
+# dabbler.yaml
+packaging:
+  pack:
+    argv: ["dotnet", "publish", "src/Api", "-c", "Release", "-o", "{output}"]
+```
+
+Whether a session publishes at all is the checkout's `dabbler.release`
+(`on-request`, the default, or `ship-by-default`), never this block.
+
 **Some repositories do not publish from the session's machine at all**, and
 that is a third answer rather than a missing block. This one is the example:
 it releases the extension from a tag-driven workflow whose credential lives
@@ -624,7 +646,8 @@ repository releases one way, and a block claiming both leaves the record
 unable to say which one it describes. The declared release is an annotated
 `vsix-v<version>` tag; the packaging run makes it at the commit the session
 landed and pushes it where origin has none, or records the one already
-there — a session ships unless its plan holds it, and nobody is asked.
+there — a session ships when `dabbler.release` and its plan say it does,
+and nobody is asked.
 `dabbler release` is the same act by hand. The gate is unchanged: it still
 asks for a `published` row, and only a tag that actually reached origin
 earns one.

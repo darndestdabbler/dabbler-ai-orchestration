@@ -15,7 +15,7 @@ export type Dabbler = {
    */
   testing?: Record<string, unknown>;
   /**
-   * Step (f) of the session lifecycle: pack, then push to the feed. Validated in full by ai_router.packaging. A repository that declares nothing here publishes nothing, which is a declaration rather than an omission.
+   * Step (f) of the session lifecycle: pack, then push to the feed; pack alone, whose artifacts are handed over from the run's package folder with a release tag; or `release: tag`. Validated in full by router-config.schema.json and packaging.ts. A repository that declares nothing here publishes nothing, which is a declaration rather than an omission.
    */
   packaging?: Record<string, unknown>;
   /**

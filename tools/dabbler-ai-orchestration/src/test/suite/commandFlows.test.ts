@@ -41,6 +41,7 @@ import {
   refreshRecord,
   storeCredential,
   setAsMyDefault,
+  setRelease,
   setRoleModel,
   type ConfigurationUi,
 } from "../../commands/configurationCommands";
@@ -1390,6 +1391,28 @@ suite("the Configuration section's model pick", () => {
     assert.deepStrictEqual(configureOptions, [
       { repoRoot: "D:/ws", auxiliaryModel: "gemini-3.1-pro-preview" },
     ]);
+  });
+});
+
+suite("the solution row's release commands", () => {
+  test("write the setting through configure, and repaint", async () => {
+    const ui: ConfigurationUi = {
+      confirm: () => Promise.resolve(true),
+      runVerb: () => Promise.resolve(0),
+      pick: () => Promise.resolve(undefined),
+      showInformationMessage: () => undefined,
+      showWarningMessage: () => undefined,
+      workspaceRoot: () => "D:/ws",
+    };
+    const { router, configureOptions } = fakeRouter(0, "written");
+    let repainted = 0;
+    await setRelease(router, "ship-by-default", () => (repainted += 1), ui);
+    await setRelease(router, "on-request", () => (repainted += 1), ui);
+    assert.deepStrictEqual(configureOptions, [
+      { repoRoot: "D:/ws", release: "ship-by-default" },
+      { repoRoot: "D:/ws", release: "on-request" },
+    ]);
+    assert.strictEqual(repainted, 2);
   });
 });
 

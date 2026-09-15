@@ -35,6 +35,14 @@ export { spawnProgram, terminateTree } from "./checks.ts";
 // second copy of a vocabulary -- which is the drift that has already been
 // paid for once here, in a phase list that was written down twice.
 export { VALID_TRANSPORTS, TRANSPORT_ENV_VAR } from "./config.ts";
+// When a session publishes: the solution row offers the command that changes
+// it, and reads the one answer the publish phase reads.
+export {
+  RELEASE_ON_REQUEST,
+  RELEASE_SHIP_BY_DEFAULT,
+  type ReleaseMode,
+  releaseMode,
+} from "./settings.ts";
 // The token a gate that judged nothing carries after its name. It is on the
 // contract because the terminal paints a gate row's mark as the bytes pass
 // and has to tell "passed" from "judged nothing", which wear the same mark.

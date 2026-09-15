@@ -276,6 +276,8 @@ export interface ConfigureOptions extends RepositoryTarget {
    * where the value lands changes.
    */
   readonly mine?: boolean;
+  /** When this solution's sessions publish: `on-request` or `ship-by-default`. */
+  readonly release?: string;
 }
 
 export interface VerifyReanchorOptions extends RepositoryTarget {

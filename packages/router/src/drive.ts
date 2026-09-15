@@ -80,7 +80,9 @@ import {
   appendSupervision,
   progressResumed,
   renderStop,
+  releaseOfPlan,
 } from "./driver.ts";
+import { RELEASE_SHIP_BY_DEFAULT, releaseMode } from "./settings.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
 import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
@@ -1657,6 +1659,27 @@ class Driver {
     );
   }
 
+  /** The one plan member this checkout's `dabbler.release` reads, as the plan ask names it. */
+  private releaseMemberAsk(): string {
+    const bump =
+      "A releasing session bumps the version in the manifest as part of its work -- patch unless the " +
+      "change adds a capability (minor) or breaks a consumer (major) -- and its task paragraph says which\n";
+    if (releaseMode(this.repoRoot) === RELEASE_SHIP_BY_DEFAULT) {
+      return (
+        "  hold_release  optional: the ONE reason this session publishes nothing -- the later session, " +
+        "sibling module or first release's go-live the work waits on. This solution ships by default: once " +
+        "new or fixed functionality can be delivered, it is delivered, so hold only for the first release " +
+        "or a stated dependency, and say which. " +
+        bump
+      );
+    }
+    return (
+      "  release     optional: the ONE reason this session publishes now. This solution releases on " +
+      "request, so a plan without it publishes nothing: name it when the work is ready to be delivered. " +
+      bump
+    );
+  }
+
   private planAsk(): string {
     let excerpt = "";
     try {
@@ -1684,7 +1707,7 @@ class Driver {
       "(for example .dabbler/scratch/plan.json), then run the answer command. The file " +
       "carries exactly these members and no other:\n" +
       "  task        one paragraph: what this session will do -- it becomes the declaration\n" +
-      "  hold_release  optional: the ONE reason this session publishes nothing -- the later session, sibling module or first release's go-live the work waits on. Once new or fixed functionality can be delivered, it is delivered: hold only for the first release or a stated dependency, and say which. A releasing session bumps the version in the manifest as part of its work -- patch unless the change adds a capability (minor) or breaks a consumer (major) -- and its task paragraph says which\n" +
+      this.releaseMemberAsk() +
       "  non_goals   a list of at least one: what this session will NOT do -- the exclusions its section of the session plan states, or the nearest concrete boundary of the task where it states none. An engine that cannot name one has not understood the scope; the reviewer holds the work to the list\n" +
       '  steps       an ordered list; each step is {"id": "<lowercase-slug>", "ask": "<what ' +
       'to do, in words>", "files": ["<every repository-relative file the step creates or ' +
@@ -1770,9 +1793,10 @@ class Driver {
     }
     this.plan = plan;
     this.setRejections(0);
+    const release = releaseOfPlan(plan, releaseMode(this.repoRoot));
     this.log("plan-accepted", {
       steps: plan.steps.map((step) => step.id),
-      hold: plan.hold_release ?? null,
+      hold: release.holdReason,
       non_goals: (plan.non_goals ?? []).length,
     });
     this.placePlannedRepositories(plan);
@@ -1783,8 +1807,8 @@ class Driver {
       const refused: { message: string; cause: DeclareRefusalCause } = { message: "", cause: "other" };
       const code = declare(this.sessionsDir, {
         task: plan.task,
-        releasable: plan.hold_release === undefined,
-        holdReason: plan.hold_release ?? null,
+        releasable: release.releasable,
+        holdReason: release.holdReason,
         sessionNumber: this.sessionNumber,
         onRefusal: (message, cause) => {
           refused.message = message;

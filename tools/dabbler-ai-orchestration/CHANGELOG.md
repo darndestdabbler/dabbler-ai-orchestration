@@ -10,6 +10,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.2.0] — 2026-09-14
+
+**When a session publishes is the solution's setting.** Release on request,
+the default, or ship by default — chosen once for the solution, from the
+Solution Explorer or a terminal, and read by every session.
+
+### Added
+
+- **`dabbler.release` in `.vscode/settings.json`.** `on-request`, the default
+  where nothing is set: a session publishes only when its plan carries
+  `release` with the one reason it releases now. `ship-by-default`: a session
+  publishes unless its plan carries `hold_release` with the one reason it
+  waits. The plan ask names the member the setting reads, and a plan carrying
+  the other is accepted with the setting deciding. `dabbler configure
+  --release on-request|ship-by-default` writes it, and refuses it beside
+  `--mine`: it is the solution's answer, never one person's default.
+- **Ship by Default and Release on Request** on the Solution Explorer's
+  solution row, one shown at a time, each writing the setting through the
+  router. The extension contributes the setting, so the Settings editor shows
+  it too.
+- **Planning asks how production is split.** The scaffolded session 1 and the
+  plan prompt ask, before any module is proposed, what runs separately in
+  production and which part may talk to the database — offering an
+  application tier that calls an API tier, with only the API tier reaching
+  the database. The answer is recorded under *Production split* with the
+  *Handoff artifacts* each part is handed over as and the standard command
+  for its form (`dotnet publish`, a Worker Service published for a service
+  host, `mvn package`, Spring Boot's `build-image`, `dotnet ef migrations
+  script --idempotent`). Session 2 creates the projects the split names,
+  writes `packaging.pack` for the handoff artifacts, and adds the tier rule
+  as an architecture test in the solution's own tests.
+- **A pack with no push.** A `packaging` block may declare `pack` alone: its
+  artifacts are handed over from the run's package folder, nothing is pushed,
+  and the release tag is still made — `v<version>` where `version.json`
+  declares one, `session-<NNN>` otherwise.
+
+### Changed
+
+- **This repository ships by default**, committed in its own settings.
+  Holds, verdicts and a repository with no packaging behave as before.
+
 ## [3.1.0] — 2026-09-14
 
 **Tests are named after what they test.** A source file's tests are the test

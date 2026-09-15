@@ -32,7 +32,7 @@ import {
   appendPackaging,
   packageOutputDir,
 } from "./ledger.ts";
-import { readSessionState } from "./progress.ts";
+import { readSessionState, sessionDisplayNumber } from "./progress.ts";
 import { resolveSecret } from "./secretResolver.ts";
 import { readText } from "./textfile.ts";
 import { sessionIsReleasable } from "./writers.ts";
@@ -153,7 +153,12 @@ export interface TagRelease {
 
 export interface Declaration {
   readonly pack: PackStep;
-  readonly push: PushStep;
+  /**
+   * Null for a block that declares a pack and no push: the artifacts stay in
+   * the run's package folder, the handoff to whoever deploys them, and the
+   * release is the tag.
+   */
+  readonly push: PushStep | null;
 }
 
 /**
@@ -532,26 +537,30 @@ export function loadDeclaration(
   if (readTagRelease(packaging) !== null) return null;
 
   const packBlock = asRecord(packaging["pack"]);
-  const pushBlock = asRecord(packaging["push"]);
-  for (const [name, value] of [
-    ["pack", packBlock],
-    ["push", pushBlock],
-  ] as const) {
-    if (value === null) {
-      throw new PackagingConfigError(
-        `packaging.${name} must be a mapping; a packaging block ` +
-          "declares both halves or neither, because a pack nobody " +
-          "pushes is a build and a push with nothing to send is a " +
-          "typo.",
-      );
-    }
+  if (packBlock === null) {
+    throw new PackagingConfigError(
+      "packaging.pack must be a mapping; a packaging block declares a pack, " +
+        "and a push beside it where the artifacts go to a feed -- a push with " +
+        "nothing to send is a typo.",
+    );
   }
-
-  const pack = packBlock as Record<string, unknown>;
-  const push = pushBlock as Record<string, unknown>;
-
+  const pack = packBlock;
   const packArgv = argvOf(pack, "packaging.pack");
   requirePlaceholders(packArgv, [PLACEHOLDER_OUTPUT], "packaging.pack");
+  const packStep: PackStep = {
+    argv: packArgv,
+    cwd: String(pack["cwd"] ?? ""),
+    timeoutSeconds: timeoutOf(pack, "packaging.pack"),
+    usesVersion: packArgv.join(" ").includes(PLACEHOLDER_VERSION),
+  };
+
+  // No push: the artifacts are the handoff, and the release is the tag.
+  if (packaging["push"] === undefined) return { pack: packStep, push: null };
+  const pushBlock = asRecord(packaging["push"]);
+  if (pushBlock === null) {
+    throw new PackagingConfigError("packaging.push must be a mapping, or left out to push nothing.");
+  }
+  const push = pushBlock;
 
   const pushArgv = argvOf(push, "packaging.push");
 
@@ -585,12 +594,7 @@ export function loadDeclaration(
   }
 
   return {
-    pack: {
-      argv: packArgv,
-      cwd: String(pack["cwd"] ?? ""),
-      timeoutSeconds: timeoutOf(pack, "packaging.pack"),
-      usesVersion: packArgv.join(" ").includes(PLACEHOLDER_VERSION),
-    },
+    pack: packStep,
     push: {
       argv: pushArgv,
       feed,
@@ -1290,15 +1294,14 @@ export function packageSession(
   // a null: `redact` already ignores anything shorter than its minimum, and
   // substitution has no `{secret}` to fill because the declaration was not
   // required to carry one.
-  const secretValue = declaration.push.secret
-    ? resolveSecret(declaration.push.secret, declaration.push.secretSource)
-    : "";
-  if (declaration.push.secret && !secretValue) {
+  const push = declaration.push;
+  const secretValue = push?.secret ? resolveSecret(push.secret, push.secretSource) : "";
+  if (push?.secret && !secretValue) {
     return refusal(
       sessionNumber,
       true,
-      `the credential '${declaration.push.secret}' is not set in the ` +
-        `'${declaration.push.secretSource}' backend. Resolving it ` +
+      `the credential '${push.secret}' is not set in the ` +
+        `'${push.secretSource}' backend. Resolving it ` +
         "before pack means a missing PAT costs nothing but this " +
         "message, rather than a build that cannot be sent anywhere.",
       gates,
@@ -1313,8 +1316,8 @@ export function packageSession(
         "dry run: every gate passed and nothing was run.",
         gates,
       ),
-      feed: declaration.push.feed,
-      secretName: declaration.push.secret,
+      feed: push?.feed ?? "",
+      secretName: push?.secret ?? "",
       ready: true,
       declared: true,
     };
@@ -1374,8 +1377,8 @@ function execute(
     sessionNumber,
     releasable: true,
     refusal: "",
-    feed: push.feed,
-    secretName: push.secret,
+    feed: push?.feed ?? "",
+    secretName: push?.secret ?? "",
     treeDigest,
     postTreeDigest: extra.post ?? null,
     treeMutated: extra.mutated === true,
@@ -1443,6 +1446,18 @@ function execute(
         "publication that did not happen.",
       gates,
     );
+  }
+
+  // Nothing to push: the artifacts stay in the run's package folder, and the
+  // release is the tag, made the way a tag release makes it.
+  if (push === null) {
+    const version = canonicalVersion(root);
+    const tag = version === null ? `session-${sessionDisplayNumber(sessionNumber)}` : `v${version}`;
+    const why = pushReleaseTag(root, tag);
+    if (why !== null) {
+      return refusal(sessionNumber, true, `the pack produced its artifacts and ${why}`, gates);
+    }
+    return { ...outcome(OUTCOME_PUBLISHED, { artifacts: [...artifacts, tag] }), feed: "origin" };
   }
 
   const pushCwd = push.cwd ? join(root, push.cwd) : root;

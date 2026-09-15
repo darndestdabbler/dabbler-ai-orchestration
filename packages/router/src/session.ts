@@ -81,7 +81,9 @@ import {
   writeReport,
   writeWorkPlan,
   appendSupervision,
+  releaseOfPlan,
 } from "./driver.ts";
+import { releaseMode } from "./settings.ts";
 import {
   ENUMERATION_CLI_ALIASES,
   configurationNode,
@@ -1621,9 +1623,10 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
   try {
     if (isPlan) {
       const plan = writeWorkPlan(repoRoot, target, stampAnswer(answer, stamps, "the work plan"));
+      const release = releaseOfPlan(plan, releaseMode(repoRoot));
       summary =
         `work plan (${plan.steps.length} step(s), ` +
-        `${plan.hold_release === undefined ? "ships" : `held: ${plan.hold_release}`}) ` +
+        `${release.releasable ? "ships" : `held: ${release.holdReason}`}) ` +
         `written to ${relative(repoRoot, planPath(repoRoot, target)).replace(/\\/g, "/")}`;
     } else {
       const set = writeDispositions(repoRoot, target, stampAnswer(answer, stamps, "the disposition"));

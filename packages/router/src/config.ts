@@ -57,6 +57,7 @@ import {
   CREDENTIAL_SETTING_BY_PROVIDER,
   SETTINGS_RELPATH,
   SETTING_AUTHORING_MODEL,
+  SETTING_RELEASE,
   SETTING_REVIEWER_TRANSPORT,
   SETTING_TRANSPORT,
   type SettingKey,
@@ -1263,6 +1264,8 @@ export interface ConfigurationChoice {
   readonly credentialProvider?: string;
   /** The credential's NAME, never its value; "" clears the reference. */
   readonly credential?: string;
+  /** When this solution's sessions publish: `on-request` or `ship-by-default`. */
+  readonly release?: string;
 }
 
 /** What was written, and where. */
@@ -1318,6 +1321,7 @@ export function writeConfigurationChoice(
     }
     values[key] = choice.credential.trim();
   }
+  if (choice.release !== undefined) values[SETTING_RELEASE] = choice.release.trim();
   return writeSettings(root, values);
 }
 

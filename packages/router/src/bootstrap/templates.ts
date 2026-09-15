@@ -114,13 +114,13 @@ export const SHARED_BODY =
   "A `wait` answered by watching `run.json` for its job to clear waits\n" +
   "forever: only the `next` you did not call clears it.\n" +
   "\n" +
-  "**A session ships unless its plan holds it**, and the framework publishes\n" +
-  "between the push and the close for itself. A plan holds a release with\n" +
-  "`hold_release` and one reason — the first release's go-live, or work a\n" +
-  "later session must land first — declared before the work and never\n" +
-  "decided afterwards; a held session publishes nothing, and no session\n" +
-  "publishes without a VERIFIED verdict. A session with no hold and no\n" +
-  "packaging run on its record cannot close: the close refuses.\n" +
+  "**A session's release follows `dabbler.release`**, and the framework\n" +
+  "publishes between the push and the close for itself. On request, the\n" +
+  "default, a plan releases with `release` and one reason; ship by default,\n" +
+  "a plan holds with `hold_release` and one reason. Either is declared\n" +
+  "before the work and never decided afterwards; no session publishes\n" +
+  "without a VERIFIED verdict, and a releasable session with no packaging\n" +
+  "run on its record cannot close: the close refuses.\n" +
   "\n" +
   "## When the framework stops\n" +
   "\n" +
@@ -231,11 +231,25 @@ export const PLAN_PROMPT =
   "do not draft one from the folder name — a guessed plan is broken by the\n" +
   "next session into sessions nobody asked for.\n" +
   "\n" +
+  "Before any module is proposed, ask them how production is split: what\n" +
+  "runs separately in production, and which part may talk to the database?\n" +
+  "Offer the default -- an application tier that calls an API tier, and\n" +
+  "only the API tier talks to the database.\n" +
+  "\n" +
   "What the plan carries, in this order:\n" +
   "- **The objective**, stated so a reader can act on it: what the solution\n" +
   "  is for, who uses it, what it must do, and what is deliberately out of\n" +
   "  scope. Vagueness that would let two people build different things is\n" +
   "  the defect to look for.\n" +
+  "- **Production split**: each part that runs separately in production,\n" +
+  "  and which one may reach the database.\n" +
+  "- **Handoff artifacts**: what each of those parts is handed over as, with\n" +
+  "  the standard command for its form -- for .NET an IIS site package\n" +
+  "  (`dotnet publish`) or a Windows Service (a Worker Service published for\n" +
+  "  a service host); for Java a runnable jar or a war (`mvn package`) or an\n" +
+  "  image (Spring Boot's `build-image`); for the database a SQL migration\n" +
+  "  script (`dotnet ef migrations script --idempotent`). The real form is\n" +
+  "  produced later; a tutorial produces the easiest one to test.\n" +
   "- **The modules.** What each is responsible for, the contract each\n" +
   "  exposes to the others (what must be true going in, what is guaranteed\n" +
   "  coming out, what is kept on purpose, how it fails, and what callers\n" +
@@ -285,6 +299,11 @@ export const DECOMPOSITION_PROMPT =
   "slugs, no directories.\n" +
   "\n" +
   "Hard requirements (do not deviate):\n" +
+  "- **Production split:** the plan's *Production split* names the parts that\n" +
+  "  run separately. Create their projects, write `packaging.pack` in\n" +
+  "  `dabbler.yaml` to produce the plan's *Handoff artifacts*, and where only\n" +
+  "  the API tier may reach the database, add that rule as an architecture\n" +
+  "  test in the solution's own tests.\n" +
   "- **Numbering:** continue from the highest session number the plan already\n" +
   "  declares. Numbers are never reused and never renumbered, including for\n" +
   "  cancelled sessions.\n" +
@@ -334,9 +353,20 @@ export const BOOTSTRAP_PLAN =
   "   who started the session for it and write their answer to that path\n" +
   "   before any work. The plan's substance is theirs: do not search\n" +
   "   neighbouring directories for one, and do not draft one from the folder\n" +
-  "   name. Then create — or import —\n" +
-  "   `docs/planning/solution-plan.md`: the\n" +
-  "   objective a reader can act on; the modules, with what each is\n" +
+  "   name. Before any module is proposed, ask them how production is split:\n" +
+  "   what runs separately in production, and which part may talk to the\n" +
+  "   database? Offer the default -- an application tier that calls an API\n" +
+  "   tier, and only the API tier talks to the database. Then create — or\n" +
+  "   import — `docs/planning/solution-plan.md`: the\n" +
+  "   objective a reader can act on; the *Production split* they answered;\n" +
+  "   the *Handoff artifacts*, what each separately running part is handed\n" +
+  "   over as, with the standard command for its form -- for .NET an IIS site\n" +
+  "   package (`dotnet publish`) or a Windows Service (a Worker Service\n" +
+  "   published for a service host), for Java a runnable jar or a war (`mvn\n" +
+  "   package`) or an image (Spring Boot's `build-image`), for the database a\n" +
+  "   SQL migration script (`dotnet ef migrations script --idempotent`); the\n" +
+  "   real form is produced later, and a tutorial produces the easiest one to\n" +
+  "   test; the modules, with what each is\n" +
   "   responsible for, the contract each exposes (what must be true going\n" +
   "   in, what is guaranteed coming out, how it fails), the dependency\n" +
   "   direction, the reason for each cut and the cuts deferred — one module\n" +
@@ -378,11 +408,16 @@ export const BOOTSTRAP_PLAN =
   "   means. Order sessions so earlier ones unblock later ones — a module\n" +
   "   before the modules that depend on it — and keep at most ~3 work steps\n" +
   "   per session.\n" +
-  "4. Cross-provider verification.\n" +
-  "5. Full test suite, recorded as the run of record.\n" +
-  "6. Close-out.\n" +
+  "4. Create the projects the plan's *Production split* names, write\n" +
+  "   `packaging.pack` in `dabbler.yaml` to produce its *Handoff artifacts*,\n" +
+  "   and where only the API tier may reach the database, add that rule as\n" +
+  "   an architecture test in the solution's own tests.\n" +
+  "5. Cross-provider verification.\n" +
+  "6. Full test suite, recorded as the run of record.\n" +
+  "7. Close-out.\n" +
   "\n" +
-  "**Creates:** the numbered session list the rest of this repository runs.\n" +
+  "**Creates:** the numbered session list the rest of this repository runs,\n" +
+  "the projects the production split names, and the pack that hands them over.\n" +
   "\n" +
   "> Do NOT hand-author `sessions.json`. The first `session start`\n" +
   "> bootstraps it from this plan — state files are the writers' job.\n";

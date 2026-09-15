@@ -12,11 +12,15 @@ import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  RELEASE_ON_REQUEST,
+  RELEASE_SHIP_BY_DEFAULT,
   SETTINGS_RELPATH,
+  SETTING_RELEASE,
   SETTING_REVIEWER_TRANSPORT,
   SETTING_TRANSPORT,
   SettingsError,
   readSettings,
+  releaseMode,
   settingValue,
   writeSettings,
 } from "../src/settings.ts";
@@ -32,6 +36,15 @@ function checkout(text: string | null): string {
   }
   return root;
 }
+
+describe("when a checkout's sessions publish", () => {
+  it("releases on request unless the file says ship-by-default exactly", () => {
+    // A value this framework does not know publishes nothing rather than everything.
+    assert.equal(releaseMode(checkout(null)), RELEASE_ON_REQUEST);
+    assert.equal(releaseMode(checkout(`{ "${SETTING_RELEASE}": "ship-by-default" }`)), RELEASE_SHIP_BY_DEFAULT);
+    assert.equal(releaseMode(checkout(`{ "${SETTING_RELEASE}": "always" }`)), RELEASE_ON_REQUEST);
+  });
+});
 
 describe("what a checkout says it is run with", () => {
   it("reads the dabbler keys and nothing else, comments and all", () => {

@@ -25,7 +25,7 @@
 // offering something the ledger will not honour.
 
 import * as vscode from "vscode";
-import { VALID_TRANSPORTS, type Router } from "dabbler-ai-router";
+import { VALID_TRANSPORTS, type ReleaseMode, type Router } from "dabbler-ai-router";
 
 import { resolveRouterCli } from "../router/terminalShim";
 
@@ -257,6 +257,7 @@ async function write(
     authoringModel?: string;
     reviewerModel?: string;
     auxiliaryModel?: string;
+    release?: ReleaseMode;
     /** Keep it as this person's default rather than this checkout's. */
     mine?: boolean;
   },
@@ -301,6 +302,22 @@ export async function setTransport(
   );
   if (!picked) return;
   await write(router, root, { transport: picked.label }, ui, refreshed);
+}
+
+/**
+ * Ship by Default or Release on Request, from the solution row: when this
+ * solution's sessions publish, written to the checkout's settings by the
+ * router, which is where the publish phase reads it.
+ */
+export async function setRelease(
+  router: Pick<Router, "configure">,
+  release: ReleaseMode,
+  refreshed: () => void,
+  ui: ConfigurationUi = defaultConfigurationUi(),
+): Promise<void> {
+  const root = ui.workspaceRoot();
+  if (!root) return;
+  await write(router, root, { release }, ui, refreshed);
 }
 
 /**

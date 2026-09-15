@@ -139,8 +139,10 @@ one.
 ## Answering
 
 The first instruction asks for a work plan — the task in a paragraph,
-a hold on the release only where the work must wait (`hold_release`, with
-its one reason; without it the session ships), at least one non-goal
+the one plan member the checkout's `dabbler.release` reads (on request,
+the default: `release` with the one reason the session publishes now,
+without which it publishes nothing; ship by default: `hold_release` with
+the one reason it waits, without which it ships), at least one non-goal
 (what the session will NOT do, which the reviewer holds the work to), and
 the ordered steps,
 each with the files it will touch and at least one mechanical check that
@@ -291,9 +293,10 @@ it inside the verification job.
 Three things take longer than a tool call: a verification round, the
 complete suite as the run of record, and the close — four, for a session
 that ships, whose publish runs between the push and the close. A session
-ships unless its plan held it, the repository declares no packaging, or
-its verdict is not VERIFIED; the close's `published_when_releasable` row
-says which. (The preverify phase runs nothing: the tests that run are each
+ships when `dabbler.release` and its plan say it does (a `release` on
+request, no `hold_release` by default), unless the repository declares no
+packaging or its verdict is not VERIFIED; the close's
+`published_when_releasable` row says which. (The preverify phase runs nothing: the tests that run are each
 step's own checks with the tests named after what the step changed, and the
 suites as the run of record — whole, or `final-targeted` where a whole run
 costs more than a session should spend, with the whole suite before a

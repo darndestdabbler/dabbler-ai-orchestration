@@ -21,6 +21,7 @@ import { readPreferences, writePreferences } from "../src/preferences.ts";
 import {
   SETTING_AUTHORING_MODEL,
   SETTING_CREDENTIAL_OPENAI,
+  SETTING_RELEASE,
   SETTING_TRANSPORT,
   settingValue,
   writeSettings,
@@ -487,6 +488,26 @@ describe("a choice kept as this person's rather than this checkout's", () => {
     } finally {
       writeSettings(root, { [SETTING_AUTHORING_MODEL]: "" });
       writePreferences({ authoringModel: "" });
+      restore();
+    }
+  });
+});
+
+describe("when a solution's sessions publish", () => {
+  it("writes the release setting to the checkout, and refuses an unknown value and --mine", () => {
+    const { root, restore } = machine();
+    try {
+      assert.equal(configure({ repoRoot: root, release: "ship-by-default" }).refusal, null);
+      assert.equal(settingValue(root, SETTING_RELEASE), "ship-by-default");
+      assert.match(String(configure({ repoRoot: root, release: "always" }).refusal), /on-request, ship-by-default/);
+      // The solution's to say, so never one person's default.
+      assert.match(
+        String(configure({ repoRoot: root, release: "on-request", mine: true }).refusal),
+        /solution's to say/,
+      );
+      assert.equal(settingValue(root, SETTING_RELEASE), "ship-by-default");
+    } finally {
+      writeSettings(root, { [SETTING_RELEASE]: "" });
       restore();
     }
   });

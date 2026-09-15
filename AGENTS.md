@@ -300,13 +300,13 @@ never by waiting on a condition that your own next call is what causes.
 A `wait` answered by watching `run.json` for its job to clear waits
 forever: only the `next` you did not call clears it.
 
-**A session ships unless its plan holds it**, and the framework publishes
-between the push and the close for itself. A plan holds a release with
-`hold_release` and one reason — the first release's go-live, or work a
-later session must land first — declared before the work and never
-decided afterwards; a held session publishes nothing, and no session
-publishes without a VERIFIED verdict. A session with no hold and no
-packaging run on its record cannot close: the close refuses.
+**A session's release follows `dabbler.release`**, and the framework
+publishes between the push and the close for itself. On request, the
+default, a plan releases with `release` and one reason; ship by default,
+a plan holds with `hold_release` and one reason. Either is declared
+before the work and never decided afterwards; no session publishes
+without a VERIFIED verdict, and a releasable session with no packaging
+run on its record cannot close: the close refuses.
 
 ## When the framework stops
 

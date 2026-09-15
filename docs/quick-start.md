@@ -343,6 +343,13 @@ paths:
   after what the step changed.
 - `test_roots` and `test_glob` belong to a **suite**, not the
   repository: one that is Java and .NET at once has two of each.
+- `packaging` says *how* a session publishes: a `pack` with a `push`, a
+  `pack` alone whose artifacts are handed over from the run's package
+  folder with a release tag, or `release: tag`. *Whether* it publishes is
+  `dabbler.release` in `.vscode/settings.json` — `on-request`, the default,
+  where a plan releases with `release` and its reason, or
+  `ship-by-default`, where a plan holds with `hold_release` — set with
+  `dabbler configure --release`.
 - Providers, models, roles and transports are not declarable here.
   `AI_ROUTER_CONFIG` is not the way round that — a named config takes
   no layer at all, so it forks the whole registry rather than adding

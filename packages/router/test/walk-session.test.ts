@@ -497,7 +497,11 @@ describe("a run left standing at the publish of a session already published", ()
       EXIT_OK,
     );
     const plan = await next(sessionsDir);
-    const releasable = Object.fromEntries(Object.entries(PLAN).filter(([key]) => key !== "hold_release"));
+    // Released on request, which is what a checkout with no setting does.
+    const releasable = {
+      ...Object.fromEntries(Object.entries(PLAN).filter(([key]) => key !== "hold_release")),
+      release: "the walk publishes",
+    };
     assert.equal(await answerPlan(sessionsDir, plan.instruction?.seq ?? 0, releasable), EXIT_OK);
     assert.equal((await next(sessionsDir)).instruction?.step_id, "widget");
 

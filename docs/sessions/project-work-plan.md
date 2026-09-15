@@ -211,7 +211,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 171 | Project references | no | 2026-09-14 |
 | 172 | The build files are the solution | yes | 2026-09-14 |
 | 173 | Tests named after what they test | yes | 2026-09-14 |
-| 174 | What planning asks, and when a session releases | — | not declared |
+| 174 | What planning asks, and when a session releases | yes | 2026-09-14 |
 | 175 | The walk, timed | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -2480,3 +2480,13 @@ Tests are named after what they test. A suite in dabbler.yaml declares test_name
 - 2026-09-14 — step 'step-named-tests': its files: the red named test is walked where a real step is judged, in walk-session, whose check milestone it now refuses (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-14 — step 'whole-run-before-release': its files: the hold is judged from the test records, so it is a pure function beside them and tested in testEvidence.test.ts; the close gate's reader spawns git, which the unit tests may not (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-14 — step 'release-3-1-0': its files: version.json is the one declared version; stamp-version writes it into the two manifests and the lock file (claude-code (anthropic, claude-fable-5-1))
+
+### Session 174 — What planning asks, and when a session releases
+
+**Releasable: yes.**
+
+Make releasing a project setting and make planning ask how production is split. `dabbler.release` in the checkout's `.vscode/settings.json` (one more key in `settings.ts`, written by `dabbler configure --release on-request|ship-by-default` and through `router.configure`; absent means on request) decides which plan member a session's release is read from: on request, a session publishes only when its plan carries `release` with the one reason it releases now; ship by default, it publishes unless its plan carries `hold_release`, as today. One pure function in `driver.ts` turns a plan and the setting into the declaration's releasable flag and hold reason, and the plan ask, the declaration at plan acceptance and the report's summary line all read it; a plan carrying the other member is accepted and the setting decides; `NOTHING_TO_PUBLISH`, the verdict hold and the whole-run-before-release hold are unchanged. The Solution Explorer's solution row offers Ship by Default or Release on Request, whichever changes the current setting, each writing it through `router.configure`. `PLAN_PROMPT` and the bootstrapped session 1 ask, before any module is proposed, what runs separately in production and which part may talk to the database (default: an application tier calling an API tier, only the API tier reaching the database), recorded in `docs/planning/solution-plan.md` under Production split and Handoff artifacts with the standard command for each form; the bootstrapped session 2 creates the projects the split names, writes `packaging.pack` for the handoff artifacts and adds the tier rule as an architecture test in the solution's own tests. A `packaging` block with `pack` and no `push` packs into the run's package folder, pushes nothing, and still makes a release tag (`v<version>` where `version.json` declares one, `session-<NNN>` otherwise). This repository commits `ship-by-default`, and the managed body, README, driving-a-session, schema reference, quick start and the extension README say so. Releasable as a minor: the version goes to 3.2.0.
+
+**Amended after acceptance:**
+
+- 2026-09-14 — step 'the-words': its files: check-shipped-docs refuses a dabbler.* id the extension does not contribute; dabbler.release is a real workspace setting, so the extension contributes it rather than the pages avoiding its name (claude-code (anthropic, claude-fable-5-1))

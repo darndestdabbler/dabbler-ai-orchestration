@@ -239,6 +239,19 @@ describe("loading a config", () => {
     assert.deepEqual(config["packaging"], { release: "tag" });
   });
 
+  it("accepts a pack with no push from a project config, and refuses a push with nothing packed", () => {
+    // The loader validates the merged config before the packaging reader is
+    // reached, so a pack-only block has to be admitted here or nowhere.
+    const pack = { argv: ["dotnet", "publish", "-o", "{output}"] };
+    const config = loadConfigFrom(sources({ project: { schema_version: 1, packaging: { pack } } }));
+    assert.deepEqual(config["packaging"], { pack });
+    const push = { argv: ["dotnet", "nuget", "push", "{artifact}", "--source", "{feed}"], feed: "https://f/" };
+    assert.match(
+      refusal(() => loadConfigFrom(sources({ project: { schema_version: 1, packaging: { push } } }))),
+      /schema validation/,
+    );
+  });
+
   it("refuses an unknown key in a role", () => {
     // A typo'd role key would silently drop the declaration it meant.
     const base = makeConfig();

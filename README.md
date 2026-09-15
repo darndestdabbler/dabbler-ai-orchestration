@@ -304,6 +304,25 @@ shadowed the very preference a later run set, for every repository on the
 machine. It is read and never written; `--no-transport-detect` retired
 with the writing.
 
+### When a session publishes
+
+`dabbler.release` in the checkout's `.vscode/settings.json` is the
+solution's answer, written by `dabbler configure --release
+on-request|ship-by-default` or by **Ship by Default** / **Release on
+Request** on the Solution Explorer's solution row. It is never a person's
+default, and it is not a `dabbler.yaml` key: `release:` there says *how* a
+repository releases.
+
+- **On request** — the default, where nothing is set: a session publishes
+  only when its plan carries `release` with the one reason it releases now.
+- **Ship by default** — a session publishes unless its plan carries
+  `hold_release` with the one reason it waits. This repository commits it.
+
+The plan ask names the member the setting reads, and a plan carrying the
+other is accepted with the setting deciding. Whichever it is, a repository
+that declares no packaging publishes nothing and no session publishes
+without a VERIFIED verdict.
+
 ## Credentials
 
 API keys are resolved from environment variables only — never from config

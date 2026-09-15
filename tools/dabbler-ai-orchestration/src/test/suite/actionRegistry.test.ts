@@ -410,6 +410,9 @@ const FIXTURES: Array<{
   return [
     { from: "a solution of two projects", projection: multi, context: {} },
     { from: "a repository with no build files", projection: single, context: {} },
+    // The solution row offers the release command that changes the setting,
+    // so each setting draws the row the other command is gated on.
+    { from: "a solution that ships by default", projection: multi, context: { release: "ship-by-default" } },
   ];
 })();
 

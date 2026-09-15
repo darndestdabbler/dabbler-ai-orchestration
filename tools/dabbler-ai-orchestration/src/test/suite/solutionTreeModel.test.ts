@@ -82,6 +82,16 @@ suite("solutionTreeModel: projects", () => {
     assert.strictEqual(descriptorFor({ kind: "solution" }, p).description, "3 projects");
   });
 
+  test("the solution row carries the release setting its menu changes", () => {
+    const p = projection();
+    // No setting releases on request, so the row offers Ship by Default.
+    assert.strictEqual(descriptorFor({ kind: "solution" }, p).contextValue, "dabblerSolution;on-request");
+    assert.strictEqual(
+      descriptorFor({ kind: "solution" }, p, { release: "ship-by-default" }).contextValue,
+      "dabblerSolution;ship-by-default",
+    );
+  });
+
   test("a repository with no build files is one row with nothing under it", () => {
     const p = single();
     const rows = childrenOf({ kind: "solution" }, p);

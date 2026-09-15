@@ -234,8 +234,9 @@ describe("the instruction files", () => {
     const project = tempDir("bootstrap-");
     writeInstructionFiles(project, "acme-app");
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
-    assert.match(agents, /ships unless its plan holds it/);
-    assert.match(agents, /hold_release/);
+    assert.match(agents, /release follows `dabbler\.release`/);
+    assert.match(agents, /releases with `release`/);
+    assert.match(agents, /holds with `hold_release`/);
     assert.match(agents.toLowerCase(), /the close refuses/);
   });
 
@@ -426,6 +427,21 @@ describe("the scaffolded setup sessions", () => {
     assert.match(text, /ask the person\s+who started the session/);
     assert.doesNotMatch(text, /`blocked`/);
     assert.doesNotMatch(text, /Ask the operator/);
+  });
+
+  it("asks how production is split in session 1, and hands it over in session 2", () => {
+    const text = readFileSync(scaffoldBootstrapSessions(tempDir("bootstrap-"))[0] as string, "utf8");
+    const [first, second] = text.split("### Session 2:") as [string, string];
+    // Asked before any module is proposed, with the default offered.
+    assert.match(first, /what runs separately in production, and which part may talk to the\s+database\?/);
+    assert.ok(first.indexOf("production is split") < first.indexOf("the modules, with"), first);
+    assert.match(first, /only the API tier talks to the database/);
+    assert.match(first, /\*Production split\*/);
+    assert.match(first, /\*Handoff artifacts\*/);
+    assert.match(first, /dotnet ef migrations script --idempotent/);
+    // Session 2 builds what the split names and packs its handoff artifacts.
+    assert.match(second, /`packaging\.pack`/);
+    assert.match(second, /architecture\s+test/);
   });
 
   it("never overwrites a plan the repository already has", () => {

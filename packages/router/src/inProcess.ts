@@ -522,6 +522,7 @@ export class InProcessRouter implements Router {
     optional(args, "--authoring-model", o.authoringModel);
     optional(args, "--reviewer-model", o.reviewerModel);
     optional(args, "--auxiliary-model", o.auxiliaryModel);
+    optional(args, "--release", o.release);
     if (o.mine === true) args.push(MINE_FLAG);
     return this.text("configure", args, o.repoRoot);
   }

@@ -8,6 +8,8 @@
 // implementations of one rule disagree eventually, and the disagreement
 // surfaces as a row nobody can explain.
 
+import type { ReleaseMode } from "dabbler-ai-router";
+
 export interface ProjectionSolution {
   name: string;
   title: string;
@@ -783,6 +785,11 @@ export interface SolutionContext {
    * one. Null when nobody has chosen and the machine's own reading stands.
    */
   readonly chosenEngine?: string | null;
+  /**
+   * When this solution's sessions publish, as the router reads it. The
+   * solution row offers the command that changes it, so the row carries it.
+   */
+  readonly release?: ReleaseMode;
 }
 
 export function descriptorFor(
@@ -805,7 +812,7 @@ export function descriptorFor(
             : "What this solution is built from, read from its build files, in dependency order.",
         icon: { id: "project" },
         expandable: true,
-        contextValue: "dabblerSolution",
+        contextValue: `dabblerSolution;${context.release ?? "on-request"}`,
       };
     }
     case "project": {

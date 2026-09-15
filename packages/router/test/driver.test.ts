@@ -32,6 +32,7 @@ import {
   validateWorkPlan,
   judgeWorkPlanHold,
   judgeWorkPlanNonGoals,
+  releaseOfPlan,
   watcherReading,
   writeDispositions,
   writeInstruction,
@@ -218,6 +219,32 @@ describe("the four answer schemas", () => {
     // A blank hold passes the schema and is refused at acceptance instead.
     assert.match(judgeWorkPlanHold({ ...validateWorkPlan(PLAN), hold_release: "  " })[0] ?? "", /hold_release/);
     assert.deepEqual(judgeWorkPlanHold(validateWorkPlan(PLAN)), []);
+  });
+
+  it("the checkout's release setting decides which member releases a plan", () => {
+    const plan = validateWorkPlan(PLAN);
+    // On request, the default: a plan publishes only by asking to, and a hold lends its words.
+    assert.equal(releaseOfPlan(plan, "on-request").releasable, false);
+    assert.match(String(releaseOfPlan(plan, "on-request").holdReason), /releases on request/);
+    assert.deepEqual(
+      releaseOfPlan(validateWorkPlan({ ...PLAN, release: "the importer is ready" }), "on-request"),
+      { releasable: true, holdReason: null },
+    );
+    assert.deepEqual(releaseOfPlan({ ...plan, hold_release: "session 2" }, "on-request"), {
+      releasable: false,
+      holdReason: "session 2",
+    });
+    // Ship by default: a plan ships unless held.
+    assert.deepEqual(releaseOfPlan(plan, "ship-by-default"), { releasable: true, holdReason: null });
+    assert.deepEqual(releaseOfPlan({ ...plan, hold_release: "session 2" }, "ship-by-default"), {
+      releasable: false,
+      holdReason: "session 2",
+    });
+    assert.match(judgeWorkPlanHold({ ...plan, release: " " })[0] ?? "", /`release` is blank/);
+    // A plan carrying both is accepted, and the setting decides which is read.
+    const both = { ...plan, release: "ship now", hold_release: "wait" };
+    assert.deepEqual(releaseOfPlan(both, "on-request"), { releasable: true, holdReason: null });
+    assert.deepEqual(releaseOfPlan(both, "ship-by-default"), { releasable: false, holdReason: "wait" });
   });
 
   it("a plan names at least one non-goal, and the refusal names the member", () => {

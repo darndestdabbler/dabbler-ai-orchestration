@@ -108,8 +108,10 @@ function publishable(): {
   sessionsDir: string;
   pushLog: string;
   ahead: (count: number) => void;
+  /** Every git argv asked, in order. */
+  calls: string[][];
 } {
-  const { repo, sessionsDir, ahead } = makeAnsweredSandbox({ "widget.py": "WIDGET = 1\n" });
+  const { repo, sessionsDir, ahead, calls } = makeAnsweredSandbox({ "widget.py": "WIDGET = 1\n" });
   registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
   declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship the widget", releasable: true });
   appendRound(repo, 1, {
@@ -123,7 +125,7 @@ function publishable(): {
     recorded_at: new Date().toISOString(),
   });
   process.env[SECRET_ENV] = SECRET_VALUE;
-  return { repo, sessionsDir, pushLog: join(repo, "..", "pushes.json"), ahead };
+  return { repo, sessionsDir, pushLog: join(repo, "..", "pushes.json"), ahead, calls };
 }
 
 beforeEach(() => {
@@ -205,19 +207,20 @@ describe("the declaration", () => {
     const own = loadDeclaration(config, "persister");
     assert.deepEqual(own?.pack.argv.slice(0, 3), ["dotnet", "pack", "modules/persister"]);
     assert.equal(own?.pack.usesVersion, true);
-    assert.equal(own?.push.feed, "D:\\feeds\\local");
+    assert.equal(own?.push?.feed, "D:\\feeds\\local");
     const inherited = loadDeclaration(config, "model");
-    assert.deepEqual(inherited?.push.feed, FEED);
+    assert.deepEqual(inherited?.push?.feed, FEED);
     assert.equal(inherited?.pack.usesVersion, false);
-    assert.deepEqual(loadDeclaration(config, null)?.push.feed, FEED);
+    assert.deepEqual(loadDeclaration(config, null)?.push?.feed, FEED);
   });
 
-  it("refuses a block that declares one half and not the other", () => {
-    // A pack nobody pushes is a build, and a push with nothing to send is a
-    // typo; neither is a publication, so neither is accepted alone.
+  it("loads a pack with no push, and refuses a push with nothing to send", () => {
+    // A pack alone hands its artifacts over from the run's package folder.
+    const packOnly = loadDeclaration(makeConfig({ packaging: { pack: { argv: ["x", "{output}"] } } }));
+    assert.equal(packOnly?.push, null);
     assert.throws(
-      () => loadDeclaration(makeConfig({ packaging: { pack: { argv: ["x", "{output}"] } } })),
-      /push must be a mapping/,
+      () => loadDeclaration(makeConfig({ packaging: { push: { argv: ["x"], feed: FEED } } })),
+      /pack must be a mapping/,
     );
   });
 
@@ -295,7 +298,7 @@ describe("a feed that takes no credential", () => {
     push["feed"] = "D:/Projects/dabbler-local-feed";
     delete push["secret"];
     push["argv"] = (push["argv"] as string[]).filter((token) => token !== "{secret}");
-    assert.equal(loadDeclaration(config)?.push.secret, "");
+    assert.equal(loadDeclaration(config)?.push?.secret, "");
   });
 
   it("still refuses an http feed that names no credential", () => {
@@ -558,6 +561,26 @@ describe("the publication", () => {
     );
     // The tree that was verified stays the tree that was verified.
     assert.equal(run.treeDigest, snapshotWorktreeTree(repo));
+  });
+
+  it("packs a block with no push into the run directory, pushes nothing, and makes the release tag", () => {
+    const { repo, sessionsDir, pushLog, calls } = publishable();
+    const run = packageSession(sessionsDir, {
+      config: makeConfig({
+        packaging: { pack: { argv: [process.execPath, "-e", PACK_SRC, "{output}", "site.zip"] } },
+      }),
+    });
+    assert.equal(run.outcome, OUTCOME_PUBLISHED, String(run.refusal));
+    // No version.json here, so the tag is named for the session.
+    assert.equal(run.artifacts[0], "site.zip");
+    assert.match(String(run.artifacts[1]), /^session-0*1$/);
+    assert.ok(existsSync(join(packageOutputDir(repo, 1), "site.zip")));
+    assert.deepEqual(run.steps.map((step) => step.step), ["pack"]);
+    assert.equal(existsSync(pushLog), false);
+    // The tag was made and pushed to origin, not only named in the record.
+    const tag = String(run.artifacts[1]);
+    assert.ok(calls.some((argv) => argv[0] === "tag" && argv[1] === "-a" && argv[2] === tag), JSON.stringify(calls));
+    assert.ok(calls.some((argv) => argv.join(" ") === `push origin ${tag}`), JSON.stringify(calls));
   });
 
   it("makes a declared folder feed that is not there before the push, and touches a feed with a host not at all", () => {

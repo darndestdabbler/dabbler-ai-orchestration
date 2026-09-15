@@ -127,15 +127,23 @@ function explain(sessionsDir: string, run: PackagingRun): string {
   }
 
   lines.push(`It would pack with:   ${declaration.pack.argv.join(" ")}`);
-  lines.push(`It would push to:     ${declaration.push.feed}`);
-  // A folder feed takes no credential, and the declaration loads with none;
-  // the sentence for a name rendered that as a name that was missing.
-  lines.push(
-    feedTakesCredential(declaration.push.feed)
-      ? `Using the credential named ${declaration.push.secret}, which is read ` +
-          "at the moment of the push and written nowhere."
-      : "No credential: the feed is a folder, and a folder takes none.",
-  );
+  const push = declaration.push;
+  if (push === null) {
+    lines.push(
+      "It pushes nothing: the artifacts stay in the run's package folder, and " +
+        "the release is the tag it makes.",
+    );
+  } else {
+    lines.push(`It would push to:     ${push.feed}`);
+    // A folder feed takes no credential, and the declaration loads with none;
+    // the sentence for a name rendered that as a name that was missing.
+    lines.push(
+      feedTakesCredential(push.feed)
+        ? `Using the credential named ${push.secret}, which is read ` +
+            "at the moment of the push and written nowhere."
+        : "No credential: the feed is a folder, and a folder takes none.",
+    );
+  }
   const failed = run.gates.filter((gate) => !gate.passed);
   if (run.gates.length === 0) {
     // Zero failed gates out of zero asked is not every gate passing. The

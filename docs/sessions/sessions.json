@@ -3571,9 +3571,9 @@
     {
       "number": 180,
       "title": "The soak, and 3.3.0",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-15T08:53:41.735000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-15T08:59:05.521000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

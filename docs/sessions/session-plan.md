@@ -11001,19 +11001,7 @@ anything is published and the finding is written up; otherwise the release is
 
 **Releasable.** Yes, a minor, 3.3.0.
 
-### Session 187 of 187: Overrides the operator provably made
-
-Scope: whole repository
-
-**What.** The AI proposes an override or skip with an ID; the operator approves
-it in the chat; the framework verifies the approval against the engine's own
-log entry marked human (Claude Code `queued_command`/user entries, Copilot
-`user.message`) before applying it, and records the proposal, the operator's
-words, the log entry, and every rule overridden or process skipped.
-
-**Releasable.** Yes, a minor.
-
-### Session 184 of 187: Gemini CLI retired
+### Session 184 of 184: Gemini CLI retired
 
 Scope: whole repository
 
@@ -11063,58 +11051,6 @@ its files, and merges when told; Start asks and re-registers with
 `--merge-origin` only on yes; the managed body stays inside its budget.
 
 **Releasable.** Yes, a patch, 3.3.1: released before session 186.
-
-### Session 186 of 187: The round names what it cost
-
-Scope: whole repository
-
-**Why.** Session 175's walk priced its five review rounds only by searching
-the Copilot seat's store for conversations opened in its scratch
-repositories. No round record names its conversation, and every
-`rounds.jsonl` row over the seat reads `input_tokens: null`,
-`output_tokens: 0`. `dabbler seat-cost` attributes by conversation id and
-never by clock, so the one verb that answers what a session spent cannot be
-pointed at a session from its own record.
-
-**What changes.** A round dispatched over the seat records, on its
-`rounds.jsonl` row, the conversation id its transport already reads
-(`metadata.session_id`) and the tokens the seat reported; the close prices
-the session's rounds through `seat-cost` and prints the number with its
-billing platform, or says it is unmeasured and why.
-
-**Non-goals.** No new billing source; no estimate where the store holds no
-row; nothing for the direct-API transport beyond the usage it already
-returns.
-
-**Tests.** One that a seat round's row carries its conversation id and
-tokens, and one that the close's line prices them.
-
-**Releasable.** Yes, a minor.
-
-### Session 185 of 187: The loop's own commands, approved at launch
-
-Scope: whole repository
-
-**Why.** Session 179's walk on Copilot CLI asked the operator to approve
-`dabbler session wait` four times and `dabbler session report` three times:
-seven of the eight deterministic actions anyone but the framework took. On a
-default Claude Code install the same commands prompt too; the walk's Claude
-ran in the operator's own auto mode and asked nothing.
-
-**What.** Start Session launches each CLI with the loop's two commands, and
-nothing wider, already approved: Claude Code's `--allowedTools` and Copilot's
-`--allow-tool`, spelled so a positional prompt is not swallowed by a flag
-that takes a list, and matched narrowly enough that `session cancel --force`
-— a person's verb — still asks. The rule each CLI actually applies is
-measured before it is relied on.
-
-**Non-goals.** No approval of file edits, tests or any other command; no
-change to a permission mode the operator set.
-
-**Tests.** One per engine that the launch carries exactly the two approvals;
-the walk repeated on both CLIs with the approvals counted.
-
-**Releasable.** Yes, a patch.
 
 ### Session 182 of 186: Resume brings the AI back
 

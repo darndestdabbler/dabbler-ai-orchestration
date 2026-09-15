@@ -3664,29 +3664,38 @@
     {
       "number": 185,
       "title": "The loop's own commands, approved at launch",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "Operator 2026-09-15: no additions to the framework for now, only simplifications and bug fixes; this session adds a capability.",
+      "cancelledAt": "2026-09-15T14:51:07-04:00"
     },
     {
       "number": 186,
       "title": "The round names what it cost",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "Operator 2026-09-15: no additions to the framework for now, only simplifications and bug fixes; this session adds a capability.",
+      "cancelledAt": "2026-09-15T14:51:07-04:00"
     },
     {
       "number": 187,
       "title": "Overrides the operator provably made",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "Operator 2026-09-15: no additions to the framework for now, only simplifications and bug fixes; this session adds a capability.",
+      "cancelledAt": "2026-09-15T14:51:08-04:00"
     }
   ]
 }

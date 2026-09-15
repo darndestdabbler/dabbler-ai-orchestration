@@ -11001,7 +11001,7 @@ anything is published and the finding is written up; otherwise the release is
 
 **Releasable.** Yes, a minor, 3.3.0.
 
-### Session 182 of 183: Overrides the operator provably made
+### Session 186 of 186: Overrides the operator provably made
 
 Scope: whole repository
 
@@ -11116,7 +11116,7 @@ the walk repeated on both CLIs with the approvals counted.
 
 **Releasable.** Yes, a patch.
 
-### Session 186 of 186: Resume brings the AI back
+### Session 182 of 186: Resume brings the AI back
 
 Scope: whole repository
 

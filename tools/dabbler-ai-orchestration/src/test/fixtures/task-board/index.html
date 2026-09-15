@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sample Task Board</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <!--
+      Set 113 Session 3's fixture web app.
+
+      This is a STAND-IN, not a product. The operator's note of 2026-08-10
+      names the real targets as .NET, Java, vanilla JS/HTML and Python web
+      applications, and observes that they are not four platforms but one:
+      they all render in a browser. So the browser recorder is proved
+      against the smallest honest instance of that one platform -- a page
+      served over HTTP, with state that changes as you drive it.
+
+      Deliberately dependency-free and framework-free. A framework here
+      would prove something about the framework; the claim under test is
+      about Chromium, Playwright and the recorder.
+    -->
+    <main>
+      <h1>Task Board</h1>
+      <p class="subtitle">A sample project's to-do list.</p>
+
+      <form id="add-form" autocomplete="off">
+        <input
+          id="new-task"
+          name="new-task"
+          type="text"
+          placeholder="What needs doing?"
+          aria-label="New task"
+        />
+        <button id="add-task" type="submit">Add task</button>
+      </form>
+
+      <div id="filters" role="group" aria-label="Filter tasks">
+        <button id="filter-all" type="button" class="filter is-selected">All</button>
+        <button id="filter-open" type="button" class="filter">Open</button>
+        <button id="filter-done" type="button" class="filter">Done</button>
+      </div>
+
+      <p id="summary">0 open</p>
+
+      <ul id="task-list" aria-label="Tasks"></ul>
+      <p id="empty-state">No tasks yet.</p>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

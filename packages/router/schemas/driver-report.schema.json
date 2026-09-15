@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "driver/report.json (the engine's answer to one step instruction)",
+  "description": "What the engine says it did, under .dabbler/runs/s<N>/driver/report.json. Written only by `dabbler session report`, which shapes the flags into this record, validates it, and replaces the file whole; the engine never writes it by hand, and a file that fails validation on read is refused, never skipped. The verb checks the shape. The driver checks the substance -- that `seq` is the outstanding instruction's, that `step_id` is the step it asked for, that every listed file exists and matches what the tree changed, and that the step's own check passes -- and issues a rejection with the reasons when it does not.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "seq",
+    "session_number",
+    "step_id",
+    "status",
+    "files_changed",
+    "tests_run",
+    "notes",
+    "reported_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Frozen at v1. A reader that finds any other value refuses the file rather than interpreting it."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The seq of the instruction this answers."
+    },
+    "session_number": { "type": "integer", "minimum": 1 },
+    "step_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "The step the instruction named."
+    },
+    "status": {
+      "enum": ["done", "blocked"],
+      "description": "Two words. `blocked` is the engine saying it could not finish, with `notes` saying why; there is no word for a verdict, because the engine has none to give."
+    },
+    "files_changed": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?![A-Za-z]:)(?!/)(?![\\s\\S]*(^|/)\\.\\.?(/|$))[^\\\\]+$",
+        "description": "Repository-relative, forward slashes, no `.` or `..` segments, never absolute."
+      },
+      "description": "Every file the engine created or changed for this step."
+    },
+    "tests_run": {
+      "type": ["string", "null"],
+      "description": "The test command the engine ran, or null when it ran none."
+    },
+    "notes": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One line for the log. People read it; the driver does not."
+    },
+    "reported_at": { "type": "string", "minLength": 1 }
+  }
+}

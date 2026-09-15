@@ -84,6 +84,9 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           the model registry rather than the seat label",
     "  --effort EFFORT          optional reasoning effort, recorded with the identity",
     "  --total-sessions N       optional; the ledger otherwise grows to the plan",
+    "  --merge-origin           merge origin's branch when it shares no history with",
+    "                           this one and holds more than a README (a README-only",
+    "                           initial commit is merged without it)",
   ],
   decision: [
     "  --decider WHO            required: operator | orchestrator | verifier | framework",
@@ -258,6 +261,7 @@ const SWITCHES = new Set([
   "--dry-run",
   "--force",
   "--mailbox",
+  "--merge-origin",
   "--stop",
 ]);
 
@@ -500,6 +504,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       effort: values.get("--effort") ?? null,
       sessionNumber,
       totalSessions,
+      mergeOrigin: switches.has("--merge-origin"),
     });
   }
 

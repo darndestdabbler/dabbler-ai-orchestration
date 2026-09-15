@@ -396,6 +396,10 @@ export function makeAnsweredRepo(
         return { stdout: lines.join("\n") };
       },
     ],
+    // A start brings the branch level with origin first: the answered origin
+    // holds nothing this pushed checkout does not.
+    [["fetch", "-q", "origin", "+refs/heads/main:refs/remotes/origin/main"], { code: 0 }],
+    [["merge-base", "--is-ancestor", "origin/main", "HEAD"], { code: 0 }],
     // Is a commit an earlier state of this checkout? Only one a test said
     // this repository landed work after. `--is-ancestor` answers by exit
     // code and prints nothing, so this does too.

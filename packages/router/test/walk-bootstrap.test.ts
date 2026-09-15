@@ -23,6 +23,7 @@ import {
   detectPackaging,
 } from "../src/bootstrap/index.ts";
 import { bootstrapVerb } from "../src/cli/bootstrap.ts";
+import { reconcileWithOrigin } from "../src/journal.ts";
 import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/packaging.ts";
 import { capture } from "../src/output.ts";
 import { CATALOG_FILENAME } from "../src/catalog.ts";
@@ -270,5 +271,49 @@ describe("a project on its first day", () => {
     assert.ok(line.includes(CATALOG_FILENAME), `the line names no catalog: ${line}`);
     assert.ok(!line.includes(join(repo, ".dabbler")), line);
     assert.ok(!line.includes(join(process.cwd(), ".dabbler")), line);
+  });
+});
+
+describe("a branch brought level with an origin the host created", () => {
+  /** A checkout on `main` with its own work, and a bare origin whose `main` was committed elsewhere. */
+  function unrelatedOrigin(remoteFiles: Record<string, string>): string {
+    const repo = scratchDir("level-");
+    const seed = scratchDir("level-seed-");
+    const bare = join(scratchDir("level-bare-"), "origin.git");
+    for (const [dir, files] of [[repo, { "README.md": "# ours\n", "app.txt": "work\n" }], [seed, remoteFiles]] as const) {
+      writeFiles(dir, files);
+      git(dir, "init", "-q", "-b", "main");
+      git(dir, "add", "-A");
+      git(dir, "commit", "-q", "-m", "init");
+    }
+    git(seed, "init", "-q", "--bare", bare);
+    git(seed, "push", "-q", bare, "main");
+    git(repo, "remote", "add", "origin", bare);
+    return repo;
+  }
+
+  it("merges a host's README-only initial commit unasked, keeps this README, and leaves the branch pushable", () => {
+    const repo = unrelatedOrigin({ "README.md": "# placeholder\n" });
+    const result = reconcileWithOrigin(repo, { allowUnrelated: false });
+    assert.equal(result.held, null);
+    assert.match(result.line ?? "", /initial README/);
+    assert.equal(gitOut(repo, "rev-parse", "--abbrev-ref", "@{u}"), "origin/main");
+    assert.match(readFileSync(join(repo, "README.md"), "utf8"), /^# ours\r?\n$/);
+    git(repo, "push", "-q");
+  });
+
+  it("holds an unrelated origin carrying more than a README and names its files, until told to merge", () => {
+    const repo = unrelatedOrigin({ "README.md": "# theirs\n", "src/lib.txt": "theirs\n" });
+    const head = gitOut(repo, "rev-parse", "HEAD");
+    const held = reconcileWithOrigin(repo, { allowUnrelated: false });
+    assert.deepEqual(held.held, { remote: "origin/main", files: ["README.md", "src/lib.txt"] });
+    assert.equal(gitOut(repo, "rev-parse", "HEAD"), head);
+
+    // Told to: their files arrive, and the README both sides have stays ours.
+    const merged = reconcileWithOrigin(repo, { allowUnrelated: true });
+    assert.equal(merged.held, null);
+    assert.match(readFileSync(join(repo, "src", "lib.txt"), "utf8"), /^theirs\r?\n$/);
+    assert.match(readFileSync(join(repo, "README.md"), "utf8"), /^# ours\r?\n$/);
+    git(repo, "push", "-q");
   });
 });

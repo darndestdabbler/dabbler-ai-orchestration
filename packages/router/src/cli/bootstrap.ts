@@ -26,7 +26,8 @@ import {
 } from "../config.ts";
 import { freshnessWarnings } from "../discovery.ts";
 import { SESSIONS_DIRNAME, ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
-import { haveCommonHistory, remoteDefaultBranch, repoRelativePath, runGit } from "../journal.ts";
+import { haveCommonHistory, reconcileWithOrigin, remoteDefaultBranch, repoRelativePath, runGit } from "../journal.ts";
+import { originHoldsWorkRefusal } from "../session.ts";
 import { PROJECT_CONFIG_FILENAME } from "../config.ts";
 import { STATUS_IN_PROGRESS } from "../progress.ts";
 import { readRawSessionState } from "../sessionState.ts";
@@ -401,7 +402,20 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   // half-configured remote an operator can finish beats a set-up that died
   // after writing the scaffold.
   if (remote !== null && remote.added) {
-    const pushed = pushUpstream(project);
+    let pushed = pushUpstream(project);
+    // A host that initialised the repository with a README refuses the first
+    // push. That commit is merged and the push made again; anything more on
+    // origin is left for Start Session, which asks before merging it.
+    if (pushed.error !== "") {
+      const root = repoRootFor(project);
+      const reconciled = root === null ? null : reconcileWithOrigin(root, { allowUnrelated: false });
+      if (reconciled?.held) {
+        writeErr(`bootstrap: ${originHoldsWorkRefusal(reconciled.held).replace(/ To merge it[\s\S]*$/, "")} Start Session asks whether to merge it.\n`);
+      } else if (reconciled?.line) {
+        writeOut(`bootstrap: ${reconciled.line}\n`);
+        pushed = pushUpstream(project);
+      }
+    }
     if (pushed.error === "") {
       writeOut(
         `bootstrap: pushed ${pushed.branch} to origin and set it to track there, ` +

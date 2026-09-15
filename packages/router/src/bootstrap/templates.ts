@@ -152,6 +152,8 @@ export const SHARED_BODY =
   "  on `PATH`. Anywhere else, run `node \"<extension dir>/dist/dabbler.cjs\"\n" +
   "  <verb>`. \"dabbler: command not found\" is a PATH problem, not a keys one.\n" +
   "- `session cancel --force` is a person's verb, never the engine's.\n" +
+  "- A fix no session covers is a session's own work: insert a session into\n" +
+  "  the session plan and make the fix there, never outside a session.\n" +
   "\n" +
   "## Writing files\n" +
   "\n" +

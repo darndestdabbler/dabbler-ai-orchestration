@@ -128,6 +128,9 @@ export { ENUMERATION_CLI_ALIASES } from "./projection.ts";
 // one Claude Code's exit code cannot protect: it exits 0 when it rejects a
 // --model and carries on with something else.
 export { preflightRefusedModel } from "./engines.ts";
+// Start Session asks the person before a start merges an origin branch that
+// shares no history with the checkout, and re-runs the start with this.
+export { MERGE_ORIGIN_FLAG } from "./session.ts";
 // WHERE that reading comes from, so a host can watch it.
 //
 // The catalog and this operator's preferences sit side by side in one

@@ -311,6 +311,118 @@ export function haveCommonHistory(repoRoot: string, left: string, right: string)
   return base.code === 1 ? false : null;
 }
 
+/** What `reconcileWithOrigin` did: a line to print, and the files it held back from merging. */
+export interface OriginReconciliation {
+  readonly line: string | null;
+  /** Set when origin's branch shares no history with this one and holds more than a README. */
+  readonly held: { readonly remote: string; readonly files: readonly string[] } | null;
+}
+
+/** A host's "initialise with a README" commit: nothing but the README, which is safe to merge unasked. */
+function isPlaceholderTree(files: readonly string[]): boolean {
+  return files.length > 0 && files.every((file) => /^readme\.md$/i.test(file));
+}
+
+/**
+ * Bring this branch level with origin's branch of the same name, before work
+ * starts on it.
+ *
+ * A host that initialised the repository with a README holds a commit this
+ * checkout has never had, so the first push is refused and nothing sets the
+ * upstream -- and every push after it, the land's included, fails the same
+ * way after the work is done. A history that shares an ancestor is
+ * fast-forwarded. One that shares none is merged unasked only when origin
+ * holds nothing but the README (on a clash this checkout's README wins: the
+ * host's is a placeholder); anything more is the operator's work or someone
+ * else's, so it is held and named until `allowUnrelated` says to merge it.
+ * The upstream is set whenever origin has the branch, so a bare `git push`
+ * works after.
+ */
+export function reconcileWithOrigin(
+  repoRoot: string,
+  options: { readonly allowUnrelated: boolean },
+): OriginReconciliation {
+  const none: OriginReconciliation = { line: null, held: null };
+  if (runGit(repoRoot, ["remote", "get-url", "origin"]).code !== 0) return none;
+  const branch = runGit(repoRoot, ["symbolic-ref", "--short", "HEAD"]).stdout.trim();
+  if (branch === "") return none;
+  // No prompt and a bound: a credential question here would hold the start
+  // open on something nobody sees.
+  const quiet = { env: { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" }, timeoutMs: 60_000 };
+  const remote = `origin/${branch}`;
+  const fetched = runGit(
+    repoRoot,
+    ["fetch", "-q", "origin", `+refs/heads/${branch}:refs/remotes/${remote}`],
+    quiet,
+  );
+  // Origin without this branch has nothing to bring in; the first push makes it.
+  if (fetched.code !== 0) return none;
+  const hadUpstream = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).code === 0;
+  const track = (): void => {
+    if (!hadUpstream) runGit(repoRoot, ["branch", `--set-upstream-to=${remote}`]);
+  };
+  if (runGit(repoRoot, ["merge-base", "--is-ancestor", remote, "HEAD"]).code === 0) {
+    track();
+    return none;
+  }
+  const related = haveCommonHistory(repoRoot, "HEAD", remote);
+  if (related === null) return none;
+  if (related) {
+    const merged = runGit(repoRoot, ["merge", "--ff-only", "-q", remote]);
+    if (merged.code !== 0) {
+      return {
+        line:
+          `not pulled from ${remote} (${firstLineOf(merged.stderr)}); carrying on with what is here -- ` +
+          "a push is refused until the two are merged.",
+        held: null,
+      };
+    }
+    track();
+    return { line: `pulled from ${remote} (fast-forward).`, held: null };
+  }
+  const files = runGit(repoRoot, ["ls-tree", "-r", "--name-only", remote]).stdout
+    .split("\n")
+    .map((file) => file.trim())
+    .filter((file) => file !== "");
+  const placeholder = isPlaceholderTree(files);
+  if (!placeholder && !options.allowUnrelated) return { line: null, held: { remote, files } };
+  // Where a file is on both sides this checkout's copy is kept: the host's
+  // README and .gitignore are templates, and a merge that stopped on them
+  // would leave the operator a manual git problem after saying yes.
+  const merged = runGit(repoRoot, [
+    "merge",
+    "-q",
+    "--allow-unrelated-histories",
+    "--no-edit",
+    "-X",
+    "ours",
+    "-m",
+    `Merge ${remote}, which shares no history with this branch`,
+    remote,
+  ]);
+  if (merged.code !== 0) {
+    runGit(repoRoot, ["merge", "--abort"]);
+    return {
+      line:
+        `${remote} shares no history with ${branch} and could not be merged ` +
+        `(${firstLineOf(merged.stderr)}); nothing was changed -- merge it yourself: ` +
+        `git merge --allow-unrelated-histories ${remote}`,
+      held: null,
+    };
+  }
+  track();
+  return {
+    line: placeholder
+      ? `merged ${remote}, the host's initial README commit, so this branch can be pushed.`
+      : `merged ${remote} (${files.length} file(s); where a file was on both sides, this checkout's copy was kept).`,
+    held: null,
+  };
+}
+
+function firstLineOf(text: string): string {
+  return text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "no reason given";
+}
+
 /**
  * One path, spelled the way the operating system spells it.
  *

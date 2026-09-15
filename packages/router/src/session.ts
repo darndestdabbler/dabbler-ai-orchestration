@@ -101,7 +101,14 @@ import { PackagingConfigError, loadDeclaration, loadTagRelease } from "./packagi
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { removeStopGate } from "./bootstrap/index.ts";
 import { isSessionBookkeeping } from "./testEvidence.ts";
-import { nowIso, platformNewlines, repoRootFor, runGit } from "./journal.ts";
+import {
+  type OriginReconciliation,
+  nowIso,
+  platformNewlines,
+  reconcileWithOrigin,
+  repoRootFor,
+  runGit,
+} from "./journal.ts";
 import {
   LedgerError,
   RUNS_DIRNAME,
@@ -603,6 +610,8 @@ export interface StartOptions {
   readonly totalSessions?: number | null;
   /** The free catalog refresh a start runs first; a test speaks through it. */
   readonly refresh?: () => Promise<string[]>;
+  /** Merge an origin branch that shares no history with this one, as the person answered. */
+  readonly mergeOrigin?: boolean;
 }
 
 /** The first line of a git error, for a one-line message. */
@@ -610,26 +619,34 @@ function firstLine(text: string): string {
   return text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "no reason given";
 }
 
+/** The switch that lets a start merge an origin branch sharing no history with this one. */
+export const MERGE_ORIGIN_FLAG = "--merge-origin";
+
 /**
- * A registration pulls its checkout forward first, when there is an
- * upstream to pull from and a clean tree to pull onto, so a session starts
- * on what the server has and not on what this folder last saw. One line
- * either way; a pull that fails is said and the start goes on, because the
- * refusal for a tree that cannot take the session belongs to the start
- * itself, not to a courtesy before it.
+ * A registration brings its checkout level with origin first, when there is
+ * a clean tree to do it on, so a session starts on what the server has and
+ * not on what this folder last saw -- and so the push at its end is not
+ * refused over a commit the host made, which is found only after the work.
+ * The rule is `reconcileWithOrigin`'s; a start adds only the clean tree.
  */
-function pullBeforeStart(repoRoot: string, sessionsDir: string): string | null {
-  const upstream = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
-  if (upstream.code !== 0 || upstream.stdout.trim() === "") return null;
+function pullBeforeStart(repoRoot: string, sessionsDir: string, allowUnrelated: boolean): OriginReconciliation {
   const status = readWorktreeStatus(repoRoot);
-  if (status.error !== "") return null;
+  if (status.error !== "") return { line: null, held: null };
   const setRel = relative(repoRoot, resolve(sessionsDir)).split("\\").join("/");
-  if (materialPaths(status.text, setRel, { beforeWork: true }).length > 0) return null;
-  const pulled = runGit(repoRoot, ["pull", "--ff-only", "-q"]);
-  return pulled.code === 0
-    ? `start: pulled from ${upstream.stdout.trim()} (git pull --ff-only) before registering.`
-    : `start: not pulled from ${upstream.stdout.trim()} (${firstLine(pulled.stderr)}); registering on ` +
-        "what is here -- run `git pull --ff-only` yourself when it can.";
+  if (materialPaths(status.text, setRel, { beforeWork: true }).length > 0) return { line: null, held: null };
+  return reconcileWithOrigin(repoRoot, { allowUnrelated });
+}
+
+/** The refusal for an origin branch that shares no history with this one and holds real files. */
+export function originHoldsWorkRefusal(held: { readonly remote: string; readonly files: readonly string[] }): string {
+  const shown = held.files.slice(0, 10).join(", ");
+  return (
+    `${held.remote} shares no history with this checkout and holds ${held.files.length} file(s) it has never had: ` +
+    `${shown}${held.files.length > 10 ? ", and more" : ""}. That is more than a host's initial README, so it may ` +
+    "be work -- yours or someone else's -- and nothing was merged or registered. To merge it into this branch " +
+    "(where a file is on both sides, this checkout's copy is kept) and start, run the same start with " +
+    `${MERGE_ORIGIN_FLAG}.`
+  );
 }
 
 /**
@@ -1139,8 +1156,12 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       if (unanswered !== null) {
         writeOut(`${unanswered}\n`);
       } else {
-        const pulled = pullBeforeStart(repoRootFromSessionsDir(sessionsDir), sessionsDir);
-        if (pulled !== null) writeOut(`${pulled}\n`);
+        const pulled = pullBeforeStart(repoRootFromSessionsDir(sessionsDir), sessionsDir, options.mergeOrigin === true);
+        if (pulled.held !== null) {
+          writeErr(`start: refused -- ${originHoldsWorkRefusal(pulled.held)}\n`);
+          return EXIT_BOUNDARY;
+        }
+        if (pulled.line !== null) writeOut(`start: ${pulled.line}\n`);
       }
     }
     // What the repository still declares that nothing reads: said, and refused never.

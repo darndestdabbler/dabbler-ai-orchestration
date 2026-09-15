@@ -413,6 +413,7 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     pickEngine: async () => ENGINES[0],
     askModel: async () => "haiku",
     askText: async (_title, _prompt, value) => value ?? "look at src/widget.py again",
+    confirm: async () => false,
     pickDrive: async (roots) => roots[0],
     report: () => undefined,
     showErrorMessage: (m: string) => errors.push(m),
@@ -544,13 +545,36 @@ suite("Start opens the person's own CLI", () => {
     assert.match(claudeArgs[2], /dabbler session wait/);
 
     const seat = engineTerminalFor(repository, copilot, "gpt-5-6-luna");
-    assert.deepStrictEqual((seat as EngineTerminal).args, ["--model", "gpt-5-6-luna"]);
+    assert.deepStrictEqual((seat as EngineTerminal).args.slice(0, 3), ["--model", "gpt-5-6-luna", "-i"]);
 
     // Empty means the engine's own default, and a flag with nothing after it
     // is a launch that fails in front of the person.
     const bare = engineTerminalFor(repository, ENGINES[0], "");
     assert.strictEqual((bare as EngineTerminal).args.length, 1);
     assert.match((bare as EngineTerminal).args[0], /dabbler session wait/);
+  });
+
+  test("asks before a start merges origin's unrelated work, and starts with the merge only on yes", async () => {
+    const refusal =
+      "start: refused -- origin/main shares no history with this checkout and holds 2 file(s) it has never had: " +
+      "src/app.ts, README.md. ... run the same start with --merge-origin.";
+    const register = (async (_root: string, args: readonly string[]) => {
+      register.calls.push([...args]);
+      return args.includes("--merge-origin") ? { code: 0, output: "" } : { code: 3, output: refusal };
+    }) as SessionRegistrar & { calls: string[][] };
+    register.calls = [];
+
+    const asked: string[] = [];
+    const declined = driveUi({ confirm: async (message) => { asked.push(message); return false; } });
+    assert.strictEqual(await runStartSession(makeRepository(), declined.ui, register, CLI), false);
+    assert.match(asked[0], /src\/app\.ts/);
+    assert.strictEqual(register.calls.length, 1);
+    assert.strictEqual(declined.terminals.length, 0);
+
+    const agreed = driveUi({ confirm: async () => true });
+    assert.strictEqual(await runStartSession(makeRepository(), agreed.ui, register, CLI), true);
+    assert.deepStrictEqual(register.calls[2].slice(-1), ["--merge-origin"]);
+    assert.strictEqual(agreed.terminals.length, 2);
   });
 
   test("passes a dated model id exactly as it was chosen", () => {
@@ -618,8 +642,8 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(dabbler.options.location?.parentTerminal, cli);
     assert.strictEqual(dabbler.shown, 1);
 
-    // The seat's CLI has no argv slot for it, so it is typed at the prompt
-    // and not sent -- one keypress, and nothing copied anywhere.
+    // The seat's CLI takes the sentence through `-i`, which starts it
+    // interactively AND submits it: nothing is typed and no Enter is owed.
     const copilot = ENGINES.find((e) => e.engine === "copilot")!;
     const seat = { ...defaultSessionRunUi(), pickEngine: async () => copilot, askModel: async () => "gpt-5-6-luna" };
     assert.strictEqual(await runStartSession(repository, seat, register, CLI), true);
@@ -628,10 +652,9 @@ suite("Start opens the person's own CLI", () => {
     assert.deepStrictEqual(register.calls[1].slice(-2), ["--model", "gpt-5-6-luna"]);
     assert.strictEqual(terminals.length, 6);
     assert.strictEqual(terminals[4].options.shellPath, "copilot");
-    assert.deepStrictEqual(terminals[4].options.shellArgs, ["--model", "gpt-5-6-luna"]);
-    assert.strictEqual(terminals[4].sent.length, 1);
-    assert.strictEqual(terminals[4].sent[0].addNewLine, false);
-    assert.match(terminals[4].sent[0].text, /dabbler session wait/);
+    assert.deepStrictEqual(terminals[4].options.shellArgs.slice(0, 3), ["--model", "gpt-5-6-luna", "-i"]);
+    assert.match(terminals[4].options.shellArgs[3], /dabbler session wait/);
+    assert.deepStrictEqual(terminals[4].sent, []);
 
     // A second session in the same window opens a second CLI, and the
     // terminal beside the FIRST one is not the arrangement Start promised

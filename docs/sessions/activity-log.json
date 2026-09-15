@@ -11572,6 +11572,21 @@
       "dateTime": "2026-09-15T08:55:03.119000-04:00",
       "task": "Session 180 records the two-hour soak of both engines and releases 3.3.0, a minor. The soak ran beside sessions 176\u2013179 with the harness in docs/design/messaging-poc/: Claude Code CLI and Copilot CLI each kept a background waiter armed for 7,007 seconds while a stand-in framework posted 16 tasks at gaps of one to fifteen minutes, Playwright typed 8 operator questions per engine (two of them mid-turn) and killed each engine's armed waiter twice. Every task was answered correctly and none was left past its deadline; every question was answered with the waiter kept; each killed waiter was noticed within a second and re-armed within nine seconds with nobody's help. The record goes into docs/design/messaging-design.md beside what the proof of concept measured, with Copilot's 120 AI credits for the run. Nothing the soak showed is a failure the overdue alert cannot surface, so sessions 177\u2013179 stand, and the release is 3.3.0: version.json bumped and stamped into both package.json files and the lockfile, and a CHANGELOG entry saying the framework now drives the session and the AI waits in the background, with the walk's four fixes.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 181,
+      "dateTime": "2026-09-15T11:43:24.516000-04:00",
+      "task": "Session 181 fixes the two defects that stopped an operator's first Copilot session on an Azure DevOps repository, tells engines that remediation is a session's work, and releases 3.3.1, a patch. Start Session launches Copilot CLI with the waiter sentence as `-i <prompt>`, which starts it interactively and submits the prompt, so nothing is typed and no Enter is owed. Before registering, `session start` brings the branch level with origin's branch of the same name through one rule in journal.ts (`reconcileWithOrigin`): a shared history fast-forwards; an unrelated history holding only README.md is merged unasked with this checkout's README kept and the upstream set, so the land's push is not refused after the work; an unrelated history holding more is refused with its files named and `--merge-origin` to merge it, and Start Session asks the person before re-running the start with that switch. Bootstrap's refused first push merges a README-only commit the same way and pushes again. The managed body (templates.ts and this repository's AGENTS.md) says a fix to the framework or the project is done through a session, inserting one into the plan when none covers it. version.json goes to 3.3.1, stamped into both manifests and the lockfile, with a CHANGELOG entry.",
+      "releasable": true
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 181,
+      "dateTime": "2026-09-15T11:46:19.133000-04:00",
+      "what": "step 'origin-before-start': its files",
+      "reason": "The two reconcileWithOrigin tests build real repositories, and the suite permits real git only in the listed walkthroughs; they move from journal.test.ts to walk-bootstrap.test.ts, which already walks a host that seeded a README",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

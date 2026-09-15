@@ -10,6 +10,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.3.1] — 2026-09-15
+
+**A first session on a new host, started without a keypress.** Two defects an
+operator met starting a first Copilot session on an Azure DevOps repository.
+
+### Fixed
+
+- **Copilot's opening sentence is submitted at launch.** Start Session passed
+  it by typing it at Copilot's prompt and leaving it for your Enter; Copilot
+  CLI now gets it as `-i <prompt>`, which starts it interactively and runs the
+  sentence, so the AI starts waiting on the framework on its own.
+- **A host's initial README commit no longer refuses the push.** A repository
+  the host initialised with a README holds a commit your checkout never had,
+  so the first push was refused, no upstream was set, and the session's own
+  push failed after the work. `session start` now fetches origin's branch
+  first: it fast-forwards a shared history, merges a README-only initial
+  commit (your README kept) and sets the upstream. When origin holds more
+  than a README on an unrelated history, the start names its files and
+  Start Session asks before merging them (`--merge-origin` on the command
+  line; your copy is kept where a file is on both sides). Bootstrap's first
+  push merges a README-only commit the same way and pushes again.
+
+### Changed
+
+- **Fixes are a session's work.** The managed instructions tell the AI that a
+  fix no session covers gets a session inserted into the plan, and is never
+  made outside one.
+
 ## [3.3.0] — 2026-09-15
 
 **The framework drives; the AI waits in the background.** Start Session hands

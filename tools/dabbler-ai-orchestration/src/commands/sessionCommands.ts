@@ -31,6 +31,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import {
   ENUMERATION_CLI_ALIASES,
+  MERGE_ORIGIN_FLAG,
   preflightRefusedModel,
   type Router,
 } from "dabbler-ai-router";
@@ -121,9 +122,12 @@ export function engineOrder(preferred: string | null): readonly EngineChoice[] {
  * - `claude`: `Usage: claude [options] [command] [prompt]`, and "starts an
  *   interactive session by default, use -p/--print for non-interactive
  *   output". The positional IS the opening prompt, so it goes in argv.
- * - `copilot`: `Usage: copilot [options] [command]` -- no positional, and
- *   its `-p, --prompt <text>` is documented as "Execute a prompt in
- *   non-interactive mode", which is the opposite of what Start wants.
+ * - `copilot`: `Usage: copilot [options] [command]` -- no positional, but
+ *   `-i, --interactive <prompt>` is "Start interactive mode and automatically
+ *   execute this prompt" (measured on 1.0.83, 2026-09-15). `-p, --prompt` is
+ *   the non-interactive one and is not what Start wants. The sentence used to
+ *   be typed at the prompt and left for the person's Enter, which is a
+ *   deterministic keypress on every Copilot start.
  * - `codex`: NOT installed on the machine this was written on, so its help
  *   was not read and nothing here claims to know it. It opens with no
  *   prompt: an argv a CLI does not take is a launch that fails in front of
@@ -147,11 +151,11 @@ export function engineOrder(preferred: string | null): readonly EngineChoice[] {
  * the person.
  */
 const ENGINE_CLI: Readonly<
-  Record<string, { program: string; carriesPrompt: boolean; modelFlag: string | null }>
+  Record<string, { program: string; promptArgs: ((sentence: string) => string[]) | null; modelFlag: string | null }>
 > = {
-  "claude-code": { program: "claude", carriesPrompt: true, modelFlag: "--model" },
-  copilot: { program: "copilot", carriesPrompt: false, modelFlag: "--model" },
-  codex: { program: "codex", carriesPrompt: false, modelFlag: null },
+  "claude-code": { program: "claude", promptArgs: (sentence) => [sentence], modelFlag: "--model" },
+  copilot: { program: "copilot", promptArgs: (sentence) => ["-i", sentence], modelFlag: "--model" },
+  codex: { program: "codex", promptArgs: null, modelFlag: null },
 };
 
 /** What Start asks the editor to open: one CLI, interactively, in one repository. */
@@ -370,8 +374,8 @@ export function engineTerminalFor(
     program: cli.program,
     // The flag first and the prompt last: `claude`'s prompt is a POSITIONAL,
     // so anything after it is read as part of it.
-    args: [...modelArgs, ...(cli.carriesPrompt ? [sentence] : [])],
-    typed: cli.carriesPrompt ? null : sentence,
+    args: [...modelArgs, ...(cli.promptArgs !== null ? cli.promptArgs(sentence) : [])],
+    typed: cli.promptArgs !== null ? null : sentence,
   };
 }
 
@@ -390,6 +394,8 @@ export interface SessionRunUi {
   askModel: (choice: EngineChoice, chosen: string) => Thenable<string | undefined>;
   /** One line of text from the person; undefined when the box was dismissed. */
   askText: (title: string, prompt: string, value?: string) => Thenable<string | undefined>;
+  /** A yes-or-no the person answers, modally; true only for the named action. */
+  confirm: (message: string, action: string) => Thenable<boolean>;
   /** Which of several running drives; undefined when dismissed. */
   pickDrive: (roots: readonly string[]) => Thenable<string | undefined>;
   report: (title: string, body: string) => void;
@@ -559,6 +565,8 @@ export function defaultSessionRunUi(
       }),
     askText: (title, prompt, value) =>
       vscode.window.showInputBox({ title, prompt, value, ignoreFocusOut: true }),
+    confirm: (message, action) =>
+      vscode.window.showWarningMessage(message, { modal: true }, action).then((picked) => picked === action),
     pickDrive: (roots) =>
       vscode.window.showQuickPick(roots, { title: "Which driven session?", ignoreFocusOut: true }),
     report: (title, body) => {
@@ -720,7 +728,15 @@ export async function runStartSession(
   }
   // Registering is the framework's, not the AI's: the identity is on the
   // record before anything opens, and a refusal opens nothing.
-  const registered = await register(repository.root, startArguments(picked, model));
+  const args = startArguments(picked, model);
+  let registered = await register(repository.root, args);
+  // Origin holds files this checkout has never had, on a history it does not
+  // share: whether they belong in this branch is the person's to say.
+  if (registered.code !== 0 && registered.output.includes(MERGE_ORIGIN_FLAG)) {
+    const said = registered.output.trim().split("\n").filter((line) => line.includes(MERGE_ORIGIN_FLAG)).join(" ");
+    if (!(await ui.confirm(said.replace(/^start: refused -- /, ""), "Merge and Start"))) return false;
+    registered = await register(repository.root, [...args, MERGE_ORIGIN_FLAG]);
+  }
   if (registered.code !== 0) {
     const said = registered.output.trim();
     ui.showErrorMessage(`The session was not registered, so nothing was opened.${said === "" ? "" : ` ${said}`}`);

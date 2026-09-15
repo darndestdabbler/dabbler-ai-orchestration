@@ -216,7 +216,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 176 | Record the research | no | 2026-09-15 |
 | 177 | The framework drives | no | 2026-09-15 |
 | 178 | The extension and the words | no | 2026-09-15 |
-| 179 | The walk | — | not declared |
+| 179 | The walk | no | 2026-09-15 |
 | 180 | The soak, and 3.3.0 | — | not declared |
 | 181 | The round names what it cost | — | not declared |
 | 182 | Overrides the operator provably made | — | not declared |
@@ -2531,3 +2531,14 @@ Session 177 lets the framework drive while the AI waits in the background, using
 **Releasable: no — held: session 180 publishes once the two-hour soak of both engines is recorded.**
 
 Session 178 makes Start Session hand the keys to the framework, and teaches the one loop. Start Session, after the engine and model are chosen and checked, registers the session itself (`dabbler session start` with that identity, through the extension's drive launcher, waiting for it to finish and showing its refusal if it refuses), opens a terminal running the framework's loop (`dabbler session run --mailbox --sessions-dir docs/sessions`), and opens the engine's CLI with a new opening sentence: keep `dabbler session wait --sessions-dir docs/sessions` running in the background, do what each instruction it prints says and answer with its answer command, run the waiter again, and stop when it prints done. Neither the operator nor the AI types `session start` or `session next`. Resume Session runs the loop with --mailbox too. The Dabbler terminal shows a step recorded as overdue (the instruction-overdue event on the supervision log) with the step and how long it has been outstanding, and a notification says so once per event, telling the operator to ask the AI whether its waiter is running; nothing is typed into the AI's chat. The managed instruction body (`packages/router/src/bootstrap/templates.ts` and this repository's AGENTS.md) teaches the loop the AI now runs, in no more lines than today, and docs/driving-a-session.md, docs/quick-start.md and the extension README say the same. It publishes nothing: the release is held for session 180.
+
+### Session 179 — The walk
+
+**Releasable: no — held: session 180 publishes once the two-hour soak of both engines is recorded.**
+
+Session 179 walks the messaging loop through the VSIX this tree builds, on Claude Code CLI and on Copilot CLI, with Playwright playing the operator. A walk script beside the POC harness installs the built VSIX into a fresh VS Code profile, opens a scratch repository that has a two-step session planned and a local bare remote, runs Start Session and answers its engine and model picks, lets the framework's loop and the AI's background waiter carry the session through the plan, two steps, verification, the run of record and the close, types one operator question while the AI waits and one while it works, and records every action it took and every command the AI ran from the engine's own log. Each deterministic action taken by anyone but the framework is counted as a defect; defects are fixed here with a test each, a larger one is written up as a later session in the session plan, and the whole walk is recorded in docs/uat/uat-messaging-walk.md. It publishes nothing: the release is held for session 180.
+
+**Amended after acceptance:**
+
+- 2026-09-15 — step 'walk-claude': its files and checks: The Claude walk could not proceed past three product defects (the loop terminal ran the editor, start refused before its free refresh, the sonnet alias refused) and the harness needed fixes to reach the prompts; each was fixed where it blocked the walk, with its test, so this step's files and checks now name them (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-15 — step 'walk-fixes': its files: Every defect that blocked a walk was fixed inside walk-claude, where it blocked; what is left are two defects whose fix changes what the AI may run unasked, and those are written up as later sessions in the session plan with the account of each defect in the walk record (claude-code (anthropic, claude-fable-5-1))

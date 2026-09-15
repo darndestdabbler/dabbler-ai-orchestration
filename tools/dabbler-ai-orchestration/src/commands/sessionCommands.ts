@@ -166,6 +166,8 @@ export interface EngineTerminal {
    * replaces copying and pasting a prompt.
    */
   readonly typed: string | null;
+  /** Added to the terminal's environment. */
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -232,6 +234,8 @@ export function loopTerminalFor(repository: SessionsRepository, cli: string): En
     program: process.execPath,
     args: [cli, "session", "run", "--mailbox", "--sessions-dir", SESSIONS_REL.replace(/\\/g, "/")],
     typed: null,
+    // The program is the editor's own executable: without this it starts a second editor, not the loop.
+    env: { ELECTRON_RUN_AS_NODE: "1" },
   };
 }
 
@@ -588,6 +592,7 @@ export function defaultSessionRunUi(
         cwd: spec.cwd,
         shellPath: spec.program,
         shellArgs: [...spec.args],
+        ...(spec.env ? { env: { ...spec.env } } : {}),
         ...location,
       });
       terminal.show();

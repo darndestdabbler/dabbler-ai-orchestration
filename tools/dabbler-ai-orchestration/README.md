@@ -123,8 +123,8 @@ project up for you (or run **`Dabbler: Set Up New Project`** from the
 Command Palette yourself). Setup writes the managed instruction blocks
 your AI agent reads, the ignore rule for the router's machine state, the
 project's own declaration and the first two sessions — then commits them,
-because session 1 is refused while they sit uncommitted. From there, tell
-your agent **"start the next session"** and watch the tree: the plan and
+because session 1 is refused while they sit uncommitted. From there, choose
+**Start Session** on the repository's row and watch the tree: the plan and
 the decomposition run through the same tracked, verified pipeline as every
 session after them.
 

@@ -11050,3 +11050,48 @@ returns.
 tokens, and one that the close's line prices them.
 
 **Releasable.** Yes, a minor.
+
+### Session 184 of 185: The loop's own commands, approved at launch
+
+Scope: whole repository
+
+**Why.** Session 179's walk on Copilot CLI asked the operator to approve
+`dabbler session wait` four times and `dabbler session report` three times:
+seven of the eight deterministic actions anyone but the framework took. On a
+default Claude Code install the same commands prompt too; the walk's Claude
+ran in the operator's own auto mode and asked nothing.
+
+**What.** Start Session launches each CLI with the loop's two commands, and
+nothing wider, already approved: Claude Code's `--allowedTools` and Copilot's
+`--allow-tool`, spelled so a positional prompt is not swallowed by a flag
+that takes a list, and matched narrowly enough that `session cancel --force`
+— a person's verb — still asks. The rule each CLI actually applies is
+measured before it is relied on.
+
+**Non-goals.** No approval of file edits, tests or any other command; no
+change to a permission mode the operator set.
+
+**Tests.** One per engine that the launch carries exactly the two approvals;
+the walk repeated on both CLIs with the approvals counted.
+
+**Releasable.** Yes, a patch.
+
+### Session 185 of 185: The typed sentence, submitted
+
+Scope: whole repository
+
+**Why.** Copilot CLI has no argument for an opening prompt, so Start types
+the waiter sentence at its prompt and leaves it for the operator's Enter — a
+deterministic action on every Copilot start. Session 179's walk pressed it
+twice, because the first press landed while the CLI was still starting.
+
+**What.** The sentence is submitted without a keypress once the CLI is ready
+to take it, and a start whose sentence did not arrive says so instead of
+leaving a CLI that looks ready and is not waiting on anything.
+
+**Non-goals.** No change for Claude Code, whose sentence is an argument.
+
+**Tests.** One that a start submits the sentence it types; the Copilot walk
+repeated with no Enter.
+
+**Releasable.** Yes, a patch.

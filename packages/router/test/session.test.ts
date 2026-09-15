@@ -310,6 +310,32 @@ describe("what a start refuses before a session exists", () => {
     }
   });
 
+  it("reads the catalog before any check that can refuse", async () => {
+    // A machine that had never read its catalog refused a seat's model the
+    // refresh would have recorded, and told the operator to run it by hand.
+    const state = stateDir();
+    try {
+      writeSettings(state.repo, { [SETTING_TRANSPORT]: TRANSPORT_COPILOT_CLI });
+      resetProjectRootCache();
+      let refreshed = false;
+      const refused = await run(() =>
+        start(state.sessionsDir, {
+          engine: "claude-code",
+          provider: "anthropic",
+          refresh: async () => {
+            refreshed = true;
+            return [];
+          },
+        }),
+      );
+      assert.notEqual(refused.code, EXIT_OK);
+      assert.equal(refreshed, true);
+    } finally {
+      resetProjectRootCache();
+      state.restore();
+    }
+  });
+
   it("takes the authoring model this checkout chose when the call names none", async () => {
     // The other half of the same rule: a setting no reader consumes is a
     // control that reports success and changes nothing.

@@ -37,6 +37,7 @@ import {
   IdentityResolutionError,
   resolveOrchestratorIdentity,
 } from "./identity.ts";
+import { engineAliases } from "./engines.ts";
 import {
   CHOSEN_VEHICLE_LAYERS,
   explainAuthoringModel,
@@ -600,6 +601,8 @@ export interface StartOptions {
   readonly effort?: string | null;
   readonly sessionNumber?: number | null;
   readonly totalSessions?: number | null;
+  /** The free catalog refresh a start runs first; a test speaks through it. */
+  readonly refresh?: () => Promise<string[]>;
 }
 
 /** The first line of a git error, for a one-line message. */
@@ -914,8 +917,10 @@ export function configuredModelRefusal(
   // declared its own at `session start` and the ledger has carried it since;
   // re-judging a recorded identity here would refuse a continuation over a
   // catalog that moved after the session began.
+  // A name the engine's CLI always accepts is never held to the catalog's
+  // list: `sonnet` is not an enumerated id, and `claude` takes it anyway.
   const authoringRefusal =
-    authoring?.["declaredAtStart"] === true
+    authoring?.["declaredAtStart"] === true || engineAliases(engine).includes(authoringModel ?? "")
       ? null
       : held(
           authoring,
@@ -1014,6 +1019,10 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       model: options.model ?? (explainAuthoringModel(null, checkout).transport || null),
       effort: options.effort ?? null,
     };
+    // Free, and before anything below reads the catalog: a machine that has
+    // never read it would otherwise refuse a seat's model the refresh is about
+    // to record, and tell the operator to run the refresh by hand.
+    for (const line of await (options.refresh ?? refreshDiscovery)()) writeOut(`${line}\n`);
     // **A vehicle a PERSON put in force and this machine cannot reach is a
     // stop, here, before the session exists and before anything is billed.**
     //
@@ -1136,9 +1145,6 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     }
     // What the repository still declares that nothing reads: said, and refused never.
     for (const line of retiredDeclarationLines(repoRootFromSessionsDir(sessionsDir))) writeOut(`${line}\n`);
-    // Free, and before the session exists: what the roles may resolve to is
-    // established while there is still nothing whose review it could change.
-    for (const line of await refreshDiscovery()) writeOut(`${line}\n`);
     registerSessionStart(sessionsDir, requested, {
       engine: identity.engine,
       provider: identity.provider,

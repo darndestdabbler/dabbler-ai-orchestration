@@ -290,6 +290,8 @@ describe("the start boundary, over a configuration that was typed into", () => {
     const { root, restore } = machine();
     try {
       assert.equal(configuredModelRefusal(root, "claude-opus-5", "claude-code"), null);
+      // A name the CLI always takes is not an enumerated id, and is not refused for it.
+      assert.equal(configuredModelRefusal(root, "sonnet", "claude-code"), null);
       // A first-run machine is not refused: refusing it would refuse the
       // setup that fixes it.
       assert.equal(configuredModelRefusal(root, null, "claude-code"), null);

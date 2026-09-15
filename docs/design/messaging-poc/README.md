@@ -18,6 +18,7 @@ linted or tested with the repository.
 | framework.mjs | The stand-in framework: posts tasks on a schedule (`--schedule 60,240,...` seconds) and times each reply. |
 | drive-poc.cjs | The driver: resets the scratch folder, launches VS Code with a fresh profile, starts the CLI in a terminal, answers its folder-trust prompt, types the opening, starts the framework, types the operator's questions (`--human "<seconds>:<text>\|..."`), kills the waiter on cue (`--kill <seconds>,...`), and saves the logs, screenshots and terminal text. |
 | report.mjs | The analyzer: one run's findings and timeline from the harness logs and the engine's own log (the Claude project transcript, or Copilot's session events and usage store). |
+| walk-vsix.cjs | The walk of the product rather than the protocol: installs a built VSIX into a fresh VS Code profile, runs Start Session from the repository's Work Explorer row, answers the engine and model picks and every prompt the CLI puts up, types the operator's questions while the AI waits and while it works, and follows the framework's records until the session completes. Every action goes to `walk.jsonl` with who took it and whether a rule could have. |
 
 ## Running it
 
@@ -53,6 +54,39 @@ folder's path with `-vscode` appended.
 
 A run longer than a tool call's limit belongs in the background; the driver's
 log gains a `done` event when it finishes.
+
+## Walking the VSIX
+
+`walk-vsix.cjs` needs a repository the extension can start a session in:
+bootstrapped, with a session planned, committed and pushed to a remote. It
+writes its evidence to a folder beside the repository, `<repo>-results/<run>`,
+so nothing it writes moves the repository's tree, and it keeps each run's VS
+Code profile in `<repo>-vscode/<run>`, which it deletes before that run
+launches: every run starts on a fresh profile of its own, so no earlier run's
+terminals are restored into it.
+
+```
+node walk-vsix.cjs --engine claude --vsix <extension>/dabbler-ai-orchestration-<version>.vsix \
+  --repo C:/temp/<scratch repo> --run claude-walk --model sonnet \
+  --human "turn:What are you working on? One sentence.|wait:Are you still waiting? One sentence."
+```
+
+Copilot needs `--model`. The `DABBLER_` keys in the environment reach the
+window, so the reviewers can be reached; `HOME` is the real one, so the CLIs
+find their logins. Which actions a person had to take is `walk.jsonl` filtered
+to `"actor":"operator"`; which commands the AI ran is the engine's own log,
+which the walk copies beside `walk.jsonl` when it ends or stops on an error,
+under a name carrying the attempt's start time. A rerun under the same `--run`
+keeps the previous log as `walk-attempt<N>.jsonl` rather than adding to it, and
+the previous engine log under its own name.
+
+Copilot's screen cannot be read, so an Enter the walk presses on it is logged
+as answering either Copilot's folder-trust prompt or the sentence Start typed,
+with a screenshot taken just before it. Tell them apart from the records: an
+Enter that submitted the sentence is followed within a second by a
+`user.message` in Copilot's session events, and one that answered the trust
+prompt is followed by nothing. Or answer the trust prompt once for the scratch
+folder before the walk, and there is only one kind.
 
 ## What to know first
 

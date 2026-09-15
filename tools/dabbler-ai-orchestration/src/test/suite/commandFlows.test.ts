@@ -463,6 +463,7 @@ interface FakeTerminal {
     cwd: string;
     shellPath: string;
     shellArgs: string[];
+    env?: Record<string, string>;
     location?: { parentTerminal?: unknown };
     pty?: unknown;
   };
@@ -591,6 +592,8 @@ suite("Start opens the person's own CLI", () => {
     assert.deepStrictEqual(terminals[0].options.shellArgs, [
       CLI, "session", "run", "--mailbox", "--sessions-dir", "docs/sessions",
     ]);
+    // The program is the editor's executable, which runs as node only when told to.
+    assert.strictEqual(terminals[0].options.env?.ELECTRON_RUN_AS_NODE, "1");
     const cli = terminals[1];
     assert.strictEqual(cli.options.shellPath, "claude");
     assert.strictEqual(cli.options.cwd, repository.root);

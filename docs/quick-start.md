@@ -70,8 +70,8 @@ The variable is still *read*, so a deliberate override typed into a shell
 still works and the answer says which layer decided.
 
 Into a project with no session plan yet, it also scaffolds the two setup
-sessions into `docs/sessions/session-plan.md`. Tell your AI agent to
-**"start the next session"**: session 1 authors (or imports)
+sessions into `docs/sessions/session-plan.md`. Choose
+**Start Session** on the repository's row in the Work Explorer: session 1 authors (or imports)
 `project-plan.md` under `docs/planning/` through the normal tracked pipeline
 (register → work → cross-provider verification → close), and session 2
 breaks that plan into the numbered sessions the rest of the repository

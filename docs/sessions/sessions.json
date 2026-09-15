@@ -3445,9 +3445,9 @@
     {
       "number": 174,
       "title": "What planning asks, and when a session releases",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-14T19:59:03.546000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-14T20:41:51.745000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

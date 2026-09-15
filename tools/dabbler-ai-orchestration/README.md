@@ -66,11 +66,12 @@ releases unless its plan holds it. It is `dabbler.release` in
 Verification needs reach to at least two provider families — two of the
 three keys, or one seat that exposes two families.
 
-**5. The framework runs the session; you do the work.** One command,
-`dabbler session next`, judges whatever answer is outstanding, advances
-the session and prints the next instruction. Your AI does what the
-instruction says, runs the command it names, and calls `next` again until
-it says `done`. Registration, the plan, each step's own checks, the
+**5. The framework runs the session; you do the work.** Start Session
+registers the session and starts the framework's loop, which judges each
+answer, advances the session and writes the next instruction. Your AI
+keeps `dabbler session wait` running in the background — so its chat stays
+free for you — does what each instruction says, answers with the command
+it names, and runs the waiter again until it says `done`. Registration, the plan, each step's own checks, the
 cross-provider round and its remediation, the complete test suite as the
 run of record, the commit, the push and the close are all the framework's
 — not a checklist anyone has to remember.

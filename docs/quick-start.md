@@ -72,7 +72,7 @@ still works and the answer says which layer decided.
 Into a project with no session plan yet, it also scaffolds the two setup
 sessions into `docs/sessions/session-plan.md`. Tell your AI agent to
 **"start the next session"**: session 1 authors (or imports)
-`docs/planning/project-plan.md` through the normal tracked pipeline
+`project-plan.md` under `docs/planning/` through the normal tracked pipeline
 (register → work → cross-provider verification → close), and session 2
 breaks that plan into the numbered sessions the rest of the repository
 runs. Do not hand-author `sessions.json` — the first session start creates
@@ -120,19 +120,23 @@ ahead.
 
 ## 2b. Run it — the whole session, one command
 
+In VS Code, **Start Session** does 2 and 2b together. From a terminal:
+
 ```
-dabbler session run
+dabbler session run --mailbox
 ```
 
-Identity comes from the record: the registered engine is invoked per
-instruction until the session says done, waits are slept out by their own
-retry times, and an engine the framework cannot invoke non-interactively
-degrades to watcher-only — the command waits and names what is owed and
-by which clock. Your whole vocabulary is **start, run, interact, cancel**:
-`dabbler session interrupt --reason "..."` talks to a running session, and
-`dabbler session cancel` is the way out. Everything else — instructions,
-reports, the `session next` protocol — is the machinery's conversation
-with the engine, not yours; you never type it.
+The framework's loop drives the session: it writes each instruction, sleeps
+out its own long work, and judges each answer as it arrives. Your AI, in
+its own chat, keeps `dabbler session wait` running in the background, does
+what each printed instruction says, answers with its `answer_command`, and
+runs the waiter again until it prints `done` — so the chat stays free for
+you the whole time. Without `--mailbox`, `session run` invokes the
+registered engine per instruction itself. Your whole vocabulary is
+**start, run, interact, cancel**: `dabbler session interrupt --reason
+"..."` talks to a running session, and `dabbler session cancel` is the way
+out. Everything else — instructions, reports, the waiter — is the
+machinery's conversation with the engine, not yours; you never type it.
 
 ## 3. Work the steps
 
@@ -153,7 +157,7 @@ exist yet, never one an engine forgot to tick.
 ### Executing an approved plan, one step at a time
 
 When the session's work is pre-registered as an approved plan
-(`.dabbler/runs/s<N>/approved-plan.json`), the steps are executed
+(`approved-plan.json` under `.dabbler/runs/s<N>/`), the steps are executed
 through the framework rather than freehand. One step is in flight at a
 time:
 
@@ -216,7 +220,7 @@ dabbler verify
   resolves on a different provider than the orchestrator, on either
   transport; one retry excludes a failed provider.
 - Each round appends one row to
-  `.dabbler/runs/s<N>/rounds.jsonl` — machine-written only, never
+  `rounds.jsonl` under `.dabbler/runs/s<N>/` — machine-written only, never
   edit it — with the raw reviewer output saved alongside.
 - On blocking findings (`critical`/`major`): remediate, then re-run the
   same command. The loop suspends at the round cap

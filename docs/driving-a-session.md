@@ -24,22 +24,40 @@ its own checks), verify with a different provider, run the whole suite,
 commit and push, close. Following that list in prose is what an engine is
 worst at — it wanders, and a less capable engine wanders further.
 
-So the framework owns the list, and the engine asks it what to do next:
+So the framework owns the list, and drives it. **Start Session** registers
+the session and starts the framework's loop in a terminal of its own:
 
 ```
-dabbler session next --sessions-dir docs/sessions
+dabbler session run --mailbox --sessions-dir docs/sessions
 ```
 
-One call, one move. It judges whatever answer is outstanding, advances the
-session by one step, and prints the next instruction on stdout. You do
-what the instruction says, run the command it names, and call `next`
-again — until it says `done`.
+The loop judges whatever answer is outstanding, advances the session, runs
+every check, review and job itself, and writes the next instruction. The
+engine answers from its own chat, with one command kept in the background:
 
-**The engine stays in its own CLI.** Nothing spawns Claude Code or Gemini
-CLI or a Copilot seat; you are already talking to one, in the terminal you
-like, with your own context, your own scrollback and your own interrupt
-key. The whole instruction an engine needs is one sentence: *call `dabbler
-session next` and do what it says until it says `done`.*
+```
+dabbler session wait --sessions-dir docs/sessions
+```
+
+It prints the instruction owed an answer and exits, consuming nothing. The
+engine does what the instruction says, runs the command it names, and
+starts the waiter again — until it prints `done`. Nobody calls anything to
+move the session on: that is the loop's.
+
+**The engine stays in its own CLI.** Nothing spawns Claude Code or a
+Copilot seat; you are already talking to one, in the terminal you like,
+with your own context, your own scrollback and your own interrupt key —
+and because the waiter runs in the background, the chat stays yours to
+type into while the session runs. The whole instruction an engine needs is
+the sentence Start gives it: *run `dabbler session wait --sessions-dir
+docs/sessions` as a background command; each time it prints an
+instruction, do what its `ask` says and answer with its `answer_command`,
+then run the waiter in the background again; stop when it prints `done`.*
+
+The walks quoted below were printed under the earlier pull, where the
+engine called `session next` itself. The instructions, the reports and the
+framework's lines are the same under the loop; what differs is who moves
+the session on, and that a `wait` never reaches the engine.
 
 ## Before the first call
 
@@ -50,24 +68,23 @@ session next` and do what it says until it says `done`.*
   `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY` or
   `DABBLER_GEMINI_API_KEY` — for a provider *other* than the engine's.
   Verification is cross-provider and there is no way to skip it.
-- `session start` registers the session, and it is the one call that
-  carries who is working:
+- **Start Session** registers the session before it opens anything, and
+  registration is the one call that carries who is working. Outside VS
+  Code it is typed:
 
   ```
   dabbler session start --sessions-dir docs/sessions \
       --engine claude-code --provider anthropic
   ```
 
-  `next` never registers. Every `next` carries no identity — the session
-  is in flight and its identity is on the record — and a `next` that names
-  an engine with nothing in flight is refused rather than starting work
-  nobody asked for. With nothing in flight, `next` answers `done`.
+  and the loop is started beside it with `dabbler session run --mailbox
+  --sessions-dir docs/sessions`. A registration the router refuses opens
+  nothing, and says why.
 
-- `--transport`, if you want it, goes on the first `next`. It is the
-  *run's*, not the call's: the call that eventually starts verification is
-  whichever `next` happens to reach that phase, following an
-  `answer_command` that names it, so it is kept on `run.json` and used when
-  the round is finally started. Naming it again on a later call changes it.
+- The vehicle a review goes through is decided by configuration, not typed
+  on a driving call: `dabbler configure --transport <vehicle>` sets this
+  checkout's, and `dabbler configuration explain` says which layer decided
+  it.
 
 - **The round cap is not typeable on a driving call.** It is
   `verification.settings.max_rounds` in the configuration, and `next` and
@@ -119,16 +136,16 @@ dabbler [11:31:20] instruction-issued seq=1 kind=step step=plan
 }
 ```
 
-Four kinds under the pull, and no fifth — the same four the managed
-body names. A fifth, `interrupt`, exists only under `session drive`, where
-the framework is the one running the engine; a `next` never sends it.
+Three kinds reach the engine under the loop, and no fourth — the same
+three the managed body names. A `wait` is the loop's own: it sleeps out the
+framework's long work itself and never hands it to the engine. An
+`interrupt` exists only under `session drive`, where the framework is the
+one running the engine.
 
 | `kind` | what it means | what you do |
 | --- | --- | --- |
-| `step` | work to do — the plan, or one step of it | do it, run `answer_command`, call `next` |
+| `step` | work to do — the plan, or one step of it | do it, run `answer_command`, start the waiter again |
 | `rejection` | your last answer was refused; `reasons` says why | put them right, answer again with **this** seq |
-| `wait` | the framework is running something long | leave it `retry_after_seconds`, call `next` |
-| `interrupt` | your invocation was ended; the reason is in `reasons`. Only `session drive` sends this — a `next` never does, because nothing but you is running your engine | read it, then answer what was still owed |
 | `done` | the session is closed | stop |
 
 `answer_command` is always literal and always right: run it as printed,
@@ -165,7 +182,10 @@ dabbler [11:31:22] instruction-issued seq=2 kind=step step=widget
 ```
 
 Every step's instruction repeats the plan's non-goals under its ask. A step
-is answered with the files you actually changed:
+is answered with its status and a line of notes. `--files` may be left
+out, and the framework takes the step's files from what changed since the
+last accepted step, less what it wrote itself; named, they are exactly the
+files you changed:
 
 ```
 dabbler session report --sessions-dir docs/sessions --seq 3 --step widget \
@@ -229,9 +249,9 @@ to say what went wrong.
 
 Answer it with the new seq. **Three refusals of one step stop the
 session** (`rejected-thrice`) — the last reasons are on the run state.
-Calling `next` again resumes it, and does not simply judge the failed
-answer a fourth time: that answer is left behind, the count starts over,
-and the step is asked afresh under a new seq. A person deciding to carry
+Resuming it — **Resume Session**, which starts the loop again — does not
+simply judge the failed answer a fourth time: that answer is left behind,
+the count starts over, and the step is asked afresh under a new seq. A person deciding to carry
 on is the intervention the bound exists to force. If a step genuinely
 cannot be done, say so instead: `--status blocked` with the reason in
 `--notes`.
@@ -302,8 +322,10 @@ suites as the run of record — whole, or `final-targeted` where a whole run
 costs more than a session should spend, with the whole suite before a
 release — and the Primary Reviewer reviews without writing or running one.)
 None
-of them runs inside a `next` call. The framework starts each one detached
-and comes straight back:
+of them blocks an answer. The framework starts each one detached, and its
+loop sleeps the wait out itself while the engine's waiter keeps waiting for
+the next step. Under the bare pull, where an engine calls `next`, the wait
+was handed to the engine instead, and this is what it looked like:
 
 ```
 dabbler [11:31:30] phase phase=preverify
@@ -322,9 +344,8 @@ dabbler [11:31:30] instruction-issued seq=4 kind=wait reasons=1
 }
 ```
 
-Nothing is owed here. Do something else for `retry_after_seconds`, read
-`log` if you want to watch, and call `next` again; the call after it
-reports progress or collects the result:
+Nothing was owed there but a later look, and the look after the job
+finished reported progress and collected the result:
 
 ```
 dabbler [11:32:05] job-finished name=verification exit=0 log=.dabbler/runs/s1/driver/jobs/verification.log
@@ -341,37 +362,43 @@ widget ok
 recorded unit [final-full]: passed in 1s (timed here)
 ```
 
-`retry_after_seconds` is advice, not a floor. The driver judges the job's
-real state on every call, so a `next` made before the number is up is
-answered with progress if the job has finished and with another `wait` if
-it has not — never refused. The number is honest where it can be: a
-run-of-record wait names a quarter over the suite's last recorded
-duration (floor ten seconds, ceiling sixty), and a verification wait names
-sixty. What may be watched, if you must watch something, is the job's
-own status file beside its log (`<job>.status.json`), which the job
-writes at its exit; `run.json` is the driver's state, and only the `next`
-you have not called yet moves it.
+`retry_after_seconds` is advice, not a floor: the driver judges the job's
+real state on every look, and a look before the number is up is answered
+with progress if the job has finished and with another `wait` if it has
+not. The number is honest where it can be: a run-of-record wait names a
+quarter over the suite's last recorded duration (floor ten seconds,
+ceiling sixty), and a verification wait names sixty. Nothing needs
+watching: `run.json` is the driver's state and only the driver moves it,
+and the job writes its own status file beside its log
+(`<job>.status.json`) at its exit.
 
-**A `wait` is a tool call, not a sleep,** and that is the point of it. An
-engine that blocks for four minutes waiting on a verification round hits
-whatever timeout its harness puts on a command, and the harness kills the
-call rather than the work — this is exactly how the driver spike died. A
-`wait` gives the engine its turn back and lets it come to the framework
-when it is ready.
+**A `wait` is never the engine's to hold.** An engine that blocks for four
+minutes waiting on a verification round hits whatever timeout its harness
+puts on a command, and the harness kills the call rather than the work —
+this is exactly how the driver spike died. The loop holds every wait, and
+the engine's waiter is a background command that leaves its turn free.
 
 Nothing holds the engine's turn for it: there is no hook. What tells a
 person that nothing is answering an instruction is the Dabbler terminal's
 silence watcher — a line once the engine has been quiet over an unmoved
 tree for longer than the threshold, and again at each multiple of it — and
-the Work Explorer's attention row. A `wait` is the one instruction that
-asks the engine to carry an obligation across the end of its turn, and one
-session lost three hours to an engine that answered it by polling
-`run.json` for a field only `next` clears; the answer to that is the
-engine's own bounded loop and a person who can see the silence, not a hook
-that blocks every end of turn in the repository. (`session start` for a
+the Work Explorer's attention row. One session lost three hours to an
+engine that answered a `wait` by polling `run.json` for a field only the
+driver clears; the answer to that is a loop that owns the waits and a
+person who can see the silence, not a hook that blocks every end of turn
+in the repository. (`session start` for a
 `claude-code` registration, and `bootstrap` under Claude Code, remove the
 Stop hook an earlier framework installed: a hook whose verb no longer
 exists would block every turn.)
+
+**Under the loop, the silence is the loop's to notice.** Once an
+instruction has waited past the threshold, and again at each multiple of
+it, the loop records `instruction-overdue` in the session's
+`supervision.jsonl`. The Dabbler terminal says it once and raises one VS
+Code warning, which suggests asking the AI whether its waiter is still
+running — the usual cause, and one the AI can put right itself. Nothing is
+typed into the AI's chat on your behalf: a typed nudge would be logged as
+your words.
 
 ## Talking to the engine, and stopping the framework
 
@@ -432,7 +459,7 @@ would never be read and "Sent" would be a promise the framework broke.
 
 A stop closes nothing and loses nothing. The phase, the accepted steps,
 the tree the next report is measured against and any job still running are
-on `.dabbler/runs/s<N>/driver/run.json`, and `stop` says in words which
+on `run.json` under `.dabbler/runs/s<N>/driver/`, and `stop` says in words which
 bound was met. **The same call resumes** — there is no separate resume
 verb, and no flag to remember:
 
@@ -478,7 +505,7 @@ There are four places and they are all files:
 dabbler status --sessions-dir docs/sessions
 ```
 
-`status` says where the session is. `.dabbler/runs/s<N>/driver/run.json`
+`status` says where the session is. `run.json` under `.dabbler/runs/s<N>/driver/`
 carries the `stop` — its `kind`, its `reason` in words, and the step it was
 on. A run written before 2.9.0 may also carry a `class`; nothing reads it. The outstanding `instruction.json` carries `reasons` when
 the last answer was refused, each one opening with the rule that refused
@@ -550,7 +577,7 @@ buy the review it refused:
 dabbler verify reopen --rounds 1 --reason "<why>"
 ```
 
-That records a grant in `.dabbler/runs/s<N>/verification-reopens.jsonl` and
+That records a grant in `verification-reopens.jsonl` under `.dabbler/runs/s<N>/` and
 reopens the loop. Read what it is carefully, because it is easy to mistake
 for the waiver this framework does not have:
 
@@ -609,24 +636,29 @@ run the session for you, and it never stands between you and your engine.
 
 ### What Start opens
 
-**Start Session** on a repository row asks which engine, then opens a VS
-Code terminal at the repository root running *that engine's own CLI*,
-interactively. Where the CLI takes an opening prompt in its arguments the
-sentence is already there; where it does not, the sentence is typed at the
-prompt for you to press Enter on. From the walk, the two engines whose
-CLIs were measured:
+**Start Session** on a repository row asks which engine, registers the
+session, and only then opens terminals at the repository root: *Framework
+loop*, running the bundled router's `session run --mailbox`; *that engine's
+own CLI*, interactively; and the Dabbler terminal beside the CLI. Where the
+CLI takes an opening prompt in its arguments the sentence is already there;
+where it does not, the sentence is typed at the prompt for you to press
+Enter on. For the two engines whose CLIs were measured:
 
 ```
+TERMINAL Framework loop
+  command:  node <extension>/dist/dabbler.cjs session run --mailbox --sessions-dir docs/sessions
+
 TERMINAL Claude Code
-  cwd:      C:\temp\s62-walk
-  command:  claude "Call `dabbler session next --sessions-dir docs/sessions --engine claude-code --provider anthropic` and do what it says until it says `done`."
+  command:  claude "Run `dabbler session wait --sessions-dir docs/sessions` as a background command, so this chat stays free. Each time it prints an instruction, do what its `ask` says and answer with its `answer_command`, then run the waiter in the background again. Stop when it prints `done`."
   typed:    (nothing; the sentence is in argv)
 
 TERMINAL GitHub Copilot
-  cwd:      C:\temp\s62-walk
-  command:  copilot
-  typed:    Call `dabbler session next --sessions-dir docs/sessions --engine copilot --provider openai --model gpt-5-6-luna` and do what it says until it says `done`.
+  command:  copilot --model gpt-5-6-luna
+  typed:    (the same sentence)
 ```
+
+The identity — engine, provider, model — is on the registration, and the
+sentence carries none of it.
 
 Claude Code takes a positional prompt and starts interactive by default.
 The Copilot CLI has no positional prompt — its `-p` is documented as
@@ -635,9 +667,11 @@ whose CLI has not been measured here is launched the same way, for a
 plainer reason: an argument a CLI does not take is a launch that fails in
 front of you, and a typed sentence costs one keypress instead.
 
-**What Start does not do.** It spawns no driver. It copies nothing to the
-clipboard and pastes nothing into a chat. After it opens the terminal, the
-session is yours: your scrollback, your chat, your Esc.
+**What Start does not do.** It spawns no engine. It copies nothing to the
+clipboard and pastes nothing into a chat beyond the opening sentence. A
+registration the router refuses opens nothing at all, and the error says
+why. After it opens the terminals, the chat is yours: your scrollback,
+your Esc, and a waiter in the background you can talk over.
 
 ### The Dabbler terminal
 

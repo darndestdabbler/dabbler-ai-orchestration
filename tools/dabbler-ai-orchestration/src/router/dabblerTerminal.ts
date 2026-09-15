@@ -147,6 +147,14 @@ const ROUNDS_FILENAME = "rounds.jsonl";
 const TEST_RUNS_FILENAME = "test-runs.jsonl";
 
 /**
+ * What the framework's own loop noticed while it waited, under the run's
+ * driver dir. The row read here is `instruction-overdue`: an instruction the
+ * AI has not answered past the threshold, which under the mailbox is most
+ * often a waiter the AI stopped running.
+ */
+const SUPERVISION_FILENAME = "supervision.jsonl";
+
+/**
  * A verdict's tone.
  *
  * `VERIFIED` is the only clean one and it is the only green one. Everything
@@ -188,6 +196,7 @@ export function lineTone(event: string, fields: Record<string, string> = {}): To
   // has been quiet over an unmoved tree. `warn` is the amber the indicator
   // already spins in, which is exactly the weight it should carry.
   if (event === "watcher") return "warn";
+  if (event === "instruction-overdue") return "warn";
   if (event === "verify") return verdictTone(fields["verdict"] ?? "");
   if (event === "tests") return (fields["outcome"] ?? "") === "passed" ? "good" : "bad";
   // Every phase, and not a chosen eight. A list of the interesting ones put
@@ -328,6 +337,8 @@ export interface DabblerTerminalOptions {
    * test drives `tick` directly rather than waiting on either.
    */
   readonly spinMs?: number;
+  /** How a warning reaches the operator outside this terminal; a VS Code notification by default. */
+  readonly warn?: (message: string) => void;
 }
 
 /** `#3874db` as the three numbers an SGR truecolour sequence takes. */
@@ -1042,6 +1053,8 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    */
   private readonly recordLines = new Map<string, number>();
 
+  private readonly warn: (message: string) => void;
+
   constructor(options: DabblerTerminalOptions) {
     this.repoRoot = options.repoRoot;
     this.now = options.now ?? (() => new Date());
@@ -1052,6 +1065,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
         vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.HighContrastLight
           ? "light"
           : "dark");
+    this.warn = options.warn ?? ((message) => void vscode.window.showWarningMessage(message));
     this.pollMs = options.pollMs ?? 500;
     this.spinMs = options.spinMs ?? 120;
     this.resizeMs = options.resizeMs ?? 150;
@@ -1439,6 +1453,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     const runDir = path.dirname(path.dirname(runPath));
     this.drainRounds(path.join(runDir, ROUNDS_FILENAME));
     this.drainTestRuns(path.join(this.repoRoot, RUNS_REL, TEST_RUNS_FILENAME));
+    this.drainOverdue(path.join(path.dirname(runPath), SUPERVISION_FILENAME), run);
 
     if (collected !== null) {
       // What it exited with is the record's to say, not this terminal's to
@@ -1694,6 +1709,31 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   /** This session's verification rounds, each said once, as they land. */
   private drainRounds(file: string): void {
     for (const row of this.newRows(file, true)) this.line("verify", roundFields(row));
+  }
+
+  /**
+   * Each `instruction-overdue` the loop recorded since the last look, said
+   * once here and once as a notification -- the operator may be in the AI's
+   * chat, not in this terminal. An event for an instruction the run has
+   * since moved past is history and says nothing.
+   */
+  private drainOverdue(file: string, run: RunRecord): void {
+    for (const row of this.newRows(file, true)) {
+      if (row["event"] !== "instruction-overdue" || row["seq"] !== run.seq) continue;
+      const seq = String(row["seq"]);
+      const step = typeof row["step"] === "string" ? row["step"] : "?";
+      const seconds = Number(row["outstanding_seconds"] ?? 0);
+      this.line("instruction-overdue", {
+        step,
+        seq,
+        outstanding: `${seconds}s`,
+        waiter: "may not be running",
+      });
+      this.warn(
+        `Dabbler: step ${step} (instruction ${seq}) has waited ${Math.floor(seconds / 60)} min with no answer. ` +
+          "The AI's waiter may not be running -- ask the AI in its chat whether `dabbler session wait` is still running.",
+      );
+    }
   }
 
   /** Test runs as they are recorded; the first look already said this session's. */

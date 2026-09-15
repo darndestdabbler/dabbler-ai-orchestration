@@ -243,44 +243,44 @@ you what to do next, one move at a time, and you do that and ask again.
 Sessions are numbered directly in this repository, under one sessions root
 (`docs/sessions/`), so no command takes a handle to one.
 
-    dabbler session next --sessions-dir docs/sessions
+**Start Session registers the session and starts the framework's loop**,
+`dabbler session run --mailbox`, in a terminal of its own. The loop drives
+the session: it judges each answer, advances the session, and writes the
+next instruction for you. Your part is one loop, kept in the background so
+this chat stays free for the operator:
 
-One call, one move: it judges whatever answer is outstanding, advances the
-session, and prints the next instruction as JSON on stdout. Do what the
-instruction says, run the command it names as `answer_command` — running
-it is the answer — and call `next` again, until it says `done`. That is
-the whole loop, and there is nothing to remember between calls: the
-framework holds the state.
+    dabbler session wait --sessions-dir docs/sessions
 
-**`start` registers the session; `next` never does.** Registering is a
-separate verb, and it is the one that carries who is working:
+Run it as a background command. It prints the instruction owed an answer,
+as JSON, and exits; it consumes nothing, so running it again prints the
+same instruction until it is answered. Do what the instruction's `ask`
+says, run its `answer_command` — running it is the answer — and start the
+waiter again in the background, until it prints `done`. There is nothing
+to remember between instructions: the framework holds the state.
 
-    dabbler session start --sessions-dir docs/sessions \
-        --engine <claude-code|gemini|copilot> --provider <anthropic|openai|google>
+The operator can talk to you while the waiter runs: answer them, and leave
+the waiter running. When an instruction has waited past its threshold the
+operator is told, and may ask whether your waiter is running — check, and
+start it again if it is not.
 
-A Copilot seat adds `--model`. **Every `next` call carries none of them**
-— the session is in flight and its identity is on the record, and a
-`next` that names an identity with nothing in flight is refused rather
-than starting work nobody asked for.
-
-`next` with nothing in flight answers `done`. That is the honest end of
-the loop, not an error: it means there is no session to advance.
+Outside VS Code the operator types the two starts: `dabbler session start
+--sessions-dir docs/sessions --engine <engine> --provider <provider>` (a
+Copilot seat adds `--model`), then `dabbler session run --mailbox
+--sessions-dir docs/sessions` in a terminal of its own.
 
 ## What comes back
 
-Four kinds of instruction, and no fifth:
+Three kinds of instruction, and no fourth:
 
 - **`step`** — work to do. Its `ask` says what; do it, then report with
-  the `answer_command`, naming every file you changed and nothing else.
+  the `answer_command`. `--files` may be left out, and the framework takes
+  the step's files from what changed; named, it lists every file you
+  changed and nothing else.
 - **`rejection`** — the answer was refused, and `reasons` says why. Fix
   it and answer again; three refusals of one step stop the session.
-- **`wait`** — the framework is running something that outlasts a tool
-  call. Nothing is owed but another `next`, after the seconds
-  `retry_after_seconds` names; `log` is where the work is being written.
-  It is a call you make later, never a sleep you hold.
 - **`done`** — the session is over and closed. Stop.
 
-Everything the framework now does for itself happens inside those calls:
+Everything the framework does for itself happens between instructions:
 declaring the work, each step's own checks, cross-provider verification
 and its remediation rounds, the suites as the run of record, the commit,
 the push, and the close. The tests that run are each step's own checks and
@@ -296,9 +296,8 @@ its tests updated or confirmed, and a removed one takes its tests with it.
 
 **The framework owns the clock, the state and the sequencing.** An
 instruction that names a command is answered by running that command —
-never by waiting on a condition that your own next call is what causes.
-A `wait` answered by watching `run.json` for its job to clear waits
-forever: only the `next` you did not call clears it.
+never by watching `run.json` or any other record for what the framework
+will do next. The waiter is the one thing you wait on.
 
 **A session's release follows `dabbler.release`**, and the framework
 publishes between the push and the close for itself. On request, the
@@ -350,12 +349,12 @@ corrupted on the way to disk. Nothing fails — the file is written, and
 it is wrong. The same goes for `echo` and for `printf` with a format
 string you did not escape twice.
 
-**Nothing may touch the working tree between a report and the `next`
-that judges it.** The framework hashes the tree before and after a
-step's checks, and an edit made while one is running refuses the report
-— correctly, because a check run against a tree that moved under it
-proves nothing about either version. Finish the step, report it, and
-wait for the answer before starting the next one.
+**Nothing may touch the working tree between a report and the
+instruction that follows it.** The framework hashes the tree before and
+after a step's checks, and an edit made while one is running refuses the
+report — correctly, because a check run against a tree that moved under
+it proves nothing about either version. Finish the step, report it, and
+wait for the next instruction before starting the next step.
 
 ---
 

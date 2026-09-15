@@ -38,7 +38,7 @@ import { makeTempDir, rmrf } from "./helpers";
 const ESC = "\u001b";
 
 /** A repository with one driven run, and the writes the pty received. */
-function drivenRepo(run: Record<string, unknown>): {
+function drivenRepo(run: Record<string, unknown>, warned: string[] = []): {
   root: string;
   driver: string;
   written: string[];
@@ -54,6 +54,7 @@ function drivenRepo(run: Record<string, unknown>): {
     now: () => new Date(2026, 7, 31, 14, 30, 5),
     // The interval is not the behaviour; every test drives `poll` itself.
     pollMs: 60_000,
+    warn: (message) => warned.push(message),
   });
   terminal.onDidWrite((text: string) => written.push(text));
   return { root, driver, written, terminal };
@@ -1524,6 +1525,35 @@ suite("the watcher", () => {
 
     terminal.dispose();
     clearConfig();
+    rmrf(root);
+  });
+
+  test("says the loop's overdue event once, in the terminal and as a notification, and not again", () => {
+    const warned: string[] = [];
+    const { root, driver, written, terminal } = drivenRepo(WAITING, warned);
+    const overdue = (at: string) =>
+      JSON.stringify({ at, event: "instruction-overdue", seq: 4, step: "widget", outstanding_seconds: 1860, tree_quiet: true }) + "\n";
+    fs.writeFileSync(path.join(driver, "supervision.jsonl"), overdue(ISSUED), "utf8");
+
+    terminal.poll();
+    const said = written.filter((t) => plain(t).includes("instruction-overdue"));
+    assert.strictEqual(said.length, 1);
+    assert.ok(plain(said[0]).includes("step=widget seq=4 outstanding=1860s waiter=may not be running"));
+    assert.strictEqual(warned.length, 1);
+    assert.match(warned[0], /step widget .*31 min.*session wait/);
+
+    written.length = 0;
+    terminal.poll();
+    assert.deepStrictEqual(written.filter((t) => plain(t).includes("instruction-overdue")), []);
+    assert.strictEqual(warned.length, 1);
+
+    // Two events unread at one look are two events, each said.
+    fs.appendFileSync(path.join(driver, "supervision.jsonl"), overdue(ISSUED) + overdue(ISSUED), "utf8");
+    terminal.poll();
+    assert.strictEqual(written.filter((t) => plain(t).includes("instruction-overdue")).length, 2);
+    assert.strictEqual(warned.length, 3);
+
+    terminal.dispose();
     rmrf(root);
   });
 

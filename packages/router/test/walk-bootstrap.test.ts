@@ -97,7 +97,7 @@ describe("a project on its first day", () => {
       assert.ok(readFileSync(join(repo, name), "utf8").includes(MANAGED_START), name);
     }
     const agents = readFileSync(join(repo, "AGENTS.md"), "utf8");
-    assert.match(agents, /dabbler session next/);
+    assert.match(agents, /dabbler session wait/);
     for (const name of ["CLAUDE.md", "GEMINI.md"]) {
       assert.match(readFileSync(join(repo, name), "utf8"), /@AGENTS\.md/);
     }

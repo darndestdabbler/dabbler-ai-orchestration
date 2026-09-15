@@ -196,11 +196,11 @@ describe("the instruction files", () => {
     writeInstructionFiles(project, "acme-app");
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
     assert.match(agents, /`acme-app`/);
-    assert.match(agents, /dabbler session next/);
+    assert.match(agents, /dabbler session wait/);
     for (const name of ["CLAUDE.md", "GEMINI.md"]) {
       const text = readFileSync(join(project, name), "utf8");
       assert.match(text, /@AGENTS\.md/);
-      assert.ok(!text.includes("dabbler session next"));
+      assert.ok(!text.includes("dabbler session wait"));
     }
   });
 
@@ -211,7 +211,7 @@ describe("the instruction files", () => {
     const project = tempDir("bootstrap-");
     writeInstructionFiles(project, "acme-app");
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
-    assert.match(agents, /dabbler session next/);
+    assert.match(agents, /dabbler session wait/);
     for (const verb of [
       "session declare",
       "dabbler affected",
@@ -261,13 +261,13 @@ describe("the instruction files", () => {
     // field -- which only `next` clears, so the callback was its own
     // precondition and a finished verification sat uncollected for three
     // hours. The sentence ruled out a sleep and left a mechanism open; the
-    // rule now names the mechanism. Asserted by meaning, not by wording.
+    // rule now names the mechanism, and the one thing that may be waited on.
     const project = tempDir("bootstrap-");
     writeInstructionFiles(project, "acme-app");
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8").toLowerCase();
     assert.match(agents, /owns the clock/);
-    assert.match(agents, /your own next call/);
-    assert.match(agents, /waits\s+forever/);
+    assert.match(agents, /never by watching `run\.json`/);
+    assert.match(agents, /the waiter is the one thing you wait on/);
   });
 
   it("gives each engine its own tail", () => {

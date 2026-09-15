@@ -57,44 +57,44 @@ export const SHARED_BODY =
   "Sessions are numbered directly in this repository, under one sessions root\n" +
   "(`docs/sessions/`), so no command takes a handle to one.\n" +
   "\n" +
-  "    dabbler session next --sessions-dir docs/sessions\n" +
+  "**Start Session registers the session and starts the framework's loop**,\n" +
+  "`dabbler session run --mailbox`, in a terminal of its own. The loop drives\n" +
+  "the session: it judges each answer, advances the session, and writes the\n" +
+  "next instruction for you. Your part is one loop, kept in the background so\n" +
+  "this chat stays free for the operator:\n" +
   "\n" +
-  "One call, one move: it judges whatever answer is outstanding, advances the\n" +
-  "session, and prints the next instruction as JSON on stdout. Do what the\n" +
-  "instruction says, run the command it names as `answer_command` — running\n" +
-  "it is the answer — and call `next` again, until it says `done`. That is\n" +
-  "the whole loop, and there is nothing to remember between calls: the\n" +
-  "framework holds the state.\n" +
+  "    dabbler session wait --sessions-dir docs/sessions\n" +
   "\n" +
-  "**`start` registers the session; `next` never does.** Registering is a\n" +
-  "separate verb, and it is the one that carries who is working:\n" +
+  "Run it as a background command. It prints the instruction owed an answer,\n" +
+  "as JSON, and exits; it consumes nothing, so running it again prints the\n" +
+  "same instruction until it is answered. Do what the instruction's `ask`\n" +
+  "says, run its `answer_command` — running it is the answer — and start the\n" +
+  "waiter again in the background, until it prints `done`. There is nothing\n" +
+  "to remember between instructions: the framework holds the state.\n" +
   "\n" +
-  "    dabbler session start --sessions-dir docs/sessions \\\n" +
-  "        --engine <claude-code|gemini|copilot> --provider <anthropic|openai|google>\n" +
+  "The operator can talk to you while the waiter runs: answer them, and leave\n" +
+  "the waiter running. When an instruction has waited past its threshold the\n" +
+  "operator is told, and may ask whether your waiter is running — check, and\n" +
+  "start it again if it is not.\n" +
   "\n" +
-  "A Copilot seat adds `--model`. **Every `next` call carries none of them**\n" +
-  "— the session is in flight and its identity is on the record, and a\n" +
-  "`next` that names an identity with nothing in flight is refused rather\n" +
-  "than starting work nobody asked for.\n" +
-  "\n" +
-  "`next` with nothing in flight answers `done`. That is the honest end of\n" +
-  "the loop, not an error: it means there is no session to advance.\n" +
+  "Outside VS Code the operator types the two starts: `dabbler session start\n" +
+  "--sessions-dir docs/sessions --engine <engine> --provider <provider>` (a\n" +
+  "Copilot seat adds `--model`), then `dabbler session run --mailbox\n" +
+  "--sessions-dir docs/sessions` in a terminal of its own.\n" +
   "\n" +
   "## What comes back\n" +
   "\n" +
-  "Four kinds of instruction, and no fifth:\n" +
+  "Three kinds of instruction, and no fourth:\n" +
   "\n" +
   "- **`step`** — work to do. Its `ask` says what; do it, then report with\n" +
-  "  the `answer_command`, naming every file you changed and nothing else.\n" +
+  "  the `answer_command`. `--files` may be left out, and the framework takes\n" +
+  "  the step's files from what changed; named, it lists every file you\n" +
+  "  changed and nothing else.\n" +
   "- **`rejection`** — the answer was refused, and `reasons` says why. Fix\n" +
   "  it and answer again; three refusals of one step stop the session.\n" +
-  "- **`wait`** — the framework is running something that outlasts a tool\n" +
-  "  call. Nothing is owed but another `next`, after the seconds\n" +
-  "  `retry_after_seconds` names; `log` is where the work is being written.\n" +
-  "  It is a call you make later, never a sleep you hold.\n" +
   "- **`done`** — the session is over and closed. Stop.\n" +
   "\n" +
-  "Everything the framework now does for itself happens inside those calls:\n" +
+  "Everything the framework does for itself happens between instructions:\n" +
   "declaring the work, each step's own checks, cross-provider verification\n" +
   "and its remediation rounds, the suites as the run of record, the commit,\n" +
   "the push, and the close. The tests that run are each step's own checks and\n" +
@@ -110,9 +110,8 @@ export const SHARED_BODY =
   "\n" +
   "**The framework owns the clock, the state and the sequencing.** An\n" +
   "instruction that names a command is answered by running that command —\n" +
-  "never by waiting on a condition that your own next call is what causes.\n" +
-  "A `wait` answered by watching `run.json` for its job to clear waits\n" +
-  "forever: only the `next` you did not call clears it.\n" +
+  "never by watching `run.json` or any other record for what the framework\n" +
+  "will do next. The waiter is the one thing you wait on.\n" +
   "\n" +
   "**A session's release follows `dabbler.release`**, and the framework\n" +
   "publishes between the push and the close for itself. On request, the\n" +
@@ -164,12 +163,12 @@ export const SHARED_BODY =
   "it is wrong. The same goes for `echo` and for `printf` with a format\n" +
   "string you did not escape twice.\n" +
   "\n" +
-  "**Nothing may touch the working tree between a report and the `next`\n" +
-  "that judges it.** The framework hashes the tree before and after a\n" +
-  "step's checks, and an edit made while one is running refuses the report\n" +
-  "— correctly, because a check run against a tree that moved under it\n" +
-  "proves nothing about either version. Finish the step, report it, and\n" +
-  "wait for the answer before starting the next one.\n";
+  "**Nothing may touch the working tree between a report and the\n" +
+  "instruction that follows it.** The framework hashes the tree before and\n" +
+  "after a step's checks, and an edit made while one is running refuses the\n" +
+  "report — correctly, because a check run against a tree that moved under\n" +
+  "it proves nothing about either version. Finish the step, report it, and\n" +
+  "wait for the next instruction before starting the next step.\n";
 
 /**
  * Claude Code reads `CLAUDE.md` only.

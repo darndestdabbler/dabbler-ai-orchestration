@@ -1,11 +1,13 @@
 // Start, Stop, Send, Close -- the engine stays in the person's own CLI.
 //
-// Start opens a terminal running the engine's own CLI, interactively, at
-// the repository root, and gives it the one sentence a session needs: call
-// `dabbler session next` and do what it says until it says `done`. Nothing
-// is spawned on the person's behalf and nothing is pasted anywhere: they
-// keep their own spinner, their own scrollback, their own chat and their
-// own interrupt key, which is what the staff already trust.
+// Start registers the session, starts the framework's loop (`session run
+// --mailbox`), and opens a terminal running the engine's own CLI,
+// interactively, at the repository root, with the one sentence a session
+// needs: keep `dabbler session wait` running in the background and answer
+// what it prints. The framework drives; nothing deterministic is left for the
+// person or the AI to type, and nothing is pasted anywhere: they keep their
+// own spinner, their own scrollback, their own chat and their own interrupt
+// key, which is what the staff already trust.
 //
 // Beside it is the *Dabbler* terminal: what the framework is doing while
 // they type. Two terminals is the arrangement, not one -- Start shows
@@ -169,24 +171,68 @@ export interface EngineTerminal {
 /**
  * The whole instruction an engine needs, as the guide states it.
  *
- * The sessions root is repository-relative because the terminal opens at
- * the repository root; the identity flags are on it because the first call
- * is the one that registers, and a seat's `--model` with it because the
- * seat label is not trusted.
+ * Start has already registered the session and started the framework's loop,
+ * so the sentence carries no identity and asks for no `start` or `next`: both
+ * are deterministic and both are the framework's. The waiter runs in the
+ * background so the chat stays free for the person. The sessions root is
+ * repository-relative because the terminal opens at the repository root.
  */
-export function openingSentence(choice: EngineChoice, model: string): string {
-  const seat = choice.modelRequired && model.trim() !== "" ? ` --model ${model.trim()}` : "";
+export function openingSentence(): string {
   const dir = SESSIONS_REL.replace(/\\/g, "/");
-  // Two commands, and the identity is on the FIRST one only. One line
-  // carrying `--engine` on `next` is what an engine re-runs after `done`,
-  // and until session 90 that registered and started the next session
-  // unasked. `next` refuses it now; the sentence must not ask for it.
   return (
-    `Run \`dabbler session start --sessions-dir ${dir} ` +
-    `--engine ${choice.engine} --provider ${choice.provider}${seat}\` once, ` +
-    `then call \`dabbler session next --sessions-dir ${dir}\` ` +
-    "and do what it says until it says `done`."
+    `Run \`dabbler session wait --sessions-dir ${dir}\` as a background command, so this chat stays free. ` +
+    "Each time it prints an instruction, do what its `ask` says and answer with its `answer_command`, " +
+    "then run the waiter in the background again. Stop when it prints `done`."
   );
+}
+
+/** Registers a session through the bundled router and waits for it: its exit code and what it printed. */
+export type SessionRegistrar = (
+  root: string,
+  args: readonly string[],
+) => Promise<{ readonly code: number | null; readonly output: string }>;
+
+/** `dabbler session start` on the editor's own Node, waited for. */
+export function defaultSessionRegistrar(cli: string | null = resolveRouterCli()): SessionRegistrar {
+  return async (root, args) => {
+    if (cli === null) {
+      return { code: null, output: "The bundled `dabbler` command was not found beside the extension." };
+    }
+    const lines: string[] = [];
+    const handle = launchDriver({ execPath: process.execPath, cli, cwd: root, args }, (line) => lines.push(line));
+    return { code: await handle.exited, output: lines.join("\n") };
+  };
+}
+
+/** The `session start` arguments for a choice: the identity, recorded by the framework rather than typed by anyone. */
+export function startArguments(choice: EngineChoice, model: string): string[] {
+  const args = [
+    "session",
+    "start",
+    "--sessions-dir",
+    SESSIONS_REL.replace(/\\/g, "/"),
+    "--engine",
+    choice.engine,
+    "--provider",
+    choice.provider,
+  ];
+  if (model.trim() !== "") args.push("--model", model.trim());
+  return args;
+}
+
+/**
+ * The terminal the framework's loop runs in: it drives the session and waits
+ * on the AI's answers. Named for the repository, so one repository's loop is
+ * never taken for another's.
+ */
+export function loopTerminalFor(repository: SessionsRepository, cli: string): EngineTerminal {
+  return {
+    name: `Framework loop — ${repository.label}`,
+    cwd: repository.root,
+    program: process.execPath,
+    args: [cli, "session", "run", "--mailbox", "--sessions-dir", SESSIONS_REL.replace(/\\/g, "/")],
+    typed: null,
+  };
 }
 
 /**
@@ -305,7 +351,7 @@ export function engineTerminalFor(
   if (choice.modelRequired && model.trim() === "") {
     return `${choice.label} is a seat and needs a model; nothing was launched.`;
   }
-  const sentence = openingSentence(choice, model);
+  const sentence = openingSentence();
   // The value the operator chose, spelled as they chose it. NOT normalised:
   // `normalizeModelToken` drops the date suffix, and the date suffix is what
   // makes a pin a pin -- a launch that quietly generalised `claude-opus-5-
@@ -553,7 +599,10 @@ export function defaultSessionRunUi(
       return terminal;
     },
     showTerminalNamed: (names) => {
-      const open = (vscode.window.terminals ?? []).find((terminal) => names.includes(terminal.name));
+      // A terminal whose process has exited is not the loop or the CLI it is named for.
+      const open = (vscode.window.terminals ?? []).find(
+        (terminal) => names.includes(terminal.name) && terminal.exitStatus === undefined,
+      );
       if (!open) return false;
       open.show();
       return true;
@@ -596,10 +645,12 @@ export function driveArguments(choice: EngineChoice, model: string): string[] | 
 }
 
 /**
- * Resume Session: the AI's terminal back, for a session in flight. The
- * engine's own terminal when it is still open, by its name; otherwise a
- * terminal named for the session running `dabbler session run`, which
- * drives the rest with the identity the record holds.
+ * Resume Session: the session's loop and the AI's terminal back, for a
+ * session in flight. The loop is restarted unless its terminal is open and
+ * running -- an engine terminal left open without it is an AI waiting on
+ * instructions nobody writes. The engine's own terminal is shown by its name
+ * when it is still open; otherwise the operator is told the sentence a new
+ * CLI needs.
  */
 export async function runResumeSession(
   repository: SessionsRepository,
@@ -610,19 +661,18 @@ export async function runResumeSession(
     ui.showInformationMessage(`Nothing is in flight in ${repository.label}; Start Session is the way in.`);
     return false;
   }
-  if (ui.showTerminalNamed(ENGINES.map((entry) => entry.label))) return true;
   if (cli === null) {
     ui.showErrorMessage("The bundled `dabbler` command was not found beside the extension; nothing was resumed.");
     return false;
   }
-  const opened = ui.openTerminal({
-    name: `Session ${String(repository.currentSession).padStart(3, "0")}`,
-    cwd: repository.root,
-    program: process.execPath,
-    args: [cli, "session", "run", "--sessions-dir", SESSIONS_REL.replace(/\\/g, "/")],
-    typed: null,
-  });
+  const loop = loopTerminalFor(repository, cli);
+  const opened = ui.showTerminalNamed([loop.name]) ? undefined : ui.openTerminal(loop);
+  if (ui.showTerminalNamed(ENGINES.map((entry) => entry.label))) return true;
   ui.showFrameworkTerminal(repository.root, opened);
+  ui.showInformationMessage(
+    `Session ${String(repository.currentSession).padStart(3, "0")}'s loop is running. ` +
+      `Open your AI's CLI in ${repository.label} and give it: ${openingSentence()}`,
+  );
   return true;
 }
 
@@ -637,6 +687,8 @@ export async function runResumeSession(
 export async function runStartSession(
   repository: SessionsRepository,
   ui: SessionRunUi,
+  register: SessionRegistrar = defaultSessionRegistrar(),
+  cli: string | null = resolveRouterCli(),
 ): Promise<boolean> {
   const picked = await ui.pickEngine();
   if (!picked) return false;
@@ -657,8 +709,23 @@ export async function runStartSession(
     ui.showErrorMessage(terminal);
     return false;
   }
+  if (cli === null) {
+    ui.showErrorMessage("The bundled `dabbler` command was not found beside the extension; nothing was started.");
+    return false;
+  }
+  // Registering is the framework's, not the AI's: the identity is on the
+  // record before anything opens, and a refusal opens nothing.
+  const registered = await register(repository.root, startArguments(picked, model));
+  if (registered.code !== 0) {
+    const said = registered.output.trim();
+    ui.showErrorMessage(`The session was not registered, so nothing was opened.${said === "" ? "" : ` ${said}`}`);
+    return false;
+  }
+  // The keys go to the framework: its loop drives the session and waits for
+  // each answer the AI gives from its own CLI.
+  ui.openTerminal(loopTerminalFor(repository, cli));
   const opened = ui.openTerminal(terminal);
-  // The framework's own terminal, beside it. Both, or the person is
+  // The framework's own terminal, beside the CLI. Both, or the person is
   // watching their engine work with no sight of what the framework is
   // doing -- which is the arrangement this session exists to build.
   ui.showFrameworkTerminal(repository.root, opened);

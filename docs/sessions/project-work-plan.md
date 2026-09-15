@@ -215,7 +215,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 175 | The walk, timed | yes | 2026-09-15 |
 | 176 | Record the research | no | 2026-09-15 |
 | 177 | The framework drives | no | 2026-09-15 |
-| 178 | The extension and the words | — | not declared |
+| 178 | The extension and the words | no | 2026-09-15 |
 | 179 | The walk | — | not declared |
 | 180 | The soak, and 3.3.0 | — | not declared |
 | 181 | The round names what it cost | — | not declared |
@@ -2525,3 +2525,9 @@ Session 177 lets the framework drive while the AI waits in the background, using
 **Amended after acceptance:**
 
 - 2026-09-15 — step 'session-wait': its files: a plan and a verification rejection are answered in their own files, not the report, so the mailbox engine now takes the one answered-rule session wait uses (claude-code (anthropic, claude-fable-5-1))
+
+### Session 178 — The extension and the words
+
+**Releasable: no — held: session 180 publishes once the two-hour soak of both engines is recorded.**
+
+Session 178 makes Start Session hand the keys to the framework, and teaches the one loop. Start Session, after the engine and model are chosen and checked, registers the session itself (`dabbler session start` with that identity, through the extension's drive launcher, waiting for it to finish and showing its refusal if it refuses), opens a terminal running the framework's loop (`dabbler session run --mailbox --sessions-dir docs/sessions`), and opens the engine's CLI with a new opening sentence: keep `dabbler session wait --sessions-dir docs/sessions` running in the background, do what each instruction it prints says and answer with its answer command, run the waiter again, and stop when it prints done. Neither the operator nor the AI types `session start` or `session next`. Resume Session runs the loop with --mailbox too. The Dabbler terminal shows a step recorded as overdue (the instruction-overdue event on the supervision log) with the step and how long it has been outstanding, and a notification says so once per event, telling the operator to ask the AI whether its waiter is running; nothing is typed into the AI's chat. The managed instruction body (`packages/router/src/bootstrap/templates.ts` and this repository's AGENTS.md) teaches the loop the AI now runs, in no more lines than today, and docs/driving-a-session.md, docs/quick-start.md and the extension README say the same. It publishes nothing: the release is held for session 180.

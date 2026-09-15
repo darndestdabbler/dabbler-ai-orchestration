@@ -2,6 +2,18 @@
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 174 CLOSED, 2026-09-14 — what planning asks, and when a session releases; 3.2.0 tagged
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 174 | `dabbler.release` in `.vscode/settings.json` (`settings.ts`, `releaseMode`): `on-request`, the default where nothing is set, publishes only a plan carrying `release` with its reason; `ship-by-default` publishes unless the plan carries `hold_release`. `releaseOfPlan` in `driver.ts` is the one decision -- the plan ask names the member the setting reads, the declaration at plan acceptance and the report's summary read it, and a plan with the other member is accepted with the setting deciding (a `hold_release` on an on-request plan lends the hold its words). `dabbler configure --release` writes it and refuses it beside `--mine`; `router.configure` passes it. The Solution Explorer's solution row carries `dabblerSolution;<mode>` and offers Ship by Default or Release on Request, the extension contributes the setting. `PLAN_PROMPT` and the bootstrapped session 1 ask the production split before any module (default: application tier -> API tier -> database, only the API reaching it), recorded under *Production split* and *Handoff artifacts* with the standard command per form; session 2 (and `DECOMPOSITION_PROMPT`) creates the projects, writes `packaging.pack` and the architecture test. A `packaging` block with `pack` and no `push` loads (`router-config.schema.json`'s `oneOf` requires only `pack`), packs into the run folder, pushes nothing and makes a tag -- `v<version>` from `version.json`, else `session-<NNN>`. This repository commits `ship-by-default`. Managed body, README, driving-a-session, schema reference, quick start and the extension README say so | CLOSED VERIFIED r3 (r1: one blocking finding -- the packaged config schema still required `push` beside `pack`, fixed with a loader test; the run of record then failed `actionRegistry.test.ts`'s menu reachability, fixed with a ship-by-default fixture), landed `e3762028`, closed `2ada0368`. **`vsix-v3.2.0` tagged by the publish phase, on origin** |
+>
+> **175 is next** (the walk, timed).
+>
+> **Left as found.** The round-2/3 nits: `configure --release` is tested through `configure()` and not `configureVerb`; the both-members case in `driver.test.ts` builds the plan by spread rather than through `validateWorkPlan`. `session declare`'s typed flags do not read the setting (a non-goal: the setting is read where a driven plan becomes a declaration). Pack-only has not met a real `dotnet publish` yet -- 175's walk is where it does.
+>
+> **Traps met.** `check-shipped-docs` refuses any `dabbler.*` id a shipped page names that `package.json` does not contribute: a new setting documented in README must be contributed (step 5 was amended to add the manifest). `dabbler.schema.json` types `packaging` loosely, but `loadConfigFrom` validates the MERGED config against `router-config.schema.json` -- a new packaging shape has to be admitted there, and a test must go through `loadConfigFrom`, not `loadDeclaration`. A new contextValue for a Solution Explorer row needs a fixture in `actionRegistry.test.ts` that draws it: the named tests for `solutionTreeModel.ts` do not include that file, so only the run of record caught it. `cd` inside a Bash call moves the session's working directory for the calls after it.
+
 > ## SESSION 173 CLOSED, 2026-09-14 — tests named after what they test; 3.1.0 tagged
 >
 > | session | what | state |

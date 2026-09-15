@@ -673,6 +673,18 @@ export function isFrameworkInstalledPath(path: string): boolean {
   return String(path).replace(/\\/g, "/").replace(/^\.\//, "") === ".claude/settings.json";
 }
 
+/**
+ * The extension's solution settings, `.vscode/settings.json`: the
+ * Configuration pane and `dabbler configure` write it, and a choice made
+ * there configures the session about to start. So the declaration gate does
+ * not count it as work -- whoever wrote it, because the pane cannot say it
+ * did -- and the land commits it with the session. By this path alone, and
+ * before the work only: at the close it counts like any other file.
+ */
+export function isSolutionSettingsPath(path: string): boolean {
+  return String(path).replace(/\\/g, "/").replace(/^\.\//, "") === ".vscode/settings.json";
+}
+
 // --- What in a working tree is the operator's own work ------------------------
 //
 // One rule with four readers now: the close, which refuses to land
@@ -833,6 +845,9 @@ export function materialPaths(
     }
     if (options.beforeWork && options.hookRemoved === true && isFrameworkInstalledPath(path)) {
       continue; // the registration's own edit to the hook file, not work; the land commits it
+    }
+    if (options.beforeWork && isSolutionSettingsPath(path)) {
+      continue; // a settings choice configures the session; the land commits it
     }
     blocking.push(path);
   }

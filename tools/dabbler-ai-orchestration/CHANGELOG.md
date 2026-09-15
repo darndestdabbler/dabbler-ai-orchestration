@@ -10,6 +10,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.3.3] — 2026-09-15
+
+**The settings the pane wrote are not work.** Choosing the authoring model in
+the Configuration pane, or running `dabbler configure`, writes
+`.vscode/settings.json` -- and the next `dabbler session start` refused the
+tree for carrying it, registering nothing.
+
+### Fixed
+
+- **A settings choice no longer stops a session's start.** Before the work,
+  `.vscode/settings.json` is not counted as a change, and the session's land
+  commits it with the work, so the choice rides with the session it
+  configures. Only that file is exempt, and only before the work: any other
+  change under `.vscode/` still stops the start, and at the close the file
+  counts like any other.
+
 ## [3.3.2] — 2026-09-15
 
 **Resume brings the AI back.** A session stopped in flight could not be

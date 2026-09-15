@@ -220,10 +220,11 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 180 | The soak, and 3.3.0 | yes | 2026-09-15 |
 | 181 | Copilot's sentence submitted, and the host's first commit | yes | 2026-09-15 |
 | 182 | Resume brings the AI back | yes | 2026-09-15 |
-| 183 | Gemini CLI retired | — | not declared |
-| 184 | The loop's own commands, approved at launch | — | not declared |
-| 185 | The round names what it cost | — | not declared |
-| 186 | Overrides the operator provably made | — | not declared |
+| 183 | The settings the pane wrote are not work | yes | 2026-09-15 |
+| 184 | Gemini CLI retired | — | not declared |
+| 185 | The loop's own commands, approved at launch | — | not declared |
+| 186 | The round names what it cost | — | not declared |
+| 187 | Overrides the operator provably made | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2567,3 +2568,9 @@ Session 181 fixes the two defects that stopped an operator's first Copilot sessi
 **Releasable: yes.**
 
 Session 182 makes Resume Session leave a stopped session with a live loop and an AI waiting on it, makes a waiter with no loop behind it say so instead of waiting forever, and releases 3.3.2, a patch. Nothing today says whether the framework's loop is alive: Resume trusts terminal names, so a loop or CLI terminal still open under its name is shown and nothing is restarted, and a CLI whose background waiter was interrupted sits at its prompt waiting on nothing. The loop (`session run --mailbox`) refreshes a heartbeat beside run.json while it runs; one router rule, `loopAlive`, reads it and is exported for the extension. `session wait` that finds no live loop within a short grace prints that no loop is driving the session, with the command that starts one, and exits. Resume starts the loop unless `loopAlive` says one is driving, and replaces the recorded engine's open CLI terminal with a fresh one carrying the waiter sentence as its argument (Claude Code's positional, Copilot's `-i`), saying what it did; with no recorded engine it tells the operator the sentence, as today. version.json goes to 3.3.2 with a CHANGELOG entry.
+
+### Session 183 — The settings the pane wrote are not work
+
+**Releasable: yes.**
+
+Stop the framework's own write to .vscode/settings.json from blocking a session's start. The worktree gate's 'has the work begun?' question (materialPaths under beforeWork, asked by session start, the pre-start pull and the task declaration) exempts .vscode/settings.json exactly, beside the .claude/settings.json exemption, so a model or vehicle chosen in the Configuration pane or with `dabbler configure` no longer refuses the registration; the land's `git add -A` then commits the file with the session's work. The exemption is before the work only and by that one path: at the close the file counts however it got there, and any other change under .vscode/ still stops the start. The settings-only wording in workBegunRefusal (commit it, or --mine and revert) becomes unreachable and is removed with its test. Releasable as a patch: version.json and the manifests it stamps move to 3.3.3, with a CHANGELOG entry.

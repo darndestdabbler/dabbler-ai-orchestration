@@ -365,36 +365,6 @@ describe("declaring a session's task list", () => {
     );
   });
 
-  it("names the extension's settings file and the two ways on when that is the only change", () => {
-    // The Configuration pane writes the authoring model and the reviewing
-    // vehicle into .vscode/settings.json, which is solution policy meant to
-    // be committed; the sample's first declaration was refused on it with
-    // "commit or revert" and nothing saying which. The refusal names the
-    // file, the commit, and the flag that keeps the choice personal instead.
-    // It commits nothing: the tree is exactly as dirty afterwards.
-    const { sessionsDir } = makeSessionsDir();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    dirty = " M .vscode/settings.json\n";
-    assert.throws(
-      () => declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false }),
-      (error: unknown) => {
-        const message = (error as Error).message;
-        return (
-          message.includes(".vscode/settings.json") &&
-          message.includes("solution settings") &&
-          /commit it/.test(message) &&
-          message.includes("dabbler configure --mine")
-        );
-      },
-    );
-    // Any other change beside it is the plain refusal: the settings file is
-    // not what is blocking, so it is not what is named.
-    dirty = " M .vscode/settings.json\n?? widget.py\n";
-    assert.throws(
-      () => declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false }),
-      /already carries 2 change/,
-    );
-  });
 });
 
 describe("the window before a session declares", () => {

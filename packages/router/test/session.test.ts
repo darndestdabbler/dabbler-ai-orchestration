@@ -227,25 +227,44 @@ describe("the identity a session in flight was registered under", () => {
 
 describe("what a start refuses before a session exists", () => {
   it("refuses a tree that already carries work, in the declaration's own words", async () => {
-    // The sample's session 1 registered over an untracked settings file the
-    // extension had written, answered its plan, and was paused inside the
-    // same `next` when the declaration refused the tree -- a condition fully
-    // known at `start`. So `start` asks the same question, with the same
-    // sentence, before any work and before the pull.
+    // The sample's session 1 registered over a change, answered its plan,
+    // and was paused inside the same `next` when the declaration refused the
+    // tree -- a condition fully known at `start`. So `start` asks the same
+    // question, with the same sentence, before any work and before the pull.
     const state = stateDir();
     const dirty = gitAnswers([
       [["rev-parse", "--show-toplevel"], { stdout: state.repo.split("\\").join("/") }],
-      [["status", "--porcelain"], { stdout: "?? .vscode/settings.json\n" }],
+      [["status", "--porcelain"], { stdout: "?? .vscode/launch.json\n" }],
     ]);
     try {
       const refused = await run(() =>
         start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
       );
       assert.notEqual(refused.code, EXIT_OK);
-      assert.ok(refused.err.includes(`start: refused -- ${workBegunRefusal(1, [".vscode/settings.json"])}`), refused.err);
+      assert.ok(refused.err.includes(`start: refused -- ${workBegunRefusal(1, [".vscode/launch.json"])}`), refused.err);
       assert.equal(readRawSessionState(state.sessionsDir), null);
     } finally {
       dirty();
+      state.restore();
+    }
+  });
+
+  it("registers with the settings file the pane wrote the only change in the tree", async () => {
+    // The tutorial's session 5 was refused over the one line the
+    // Configuration pane had just written, and `dabbler configure` -- the
+    // command another refusal named -- writes the same file.
+    const state = stateDir();
+    const settings = cleanRepoAnswers(state.repo, [
+      [["status", "--porcelain"], { stdout: " M .vscode/settings.json\n" }],
+    ]);
+    try {
+      const registered = await run(() =>
+        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
+      );
+      assert.equal(registered.code, EXIT_OK, registered.err);
+      assert.equal(readRawSessionState(state.sessionsDir) === null, false);
+    } finally {
+      settings();
       state.restore();
     }
   });

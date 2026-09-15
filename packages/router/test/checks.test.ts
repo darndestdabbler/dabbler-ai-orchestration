@@ -568,6 +568,14 @@ describe("what counts as work in a porcelain status", () => {
     assert.deepEqual(materialPaths(" M .claude/settings.json\n", SESSIONS), [".claude/settings.json"]);
     assert.deepEqual(materialPaths("?? .claude/settings.json\n", SESSIONS), [".claude/settings.json"]);
     assert.deepEqual(materialPaths("?? .claude/other.json\n", SESSIONS, removed), [".claude/other.json"]);
+    // The settings file the Configuration pane and `dabbler configure` write
+    // configures the session about to start: not work before it, whoever
+    // wrote it, and counted at the close. No other path under .vscode/ is.
+    const before = { beforeWork: true };
+    assert.deepEqual(materialPaths(" M .vscode/settings.json\n", SESSIONS, before), []);
+    assert.deepEqual(materialPaths("?? .vscode/settings.json\n", SESSIONS, before), []);
+    assert.deepEqual(materialPaths(" M .vscode/settings.json\n", SESSIONS), [".vscode/settings.json"]);
+    assert.deepEqual(materialPaths("?? .vscode/launch.json\n", SESSIONS, before), [".vscode/launch.json"]);
   });
 
   it("skips a line too short to carry a path", () => {

@@ -27,7 +27,6 @@ import {
 } from "./evidence.ts";
 import { readRecords, releaseTestsHold } from "./testEvidence.ts";
 import { materialWorktreeChanges, previewPaths } from "./gates.ts";
-import { MINE_FLAG, SETTINGS_RELPATH } from "./settings.ts";
 import { nowIso, platformNewlines } from "./journal.ts";
 import {
   KIND_TASK_DECLARATION,
@@ -124,27 +123,8 @@ export class WorkBegunError extends SanctionedWriteError {
  * Why a session with material changes in its tree cannot declare -- and
  * cannot start, which asks the same question earlier, at the moment the
  * condition is fully known and before any work. One sentence for both.
- *
- * The extension's own write is the one change a person did not make: the
- * Configuration pane puts the authoring model, the reviewing vehicle or a
- * credential's NAME into the checkout's settings file, which is solution
- * policy and meant to be committed. A refusal that only said "commit or
- * revert" left the sample's developer choosing blind, so this one names the
- * file and the two ways on. It commits nothing.
  */
 export function workBegunRefusal(number: number, paths: readonly string[]): string {
-  const settings = SETTINGS_RELPATH.split("\\").join("/");
-  if (paths.every((path) => path.split("\\").join("/") === settings)) {
-    return (
-      `session ${number} cannot declare its task list now: the working tree ` +
-      `carries ${settings}, which holds the extension's solution settings ` +
-      "(the authoring model, the reviewing vehicle, a credential's name). " +
-      "Two ways on: commit it, because it is solution policy and travels to " +
-      "everyone who clones; or keep the choice as your own default instead " +
-      `with \`dabbler configure ${MINE_FLAG} <the same flag>\`, which writes ` +
-      "your user-level preferences, and revert the file. Then declare."
-    );
-  }
   return (
     `session ${number} cannot declare its task list now: the working tree ` +
     `already carries ${paths.length} change(s) (${previewPaths(paths)}). ` +

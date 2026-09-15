@@ -3613,7 +3613,7 @@
     {
       "number": 182,
       "title": "Resume brings the AI back",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-15T12:06:10.806000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -3622,7 +3622,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.3.1",
-      "completedAt": null,
+      "completedAt": "2026-09-15T12:36:34.293000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 3,

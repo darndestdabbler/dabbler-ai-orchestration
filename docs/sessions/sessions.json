@@ -3497,6 +3497,27 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "3.2.1"
+    },
+    {
+      "number": 177,
+      "title": "The framework drives",
+      "status": "in-progress",
+      "startedAt": "2026-09-15T07:03:29.028000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5-1",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "3.2.1",
       "verification": {
         "rounds": 2,
@@ -3504,15 +3525,6 @@
         "verifierProvider": "openai",
         "transport": "api"
       }
-    },
-    {
-      "number": 177,
-      "title": "The framework drives",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     },
     {
       "number": 178,

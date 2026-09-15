@@ -13,7 +13,7 @@
 // `--not-releasable` that parsed as nothing would publish.
 
 import { shlexSplit } from "../checks.ts";
-import { WAIT_IN_CALL_MS, driveSession, runWholeSession, sessionNext } from "../drive.ts";
+import { WAIT_IN_CALL_MS, driveSession, runWholeSession, sessionNext, sessionWait } from "../drive.ts";
 import {
   ENGINE_OUTPUT_MODES,
   type Engine,
@@ -50,6 +50,7 @@ const SUMMARY: Record<string, string> = {
   declare: "declare the session's task list and releasability",
   next: "advance the session one move and print the instruction to answer",
   run: "drive the in-flight session to done in one command, identity from the record",
+  wait: "wait for the instruction owed an answer, print it and exit (run it in the background)",
   drive: "run the next session end to end: the framework drives, the engine answers",
   interrupt: "end the engine's running invocation under a driven session, with a reason",
   rebaseline: "record a repair made while the run was stopped, and move the baseline",
@@ -118,8 +119,14 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  `retry_after_seconds`, read its `log` if you like, and call this again.",
   ],
   run: [
+    "  --mailbox                the AI answers from its own CLI: a background",
+    "                           `dabbler session wait` prints each instruction, and this",
+    "                           loop waits for its report and runs everything between",
     "  --show-engine MODE       stream | quiet, for a registered built-in engine",
     "  --max-invocations N      the paid-invocation budget for this run",
+    "",
+    "  With --mailbox the AI keeps `dabbler session wait` running in the background;",
+    "  this loop never issues `wait` and never needs `next` called.",
     "",
     "  Identity comes from the record: the registered orchestrator is invoked per",
     "  instruction when its engine has a built-in command; any other engine degrades",
@@ -158,8 +165,8 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  a step report, when the instruction asked for one:",
     "  --step ID                the step id the instruction named",
     "  --status STATUS          done | blocked",
-    "  --files A,B,...          every file created or changed, repo-relative; an empty",
-    "                           string when none",
+    "  --files A,B,...          every file created or changed, repo-relative; leave it",
+    "                           out and the framework takes them from the diff",
     "  --notes TEXT             one line for the log",
     "  --tests COMMAND          the test command run, when one was",
     "  a work plan or a disposition, when the instruction asked for one:",
@@ -250,6 +257,7 @@ const RETIRED_FLAGS: ReadonlyMap<string, string> = new Map([
 const SWITCHES = new Set([
   "--dry-run",
   "--force",
+  "--mailbox",
   "--stop",
 ]);
 
@@ -510,6 +518,12 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     });
   }
 
+  if (subcommand === "wait") {
+    // The AI's side of the mailbox: run in the background, so the chat stays
+    // free, and re-armed after each answer. It reads and never writes.
+    return sessionWait(sessionsDir);
+  }
+
   if (subcommand === "run") {
     // One command, the whole session: the developer's vocabulary is start,
     // interact, cancel -- `run` is the start that stays. Identity comes
@@ -521,6 +535,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
         return typeof parsed === "string" ? null : parsed;
       })(),
       showEngine: values.get("--show-engine") ?? null,
+      mailbox: switches.has("--mailbox"),
     });
   }
 
@@ -605,7 +620,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     const answerFile = values.get("--answer-file");
     const required =
       answerFile === undefined
-        ? ["--seq", "--step", "--status", "--files", "--notes"]
+        ? ["--seq", "--step", "--status", "--notes"]
         : ["--seq"];
     const missing = required.filter((flag) => !values.has(flag));
     if (missing.length > 0) {
@@ -637,7 +652,8 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       seq: seq!,
       stepId: values.get("--step")!,
       status: values.get("--status")!,
-      files: values.get("--files")!.split(","),
+      // Absent: the framework takes the step's files from the diff it computes.
+      files: values.has("--files") ? values.get("--files")!.split(",") : null,
       testsRun: values.get("--tests") ?? null,
       notes: values.get("--notes")!,
       sessionNumber,

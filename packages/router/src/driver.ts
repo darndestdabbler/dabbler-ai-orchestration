@@ -841,7 +841,8 @@ export interface ReportInput {
   readonly seq: number;
   readonly stepId: string;
   readonly status: string;
-  readonly files: readonly string[];
+  /** Null when the report named none: the driver takes the step's files from the diff. */
+  readonly files: readonly string[] | null;
   readonly testsRun: string | null;
   readonly notes: string;
 }
@@ -854,7 +855,8 @@ export function shapeReport(input: ReportInput, reportedAt: string): Record<stri
     session_number: input.sessionNumber,
     step_id: input.stepId,
     status: input.status,
-    files_changed: normalizeChangedFiles(input.files),
+    files_changed: normalizeChangedFiles(input.files ?? []),
+    ...(input.files === null ? { files_from_diff: true } : {}),
     tests_run: input.testsRun,
     notes: input.notes,
     reported_at: reportedAt,

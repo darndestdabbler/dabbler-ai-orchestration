@@ -45,6 +45,10 @@
       },
       "description": "Every file the engine created or changed for this step."
     },
+    "files_from_diff": {
+      "type": "boolean",
+      "description": "True when the report named no files. With `files_changed` empty, the driver takes the step's files from the diff since the last accepted step, less what the framework wrote itself; a report that names files is judged on the files it names, flag or no flag."
+    },
     "tests_run": {
       "type": ["string", "null"],
       "description": "The test command the engine ran, or null when it ran none."

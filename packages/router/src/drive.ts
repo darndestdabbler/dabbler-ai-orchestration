@@ -89,7 +89,7 @@ import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.t
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { ensureRootFiles, ignoreBuildOutput } from "./ecosystem.ts";
 import { readProjectGraph } from "./projectGraph.ts";
-import { BUILT_IN_ENGINES, builtInEngine, engineAliases } from "./engines.ts";
+import { BUILT_IN_ENGINES, builtInEngine, engineAliases, mailboxEngine } from "./engines.ts";
 import type { Engine, EngineOutcome, EngineOutput } from "./engines.ts";
 import {
   EVIDENCE_SERVED,
@@ -334,6 +334,25 @@ export function reportIsSpent(report: DriverReport | null, instruction: DriverIn
 }
 
 /**
+ * The threshold multiple an outstanding instruction has newly passed, or null.
+ *
+ * Strictly past the threshold, matching the watcher rule itself: asking it at
+ * exactly the threshold would spend its probe on a `quiet` and count that
+ * multiple as said. Once per multiple, and never the same multiple twice.
+ */
+export function overdueMultiple(
+  issuedAtMs: number,
+  nowMs: number,
+  thresholdSeconds: number,
+  alreadySaid: number,
+): number | null {
+  if (!Number.isFinite(issuedAtMs) || thresholdSeconds <= 0) return null;
+  const elapsed = Math.trunc((nowMs - issuedAtMs) / 1000);
+  const multiple = Math.trunc(elapsed / thresholdSeconds);
+  return elapsed > thresholdSeconds && multiple > alreadySaid ? multiple : null;
+}
+
+/**
  * Whether a report answers the instruction it was handed at all.
  *
  * Read before the tree is: a report about something else cannot be measured
@@ -376,6 +395,16 @@ export function judgeReportShape(
   }
   if (reasons.length > 0) return reasons;
   return report.status === "blocked" ? "blocked" : "ok";
+}
+
+/**
+ * The files a report stands for: the diff itself when it named none
+ * (`files_from_diff` with an empty list), its own list otherwise. Listing what
+ * changed is the framework's to do; a report that lists files -- flagged or not
+ * -- is held to them.
+ */
+export function reportedFiles(report: DriverReport, changed: readonly string[]): readonly string[] {
+  return report.files_from_diff === true && report.files_changed.length === 0 ? changed : report.files_changed;
 }
 
 /**
@@ -1253,7 +1282,7 @@ class Driver {
       if (kind === "file") return `${head} --answer-file <path to the JSON you wrote>`;
       return (
         `${head} --step ${stepId} --status done ` +
-        "--files <every file you created, changed or deleted, comma-separated, repository-relative> " +
+        "[--files <every file you created, changed or deleted, comma-separated, repository-relative>] " +
         '--notes "<one line>" [--tests "<the test command you ran>"]'
       );
     };
@@ -1311,7 +1340,10 @@ class Driver {
    * extension's Stop) and this one holds the child.
    */
   private async invoke(instruction: DriverInstruction): Promise<string | null> {
-    if (this.run.invocations >= this.run.max_invocations) {
+    // An engine the framework does not pay for (the mailbox: the AI answers
+    // from its own CLI) is not held to the budget, as the pull is not.
+    const metered = this.options.adapter?.metered !== false;
+    if (metered && this.run.invocations >= this.run.max_invocations) {
       throw new Stop(
         "budget",
         `the engine has been invoked ${this.run.invocations} time(s), which is ` +
@@ -1321,8 +1353,11 @@ class Driver {
     }
     const invocation = this.run.invocations + 1;
     const first = this.run.invocations === 0;
-    this.run = { ...this.run, invocations: invocation };
-    this.save();
+    // An unmetered engine spends nothing of the framework's, so nothing is counted.
+    if (metered) {
+      this.run = { ...this.run, invocations: invocation };
+      this.save();
+    }
 
     const transcript = transcriptPath(this.repoRoot, this.sessionNumber, invocation);
     mkdirSync(dirname(transcript), { recursive: true });
@@ -1357,23 +1392,29 @@ class Driver {
     const issued = Date.parse(instruction.issued_at);
     let saidMultiple = 0;
     const poll = setInterval(() => {
-      if (reason === null && Number.isFinite(issued) && threshold > 0) {
-        const elapsed = Math.trunc((Date.now() - issued) / 1000);
-        const multiple = Math.trunc(elapsed / threshold);
-        // Strictly past the threshold, matching the rule itself: asking it
-        // at exactly the threshold would spend the probe on a `quiet` and
-        // then count that multiple as said.
-        if (elapsed > threshold && multiple > saidMultiple) {
-          saidMultiple = multiple;
-          const reading = readWatcher(this.repoRoot, this.sessionNumber, threshold);
-          if (reading.state === WATCHER_OUTSTANDING) {
-            this.log("watcher", {
-              since: `${reading.sinceSeconds}s`,
-              state: reading.state,
-              ...(reading.clock ? { clock: reading.clock } : {}),
-            });
-          }
+      const multiple = reason === null ? overdueMultiple(issued, Date.now(), threshold, saidMultiple) : null;
+      if (multiple !== null) {
+        saidMultiple = multiple;
+        const reading = readWatcher(this.repoRoot, this.sessionNumber, threshold);
+        const quiet = reading.state === WATCHER_OUTSTANDING;
+        if (quiet) {
+          this.log("watcher", {
+            since: `${reading.sinceSeconds}s`,
+            state: reading.state,
+            ...(reading.clock ? { clock: reading.clock } : {}),
+          });
         }
+        // Overdue whether or not the tree moved: an AI that changed files and
+        // then went silent is still owed an answer. On the record for the
+        // extension to show; nothing types into the AI's chat, where a typed
+        // nudge would be logged as the operator's words.
+        appendSupervision(this.repoRoot, this.sessionNumber, {
+          event: "instruction-overdue",
+          seq: instruction.seq,
+          step: instruction.step_id ?? null,
+          outstanding_seconds: Math.trunc((Date.now() - issued) / 1000),
+          tree_quiet: quiet,
+        });
       }
       if (reason !== null) return;
       const request = takeInterrupt(this.repoRoot, this.sessionNumber);
@@ -1394,11 +1435,13 @@ class Driver {
       // silently taking the push path with nothing on the other end.
       throw new Stop("engine", "this run has no engine adapter to invoke");
     }
-    appendSupervision(this.repoRoot, this.sessionNumber, {
-      event: "continuation-spent",
-      invocation,
-      of_budget: this.run.max_invocations,
-    });
+    if (metered) {
+      appendSupervision(this.repoRoot, this.sessionNumber, {
+        event: "continuation-spent",
+        invocation,
+        of_budget: this.run.max_invocations,
+      });
+    }
     let outcome;
     try {
       outcome = await adapter.invoke({
@@ -1908,9 +1951,10 @@ class Driver {
     return (
       spec.ask +
       this.nonGoalsLine() +
-      "\n\nWhen the step is done, report with the answer command. --files names every " +
-      "file you created, changed or deleted in this step and nothing else -- a deleted " +
-      "file is a change to name. Use --status blocked only if the step cannot be done, " +
+      "\n\nWhen the step is done, report with the answer command. --files may be left out: " +
+      "the framework takes the step's files from what changed. Named, it lists every file " +
+      "you created, changed or deleted in this step and nothing else -- a deleted file is " +
+      "a change to name. Use --status blocked only if the step cannot be done, " +
       "and say why in --notes." +
       (rejected
         ? "\n\nThe previous report for this step was refused for the reasons listed under " +
@@ -2056,10 +2100,11 @@ class Driver {
     const diff = changedPathsBetween(this.repoRoot, String(this.run.baseline_tree), current);
     if (diff === null) throw new Stop("engine", "could not diff the working tree against the last accepted step");
     const changed = stepChangedPaths(diff, repoRelativePath(this.repoRoot, this.sessionsDir));
-    const reasons = judgeReportFiles(answered, changed, (file) =>
+    const judged = { ...answered, files_changed: [...reportedFiles(answered, changed)] };
+    const reasons = judgeReportFiles(judged, changed, (file) =>
       existsSync(join(this.repoRoot, file)),
     );
-    for (const file of unchangedStepFiles(spec, answered, changed)) {
+    for (const file of unchangedStepFiles(spec, judged, changed)) {
       this.log("step-file-unchanged", { step: spec.id, file });
     }
     if (reasons.length > 0) return reasons;
@@ -3380,11 +3425,95 @@ export async function sessionNext(sessionsDir: string, options: NextOptions): Pr
   return code;
 }
 
+// --- wait: the AI's side of the mailbox ------------------------------------------
+
+/** How often `session wait` looks at the session's files: a local read, no model called. */
+export const SESSION_WAIT_POLL_MS = 1000;
+
+/**
+ * Whether `instruction` has its answer on disk. A plan is answered by the work
+ * plan being there (a refused one is removed and asked for afresh), a
+ * verification rejection by dispositions carrying its seq, and every other
+ * instruction by a report carrying its seq. A file caught mid-write, or one
+ * that does not validate, is no answer yet: the driver judges whatever is there
+ * once one lands.
+ */
+export function instructionAnswered(
+  repoRoot: string,
+  sessionNumber: number,
+  instruction: DriverInstruction,
+): boolean {
+  try {
+    if (instruction.answer_schema === WORK_PLAN_SCHEMA) {
+      return readWorkPlan(repoRoot, sessionNumber) !== null;
+    }
+    // The answer to THIS instruction: its own seq, never merely a later one.
+    if (instruction.answer_schema === DISPOSITION_SCHEMA) {
+      return readDispositions(repoRoot, sessionNumber)?.seq === instruction.seq;
+    }
+    return readReport(repoRoot, sessionNumber)?.seq === instruction.seq;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The instruction owed an answer, or null. A `done` is owed nothing and is
+ * returned so a waiter can end; a pull's `wait` is not the AI's to answer.
+ * Nothing is consumed: until its answer is on disk, every reader is owed the
+ * same instruction, so an AI that loses a step loses nothing.
+ */
+export function owedInstruction(repoRoot: string, sessionNumber: number): DriverInstruction | null {
+  let instruction: DriverInstruction | null;
+  try {
+    instruction = readInstruction(repoRoot, sessionNumber);
+  } catch {
+    return null;
+  }
+  if (instruction === null || instruction.kind === "wait") return null;
+  if (instruction.kind === "done") return instruction;
+  return instructionAnswered(repoRoot, sessionNumber, instruction) ? null : instruction;
+}
+
+/**
+ * Wait for the instruction owed an answer, print it as JSON, and return. The AI
+ * runs this in the background, so its chat stays free while it waits, and runs
+ * it again after each answer. With nothing in flight it prints the idle `done`.
+ */
+export async function sessionWait(
+  sessionsDir: string,
+  pollMs: number = SESSION_WAIT_POLL_MS,
+): Promise<number> {
+  const repoRoot = repoRootFor(sessionsDir);
+  if (repoRoot === null) {
+    writeErr(`dabbler: not inside a git repository: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  for (;;) {
+    const current = readSessionState(sessionsDir)?.["currentSession"];
+    if (typeof current !== "number") {
+      writeOut(`${JSON.stringify(idleInstruction(nowIso()), null, 2)}\n`);
+      return EXIT_OK;
+    }
+    const owed = owedInstruction(repoRoot, current);
+    if (owed !== null) {
+      writeOut(`${JSON.stringify(owed, null, 2)}\n`);
+      return EXIT_OK;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+}
+
 // --- run: one command, the whole session --------------------------------------
 
 export interface RunCliOptions {
   readonly maxInvocations: number | null;
   readonly showEngine: string | null;
+  /**
+   * The AI answers from its own CLI through `session wait`: the loop waits for
+   * each report through the mailbox engine, whatever engine is registered.
+   */
+  readonly mailbox?: boolean;
 }
 
 /**
@@ -3421,6 +3550,20 @@ export async function runWholeSession(
   const sessionNumber = Number(inFlight["number"]);
   const repoRoot = repoRootFromSessionsDir(sessionsDir);
 
+  if (options.mailbox === true) {
+    appendSupervision(repoRoot, sessionNumber, { event: "session-run-started", engine, mode: "mailbox" });
+    const adapter = mailboxEngine((invocation) =>
+      instructionAnswered(invocation.repoRoot, invocation.sessionNumber, invocation.instruction),
+    );
+    return driveSession(sessionsDir, {
+      engine,
+      provider: typeof orchestrator["provider"] === "string" ? orchestrator["provider"] : null,
+      model: typeof orchestrator["model"] === "string" ? orchestrator["model"] : null,
+      effort: typeof orchestrator["effort"] === "string" ? orchestrator["effort"] : null,
+      adapter,
+      maxInvocations: options.maxInvocations,
+    });
+  }
 
   if ((BUILT_IN_ENGINES as readonly string[]).includes(engine)) {
     const adapter = builtInEngine(

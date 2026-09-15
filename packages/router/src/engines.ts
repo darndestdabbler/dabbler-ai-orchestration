@@ -113,11 +113,69 @@ export interface EngineOutcome {
 /** One engine, reached one way. */
 export interface Engine {
   readonly name: string;
+  /**
+   * False for an engine the framework does not pay for, because its answers
+   * come from a CLI the person runs. `driver.max_invocations` bounds what the
+   * framework spends invoking an engine, so such an engine is not held to it.
+   */
+  readonly metered?: boolean;
   invoke(invocation: EngineInvocation): Promise<EngineOutcome>;
 }
 
 export const INSTRUCTION_PLACEHOLDER = "{instruction}";
 export const INSTRUCTION_ENV_VAR = "DABBLER_DRIVER_INSTRUCTION";
+
+// --- The mailbox -----------------------------------------------------------------
+
+/** How often the mailbox looks for the report: a local file read, no model called. */
+export const MAILBOX_POLL_MS = 1000;
+
+/**
+ * The AI answering from its own CLI, where a background `dabbler session
+ * wait` printed the instruction. Nothing is spawned: the invocation is the
+ * wait for the instruction's answer to be written, and it ends when it is or
+ * when the driver aborts it.
+ *
+ * `answered` says whether the invocation's instruction has its answer on disk;
+ * it is passed in so this module stays ignorant of where the driver keeps its
+ * files, and of which file answers which kind of instruction.
+ */
+export function mailboxEngine(
+  answered: (invocation: EngineInvocation) => boolean,
+  pollMs: number = MAILBOX_POLL_MS,
+): Engine {
+  return {
+    // The pull's own engine name on `run.json`: both mean the person's CLI
+    // answers, so a run can move between `next` and the mailbox without a
+    // resume being refused for naming a different engine.
+    name: "cli",
+    metered: false,
+    invoke(invocation) {
+      return new Promise((settle) => {
+        // Held in an object: the first look can finish before the timer exists.
+        const polling: { timer?: ReturnType<typeof setInterval> } = {};
+        const finish = (outcome: EngineOutcome): void => {
+          if (polling.timer !== undefined) clearInterval(polling.timer);
+          invocation.signal.removeEventListener("abort", onAbort);
+          settle(outcome);
+        };
+        const onAbort = (): void => finish({ exitCode: null, interrupted: true });
+        const look = (): boolean => {
+          if (!answered(invocation)) return false;
+          finish({ exitCode: 0 });
+          return true;
+        };
+        if (invocation.signal.aborted) {
+          onAbort();
+          return;
+        }
+        invocation.signal.addEventListener("abort", onAbort, { once: true });
+        if (look()) return;
+        polling.timer = setInterval(look, pollMs);
+      });
+    },
+  };
+}
 
 export { DEFAULT_ENGINE_OUTPUT, ENGINE_OUTPUT_MODES, type EngineOutput } from "./config.ts";
 

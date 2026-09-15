@@ -214,7 +214,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 174 | What planning asks, and when a session releases | yes | 2026-09-14 |
 | 175 | The walk, timed | yes | 2026-09-15 |
 | 176 | Record the research | no | 2026-09-15 |
-| 177 | The framework drives | — | not declared |
+| 177 | The framework drives | no | 2026-09-15 |
 | 178 | The extension and the words | — | not declared |
 | 179 | The walk | — | not declared |
 | 180 | The soak, and 3.3.0 | — | not declared |
@@ -2515,3 +2515,13 @@ Session 175 walks what sessions 170-174 left: the extension this tree builds, pa
 **Releasable: no — held: session 180 publishes once the two-hour soak of both engines, running beside sessions 176-179, is recorded.**
 
 Session 176 records what 2026-09-15 established about how the framework and the AI talk to each other, so the build in sessions 177-180 and any later measurement start from facts. docs/design/messaging-design.md states the operator's three principles; the messaging design (the framework and the AI wait on each other through instruction and report files, the AI keeps a background waiter so its chat stays free, the framework never types into the chat); every POC measurement on Claude Code CLI 2.1.271 and Copilot CLI 1.0.83 (wakes from idle, replies, questions while waiting and mid-turn, killed waiters, 16-minute idle, cost per message); the prompt-cache findings (Claude's one-hour cache, Copilot's best-effort cache in 512-token blocks with hits and misses at 4.3, 7.8, 11.75 and 16 minutes); the keep-alive A/B (22.20 against 19.73 AI credits, three calls per keep-alive, break-even about 15 minutes); the cost model and why it is not built, including that it would rest on Copilot's internal caching, which can change without notice; the launch pitfalls; and consult round 16's recommendation with where Sol and Gemini split. The consult brief, both answers and the synthesis go under docs/design/consults/ as round 16, and the POC harness (driver, stand-in framework, waiter, reply script, analyzer, protocol) goes under docs/design/messaging-poc/ with a README saying how to run it. It publishes nothing: the release is held for session 180, which records the two-hour soak running beside this work.
+
+### Session 177 — The framework drives
+
+**Releasable: no — held: session 180 publishes once the two-hour soak of both engines is recorded.**
+
+Session 177 lets the framework drive while the AI waits in the background, using the instruction and report files the driver already writes. A mailbox engine adapter answers the drive loop's invoke by waiting for the report whose seq matches the instruction and returning when it lands (or when the invocation is interrupted); it is not counted against driver.max_invocations, because the AI answers from its own CLI as it does under the pull. `dabbler session run --mailbox` drives the in-flight session with it, so the loop runs every deterministic phase between reports itself and never issues a wait instruction. `dabbler session wait --sessions-dir <dir>` blocks until the in-flight session has an instruction with no report for its seq, prints it and exits; it consumes nothing, so a second wait prints the same instruction and an instruction stays pending until its report is accepted. While a mailbox invocation waits past verification.stalled_after_seconds, the driver records an instruction-overdue event on the supervision log once per threshold, for the extension to show; nothing types into the AI's chat. A step report may omit --files: it is recorded with files_from_diff, and the driver takes the step's files from the diff it already computes, less what it wrote itself; a report that names files is judged as today. The work plan's step ask and the report command's help say so. It publishes nothing: the release is held for session 180.
+
+**Amended after acceptance:**
+
+- 2026-09-15 — step 'session-wait': its files: a plan and a verification rejection are answered in their own files, not the report, so the mailbox engine now takes the one answered-rule session wait uses (claude-code (anthropic, claude-fable-5-1))

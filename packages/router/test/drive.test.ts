@@ -7,8 +7,11 @@
 // the loop composes around them. The loop itself, driven from next to done,
 // is walk-session.test.ts.
 import assert from "node:assert/strict";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { describe, it } from "node:test";
 
+import { instructionPath, reportPath } from "../src/driver.ts";
 import {
   MAX_REJECTIONS,
   REFUSE_START_REASON,
@@ -29,6 +32,9 @@ import {
   reportIsSpent,
   localGateReceipt,
   namedTestCommands,
+  overdueMultiple,
+  owedInstruction,
+  reportedFiles,
   suiteRetrySeconds,
   staleJobDisposition,
   stepChangedPaths,
@@ -52,6 +58,53 @@ const INSTRUCTION = {
   answer_schema: "driver-report.schema.json",
   answer_command: "dabbler session report --seq 4 --step widget ...",
 } as unknown as DriverInstruction;
+
+describe("the instruction owed an answer, which `session wait` prints", () => {
+  function writeInstruction(root: string, instruction: DriverInstruction): void {
+    mkdirSync(dirname(instructionPath(root, 1)), { recursive: true });
+    writeFileSync(instructionPath(root, 1), JSON.stringify(instruction));
+  }
+
+  it("is owed to every reader until a report carries its seq, and then the next one is", () => {
+    const root = tempDir("owed-");
+    writeInstruction(root, INSTRUCTION);
+    // Nothing is consumed: a second waiter is owed the same instruction.
+    assert.equal(owedInstruction(root, 1)?.seq, 4);
+    assert.equal(owedInstruction(root, 1)?.seq, 4);
+    // A later report is not this instruction's answer.
+    writeFileSync(reportPath(root, 1), JSON.stringify(report({ seq: 5 })));
+    assert.equal(owedInstruction(root, 1)?.seq, 4);
+    writeFileSync(reportPath(root, 1), JSON.stringify(report({ seq: 4 })));
+    assert.equal(owedInstruction(root, 1), null);
+    writeInstruction(root, { ...INSTRUCTION, seq: 5 });
+    assert.equal(owedInstruction(root, 1)?.seq, 5);
+  });
+});
+
+describe("when an outstanding instruction is recorded as overdue", () => {
+  it("is nothing before the threshold, once per multiple past it, and never the same multiple twice", () => {
+    const issued = Date.parse("2026-09-15T10:00:00Z");
+    const at = (seconds: number): number => issued + seconds * 1000;
+    assert.equal(overdueMultiple(issued, at(1800), 1800, 0), null);
+    assert.equal(overdueMultiple(issued, at(1801), 1800, 0), 1);
+    assert.equal(overdueMultiple(issued, at(2500), 1800, 1), null);
+    assert.equal(overdueMultiple(issued, at(3601), 1800, 1), 2);
+  });
+});
+
+describe("the files a report stands for", () => {
+  it("is the diff when the report named none, and the report's own list when it named some", () => {
+    const changed = ["src/widget.py", "tests/test_widget.py"];
+    assert.deepEqual(reportedFiles(report({ files_changed: [], files_from_diff: true }), changed), changed);
+    // A report that names files is still held to them: omitting a change is refused.
+    const named = report({ files_changed: ["src/widget.py"] });
+    assert.deepEqual(reportedFiles(named, changed), ["src/widget.py"]);
+    assert.equal(judgeReportFiles(named, changed, () => true).length, 1);
+    // The flag does not excuse a list: a flagged report that names files is judged on them.
+    const flaggedAndNamed = report({ files_changed: ["src/widget.py"], files_from_diff: true });
+    assert.deepEqual(reportedFiles(flaggedAndNamed, changed), ["src/widget.py"]);
+  });
+});
 
 const SPEC: StepSpec = {
   id: "widget",

@@ -28,6 +28,10 @@ export type DriverReport = {
    */
   files_changed: string[];
   /**
+   * True when the report named no files. With `files_changed` empty, the driver takes the step's files from the diff since the last accepted step, less what the framework wrote itself; a report that names files is judged on the files it names, flag or no flag.
+   */
+  files_from_diff?: boolean;
+  /**
    * The test command the engine ran, or null when it ran none.
    */
   tests_run: string | null;

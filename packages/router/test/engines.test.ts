@@ -24,6 +24,7 @@ import {
   enginePrompt,
   engineShape,
   installedEngines,
+  mailboxEngine,
   renderClaudeCodeEvent,
   renderCodexEvent,
   type EngineInvocation,
@@ -78,6 +79,32 @@ function invocation(
     ...overrides,
   } as EngineInvocation;
 }
+
+describe("the mailbox engine", () => {
+  it("returns once the report answering its instruction is written, not an older one", async () => {
+    let seq: number | null = null;
+    const engine = mailboxEngine((answering) => seq !== null && seq >= answering.instruction.seq, 10);
+    const pending = engine.invoke(invocation({ instruction: { ...invocation({}, []).instruction, seq: 4 } }, []));
+    let settled = false;
+    void pending.then(() => {
+      settled = true;
+    });
+    seq = 3;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(settled, false);
+    seq = 4;
+    assert.deepEqual(await pending, { exitCode: 0 });
+    assert.equal(engine.metered, false);
+  });
+
+  it("returns interrupted when the driver aborts the wait", async () => {
+    const controller = new AbortController();
+    const engine = mailboxEngine(() => false, 10);
+    const pending = engine.invoke(invocation({ signal: controller.signal }, []));
+    controller.abort("stop");
+    assert.deepEqual(await pending, { exitCode: null, interrupted: true });
+  });
+});
 
 // A stand-in for Claude Code's `-p --input-format stream-json`: reads user
 // messages from stdin, prints the events the real CLI prints, answers a

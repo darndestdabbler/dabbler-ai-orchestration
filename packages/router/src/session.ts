@@ -1537,7 +1537,7 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
         seq: options.seq,
         stepId: options.stepId ?? "",
         status: options.status ?? "",
-        files: options.files ?? [],
+        files: options.files ?? null,
         testsRun: options.testsRun ?? null,
         notes: options.notes ?? "",
       },

@@ -2,6 +2,18 @@
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 175 CLOSED, 2026-09-15 — the walk, timed; 3.2.1 tagged
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 175 | The 3.2.0 VSIX installed into a scratch Code profile (`C:\temp\s175-walk`, no development path) drove two new solutions through its shim, each session timed from the driver's own lines, job logs and ledger row: the CSV tutorial as three tiers in .NET (`C:\temp\s175-csv` — Csv.Model, Csv.Importer, People.Api and their test projects; sessions 1 plan 2 m 22 s, 2 projects 9 m 04 s, 3 Person 2 m 24 s with about 45 s of framework time, released `v0.1.0` by pack-only `build/Handoff.proj` into two published folders) and a developer's existing Maven reactor (`C:\temp\s175-maven`, session 1 2 m 31 s). Seven defects fixed with a test each: a step's build check refused as "the check changed the tree" because `bin/`/`obj/`/`target/` were ignored only at pre-verify and never where the root `.slnx`/`pom.xml` already existed (`ignoreBuildOutput` in `ecosystem.ts`, `treeWithPaths` in `journal.ts`, `writeRootFiles` before a step's checks in `drive.ts`); bootstrap's Maven `test_roots: - .` loads as null under YAML 1.1 so no Maven named test ever ran (quoted in `detect.ts`); `seat-cost` refused store schema 7; a real publish headed *dry run*; `configuration explain` said *none installed* on a two-CLI machine; bootstrap's help and two messages described the focused checkout; the managed body said no `docs/sessions` file is named in a report. A and F proved on a fresh reactor copy (`C:\temp\s175-verify`, left in flight, disposable). The walk's 5 reviews cost 31.839 AI credits ($0.32), now measured by `dabbler seat-cost`. Record `docs/uat/uat-simplified-walk.md`; the CSV tutorial rewritten from the walk with its screenshots retaken; README and the plan ask say the root files and ignore rules arrive before a step's checks | CLOSED VERIFIED r1 (four nits, none blocking), landed `34a4f0fd`, closed `605d2400`. **`vsix-v3.2.1` tagged by the publish phase, on origin** |
+>
+> **176 is next** (the round names what it cost: a seat round's `rounds.jsonl` row carries no conversation id and null tokens, so `seat-cost` cannot be pointed at a session from its own record).
+>
+> **Left as found.** The round-1 nits: defect A's test proves `ignoreBuildOutput` but no test drives a step through `next`; `csvWalkSteps.ts` does not assert the three test projects; no test pins the managed body's `session-plan.md` sentence; the bill in the record was read from the store before `seat-cost` could (the fixed verb measured the same 31.839 credits after the close). `stage-csv-solution.mjs` (923 lines) and `csv-module-walk.spec.ts` still stage and assert the four-module corpus; nothing runs them. Both reviewing roles resolve to the same model when nothing is chosen. A Maven repository bootstrapped on 3.1.0 or 3.2.0 quotes its root by hand: `test_roots: ["."]`.
+>
+> **Traps met.** A report MUST name `docs/sessions/session-plan.md` when a step edits it: only the state the router writes is exempt. doc-paths flags any backticked token holding a slash and a dot, `tests/Csv.Model.Tests` included. A Dabbler tree row runs its command when clicked: Playwright expands it through `.monaco-tl-twistie`. The installed extension writes its shim only once it activates, and nothing activates it until a Dabbler view or command is used. A pack file beside the `.slnx` breaks `dotnet test` at the root (MSB1011).
+
 > ## SESSION 174 CLOSED, 2026-09-14 — what planning asks, and when a session releases; 3.2.0 tagged
 >
 > | session | what | state |

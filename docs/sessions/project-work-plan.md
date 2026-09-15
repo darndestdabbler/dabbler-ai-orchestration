@@ -213,6 +213,14 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 173 | Tests named after what they test | yes | 2026-09-14 |
 | 174 | What planning asks, and when a session releases | yes | 2026-09-14 |
 | 175 | The walk, timed | yes | 2026-09-15 |
+| 176 | Record the research | no | 2026-09-15 |
+| 177 | The framework drives | — | not declared |
+| 178 | The extension and the words | — | not declared |
+| 179 | The walk | — | not declared |
+| 180 | The soak, and 3.3.0 | — | not declared |
+| 181 | The round names what it cost | — | not declared |
+| 182 | Overrides the operator provably made | — | not declared |
+| 183 | Gemini CLI retired | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2501,3 +2509,9 @@ Session 175 walks what sessions 170-174 left: the extension this tree builds, pa
 
 - 2026-09-15 — step 'walk-fixes': its files: the six defects the walks found, each fixed with its test; README and the plan ask now say when the root files arrive (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-15 — step 'walk-fixes': its files: session 176 is written into the session plan, which a report names; the managed body said no docs/sessions file is ever named, which cost this step a refusal (claude-code (anthropic, claude-fable-5-1))
+
+### Session 176 — Record the research
+
+**Releasable: no — held: session 180 publishes once the two-hour soak of both engines, running beside sessions 176-179, is recorded.**
+
+Session 176 records what 2026-09-15 established about how the framework and the AI talk to each other, so the build in sessions 177-180 and any later measurement start from facts. docs/design/messaging-design.md states the operator's three principles; the messaging design (the framework and the AI wait on each other through instruction and report files, the AI keeps a background waiter so its chat stays free, the framework never types into the chat); every POC measurement on Claude Code CLI 2.1.271 and Copilot CLI 1.0.83 (wakes from idle, replies, questions while waiting and mid-turn, killed waiters, 16-minute idle, cost per message); the prompt-cache findings (Claude's one-hour cache, Copilot's best-effort cache in 512-token blocks with hits and misses at 4.3, 7.8, 11.75 and 16 minutes); the keep-alive A/B (22.20 against 19.73 AI credits, three calls per keep-alive, break-even about 15 minutes); the cost model and why it is not built, including that it would rest on Copilot's internal caching, which can change without notice; the launch pitfalls; and consult round 16's recommendation with where Sol and Gemini split. The consult brief, both answers and the synthesis go under docs/design/consults/ as round 16, and the POC harness (driver, stand-in framework, waiter, reply script, analyzer, protocol) goes under docs/design/messaging-poc/ with a README saying how to run it. It publishes nothing: the release is held for session 180, which records the two-hour soak running beside this work.

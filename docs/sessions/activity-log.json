@@ -11509,6 +11509,14 @@
       "what": "step 'walk-fixes': its files",
       "reason": "session 176 is written into the session plan, which a report names; the managed body said no docs/sessions file is ever named, which cost this step a refusal",
       "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 176,
+      "dateTime": "2026-09-15T06:54:44.614000-04:00",
+      "task": "Session 176 records what 2026-09-15 established about how the framework and the AI talk to each other, so the build in sessions 177-180 and any later measurement start from facts. docs/design/messaging-design.md states the operator's three principles; the messaging design (the framework and the AI wait on each other through instruction and report files, the AI keeps a background waiter so its chat stays free, the framework never types into the chat); every POC measurement on Claude Code CLI 2.1.271 and Copilot CLI 1.0.83 (wakes from idle, replies, questions while waiting and mid-turn, killed waiters, 16-minute idle, cost per message); the prompt-cache findings (Claude's one-hour cache, Copilot's best-effort cache in 512-token blocks with hits and misses at 4.3, 7.8, 11.75 and 16 minutes); the keep-alive A/B (22.20 against 19.73 AI credits, three calls per keep-alive, break-even about 15 minutes); the cost model and why it is not built, including that it would rest on Copilot's internal caching, which can change without notice; the launch pitfalls; and consult round 16's recommendation with where Sol and Gemini split. The consult brief, both answers and the synthesis go under docs/design/consults/ as round 16, and the POC harness (driver, stand-in framework, waiter, reply script, analyzer, protocol) goes under docs/design/messaging-poc/ with a README saying how to run it. It publishes nothing: the release is held for session 180, which records the two-hour soak running beside this work.",
+      "releasable": false,
+      "holdReason": "session 180 publishes once the two-hour soak of both engines, running beside sessions 176-179, is recorded"
     }
   ]
 }

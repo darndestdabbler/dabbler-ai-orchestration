@@ -3634,7 +3634,7 @@
     {
       "number": 183,
       "title": "The settings the pane wrote are not work",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-15T13:31:46.951000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -3643,7 +3643,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.3.0",
-      "completedAt": null,
+      "completedAt": "2026-09-15T13:42:48.372000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,

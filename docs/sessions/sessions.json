@@ -3592,7 +3592,7 @@
     {
       "number": 181,
       "title": "Copilot's sentence submitted, and the host's first commit",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-15T11:41:23.717000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -3601,7 +3601,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.3.0",
-      "completedAt": null,
+      "completedAt": "2026-09-15T11:54:06.466000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,

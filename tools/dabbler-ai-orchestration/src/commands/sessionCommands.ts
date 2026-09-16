@@ -245,6 +245,34 @@ export function loopTerminalFor(repository: SessionsRepository, cli: string): En
 }
 
 /**
+ * Dispose every open loop terminal of this repository.
+ *
+ * Closing the tab does not end the loop -- the editor's own binary outlives
+ * its tab -- so this removes only what the operator sees. The loop exits by
+ * itself when its session closes, and Resume's heartbeat check keeps a second
+ * one from starting beside a loop still running.
+ */
+export function closeLoopTerminals(repository: SessionsRepository): void {
+  const spec = loopTerminalFor(repository, "");
+  for (const terminal of vscode.window.terminals ?? []) {
+    // The name it was created with: the tab's own is `Code`, taken from the
+    // executable, because the editor never sees this shell reach process-ready.
+    const options = terminal.creationOptions as vscode.TerminalOptions;
+    if (options.name === spec.name && launchedAs(options, spec)) terminal.dispose();
+  }
+}
+
+/** The last in-flight session per repository, so an end is a change and not a state. */
+const loopSessionSeen = new Map<string, number | null>();
+
+/** The session completing takes its loop terminal with it. */
+export function closeLoopOnSessionEnd(repository: SessionsRepository): void {
+  const before = loopSessionSeen.get(repository.root);
+  loopSessionSeen.set(repository.root, repository.currentSession);
+  if (typeof before === "number" && repository.currentSession === null) closeLoopTerminals(repository);
+}
+
+/**
  * What this checkout already chose for the authoring model, or "".
  *
  * Read through the router at the moment it is asked for, exactly as the pane
@@ -380,6 +408,14 @@ export function engineTerminalFor(
   };
 }
 
+/** Whether a terminal was created running `spec`'s program at `spec`'s root. */
+function launchedAs(options: vscode.TerminalOptions, spec: EngineTerminal): boolean {
+  const cwd = typeof options.cwd === "string" ? options.cwd : options.cwd?.fsPath;
+  if (options.shellPath !== spec.program || cwd === undefined) return false;
+  const [left, right] = [path.resolve(cwd), path.resolve(spec.cwd)];
+  return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
+
 /**
  * Whether an open terminal is the CLI `spec` would open: the same engine name,
  * program and repository root. A name alone is not enough -- two repositories
@@ -393,11 +429,7 @@ export function isEngineTerminalOf(
   },
   spec: EngineTerminal,
 ): boolean {
-  const options = terminal.creationOptions as vscode.TerminalOptions;
-  const cwd = typeof options.cwd === "string" ? options.cwd : options.cwd?.fsPath;
-  if (terminal.name !== spec.name || options.shellPath !== spec.program || cwd === undefined) return false;
-  const [left, right] = [path.resolve(cwd), path.resolve(spec.cwd)];
-  return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
+  return terminal.name === spec.name && launchedAs(terminal.creationOptions as vscode.TerminalOptions, spec);
 }
 
 export interface SessionRunUi {
@@ -426,6 +458,8 @@ export interface SessionRunUi {
   engineLine: (line: string) => void;
   /** Open the person's own CLI, interactively, and show it. */
   openTerminal: (terminal: EngineTerminal) => unknown;
+  /** Open the framework's loop in the panel, without the focus, replacing this repository's last one. */
+  openLoopTerminal: (repository: SessionsRepository, terminal: EngineTerminal) => unknown;
   /**
    * Ask the installed CLI whether it knows this model. Answers the model it
    * refused, or null for "it did not refuse" -- which covers no CLI, no
@@ -632,6 +666,21 @@ export function defaultSessionRunUi(
       if (spec.typed !== null) terminal.sendText(spec.typed, false);
       return terminal;
     },
+    openLoopTerminal: (repository, spec) => {
+      // The panel whatever `dabbler.terminalLocation` says, and without the
+      // caret: the editor area is the CLI's and the Dabbler terminal's.
+      closeLoopTerminals(repository);
+      const terminal = vscode.window.createTerminal({
+        name: spec.name,
+        cwd: spec.cwd,
+        shellPath: spec.program,
+        shellArgs: [...spec.args],
+        ...(spec.env ? { env: { ...spec.env } } : {}),
+        location: vscode.TerminalLocation.Panel,
+      });
+      terminal.show(true);
+      return terminal;
+    },
     closeEngineTerminals: (spec) => {
       for (const terminal of vscode.window.terminals ?? []) {
         if (isEngineTerminalOf(terminal, spec)) terminal.dispose();
@@ -702,7 +751,7 @@ export async function runResumeSession(
     return false;
   }
   const restarted = !alive(repository.root, session);
-  const loop = restarted ? ui.openTerminal(loopTerminalFor(repository, cli)) : undefined;
+  const loop = restarted ? ui.openLoopTerminal(repository, loopTerminalFor(repository, cli)) : undefined;
   const number = String(session).padStart(3, "0");
   const recorded = ENGINES.find((entry) => entry.engine === repository.orchestrator?.engine);
   const terminal = recorded ? engineTerminalFor(repository, recorded, repository.orchestrator?.model ?? "") : null;
@@ -778,7 +827,7 @@ export async function runStartSession(
   }
   // The keys go to the framework: its loop drives the session and waits for
   // each answer the AI gives from its own CLI.
-  ui.openTerminal(loopTerminalFor(repository, cli));
+  ui.openLoopTerminal(repository, loopTerminalFor(repository, cli));
   const opened = ui.openTerminal(terminal);
   // The framework's own terminal, beside the CLI. Both, or the person is
   // watching their engine work with no sight of what the framework is

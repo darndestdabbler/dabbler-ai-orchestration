@@ -221,6 +221,7 @@ const vscodeStub = {
     createTerminal: (options) => {
       const terminal = {
         options,
+        creationOptions: options,
         // A Pseudoterminal terminal is opened by the editor, which is what
         // starts the pty. The stub does the same so a test drives the real
         // lifecycle rather than poking at internals.
@@ -251,6 +252,10 @@ const vscodeStub = {
     },
     /** Every terminal created, in order. Test-only, hence the `__` prefix. */
     __terminals: [],
+    /** The terminals still open, as the editor reports them. */
+    get terminals() {
+      return vscodeStub.window.__terminals.filter((terminal) => terminal.disposed === 0);
+    },
     // Session 62: the Dabbler terminal paints its band from the editor's
     // theme kind and re-reads it when the theme changes, so both the value
     // and the event have to exist here.

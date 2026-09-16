@@ -26,10 +26,12 @@ import {
   type EngineTerminal,
   type SessionRegistrar,
   type SessionRunUi,
+  closeLoopOnSessionEnd,
   defaultSessionRunUi,
   engineOutputChannel,
   engineTerminalFor,
   isEngineTerminalOf,
+  loopTerminalFor,
   repositoryOf,
   runResumeSession,
   runSendToEngine,
@@ -424,6 +426,10 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
       terminals.push(terminal);
       return undefined;
     },
+    openLoopTerminal: (_repository, terminal) => {
+      terminals.push(terminal);
+      return undefined;
+    },
     showFrameworkTerminal: () => undefined,
     withProgress: (_title, work) => work(),
     ...overrides,
@@ -472,6 +478,8 @@ interface FakeTerminal {
   shown: number;
   disposed: number;
   sent: Array<{ text: string; addNewLine: boolean }>;
+  preserveFocus?: boolean;
+  dispose: () => void;
 }
 
 suite("Start opens the person's own CLI", () => {
@@ -727,6 +735,69 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(terminals.length, 5);
     assert.strictEqual(terminals[2].disposed, 0);
     assert.strictEqual(terminals[2].shown, 2);
+  });
+
+  test("opens the framework's loop in the panel without taking focus, whatever the pair's location", async () => {
+    const repository = makeRepository({ root: path.join("D:", "loop-panel") });
+    const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
+    terminals.length = 0;
+
+    const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
+    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), CLI), true);
+    const loop = terminals[0];
+    assert.deepStrictEqual(loop.options.shellArgs.slice(1, 4), ["session", "run", "--mailbox"]);
+    assert.strictEqual(loop.options.location, vscode.TerminalLocation.Panel);
+    assert.strictEqual(loop.preserveFocus, true);
+  });
+
+  test("a second Start replaces the repository's loop terminal and leaves the CLI and Dabbler terminals open", async () => {
+    const repository = makeRepository({ root: path.join("D:", "loop-replaced") });
+    const other = makeRepository({ root: path.join("D:", "elsewhere", "loop-replaced") });
+    const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
+    terminals.length = 0;
+
+    const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
+    assert.strictEqual(await runStartSession(other, ui, registrarOf(), CLI), true);
+    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), CLI), true);
+    const [otherLoop, firstLoop, cli, dabbler] = [terminals[0], terminals[3], terminals[4], terminals[5]];
+    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), CLI), true);
+    assert.strictEqual(firstLoop.disposed, 1);
+    assert.strictEqual(terminals[6].disposed, 0);
+    assert.strictEqual(otherLoop.disposed, 0);
+    assert.strictEqual(cli.disposed, 0);
+    assert.strictEqual(dabbler.disposed, 0);
+  });
+
+  test("the session completing disposes its loop terminal", async () => {
+    const repository = makeRepository({ root: path.join("D:", "loop-completes"), currentSession: 2 });
+    const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
+    terminals.length = 0;
+    closeLoopOnSessionEnd(repository);
+
+    defaultSessionRunUi().openLoopTerminal(repository, loopTerminalFor(repository, CLI));
+    // A scan that still reads the session in flight leaves it open.
+    closeLoopOnSessionEnd(repository);
+    assert.strictEqual(terminals[0].disposed, 0);
+    closeLoopOnSessionEnd({ ...repository, currentSession: null });
+    assert.strictEqual(terminals[0].disposed, 1);
+  });
+
+  test("closing the loop terminal by hand leaves Resume refusing to start a second loop beside a live one", async () => {
+    const repository = makeRepository({
+      root: path.join("D:", "loop-closed-by-hand"),
+      currentSession: 2,
+      nextSession: 2,
+      sessions: [makeSession({ number: 2, status: "in-progress" })],
+    });
+    const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
+    terminals.length = 0;
+    const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
+    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), CLI), true);
+    terminals[0].dispose();
+
+    // The heartbeat says the loop is still driving, so no loop is opened.
+    assert.strictEqual(await runResumeSession(repository, ui, CLI, () => true), true);
+    assert.ok(!terminals.slice(3).some((terminal) => terminal.options.shellArgs?.includes("--mailbox")));
   });
 
   test("a seat without a model opens nothing, and a dismissed pick opens nothing", async () => {

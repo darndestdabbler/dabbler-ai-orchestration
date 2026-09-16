@@ -10,6 +10,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.3.5] — 2026-09-16
+
+**One loop terminal, and it goes when the session does.** Start and Resume
+opened the framework's loop in the editor area beside the CLI, labelled
+`Code`, and nothing ever closed it -- so every Start left another tab nobody
+could identify.
+
+### Changed
+
+- **The loop terminal opens in the panel and does not take focus**, whatever
+  `dabbler.terminalLocation` says; that setting still places the CLI and the
+  Dabbler terminal.
+- **One per repository.** Start and Resume close the repository's previous
+  loop terminal before opening the next, including one left from before a
+  window reload.
+- **The session completing closes it.** Closing it by hand still leaves the
+  loop running, and Resume still will not start a second beside it.
+
 ## [3.3.4] — 2026-09-15
 
 **Gemini CLI is no longer an engine.** VS Code no longer supports it, and a

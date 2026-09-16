@@ -5,6 +5,7 @@ import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import {
   ENGINES,
+  closeLoopOnSessionEnd,
   defaultSessionRunUi,
   registerSessionCommands,
   sharedDrives,
@@ -101,6 +102,7 @@ export function activate(context: vscode.ExtensionContext): void {
     // that knows; the transition rule is the terminal's.
     for (const repository of repositories) {
       revealOnSessionStart(repository.root, repository.currentSession);
+      closeLoopOnSessionEnd(repository);
     }
   });
 

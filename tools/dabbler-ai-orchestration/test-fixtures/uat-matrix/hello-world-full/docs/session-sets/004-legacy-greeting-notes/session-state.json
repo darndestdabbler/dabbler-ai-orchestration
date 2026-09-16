@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 3,
+  "sessionSetName": "004-legacy-greeting-notes",
+  "status": "complete",
+  "lifecycleState": "closed",
+  "currentSession": 2,
+  "totalSessions": 2,
+  "completedSessions": [1, 2],
+  "startedAt": "2026-05-20T09:00:00-04:00",
+  "completedAt": "2026-05-21T16:30:00-04:00",
+  "orchestrator": null,
+  "verificationVerdict": "VERIFIED",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Draft the notes",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Review and close",
+      "status": "complete"
+    }
+  ]
+}

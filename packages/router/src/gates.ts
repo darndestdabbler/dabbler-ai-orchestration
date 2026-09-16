@@ -733,7 +733,7 @@ export function judgeFreshness(verdicts: readonly FreshnessVerdict[]): Check {
 }
 
 /** The ecosystems whose build files say this repository builds code; empty for a repository of documents. */
-function codeEcosystems(root: string): string[] {
+export function codeEcosystems(root: string): string[] {
   try {
     return detectEcosystems(root).map((eco) => eco.key);
   } catch {

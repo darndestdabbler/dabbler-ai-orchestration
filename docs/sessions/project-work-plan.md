@@ -226,6 +226,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 186 | The round names what it cost | — | not declared |
 | 187 | Overrides the operator provably made | — | not declared |
 | 188 | One loop terminal, and it goes when the session does | yes | 2026-09-16 |
+| 189 | The suite nobody declared, asked before the push | yes | 2026-09-16 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2591,3 +2592,13 @@ Retire Gemini CLI as an engine while Google stays a reviewer provider over the d
 **Releasable: yes.**
 
 Make the framework's loop terminal one per repository, out of the operator's way, and gone when the session is. In the extension's sessionCommands.ts, Start and Resume open the loop terminal through its own path rather than the shared openTerminal: always in the panel (vscode.TerminalLocation.Panel, independent of dabbler.terminalLocation, which keeps deciding for the CLI and the Dabbler terminal), shown with focus preserved. A registry keyed on the repository root holds the one loop terminal; opening a new one disposes the registered one first, and, for a window reload that lost the registry, any open terminal whose creationOptions.name is that repository's loop name (the tab's name reads `Code`, so `name` cannot be trusted). The Work Explorer scan in extension.ts, which already reports each repository's currentSession, calls one exported function that disposes the repository's loop terminal when currentSession goes from a number to null. Closing the tab by hand is left as it is: the loop keeps running, and Resume's heartbeat check still refuses to start a second. Unit tests in commandFlows.test.ts (with the vscode stub given creationOptions and window.terminals where it lacks them) and one Playwright spec against the real editor for placement and focus. Releasable as a patch: version.json and the manifests it stamps move to 3.3.5, with a CHANGELOG entry.
+
+### Session 189 — The suite nobody declared, asked before the push
+
+**Releasable: yes.**
+
+Move the suite-declaration question from after the push to the run of record. In packages/router/src/gates.ts export the ecosystem reading the close gate already uses (codeEcosystems) so there is one predicate; in drive.ts phaseRunOfRecord, when no expensive suite is declared, ask judgeSuiteDeclaration with the declared suites and the repository's code ecosystems, and when it refuses hand back the existing synthesised fix-run-of-record step (returning to preverify) whose ask carries the gate's own refusal words, instead of logging run-of-record-none and landing. A repository of documents with no suite keeps logging run-of-record-none and lands as today. Tests in walk-session.test.ts: code with no suite stops at the run of record with the gate's words and never lands; the fix declaring a suite returns the session to preverify and reaches done green; the existing documents test is confirmed to land. Measure in this session whether `dotnet test` over a solution with no test project exits 0 (a scratch measurement before this plan says it does) and, on that result, the Session 2 template in bootstrap/templates.ts tells the first project's session to declare the test suite in dabbler.yaml under testing.suites even before any tests exist. docs/driving-a-session.md, When the framework stops, gains the case of a close-gate stop reached after the land and that `session rebaseline`, not `session cancel --force`, is its way out. Releasable as a patch: version.json and the manifests it stamps move to 3.3.6, with a CHANGELOG entry.
+
+**Amended after acceptance:**
+
+- 2026-09-16 — step 'template-and-driving-doc': its checks: the whole bootstrap test file includes the commit-guard hook test, which needs sh on PATH and the check's built environment carries none; the template tests are the ones this step changes (claude-code (anthropic, claude-opus-5))

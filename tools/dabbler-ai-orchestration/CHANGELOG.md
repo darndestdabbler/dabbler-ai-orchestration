@@ -10,6 +10,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.3.6] — 2026-09-16
+
+**The suite nobody declared is asked about before the push.** A repository
+that builds code with no test suite declared used to be verified, committed
+and pushed, and only then refused at the close on `test_run_fresh`, with the
+verified tree already on the remote.
+
+### Changed
+
+- **The run of record asks the close's question first.** No suite declared
+  in a repository that builds code now hands back a `fix-run-of-record` step
+  in the gate's own words, before the commit and the push; declaring the
+  suite there sends the session back through the checks, verification and
+  the suite. A repository of documents with no suite lands as before.
+- **The setup template says to declare the suite with the first project**,
+  even before any tests exist: `dotnet test` over a solution with no test
+  project exits 0.
+- **`docs/driving-a-session.md`** covers a close stop reached after the
+  land: repair it and `dabbler session rebaseline`, never
+  `session cancel --force`, which does not unpush anything.
+
 ## [3.3.5] — 2026-09-16
 
 **One loop terminal, and it goes when the session does.** Start and Resume

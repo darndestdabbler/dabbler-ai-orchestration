@@ -401,7 +401,10 @@ export const BOOTSTRAP_PLAN =
   "4. Create the projects the plan's *Production split* names, write\n" +
   "   `packaging.pack` in `dabbler.yaml` to produce its *Handoff artifacts*,\n" +
   "   and where only the API tier may reach the database, add that rule as\n" +
-  "   an architecture test in the solution's own tests.\n" +
+  "   an architecture test in the solution's own tests. Declare the test\n" +
+  "   suite in `dabbler.yaml` under `testing.suites` in the same session as\n" +
+  "   the first project, even before any tests exist: a repository that\n" +
+  "   builds code with no suite declared stops at the run of record.\n" +
   "5. Cross-provider verification.\n" +
   "6. Full test suite, recorded as the run of record.\n" +
   "7. Close-out.\n" +

@@ -487,6 +487,19 @@ the shape of a run. A close or a publish that has already happened is
 collected by the next call rather than made again, so running `next` after
 closing or packaging by hand moves the session on.
 
+**A close stop after the land** is the one stop that finds the work already
+committed and pushed: a gate refused at the close, after the verified tree
+reached the remote. The run of record asks the suite question before it
+lands — a repository that builds code with no suite declared gets a
+`fix-run-of-record` step there, before the commit — but a run that
+reached the close before that, or a gate only the close can judge, still
+leaves you here. The way out is to repair it and record the repair:
+declare the suite (or fix what the gate named), then `dabbler session
+rebaseline --reason "<what was repaired>"`, and the next call resumes and
+takes the session back through the phase the refused gate owes. **Not
+`session cancel --force`**: a cancel ends the session's record, and it
+does not unpush what was pushed.
+
 If a job **vanished** — no process and no recorded result, which is what a
 machine restart leaves — that is a stop too, and deliberately: re-running
 a verification round nobody recorded would spend another round's worth of

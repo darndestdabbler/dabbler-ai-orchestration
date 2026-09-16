@@ -3714,17 +3714,38 @@
       "title": "One loop terminal, and it goes when the session does",
       "status": "complete",
       "startedAt": "2026-09-16T04:23:39.050000-04:00",
+      "completedAt": "2026-09-16T04:41:06.047000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-opus-5",
         "identityProvenance": "direct"
       },
-      "frameworkVersion": "3.3.3",
-      "completedAt": "2026-09-16T04:41:06.047000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,
+        "verifierModel": "gpt-5.6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "3.3.3"
+    },
+    {
+      "number": 189,
+      "title": "The suite nobody declared, asked before the push",
+      "status": "in-progress",
+      "startedAt": "2026-09-16T06:10:14.788000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "direct"
+      },
+      "frameworkVersion": "3.3.5",
+      "completedAt": null,
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
         "verifierModel": "gpt-5.6-sol",
         "verifierProvider": "openai",
         "transport": "api"

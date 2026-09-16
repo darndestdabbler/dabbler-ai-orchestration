@@ -19,6 +19,7 @@ import { after, describe, it } from "node:test";
 import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { driveSession, sessionNext, type Engine } from "../src/drive.ts";
 import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
+import { judgeSuiteDeclaration } from "../src/gates.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
 import { appendPackaging, readRounds } from "../src/ledger.ts";
 import { capture } from "../src/output.ts";
@@ -1051,5 +1052,66 @@ describe("a session with no suite declared", () => {
       await settleJobs();
     }
     assert.match(said.join("\n"), /run-of-record-none reason=no suite declared; nothing to run/);
+  });
+
+  it("stops a repository that builds code at the run of record, before the land, and the declared suite closes it", async () => {
+    // A .NET project and no suite used to land and push, then refuse at the
+    // close on test_run_fresh with nothing left that kept the tree verified.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(
+      { ...SEED, "App.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' },
+      { origin: true },
+    );
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED, VERIFIED], { suites: [] });
+    await capture(() =>
+      Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
+    );
+    const plan = await next(sessionsDir);
+    assert.equal(await answerPlan(sessionsDir, plan.instruction?.seq ?? 0, PLAN), EXIT_OK);
+    const step = await next(sessionsDir);
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+    assert.equal((await answerStep(sessionsDir, step.instruction?.seq ?? 0, "widget", ["src/widget.py"])).code, EXIT_OK);
+    const head = gitOut(repo, "rev-parse", "HEAD").trim();
+
+    const walk = async (kind: DriverInstruction["kind"]): Promise<DriverInstruction> => {
+      const deadline = Date.now() + 180_000;
+      for (;;) {
+        const move = await next(sessionsDir);
+        if (move.instruction?.kind === kind) return move.instruction;
+        assert.equal(move.instruction?.kind, "wait", move.err);
+        if (Date.now() > deadline) assert.fail("the framework's own jobs never finished");
+        await settleJobs();
+      }
+    };
+
+    // --- the stop: the gate's own words, and nothing landed -----------------
+    const fix = await walk("step");
+    assert.equal(fix.step_id, "fix-run-of-record");
+    const refusal = judgeSuiteDeclaration({ suites: [], errors: [], ok: true }, ["dotnet"]);
+    assert.ok(String(fix.ask).includes(String(refusal?.[1])), String(fix.ask));
+    const waiting = readRun(repo, 1);
+    assert.equal(waiting?.phase, "run-of-record");
+    assert.equal(waiting?.pending_step?.then, "preverify");
+    assert.equal(gitOut(repo, "rev-parse", "HEAD").trim(), head);
+
+    // --- the suite declared in the fix; verified again, run, closed ----------
+    writeFileSync(
+      join(repo, "dabbler.yaml"),
+      JSON.stringify({ schema_version: 1, testing: { suites: [TESTING.suites[0]] } }) + "\n",
+      "utf8",
+    );
+    // A test's config file replaces every layer, dabbler.yaml among them, so
+    // the declaration the fix wrote is handed to the router the same way.
+    configure([VERIFIED, VERIFIED], { suites: [TESTING.suites[0]] });
+    assert.equal((await answerStep(sessionsDir, fix.seq, "fix-run-of-record", ["dabbler.yaml"])).code, EXIT_OK);
+    await walk("done");
+    assert.equal(readRounds(repo, 1).length, 2);
+    assert.ok(
+      readRecords(repo).some((row) => row.suite === "unit" && row.stage === "final-full" && row.outcome === "passed"),
+      "no green final-full record for the declared suite",
+    );
   });
 });

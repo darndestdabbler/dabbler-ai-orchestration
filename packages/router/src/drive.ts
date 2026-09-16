@@ -102,6 +102,8 @@ import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
   type EvidencePhase,
   checkVerificationClean,
+  codeEcosystems,
+  judgeSuiteDeclaration,
   rewindPhaseFor,
 } from "./gates.ts";
 import type {
@@ -2662,6 +2664,19 @@ class Driver {
     // Said, rather than left to a gate's N/A: a reader of the record could
     // not otherwise tell a suite that was skipped from one that was green.
     if (suites.length === 0) {
+      // The close's own question, asked before the land: refused there, the
+      // verified tree is already pushed and no exit leaves it verified.
+      const declared = judgeSuiteDeclaration(loadSuitesChecked(this.config), codeEcosystems(this.repoRoot));
+      if (declared !== null && !declared[0]) {
+        this.log("run-of-record-undeclared", { reason: declared[1] });
+        await this.runSynthesisedStep(
+          "fix-run-of-record",
+          `The run of record has nothing to run: ${declared[1]}. The framework will run ` +
+            "every step's checks, verification and the suite again.",
+          "preverify",
+        );
+        return;
+      }
       this.log("run-of-record-none", { reason: "no suite declared; nothing to run" });
     }
     const records = readRecords(this.repoRoot);

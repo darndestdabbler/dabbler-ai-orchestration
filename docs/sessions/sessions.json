@@ -3754,7 +3754,7 @@
     {
       "number": 190,
       "title": "The declaration a step writes is the declaration the loop reads",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-16T09:21:16.981000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -3763,7 +3763,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.3.5",
-      "completedAt": null,
+      "completedAt": "2026-09-16T10:16:55.370000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 3,

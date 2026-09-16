@@ -11124,3 +11124,58 @@ behalf outside a session.
 the only change in the tree, and one that the land commits it.
 
 **Releasable.** Yes, a patch, 3.3.3.
+
+### Session 188 of 188: One loop terminal, and it goes when the session does
+
+Scope: whole repository
+
+**Why.** Start opens the framework's loop terminal with the editor's own
+binary as its shell -- `loopTerminalFor` passes `process.execPath` and
+`ELECTRON_RUN_AS_NODE` -- and VS Code never reaches process-ready for it. So
+the tab is labelled from the executable's basename, `Code`, instead of the
+name the extension gave it, and nothing ever closes it. The operator's own
+`terminal.log` for 2026-09-15 carries two such pairs left over in one window:
+ids 21 and 23 titled `Code` with `pid 0`, beside ids 22 and 24 titled
+`Claude Code` with real pids. Every Start therefore adds a tab to the editor
+area that nobody can identify from its name and nothing removes, next to the
+CLI and the Dabbler terminal, which are the two panes the operator is
+actually reading.
+
+Measured 2026-09-16 against an isolated VS Code 1.137.0, with a throwaway
+extension standing in for this one: a terminal created with a name and a
+`shellPath` of `Code.exe` reports its name as `Code`, while the same call
+with `cmd.exe` keeps the name it was given; and disposing such a terminal
+does not end its process -- a marker kept beating for thirty seconds after
+its tab was gone.
+
+**What.** The loop terminal opens in the panel and does not take focus, so
+the editor area stays the CLI's and the Dabbler terminal's. Its location
+becomes its own rather than the global `dabbler.terminalLocation` answer,
+which today decides for every terminal Start opens at once. One is kept per
+repository, in a registry keyed on the repository root the way the Dabbler
+terminal's is; Start disposes a leftover before opening the next, and a
+window reload that loses the registry is covered by a scan on
+`creationOptions.name`, which holds the true name where `name` does not. The
+session completing disposes it: `sessions.json` is watched already, and
+`currentSession` going null is the signal.
+
+Closing it by hand keeps today's behaviour deliberately -- the loop runs on,
+and Resume's heartbeat check keeps a second one from starting beside it. An
+orphaned loop cannot reach another session: it binds to one session number at
+`register()` and exits when that session closes.
+
+**Non-goals.** The `Code` label itself: correcting it means launching through
+a real shell, and that changes what closing the tab does, which is the one
+behaviour this session is keeping. The CLI terminals, which stay open across
+sessions so an operator can read an old one while a new session runs. The
+Dabbler terminal. Resume's own replacement of the CLI it reopens. Anything in
+the router.
+
+**Tests.** One that Start opens the loop terminal in the panel without taking
+focus; one that a second Start disposes the first loop terminal and leaves the
+CLI and Dabbler terminals alone; one that the session completing disposes it;
+one that closing it by hand leaves the heartbeat, and Resume's refusal to
+start a second loop, intact. The placement and the focus are Playwright's
+against the real editor, because the `vscode` stub can see neither.
+
+**Releasable.** Yes, a patch.

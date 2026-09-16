@@ -11248,3 +11248,118 @@ close green. The stop's words are the gate's own, asserted once against the
 shared predicate rather than copied into a second string.
 
 **Releasable.** Yes, a patch.
+
+### Session 190 of 190: The declaration a step writes is the declaration the loop reads
+
+Scope: whole repository
+
+**Why.** On 2026-09-16, 3.3.6 -- session 189's release -- stopped session 2 of
+`test-dabbler-orchestration-terminals` with no way forward. The session's
+own step `declare-suite-and-pack` wrote the `dotnet` suite into
+`dabbler.yaml` at 09:05:37; at 09:06:22 the run of record issued
+`fix-run-of-record`: *"no suite is declared, and this repository builds dotnet
+code"*. The file on disk declared it. The loop did not see it, because
+`withDriver` calls `loadConfig` once, when `dabbler session run --mailbox`
+starts, and `Driver` keeps that answer in a `readonly config` for the life of
+the process. The loop started at 09:00:24, before the step wrote the suite.
+Answering the step `done` returns the session to `preverify`, and verification
+runs again and reaches the same question with the same stale answer. That
+repeats until the invocation cap. The only exit is a person killing the loop
+terminal and pressing Resume. That breaks the zero-deadlock rule, and it hits
+the path session 189's own Session 2 template now recommends: declare the
+suite in the session that adds the first project.
+
+Before 189 the same stale read did quieter damage. `expensiveSuites()` found
+nothing, the run of record logged `run-of-record-none` and landed, and the
+close refused on `test_run_fresh`, which reads the file from disk. 189 moved
+that question before the push and kept the stale answer it asks with.
+
+**Why 189's tests passed.** Its test drives the session with `sessionNext`,
+which builds a new `Driver`, and so reloads the config, on every move. It also
+hands the new suite to the router by calling `configure()` again, rewriting
+the config override itself. Neither is what the product runs. The
+long-lived loop that Start opens is one `driveSession` call, and nothing
+rewrites its config. A test that builds a fresh driver per move cannot see a
+defect in what one driver remembers.
+
+**What.** The driver reads the repository's configuration when it acts on it,
+not once when the process starts. `this.config` goes, and a
+`config()` read through `loadConfig(undefined, this.repoRoot)` takes its
+place at every site that reads it today: the invocation cap, `engine_output`,
+the check timeouts and the named test commands, the suites at the checks and
+the run of record, and the verification round cap. That is one rule for every
+site, not a list of fields someone chose to refresh. `withDriver` keeps its
+first load only to refuse a malformed configuration before registering.
+
+Re-reading adds a failure the startup read did not have: a step can leave
+`dabbler.yaml` malformed while the loop is running. That can never crash the
+loop or stop it with no way out. A `ConfigError` read at a move becomes the
+synthesised fix step the run of record already uses. Its ask names the file
+and the loader's own message, and it returns to `preverify`, so the same exit
+that clears a missing suite clears a broken one.
+
+**Test before publishing -- two proofs, both before the push.** The framework
+publishes between the push and the close, so anything that must hold the
+release has to fail before the push. Both proofs are steps in this session,
+and either one failing reports its step `blocked`. The session stops there,
+with nothing pushed and nothing published.
+
+1. **The regression test is shown red first.** A test in
+   `walk-session.test.ts` drives the whole session with **one**
+   `driveSession` call, the way `session run --mailbox` does. Its engine
+   adapter answers the steps. One step writes the suite into the
+   configuration the driver loaded, mid-drive, with no fresh driver and no
+   second `configure()`. The test asserts that the run of record runs the
+   suite and the session reaches `done` with a green `final-full` record,
+   and that no `fix-run-of-record` step is issued. It is committed only after
+   it has been run against the unfixed `drive.ts` and **failed**. The failing
+   output goes in the step's notes. A regression test that has never failed
+   has not shown it can detect this defect.
+
+2. **The shipped artifact walks the incident, before and after.** After the
+   fix and the build, the operator's incident is replayed with the `dabbler.cjs`
+   bundled in `tools/dabbler-ai-orchestration/dist/`, the file the VSIX
+   ships, not the source. The walk runs in a clone of
+   `D:\Projects\test-dabbler-orchestration-terminals` at `2e21359`, *"Reset
+   to the close of session 1"*, under `C:\temp\s190-walk`, with a bare origin
+   of its own so the land pushes nowhere real:
+   - **Control first, on 3.3.6.** Session 2 runs through `session run
+     --mailbox` with the 3.3.6 bundle, with this session's AI answering
+     through `session wait`, until `fix-run-of-record` appears, and stops
+     there. This proves the walk reproduces the incident. A walk that cannot
+     reproduce it proves nothing about the fix, and the step reports
+     `blocked`.
+   - **Then the fix, from a fresh clone.** The same session 2 runs with the
+     new bundle, through **one** loop process, to `done`. It passes when
+     `loop.json` shows the same pid from start to close, no
+     `fix-run-of-record` is issued, `test-evidence` holds a passed
+     `final-full` row for `dotnet`, and the session closes. Reviewers are
+     the real ones this machine is configured for, because this is the
+     acceptance run, not a unit test.
+
+   The record is `docs/uat/uat-stale-config-walk.md`: both runs, the
+   commands, the pids, and what each stopped on or closed with.
+
+**Non-goals.** Changing what `judgeSuiteDeclaration` or `test_run_fresh`
+decides, or their wording. Re-reading configuration anywhere outside the
+driver: `dabbler packaging`, the test-evidence runner and the close already
+run as their own processes and read the file fresh. Unsticking the operator's
+own `test-dabbler-orchestration-terminals` session 2, which a loop restart
+through Resume clears on 3.3.6 today. Watching `dabbler.yaml` for changes:
+reading it when it is used makes a watcher unnecessary. Anything in the
+extension.
+
+**Steps.** (1) The regression test, run red against the unfixed driver, the
+output kept. (2) The fix: `config()` at every site, and the malformed-file
+fix step. (3) The build, the control walk on 3.3.6, then the walk on the new
+bundle, recorded. (4) Release: version, stamp, CHANGELOG.
+
+**Tests.** One that a suite a step writes mid-drive is the suite the run of
+record runs, in one `driveSession` (red on 3.3.6, green after). One that a
+`dabbler.yaml` a step leaves malformed mid-drive issues the fix step naming
+the file and returns to `preverify`, and that repairing it reaches `done`.
+The 189 test stays as it is, because it still covers the case where no suite
+is declared at all.
+
+**Releasable.** Yes, a patch, 3.3.7. It publishes only if both proofs
+passed, since each one stops the session before the push when it fails.

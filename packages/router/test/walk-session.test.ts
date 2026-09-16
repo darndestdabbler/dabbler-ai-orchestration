@@ -1115,3 +1115,252 @@ describe("a session with no suite declared", () => {
     );
   });
 });
+
+describe("one loop, and a suite a step declares while it runs", () => {
+  it("runs the suite the step declared at the run of record, without asking for it again", async () => {
+    // `session run --mailbox` is ONE driveSession for the whole session. A
+    // test that builds a driver per move reloads the configuration on every
+    // move, and so cannot see what one long-lived driver remembers.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(
+      { ...SEED, "App.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' },
+      { origin: true },
+    );
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED, VERIFIED], { suites: [] });
+    const configPath = String(process.env[CONFIG_ENV_VAR]);
+
+    const asked: string[] = [];
+    const engine: Engine = {
+      name: "claude-code",
+      invoke: ({ instruction }) => {
+        const stepId = String(instruction.step_id);
+        asked.push(stepId);
+        if (stepId === "plan") {
+          const path = join(tempDir("answer-"), "answer.json");
+          writeFileSync(path, JSON.stringify(PLAN), "utf8");
+          report(sessionsDir, { seq: instruction.seq, answerFile: path });
+        } else {
+          writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+          // The step declares the suite in the configuration the loop has
+          // already loaded: no fresh driver, no second configure().
+          const config = JSON.parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;
+          writeFileSync(
+            configPath,
+            JSON.stringify({ ...config, testing: { suites: [TESTING.suites[0]] } }),
+            "utf8",
+          );
+          report(sessionsDir, {
+            seq: instruction.seq,
+            stepId,
+            status: "done",
+            files: ["src/widget.py"],
+            testsRun: null,
+            notes: "walked",
+          });
+        }
+        return Promise.resolve({ exitCode: 0 });
+      },
+    };
+
+    // Real jobs: the in-process starter runs a job only when a walkthrough
+    // settles it, and nothing can while one driveSession call is in flight.
+    restoreJobs();
+    let drive;
+    try {
+      drive = await capture(() =>
+        driveSession(sessionsDir, {
+          engine: "claude-code",
+          provider: "anthropic",
+          adapter: engine,
+          maxInvocations: 4,
+        }),
+      );
+    } finally {
+      restoreJobs = useInProcessJobs();
+    }
+
+    assert.ok(!asked.includes("fix-run-of-record"), `asked: ${asked.join(", ")}\n${drive.stderr}`);
+    assert.equal(drive.value, EXIT_OK, drive.stderr);
+    assert.ok(
+      readRecords(repo).some((row) => row.suite === "unit" && row.stage === "final-full" && row.outcome === "passed"),
+      "no green final-full record for the suite the step declared",
+    );
+  });
+
+  it("refuses the step that leaves the configuration malformed, in the loader's words, and the repair it answers with carries on", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED, VERIFIED], { suites: [TESTING.suites[0]] });
+    const configPath = String(process.env[CONFIG_ENV_VAR]);
+    const good = readFileSync(configPath, "utf8");
+
+    const asked: string[] = [];
+    let refused = "";
+    const engine: Engine = {
+      name: "claude-code",
+      invoke: ({ instruction }) => {
+        const stepId = String(instruction.step_id);
+        asked.push(`${instruction.kind}:${stepId}`);
+        if (stepId === "plan") {
+          const path = join(tempDir("answer-"), "answer.json");
+          writeFileSync(path, JSON.stringify(PLAN), "utf8");
+          report(sessionsDir, { seq: instruction.seq, answerFile: path });
+          return Promise.resolve({ exitCode: 0 });
+        }
+        if (instruction.kind === "rejection") {
+          refused = (instruction.reasons ?? []).join(" ");
+          writeFileSync(configPath, good, "utf8");
+        } else {
+          writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+          writeFileSync(configPath, "{ this is not: [valid", "utf8");
+        }
+        report(sessionsDir, {
+          seq: instruction.seq,
+          stepId,
+          status: "done",
+          files: ["src/widget.py"],
+          testsRun: null,
+          notes: "walked",
+        });
+        return Promise.resolve({ exitCode: 0 });
+      },
+    };
+
+    restoreJobs();
+    let drive;
+    try {
+      drive = await capture(() =>
+        driveSession(sessionsDir, {
+          engine: "claude-code",
+          provider: "anthropic",
+          adapter: engine,
+          maxInvocations: 4,
+        }),
+      );
+    } finally {
+      writeFileSync(configPath, good, "utf8");
+      restoreJobs = useInProcessJobs();
+    }
+
+    // The step is asked again rather than skipped, and nothing after it is.
+    assert.deepEqual(asked, ["step:plan", "step:widget", "rejection:widget"], drive.stderr);
+    assert.match(refused, /\[config-malformed\]/);
+    assert.ok(refused.includes("does not parse"), refused);
+    assert.ok(refused.includes(configPath), refused);
+    assert.equal(drive.value, EXIT_OK, drive.stderr);
+    assert.ok(
+      readRecords(repo).some((row) => row.suite === "unit" && row.stage === "final-full" && row.outcome === "passed"),
+      "no green final-full record after the repair",
+    );
+  });
+
+  it("asks for a configuration broken under the framework's own phase to be repaired, again while it stays broken, then carries on from preverify", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED, VERIFIED], { suites: [TESTING.suites[0]] });
+    const configPath = String(process.env[CONFIG_ENV_VAR]);
+    const good = readFileSync(configPath, "utf8");
+
+    // The step's own check breaks the file, once, after the judgement has
+    // read it: the first reader after that is the verification phase.
+    const marker = join(tempDir("broke-"), "broke");
+    const breaking = {
+      ...PLAN,
+      steps: [
+        {
+          ...PLAN.steps[0],
+          checks: [
+            {
+              argv: [
+                NODE,
+                "-e",
+                `const fs=require('fs');if(!fs.existsSync(${JSON.stringify(marker)})){` +
+                  `fs.writeFileSync(${JSON.stringify(marker)},'');` +
+                  `fs.writeFileSync(${JSON.stringify(configPath)},'{ this is not: [valid');}` +
+                  "process.exit(fs.readFileSync('src/widget.py','utf8').includes('return 2') ? 0 : 1)",
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const asked: string[] = [];
+    let fix: { ask: string; then: unknown } | null = null;
+    let refused = "";
+    const engine: Engine = {
+      name: "claude-code",
+      invoke: ({ instruction }) => {
+        const stepId = String(instruction.step_id);
+        asked.push(`${instruction.kind}:${stepId}`);
+        if (stepId === "plan") {
+          const path = join(tempDir("answer-"), "answer.json");
+          writeFileSync(path, JSON.stringify(breaking), "utf8");
+          report(sessionsDir, { seq: instruction.seq, answerFile: path });
+          return Promise.resolve({ exitCode: 0 });
+        }
+        if (stepId === "widget") {
+          writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+        } else if (instruction.kind === "step") {
+          // The first repair parses, and still declares no suite that can run.
+          fix = { ask: String(instruction.ask), then: readRun(repo, 1)?.pending_step?.then };
+          const config = JSON.parse(good) as Record<string, unknown>;
+          writeFileSync(configPath, JSON.stringify({ ...config, testing: { suites: [{ name: "unit" }] } }), "utf8");
+        } else {
+          refused = (instruction.reasons ?? []).join(" ");
+          writeFileSync(configPath, good, "utf8");
+        }
+        report(sessionsDir, {
+          seq: instruction.seq,
+          stepId,
+          status: "done",
+          files: stepId === "widget" ? ["src/widget.py"] : [],
+          testsRun: null,
+          notes: "walked",
+        });
+        return Promise.resolve({ exitCode: 0 });
+      },
+    };
+
+    restoreJobs();
+    let drive;
+    try {
+      drive = await capture(() =>
+        driveSession(sessionsDir, {
+          engine: "claude-code",
+          provider: "anthropic",
+          adapter: engine,
+          maxInvocations: 5,
+        }),
+      );
+    } finally {
+      writeFileSync(configPath, good, "utf8");
+      restoreJobs = useInProcessJobs();
+    }
+
+    assert.deepEqual(
+      asked,
+      ["step:plan", "step:widget", "step:fix-configuration", "rejection:fix-configuration"],
+      drive.stderr,
+    );
+    const issued = fix as { ask: string; then: unknown } | null;
+    assert.ok(String(issued?.ask).includes("does not parse"), String(issued?.ask));
+    assert.ok(String(issued?.ask).includes(configPath), String(issued?.ask));
+    assert.equal(issued?.then, "preverify");
+    assert.match(refused, /\[config-malformed\].*testing\.suites is malformed/);
+    assert.equal(drive.value, EXIT_OK, drive.stderr);
+    assert.ok(
+      readRecords(repo).some((row) => row.suite === "unit" && row.stage === "final-full" && row.outcome === "passed"),
+      "no green final-full record after the repair",
+    );
+  });
+});

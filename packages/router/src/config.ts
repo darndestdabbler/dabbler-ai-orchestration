@@ -208,7 +208,14 @@ export function deepMerge(
 
 function readYaml(path: string): unknown {
   // 1.1 is PyYAML's version; see the module header.
-  return parseYaml(readText(path), { version: "1.1" }) ?? null;
+  const text = readText(path);
+  try {
+    return parseYaml(text, { version: "1.1" }) ?? null;
+  } catch (error) {
+    // A file that does not parse is a configuration that does not load, and
+    // is refused in the one shape every caller already answers.
+    throw new ConfigError(`${path} does not parse: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 // --- Schemas ----------------------------------------------------------------

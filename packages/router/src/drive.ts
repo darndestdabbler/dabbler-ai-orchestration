@@ -47,6 +47,7 @@ import {
 import { divertOut, writeErr, writeOut } from "./output.ts";
 import {
   ConfigError,
+  DEFAULT_ENGINE_OUTPUT,
   type RouterConfig,
   driverEngineOutput,
   driverInvocationCap,
@@ -621,6 +622,7 @@ const RULE = {
   filesChangedMissingFile: "files-changed-missing-file",
   filesChangedOmits: "files-changed-omits",
   checkFailed: "check-failed",
+  configMalformed: "config-malformed",
   noWorkPlan: "no-work-plan",
   /** The plan names nothing it will not do. */
   planNonGoals: "plan-non-goals",
@@ -631,6 +633,27 @@ const RULE = {
 /** One refusal, carrying the name of the rule that refused it. */
 function refusal(rule: string, reason: string): string {
   return `[${rule}] ${reason}`;
+}
+
+/**
+ * The suites a configuration declares, or the refusal of a configuration
+ * whose suites do not load: parseable text in the wrong shape is repaired by
+ * the same step as text that does not parse.
+ */
+function checkedSuites(config: unknown): ReturnType<typeof loadSuitesChecked> {
+  const loaded = loadSuitesChecked(config);
+  if (loaded.errors.length > 0) {
+    throw new ConfigError(`testing.suites is malformed: ${loaded.errors.join("; ")}`);
+  }
+  return loaded;
+}
+
+/** What a configuration that does not load asks for, in the loader's own words. */
+function configurationRefusal(error: ConfigError): string {
+  return (
+    `the repository's configuration does not load: ${error.message}. Repair ` +
+    `${PROJECT_CONFIG_FILENAME}, or the file the message names`
+  );
 }
 
 /**
@@ -928,7 +951,6 @@ class Driver {
   private readonly sessionsDir: string;
   private readonly options: DriverOptions;
   private readonly repoRoot: string;
-  private readonly config: RouterConfig;
   private sessionNumber = 0;
   private run!: DriverRun;
   /**
@@ -958,16 +980,22 @@ class Driver {
    */
   private answered = false;
 
-  constructor(
-    sessionsDir: string,
-    options: DriverOptions,
-    repoRoot: string,
-    config: RouterConfig,
-  ) {
+  constructor(sessionsDir: string, options: DriverOptions, repoRoot: string) {
     this.sessionsDir = sessionsDir;
     this.options = options;
     this.repoRoot = repoRoot;
-    this.config = config;
+  }
+
+  /**
+   * The repository's configuration, read when it is acted on.
+   *
+   * One driver lives for a whole session under `session run --mailbox`, and
+   * a step may declare a suite in `dabbler.yaml` while it runs. An answer
+   * kept from the process's start is the answer before that step, and the
+   * run of record would ask for the suite the file already declares.
+   */
+  private config(): RouterConfig {
+    return loadConfig(undefined, this.repoRoot);
   }
 
   private get pull(): boolean {
@@ -1161,7 +1189,7 @@ class Driver {
     // two of a push run's own invocations: one bug, in two modes.
 
     const existing = readRun(this.repoRoot, current);
-    const cap = this.options.maxInvocations ?? driverInvocationCap(this.config);
+    const cap = this.options.maxInvocations ?? driverInvocationCap(this.config());
     if (existing === null) {
       const now = nowIso();
       this.run = {
@@ -1595,7 +1623,16 @@ class Driver {
   }
 
   private engineOutput(): EngineOutput {
-    return this.options.engineOutput ?? driverEngineOutput(this.config);
+    if (this.options.engineOutput) return this.options.engineOutput;
+    try {
+      return driverEngineOutput(this.config());
+    } catch (error) {
+      // How the engine's output is shown must not stand between a malformed
+      // configuration and the invocation that repairs it: thrown here, the
+      // fix step could never be issued to an engine.
+      if (!(error instanceof ConfigError)) throw error;
+      return DEFAULT_ENGINE_OUTPUT;
+    }
   }
 
   /**
@@ -1691,7 +1728,7 @@ class Driver {
    * the engine can still do something about it.
    */
   private suiteGap(): string {
-    const loaded = loadSuitesChecked(this.config);
+    const loaded = loadSuitesChecked(this.config());
     if (!loaded.ok || loaded.suites.some((suite) => suite.expensive)) return "";
     let code: string[] = [];
     try {
@@ -1989,6 +2026,37 @@ class Driver {
     this.setPhase(then);
   }
 
+  /**
+   * A configuration that stopped loading while one of the framework's own
+   * phases ran.
+   *
+   * Read where it is acted on, `dabbler.yaml` can be left malformed
+   * mid-session. That is a step to repair it, never a crash and never a stop
+   * with no exit. It is only recorded here: the loop head issues it, inside
+   * the same guard, so a repair that still leaves the file broken asks
+   * again rather than throwing out of this handler. It returns to where the
+   * pending step it replaces was going, or to the plan or the steps when
+   * those are what met it, and otherwise to `preverify`, as the run of record's own fix step
+   * does, so every check, verification and the suite run again over the
+   * repaired file. A step's own answer never reaches here: `judge` refuses
+   * it, so the step that broke the file is the step asked to repair it.
+   */
+  private pendConfigurationFix(error: ConfigError): void {
+    this.log("configuration-malformed", { reason: error.message });
+    const pending = this.run.pending_step ?? null;
+    const phase = this.run.phase;
+    const then = pending?.then ?? (phase === "plan" || isWorkPhase(phase) ? phase : "preverify");
+    this.run = {
+      ...this.run,
+      pending_step: {
+        id: "fix-configuration",
+        ask: `${configurationRefusal(error)}; the framework will run every step's checks, verification and the suite again.`,
+        then,
+      },
+    };
+    this.save();
+  }
+
   /** Ask for a step until its report is accepted, refused three times, or blocked. */
   private async runStep(spec: StepSpec): Promise<void> {
     // Cleared on the way out and NOT in a `finally`: a `finally` runs while
@@ -2112,13 +2180,26 @@ class Driver {
     }
     if (reasons.length > 0) return reasons;
 
+    // Read once for this judgement. A step that left it malformed is refused,
+    // so the step that broke the file is the step asked to repair it and
+    // nothing it or the plan still owes is skipped.
+    let config: RouterConfig;
+    try {
+      config = this.config();
+      checkedSuites(config);
+    } catch (error) {
+      if (!(error instanceof ConfigError)) throw error;
+      this.log(RULE.configMalformed, { step: spec.id, reason: error.message });
+      return [refusal(RULE.configMalformed, configurationRefusal(error))];
+    }
+
     for (const [index, check] of spec.checks.entries()) {
       const argv = [...check.argv];
       const declared = makeCheck({ name: `${spec.id} check ${index + 1}`, argv, kind: "control" });
       const run = await executeCheck(this.repoRoot, declared, argv.join(" "), {
         stage: "driver",
         treeDigest: current,
-        timeoutSeconds: timeoutFor(declared, this.config),
+        timeoutSeconds: timeoutFor(declared, config),
       });
       const green = checkRunGreen(run);
       // The log event and the rule are the same fact, so they are the same
@@ -2136,7 +2217,7 @@ class Driver {
         );
       }
     }
-    if (reasons.length === 0) reasons.push(...(await this.namedTestRefusals(spec.id, changed, current)));
+    if (reasons.length === 0) reasons.push(...(await this.namedTestRefusals(spec.id, changed, current, config)));
     return reasons;
   }
 
@@ -2150,14 +2231,15 @@ class Driver {
     stepId: string,
     changed: readonly string[],
     tree: string,
+    config: RouterConfig,
   ): Promise<string[]> {
     const reasons: string[] = [];
-    for (const { suite, command } of namedTestCommands(this.repoRoot, this.config, changed)) {
+    for (const { suite, command } of namedTestCommands(this.repoRoot, config, changed)) {
       const declared = makeCheck({ name: `${stepId} named tests of ${suite}`, command });
       const run = await executeCheck(this.repoRoot, declared, command, {
         stage: "driver",
         treeDigest: tree,
-        timeoutSeconds: timeoutFor(declared, this.config),
+        timeoutSeconds: timeoutFor(declared, config),
       });
       const green = checkRunGreen(run);
       this.log(green ? "named-tests-passed" : RULE.checkFailed, { step: stepId, suite, command });
@@ -2178,10 +2260,7 @@ class Driver {
   // --- the tests -------------------------------------------------------------
 
   private expensiveSuites() {
-    const loaded = loadSuitesChecked(this.config);
-    if (loaded.errors.length > 0) {
-      throw new Stop("tests", `testing.suites is malformed: ${loaded.errors.join("; ")}`);
-    }
+    const loaded = checkedSuites(this.config());
     return loaded.suites.filter((suite) => suite.expensive);
   }
 
@@ -2360,7 +2439,7 @@ class Driver {
       this.repoRoot,
       this.sessionNumber,
       readRounds(this.repoRoot, this.sessionNumber),
-      this.run.verification?.max_rounds || verificationRoundCap(this.config),
+      this.run.verification?.max_rounds || verificationRoundCap(this.config()),
     );
     if (noRound === NO_ROUND_TERMINAL || noRound === NO_ROUND_CAP_CLEAN) {
       // With one condition, which `verify`'s own message cannot state and
@@ -2405,7 +2484,7 @@ class Driver {
         "verification",
         capDisputedRefusal(
           this.sessionsDir,
-          this.run.verification?.max_rounds || verificationRoundCap(this.config),
+          this.run.verification?.max_rounds || verificationRoundCap(this.config()),
           latest["round"],
         ),
         "cap-disputed",
@@ -2666,7 +2745,7 @@ class Driver {
     if (suites.length === 0) {
       // The close's own question, asked before the land: refused there, the
       // verified tree is already pushed and no exit leaves it verified.
-      const declared = judgeSuiteDeclaration(loadSuitesChecked(this.config), codeEcosystems(this.repoRoot));
+      const declared = judgeSuiteDeclaration(loadSuitesChecked(this.config()), codeEcosystems(this.repoRoot));
       if (declared !== null && !declared[0]) {
         this.log("run-of-record-undeclared", { reason: declared[1] });
         await this.runSynthesisedStep(
@@ -2764,10 +2843,7 @@ class Driver {
    * since the verified tree.
    */
   private landFacts(): LandFacts {
-    const loaded = loadSuitesChecked(this.config);
-    if (loaded.errors.length > 0) {
-      throw new Stop("land", `testing.suites is malformed: ${loaded.errors.join("; ")}`);
-    }
+    const loaded = checkedSuites(this.config());
     const owed = loaded.suites.filter((suite) => suite.expensive && suiteRequiredForClose(suite));
     const runs = readRecords(this.repoRoot);
     const sessionSeconds = closedSessionSeconds(readSessionState(this.sessionsDir));
@@ -3193,73 +3269,78 @@ class Driver {
         // A stop asked for while the framework's own phase was running (a
         // verification round, the suite) takes effect at this boundary.
         if (this.run.phase !== "complete") this.honourPendingStop();
-        // A synthesised step whose answer is outstanding is judged before
-        // the phase it was issued from does anything else.
-        const pending = this.run.pending_step ?? null;
-        if (pending !== null && this.run.phase !== "complete") {
-          await this.runSynthesisedStep(pending.id, pending.ask, pending.then);
-          continue;
-        }
-        // Dispatched on the canonical name, so a run recorded under the old
-        // one resumes into the phase it stopped in without its record being
-        // rewritten to be readable. `isWorkPhase` is the only place either
-        // name is recognised.
-        switch (isWorkPhase(this.run.phase) ? PHASE_WORK : this.run.phase) {
-          case "plan":
-            await this.phasePlan();
-            break;
-          case PHASE_WORK:
-            await this.phaseSteps();
-            break;
-          case "preverify":
-            await this.phasePreverify();
-            break;
-          case "verify":
-            await this.phaseVerify();
-            break;
-          case "dispositions":
-            await this.phaseDispositions();
-            break;
-          case "fix":
-            await this.phaseFix();
-            break;
-          case "run-of-record":
-            await this.phaseRunOfRecord();
-            break;
-          case "land":
-            this.phaseLand();
-            break;
-          case "gate-wait":
-            await this.phaseGateWait();
-            break;
-          case "publish":
-            await this.phasePublish();
-            break;
-          case "close":
-            await this.phaseClose();
-            break;
-          case "complete":
-            this.log("session-complete", {
-              session: sessionDisplayNumber(this.sessionNumber),
-              invocations: this.run.invocations,
-            });
-            // The invocation count is the framework's own spending, and
-            // under the pull it spent none: the engine was the person's CLI
-            // and its bill is theirs. Saying "0 engine invocations" there
-            // would read as a session that did nothing.
-            writeOut(
-              `dabbler: session ${sessionDisplayNumber(this.sessionNumber)} complete` +
-                (this.pull ? ".\n" : ` after ${this.run.invocations} engine invocation(s).\n`),
-            );
-            // Nothing more is expected, and the pull says so in the one
-            // shape it says everything: the `done` the close issued.
-            if (this.pull) {
-              const done =
-                readInstruction(this.repoRoot, this.sessionNumber) ??
-                this.issue({ kind: "done" });
-              throw new Awaiting(done.kind === "done" ? done : this.issue({ kind: "done" }));
-            }
-            return EXIT_OK;
+        try {
+          // A synthesised step whose answer is outstanding is judged before
+          // the phase it was issued from does anything else.
+          const pending = this.run.pending_step ?? null;
+          if (pending !== null && this.run.phase !== "complete") {
+            await this.runSynthesisedStep(pending.id, pending.ask, pending.then);
+            continue;
+          }
+          // Dispatched on the canonical name, so a run recorded under the old
+          // one resumes into the phase it stopped in without its record being
+          // rewritten to be readable. `isWorkPhase` is the only place either
+          // name is recognised.
+          switch (isWorkPhase(this.run.phase) ? PHASE_WORK : this.run.phase) {
+            case "plan":
+              await this.phasePlan();
+              break;
+            case PHASE_WORK:
+              await this.phaseSteps();
+              break;
+            case "preverify":
+              await this.phasePreverify();
+              break;
+            case "verify":
+              await this.phaseVerify();
+              break;
+            case "dispositions":
+              await this.phaseDispositions();
+              break;
+            case "fix":
+              await this.phaseFix();
+              break;
+            case "run-of-record":
+              await this.phaseRunOfRecord();
+              break;
+            case "land":
+              this.phaseLand();
+              break;
+            case "gate-wait":
+              await this.phaseGateWait();
+              break;
+            case "publish":
+              await this.phasePublish();
+              break;
+            case "close":
+              await this.phaseClose();
+              break;
+            case "complete":
+              this.log("session-complete", {
+                session: sessionDisplayNumber(this.sessionNumber),
+                invocations: this.run.invocations,
+              });
+              // The invocation count is the framework's own spending, and
+              // under the pull it spent none: the engine was the person's CLI
+              // and its bill is theirs. Saying "0 engine invocations" there
+              // would read as a session that did nothing.
+              writeOut(
+                `dabbler: session ${sessionDisplayNumber(this.sessionNumber)} complete` +
+                  (this.pull ? ".\n" : ` after ${this.run.invocations} engine invocation(s).\n`),
+              );
+              // Nothing more is expected, and the pull says so in the one
+              // shape it says everything: the `done` the close issued.
+              if (this.pull) {
+                const done =
+                  readInstruction(this.repoRoot, this.sessionNumber) ??
+                  this.issue({ kind: "done" });
+                throw new Awaiting(done.kind === "done" ? done : this.issue({ kind: "done" }));
+              }
+              return EXIT_OK;
+          }
+        } catch (error) {
+          if (!(error instanceof ConfigError)) throw error;
+          this.pendConfigurationFix(error);
         }
       }
     } catch (error) {
@@ -3359,21 +3440,20 @@ async function withDriver(
     writeErr(`dabbler: not inside a git repository: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
-  let config: RouterConfig;
   try {
-    // The repository under `--sessions-dir`, never the one the command was
-    // typed in. The driver reads its invocation cap, its engine_output, its
-    // check timeouts and -- the one that does damage -- its `testing.suites`
-    // from this: a config resolved from the working directory would run
+    // Read here only to refuse a malformed configuration before anything is
+    // registered; the driver reads it again wherever it acts on it. Always
+    // the repository under `--sessions-dir`, never the one the command was
+    // typed in: a config resolved from the working directory would run
     // another repository's suite against this tree and record it as this
     // session's evidence.
-    config = loadConfig(undefined, repoRoot);
+    loadConfig(undefined, repoRoot);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     writeErr(`dabbler: ${error.message}\n`);
     return EXIT_USAGE;
   }
-  const driver = new Driver(sessionsDir, options, repoRoot, config);
+  const driver = new Driver(sessionsDir, options, repoRoot);
   try {
     const registered = await driver.register();
     if (registered !== EXIT_OK) return registered;

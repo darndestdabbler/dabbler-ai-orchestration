@@ -10,6 +10,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.3.7] — 2026-09-16
+
+**The declaration a step writes is the declaration the loop reads.** 3.3.6
+stopped a session that declared its suite in `dabbler.yaml` mid-session:
+the `session run --mailbox` loop had read the configuration once, when it
+started, and its run of record kept asking for a suite the file already
+declared -- every answer sent the session round again, until the loop was
+killed and resumed.
+
+### Fixed
+
+- **The loop reads the configuration when it acts on it.** The suites at
+  the checks and the run of record, the check timeouts and named tests, the
+  invocation and verification caps and the engine output setting are all
+  read from the repository at the moment they are used, so a suite a step
+  declares is the suite the run of record runs, in the same loop.
+- **A configuration that stops loading mid-session is a step, not a crash.**
+  A `dabbler.yaml` that no longer loads -- a YAML syntax error included, which
+  is now refused naming the file -- refuses the step that left it so, in the
+  loader's words, and that step is asked again. Met by one of the framework's
+  own phases instead, it becomes a `fix-configuration` step, asked again while
+  the file stays broken; repairing it sends the session back through the
+  checks, verification and the suite.
+- Replayed on the shipped bundle against the original incident: 3.3.6
+  reproduces it, and 3.3.7 closes the same session in one loop
+  (`docs/uat/uat-stale-config-walk.md`).
+
 ## [3.3.6] — 2026-09-16
 
 **The suite nobody declared is asked about before the push.** A repository

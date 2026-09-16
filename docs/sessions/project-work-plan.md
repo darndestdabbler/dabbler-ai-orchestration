@@ -227,6 +227,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 187 | Overrides the operator provably made | — | not declared |
 | 188 | One loop terminal, and it goes when the session does | yes | 2026-09-16 |
 | 189 | The suite nobody declared, asked before the push | yes | 2026-09-16 |
+| 190 | The declaration a step writes is the declaration the loop reads | yes | 2026-09-16 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2602,3 +2603,13 @@ Move the suite-declaration question from after the push to the run of record. In
 **Amended after acceptance:**
 
 - 2026-09-16 — step 'template-and-driving-doc': its checks: the whole bootstrap test file includes the commit-guard hook test, which needs sh on PATH and the check's built environment carries none; the template tests are the ones this step changes (claude-code (anthropic, claude-opus-5))
+
+### Session 190 — The declaration a step writes is the declaration the loop reads
+
+**Releasable: yes.**
+
+Make the long-lived driver read the repository's configuration when it acts on it rather than once at process start. In packages/router/src/drive.ts the Driver loses its readonly config and gains a private config() that returns loadConfig(undefined, this.repoRoot), called at every site that reads this.config today (the invocation cap, engine_output, the check timeouts and named test commands, the suites at the checks and at the run of record, and the verification round cap); withDriver keeps its first load only to refuse a malformed configuration before registering. A ConfigError raised by that read during a move becomes the synthesised fix step the run of record already uses, whose ask names dabbler.yaml and the loader's own message and which returns to preverify, so a step that leaves the file malformed never crashes the loop or stops it with no exit. Tests in packages/router/test/walk-session.test.ts drive a whole session with ONE driveSession call and an engine adapter: one where a step writes the suite into the loaded configuration mid-drive and the run of record runs it and reaches done with a green final-full record and no fix-run-of-record step -- shown red against the unfixed drive.ts first, its failing output kept -- and one where a step leaves the configuration malformed mid-drive, the fix step names the file and returns to preverify, and repairing it reaches done. The 189 test stays unchanged. The fix is then proven on the shipped artifact: the incident is replayed in a clone of test-dabbler-orchestration-terminals at 2e21359 under C:\temp\s190-walk with a bare origin of its own, first with the installed 3.3.6 bundle until fix-run-of-record appears (the control), then from a fresh clone with the newly built tools/dabbler-ai-orchestration/dist/dabbler.cjs through one loop process to a closed session with a green dotnet final-full row, recorded in docs/uat/uat-stale-config-walk.md. Either proof failing reports its step blocked, before anything is pushed. Releasable as a patch: version.json and the manifests it stamps move to 3.3.7, with a CHANGELOG entry.
+
+**Amended after acceptance:**
+
+- 2026-09-16 — step 'malformed-config-mid-drive': its files: A YAML syntax error in a configuration layer raises YAMLParseError, not ConfigError, so the loader's readYaml must name the file and raise ConfigError for the loop (and withDriver's startup refusal) to catch it (claude-code (anthropic, claude-opus-5))

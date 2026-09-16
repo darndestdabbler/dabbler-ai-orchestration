@@ -11179,3 +11179,72 @@ start a second loop, intact. The placement and the focus are Playwright's
 against the real editor, because the `vscode` stub can see neither.
 
 **Releasable.** Yes, a patch.
+
+### Session 189 of 189: The suite nobody declared, asked before the push
+
+Scope: whole repository
+
+**Why.** On 2026-09-16, session 2 of `test-dabbler-orchestration-terminals`
+added a .NET console project and declared no `testing.suites`. The framework
+accepted the plan, ran every step's checks, verified the work (round 1
+VERIFIED, `gpt-5.6-sol/openai`), committed it and **pushed it** -- and only
+then refused at the close on `test_run_fresh`: *"no suite is declared, and
+this repository builds dotnet code"*. The verified tree was already on the
+remote, and the session's only ways forward were a repair that changes the
+verified tree or a person's `session cancel --force`. That is this
+repository's own durable lesson from session 142 being broken by one of its
+own gates: a check made after the irreversible act is not a check.
+
+The rule is right and stays. Its position is the defect, and the position is
+not a hard problem, because the judgment needs nothing the close has and the
+run of record does not. `judgeSuiteDeclaration` is already a pure function of
+two facts -- the declared suites and the ecosystems the repository builds --
+and `phaseRunOfRecord` sits **before** `phaseLand` with both facts already on
+disk: the project file the session just wrote is what makes the detector say
+`dotnet`. What that phase does with them today is the whole of it:
+
+    if (suites.length === 0) {
+      this.log("run-of-record-none", { reason: "no suite declared; nothing to run" });
+    }
+
+It notes the first fact, never asks the second, and lands.
+
+**What.** The run of record asks the close's own question at the moment it
+would have run a suite and found none: no expensive suite declared and a
+repository that builds code is a stop there, in the same words the gate uses,
+before the commit and the push. The forward exit is the one that phase
+already has -- the synthesised `fix-run-of-record` step returns the session to
+`preverify`, so the suite is declared, the checks and the verification run
+again, and the tree that lands is the tree that was verified. A repository of
+documents still passes untouched: nothing to run is not the same as nothing
+declared, and `judgeSuiteDeclaration` already tells them apart.
+
+`docs/driving-a-session.md`, *When the framework stops*, gains the case: a
+close-gate stop that happens after the land, what it means, and that
+`session rebaseline` and not `session cancel --force` is the way out of one
+already reached -- a cancel does not unpush what was pushed.
+
+**Measured, not assumed, and it decides the wording below.** Whether a
+declared suite with no test project yet -- `dotnet test` over a solution that
+has none -- satisfies the gate is answered by running it in this session, not
+by reading the code. The Session 2 template gains *"declare the test suite in
+`dabbler.yaml` under `testing.suites` in the same session as the first
+project, even before any tests exist"* only if that measurement says the
+declaration alone is enough; if it is not, the template says what placeholder
+the first session owes instead.
+
+**Non-goals.** The gate's rule, its words and its incident. Refusing at plan
+acceptance: at that moment the repository builds nothing yet, so the
+ecosystems would have to be guessed from the prose of a file list, and a wrong
+guess refuses a good plan at the one instruction that starts the work. Any
+change to what `test_run_fresh` decides at the close, which stays exactly as
+it is for every session that reaches it.
+
+**Tests.** One that a repository which builds code and declares no suite stops
+at the run of record and never reaches the land; one that a repository of
+documents with no suite lands as it does today; one that the stop's forward
+exit returns the session to `preverify` and a suite declared there reaches the
+close green. The stop's words are the gate's own, asserted once against the
+shared predicate rather than copied into a second string.
+
+**Releasable.** Yes, a patch.

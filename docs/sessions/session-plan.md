@@ -11901,3 +11901,75 @@ changed rather than joined.
 
 **Releasable.** Yes, a minor, because which reviewers the pane presents as
 usable changes.
+
+### Session 199 of 199: A refused dispute goes back to the AI, and Resume is there when the loop is not
+
+Scope: whole repository
+
+**Why.** On 2026-09-17, session 198's round 1 raised one blocking finding.
+The authoring AI answered with a dispute whose evidence cited
+`docs/sessions/session-plan.md` whole, which is 689,979 bytes. `recordDispute`
+refuses a bare cite over `DISPUTE_EVIDENCE_INLINE_CAP` (16,384) and asks for a
+line range. Three defects then turned a correction the AI could make itself
+into a session nobody could move:
+1. **The refusal was a stop, not a rejection.** `phaseDispositions` in
+   `drive.ts` accepts the answer, then calls `recordDispute` and throws
+   `Stop("verification", ..., "dispute-refused")` when it refuses. The phase's
+   own rejection loop, a few lines above, already returns bad answers to the
+   engine with reasons and three tries. Its evidence check
+   (`resolveRepoRelative` only) is a weaker copy of the one `recordDispute`
+   applies, so the answer passed the first check and failed the second. The
+   stop's own table (`driver.ts`, `dispute-refused`) names the engine as the
+   actor.
+2. **A resumed loop reused the refused answer.** `phaseDispositions` reads the
+   stored `dispositions.json`. When its round matches, the phase skips the ask
+   and records the same dispute again, so `dabbler session run --mailbox`
+   stopped on the same refusal in the same second. The operator got past it
+   only by answering instruction 11 again through `dabbler session report`.
+3. **Resume was hidden with no loop running.** `ActionRegistry.ts` withholds
+   Resume whenever `stopActor` is `engine`, on the premise that a live loop
+   will hand the stop back to the engine. A stop ends the mailbox loop and
+   removes its heartbeat, so nothing was driving and nothing could be clicked.
+   `runResumeSession` already restarts a dead loop (`loopAlive`). Only the
+   button's condition was wrong.
+
+This breaks the zero-deadlock rule, and "a correction the engine can make
+never waits on a person" is the rule sessions 169 and 182 were written to.
+
+**What -- one evidence rule, applied where answers are judged.** The evidence
+checks in `recordDispute` (non-empty, in the repository, a
+`path:START-END` range, a bare cite no larger than the inline cap) become one
+exported judgment in `verify/disputes.ts`. `recordDispute` calls it, and so
+does `phaseDispositions`' rejection loop, in place of its own
+`resolveRepoRelative` check. A dispute the judgment refuses goes back to the
+engine as a `rejection`, carrying the refusal's own sentence, and counts
+toward `MAX_REJECTIONS` like any other refused answer.
+
+**What -- a stored answer is judged like a new one.** A `dispositions.json`
+read at the start of the phase is judged by the same rule before it is used.
+One the rule refuses is treated as unanswered: the phase asks again, with the
+refusal as a reason, instead of recording it. That covers a loop resumed
+after this stop on an older router. A refusal from `recordDispute` that the
+judgment could not have predicted, such as a round that is not recorded, is a
+state problem and stays a stop.
+
+**What -- Resume.** Resume is withheld at an engine-owned stop only while the
+session's loop is alive, read through the same heartbeat `runResumeSession`
+uses. With no loop, it is offered, and clicking it restarts the loop and
+reopens the CLI as it does today. The stop's printed moves for
+`dispute-refused` name Resume where the loop has ended.
+
+**Non-goals.** The inline cap's size, or accepting whole large files as
+evidence. What a dispute is or how the next round engages it. The Auxiliary
+Reviewer's adjudication. A human-override channel for verification. Changes
+to any other stop's actor.
+
+**Tests.** One that a dispute citing a file over the inline cap is returned as
+a rejection naming the range form, and a corrected answer proceeds to the
+next round. One that a stored `dispositions.json` with such a cite, found on
+resume, produces that rejection rather than a stop. One that Resume is offered
+at an engine-owned stop with no live loop and withheld while the loop beats.
+Existing tests asserting the `dispute-refused` stop from an oversized cite
+are changed rather than joined.
+
+**Releasable.** Yes, a patch.

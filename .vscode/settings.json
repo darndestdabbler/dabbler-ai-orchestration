@@ -1,0 +1,13 @@
+{
+  // How a provider is reached from this checkout. The Copilot seat: this
+  // solution is developed on a seat, and no DABBLER_*_API_KEY is required to
+  // run a session or a review. A checkout that holds provider keys reaches
+  // the direct API deliberately, with `--transport api`.
+  "dabbler.transport": "copilot-cli",
+  // This repository ships by default: every verified session that is not
+  // held publishes the extension, because a fix nobody can install is not
+  // delivered. A plan holds with `hold_release` and its reason.
+  "dabbler.release": "ship-by-default",
+  "dabbler.authoringModel": "claude-opus-5",
+  "dabbler.reviewerTransport": "api"
+}

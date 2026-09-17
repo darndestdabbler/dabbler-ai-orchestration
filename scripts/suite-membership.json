@@ -1,0 +1,10 @@
+{
+  "measured_on": "2026-09-11",
+  "note": "Which router tests run on the Windows host rather than in the container, and why each one is there. Everything not named here runs in the container. Read scripts/suite.mjs, which is the only thing that acts on this, and docs/design/suite-runners.md, which says how the list was measured. scripts/check-suite-membership.mjs fails when this file, the test tree and that document stop agreeing.",
+  "host_only": [
+    {
+      "file": "packages/router/test/copilot.test.ts",
+      "reason": "Its four seat-timeout tests hang on Linux rather than failing, and take the thirty-two tests after them down as cancelledByParent while the file still reports `# fail 0`. The cause is not the seat -- nothing in this file spawns a process -- it is that `sleep()` in src/transports/copilot.ts unrefs its deadline timer, so when the spawner never settles there is nothing left holding the event loop open and the deadline that would classify the timeout never fires. Windows keeps the loop alive here and Linux does not, so on this host the tests pass by luck rather than by design. They stay on the host because that is where they are true; docs/design/suite-runners.md carries the finding, which is a defect in the transport and not in the image."
+    }
+  ]
+}

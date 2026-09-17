@@ -11529,7 +11529,7 @@ joined.
 
 **Releasable.** Yes, a minor, because which starts are refused changes.
 
-### Session 193 of 193: Consult with AI
+### Session 193 of 194: Consult with AI
 
 Scope: whole repository
 
@@ -11600,3 +11600,49 @@ sentence, and registers nothing. One that the menu entry is contributed on
 both node kinds.
 
 **Releasable.** Yes, a minor.
+
+### Session 194 of 194: Choose the model from a list
+
+Scope: whole repository
+
+**Why.** Start Session and Consult with AI ask for the model in a free-text
+box (`askModel`, `showInputBox`). The operator has to know the id by heart.
+The machine already holds the list: `engineModelRefusal` reads the engine's
+candidates from `solutionConfiguration(root, { engine })` and refuses a typed
+id the list does not name. So the box refuses what it will not show. The
+Configuration section's *Set the Authoring Model* already offers the same
+candidates as a QuickPick through `modelItems`. Found on the walk of 3.6.0,
+in the Consult with AI box.
+
+**What.** `askModel` in `defaultSessionRunUi` becomes a QuickPick over the
+engine's candidates, read from `solutionConfiguration(root, { engine })` for
+the engine just picked, the same reading `engineModelRefusal` uses:
+- **The items.** The candidates, labelled through `modelItems` so the pick
+  and the Configuration rows describe a model in the same words. The model
+  already chosen (`chosenAuthoringModel`) is first and marked.
+- **The engine's default.** Where the engine does not require a model, one
+  item leaves it empty, which is the engine's own default, as the empty box
+  does today. A seat (`modelRequired`) offers no such item.
+- **Typing stays possible.** One item, *Enter a model id…*, opens the text box
+  as it is today. That is for an id the CLI knows before this machine's list
+  does. The CLI's own refusal (`engineRefusesModel`) still guards it.
+- **No list to offer.** Where the candidates are empty, or the reading is
+  the alias floor (`ENUMERATION_CLI_ALIASES`), the text box opens as it
+  does today, with the aliases as the placeholder where that is the reading.
+  An empty pick would be a broken pane.
+
+The `askModel` signature is unchanged, so `runStartSession`,
+`runStartUnattendedSession` and `runConsultWithAi` change nothing, and both
+refusals still run after the choice.
+
+**Non-goals.** Refreshing the catalog from the pick. Changing which models a
+role may use, or `modelItems`' wording. Remembering the model chosen in the
+box as a preference: *Set the Authoring Model* is where a choice is kept.
+The engine pick, which is already a list.
+
+**Tests.** One that the model question offers the engine's candidates with
+the chosen model first, and an engine-default item only where the engine does
+not require a model. One that *Enter a model id…* and an empty or alias-floor
+reading both fall back to the text box.
+
+**Releasable.** Yes, a patch.

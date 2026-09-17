@@ -2002,9 +2002,15 @@ class Driver {
    * The plan's non-goals under every step's ask, so the author holds them
    * during the work and not only before it. A step asked before a plan is
    * accepted -- there is none -- carries nothing.
+   *
+   * Read from disk ahead of the cached plan: `plan amend --drop-non-goal`
+   * writes there and the driver's copy does not move, so a cached read made
+   * the ask and the verification round disagree about the same plan -- the
+   * ask still naming a non-goal the round had been told was dropped.
    */
   private nonGoalsLine(): string {
-    const nonGoals = (this.plan ?? readWorkPlan(this.repoRoot, this.sessionNumber))?.non_goals ?? [];
+    const nonGoals =
+      (readWorkPlan(this.repoRoot, this.sessionNumber) ?? this.plan)?.non_goals ?? [];
     if (nonGoals.length === 0) return "";
     return `\n\nNon-goals of this session, which the reviewer holds the work to: ${nonGoals.join("; ")}`;
   }

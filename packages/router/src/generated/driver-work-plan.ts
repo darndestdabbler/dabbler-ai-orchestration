@@ -32,6 +32,19 @@ export type DriverWorkPlan = {
    */
   non_goals?: string[];
   /**
+   * The non-goals this session declared and then dropped, each with the reason given. A non-goal is declared before the work and the work can falsify it; dropping it is a scope change recorded as one, rather than a true finding disputed away. The work is no longer held to these, and the reviewer is shown both lists -- so what it judges is the reason. Written only by `session plan amend --drop-non-goal`, which is drop-only: nothing adds a non-goal mid-session, because that would put finished, reviewed work retroactively out of scope.
+   */
+  dropped_non_goals?: {
+    /**
+     * The non-goal as it was declared, word for word: the drop names a declared one or it is refused.
+     */
+    text: string;
+    /**
+     * Why the work falsified it, given when it was dropped.
+     */
+    reason: string;
+  }[];
+  /**
    * Other repositories of this SOLUTION that the plan needs to exist. Each is placed when the plan is accepted -- created beside this one with a `solution-dependencies.json` declaring which solution it is in and its own id, and nothing else -- so that finishing this repository leaves the next one visible in the Solution Explorer instead of leaving the operator to remember it. One that already declares itself is left exactly as it is. It declares no dependency: what this repository takes is declared on the edge that takes it, and placing a repository never invents one. Optional, and absent in the ordinary single-repository session.
    */
   repositories?: {

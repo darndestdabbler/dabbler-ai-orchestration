@@ -16,6 +16,8 @@ import {
   WATCHER_OUTSTANDING,
   WATCHER_QUIET,
   progressResumed,
+  dropNonGoal,
+  readAmendments,
   readDispositions,
   readReport,
   readWatcher,
@@ -36,6 +38,7 @@ import {
   watcherReading,
   writeDispositions,
   writeInstruction,
+  writeWorkPlan,
   writeRun,
   type WatcherInputs,
 } from "../src/driver.ts";
@@ -260,6 +263,86 @@ describe("the four answer schemas", () => {
     assert.deepEqual(judgeWorkPlanNonGoals({ ...plan, non_goals: ["A second widget."] }), []);
     // An empty list is the schema's to refuse where the member is present.
     assert.throws(() => validateWorkPlan({ ...PLAN, non_goals: [] }), /non_goals/);
+  });
+
+  it("drops a declared non-goal the work falsified, and records the amendment", () => {
+    // A non-goal is declared before the work and the work can falsify it.
+    // Without this the only exit was to dispute a true finding, which
+    // teaches the author to reject correct findings.
+    const { repo, restore } = runDir();
+    try {
+      writeWorkPlan(repo, 1, { ...PLAN, non_goals: ["Anything the step does not name.", "A second widget."] });
+      const amended = dropNonGoal(
+        repo,
+        1,
+        { text: "A second widget.", reason: "the step's own contract needs it", by: "claude-code" },
+        "2026-09-17T12:00:00-04:00",
+      );
+      // The plan the verifier reads no longer holds the work to it, and
+      // carries the drop with its reason instead.
+      assert.deepEqual(amended.non_goals, ["Anything the step does not name."]);
+      assert.deepEqual(amended.dropped_non_goals, [
+        { text: "A second widget.", reason: "the step's own contract needs it" },
+      ]);
+      const row = readAmendments(repo, 1).at(-1) ?? {};
+      assert.equal(row["step_id"], null);
+      assert.match(String(row["reason"]), /own contract/);
+      // The last one goes with the member: the schema admits no empty list.
+      const emptied = dropNonGoal(
+        repo,
+        1,
+        { text: "Anything the step does not name.", reason: "the fix is in it", by: "claude-code" },
+        "2026-09-17T12:01:00-04:00",
+      );
+      assert.equal(emptied.non_goals, undefined);
+      assert.equal(emptied.dropped_non_goals?.length, 2);
+    } finally {
+      restore();
+    }
+  });
+
+  it("refuses a drop naming text declared nowhere, and names what is declared", () => {
+    // The refusal carries the list so the next call is typeable from it,
+    // instead of sending the author to read the plan under `.dabbler/runs/`.
+    const { repo, restore } = runDir();
+    try {
+      writeWorkPlan(repo, 1, PLAN);
+      assert.throws(
+        () =>
+          dropNonGoal(repo, 1, { text: "A third widget.", reason: "why", by: "claude-code" }, "t"),
+        (error: unknown) =>
+          error instanceof LedgerError && /Anything the step does not name\./.test(error.message),
+      );
+      // A reason is not optional, and a drop happens once.
+      assert.throws(
+        () =>
+          dropNonGoal(
+            repo,
+            1,
+            { text: "Anything the step does not name.", reason: " ", by: "claude-code" },
+            "t",
+          ),
+        /reason/,
+      );
+      dropNonGoal(
+        repo,
+        1,
+        { text: "Anything the step does not name.", reason: "falsified", by: "claude-code" },
+        "t",
+      );
+      assert.throws(
+        () =>
+          dropNonGoal(
+            repo,
+            1,
+            { text: "Anything the step does not name.", reason: "again", by: "claude-code" },
+            "t",
+          ),
+        /already dropped/,
+      );
+    } finally {
+      restore();
+    }
   });
 
   it("still accepts a recorded plan that names modules, and reads nothing from them", () => {

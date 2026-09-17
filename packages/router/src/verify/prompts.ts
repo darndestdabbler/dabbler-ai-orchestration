@@ -18,6 +18,7 @@ import { SESSION_PLAN_FILENAME } from "../evidence.ts";
 import { extractSpecExcerpt } from "../session.ts";
 import type { Row } from "../ledger.ts";
 import { dumps } from "../pythonJson.ts";
+import { decisionEntries } from "../writers.ts";
 
 export function specExcerpt(sessionsDir: string, sessionNumber: number): string {
   let text: string;
@@ -193,6 +194,12 @@ export function priorFindingsBlock(
       "each unresolved finding: if it persists, RE-RAISE it; if the " +
       "remediation resolves it, say so.",
     "",
+    "Where the remediation did exactly what a prior round DEMANDED and that is " +
+      "what created the defect you are about to raise, say so instead — name the " +
+      "round and what it demanded — rather than raising the consequence as a " +
+      "fresh finding: two rounds each right on their own terms and mutually " +
+      "exclusive leave the session with no way forward.",
+    "",
   ];
   if (pending.size > 0) {
     lines.splice(
@@ -276,6 +283,53 @@ export function workPlanBlock(repoRoot: string | null, sessionNumber: number): s
     );
     for (const goal of nonGoals) lines.push(`- ${goal}`);
   }
+  // A non-goal is declared before the work and the work can falsify it. The
+  // drop is a scope change recorded AS one, and it is shown here so the
+  // round meets an explained change rather than an unexplained violation of
+  // a constraint it was told to hold the work to.
+  const dropped = plan.dropped_non_goals ?? [];
+  if (dropped.length > 0) {
+    lines.push(
+      "",
+      "Non-goals DROPPED during this session, with the reason given. The work is no " +
+        "longer held to these -- judge the REASON, not the fact that the work crosses " +
+        "them:",
+    );
+    for (const entry of dropped) lines.push(`- ${entry.text} — dropped: ${entry.reason}`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * The decisions this session recorded, in the order they were recorded.
+ *
+ * Context the session itself wrote down, not findings and not a gate: a
+ * decision taken between two rounds -- why a constraint gave way, which of
+ * two readings was taken -- reached nothing, so the round after it met the
+ * consequence with no account of it. Only THIS session's, because another
+ * session's decisions are the repository's history and not this review's.
+ */
+export function decisionsBlock(sessionsDir: string, sessionNumber: number): string {
+  let entries;
+  try {
+    entries = decisionEntries(sessionsDir, sessionNumber);
+  } catch {
+    return "";
+  }
+  if (entries.length === 0) return "";
+  const lines = [
+    "#### Decisions recorded during this session",
+    "",
+    "What the session decided while the work was being done, as it recorded it. This " +
+      "is context, not findings: read it for why the work took the shape it did.",
+  ];
+  for (const entry of entries) {
+    lines.push(
+      "",
+      `**${String(entry["decisionId"])} — ${String(entry["headline"])}**`,
+      sliceCodePoints(String(entry["body"] ?? "").trim(), 1200),
+    );
+  }
   return lines.join("\n");
 }
 
@@ -315,6 +369,8 @@ export function buildTaskBlock(
   );
   const plan = workPlanBlock(repoRoot, sessionNumber);
   if (plan) parts.push(plan);
+  const decisions = decisionsBlock(sessionsDir, sessionNumber);
+  if (decisions) parts.push(decisions);
   const gap = untestedBlock(untested);
   if (gap) parts.push(gap);
   const brief = grant !== null ? briefing(grant) : "";

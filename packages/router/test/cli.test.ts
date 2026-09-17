@@ -181,6 +181,24 @@ describe("dabbler session, the whole surface", () => {
     assert.match(amend.err, /session start/);
   });
 
+  it("refuses --drop-non-goal beside a step or a round cap: one amendment per call", async () => {
+    // Three amendments, and each carries its own reason: what a step is
+    // measured against, how many reviews the tree may have, and what the
+    // work is held to. Two in one call is a reason that covers neither.
+    const { sessionsDir } = makeAnsweredSandbox();
+    for (const other of [["--step", "x"], ["--max-rounds", "4"]]) {
+      const amend = await run(() =>
+        sessionVerb([
+          "plan", "amend", "--sessions-dir", sessionsDir,
+          "--drop-non-goal", "A second widget.", "--reason", "r", ...other,
+        ]),
+      );
+      assert.equal(amend.code, 2, amend.err);
+      assert.match(amend.err, /--drop-non-goal: not allowed with argument/);
+      assert.match(amend.err, new RegExp(other[0]!));
+    }
+  });
+
   it("refuses a subcommand that does not exist, and says so differently", async () => {
     const result = await run(() => sessionVerb(["clsoe"]));
     assert.equal(result.code, 2);

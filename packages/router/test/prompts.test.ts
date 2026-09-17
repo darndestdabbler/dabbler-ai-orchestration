@@ -17,8 +17,9 @@ import {
   splitLines,
 } from "../src/verify/prompts.ts";
 import { writeWorkPlan } from "../src/driver.ts";
+import { appendDecision, registerSessionStart } from "../src/writers.ts";
 import { buildVerificationPrompt } from "../src/verifyjob.ts";
-import { seed, tempDir } from "./support/answers.ts";
+import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 
 describe("an evidence citation", () => {
   it("reads a bare path, a single line, and a range", () => {
@@ -115,6 +116,67 @@ describe("the task block a round opens with", () => {
     });
     const block = buildTaskBlock(sessionsDir, 1, 1, [], null, repo);
     assert.ok(block.includes("Task: Make the widget real.") && block.includes("- A second widget."));
+  });
+
+  it("carries a dropped non-goal with its reason, so the round judges the reason", () => {
+    // Round 3 blocked a one-line fix as a non-goal violation and round 4
+    // blocked the revert, because the plan could not say the non-goal had
+    // been falsified. A drop is shown, with its reason, to every round after.
+    const repo = tempDir();
+    seed(repo, { "docs/sessions/session-plan.md": "### Session 1 of 1: First things\n1. Build the widget.\n" });
+    const sessionsDir = join(repo, "docs", "sessions");
+    writeWorkPlan(repo, 1, {
+      schema_version: 1,
+      session_number: 1,
+      task: "Make the widget real.",
+      dropped_non_goals: [
+        { text: "The persistence module.", reason: "the console app cannot run without its one line" },
+      ],
+      recorded_at: "2026-09-17T05:00:00-04:00",
+      steps: [{ id: "widget", ask: "Make it.", files: ["src/w.ts"], checks: [{ argv: ["true"] }] }],
+    });
+    // Shown even with no surviving non-goal, which is what dropping the last
+    // one leaves behind.
+    const block = buildTaskBlock(sessionsDir, 1, 1, [], null, repo);
+    assert.ok(block.includes("Non-goals DROPPED during this session"), block);
+    assert.ok(block.includes("The persistence module. — dropped: the console app cannot run"), block);
+  });
+
+  it("carries the decisions recorded during this session, and not another session's", () => {
+    // A decision recorded between two rounds used to change nothing about
+    // what the next round was told: the verifier read no part of the log.
+    const repo = tempDir();
+    seed(repo, { "docs/sessions/session-plan.md": "### Session 1 of 2: First things\n1. Build the widget.\n\n### Session 2 of 2: Second\n1. Again.\n" });
+    const sessionsDir = join(repo, "docs", "sessions");
+    // The record's writers ask git where the root is and whether the tree is
+    // clean; this file otherwise runs without it.
+    const restore = gitAnswers([
+      [["rev-parse", "--show-toplevel"], (_args, root) => ({ stdout: root.split("\\").join("/") })],
+      [["status", "--porcelain", "-uall"], { stdout: "" }],
+      [["status", "--porcelain"], { stdout: "" }],
+    ]);
+    try {
+      registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+      assert.ok(!buildTaskBlock(sessionsDir, 1, 1, [], null, repo).includes("Decisions recorded"));
+      appendDecision(sessionsDir, {
+        sessionNumber: 1,
+        decider: "operator",
+        headline: "The persistence non-goal gives way",
+        body: "The console app cannot meet its own contract without the one line.",
+      });
+      appendDecision(sessionsDir, {
+        sessionNumber: 2,
+        decider: "operator",
+        headline: "Another session's business",
+        body: "Not this review's.",
+      });
+      const block = buildTaskBlock(sessionsDir, 1, 1, [], null, repo);
+      assert.ok(block.includes("Decisions recorded during this session"), block);
+      assert.ok(block.includes("The persistence non-goal gives way"), block);
+      assert.ok(!block.includes("Another session's business"), block);
+    } finally {
+      restore();
+    }
   });
 
   it("names the changed source files no test is named after, and says nothing when every one has a test", () => {

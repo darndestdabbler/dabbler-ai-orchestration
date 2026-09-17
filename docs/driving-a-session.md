@@ -112,6 +112,40 @@ the session on, and that a `wait` never reaches the engine.
   `dabbler verify --max-rounds` is unchanged: that is the verb's own flag,
   for a round run by hand outside a driven session.
 
+- **A non-goal the work falsifies is dropped, not disputed.** Non-goals are
+  declared before the work, and the work can prove one of them wrong — the
+  change the plan said it would not make turns out to be the only way the
+  work can meet its own contract. Until there was a verb for that, the plan
+  could not say so, and the rounds deadlocked: one round blocks the touch
+  as a non-goal violation, the fix is reverted, and the next round blocks
+  the reverted state because the thing no longer runs. Both rounds are
+  right on their own terms and they demand opposite things, and the only
+  exit anyone found was to dispute a finding that was true — which teaches
+  the author to reject correct findings and launders a scope change
+  through the adjudicator instead of recording it as one.
+
+  ```
+  dabbler session plan amend --sessions-dir docs/sessions \
+      --drop-non-goal "<the non-goal, word for word as declared>" \
+      --reason "<why the work falsified it>"
+  ```
+
+  Both arguments are required. The text must match a declared non-goal; one
+  that matches none is refused and the refusal names every non-goal the plan
+  declares, so the next call is typeable straight off it. It is refused
+  beside `--step` and beside `--max-rounds` — one amendment per call, each
+  with its own reason.
+
+  **Drop-only: nothing adds a non-goal.** Adding one mid-session would put
+  finished, reviewed work retroactively out of scope.
+
+  **It is not a gate, and it does not settle anything.** Every round from
+  there is shown the drop with the reason given, beside the non-goals still
+  standing, and judges the reason — a reviewer that finds the reason poor
+  blocks it the way it blocks any finding, and the dispute and adjudication
+  path is unchanged. The AI runs the amendment itself: what keeps the record
+  honest is what the reviewer is shown, not who is allowed to type.
+
 ## What comes back
 
 Stdout carries exactly one thing — the instruction, as JSON. Everything

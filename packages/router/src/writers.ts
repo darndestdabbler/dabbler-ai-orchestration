@@ -937,6 +937,20 @@ export function amendmentEntries(sessionsDir: string, sessionNumber: number): En
   );
 }
 
+/**
+ * A session's decisions, oldest first, as a verification round reads them.
+ *
+ * The verifier read no part of `decisions-log.md`, so a decision recorded
+ * between two rounds changed nothing about what the next round was told --
+ * the session wrote down why it was doing something and the reviewer never
+ * saw it. This shows what is already on the record and adds none.
+ */
+export function decisionEntries(sessionsDir: string, sessionNumber: number): Entry[] {
+  return entriesOfKind(readOrCreateActivityLog(sessionsDir), KIND_DECISION).filter(
+    (entry) => entry["sessionNumber"] === sessionNumber,
+  );
+}
+
 /** One amendment as a line a person reads: what moved, why, and who was working. */
 export function amendmentLine(entry: Entry): string {
   return `${String(entry["what"])}: ${String(entry["reason"])} (${String(entry["by"])})`;

@@ -186,13 +186,19 @@ const OPTIONS: Record<string, readonly string[]> = {
     "",
     "  `dabbler session plan amend` instead amends ONE not-yet-accepted step of the",
     "  driven work plan -- what the next instruction for it is measured against:",
-    "  --step ID                the step to amend; required unless --max-rounds is given",
+    "  --step ID                the step to amend; required unless --max-rounds or",
+    "                           --drop-non-goal is given",
     "  --files A,B              the step's files as they should now read, whole",
     "  --checks-file PATH       the step's checks, whole, as JSON: [{\"argv\": [...]}]",
     "  --max-rounds N           instead of a step: the verification round cap this RUN",
     "                           verifies under. It is not typeable on `next` or `drive`;",
     "                           here the change carries a reason and the rounds already",
     "                           run, and no gate reads it",
+    "  --drop-non-goal TEXT     instead of a step: drop ONE declared non-goal the work",
+    "                           has falsified, word for word as it was declared. Nothing",
+    "                           adds a non-goal -- that would put reviewed work out of",
+    "                           scope afterwards. Every round from here is shown the",
+    "                           drop with its reason, and judges the reason",
     "  --reason TEXT            required: why this is the minimal change. Who was working",
     "                           is on the record from `session start` and is written",
     "                           into the row; there is no flag for it",
@@ -388,17 +394,34 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(`dabbler session plan amend: ${maxRounds}\n`);
       return EXIT_USAGE;
     }
-    // The cap belongs to the run, not to a step, and the two are separate
-    // amendments: one moves what a step is measured against, the other how
-    // many reviews the tree may still have.
+    const droppedNonGoal = values.get("--drop-non-goal");
+    // Three amendments, one per call. The cap belongs to the run, not to a
+    // step; a dropped non-goal belongs to the declaration. One moves what a
+    // step is measured against, one how many reviews the tree may still
+    // have, one what the work is held to -- and each carries its own reason.
     if (maxRounds !== null && stepId !== undefined) {
       writeErr(
         "dabbler session plan amend: argument --max-rounds: not allowed with argument --step\n",
       );
       return EXIT_USAGE;
     }
+    if (droppedNonGoal !== undefined && stepId !== undefined) {
+      writeErr(
+        "dabbler session plan amend: argument --drop-non-goal: not allowed with argument --step\n",
+      );
+      return EXIT_USAGE;
+    }
+    if (droppedNonGoal !== undefined && maxRounds !== null) {
+      writeErr(
+        "dabbler session plan amend: argument --drop-non-goal: not allowed with " +
+          "argument --max-rounds\n",
+      );
+      return EXIT_USAGE;
+    }
     const missing = [
-      stepId === undefined && maxRounds === null ? "--step" : null,
+      stepId === undefined && maxRounds === null && droppedNonGoal === undefined
+        ? "--step"
+        : null,
       reason === undefined ? "--reason" : null,
     ].filter((flag): flag is string => flag !== null);
     if (missing.length > 0) {
@@ -419,6 +442,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
           : files.split(",").map((entry) => entry.trim()).filter((entry) => entry !== ""),
       checksFile: values.get("--checks-file") ?? null,
       maxRounds,
+      dropNonGoal: droppedNonGoal ?? null,
       reason: reason as string,
       sessionNumber,
     });

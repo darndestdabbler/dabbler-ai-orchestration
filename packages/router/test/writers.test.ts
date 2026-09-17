@@ -31,6 +31,7 @@ import {
   SanctionedWriteError,
   amendmentEntries,
   appendDecision,
+  decisionEntries,
   buildOrchestratorBlock,
   commitBeforeDeclaring,
   declareSessionTask,
@@ -325,6 +326,22 @@ describe("appending a decision", () => {
     appendDecision(sessionsDir, { ...common, sessionNumber: 2, headline: "Second" });
     appendDecision(sessionsDir, { ...common, sessionNumber: 1, headline: "Third" });
     assert.match(renderDecisionsLog(sessionsDir), /\(continued\)/);
+  });
+
+  it("reads back one session's decisions, oldest first, and not another session's", () => {
+    // A verification round is shown the decisions of the session under
+    // review; another session's are the repository's history, not this
+    // review's.
+    const { sessionsDir } = makeSessionsDir();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    appendDecision(sessionsDir, { ...common, sessionNumber: 1, headline: "First" });
+    appendDecision(sessionsDir, { ...common, sessionNumber: 2, headline: "Second" });
+    appendDecision(sessionsDir, { ...common, sessionNumber: 1, headline: "Third" });
+    assert.deepEqual(
+      decisionEntries(sessionsDir, 1).map((entry) => entry["headline"]),
+      ["First", "Third"],
+    );
+    assert.deepEqual(decisionEntries(sessionsDir, 3), []);
   });
 });
 

@@ -10,6 +10,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.11.0] — 2026-09-17
+
+**A non-goal that turns out to be wrong is amended, not disputed.**
+
+### Added
+
+- `dabbler session plan amend --drop-non-goal "<text>" --reason "<why>"`
+  drops one non-goal the work has falsified. A non-goal is declared before
+  the work, and the work can prove it wrong; until now the only way past
+  the round that blocked it was to dispute a finding that was true. The
+  text must name a declared non-goal, and a text that names none is
+  refused with the list of what is declared. It drops only: nothing adds a
+  non-goal, because that would put reviewed work out of scope afterwards.
+  The amendment is recorded with its reason and read out at the close.
+- Every verification round is shown the non-goals that were dropped and
+  the reason each was dropped for, beside the ones still standing. The
+  reviewer judges the reason, and blocks a poor one as it blocks any
+  finding.
+- The decisions a session records now reach its own verification rounds.
+  A decision taken between two rounds used to change nothing about what
+  the next round was told.
+
+### Changed
+
+- A verification round is told to say when the remediation a prior round
+  demanded is what created the defect it is about to raise, naming that
+  round, instead of raising the consequence as a fresh finding.
+
 ## [3.10.0] — 2026-09-17
 
 **Plans first, code in sessions, and no dead ends.**

@@ -74,6 +74,7 @@ import {
   amendPlanStep,
   amendRoundCap,
   dispositionsPath,
+  dropNonGoal,
   driverDir,
   planPath,
   readInstruction,
@@ -2184,6 +2185,11 @@ export interface PlanAmendCliOptions {
    * what is being amended. It is not typeable anywhere else.
    */
   readonly maxRounds: number | null;
+  /**
+   * The declared non-goal this amendment drops, when that is what is being
+   * amended: a non-goal the work falsified. Drop-only -- nothing adds one.
+   */
+  readonly dropNonGoal?: string | null;
   readonly reason: string;
   readonly sessionNumber?: number | null;
 }
@@ -2240,6 +2246,38 @@ export function planAmend(sessionsDir: string, options: PlanAmendCliOptions): nu
       writeErr(`plan amend: refused -- ${error.message}\n`);
       return EXIT_BOUNDARY;
     }
+  }
+
+  // A non-goal the work falsified belongs to the plan's declaration rather
+  // than to any one step, so it moves here and not through `--step`. The AI
+  // runs it: the record is kept honest by what the reviewer is SHOWN, not by
+  // who is allowed to type, and a stop whose only forward exit is to argue
+  // that a true finding is false is a deadlock wearing a dispute's clothes.
+  if (options.dropNonGoal !== null && options.dropNonGoal !== undefined) {
+    try {
+      dropNonGoal(
+        repoRoot,
+        target,
+        { text: options.dropNonGoal, reason: options.reason, by },
+        nowIso(),
+      );
+    } catch (error) {
+      if (!(error instanceof LedgerError)) throw error;
+      writeErr(`plan amend: refused -- ${error.message}\n`);
+      return EXIT_BOUNDARY;
+    }
+    recordAmendment(sessionsDir, {
+      sessionNumber: target,
+      what: `the non-goal '${options.dropNonGoal.trim()}', dropped`,
+      reason: options.reason.trim(),
+      by,
+    });
+    writeOut(
+      `plan amend: session ${sessionDisplayNumber(target)} is no longer held to the ` +
+        `non-goal '${options.dropNonGoal.trim()}', dropped by ${by}; every round from ` +
+        "here is shown the drop with its reason, and judges the reason.\n",
+    );
+    return EXIT_OK;
   }
 
   let checks: { argv: string[] }[] | null = null;

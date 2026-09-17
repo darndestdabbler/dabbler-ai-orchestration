@@ -730,6 +730,93 @@ export function amendPlanStep(
   return amended;
 }
 
+export interface DropNonGoalInput {
+  /** The non-goal as it was declared, word for word. */
+  readonly text: string;
+  readonly reason: string;
+  /** Who was working when it was dropped, as the record from `start` says. */
+  readonly by: string;
+}
+
+/**
+ * Drop ONE declared non-goal, with the reason the work falsified it.
+ *
+ * A non-goal is declared before the work and the work can falsify it. When
+ * it does, every round after that meets a constraint it was told to hold the
+ * work to and a change that breaks it, and the only exit the framework had
+ * was to argue that a true finding was false -- which teaches the author to
+ * reject correct findings and launders a scope change through the
+ * adjudicator. Session 8 of the csv-parser solution, 2026-09-17, oscillated
+ * on exactly that: round 3 blocked a one-line fix as a non-goal violation,
+ * the fix was reverted, and round 4 blocked the reverted state because the
+ * app could no longer run. Both rounds were right.
+ *
+ * Drop-only, and that is the whole asymmetry: adding a non-goal mid-session
+ * would put finished, reviewed work retroactively out of scope. The reviewer
+ * is shown the drop with its reason and judges the reason, which is a thing
+ * it can sensibly judge -- so this is not a gate, and no verdict moves here.
+ */
+export function dropNonGoal(
+  repoRoot: string,
+  sessionNumber: number,
+  input: DropNonGoalInput,
+  droppedAt: string,
+): DriverWorkPlan {
+  const reason = input.reason.trim();
+  if (reason === "") {
+    throw new LedgerError(
+      "an amendment carries a reason; a non-goal dropped for no stated reason is a " +
+        "scope change nobody can hold anyone to",
+    );
+  }
+  const text = input.text.trim();
+  const plan = readWorkPlan(repoRoot, sessionNumber);
+  if (plan === null) {
+    throw new LedgerError(
+      `session ${sessionNumber} has no work plan; there is no non-goal here to drop`,
+    );
+  }
+  const declared = plan.non_goals ?? [];
+  const dropped = plan.dropped_non_goals ?? [];
+  if (dropped.some((entry) => entry.text.trim() === text)) {
+    throw new LedgerError(
+      `the non-goal '${text}' was already dropped; a drop happens once`,
+    );
+  }
+  // Named rather than matched loosely, and the refusal carries the list: an
+  // engine that mistyped a non-goal can type the next call straight off the
+  // refusal instead of going to read the plan under `.dabbler/runs/`.
+  const match = declared.find((goal) => goal.trim() === text);
+  if (match === undefined) {
+    throw new LedgerError(
+      `the work plan declares no non-goal '${text}'; its non-goals are ` +
+        (declared.length === 0
+          ? "none"
+          : declared.map((goal) => `'${goal}'`).join(", ")),
+    );
+  }
+  const remaining = declared.filter((goal) => goal !== match);
+  const after = [...dropped, { text: match, reason }];
+  const next: Record<string, unknown> = { ...plan, dropped_non_goals: after };
+  // The member goes rather than emptying: the schema admits no empty list,
+  // and a plan is required to name a non-goal at acceptance and nowhere
+  // after it.
+  if (remaining.length === 0) delete next["non_goals"];
+  else next["non_goals"] = remaining;
+  const amended = writeWorkPlan(repoRoot, sessionNumber, next);
+  appendJsonl(amendmentsPath(repoRoot, sessionNumber), {
+    schema_version: DRIVER_SCHEMA_VERSION,
+    session_number: sessionNumber,
+    step_id: null,
+    reason,
+    by: input.by,
+    amended_at: droppedAt,
+    before: { non_goals: [...declared], dropped_non_goals: [...dropped] },
+    after: { non_goals: remaining, dropped_non_goals: after },
+  });
+  return amended;
+}
+
 export interface RoundCapInput {
   readonly cap: number;
   readonly reason: string;

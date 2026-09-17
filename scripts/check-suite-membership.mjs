@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import { parse } from "yaml";
 
-import { allTests, hostOnly } from "./suite.mjs";
+import { allExtensionTests, allTests, hostOnly } from "./suite.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST = "scripts/suite-membership.json";
@@ -26,6 +26,7 @@ const DOC = "docs/design/suite-runners.md";
 const CONFIG = "dabbler.yaml";
 const HOST_SUITE = "typescript-windows";
 const CONTAINER_SUITE = "typescript";
+const EXTENSION_SUITE = "extension";
 
 const failures = [];
 function refuse(message) {
@@ -97,7 +98,40 @@ if (doc === null) {
   }
 }
 
-// Both doors are declared, declared as the runner, and declared in the order
+// The extension's list, held to the same things: a reason, a spec that
+// exists, and the document. It has no host door of its own -- the 2026-09-17
+// measurement found no spec that is true only on Windows -- so an entry here
+// would be a spec the container declines and nothing runs, and is refused
+// until one is declared.
+const extensionEntries = manifest.extension_host_only;
+if (!Array.isArray(extensionEntries)) {
+  refuse(`${MANIFEST}: extension_host_only must be a list, even when it is empty.`);
+} else {
+  const specs = new Set(allExtensionTests());
+  for (const [index, entry] of extensionEntries.entries()) {
+    const where = `${MANIFEST}: extension_host_only[${index}]`;
+    const file = typeof entry?.file === "string" ? entry.file : "";
+    if (file === "") {
+      refuse(`${where} names no file.`);
+      continue;
+    }
+    if (typeof entry.reason !== "string" || entry.reason.trim() === "") {
+      refuse(`${where} (${file}) gives no reason for being on the host.`);
+    }
+    if (!specs.has(file)) {
+      refuse(`${where} names ${file}, which is not one of the ${specs.size} extension specs.`);
+    }
+    if (doc !== null && !doc.includes(file)) {
+      refuse(`${DOC} does not name ${file}, which ${MANIFEST} keeps on the host.`);
+    }
+    refuse(
+      `${where} keeps ${file} on the host, and no host door runs extension specs: ` +
+        `declare one in ${CONFIG} and scripts/suite.mjs before listing it, or it runs nowhere.`,
+    );
+  }
+}
+
+// Every door is declared, declared as the runner, and declared in the order
 // that decides which of them owns a file.
 const suites = parse(readFileSync(join(ROOT, CONFIG), "utf8"))?.testing?.suites ?? [];
 const at = (name) => suites.findIndex((suite) => suite?.name === name);
@@ -107,6 +141,7 @@ const containerAt = at(CONTAINER_SUITE);
 for (const [name, index, command] of [
   [HOST_SUITE, hostAt, "node scripts/suite.mjs host"],
   [CONTAINER_SUITE, containerAt, "node scripts/suite.mjs container"],
+  [EXTENSION_SUITE, at(EXTENSION_SUITE), "node scripts/suite.mjs extension"],
 ]) {
   if (index < 0) {
     refuse(`${CONFIG} no longer declares the suite '${name}'.`);
@@ -159,5 +194,6 @@ if (failures.length > 0) {
 
 process.stdout.write(
   `suite-membership: ${tests.size} test files, ${declared.length} on the host, ` +
-    `${tests.size - declared.length} in the container; ${MANIFEST}, the tree and ${DOC} agree.\n`,
+    `${tests.size - declared.length} in the container; ${allExtensionTests().length} extension ` +
+    `specs, all in the container; ${MANIFEST}, the tree and ${DOC} agree.\n`,
 );

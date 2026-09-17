@@ -10,6 +10,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.9.3] — 2026-09-17
+
+**The extension suite runs where the machine cannot answer for it.**
+
+### Fixed
+
+- The extension suite's test that starts a session no longer depends on
+  this machine's Copilot seat login, its provider keys or a catalog
+  refresh: it starts from an empty home, with no key set, against a
+  catalog it seeds itself. 3.9.2 still failed `Test` on the GitHub runner
+  on this test, so this is the version meant to reach the Marketplace
+  after 3.3.7.
+- Locally, the extension suite now runs in the same container as the
+  router suite, which has no `claude`, no seat login and no keys, so a
+  test that depends on the machine fails there before it fails in CI.
+  CI itself is unchanged.
+
 ## [3.9.2] — 2026-09-17
 
 **The extension suite does not read this machine's PATH.**

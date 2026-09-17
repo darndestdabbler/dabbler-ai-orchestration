@@ -279,10 +279,49 @@ not a mystery — it means the test depends on the platform, and the answer is
 to find out which way and record it here. Session 154 is where the two doors
 into each suite are held together; this section is the input to it.
 
+## The extension suite, in the same container
+
+Written in session 201, measured on the operator's machine on 2026-09-17.
+
+    node scripts/suite.mjs extension [spec paths...]
+
+runs the extension's mocha suite through
+`tools/dabbler-ai-orchestration/scripts/run-unit.mjs` inside the same image,
+with the same three dependency volumes. `dabbler.yaml` declares the
+`extension` suite through it. CI is not moved: it still runs `npm run
+test:unit` on `windows-latest`, and `scripts/ci-suites.json` carries that
+divergence and its reason.
+
+The reason is not speed. **The host answered for the suite.** Sessions 199 and
+200 closed with the extension suite green here and `Test` red on the GitHub
+runner, both times on the one spec that starts a session through the
+in-process router: `session start` looks up `claude` on PATH, refreshes the
+catalog from this machine's Copilot login and `DABBLER_*_API_KEY` variables,
+and then finds a reviewer in what it read. The operator's machine has all of
+that and the runner has none of it. Neither does the container, so a run of
+record there fails where CI fails.
+
+| run | wall | passing | failing |
+|---|---|---|---|
+| the whole suite on the host, before session 201's fix | 22 s | 258 | 0 |
+| the whole suite in the container, before session 201's fix | 16 s | 257 | 1 |
+
+The one failure in the container is CI's own refusal, word for word: `the
+Primary Reviewer cannot be reached on the reviewing vehicle 'copilot-cli' ...
+this machine has not read its model lists yet`. It is a machine dependency in
+the spec, not a fact about Windows, and it is fixed in the spec.
+
+**No extension spec is kept on the host.** Every other spec passed in the
+container on the first run, so `extension_host_only` in
+`scripts/suite-membership.json` is empty. There is no host door for extension
+specs, and `check-suite-membership.mjs` refuses an entry there until one is
+declared — an entry with no door would be a spec that runs nowhere.
+
 ## Repeating the measurement
 
     node scripts/suite.mjs container    # the container door, whole
     node scripts/suite.mjs host         # the host door, whole
+    node scripts/suite.mjs extension    # the extension suite, whole
     node scripts/check-suite-membership.mjs
 
 The last one fails when this document, `scripts/suite-membership.json` and the

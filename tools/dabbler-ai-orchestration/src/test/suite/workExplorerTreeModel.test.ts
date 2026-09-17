@@ -996,10 +996,58 @@ suite("workExplorerTreeModel: the two surfaces over one record", () => {
     const bin = makeTempDir("dabbler-parity-bin-");
     fs.writeFileSync(path.join(bin, "claude"), "#!/bin/sh\n", "utf8");
     fs.writeFileSync(path.join(bin, "claude.cmd"), "@echo off\n", "utf8");
-    const savedPath = process.env.PATH;
-    const savedPathext = process.env.PATHEXT;
-    process.env.PATH = [bin, savedPath ?? ""].join(path.delimiter);
-    process.env.PATHEXT = ".COM;.EXE;.BAT;.CMD";
+    // `start` also refreshes the catalog when this machine has a seat login or
+    // a provider key, and then asks it for a Primary Reviewer outside the
+    // author's provider. The suite may read neither, so the home is empty, no
+    // key is set, nothing is due, and the reviewer is the one model the
+    // catalog is seeded with -- a seat block read for no login, which is what
+    // an empty home believes.
+    const home = makeTempDir("dabbler-parity-home-");
+    const catalogPath = process.env.DABBLER_CATALOG_PATH as string;
+    const savedCatalog = fs.existsSync(catalogPath) ? fs.readFileSync(catalogPath, "utf8") : null;
+    const now = new Date().toISOString();
+    fs.writeFileSync(
+      catalogPath,
+      JSON.stringify({
+        schema_version: 1,
+        written_by: "workExplorerTreeModel.test.ts",
+        written_at: now,
+        transports: {
+          "copilot-cli": {
+            refreshed_at: now,
+            source: "acp-session-new",
+            scope: {},
+            models: [
+              {
+                id: "gpt-5.4",
+                provider: "openai",
+                provider_source: "openai",
+                display_name: "GPT-5.4",
+                enabled: true,
+                price_category: null,
+                cost: null,
+                listed_at: now,
+              },
+            ],
+            retired: [],
+          },
+        },
+      }),
+      "utf8",
+    );
+    const saved = new Map<string, string | undefined>();
+    const set = (name: string, value: string | undefined): void => {
+      if (!saved.has(name)) saved.set(name, process.env[name]);
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    };
+    set("PATH", [bin, process.env.PATH ?? ""].join(path.delimiter));
+    set("PATHEXT", ".COM;.EXE;.BAT;.CMD");
+    set("HOME", home);
+    set("USERPROFILE", home);
+    for (const name of Object.keys(process.env).filter((key) => /^DABBLER_.*_API_KEY$/.test(key))) {
+      set(name, undefined);
+    }
     const router = createInProcessRouter();
     let started;
     try {
@@ -1010,10 +1058,12 @@ suite("workExplorerTreeModel: the two surfaces over one record", () => {
         sessionsDir,
       });
     } finally {
-      if (savedPath === undefined) delete process.env.PATH;
-      else process.env.PATH = savedPath;
-      if (savedPathext === undefined) delete process.env.PATHEXT;
-      else process.env.PATHEXT = savedPathext;
+      for (const [name, value] of saved) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+      if (savedCatalog === null) fs.rmSync(catalogPath, { force: true });
+      else fs.writeFileSync(catalogPath, savedCatalog, "utf8");
     }
     assert.ok(started.ok, JSON.stringify(started));
 

@@ -246,19 +246,32 @@ testing:
     # names the runner directly because a declared command is spawned as
     # written, and `node` is an executable on every host while `npm` is a
     # shim.
+    #
+    # From session 201 that runner runs inside the router suite's container,
+    # through `scripts/suite.mjs extension`. Not for speed: the host is the
+    # operator's machine, and it answered for the suite. Sessions 199 and 200
+    # closed green here and failed on the GitHub runner, because `session
+    # start` found this machine's `claude`, Copilot login and provider keys
+    # and the runner has none of them. The container has none either, so a
+    # run of record there fails where CI fails. Measured on 2026-09-17: every
+    # spec passes in the container but the one that depended on the machine,
+    # so none is kept on the host; `docs/design/suite-runners.md` carries it.
     - name: extension
-      command: node tools/dabbler-ai-orchestration/scripts/run-unit.mjs
+      command: node scripts/suite.mjs extension
       expensive: true
       covers:
         - tools/dabbler-ai-orchestration/
         - package.json
         - package-lock.json
         - dabbler.yaml
+        - Containerfile
+        - scripts/suite.mjs
+        - scripts/suite-membership.json
       test_roots:
         - tools/dabbler-ai-orchestration/src/test/suite
       test_glob: "*.test.ts"
       test_name: "{name}.test.ts"
-      select: node tools/dabbler-ai-orchestration/scripts/run-unit.mjs {paths}
+      select: node scripts/suite.mjs extension {paths}
 
   # Deterministic controls — one entry per kind, from compile, typecheck,
   # lint, analyzer. A declared control runs before verification and its

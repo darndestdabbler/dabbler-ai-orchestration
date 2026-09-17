@@ -4,7 +4,7 @@
     {
       "suite": "extension",
       "workflow_command": "npm run test:unit",
-      "reason": "CI runs the package's own npm script, which is the door a person copies out of package.json, while dabbler.yaml names scripts/run-unit.mjs because a work plan's check is argv spawned with no shell and `npm` on Windows is a .cmd shim argv cannot reach. The two are one door in every way that matters: both are mocha started from the package directory, and everything that configures the run -- the compiler hook, the vscode stub, the arming that keeps the suite off this machine's own records -- is .mocharc.json, which mocha finds whoever invoked it. That is session 154's repair; before it, the arming lived in the runner alone and the npm door read the operator's real catalog."
+      "reason": "CI runs the package's own npm script on windows-latest, which is the door a person copies out of package.json and the platform the extension is operated on. dabbler.yaml names `node scripts/suite.mjs extension`, which runs the same mocha through scripts/run-unit.mjs inside the router suite's Podman container: session 201, because on the operator's host this machine's `claude`, Copilot login and provider keys answered for tests the GitHub runner then failed, and the container has none of them either. Both are mocha started from the package directory, and everything that configures the run -- the compiler hook, the vscode stub, the arming that keeps the suite off this machine's own records -- is .mocharc.json, which mocha finds whoever invoked it (session 154's repair). docs/design/suite-runners.md carries the measurement."
     },
     {
       "suite": "typescript",

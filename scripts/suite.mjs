@@ -1,8 +1,15 @@
 #!/usr/bin/env node
-// The two doors into this repository's router suite.
+// The doors into this repository's suites.
 //
 //   node scripts/suite.mjs container [test paths...]
 //   node scripts/suite.mjs host      [test paths...]
+//   node scripts/suite.mjs extension [spec paths...]
+//
+// `extension` runs the VS Code extension's mocha suite in the same container,
+// through the package's own `run-unit.mjs`. It is there for what the container
+// does NOT have: no `claude`, no Copilot login and no provider keys, which is
+// the GitHub runner's environment. On this host the operator's own machine
+// answered for tests that CI then failed.
 //
 // `container` runs the platform-independent tests in a CPU-bounded Podman
 // container, which is where nearly all of them belong: 360 seconds on this
@@ -30,6 +37,8 @@ const IMAGE = "dabbler-suite:local";
 /** Where the image records the Containerfile it was built from. */
 const LABEL = "dabbler.containerfile.sha256";
 const TEST_ROOT = "packages/router/test";
+const EXTENSION_PACKAGE = "tools/dabbler-ai-orchestration";
+export const EXTENSION_TEST_ROOT = `${EXTENSION_PACKAGE}/src/test/suite`;
 const MEMBERSHIP = join(ROOT, "scripts", "suite-membership.json");
 
 /**
@@ -85,12 +94,28 @@ export function hostOnly() {
   return manifest.host_only.map((entry) => entry.file);
 }
 
-/** Every router test file, in the one spelling the rest of this file uses. */
-export function allTests() {
-  return readdirSync(join(ROOT, TEST_ROOT), { recursive: true })
-    .map((name) => `${TEST_ROOT}/${String(name).split("\\").join("/")}`)
+/** The extension spec files kept off the container, from the same manifest. */
+export function extensionHostOnly() {
+  const manifest = JSON.parse(readFileSync(MEMBERSHIP, "utf8"));
+  return (manifest.extension_host_only ?? []).map((entry) => entry.file);
+}
+
+/** Every test file under a root, in the one spelling the rest of this file uses. */
+function testsUnder(root) {
+  return readdirSync(join(ROOT, root), { recursive: true })
+    .map((name) => `${root}/${String(name).split("\\").join("/")}`)
     .filter((path) => path.endsWith(".test.ts"))
     .sort();
+}
+
+/** Every router test file. */
+export function allTests() {
+  return testsUnder(TEST_ROOT);
+}
+
+/** Every extension spec file. */
+export function allExtensionTests() {
+  return testsUnder(EXTENSION_TEST_ROOT);
 }
 
 /** Paths as the selector appends them, in the one spelling to compare in. */
@@ -397,11 +422,9 @@ function runWatched(program, argv) {
   });
 }
 
-function runContainer(tests) {
-  requirePodman();
-  ensureImage();
-  ensureVolumes();
-  const argv = [
+/** `podman run` of one command in the suite's container, bounded and reaped. */
+function containerArgv(command) {
+  return [
     "run",
     "--rm",
     // An init as PID 1, and it is not hygiene -- it is what makes two tests
@@ -420,24 +443,66 @@ function runContainer(tests) {
     "--workdir",
     "/repo",
     IMAGE,
-    "node",
-    ...NODE_TEST,
-    ...tests,
+    ...command,
   ];
-  return runWatched("podman", argv);
+}
+
+function prepareContainer() {
+  requirePodman();
+  ensureImage();
+  ensureVolumes();
+}
+
+function runContainer(tests) {
+  prepareContainer();
+  return runWatched("podman", containerArgv(["node", ...NODE_TEST, ...tests]));
 }
 
 function runHost(tests) {
   return runWatched(process.execPath, [...NODE_TEST, ...tests]);
 }
 
+/**
+ * The extension's mocha suite, in the container. Mocha's reporter is not TAP
+ * and counts nothing as cancelled, so its own exit status is the verdict.
+ * With no specs asked for, `run-unit.mjs` runs the whole suite -- unless the
+ * manifest keeps a spec on the host, in which case the rest are named.
+ */
+function runExtension(asked) {
+  const host = new Set(extensionHostOnly().map(normalize));
+  const offered = asked.length === 0 && host.size > 0 ? allExtensionTests() : asked;
+  const specs = [];
+  for (const path of offered) {
+    if (host.has(normalize(path))) note(`declined ${path}: it is kept on the host`);
+    else specs.push(path);
+  }
+  if (offered.length > 0 && specs.length === 0) {
+    note(`nothing for the extension suite among the ${offered.length} path(s) offered`);
+    return 0;
+  }
+  prepareContainer();
+  return new Promise((done) => {
+    const child = spawn(
+      "podman",
+      containerArgv(["node", `${EXTENSION_PACKAGE}/scripts/run-unit.mjs`, ...specs]),
+      { cwd: ROOT, stdio: "inherit" },
+    );
+    child.on("error", (error) => {
+      note(error.message);
+      done(CANNOT_RUN);
+    });
+    child.on("close", (status) => done(status ?? CANNOT_RUN));
+  });
+}
+
 function main(argv) {
   const mode = argv[0];
   const asked = argv.slice(1);
+  if (mode === "extension") return runExtension(asked);
   if (mode !== "container" && mode !== "host") {
     stop(
       `unknown mode ${mode === undefined ? "(none given)" : `'${mode}'`}.`,
-      "Usage: node scripts/suite.mjs <container|host> [test paths...]",
+      "Usage: node scripts/suite.mjs <container|host|extension> [test paths...]",
     );
   }
   const other = mode === "container" ? "host" : "container";

@@ -3838,7 +3838,7 @@
     {
       "number": 194,
       "title": "Choose the model from a list",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-17T06:11:36.576000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -3847,7 +3847,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.5.0",
-      "completedAt": null,
+      "completedAt": "2026-09-17T06:21:39.210000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,

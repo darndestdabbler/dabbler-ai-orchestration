@@ -3880,7 +3880,7 @@
     {
       "number": 196,
       "title": "Uncommitted changes at Start are a question, not a dead end",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-17T07:00:55.676000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -3889,7 +3889,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.5.0",
-      "completedAt": null,
+      "completedAt": "2026-09-17T07:14:19.072000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,

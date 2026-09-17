@@ -12093,3 +12093,101 @@ container.
 
 **Releasable.** Yes, a patch. Its tag is the first to publish since 3.3.7,
 once `Test` is green for its commit.
+
+### Session 202 of 202: Plans first, code in sessions, and no dead ends
+
+Scope: whole repository
+
+**The rule this session serves (operator, 2026-09-17).** Keep it simple and
+consistent, and add no blocker that has a simple resolution. An AI must never
+be left saying it does not know what to do or that the framework will not let
+it. Every change below removes a stop or a question. None adds one.
+
+**Why.** On 2026-09-17 session 3 of `test-dabbler-orchestration-terminals`
+dead-ended:
+1. **Session 2 built the application.** The Session 2 template
+   (`bootstrap/templates.ts`, step 4) tells it to "create the projects the
+   plan's Production split names", plus packaging and an architecture test.
+   For a hello-world app that was the whole app. Session 2 was verified and
+   committed. Its reviewer noted that the session 3 it had planned would
+   create the same projects again, and rated that a nit.
+2. **Session 3 had nothing to do.** Its steps reported the work already
+   present, which was true, and changed no file.
+3. **Verification refused an empty change and the loop ended.**
+   `facts.ts` throws `EvidenceEmptyError` when there is no diff against HEAD,
+   `verify` exits 7, and the driver stops `no-verdict`. No command an AI
+   can run clears that.
+4. **The waiter said only that no loop was driving** (`drive.ts`, `wait`),
+   not why the loop had stopped or what to do.
+5. **Cancelling leaves the framework's own files uncommitted.**
+   `session cancel` writes `sessions.json` and commits nothing. Registration
+   had already changed `sessions.json`, `activity-log.json` and
+   `project-work-plan.md`, so a person who cancels is left with three files
+   they did not write, and the next Start asks about them.
+
+**What -- sessions 001 and 002 write plans, and nothing else.** The
+bootstrap templates change to one rule:
+- **Session 001** writes or imports `docs/planning/solution-plan.md`.
+- **Session 002** challenges it and writes the numbered sessions into
+  `session-plan.md`.
+- **Neither creates, edits or deletes any code, project, build file, test,
+  `dabbler.yaml` suite or packaging.**
+
+Session 002's template tells it to plan the first numbered session as **the
+skeleton**. For .NET, that is the solution file and every project the plan
+names, with their references. For Maven or Gradle, it is the parent build and
+every module. Either way it includes the test suite declared in
+`dabbler.yaml`, the packaging where the plan names handoff artifacts, and any
+architecture test the plan requires. Later sessions fill modules in and never
+re-create what the skeleton made. The Session 2 step that creates projects,
+and its *Creates* line, go.
+
+The session checks, rather than assumes, that the skeleton works with no
+tests yet. It builds a two-project .NET sample and a two-module Maven sample,
+declares each suite with no tests, and runs the declared command. Where the
+empty run fails, the skeleton step in the template also adds one placeholder
+test, so the skeleton session always passes its own suite. The results go in
+the step's notes.
+
+**What -- a session that changes nothing closes by itself.** When a session's
+work steps are all accepted and the diff the framework measures against HEAD
+is empty, with no tracked change and no untracked file, the driver does not
+call `verify`. It closes the session as **no change**: no review round, no
+commit of work, no release. The ledger and the Work Explorer both say *no
+change*, and the close's own state-file commit is made as usual. No
+instruction is issued and no person is asked. This is safe under the
+review mandate, because the framework measures the emptiness itself: the
+incident behind the mandate trusted a path list the AI supplied. Nothing
+unreviewed can land, because nothing lands.
+
+**What -- a waiter that is out of instructions says why.** When no loop is
+driving and the session has a recorded stop, `wait` prints the stop's reason
+and the moves from its stop table in the same words the loop prints. It
+names Resume in VS Code first, then the terminal command.
+
+**What -- cancel leaves a clean tree.** `session cancel` commits the
+framework's own files it and the registration wrote (`sessions.json`,
+`activity-log.json`, `project-work-plan.md`), with the message *Cancel session
+<N> of <sessions>*, the same way close commits its own. It commits nothing
+else. Anything else uncommitted is left alone.
+
+**Non-goals.** Repositories past session 002 are not migrated: the templates
+affect new bootstraps only. No new stop, gate, question or setting. No change
+to review for any session that changes something. No change to what
+`verify` does when called by a person. No unwinding of work by cancel.
+
+**Tests.**
+- Session 002's template names no code or project creation, and the
+  skeleton appears as a numbered-session instruction. This is asserted on
+  structure, not exact wording.
+- A driven session whose steps change nothing closes as no change, with no
+  `verify` call and no stop.
+- `wait`, with a recorded stop and no loop, prints the stop's reason and its
+  moves.
+- `session cancel` leaves the three framework files committed and anything
+  else untouched.
+
+Existing tests that assert the removed template step or the `no-verdict` stop
+on an empty change are changed rather than joined.
+
+**Releasable.** Yes, a minor, because new repositories plan differently.

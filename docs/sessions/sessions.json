@@ -3859,7 +3859,7 @@
     {
       "number": 195,
       "title": "Remove Start Unattended Session",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-17T06:45:39.843000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -3868,7 +3868,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.5.0",
-      "completedAt": null,
+      "completedAt": "2026-09-17T06:55:26.310000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,

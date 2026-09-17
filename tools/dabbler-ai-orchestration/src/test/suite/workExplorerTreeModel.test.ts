@@ -990,13 +990,31 @@ suite("workExplorerTreeModel: the two surfaces over one record", () => {
       assert.strictEqual(git.status, 0, `git ${args.join(" ")}: ${git.stdout}${git.stderr}`);
     }
 
+    // `start` refuses an engine whose CLI is not on PATH, and the suite may
+    // not read this machine's PATH -- so it builds the one it needs. Both
+    // spellings, so the lookup finds one on either platform; nothing runs.
+    const bin = makeTempDir("dabbler-parity-bin-");
+    fs.writeFileSync(path.join(bin, "claude"), "#!/bin/sh\n", "utf8");
+    fs.writeFileSync(path.join(bin, "claude.cmd"), "@echo off\n", "utf8");
+    const savedPath = process.env.PATH;
+    const savedPathext = process.env.PATHEXT;
+    process.env.PATH = [bin, savedPath ?? ""].join(path.delimiter);
+    process.env.PATHEXT = ".COM;.EXE;.BAT;.CMD";
     const router = createInProcessRouter();
-    const started = await router.session.start({
-      engine: "claude-code",
-      provider: "anthropic",
-      repoRoot: root,
-      sessionsDir,
-    });
+    let started;
+    try {
+      started = await router.session.start({
+        engine: "claude-code",
+        provider: "anthropic",
+        repoRoot: root,
+        sessionsDir,
+      });
+    } finally {
+      if (savedPath === undefined) delete process.env.PATH;
+      else process.env.PATH = savedPath;
+      if (savedPathext === undefined) delete process.env.PATHEXT;
+      else process.env.PATHEXT = savedPathext;
+    }
     assert.ok(started.ok, JSON.stringify(started));
 
     const driver = path.join(root, ".dabbler", "runs", "s1", "driver");

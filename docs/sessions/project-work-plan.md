@@ -237,6 +237,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 197 | A new session never inherits an earlier run's record | yes | 2026-09-17 |
 | 198 | One reviewer rule, and refusals that name the cause | yes | 2026-09-17 |
 | 199 | A refused dispute goes back to the AI, and Resume is there when the loop is not | yes | 2026-09-17 |
+| 200 | The extension suite does not read this machine's PATH | yes | 2026-09-17 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2702,3 +2703,9 @@ Make review cross-vendor everywhere and make every refusal about an unreachable 
 **Releasable: yes.**
 
 Make a refused dispute a rejection the AI corrects instead of a stop nobody can move, and offer Resume when no loop is running. In packages/router/src/verify/disputes.ts the evidence checks `recordDispute` applies (at least one cite, inside the repository, a `path:START-END` range, a bare cite no larger than DISPUTE_EVIDENCE_INLINE_CAP) become one exported judgment, `judgeDisputeEvidence`, which `recordDispute` calls. In packages/router/src/drive.ts, `phaseDispositions` judges every reject disposition with that same judgment in place of its own `resolveRepoRelative` check, through one small exported helper, `dispositionRefusals`: a refused dispute goes back to the engine as a rejection carrying the refusal's own sentence and counts toward MAX_REJECTIONS; a stored dispositions.json read at the start of the phase is judged the same way, and one it refuses is treated as unanswered and asked again with the refusal as a reason rather than recorded. A refusal from `recordDispute` that the judgment could not predict (a round or finding not recorded) stays the `dispute-refused` stop. In packages/router/src/driver.ts the `dispute-refused` stop's moves add Resume Session for where the loop has ended. In tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts Resume is withheld at an engine-owned stop only while `loopAlive` reads the session's heartbeat as beating. Releasable as a patch: version.json moves to 3.9.1, stamped with `npm run stamp:version`, with a CHANGELOG entry.
+
+### Session 200 — The extension suite does not read this machine's PATH
+
+**Releasable: yes.**
+
+Make the extension suite's one test that starts a session through the in-process router independent of this machine's PATH, so the GitHub runner, which has no `claude`, turns `Test` green and the next tag publishes. In tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts, the test "the terminal and the Work Explorer name the same step, from one instruction at one seq" seeds a temporary directory with a stand-in `claude` and `claude.cmd` before `router.session.start`, puts it first on `process.env.PATH` with `PATHEXT` set, and restores both in a `finally`; nothing is executed, because the start check only looks the program up. The rest of the extension suite was searched for any other test that starts a session through the in-process router with a built-in engine (`createInProcessRouter`, `.session.start(`, `engine: "claude-code"`): the other hits are fixtures of recorded state, stubbed install readings or asserted argv, and start nothing, so this is the only test changed. The fix is proved by running the test with every directory holding `claude` stripped from PATH, before the fix (reproducing CI's refusal) and after it (passing), both outputs in the step's notes. Releasable as a patch: version.json moves to 3.9.2, stamped with `npm run stamp:version`, with a CHANGELOG entry.

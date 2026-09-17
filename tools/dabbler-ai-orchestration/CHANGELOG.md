@@ -10,6 +10,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.9.2] — 2026-09-17
+
+**The extension suite does not read this machine's PATH.**
+
+### Fixed
+
+- The extension suite's test that starts a session provides its own
+  stand-in `claude` on PATH instead of relying on the machine's, so `Test`
+  passes on a runner with no `claude` installed. This is the first version
+  to reach the Marketplace since 3.3.7; the 3.4.0–3.9.1 tags were refused
+  there because `Test` was red.
+
 ## [3.9.1] — 2026-09-17
 
 **A refused dispute goes back to the AI, and Resume is there when the loop is not.**

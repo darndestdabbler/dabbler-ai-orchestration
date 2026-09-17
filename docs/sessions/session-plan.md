@@ -11747,3 +11747,44 @@ the question on that refusal and passes the flag for the answer chosen, and
 passes nothing on Cancel. One that the consult brief says to commit and push.
 
 **Releasable.** Yes, a minor: Start gains a way through that it did not have.
+
+### Session 197 of 197: A new session never inherits an earlier run's record
+
+Scope: whole repository
+
+**Why.** Walking 3.8.0 in `test-dabbler-orchestration-terminals`, the operator
+reset the repository to the close of session 2, and Consult with AI inserted
+"Print a startup banner" as session 3, moving Greeter to session 4. Start
+Session registered the new session 3, and the AI's waiter printed `done` at
+once: *"session 3 is closed. Nothing further to do."* Nothing had been done.
+`.dabbler/` is gitignored, so the reset left `.dabbler/runs/s3/` in place, from
+the Greeter run that finished at 03:08. Its `driver/run.json` said `"phase":
+"complete"` with `accepted_steps` `greeter` and `greeter-tests`, and the loop
+took it over as session 3's run. The run records are keyed by session number
+alone, so any reuse of a number hands the new session the old one's record,
+including its `rounds.jsonl`. That happens after a reset, and after a plan edit
+renumbers sessions. It is the same trap for a cancelled session: inserting a
+session ahead of a cancelled one gives the new session the cancelled one's
+run.
+
+**What.** A fresh registration, the branch of `session start` where no session
+is in flight or a different one is requested, starts with no run record.
+Where `.dabbler/runs/s<N>/` already exists, `start` moves it whole to
+`.dabbler/superseded-runs/s<N>-<timestamp>/` before it registers. That folder
+is outside `runs/`, so no reader that lists `runs/` sees it. `start` prints one
+line naming the folder it moved the record to. A continuation (re-registering
+the session in flight) and a restored session are unchanged: `session restore`
+puts the row back to the status it had, so an in-progress session continues
+its own run, which is what restoring it means.
+
+**Non-goals.** No move is made on restore or on a continuation. No run record
+follows its session when a plan edit renumbers it: a cancelled session that
+moves to a new number and is later restored starts a fresh run. Nothing is
+deleted, and nothing under `runs/` is edited in place. `session cancel` is
+unchanged.
+
+**Tests.** One in `session.test.ts`: a start that registers a session whose
+`runs/s<N>/` holds a completed run moves that folder under `superseded-runs/`,
+names it in its output, and leaves no `runs/s<N>/` behind.
+
+**Releasable.** Yes, a patch.

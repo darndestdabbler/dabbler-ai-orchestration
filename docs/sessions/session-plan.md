@@ -11973,3 +11973,56 @@ Existing tests asserting the `dispute-refused` stop from an oversized cite
 are changed rather than joined.
 
 **Releasable.** Yes, a patch.
+
+### Session 200 of 200: The extension suite does not read this machine's PATH
+
+Scope: whole repository
+
+**Why.** Nothing has reached the Marketplace since 3.3.7 (session 190). The
+tags `vsix-v3.4.0` through `vsix-v3.9.0` were pushed, and every run of
+`publish-vscode.yml` refused. It requires a green `Test` run for the tagged
+commit, and `Test` has been red on every commit since session 192. The last
+green run was on 2026-09-17 at 09:00. Every red run fails the same single test
+in the extension job:
+
+> `workExplorerTreeModel: the two surfaces over one record` -- *the terminal
+> and the Work Explorer name the same step, from one instruction at one seq*:
+> `start: refused -- the engine 'claude-code' runs through 'claude', which is
+> not on this machine's PATH`
+
+Session 192 made `session start` refuse an engine whose CLI is not on PATH
+(`installedEngines` in `engines.ts`, reading `process.env`). This test starts
+a session through `createInProcessRouter()` with `engine: "claude-code"`, so
+the router reads the PATH of whatever process runs the suite. On the
+operator's machine `claude` is installed, so the run of record passed in every
+session. The GitHub runner has no `claude`, so CI fails. A suite may not read
+the operator's environment; this test does.
+
+**What.** The test builds the PATH it needs. Before `router.session.start`, it
+seeds a temporary directory with a stand-in `claude` and `claude.cmd`, the same
+shape `engines.test.ts` already uses. The directory goes first on
+`process.env.PATH`, with `PATHEXT` set, and both are restored in a `finally`,
+so nothing leaks into the next test. Nothing is executed: `lookupOnPath` only
+has to find the file. The suite is then searched for any other test that
+starts a session through the in-process router with a built-in engine. Each
+one found gets the same treatment, and the step's notes list what was
+searched.
+
+**Proof before the push.** The test is run once with `PATH` stripped of every
+directory holding `claude`, first against the unfixed test to show it
+reproduces CI's failure, then against the fix to show it passes. Both outputs
+go in the step's notes.
+
+**Non-goals.** The start check itself, which is correct. Running the extension
+suite in Podman: the container is this repository's own suite runner, and a
+.NET or Java repository has no use for it. Having the close check whether the
+Publish workflow succeeded: pushing without publishing is a normal outcome for
+the solutions this framework serves, so that would need its own setting.
+Re-running the refused Publish runs for the older tags: the next tag publishes
+everything since 3.3.7.
+
+**Tests.** No new test. The existing test is made self-contained, and passes
+with no `claude` on the machine's PATH.
+
+**Releasable.** Yes, a patch. Its tag is the first to publish since 3.3.7,
+once `Test` is green for its commit.

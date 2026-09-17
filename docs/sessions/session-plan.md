@@ -11569,9 +11569,12 @@ credential references. A reference that names nothing on a provider the
 reviewing vehicle would call is not a stop: that provider is simply not a
 candidate. It is named in the reviewing refusal where it leaves no candidate,
 and printed as a warning where it does not. A reference on a provider nothing
-in this session calls produces no output. A key pasted where a variable's
-name or a credential's name belongs is printed as a warning naming the file,
-and never refuses. Session 191's order stands: a reference that names
+in this session calls produces no output. **The one exception is a key pasted
+where a variable's name or a credential's name belongs:** it still refuses the
+start, on any provider, whether or not this session calls it, naming the file
+and never the value. The session would run, but a key in a committed file is
+shared with everyone who clones, and that is not a thing to proceed over
+(operator, 2026-09-17). Session 191's order stands: a reference that names
 nothing resolves to no key, and never falls to the variable.
 
 **What -- the round's own words.** Where the reviewing vehicle stops being
@@ -11591,7 +11594,8 @@ is refused, naming both ways forward. One that a start whose only keyed
 provider is the author's own is refused. One that a dangling credential
 reference on a provider no role calls starts cleanly, with nothing printed.
 One that an unreachable machine vehicle the reviewing vehicle does not use
-starts cleanly. One that a seat round with no catalog names the refresh.
+starts cleanly. One that a key pasted into a setting refuses the start for a
+provider no role calls. One that a seat round with no catalog names the refresh.
 The existing tests asserting the removed refusals are changed rather than
 joined.
 

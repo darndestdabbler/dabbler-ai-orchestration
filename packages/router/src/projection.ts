@@ -63,6 +63,7 @@ import {
   type ResolveOptions,
   reviewerRefusal,
   type RoleResolution,
+  vendorConflict,
 } from "./selection.ts";
 import { REFRESH_COMMAND, explainRoleCandidates, seatBlock } from "./transports/copilot.ts";
 
@@ -278,12 +279,17 @@ function candidateNode(
   candidate: readonly [string, string],
   retired: ReadonlyMap<string, RetiredModel>,
   priceCategory: ReadonlyMap<string, string> = new Map(),
+  conflictOf: (provider: string) => string | null = () => null,
 ): Node {
   const [modelId, provider] = candidate;
   const withdrawn = retired.get(modelId);
   return {
     model: modelId,
     provider,
+    // Why this model cannot review today's author, or null. Marked and kept:
+    // the author is chosen at each Start, so a hidden model could not be
+    // chosen ahead of switching the author.
+    conflict: conflictOf(provider),
     // What the source said this costs, in the source's own word for it, and
     // null where the source said nothing. Never inferred.
     priceCategory: priceCategory.get(modelId) ?? null,
@@ -311,17 +317,16 @@ function roleNode(
   exclude: readonly string[] | null,
   /**
    * The authoring model, on a reviewing role: the one model this role may
-   * not be, and the whole of what it may not be.
-   *
-   * It is a MODEL and no longer a provider. Excluding the author's provider
-   * withheld every model that vendor serves from the list, which asserted
-   * something this framework cannot know -- that two models of one family
-   * share a blind spot -- while failing to stop the thing it was named for,
-   * since `gpt-5.6-sol` reviewing `gpt-5.6-terra` is very likely one model
-   * reviewing itself and passes a provider test only because the two ids
-   * differ. What remains is the rule that needs no judgement.
+   * never be offered as, whoever authors next.
    */
   notThisModel: string | null = null,
+  /**
+   * Why a candidate from a given provider cannot review today's author, or
+   * null. Review is cross-vendor (D281), but the author is chosen at each
+   * Start, so a candidate from the author's vendor is marked rather than
+   * withheld.
+   */
+  conflictOf: (provider: string) => string | null = () => null,
 ): Node {
   const retired = reading.retired;
   // Everything this role COULD be, not the one thing it will be: a pane
@@ -357,10 +362,14 @@ function roleNode(
         );
   return {
     role,
-    chosen: chosen === undefined ? null : candidateNode(chosen, retired, reading.priceCategory),
+    chosen:
+      chosen === undefined ? null : candidateNode(chosen, retired, reading.priceCategory, conflictOf),
     candidates: served.map((candidate) =>
-      candidateNode(candidate, retired, reading.priceCategory),
+      candidateNode(candidate, retired, reading.priceCategory, conflictOf),
     ),
+    // The operator's own selection, where today's author conflicts with it:
+    // the row says so, in words, before a Start refuses it.
+    conflict: resolution.selected === null || chosen === undefined ? null : conflictOf(chosen[1]),
     withheld: [...retired.values()].map((entry) =>
       candidateNode([entry.id, entry.provider], retired, reading.priceCategory),
     ),
@@ -933,8 +942,11 @@ export function configurationNode(
     const reviewingVehicle = reviewingVehicleNode(config, root);
     const reviewingTransport = String(reviewingVehicle["chosen"]);
     /** A reviewing role as this machine would resolve it, on the reviewing vehicle. */
+    const authorProvider = typeof authoring["provider"] === "string" ? authoring["provider"] : null;
     const reviewingNode = (role: string): Node => ({
-      ...roleNode(readingFor(reviewingTransport), role, null, authorModel),
+      ...roleNode(readingFor(reviewingTransport), role, null, authorModel, (provider) =>
+        vendorConflict(config, authorProvider, provider),
+      ),
       vehicle: reviewingVehicle,
     });
     return {
@@ -952,10 +964,8 @@ export function configurationNode(
         installed: engines.engines.map((entry) => ({ ...entry })),
       },
       authoring: { ...authoring, vehicle: engineVehicleNode(root) },
-      // Excluded by the author's own MODEL and nothing else. Whether a second
-      // model from one vendor is far enough from the first is the developer's
-      // judgement, and `authoring.provider` against each option's `provider`
-      // is what lets them make it.
+      // Never the author's own model, and every candidate from the author's
+      // vendor marked as not usable while that vendor authors (D281).
       primaryReviewer: reviewingNode(ROLE_PRIMARY_REVIEWER),
       // The third voice, which has been dispatchable since the roles were
       // named and has never had a surface. It is resolved here against the

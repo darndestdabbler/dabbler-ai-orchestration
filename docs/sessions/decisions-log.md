@@ -8934,3 +8934,9 @@ Resolution of a provider key becomes: the checkout's reference (`dabbler.credent
 Why. Everywhere else in this framework the checkout outranks the person. A `DABBLER_*_API_KEY` set at user scope is exactly a personal, machine-wide default, and with the environment first it silently shadows every repository's committed choice of credential -- and so which account is billed -- on every repository on the machine. That is the shape session 157 retired `DABBLER_TRANSPORT` for. The CI argument does not survive the new order: a CI machine holds no stored credentials, and where nothing names one the variable still supplies the key.
 
 Consequence. A reference that names a credential this machine does not hold, or one stored for another vendor, is a stop whether or not the variable is set, because falling to the variable would change the billed account without saying so. The two checks for a key pasted into a file are unchanged.
+
+## Session 198 — One reviewer rule, and refusals that name the cause
+
+### D281 · 2026-09-17 · Operator · Review is cross-vendor everywhere
+
+On 2026-09-17 the operator ruled that the reviewer is never from the authoring model's vendor, on every surface. The review rounds, triage and session start already exclude the author's whole provider; the pane and dabbler configure applied only the not-the-same-model rule and labelled a same-vendor reviewer as allowed, so the pane offered choices every session with that author refused. Session 151's same-vendor allowance is reversed: the pane keeps same-vendor candidates visible but marks them not usable while authoring is that vendor, a chosen reviewer that conflicts takes the attention tone, and configure warns rather than refuses because the author is chosen at each Start. The not-the-same-model check stays where it is, because the vendor rule covers it.

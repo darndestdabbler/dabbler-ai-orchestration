@@ -28,6 +28,7 @@ import {
   reviewerRefusal,
   resolveRole,
   roleDeclaration,
+  vendorConflict,
   type Candidate,
 } from "../src/selection.ts";
 import { writePreferences } from "../src/preferences.ts";
@@ -267,17 +268,20 @@ describe("spelling a model id", () => {
 });
 
 describe("what a verifying model may be", () => {
-  it("refuses only the authoring model itself, and says what it does not claim", () => {
-    // One rule and one comparison: no capability data, no provider inference,
-    // no registry. A different model on the SAME provider is accepted,
-    // because whether two models of one family share a blind spot is a
-    // judgement this framework has no data to make -- and the refusal says
-    // so rather than leaving the developer to assume it was checked.
+  it("refuses the authoring model itself, and never calls a same-vendor reviewer allowed", () => {
     assert.equal(reviewerRefusal("claude-opus-5", "gpt-5.6-terra"), null);
-    assert.equal(reviewerRefusal("gpt-5.6-sol", "gpt-5.6-terra"), null);
     const refused = String(reviewerRefusal("claude-opus-5", "claude-opus-5"));
     assert.match(refused, /they are the same model/);
-    assert.match(refused, /same provider is allowed/);
+    assert.doesNotMatch(refused, /allowed/);
+  });
+
+  it("marks a reviewer from the authoring vendor by the vendor's own label, and nothing else", () => {
+    // vendorConflict: review is cross-vendor (D281), stated without refusing.
+    const config = makeConfig();
+    (config["providers"] as Record<string, Record<string, unknown>>)["openai"]!["display_label"] = "OpenAI";
+    assert.match(String(vendorConflict(config, "openai", "openai")), /not usable while authoring is OpenAI/);
+    assert.equal(vendorConflict(config, "openai", "anthropic"), null);
+    assert.equal(vendorConflict(config, null, "openai"), null);
   });
 
   it("reads a dated pin and its undated id as the same model", () => {

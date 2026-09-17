@@ -40,7 +40,7 @@ import {
 } from "../ledger.ts";
 import { readSessionState } from "../progress.ts";
 import { pythonRepr } from "../pythonJson.ts";
-import { NoCandidateError, RouterError, type RouteResult } from "../route.ts";
+import { NoCandidateError, RouterError, prose, type RouteResult } from "../route.ts";
 import { ROLE_AUXILIARY_REVIEWER, reviewerExclusions } from "../selection.ts";
 import {
   OUTCOME_OVERRULED,
@@ -464,15 +464,24 @@ export async function runAdjudication(
     });
   } catch (error) {
     if (error instanceof NoCandidateError) {
+      const outside = Object.keys(loadConfig()["providers"] ?? {}).filter(
+        (provider) => !excluded.includes(provider),
+      );
       writeErr(
         "verify adjudicate: VERIFICATION UNAVAILABLE -- no eligible " +
           "adjudicator exists outside the excluded providers " +
-          `(${excluded.join(", ")}). Reason: ${error.message}\n` +
+          `(${prose(excluded)}): ${error.message}\n` +
           "No verdict was written; the close stays BLOCKED and the " +
           "session is UNRESOLVED — its disputed findings stand unjudged " +
           "and nothing lands but the record.\n" +
-          "The one exit is a third provider: enable a model from outside " +
-          "the exclusions and re-run:\n" +
+          "The one exit is a third vendor: `dabbler configure --auxiliary-model <id>` " +
+          "for a model from " +
+          (outside.length > 0 ? prose(outside) : "a vendor outside the exclusions") +
+          (outside.length > 0
+            ? `, or ${prose(outside.map((provider) => `\`dabbler auth set ${provider}\``))} ` +
+              "where this machine holds no key for it"
+            : "") +
+          ", then re-run:\n" +
           `  dabbler verify adjudicate --sessions-dir ` +
           `${sessionsDir}\n` +
           "There is no verdict a person can type in its place.\n",

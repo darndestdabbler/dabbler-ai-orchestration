@@ -15,7 +15,9 @@ import {
   runOfRecordLines,
   substitutionNote,
   turnCount,
+  verificationUnavailable,
 } from "../src/verify/rounds.ts";
+import { CAUSE_VENDOR_CONFLICT, NoCandidateError } from "../src/route.ts";
 import { gitAnswers, tempDir } from "./support/answers.ts";
 
 // A directory with no repository holds no object, so a round's tree is never
@@ -184,5 +186,20 @@ describe("what a round says about the model that answered", () => {
     // A provider substituting a model is a fact about what was bought, not a
     // verification failure: the verdict stands and the round is not refused.
     assert.match(note, /verdict stands/);
+  });
+});
+
+describe("what verify says when no reviewer can be dispatched", () => {
+  it("carries the ladder's cause and ways forward, and never points at packaged configuration", () => {
+    const stop = new NoCandidateError(
+      "you chose 'gpt-5.6-sol' for the Primary Reviewer, and this call cannot dispatch to it: " +
+        "'gpt-5.6-sol' is OpenAI's, and so is the authoring model.",
+      CAUSE_VENDOR_CONFLICT,
+    );
+    const text = verificationUnavailable("docs/sessions", "openai", stop);
+    assert.match(text, /VERIFICATION UNAVAILABLE/);
+    assert.match(text, /is OpenAI's, and so is the authoring model/);
+    assert.match(text, /dabbler verify --sessions-dir docs\/sessions/);
+    assert.doesNotMatch(text, /router-config\.yaml/);
   });
 });

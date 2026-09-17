@@ -717,6 +717,21 @@ suite("solutionTreeModel: what a session is run with", () => {
       assert.ok(primaryReviewer?.tooltip?.includes("PRICE and not a capability"));
       assert.ok(primaryReviewer?.tooltip?.includes("You chose gpt-5.6-terra"));
       assert.ok(primaryReviewer?.tooltip?.includes("nothing is substituted for it"));
+      assert.notStrictEqual(primaryReviewer?.icon?.tone, "attention");
+
+      // A chosen reviewer from today's authoring vendor takes the attention
+      // tone and says the conflict in the router's words.
+      const conflicting = descriptorFor(
+        { kind: "configRole", role: "primaryReviewer" },
+        configured({
+          primaryReviewer: {
+            ...(configured().configuration?.primaryReviewer as ConfigurationRole),
+            conflict: "not usable while authoring is OpenAI",
+          },
+        }),
+      );
+      assert.strictEqual(conflicting.icon?.tone, "attention");
+      assert.ok(conflicting.tooltip?.includes("not usable while authoring is OpenAI"), conflicting.tooltip);
 
       // And the third voice, which is what this section never had: what it
       // is for, and what narrows it at the round, in the router's own words.
@@ -978,6 +993,32 @@ suite("solutionTreeModel: what a configuration reading costs", () => {
     // A seat is nothing without a model, so it is offered no default.
     const required = modelPickItems(root, { ...claude, modelRequired: true }, "");
     assert.deepStrictEqual(required?.map((item) => item.model), ["a-author", "a-second", undefined]);
+  });
+
+  test("the model question marks an authoring model from the chosen Primary Reviewer's vendor, and still offers it", () => {
+    const preferences = process.env.DABBLER_PREFERENCES_PATH as string;
+    const before = fs.existsSync(preferences) ? fs.readFileSync(preferences, "utf8") : null;
+    const chose = (reviewer: string): string =>
+      JSON.stringify({ schema_version: 1, written_by: "test", written_at: "2026-09-17T00:00:00Z", selected: { reviewer } });
+    fs.mkdirSync(path.dirname(preferences), { recursive: true });
+    fs.writeFileSync(preferences, chose("o-reviewer"), "utf8");
+    try {
+      const claude = ENGINES.find((entry) => entry.engine === "claude-code") as EngineChoice;
+      const items = modelPickItems(root, claude, "a-author");
+      assert.ok(items);
+      // Claude Code authors Anthropic only, so nothing on its list is the reviewer's vendor.
+      assert.ok(items.every((item) => !item.description?.includes("same vendor as your Primary Reviewer")));
+      fs.writeFileSync(preferences, chose("a-second"), "utf8");
+      const marked = modelPickItems(root, claude, "a-author");
+      const author = marked?.find((item) => item.model === "a-author");
+      assert.ok(
+        author?.description?.includes("same vendor as your Primary Reviewer (a-second); this session would not start"),
+        author?.description,
+      );
+    } finally {
+      if (before === null) fs.rmSync(preferences, { force: true });
+      else fs.writeFileSync(preferences, before, "utf8");
+    }
   });
 
   test("the model question falls back to the text box on 'Enter a model id…', no list, or the alias floor", async () => {

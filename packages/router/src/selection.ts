@@ -353,15 +353,22 @@ export function explainRole<T extends Candidate>(
 export function fellThroughWarning<T extends Candidate>(
   resolution: RoleResolution<T>,
   role: string,
+  label: (provider: string) => string = (provider) => provider,
 ): string | null {
   if (!resolution.fellThrough) return null;
   const chosen = resolution.candidates[0];
   if (chosen === undefined) return null;
-  const rules = [...new Set(resolution.removed.map((row) => row.rule))];
+  const why = (row: RemovedCandidate): string =>
+    row.rule === REMOVED_EXCLUDED_PROVIDER
+      ? `because this call excludes ${label(row.provider)}`
+      : row.rule === REMOVED_NOT_SELECTED
+        ? "because another model was chosen for this role"
+        : "because no vendor could be placed behind it";
+  const skipped = resolution.removed.map((row) => `'${row.model}' ${why(row)}`);
   const because =
-    rules.length === 0
-      ? "the order names no reachable model"
-      : `the models it names were removed: ${rules.join(", ")}`;
+    skipped.length === 0
+      ? "the order names no model this machine can reach"
+      : `it skipped ${skipped.join("; ")}`;
   return (
     `the '${role}' role fell past its preference order and resolved to ` +
     `'${chosen[0]}' (${chosen[1]}), which the order does not name -- ${because}`
@@ -370,17 +377,14 @@ export function fellThroughWarning<T extends Candidate>(
 
 // --- What a reviewing model may be -----------------------------------------
 //
-// One rule survives, and it is the only one that needs no judgement this
-// framework cannot make: **the reviewing model may not be the authoring
-// model.** Two strings compared -- no capability data, no provider
-// inference, no registry.
+// **Review is cross-vendor, everywhere** (D281): the reviewer is never from
+// the authoring model's vendor. The rounds, triage and `session start`
+// exclude the author's whole provider; a surface that offered a same-vendor
+// reviewer as usable offered a choice every such session refuses.
 //
-// It is stated with its limit, because the limit is the honest part. It
-// stops a model reviewing its own literal output, and it does NOT stop
-// correlated review: `gpt-5.6-sol` and `gpt-5.6-terra` are different ids and
-// very likely the same base model, and a rule that pretended to know
-// otherwise would be grading models on data nobody has. That judgement is
-// the developer's, and the surface labels the pair rather than refusing it.
+// The same-model comparison below stays, because a surface that knows the
+// author's model but not yet its vendor still has to refuse the one case the
+// vendor rule would also refuse.
 
 /**
  * Why this model may not review that one, or null when it may.
@@ -395,10 +399,30 @@ export function reviewerRefusal(author: string, reviewer: string): string | null
   return (
     `'${reviewer}' cannot review '${author}': they are the same model, and a ` +
     "model reviewing its own literal output is the one thing a second " +
-    "opinion cannot be. Choosing a different model from the same provider " +
-    "is allowed and is labelled as such -- whether two models of one family " +
-    "share a blind spot is a judgement this framework has no data to make."
+    "opinion cannot be. A reviewer is never from the authoring model's vendor."
   );
+}
+
+/** A provider as a person reads it: its configured display label, or its id. */
+export function providerLabel(config: RouterConfig, provider: string): string {
+  const block = (config["providers"] as Record<string, unknown> | undefined)?.[provider];
+  const label = (block as Record<string, unknown> | null | undefined)?.["display_label"];
+  return typeof label === "string" && label !== "" ? label : provider;
+}
+
+/**
+ * Why a reviewer from this provider cannot review today's author, or null.
+ *
+ * Not a refusal: the author is chosen at each Start, so a surface marks the
+ * conflict and keeps the model choosable ahead of switching the author.
+ */
+export function vendorConflict(
+  config: RouterConfig,
+  authorProvider: string | null | undefined,
+  reviewerProvider: string,
+): string | null {
+  if (!authorProvider || authorProvider !== reviewerProvider) return null;
+  return `not usable while authoring is ${providerLabel(config, authorProvider)}`;
 }
 
 // --- Whether the model asked for is the model that answered ---------------

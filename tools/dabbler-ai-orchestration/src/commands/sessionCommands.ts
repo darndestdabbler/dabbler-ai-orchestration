@@ -340,6 +340,13 @@ function engineAuthoringReading(root: string, engine: string): ConfigurationRole
   return configuration?.authoring;
 }
 
+/** The Primary Reviewer the operator chose, with its provider, or null where none is chosen or listed. */
+function chosenPrimaryReviewer(root: string, engine: string): ConfigurationModel | null {
+  const configuration = solutionConfiguration(root, { engine }) as { primaryReviewer?: ConfigurationRole } | null;
+  const reviewer = configuration?.primaryReviewer;
+  return reviewer?.candidates.find((row) => row.model === reviewer.selected) ?? null;
+}
+
 /** The ids a reading lists, blanks dropped. */
 function listedModels(authoring: ConfigurationRole | undefined): ConfigurationModel[] {
   return (authoring?.candidates ?? []).filter((row) => String(row.model ?? "") !== "");
@@ -389,9 +396,22 @@ export function modelPickItems(root: string, choice: EngineChoice, chosen: strin
   const listed = listedModels(authoring);
   if (authoring?.enumeration === ENUMERATION_CLI_ALIASES || listed.length === 0) return null;
   const ordered = [...listed.filter((row) => row.model === chosen), ...listed.filter((row) => row.model !== chosen)];
-  const items: ModelPickItem[] = modelItems(ordered, authoring?.provider, chosen).map((item) => ({
+  // Review is cross-vendor: an authoring model from the chosen Primary
+  // Reviewer's vendor is marked, and stays pickable -- the start refusal decides.
+  const reviewer = chosenPrimaryReviewer(root, choice.engine);
+  const items: ModelPickItem[] = modelItems(ordered, authoring?.provider, chosen).map((item, index) => ({
     ...item,
     model: item.label,
+    ...(reviewer !== null && ordered[index]?.provider === reviewer.provider
+      ? {
+          description: [
+            item.description,
+            `same vendor as your Primary Reviewer (${reviewer.model}); this session would not start`,
+          ]
+            .filter((part) => part)
+            .join(" · "),
+        }
+      : {}),
   }));
   if (!choice.modelRequired) {
     items.push({ label: "The engine's default", description: "no `--model` is passed", model: "" });

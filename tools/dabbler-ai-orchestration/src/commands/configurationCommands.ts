@@ -196,6 +196,9 @@ export function modelItems(
       // What the source said it costs, in the source's own word, and
       // nothing at all where the source said nothing.
       model.priceCategory ? `${model.priceCategory} price` : null,
+      // The router's words for a reviewer from today's authoring vendor:
+      // still choosable, because the author is chosen at each Start.
+      model.conflict ?? null,
     ]
       .filter((part) => part !== null && part !== "")
       .join(" · "),
@@ -623,7 +626,9 @@ export async function setRoleModel(
       `No model qualifies for that role here. ${read}${
         role?.unavailable
           ? `${role.unavailable}.`
-          : "A provider with no key resolves to no candidate at all."
+          : role?.enumeration === "seat-catalog"
+            ? "The seat's catalog lists no model for this role."
+            : "A provider with no key resolves to no candidate at all."
       }`,
     );
     return;

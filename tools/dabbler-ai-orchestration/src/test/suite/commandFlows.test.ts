@@ -1200,6 +1200,7 @@ suite("the Configuration section's model pick", () => {
               model: "claude-opus-5",
               provider: "anthropic",
               priceCategory: "high",
+              conflict: "not usable while authoring is Anthropic",
             }),
             model({
               model: "gpt-5.6-terra",
@@ -1223,6 +1224,9 @@ suite("the Configuration section's model pick", () => {
     assert.ok(offered[0].description?.includes("same provider"), offered[0].description);
     assert.ok(offered[0].description?.includes("high price"), offered[0].description);
     assert.ok(offered[1].description?.includes("different provider"), offered[1].description);
+    // A candidate from the authoring vendor stays offered, and is marked.
+    assert.ok(offered[0].description?.includes("not usable while authoring is Anthropic"), offered[0].description);
+    assert.ok(!offered[1].description?.includes("not usable"), offered[1].description);
     // Nothing said, nothing shown: no price is invented for the second.
     assert.ok(!offered[1].description?.includes("price"), offered[1].description);
     // And the one line of help travels with the list, where the choice is made.

@@ -80,6 +80,7 @@ import {
   ROLE_AUXILIARY_REVIEWER,
   ROLE_PRIMARY_REVIEWER,
   reviewerRefusal,
+  vendorConflict,
 } from "../selection.ts";
 import { normalizeModelToken } from "../contracts/models.ts";
 import { writeErr, writeOut } from "./output.ts";
@@ -125,8 +126,10 @@ function usage(): string {
     "  --reviewer-model M      the model that reviews the next session, named as",
     "                          the reviewer's own transport lists it. The one",
     "                          refusal is the AUTHORING model itself -- which is",
-    "                          the engine's, declared at `session start` -- and",
-    "                          another model on the same provider is allowed",
+    "                          the engine's, declared at `session start`. A",
+    "                          model from the authoring vendor is accepted with",
+    "                          a warning: review is cross-vendor, so a session",
+    "                          with that author would not start",
     "  --auxiliary-model M     the model that adjudicates a disputed finding,",
     "                          named as the auxiliary role's own transport lists",
     "                          it. Checked by the same rule; the round excludes",
@@ -178,22 +181,6 @@ function usage(): string {
  */
 function offered(reading: RoleReading, role: string): Array<readonly [string, string]> {
   return reading.resolve(role, null, { applySelection: false }).candidates;
-}
-
-/**
- * The catalog id for what the operator named, or null when it lists nothing
- * by that name.
- *
- * This replaces `aliasFor`, which walked `config["models"]` on every
- * transport -- including the seat, whose models were never in there, so on a
- * seat it refused every model the pane had just offered. There is no alias
- * to resolve any more: the catalog's id is what the surface shows, what this
- * checks, and what goes on the wire, so the name an operator gives is the
- * name that is written.
- */
-function offeredId(reading: RoleReading, role: string, named: string): string | null {
-  const match = offered(reading, role).find(([modelId]) => modelId === named);
-  return match === undefined ? null : match[0];
 }
 
 /** What each personal default is called in the sentence that reports it. */
@@ -273,6 +260,11 @@ export interface ConfigureOutcome {
    * generically, because an alias for one retired id is a second catalog.
    */
   readonly stale: string | null;
+  /**
+   * A reviewer chosen from the vendor that authors today. Said and never
+   * refused: the author is chosen at each Start, so the next one may differ.
+   */
+  readonly warnings: readonly string[];
 }
 
 /**
@@ -291,7 +283,7 @@ export function staleModelChoice(repoRoot: string): string | null {
  */
 export function configure(options: ConfigureOptions): ConfigureOutcome {
   const config = loadConfig(undefined, options.repoRoot);
-  const empty = { changed: [], path: null, stale: null };
+  const empty = { changed: [], path: null, stale: null, warnings: [] };
   const choice: ConfigurationChoice = {};
   const named: Record<string, string> = {};
   if (
@@ -383,10 +375,10 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     role: string,
     transport: string,
     value: string,
-  ): { modelId: string } | { refusal: string } => {
+  ): { modelId: string; provider: string } | { refusal: string } => {
     const reading = readingFor(transport);
-    const modelId = offeredId(reading, role, value);
-    if (modelId === null) {
+    const match = offered(reading, role).find(([id]) => id === value);
+    if (match === undefined) {
       // THREE problems, not two, and each has a different remedy:
       //
       //   - the transport has read nothing, which is free to fix;
@@ -418,8 +410,24 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
           namesOffered(offered(reading, role).map(([id]) => id)),
       };
     }
+    const [modelId, provider] = match;
     const refusal = author === null ? null : reviewerRefusal(author, modelId);
-    return refusal === null ? { modelId } : { refusal };
+    return refusal === null ? { modelId, provider } : { refusal };
+  };
+  const warnings: string[] = [];
+  /** Review is cross-vendor (D281): a reviewer from today's authoring vendor is named, not refused. */
+  const warnIfSameVendor = (what: string, checked: { modelId: string; provider: string }): void => {
+    const authorProvider = authoringNode(options.repoRoot, readingFor)["provider"];
+    const conflict = vendorConflict(
+      config,
+      typeof authorProvider === "string" ? authorProvider : null,
+      checked.provider,
+    );
+    if (conflict === null) return;
+    warnings.push(
+      `${what} '${checked.modelId}' is ${conflict}: a reviewer is never from the authoring ` +
+        "model's vendor, so a session started with today's author would not start.",
+    );
   };
   if (options.reviewerModel !== undefined) {
     const checked = checkedModel(
@@ -429,6 +437,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     );
     if ("refusal" in checked) return { ...empty, refusal: checked.refusal };
     named["reviewerModel"] = checked.modelId;
+    warnIfSameVendor("The Primary Reviewer", checked);
   }
   if (options.auxiliaryModel !== undefined) {
     const checked = checkedModel(
@@ -467,6 +476,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
       };
     }
     named["auxiliaryModel"] = checked.modelId;
+    warnIfSameVendor("The Auxiliary Reviewer", checked);
   }
   // **The authoring model: checked against what the transport LISTS.**
   //
@@ -726,6 +736,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     // Read AFTER the write, so a call that fixes the stale choice reports
     // nothing, and a call that sets something else beside it reports it.
     stale: staleModelChoice(options.repoRoot),
+    warnings,
   };
 }
 
@@ -809,6 +820,7 @@ export async function configureVerb(argv: string[]): Promise<number> {
     writeErr(`dabbler configure: ${outcome.refusal}\n`);
     return EXIT_REFUSED;
   }
+  for (const warning of outcome.warnings) writeErr(`dabbler configure: warning: ${warning}\n`);
   writeOut(
     [
       ...outcome.changed.map((line) => `configure: ${line}`),

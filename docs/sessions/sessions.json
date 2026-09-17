@@ -3903,18 +3903,39 @@
       "title": "A new session never inherits an earlier run's record",
       "status": "complete",
       "startedAt": "2026-09-17T07:49:19.998000-04:00",
+      "completedAt": "2026-09-17T07:56:10.341000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-opus-5",
         "identityProvenance": "direct"
       },
-      "frameworkVersion": "3.5.0",
-      "completedAt": "2026-09-17T07:56:10.341000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,
         "verifierModel": "gpt-5.6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "3.5.0"
+    },
+    {
+      "number": 198,
+      "title": "One reviewer rule, and refusals that name the cause",
+      "status": "in-progress",
+      "startedAt": "2026-09-17T08:15:33.686000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "direct"
+      },
+      "frameworkVersion": "3.8.1",
+      "completedAt": null,
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.6-terra",
         "verifierProvider": "openai",
         "transport": "api"
       }

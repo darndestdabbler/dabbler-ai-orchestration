@@ -33,12 +33,18 @@ import {
   truthy,
   type RouterConfig,
 } from "./config.ts";
-import { apiBlock, apiSelectableModels } from "./discovery.ts";
+import { CATALOG_REFRESH_COMMAND, apiBlock, apiSelectableModels } from "./discovery.ts";
+import { normalizeModelToken } from "./contracts/models.ts";
 import { recordCall, type CallRecord } from "./metrics.ts";
 import { isNoRouterMode } from "./runtimeMode.ts";
 import {
+  REMOVED_EXCLUDED_PROVIDER,
   REVIEWING_ROLES,
+  ROLE_AUXILIARY_REVIEWER,
+  ROLE_PRIMARY_REVIEWER,
   fellThroughWarning,
+  providerLabel,
+  providerReachable,
   reviewerRefusal,
   type Candidate as RoleCandidate,
   type RoleResolution,
@@ -75,9 +81,17 @@ export class RouterError extends Error {}
 
 /**
  * No enabled model survives the provider exclusion. The caller's fail-closed
- * case, never a silent same-provider pick.
+ * case, never a silent same-provider pick. `stopCause` is the one cause that
+ * holds (a `CAUSE_*`), which a caller's ways forward are chosen by.
  */
-export class NoCandidateError extends RouterError {}
+export class NoCandidateError extends RouterError {
+  readonly stopCause: string | null;
+
+  constructor(message: string, stopCause: string | null = null) {
+    super(message);
+    this.stopCause = stopCause;
+  }
+}
 
 /**
  * A candidate reached the call site with an excluded provider.
@@ -609,58 +623,181 @@ export function apiLadder(
   // Reachability is the direct-API path own guard, applied here and not in
   // the shared enumeration rule: a seat has no provider keys at all.
   const resolution = explainRoleCandidates(config, apiSelectableModels(config, block), role, exclude);
-  warnIfFellThrough(resolution, role);
+  warnIfFellThrough(config, resolution, role);
   const ladder: Candidate[] = resolution.candidates.map(([modelId, provider]) => ({
     model_id: modelId,
     provider,
   }));
   if (ladder.length === 0) {
-    throw new NoCandidateError(unreachableLadder(resolution, role, taskType, exclude, block === null));
+    const stop = unreachableLadder(config, resolution, role, exclude, {
+      vehicle: "api",
+      listed: block?.models ?? null,
+    });
+    throw new NoCandidateError(stop.message, stop.cause);
   }
   return ladder;
+}
+
+/** Why a ladder is empty: the one cause that holds, which picks the ways forward. */
+export const CAUSE_UNREAD = "unread";
+export const CAUSE_VENDOR_CONFLICT = "vendor-conflict";
+export const CAUSE_NOT_LISTED = "not-listed";
+export const CAUSE_NO_KEY = "no-key";
+
+/** Items as a sentence reads them: "A", "A and B", "A, B and C". */
+export function prose(items: readonly string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/** A role as the person who configures it names it. */
+function roleWords(role: string): string {
+  if (role === ROLE_PRIMARY_REVIEWER) return "the Primary Reviewer";
+  if (role === ROLE_AUXILIARY_REVIEWER) return "the Auxiliary Reviewer";
+  return `the '${role}' role`;
+}
+
+/** The `configure` flag that chooses a model for this role, or null where none does. */
+export function roleFlag(role: string): string | null {
+  if (role === ROLE_PRIMARY_REVIEWER) return "--reviewer-model";
+  if (role === ROLE_AUXILIARY_REVIEWER) return "--auxiliary-model";
+  return null;
 }
 
 /**
  * Why a ladder is empty, in words the person who has to act can act on.
  *
- * A SELECTION nobody can dispatch to is its own situation and is named as
- * one: the operator chose that model, and telling them "no candidate
- * survived the exclusion" would leave out the half of the sentence they can
- * act on. It never falls to the next model, because falling through is the
- * silent substitution a selection exists to stop.
+ * The cause is read from facts already in hand -- the resolution's own
+ * removals, what the vehicle lists, which providers hold a key -- so the
+ * stop names the one that holds and only the ways forward that would fix
+ * it. A SELECTION nobody can dispatch to is never replaced by the next
+ * model: falling through is the silent substitution a selection exists to
+ * stop.
  */
 function unreachableLadder(
+  config: RouterConfig,
   resolution: RoleResolution<readonly [string, string]>,
   role: string,
-  taskType: string,
   exclude: readonly string[],
-  unread: boolean,
-): string {
-  if (resolution.selectedUnmet !== null) {
-    return (
-      `you chose '${resolution.selectedUnmet}' for the '${role}' role, and ` +
-      "this call cannot dispatch to it: " +
-      (unread
-        ? "this machine has not read its model lists yet, or holds a " +
-          "reading taken for a different seat or set of keys"
-        : "the transport in force does not list that model, its provider " +
-          `has no key here, or this call excludes its provider ` +
-          `(${renderList(exclude)})`) +
-      `. Nothing was substituted for it. Refresh the catalog with \`${REFRESH_COMMAND}\`, ` +
-      "or choose a model this call can reach with `dabbler configure " +
-      "--reviewer-model <id>`."
+  /** `listed` is every model the vehicle's block holds, keyless ones included; null where it was never read. */
+  reading: { readonly vehicle: "api" | "seat"; readonly listed: readonly CatalogModel[] | null },
+): { message: string; cause: string } {
+  // One refresh on either vehicle: it reads the vendors' lists and the seat's, free.
+  const refresh = CATALOG_REFRESH_COMMAND;
+  const who = roleWords(role);
+  const flag = roleFlag(role);
+  const choose = (what: string): string =>
+    flag === null ? `choose ${what} for ${who}` : `choose ${what} with \`dabbler configure ${flag} <id>\``;
+  const excluded = prose(exclude.map((provider) => providerLabel(config, provider)));
+  const unread = reading.listed === null;
+  const selected = resolution.selectedUnmet;
+  if (selected !== null) {
+    const opening = `you chose '${selected}' for ${who}, and this call cannot dispatch to it: `;
+    const closing = " Nothing was substituted for it.";
+    const same = (model: string): boolean =>
+      normalizeModelToken(model) === normalizeModelToken(selected);
+    if (unread) {
+      return {
+        cause: CAUSE_UNREAD,
+        message:
+          `${opening}this machine has not read its model lists yet, or holds a reading taken ` +
+          `for a different seat or set of keys. \`${refresh}\` reads them, free.${closing}`,
+      };
+    }
+    const removed = resolution.removed.find(
+      (row) => row.rule === REMOVED_EXCLUDED_PROVIDER && same(row.model),
     );
+    if (removed !== undefined) {
+      const vendor = providerLabel(config, removed.provider);
+      const because =
+        role === ROLE_AUXILIARY_REVIEWER
+          ? `${vendor} has already authored or reviewed this session, and the Auxiliary ` +
+            "Reviewer is a third voice"
+          : `so is the authoring model, and a reviewer is never from the author's vendor`;
+      const forward =
+        role === ROLE_PRIMARY_REVIEWER
+          ? `${choose("a reviewer from another vendor")}, or author with another vendor's ` +
+            "model (`dabbler configure --authoring-model <id>`)"
+          : choose(`a model from a vendor other than ${excluded}`);
+      return {
+        cause: CAUSE_VENDOR_CONFLICT,
+        message: `${opening}'${selected}' is ${vendor}'s, and ${because}. ${capitalise(forward)}.${closing}`,
+      };
+    }
+    const keyless = reading.vehicle === "api"
+      ? reading.listed?.find((entry) => same(entry.id) && entry.provider !== null && !providerReachable(config, entry.provider))
+      : undefined;
+    if (keyless !== undefined) {
+      const provider = keyless.provider as string;
+      const vendor = providerLabel(config, provider);
+      return {
+        cause: CAUSE_NO_KEY,
+        message:
+          `${opening}'${selected}' is ${vendor}'s, and this machine holds no ${vendor} key. ` +
+          `\`dabbler auth set ${provider}\` stores one, or ${choose("a model this machine can reach")}.${closing}`,
+      };
+    }
+    const where = reading.vehicle === "api" ? "no vendor's list on this machine names it" : "the Copilot seat does not list it";
+    return {
+      cause: CAUSE_NOT_LISTED,
+      message:
+        `${opening}${where}. \`${refresh}\` reads the list again, free, or ` +
+        `${choose("a model it lists")}.${closing}`,
+    };
   }
-  return (
-    (unread
-      ? "this machine has not read its providers' model lists yet, or it " +
-        "holds a reading taken for a different set of keys -- " +
-        `\`${REFRESH_COMMAND}\` reads them, free. `
-      : "no model this machine's providers list survives the ") +
-    `provider exclusion ${renderList(exclude)} for the '${role}' role ` +
-    `(task_type='${taskType}'). Set a surviving provider's API key, or ` +
-    "refresh the catalog."
-  );
+  if (unread) {
+    return {
+      cause: CAUSE_UNREAD,
+      message:
+        "this machine has not read its model lists yet, or holds a reading taken for a " +
+        `different seat or set of keys, so nothing can serve ${who}. \`${refresh}\` reads them, free.`,
+    };
+  }
+  const outside = exclude.length === 0 ? "" : ` outside ${excluded}`;
+  if (reading.vehicle === "seat" && reading.listed?.length === 0) {
+    return {
+      cause: CAUSE_NOT_LISTED,
+      message:
+        `the Copilot seat was read and lists no model, so nothing can serve ${who}. ` +
+        `\`${refresh}\` reads it again, free, and \`copilot login\` signs a seat in.`,
+    };
+  }
+  if (reading.vehicle === "seat") {
+    return {
+      cause: CAUSE_VENDOR_CONFLICT,
+      message:
+        `every model the Copilot seat lists for ${who} is from ${excluded || "no placeable vendor"}, ` +
+        "which this call excludes: a reviewer is never from the author's vendor.",
+    };
+  }
+  const noKey = Object.entries(record(config["providers"]))
+    .filter(
+      ([name, block]) =>
+        !exclude.includes(name) &&
+        isRecord(block) &&
+        block["enabled"] !== false &&
+        !providerReachable(config, name),
+    )
+    .map(([name]) => name);
+  if (noKey.length > 0) {
+    return {
+      cause: CAUSE_NO_KEY,
+      message:
+        `no model${outside} is reachable for ${who}: this machine holds no key for ` +
+        `${prose(noKey.map((name) => providerLabel(config, name)))}. ` +
+        `${prose(noKey.map((name) => `\`dabbler auth set ${name}\``))} stores one.`,
+    };
+  }
+  return {
+    cause: CAUSE_NOT_LISTED,
+    message:
+      `no model the vendors list${outside} can serve ${who}. \`${refresh}\` reads their lists ` +
+      "again, free.",
+  };
+}
+
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /**
@@ -672,29 +809,35 @@ function unreachableLadder(
  * this fact available at selection time and printed nothing.
  */
 function warnIfFellThrough<T extends RoleCandidate>(
+  config: RouterConfig,
   resolution: RoleResolution<T>,
   role: string,
 ): void {
-  const warning = fellThroughWarning(resolution, role);
-  if (warning !== null) process.stderr.write(`ai_router: ${warning}\n`);
+  const warning = fellThroughWarning(resolution, role, (provider) => providerLabel(config, provider));
+  if (warning !== null) process.stderr.write(`dabbler: ${warning}\n`);
 }
 
-/** The same, over the seat's confirmed catalog. */
+/**
+ * The same, over the seat's confirmed catalog. Null is a seat never read,
+ * which is a different stop from a seat whose list holds nothing.
+ */
 export function seatLadder(
   config: RouterConfig,
-  catalog: readonly CatalogModel[],
+  catalog: readonly CatalogModel[] | null,
   role: string,
   exclude: readonly string[],
 ): Candidate[] {
-  const resolution = explainRoleCandidates(config, catalog, role, exclude);
-  warnIfFellThrough(resolution, role);
+  const resolution = explainRoleCandidates(config, catalog ?? [], role, exclude);
+  warnIfFellThrough(config, resolution, role);
   const ladder: Candidate[] = resolution.candidates.map(
     ([modelId, provider]) => ({ model_id: modelId, provider }),
   );
   if (ladder.length === 0) {
-    throw new NoCandidateError(
-      unreachableLadder(resolution, role, "seat", exclude, catalog.length === 0),
-    );
+    const stop = unreachableLadder(config, resolution, role, exclude, {
+      vehicle: "seat",
+      listed: catalog,
+    });
+    throw new NoCandidateError(stop.message, stop.cause);
   }
   return ladder;
 }

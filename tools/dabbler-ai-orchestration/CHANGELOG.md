@@ -10,6 +10,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.9.0] — 2026-09-17
+
+**One reviewer rule, and refusals that name the cause.**
+
+### Changed
+
+- Review is cross-vendor everywhere: a reviewer is never from the authoring
+  model's vendor. The Configuration pane no longer calls a same-vendor
+  reviewer allowed. Such a model stays listed, marked *not usable while
+  authoring is <vendor>*, and a chosen one turns its row to the attention
+  colour with the conflict in words. `dabbler configure --reviewer-model` and
+  `--auxiliary-model` accept it with one warning, because the next Start may
+  use another author.
+- Start's model list marks an authoring model from your Primary Reviewer's
+  vendor: *this session would not start*. It can still be picked.
+
+### Fixed
+
+- A stop over a reviewer that cannot be reached names the cause that holds —
+  a vendor conflict, a model the vehicle does not list, a provider with no
+  key, or a list never read — and offers only the ways forward that fix it,
+  with real commands. The Auxiliary Reviewer's stop names `--auxiliary-model`.
+- `session start` tells a Copilot seat that was never read from one that
+  lists nothing, and says "the built-in default" rather than an internal
+  setting name. A chosen model that is not a candidate says why.
+- `dabbler verify` and `verify adjudicate`, when no reviewer can be reached,
+  carry that cause and no longer tell you to edit `router-config.yaml`.
+- The fell-through warning names the skipped models and why, in words.
+
 ## [3.8.1] — 2026-09-17
 
 **A new session never inherits an earlier run's record.**

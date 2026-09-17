@@ -135,6 +135,12 @@ export interface ConfigurationModel {
    * a developer to distrust the pane.
    */
   priceCategory?: string | null;
+  /**
+   * A reviewing candidate only: why it cannot review while today's author's
+   * vendor authors, in the router's words, or null. Marked and kept, because
+   * the author is chosen at each Start.
+   */
+  conflict?: string | null;
 }
 
 /**
@@ -174,6 +180,8 @@ export interface ConfigurationRole {
    * no authoring model at all to compare against.
    */
   provider?: string | null;
+  /** A reviewing row only: why the model the operator chose cannot review today's author, or null. */
+  conflict?: string | null;
   /** What carries this role: the engine's CLI, or the reviewer's transport. */
   vehicle?: ConfigurationVehicle;
   /**
@@ -500,7 +508,7 @@ export const ROLE_HELP: Record<ConfigRoleName, string> = {
   authoring:
     "The model the engine's own CLI is launched on. It is set here for the NEXT session; while a session is in flight this row reports what that session declared, because the ledger carries its identity from the moment it was registered.",
   primaryReviewer:
-    "The reviewer of record, defined as NOT THE AUTHOR: the only model refused is the authoring model itself, and every other is offered and labelled. Its verdict blocks a close.",
+    "The reviewer of record, never from the authoring model's vendor. A model from that vendor is still listed, marked as not usable while it authors, because the author is chosen at each Start. Its verdict blocks a close.",
   auxiliaryReviewer:
     "The third voice, reached only when the Primary Reviewer's findings are disputed. It is defined as not the author AND not a provider that has already reviewed this session, which is what makes an adjudication a third opinion rather than a repeat one.",
 };
@@ -514,7 +522,7 @@ const ROLE_ICONS: Record<ConfigRoleName, string> = {
 
 /** The one line of help under a list of possible reviewers. */
 export const REVIEWER_HELP =
-  "A different provider reduces the chance the reviewer shares the author's blind spots.";
+  "A reviewer is never from the authoring model's vendor, so it cannot share the author's blind spots.";
 
 /** One model as a row reads it: the id that is dispatched, and whose it is. */
 /**
@@ -1140,7 +1148,7 @@ export function descriptorFor(
           // from the preference order, so a null chosen there really is
           // nothing resolving rather than nobody having picked.
           authoring ? (role?.candidates.length ?? 0) : 0,
-        )}${role?.fellThrough ? " ⚠" : ""}`,
+        )}${role?.fellThrough || role?.conflict ? " ⚠" : ""}`,
         tooltip: [
           ROLE_HELP[node.role],
           // What narrows this role at the round, in the router's own words
@@ -1154,6 +1162,9 @@ export function descriptorFor(
           // because a comparison of two fields is not a third field.
           !authoring && role?.chosen
             ? `This one is on a ${providerRelationWord(configuration(p).authoring?.provider, role.chosen.provider)}.`
+            : "",
+          role?.conflict
+            ? `'${role.selected}' is ${role.conflict}: a reviewer is never from the authoring model's vendor, so a session with this author would not start.`
             : "",
           role?.chosen?.priceCategory
             ? `Its source states a '${role.chosen.priceCategory}' price category. That is a PRICE and not a capability: this framework does not grade models.`
@@ -1202,10 +1213,11 @@ export function descriptorFor(
           .join("\n\n"),
         icon: {
           id: ROLE_ICONS[node.role],
-          // Falling past the preference order is the one thing here worth a
-          // colour: what answers is then a model nobody named, which is what
-          // billed one session 364 premium requests.
-          ...(role?.fellThrough ? { tone: "attention" as const } : {}),
+          // Two things here are worth a colour: falling past the preference
+          // order, where what answers is a model nobody named (which billed
+          // one session 364 premium requests), and a chosen reviewer from
+          // today's authoring vendor, which a Start would refuse.
+          ...(role?.fellThrough || role?.conflict ? { tone: "attention" as const } : {}),
         },
         expandable: false,
         contextValue: `dabblerConfigRole;${node.role}`,

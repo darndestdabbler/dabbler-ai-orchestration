@@ -18,6 +18,9 @@ import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { loadMetrics } from "../src/metrics.ts";
 import { writePreferences } from "../src/preferences.ts";
 import {
+  CAUSE_NO_KEY,
+  CAUSE_NOT_LISTED,
+  CAUSE_VENDOR_CONFLICT,
   ExcludedProviderError,
   NoCandidateError,
   PromptTooLargeError,
@@ -189,6 +192,63 @@ describe("the ladder a call may take", () => {
     assert.throws(() => apiLadder(config, "reviewer", "general", []), /dabbler configure/);
   });
 
+  /** The stop a selected Primary Reviewer meets, with the cause it carries. */
+  function selectedStop(config: Record<string, unknown>, exclude: string[]): NoCandidateError {
+    try {
+      apiLadder(config, "reviewer", "general", exclude);
+    } catch (error) {
+      if (error instanceof NoCandidateError) return error;
+      throw error;
+    }
+    throw new Error("the ladder did not stop");
+  }
+
+  it("names a vendor conflict as the cause, and offers another vendor on either side", () => {
+    writePreferences({ role: "reviewer", selected: "o-gpt" });
+    const stop = selectedStop(makeConfig(), ["openai"]);
+    assert.equal(stop.stopCause, CAUSE_VENDOR_CONFLICT);
+    assert.match(stop.message, /'o-gpt' is openai's/);
+    assert.match(stop.message, /--reviewer-model/);
+    assert.match(stop.message, /--authoring-model/);
+    assert.doesNotMatch(stop.message, /auth set|discovery refresh|does not list/);
+  });
+
+  it("names a model no list holds as the cause, and offers the refresh", () => {
+    writePreferences({ role: "reviewer", selected: "o-nothing-lists-this" });
+    const stop = selectedStop(makeConfig(), ["anthropic"]);
+    assert.equal(stop.stopCause, CAUSE_NOT_LISTED);
+    assert.match(stop.message, /dabbler discovery refresh/);
+    assert.doesNotMatch(stop.message, /auth set|author's vendor/);
+  });
+
+  it("names a provider with no key as the cause, and offers storing one", () => {
+    // Read while the key was gone, so the block is this machine's and still lists o-gpt.
+    delete process.env["TEST_OPENAI_KEY"];
+    const config = makeConfig();
+    seedApiCatalog(config);
+    writePreferences({ role: "reviewer", selected: "o-gpt" });
+    const stop = selectedStop(config, ["anthropic"]);
+    assert.equal(stop.stopCause, CAUSE_NO_KEY);
+    assert.match(stop.message, /no openai key/);
+    assert.match(stop.message, /dabbler auth set openai/);
+    assert.doesNotMatch(stop.message, /author's vendor|discovery refresh/);
+  });
+
+  it("names the Auxiliary Reviewer's own flag in its stop", () => {
+    writePreferences({ role: "auxiliary-reviewer", selected: "o-gpt" });
+    try {
+      assert.throws(
+        () => apiLadder(makeConfig(), "auxiliary-reviewer", "general", ["openai", "anthropic"]),
+        (error: unknown) =>
+          error instanceof NoCandidateError &&
+          /--auxiliary-model/.test(error.message) &&
+          !/--reviewer-model/.test(error.message),
+      );
+    } finally {
+      writePreferences({ role: "auxiliary-reviewer", selected: "" });
+    }
+  });
+
   it("narrows to the selected model, and stops rather than widening past the exclusion", () => {
     // A selection NARROWS. It used to bypass the caller's exclusion, and
     // what that bought was a model that reviewed round 1 adjudicating its
@@ -268,7 +328,7 @@ describe("the ladder a call may take", () => {
   it("names the remedy in the refusal", () => {
     assert.throws(
       () => apiLadder(makeConfig(), "generator", "formatting", ["google", "openai", "anthropic"]),
-      /Set a surviving provider's API key, or refresh the catalog/,
+      /dabbler discovery refresh/,
     );
   });
 
@@ -295,7 +355,8 @@ describe("the ladder a call may take", () => {
       assert.match(warning, /fell past its preference order/);
       // What answered, and why the named ones did not.
       assert.match(warning, new RegExp(ladder[0]!.model_id));
-      assert.match(warning, /excluded-provider/);
+      assert.match(warning, /because this call excludes google/);
+      assert.doesNotMatch(warning, /ai_router:|excluded-provider/);
 
       // Silence on an ordinary round: the order's own first choice answers.
       written.length = 0;

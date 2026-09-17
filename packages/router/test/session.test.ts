@@ -14,7 +14,22 @@ import { describe, it } from "node:test";
 import { capture } from "../src/output.ts";
 import { platformNewlines } from "../src/journal.ts";
 import { checkPublishedWhenReleasable } from "../src/gates.ts";
-import { TRANSPORT_COPILOT_CLI, TRANSPORT_OFFLINE, resetProjectRootCache } from "../src/config.ts";
+import {
+  SOURCE_API,
+  SOURCE_SEAT,
+  TRANSPORT_API,
+  TRANSPORT_SEAT,
+  writeBlock,
+  type CatalogModel,
+} from "../src/catalog.ts";
+import {
+  TRANSPORT_COPILOT_CLI,
+  TRANSPORT_OFFLINE,
+  loadConfig,
+  resetProjectRootCache,
+} from "../src/config.ts";
+import { writePreferences } from "../src/preferences.ts";
+import { setSeatIdentity } from "../src/transports/copilot.ts";
 import {
   SETTING_AUTHORING_MODEL,
   SETTING_REVIEWER_TRANSPORT,
@@ -31,6 +46,7 @@ import {
   callerIsEngine,
   cancel,
   carryForward,
+  configuredModelRefusal,
   identityClash,
   judgeCancellation,
   judgeRestoration,
@@ -448,6 +464,120 @@ describe("what a start refuses before a session exists", () => {
     } finally {
       resetProjectRootCache();
       state.restore();
+    }
+  });
+});
+
+describe("why a start cannot reach its reviewer, and only the ways forward that fix it", () => {
+  const KEYS = ["DABBLER_ANTHROPIC_API_KEY", "DABBLER_OPENAI_API_KEY", "DABBLER_GEMINI_API_KEY"];
+  const SEAT = { host: "https://github.com", login: "someone" };
+
+  function row(id: string, provider: string): CatalogModel {
+    return {
+      id,
+      provider,
+      provider_source: "vendor-endpoint",
+      display_name: id,
+      enabled: true,
+      price_category: null,
+      cost: null,
+      listed_at: "2026-09-11T00:00:00Z",
+    };
+  }
+
+  /** A checkout whose reviewing vehicle is `vehicle`, with only these keys set. */
+  function checkout(vehicle: string, keys: string[]): { root: string; restore: () => void } {
+    const root = tempDir("reviewer-stop-");
+    const held = KEYS.map((name) => [name, process.env[name]] as const);
+    for (const name of KEYS) delete process.env[name];
+    for (const name of keys) process.env[name] = "k";
+    const ungit = gitAnswers([[["rev-parse", "--show-toplevel"], { stdout: root.split("\\").join("/") }]]);
+    writeSettings(root, { [SETTING_REVIEWER_TRANSPORT]: vehicle });
+    resetProjectRootCache();
+    return {
+      root,
+      restore: () => {
+        writePreferences({ role: "reviewer", selected: "" });
+        ungit();
+        resetProjectRootCache();
+        for (const [name, value] of held) {
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+        }
+      },
+    };
+  }
+
+  it("offers another vendor on either side for a vendor conflict, and no key or vehicle", () => {
+    const { root, restore } = checkout(TRANSPORT_API, ["DABBLER_OPENAI_API_KEY"]);
+    try {
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["openai"] },
+        models: [row("gpt-5.6-sol", "openai")],
+        retired: [],
+      });
+      writePreferences({ role: "reviewer", selected: "gpt-5.6-sol" });
+      const refusal = String(reviewingVehicleRefusal(loadConfig(undefined, root), root, "openai").refusal);
+      assert.match(refusal, /never from the author's vendor/);
+      assert.match(refusal, /--reviewer-model/);
+      assert.match(refusal, /--authoring-model/);
+      assert.doesNotMatch(refusal, /auth set|--reviewer-transport|transport\.profile|\['/);
+    } finally {
+      restore();
+    }
+  });
+
+  it("tells a seat never read from a seat that lists nothing, and offers signing in only for the first", () => {
+    const { root, restore } = checkout(TRANSPORT_COPILOT_CLI, []);
+    try {
+      setSeatIdentity(SEAT);
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models: [],
+        retired: [],
+      });
+      const empty = String(reviewingVehicleRefusal(loadConfig(undefined, root), root, "anthropic").refusal);
+      assert.match(empty, /lists no model/);
+      // A block recorded for another seat is a seat this machine has not read.
+      setSeatIdentity({ host: SEAT.host, login: "someone-else" });
+      const unread = String(reviewingVehicleRefusal(loadConfig(undefined, root), root, "anthropic").refusal);
+      assert.match(unread, /has not read/);
+      assert.match(unread, /dabbler discovery refresh/);
+      assert.match(unread, /copilot login/);
+      assert.doesNotMatch(unread, /auth set|--reviewer-model/);
+      assert.notEqual(empty, unread);
+    } finally {
+      setSeatIdentity(null);
+      restore();
+    }
+  });
+
+  it("says which reason keeps a chosen reviewer off its list", () => {
+    const { root, restore } = checkout(TRANSPORT_API, ["DABBLER_ANTHROPIC_API_KEY", "DABBLER_OPENAI_API_KEY"]);
+    try {
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic", "openai"] },
+        models: [row("claude-opus-5", "anthropic"), row("gpt-5.6-terra", "openai")],
+        retired: [],
+      });
+      writePreferences({ role: "reviewer", selected: "claude-opus-5" });
+      assert.match(
+        String(configuredModelRefusal(root, "claude-opus-5", "claude-code")),
+        /the authoring model itself/,
+      );
+      writePreferences({ role: "reviewer", selected: "no-such-model" });
+      assert.match(
+        String(configuredModelRefusal(root, "claude-opus-5", "claude-code")),
+        /vehicle does not list it/,
+      );
+    } finally {
+      restore();
     }
   });
 });

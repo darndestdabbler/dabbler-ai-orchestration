@@ -39,16 +39,18 @@ import {
 } from "./identity.ts";
 import { GEMINI_RETIRED, engineAliases, installedEngines } from "./engines.ts";
 import { currentCatalogPath } from "./catalog.ts";
+import { normalizeModelToken } from "./contracts/models.ts";
 import {
   TRANSPORT_API,
   TRANSPORT_COPILOT_CLI,
+  REVIEWING_TRANSPORT_KEY,
+  TRANSPORT_SOURCE_CONFIG,
   explainAuthoringModel,
   explainReviewingTransport,
   loadConfig,
   type RouterConfig,
 } from "./config.ts";
 import {
-  CATALOG_REFRESH_COMMAND,
   credentialStops,
   pastedKeyRefusal,
   transportPresence,
@@ -89,7 +91,15 @@ import {
   releaseOfPlan,
 } from "./driver.ts";
 import { releaseMode } from "./settings.ts";
-import { NoCandidateError, apiLadder, seatLadder } from "./route.ts";
+import {
+  CAUSE_NOT_LISTED,
+  CAUSE_NO_KEY,
+  CAUSE_UNREAD,
+  NoCandidateError,
+  apiLadder,
+  prose,
+  seatLadder,
+} from "./route.ts";
 import { ROLE_PRIMARY_REVIEWER } from "./selection.ts";
 import { seatModels } from "./transports/copilot.ts";
 import {
@@ -989,6 +999,23 @@ export function configuredModelRefusal(
    * a pane is not empty, on a machine that by definition does not know what
    * its CLI accepts.
    */
+  /** Which of the three reasons keeps a chosen model off a role's list. */
+  const notACandidate = (role: Record<string, unknown>, chosen: string): string => {
+    const author = roleOf("authoring")?.["chosen"] as Record<string, unknown> | null | undefined;
+    const withheld = Array.isArray(role["withheld"]) ? modelsOf({ candidates: role["withheld"] }) : [];
+    if (
+      role !== roleOf("authoring") &&
+      typeof author?.["model"] === "string" &&
+      normalizeModelToken(author["model"]) === normalizeModelToken(chosen)
+    ) {
+      return "it is the authoring model itself, and a reviewer is never from the author's vendor";
+    }
+    if (withheld.includes(chosen)) return "its vendor no longer serves it";
+    const vehicle = (role["vehicle"] as Record<string, unknown> | undefined)?.["chosen"];
+    return typeof vehicle === "string"
+      ? `the '${vehicle}' vehicle does not list it`
+      : "the list it is read from does not name it";
+  };
   const held = (
     role: Record<string, unknown> | null,
     chosen: string | null,
@@ -1001,7 +1028,7 @@ export function configuredModelRefusal(
     const candidates = modelsOf(role);
     if (candidates.length === 0 || candidates.includes(chosen)) return null;
     return (
-      `${what} is set to '${chosen}', which is not one it can be. ` +
+      `${what} is set to '${chosen}', which is not one it can be: ${notACandidate(role, chosen)}. ` +
       `${offeredNames(candidates)} It was chosen in ${where}; ${fix} changes ` +
       "it, and `dabbler configuration options` lists what this machine may " +
       "choose. Nothing was started and nothing was billed."
@@ -1078,44 +1105,40 @@ export function reviewingVehicleRefusal(
     if (reading.transport === TRANSPORT_API) {
       apiLadder(config, ROLE_PRIMARY_REVIEWER, "session-verification", exclude);
     } else if (reading.transport === TRANSPORT_COPILOT_CLI) {
-      seatLadder(config, seatModels() ?? [], ROLE_PRIMARY_REVIEWER, exclude);
+      // Null is a seat never read, which the ladder tells from a seat that lists nothing.
+      seatLadder(config, seatModels(), ROLE_PRIMARY_REVIEWER, exclude);
     }
   } catch (error) {
     if (!(error instanceof NoCandidateError)) throw error;
     const chose =
-      reading.decidedBy === null ? "is the built-in default" : `was set by ${reading.decidedBy}`;
+      reading.decidedBy === null ||
+      reading.decidedBy === TRANSPORT_SOURCE_CONFIG ||
+      reading.decidedBy === REVIEWING_TRANSPORT_KEY
+        ? "is the built-in default"
+        : `was set by ${reading.decidedBy}`;
+    // The ladder's message already carries the ways forward its cause has.
+    // Only what fixes that same cause is added: another vehicle helps a model
+    // no list holds or a key this machine lacks, never a vendor conflict,
+    // and an unread seat also needs signing in.
     const others = transportPresence(config)
       .filter((entry) => entry.present && entry.transport !== reading.transport)
       .map((entry) => `'${entry.transport}'`);
     const elsewhere =
-      "`dabbler configure --reviewer-transport <vehicle>` for a vehicle this machine has" +
-      (others.length > 0 ? ` (${others.join(", ")})` : "");
+      "`dabbler configure --reviewer-transport <vehicle>` moves the review to " +
+      (others.length > 0 ? `${prose(others)}, which this machine has` : "a vehicle this machine has");
     const forward =
-      reading.transport === TRANSPORT_COPILOT_CLI
-        ? [
-            `\`${CATALOG_REFRESH_COMMAND}\` to read the seat's model list, free`,
-            "`copilot login` where the seat is not signed in",
-            elsewhere,
-          ]
-        : [
-            ...Object.entries(config["providers"] ?? {})
-              .filter(([name]) => name !== authorProvider)
-              .map(([name, cfg]) => {
-                const variable = (cfg as Record<string, unknown> | null)?.["api_key_env"];
-                return (
-                  `\`dabbler auth set ${name}\`` +
-                  (typeof variable === "string" && variable !== "" ? ` or ${variable}` : "")
-                );
-              }),
-            elsewhere,
-          ];
+      error.stopCause === CAUSE_UNREAD && reading.transport === TRANSPORT_COPILOT_CLI
+        ? ["`copilot login` signs the seat in where it is not"]
+        : error.stopCause === CAUSE_NO_KEY || error.stopCause === CAUSE_NOT_LISTED
+          ? [elsewhere]
+          : [];
     return {
       refusal:
         `the Primary Reviewer cannot be reached on the reviewing vehicle ` +
         `'${reading.transport}', which ${chose}, outside the author's provider ` +
         `(${authorProvider}): ${error.message}` +
         (credentials.length > 0 ? ` ${credentials.join(" ")}` : "") +
-        ` Ways forward: ${forward.join("; ")}.`,
+        (forward.length > 0 ? ` Also: ${forward.join("; ")}.` : ""),
       warnings: [],
     };
   }

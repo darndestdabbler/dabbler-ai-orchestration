@@ -168,6 +168,27 @@ export async function dispatchVerification(
   throw lastError; // unreachable; defensive
 }
 
+/**
+ * What `verify` says when no reviewer can be dispatched.
+ *
+ * The ladder's own message carries the cause that holds and the ways forward
+ * that fix it, so nothing here restates a remedy -- and nothing points at
+ * `router-config.yaml`, which is packaged data and not the operator's to edit.
+ */
+export function verificationUnavailable(
+  sessionsDir: string,
+  authorProvider: string,
+  error: Error,
+): string {
+  return (
+    "verify: VERIFICATION UNAVAILABLE -- no reviewer can be dispatched outside " +
+    `the authoring vendor (${authorProvider}): ${error.message}\n` +
+    "No verdict was written; the close stays BLOCKED. This state is resolvable " +
+    "only by the operator (never the engine). Once it is, re-run:\n" +
+    `  dabbler verify --sessions-dir ${sessionsDir}\n`
+  );
+}
+
 // --- What a round says it cost ----------------------------------------------
 //
 // Three small readings, pure and separate from the append, because each one
@@ -793,17 +814,7 @@ export async function runRound(
     });
   } catch (error) {
     if (error instanceof NoCandidateError) {
-      writeErr(
-        "verify: VERIFICATION UNAVAILABLE -- no eligible verifier " +
-          "exists outside the orchestrator's effective provider " +
-          `(${orchestrator.effectiveProvider}). Reason: ${error.message}\n` +
-          "No verdict was written; the close stays BLOCKED. This state " +
-          "is resolvable only by the operator (never the engine).\n" +
-          "Operator exit: enable a model from another provider in " +
-          "router-config.yaml (or set its API key env var), then " +
-          "re-run:\n" +
-          `  dabbler verify --sessions-dir ${sessionsDir}\n`,
-      );
+      writeErr(verificationUnavailable(sessionsDir, orchestrator.effectiveProvider, error));
       return EXIT_UNAVAILABLE;
     }
     if (error instanceof RouterError) {

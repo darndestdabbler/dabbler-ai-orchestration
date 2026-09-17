@@ -352,11 +352,11 @@ describe("what a session would be run with", () => {
     }
   });
 
-  it("refuses only the authoring model itself, and accepts its provider-mate", () => {
-    // The one rule, from the verb's side: two ids compared. A second model
-    // from the same vendor is accepted because whether it shares the first's
-    // blind spot is a judgement this framework has no data to make -- and
-    // the seat below fronts two OpenAI models, which is exactly that case.
+  it("refuses the authoring model itself, and marks its provider-mate rather than hiding it", () => {
+    // Review is cross-vendor (D281), but the author is chosen at each Start:
+    // a second model from the author's vendor stays offered and choosable,
+    // marked as not usable while that vendor authors, and a chosen one flags
+    // its row.
     //
     // The author is the ORCHESTRATOR's model, off the ledger, because that
     // is the model that authors. It used to be a role's resolution, and that
@@ -398,11 +398,13 @@ describe("what a session would be run with", () => {
         /they are the same model/,
       );
       withoutOverlay(root);
-      assert.equal(
-        configure({ repoRoot: root, reviewerModel: "gpt-5.6-sol" }).refusal,
-        null,
-        "a different model on the same provider is the developer's call to make",
+      assert.equal(configure({ repoRoot: root, reviewerModel: "gpt-5.6-sol" }).refusal, null);
+      const reviewer = configurationNode(root)["primaryReviewer"] as Record<string, unknown>;
+      const sol = (reviewer["candidates"] as Array<Record<string, unknown>>).find(
+        (candidate) => candidate["model"] === "gpt-5.6-sol",
       );
+      assert.match(String(sol?.["conflict"]), /not usable while authoring is/);
+      assert.match(String(reviewer["conflict"]), /not usable while authoring is/);
     } finally {
       withoutOverlay(root);
       ungit();

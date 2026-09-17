@@ -11769,6 +11769,32 @@
       "dateTime": "2026-09-17T07:50:31.024000-04:00",
       "task": "Make a fresh registration start with no run record. In packages/router/src/session.ts, `start`'s fresh-registration branch (no session in flight, or a different one requested) checks for `.dabbler/runs/s<N>/` via `sessionRunDir`; where it exists, it moves the folder whole with the existing `moveEntry` to `.dabbler/superseded-runs/s<N>-<timestamp>/` just before `registerSessionStart`, and prints one line naming that folder. A continuation of the session in flight and a restored session are left untouched. One test in packages/router/test/session.test.ts: a start that registers a session whose `runs/s<N>/` holds a completed run moves the folder under `superseded-runs/`, names it in its output, and leaves no `runs/s<N>/` behind. Releasable as a patch: version.json moves to 3.8.1, stamped into the manifests with `npm run stamp:version`, with a CHANGELOG entry.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 198,
+      "dateTime": "2026-09-17T08:17:53.256000-04:00",
+      "task": "Make review cross-vendor everywhere and make every refusal about an unreachable reviewer name the cause that actually holds. First the operator's 2026-09-17 decision -- the reviewer is never from the authoring model's vendor, reversing session 151's same-vendor allowance -- is recorded with `dabbler session decision`. The surfaces then follow the rule: the projection marks each reviewer candidate from the authoring vendor as not usable while authoring is that vendor (kept visible, not hidden) and flags a chosen reviewer that conflicts; `reviewerRefusal`, `REVIEWER_HELP`, the role help and `configure`'s help drop \"is allowed\"; `dabbler configure --reviewer-model` / `--auxiliary-model` accept a same-vendor model with one warning; the pane's reviewer rows take the attention tone on a conflict and their picks carry the mark; Start's authoring-model list marks models from the Primary Reviewer's vendor while leaving them pickable. The refusals are rewritten from facts already in hand: `unreachableLadder` in route.ts looks the selected model up in `resolution.removed` and says which of vendor conflict, not listed by the vehicle, or no key holds, names the role's own flag (`--auxiliary-model` for the Auxiliary Reviewer), gives the api refresh command on api, and on its non-selected branch speaks of the seat's list or the keyless providers as fits; `fellThroughWarning` names skipped models and why, without raw rule ids, `task_type=` or the `ai_router:` prefix; `reviewingVehicleRefusal` in session.ts picks its ways forward by cause, tells an unread seat from an empty one, and says \"the built-in default\" rather than `transport.profile`; `held` says which reason a chosen model is not a candidate; `verify`'s and `verify adjudicate`'s VERIFICATION UNAVAILABLE carry the cause and real verbs instead of `router-config.yaml`; the pane's no-candidate warning stops mentioning keys on the seat vehicle. Tests change where they asserted the old sentences and gain one per behaviour the plan lists. Releasable as a minor: version.json moves to 3.9.0, stamped into the manifests with `npm run stamp:version`, with a CHANGELOG entry.",
+      "releasable": true
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D281",
+      "ordinal": 281,
+      "sessionNumber": 198,
+      "decidedOn": "2026-09-17",
+      "recordedAt": "2026-09-17T08:18:11.908000-04:00",
+      "decider": "operator",
+      "headline": "Review is cross-vendor everywhere",
+      "body": "On 2026-09-17 the operator ruled that the reviewer is never from the authoring model's vendor, on every surface. The review rounds, triage and session start already exclude the author's whole provider; the pane and dabbler configure applied only the not-the-same-model rule and labelled a same-vendor reviewer as allowed, so the pane offered choices every session with that author refused. Session 151's same-vendor allowance is reversed: the pane keeps same-vendor candidates visible but marks them not usable while authoring is that vendor, a chosen reviewer that conflicts takes the attention tone, and configure warns rather than refuses because the author is chosen at each Start. The not-the-same-model check stays where it is, because the vendor rule covers it."
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 198,
+      "dateTime": "2026-09-17T08:27:25.434000-04:00",
+      "what": "step 'start-refusal-cause': its files",
+      "reason": "The unread-seat stop must name the seat's free refresh, dabbler discovery refresh, which the start refusal and an existing driver test already use; route.ts named dabbler copilot refresh on the seat, a one-line fix to keep one refresh command.",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

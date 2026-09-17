@@ -344,6 +344,23 @@ describe("the start boundary, over a configuration that was typed into", () => {
     }
   });
 
+  it("accepts a reviewer from today's authoring vendor, and warns once naming the conflict", () => {
+    // Review is cross-vendor (D281), but the author is chosen at each Start:
+    // `configure` says so and writes the choice rather than gating it.
+    const { root, restore } = machine();
+    try {
+      const same = configure({ repoRoot: root, reviewerModel: "claude-opus-5" });
+      assert.equal(same.refusal, null);
+      assert.equal(same.warnings.length, 1);
+      assert.match(String(same.warnings[0]), /claude-opus-5/);
+      assert.match(String(same.warnings[0]), /not usable while authoring is/);
+      assert.deepEqual(configure({ repoRoot: root, reviewerModel: "gpt-5.6-terra" }).warnings, []);
+    } finally {
+      writePreferences({ role: "reviewer", selected: "" });
+      restore();
+    }
+  });
+
   it("refuses a reviewer that is the author, through the rule the reading already applies", () => {
     // The one rule, and it is NOT restated at the boundary: `roleNode` keeps
     // the author out of the candidates, so a selection equal to the author

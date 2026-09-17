@@ -235,6 +235,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 195 | Remove Start Unattended Session | yes | 2026-09-17 |
 | 196 | Uncommitted changes at Start are a question, not a dead end | yes | 2026-09-17 |
 | 197 | A new session never inherits an earlier run's record | yes | 2026-09-17 |
+| 198 | One reviewer rule, and refusals that name the cause | yes | 2026-09-17 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2684,3 +2685,13 @@ Make uncommitted changes at Start a question with a way through. In packages/rou
 **Releasable: yes.**
 
 Make a fresh registration start with no run record. In packages/router/src/session.ts, `start`'s fresh-registration branch (no session in flight, or a different one requested) checks for `.dabbler/runs/s<N>/` via `sessionRunDir`; where it exists, it moves the folder whole with the existing `moveEntry` to `.dabbler/superseded-runs/s<N>-<timestamp>/` just before `registerSessionStart`, and prints one line naming that folder. A continuation of the session in flight and a restored session are left untouched. One test in packages/router/test/session.test.ts: a start that registers a session whose `runs/s<N>/` holds a completed run moves the folder under `superseded-runs/`, names it in its output, and leaves no `runs/s<N>/` behind. Releasable as a patch: version.json moves to 3.8.1, stamped into the manifests with `npm run stamp:version`, with a CHANGELOG entry.
+
+### Session 198 — One reviewer rule, and refusals that name the cause
+
+**Releasable: yes.**
+
+Make review cross-vendor everywhere and make every refusal about an unreachable reviewer name the cause that actually holds. First the operator's 2026-09-17 decision -- the reviewer is never from the authoring model's vendor, reversing session 151's same-vendor allowance -- is recorded with `dabbler session decision`. The surfaces then follow the rule: the projection marks each reviewer candidate from the authoring vendor as not usable while authoring is that vendor (kept visible, not hidden) and flags a chosen reviewer that conflicts; `reviewerRefusal`, `REVIEWER_HELP`, the role help and `configure`'s help drop "is allowed"; `dabbler configure --reviewer-model` / `--auxiliary-model` accept a same-vendor model with one warning; the pane's reviewer rows take the attention tone on a conflict and their picks carry the mark; Start's authoring-model list marks models from the Primary Reviewer's vendor while leaving them pickable. The refusals are rewritten from facts already in hand: `unreachableLadder` in route.ts looks the selected model up in `resolution.removed` and says which of vendor conflict, not listed by the vehicle, or no key holds, names the role's own flag (`--auxiliary-model` for the Auxiliary Reviewer), gives the api refresh command on api, and on its non-selected branch speaks of the seat's list or the keyless providers as fits; `fellThroughWarning` names skipped models and why, without raw rule ids, `task_type=` or the `ai_router:` prefix; `reviewingVehicleRefusal` in session.ts picks its ways forward by cause, tells an unread seat from an empty one, and says "the built-in default" rather than `transport.profile`; `held` says which reason a chosen model is not a candidate; `verify`'s and `verify adjudicate`'s VERIFICATION UNAVAILABLE carry the cause and real verbs instead of `router-config.yaml`; the pane's no-candidate warning stops mentioning keys on the seat vehicle. Tests change where they asserted the old sentences and gain one per behaviour the plan lists. Releasable as a minor: version.json moves to 3.9.0, stamped into the manifests with `npm run stamp:version`, with a CHANGELOG entry.
+
+**Amended after acceptance:**
+
+- 2026-09-17 — step 'start-refusal-cause': its files: The unread-seat stop must name the seat's free refresh, dabbler discovery refresh, which the start refusal and an existing driver test already use; route.ts named dabbler copilot refresh on the seat, a one-line fix to keep one refresh command. (claude-code (anthropic, claude-opus-5))

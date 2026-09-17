@@ -11788,3 +11788,116 @@ unchanged.
 names it in its output, and leaves no `runs/s<N>/` behind.
 
 **Releasable.** Yes, a patch.
+
+### Session 198 of 198: One reviewer rule, and refusals that name the cause
+
+Scope: whole repository
+
+**Why.** On 2026-09-17 the operator started session 4 of
+`test-dabbler-orchestration-terminals` on the Copilot seat with
+`gpt-5.6-luna` as the authoring model. Their Primary Reviewer was still
+`gpt-5.6-sol`, chosen when Claude Code was the engine. Start refused:
+
+> the Primary Reviewer cannot be reached on the reviewing vehicle
+> 'copilot-cli', which was set by transport.profile, outside the author's
+> provider (openai): you chose 'gpt-5.6-sol' for the 'reviewer' role, and this
+> call cannot dispatch to it: the transport in force does not list that model,
+> its provider has no key here, or this call excludes its provider
+> (['openai']). ... Ways forward: `dabbler discovery refresh` ...; `copilot
+> login` ...; `dabbler configure --reviewer-transport <vehicle>` ...
+
+Refusing was right. The message was not. Only the third of its three possible
+causes held, and the router had the fact to say so: `explainRole` records
+every removed model with its rule. None of the three ways forward fixes the
+problem, and on `api` Sol is still OpenAI's and still excluded.
+
+**The refusal exists because the framework has two reviewer rules.** Session
+151 made the pane and `dabbler configure` apply only *the reviewer is not the
+author's model*, and labelled a same-vendor reviewer as allowed
+(`roleNode`'s `notThisModel` in `projection.ts`; `reviewerRefusal` in
+`selection.ts`: "Choosing a different model from the same provider is
+allowed"). Start (`reviewingVehicleRefusal`, `session.ts`), the review rounds
+(`verify/rounds.ts`) and triage (`triage.ts`) exclude the author's whole
+provider. So the pane offers choices every session with that author refuses.
+
+**Operator decision, 2026-09-17: review is cross-vendor, everywhere.** The
+reviewer is never from the authoring model's vendor. That is what the rounds
+already enforce, and the operator's standing mandate. Session 151's
+same-vendor allowance is reversed, recorded as a decision before the run of
+record. The not-the-same-model check stays where it is, because the vendor
+rule covers it.
+
+**What -- the surfaces follow the rule.**
+- **The reviewer rows and picks.** The Primary and Auxiliary Reviewer rows and
+  their model picks resolve against the authoring vendor as the pane knows it.
+  A candidate from that vendor stays visible, marked *not usable while
+  authoring is <vendor>*, rather than hidden. The author is chosen at each
+  Start, so a hidden model could not be picked ahead of switching the author.
+  `REVIEWER_HELP` and `reviewerRefusal`'s sentence drop "is allowed".
+- **A chosen reviewer the current author conflicts with** gets the attention
+  tone on its row, with the conflict in words.
+- **`dabbler configure --reviewer-model` / `--auxiliary-model`** accept such a
+  model and print one warning naming the conflict with today's authoring
+  vendor. That is not a refusal: the next Start may use another author.
+- **Start's model list** (session 194's pick) marks each authoring model from
+  the chosen Primary Reviewer's vendor: *same vendor as your Primary Reviewer
+  (<model>); this session would not start*. The item is still pickable, and
+  the start refusal still decides.
+
+**What -- refusals that name the cause.** Every stop below states the cause
+that holds, from facts already in hand, and gives only ways forward that
+would fix it. Commands are real verbs and flags. Lists read as prose, not
+`['openai']`. Internal names are plain words: `transport.profile` becomes
+"the built-in default", and `task_type=` and the `ai_router:` prefix go.
+1. **`unreachableLadder`, selected branch (`route.ts`).** The cause is looked
+   up in `resolution.removed` for the selected model. For an excluded
+   provider it says "'gpt-5.6-sol' is OpenAI's, and so is the authoring model
+   'gpt-5.6-luna'; a reviewer is never from the author's vendor". If the
+   vehicle does not list the model, it says that. On `api`, if the provider
+   has no key, it says that. The unread-catalog hint names
+   `dabbler discovery refresh` on `api`, not the seat's refresh.
+2. **The start refusal's ways forward (`session.ts`).** They are chosen by
+   that cause. An excluded provider offers a reviewer model from another
+   vendor, or an authoring model from another vendor. An unread seat offers
+   the refresh and `copilot login`. `dabbler auth set` is offered only for
+   providers with no key.
+3. **The role's flag.** A refusal for the Auxiliary Reviewer names
+   `--auxiliary-model`, not `--reviewer-model` (`route.ts`, reached from
+   `verify adjudicate`).
+4. **`unreachableLadder`, non-selected branch.** On a seat it says every model
+   the seat lists for the role is from the author's vendor, with no advice
+   about API keys. On `api` it names the providers with no key.
+5. **`verify`'s VERIFICATION UNAVAILABLE (`verify/rounds.ts`).** It no longer
+   tells the operator to edit `router-config.yaml`, which is packaged data.
+   It carries the cause and the ways forward from items 1 and 2.
+6. **`verify adjudicate` (`verify/disputes.ts`).** "enable a model from
+   outside the exclusions" becomes `--auxiliary-model` and `dabbler auth set`
+   for a named provider outside the exclusions.
+7. **`warnIfFellThrough`.** It names the skipped models and why ("skipped
+   because OpenAI authored this session"), not raw rule ids.
+8. **A chosen model that is not among the candidates (`session.ts`, `held`).**
+   It says which reason applies: the vendor conflict, retired, or not listed
+   by the vehicle.
+9. **The pane's no-candidate hover (`configurationCommands.ts`).** On the seat
+   vehicle it no longer mentions provider keys.
+10. **A seat never read vs a seat that lists nothing.** They get different
+    sentences: `seatModels() ?? []` in `reviewingVehicleRefusal` no longer
+    merges the two.
+
+**Non-goals.** Which reviewer is picked where nobody chose one. The
+verification protocol, round caps and verdicts. The seat catalog and its
+refresh. Hiding same-vendor candidates from the pane. A gate at `configure`.
+The operator's own preferences file, which they change through the pane.
+
+**Tests.** One that the pane marks a reviewer candidate from the authoring
+vendor, and a chosen one takes the attention tone. One that Start's model list
+marks an authoring model from the Primary Reviewer's vendor. One per cause for
+the selected-branch refusal: the vendor conflict, not listed, no key. Each
+asserts that the cause named is the one that holds and the ways forward fit
+it, without matching whole sentences. One that an Auxiliary Reviewer refusal
+names `--auxiliary-model`. One that `verify` unavailable carries the cause.
+Existing tests that assert the old sentences or the same-vendor allowance are
+changed rather than joined.
+
+**Releasable.** Yes, a minor, because which reviewers the pane presents as
+usable changes.

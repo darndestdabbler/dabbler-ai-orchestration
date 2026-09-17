@@ -12026,3 +12026,70 @@ with no `claude` on the machine's PATH.
 
 **Releasable.** Yes, a patch. Its tag is the first to publish since 3.3.7,
 once `Test` is green for its commit.
+
+### Session 201 of 201: The extension suite runs where the machine cannot answer for it
+
+Scope: whole repository
+
+**Why.** Session 200 closed green and CI failed again, on the same test and
+at the next check in the same `session start` call:
+
+> `start: refused -- the Primary Reviewer cannot be reached on the reviewing
+> vehicle 'copilot-cli', which is the built-in default, outside the author's
+> provider (anthropic): this machine has not read its model lists yet ...`
+
+Session 200 removed the test's dependence on `claude` being on PATH, and its
+proof stripped PATH and nothing else. The test depends on the machine in at
+least two more ways. `session start` refreshes the catalog on the first start
+of each day (`refreshCatalogIfDue`, `discovery.ts`), which reads this machine's
+Copilot seat login and its `DABBLER_*_API_KEY` variables into the suite's
+temporary catalog, and session 192's reviewer check then finds a reviewer
+there. On the operator's machine all of that is present, so the run of record
+passed in sessions 192 through 200. The GitHub runner has none of it. Two
+sessions in a row passed locally and failed in CI, and each fix proved only
+the one variable it was aimed at.
+
+The router suite does not have this problem, because it already runs in the
+Podman container (`scripts/suite.mjs container`). The container has no
+`claude`, no Copilot login and no keys, so it reproduces CI's environment.
+The extension suite runs on the Windows host (`run-unit.mjs`), where the
+operator's own machine answers for it.
+
+**What -- the test.** The `workExplorerTreeModel` parity test's start is
+decided by its fixture, not the machine. The session chooses the seam, within
+these constraints: no network call, no reading of a seat login, no provider
+key from the process environment, and a reviewer that is reachable only
+because the fixture says so, for example a seeded, current catalog reading in
+the suite's temporary catalog. Anything the test sets on `process.env` is
+restored in a `finally`. The session searches the extension suite for other
+tests that reach `session start`, a catalog refresh or a provider key through
+the in-process router, fixes each one found the same way, and lists what it
+searched in the step's notes.
+
+**What -- the suite's home.** The extension's unit suite runs in the same
+container as the router's. `scripts/suite.mjs` gains the extension suite: the
+container already mounts the extension's `node_modules` volume. `dabbler.yaml`
+declares it through `suite.mjs`, beside the router's two suites. A test that
+is true only on Windows stays on the host, named in `suite-membership.json`
+with its reason. It is found by running the whole suite in the container and
+reading each failure, as the router's list was on 2026-09-11, and never by
+guessing. `check-suite-membership.mjs` and `docs/design/suite-runners.md` are
+kept in agreement with that list. CI stays on `windows-latest`.
+
+**Proof before the push.** The extension suite is run in the container against
+the unfixed test first. It must fail with CI's refusal; if it passes, the
+container does not reproduce CI, and the step reports `blocked`. Then it is
+run against the fix and must pass. Both outputs go in the step's notes. The
+run of record is the container run.
+
+**Non-goals.** Any Podman dependency in the shipped router or extension: the
+container is this repository's own suite runner, and a .NET or Java repository
+never uses it. The start checks themselves, which are correct. Moving CI off
+Windows. The Playwright specs. Having the close check the Publish workflow.
+
+**Tests.** No new test. The parity test, and any others found, are made
+independent of the machine, and the whole extension suite passes in the
+container.
+
+**Releasable.** Yes, a patch. Its tag is the first to publish since 3.3.7,
+once `Test` is green for its commit.

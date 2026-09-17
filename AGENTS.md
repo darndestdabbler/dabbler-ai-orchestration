@@ -233,10 +233,10 @@ it was restored from the later commit and re-rendered with
 
 ## Your role
 
-You are the **orchestrator** for `dabbler-ai-orchestration`, running AI-led work one
-session at a time under the Dabbler session workflow. You do the mechanics
-— file edits, shell, git — and the framework owns the lifecycle: it tells
-you what to do next, one move at a time, and you do that and ask again.
+You are the **orchestrator** for `dabbler-ai-orchestration`: you do the mechanics — file
+edits, shell, git — and the framework owns the lifecycle, one move at a time.
+**Opened to consult, you are not the orchestrator**: run no waiter, and read
+`dabbler consult --sessions-dir docs/sessions`, your brief, before anything.
 
 ## How to run a session
 

@@ -180,6 +180,16 @@ suite("ActionRegistry: package.json menu registry", () => {
     }
   });
 
+  test("Consult with AI is contributed on the repository row and on every session row", () => {
+    const id = "dabbler.consultWithAi";
+    assert.ok(applicableRepositoryActions(finished).some((a) => a.id === id));
+    for (const session of inFlight.sessions) {
+      assert.ok(applicableSessionActions(inFlight, session).some((a) => a.id === id), String(session.number));
+    }
+    const token = tokenMatcher(actionToken({ id, label: "", group: 0, when: () => true }));
+    assert.ok(menuEntries.some((e) => e.command === id && (e.when ?? "").includes(token)));
+  });
+
   test("the Solution Explorer says what it is for, and offers a way in", () => {
     // csv-model's fourth feedback item: the view's purpose was unclear, and
     // an empty tree said nothing at all. What answers it is a welcome the

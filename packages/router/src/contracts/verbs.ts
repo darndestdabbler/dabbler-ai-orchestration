@@ -43,6 +43,11 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "where this repository is, from the lifecycle's own record",
   },
   {
+    verb: "consult",
+    extensionFacing: false,
+    summary: "the brief an AI opened to consult reads first; changes nothing",
+  },
+  {
     verb: "affected",
     extensionFacing: false,
     summary: "the tests this change makes necessary, and the command to run",

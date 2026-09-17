@@ -47,10 +47,10 @@ export const SHARED_BODY =
   "\n" +
   "## Your role\n" +
   "\n" +
-  "You are the **orchestrator** for `{repo_name}`, running AI-led work one\n" +
-  "session at a time under the Dabbler session workflow. You do the mechanics\n" +
-  "— file edits, shell, git — and the framework owns the lifecycle: it tells\n" +
-  "you what to do next, one move at a time, and you do that and ask again.\n" +
+  "You are the **orchestrator** for `{repo_name}`: you do the mechanics — file\n" +
+  "edits, shell, git — and the framework owns the lifecycle, one move at a time.\n" +
+  "**Opened to consult, you are not the orchestrator**: run no waiter, and read\n" +
+  "`dabbler consult --sessions-dir docs/sessions`, your brief, before anything.\n" +
   "\n" +
   "## How to run a session\n" +
   "\n" +

@@ -382,13 +382,14 @@ export function engineTerminalFor(
   repository: SessionsRepository,
   choice: EngineChoice,
   model: string,
+  sentence: string = openingSentence(),
+  name: string = choice.label,
 ): EngineTerminal | string {
   const cli = ENGINE_CLI[choice.engine];
   if (!cli) return `${choice.label} has no known CLI to open; nothing was launched.`;
   if (choice.modelRequired && model.trim() === "") {
     return `${choice.label} is a seat and needs a model; nothing was launched.`;
   }
-  const sentence = openingSentence();
   // The value the operator chose, spelled as they chose it. NOT normalised:
   // `normalizeModelToken` drops the date suffix, and the date suffix is what
   // makes a pin a pin -- a launch that quietly generalised `claude-opus-5-
@@ -398,7 +399,7 @@ export function engineTerminalFor(
   const wanted = model.trim();
   const modelArgs = cli.modelFlag !== null && wanted !== "" ? [cli.modelFlag, wanted] : [];
   return {
-    name: choice.label,
+    name,
     cwd: repository.root,
     program: cli.program,
     // The flag first and the prompt last: `claude`'s prompt is a POSITIONAL,
@@ -406,6 +407,39 @@ export function engineTerminalFor(
     args: [...modelArgs, ...(cli.promptArgs !== null ? cli.promptArgs(sentence) : [])],
     typed: cli.promptArgs !== null ? null : sentence,
   };
+}
+
+/** How the engine and model boxes are titled for a consult. */
+export const CONSULT_PURPOSE = "Consult with AI";
+
+/**
+ * What an AI opened to consult is asked first: read the brief, then the
+ * operator. It names no waiter, because a consult drives nothing.
+ */
+export function consultSentence(session?: number): string {
+  const dir = SESSIONS_REL.replace(/\\/g, "/");
+  const about = session === undefined ? "" : ` --session ${session}`;
+  return (
+    `Run \`dabbler consult --sessions-dir ${dir}${about}\` and read what it prints before anything else. ` +
+    "Then ask me what I need."
+  );
+}
+
+/** The CLI Consult with AI opens: Start's construction, the consult sentence, and a name of its own. */
+export function consultTerminalFor(
+  repository: SessionsRepository,
+  choice: EngineChoice,
+  model: string,
+  session?: number,
+): EngineTerminal | string {
+  const about = session === undefined ? "" : ` (session ${session})`;
+  return engineTerminalFor(
+    repository,
+    choice,
+    model,
+    consultSentence(session),
+    `Consult — ${choice.label} — ${repository.label}${about}`,
+  );
 }
 
 /** Whether a terminal was created running `spec`'s program at `spec`'s root. */
@@ -433,7 +467,8 @@ export function isEngineTerminalOf(
 }
 
 export interface SessionRunUi {
-  pickEngine: () => Thenable<EngineChoice | undefined>;
+  /** `purpose` titles the pick; Start's when omitted. */
+  pickEngine: (purpose?: string) => Thenable<EngineChoice | undefined>;
   /**
    * The model to drive with; empty for the engine's default; undefined when
    * the box was dismissed.
@@ -444,7 +479,7 @@ export interface SessionRunUi {
    * asked to retype it here would have two places saying what the next
    * session authors with and no reason to believe either.
    */
-  askModel: (choice: EngineChoice, chosen: string) => Thenable<string | undefined>;
+  askModel: (choice: EngineChoice, chosen: string, purpose?: string) => Thenable<string | undefined>;
   /** One line of text from the person; undefined when the box was dismissed. */
   askText: (title: string, prompt: string, value?: string) => Thenable<string | undefined>;
   /** A yes-or-no the person answers, modally; true only for the named action. */
@@ -583,7 +618,7 @@ export function defaultSessionRunUi(
     // installed CLI, which is the only thing that actually knows whether it
     // will run on a model, and it bills nothing doing it.
     engineKnowsModel: (choice, model) => preflightRefusedModel(choice.engine, model),
-    pickEngine: () =>
+    pickEngine: (purpose = "Start session") =>
       vscode.window
         .showQuickPick(
           // The default the Configuration section set, first in the list and
@@ -600,17 +635,22 @@ export function defaultSessionRunUi(
             entry,
           })),
           {
-            title: "Start session — which engine runs it?",
-            placeHolder: "The framework drives; this engine answers each step.",
+            title: `${purpose} — which engine runs it?`,
+            placeHolder:
+              purpose === CONSULT_PURPOSE
+                ? "This engine reads the consult brief and answers you; nothing is driven."
+                : "The framework drives; this engine answers each step.",
             ignoreFocusOut: true,
           },
         )
         .then((picked) => picked?.entry),
-    askModel: (choice, chosen) =>
+    askModel: (choice, chosen, purpose = "Start session") =>
       vscode.window.showInputBox({
-        title: `Start session — model for ${choice.label}`,
+        title: `${purpose} — model for ${choice.label}`,
         prompt: choice.modelRequired
-          ? "Required: the seat's model. It is passed to the CLI and recorded on the ledger."
+          ? purpose === CONSULT_PURPOSE
+            ? "Required: the seat's model. It is passed to the CLI; nothing is recorded."
+            : "Required: the seat's model. It is passed to the CLI and recorded on the ledger."
           : "Optional: leave empty for the engine's default. It is passed to the CLI as `--model`.",
         placeHolder: choice.modelRequired ? "e.g. gpt-5-6-luna" : "e.g. haiku",
         // What the Configuration section already chose, so the pane and this
@@ -833,6 +873,39 @@ export async function runStartSession(
   // watching their engine work with no sight of what the framework is
   // doing -- which is the arrangement this session exists to build.
   ui.showFrameworkTerminal(repository.root, opened);
+  return true;
+}
+
+/**
+ * Consult with AI: the person's own CLI, opened to read the consult brief.
+ *
+ * The same engine and model questions as Start, and the same two refusals,
+ * so a model Start would refuse is refused here too. Nothing is registered
+ * and no loop is started: a consult drives no session.
+ */
+export async function runConsultWithAi(
+  repository: SessionsRepository,
+  ui: SessionRunUi,
+  session?: number,
+): Promise<boolean> {
+  const purpose = CONSULT_PURPOSE;
+  const picked = await ui.pickEngine(purpose);
+  if (!picked) return false;
+  const model = await ui.askModel(picked, chosenAuthoringModel(repository.root), purpose);
+  if (model === undefined) return false;
+  const impossible =
+    engineModelRefusal(repository, picked, model) ??
+    (await engineRefusesModel(ui, picked, model));
+  if (impossible !== null) {
+    ui.showErrorMessage(impossible);
+    return false;
+  }
+  const terminal = consultTerminalFor(repository, picked, model, session);
+  if (typeof terminal === "string") {
+    ui.showErrorMessage(terminal);
+    return false;
+  }
+  ui.openTerminal(terminal);
   return true;
 }
 
@@ -1072,6 +1145,11 @@ export function registerSessionCommands(
       const repository = repositoryOf(arg);
       if (!repository) return;
       await runResumeSession(repository, ui);
+    }),
+    vscode.commands.registerCommand("dabbler.consultWithAi", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      await runConsultWithAi(repository, ui, asSessionNode(arg)?.session.number);
     }),
     vscode.commands.registerCommand("dabbler.stopDrive", async (arg: unknown) => {
       await runStopDrive(asRepositoryNode(arg)?.repository, ui, router, drives);

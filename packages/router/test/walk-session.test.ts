@@ -1364,3 +1364,71 @@ describe("one loop, and a suite a step declares while it runs", () => {
     );
   });
 });
+
+
+describe("a session-plan.md edit while a session is in progress", () => {
+  it("is the resumed step's change after a stop between instructions, and moves the tree under a step's checks", async () => {
+    // What `dabbler consult` permits rests on this: a consult editing the plan
+    // disturbs the session in flight in both states, so plan edits wait for
+    // the close.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED], { suites: [] });
+    const planFile = join(repo, "docs", "sessions", "session-plan.md");
+    const editsPlan = {
+      ...PLAN,
+      steps: [
+        {
+          ...PLAN.steps[0],
+          // A plan edit landing while the check runs.
+          checks: [{ argv: [NODE, "-e", "require('fs').appendFileSync('docs/sessions/session-plan.md', 'mid-step')"] }],
+        },
+      ],
+    };
+
+    const refusals: string[][] = [];
+    let answerStep = false;
+    const engine: Engine = {
+      name: "claude-code",
+      invoke: ({ instruction }) => {
+        if (instruction.step_id === "plan") {
+          const path = join(tempDir("answer-"), "answer.json");
+          writeFileSync(path, JSON.stringify(editsPlan), "utf8");
+          report(sessionsDir, { seq: instruction.seq, answerFile: path });
+          return Promise.resolve({ exitCode: 0 });
+        }
+        // Before the stop the step goes unanswered, so the loop is left
+        // standing on an instruction.
+        if (!answerStep) return Promise.resolve({ exitCode: 0 });
+        if (instruction.kind === "rejection") refusals.push([...(instruction.reasons ?? [])]);
+        writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+        const files = refusals.length === 0 ? ["src/widget.py"] : ["src/widget.py", "docs/sessions/session-plan.md"];
+        report(sessionsDir, { seq: instruction.seq, stepId: "widget", status: "done", files, testsRun: null, notes: "walked" });
+        return Promise.resolve({ exitCode: 0 });
+      },
+    };
+    const drive = (maxInvocations: number) =>
+      capture(() =>
+        driveSession(sessionsDir, { engine: "claude-code", provider: "anthropic", adapter: engine, maxInvocations }),
+      );
+
+    // Stopped between instructions: the budget ends the loop with the step unanswered.
+    await drive(2);
+    assert.ok(readRun(repo, 1)?.stop, "the loop did not stop");
+
+    // The consult's edit, made while nothing runs; then the session resumes.
+    writeFileSync(planFile, readFileSync(planFile, "utf8") + "while stopped\n", "utf8");
+    answerStep = true;
+    await drive(10);
+
+    // The resumed step owns the edit: a report that leaves it out is refused.
+    assert.equal(refusals.length, 1);
+    assert.match(refusals[0].join(" "), /\[files-changed-omits\].*session-plan\.md/s);
+    // Mid-step: the check's tree moved, so the checks prove nothing. It is the
+    // step's third refusal, so it is the stop's own reason.
+    assert.match(String(readRun(repo, 1)?.stop?.reason), /\[check-failed\].*\(the check changed the tree\)/s);
+  });
+});

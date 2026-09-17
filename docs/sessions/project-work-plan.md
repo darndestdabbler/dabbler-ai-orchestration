@@ -230,7 +230,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 190 | The declaration a step writes is the declaration the loop reads | yes | 2026-09-16 |
 | 191 | API Keys, grouped, and the project's choice wins | yes | 2026-09-17 |
 | 192 | Friction only where a session would not succeed | yes | 2026-09-17 |
-| 193 | Consult with AI | — | not declared |
+| 193 | Consult with AI | yes | 2026-09-17 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2637,3 +2637,13 @@ Make `session start` refuse only what would stop this session, and make the roun
 
 - 2026-09-17 — step 'start-assessment': its files: The typecheck covers the tests and the suite named after session.ts runs after the check, so the removed refusal's test import, the start test asserting the removed vehicle refusal, and the suite's stand-in for the new start reading must change with the source in this step (claude-code (anthropic, claude-opus-5))
 - 2026-09-17 — step 'round-words': its files: A stop code is a closed vocabulary held by the run schema and the type generated from it, so the new reviewer-unreachable code is named there before it can be recorded (claude-code (anthropic, claude-opus-5))
+
+### Session 193 — Consult with AI
+
+**Releasable: yes.**
+
+Give planning a way in. A new router verb, `dabbler consult --sessions-dir <dir> [--session <N>]` (packages/router/src/cli/consult.ts, listed in contracts/verbs.ts and cli/registry.ts), prints the brief a consulting AI reads first: it changes nothing and bills nothing, and it is computed from `buildProjection`, the same state `dabbler status` reads, so no fact is stated twice. The brief says where things are (the sessions root, session-plan.md, project-work-plan.md, sessions.json and a session's `.dabbler/runs/s<N>/driver/run.json`, marking which are the router's alone); what is true now (the current session and its state, and for a stopped one the stop's kind, its reasons and its forward exits -- `dabbler verify reopen`, `dabbler session plan amend`, Resume -- with `session cancel --force` named as the person's verb only); how to plan a session (the `### Session N of M: Title` heading and section shape, the next free number, committed as a plain commit); and the licence (answer questions, read anything, edit and commit the plan files; no code, no record, no verdict; code changes and fixes a stop needs become a planned session). Before the brief states when plan edits are safe, this session measures it: a driver test edits session-plan.md against a session mid-step and against one stopped between instructions and records whether either moves the tree check or lands in the step's diff, and the brief permits plan edits only in the states that test shows are safe, telling the AI otherwise to draft the text in the chat and wait for the close. Work Explorer gains **Consult with AI** on the repository node and on a session node (the latter passing `--session`), asking for vehicle and model through `engineOrder`, `chosenAuthoringModel`, `engineModelRefusal` and `engineRefusesModel` as Start does, and opening the engine CLI in its own terminal named for the consult, built the way `engineTerminalFor` builds Start's but with a consult opening sentence; it registers no session and starts no loop. The managed AGENTS.md body in bootstrap/templates.ts gains one short paragraph saying an AI opened to consult is not the orchestrator, runs no waiter, and reads `dabbler consult`; this repository's AGENTS.md is re-rendered with `dabbler bootstrap`. Releasable as a minor, because it adds a capability: version.json and the manifests it stamps move to 3.6.0, with a CHANGELOG entry.
+
+**Amended after acceptance:**
+
+- 2026-09-17 — step 'agents-paragraph': its checks: The whole bootstrap file includes the commit-guard hook test, which needs sh on PATH and fails in the check environment independent of this change; the instruction-file tests are the ones this step's template change touches (claude-code (anthropic, claude-opus-5))

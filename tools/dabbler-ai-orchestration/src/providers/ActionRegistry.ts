@@ -34,6 +34,7 @@ const hasNextSession = (r: SessionsRepository): boolean =>
   );
 
 const START_SESSION = "dabblerSessionSets.startSession";
+const CONSULT_WITH_AI = "dabbler.consultWithAi";
 
 // Ordered list; `group` bands: 1xx Open File submenu, 3xx Copy Prompt
 // submenu, 9xx lifecycle.
@@ -55,6 +56,8 @@ export const REPOSITORY_ACTIONS: RepositoryAction[] = [
   },
   { id: "dabblerSessionSets.closeSession", label: "Close Session", group: 906,
     when: (r) => r.currentSession !== null },
+  // Whatever state the work is in: a consult drives nothing.
+  { id: CONSULT_WITH_AI, label: "Consult with AI", group: 908, when: () => true },
 ];
 
 export function applicableRepositoryActions(
@@ -123,6 +126,7 @@ export const SESSION_ACTIONS: SessionAction[] = [
       session.status === "in-progress" &&
       session.stopActor !== "engine",
   },
+  { id: CONSULT_WITH_AI, label: "Consult with AI", group: 904, when: () => true },
   {
     id: "dabblerSessionSets.cancel",
     label: "Cancel Session",

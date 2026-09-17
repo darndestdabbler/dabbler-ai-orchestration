@@ -25,7 +25,9 @@ import {
 import {
   ENGINES,
   engineModelRefusal,
+  runConsultWithAi,
   type EngineChoice,
+  type SessionRunUi,
 } from "../../commands/sessionCommands";
 import type { SessionsRepository } from "../../utils/fileSystem";
 import { makeTempDir, rmrf, writeFileTree } from "./helpers";
@@ -936,6 +938,25 @@ suite("solutionTreeModel: what a configuration reading costs", () => {
     // means the engine's own default.
     assert.strictEqual(engineModelRefusal(repository, claude, "a-author"), null);
     assert.strictEqual(engineModelRefusal(repository, claude, ""), null);
+  });
+
+  test("Consult with AI refuses a model the engine's own list does not name, and opens nothing", async () => {
+    const repository = { root, label: "r" } as unknown as SessionsRepository;
+    const claude = ENGINES.find((entry) => entry.engine === "claude-code") as EngineChoice;
+    const errors: string[] = [];
+    const opened: unknown[] = [];
+    const ui = {
+      pickEngine: async () => claude,
+      askModel: async () => "not-a-model-anywhere",
+      // The installed CLI accepts it: the list alone refuses.
+      engineKnowsModel: async () => null,
+      showErrorMessage: (message: string) => errors.push(message),
+      openTerminal: (terminal: unknown) => opened.push(terminal),
+    } as unknown as SessionRunUi;
+    assert.strictEqual(await runConsultWithAi(repository, ui), false);
+    assert.strictEqual(errors.length, 1);
+    assert.ok(errors[0].includes("not-a-model-anywhere"), errors[0]);
+    assert.strictEqual(opened.length, 0);
   });
 
   test("reaches no vendor and no CLI, and renders the dated record it read", () => {

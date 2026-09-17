@@ -10,6 +10,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.6.0] — 2026-09-17
+
+**Consult with AI: a way into planning that drives nothing.**
+
+### Added
+
+- **`dabbler consult --sessions-dir <dir> [--session N]`** prints the brief an
+  AI opened to consult reads first. It changes nothing and bills nothing, and
+  it is read from the same state `dabbler status` prints: where the plan
+  files and the router's records are, the session in progress and any stop
+  standing over it with its forward exits (`dabbler verify reopen`, `dabbler
+  session plan amend`, Resume Session; `session cancel --force` is named as
+  the person's verb only), how a session is planned and the next free number,
+  and what a consult may change. Plan edits are permitted only while no
+  session is in progress: an edit to `session-plan.md` during one moves the
+  tree its checks prove and lands in its diff, so the brief asks for the text
+  to be drafted in the chat instead.
+- **Consult with AI** on the Work Explorer's repository row and on each
+  session row. It asks for the engine and model the way Start Session does,
+  refuses the same models, and opens that CLI in a terminal of its own with
+  one sentence: read `dabbler consult`, then ask what is needed. It registers
+  no session and starts no loop.
+- The managed `AGENTS.md` body tells an AI opened to consult that it is not
+  the orchestrator, runs no waiter, and reads `dabbler consult` first.
+
 ## [3.5.0] — 2026-09-17
 
 **A start refuses only what would stop the session.** `session start` now

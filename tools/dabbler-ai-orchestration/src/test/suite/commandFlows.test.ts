@@ -33,6 +33,7 @@ import {
   isEngineTerminalOf,
   loopTerminalFor,
   repositoryOf,
+  runConsultWithAi,
   runResumeSession,
   runSendToEngine,
   runStartSession,
@@ -584,6 +585,32 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(await runStartSession(makeRepository(), agreed.ui, register, CLI), true);
     assert.deepStrictEqual(register.calls[2].slice(-1), ["--merge-origin"]);
     assert.strictEqual(agreed.terminals.length, 2);
+  });
+
+  test("Consult with AI opens the chosen CLI with the chosen model and the consult sentence, and registers nothing", async () => {
+    const copilot = ENGINES.find((e) => e.engine === "copilot")!;
+    const asked: string[] = [];
+    const run = driveUi({
+      pickEngine: async (purpose) => { asked.push(String(purpose)); return copilot; },
+      askModel: async () => "gpt-5-6-luna",
+    });
+    assert.strictEqual(await runConsultWithAi(makeRepository(), run.ui, 7), true);
+    assert.deepStrictEqual(asked, ["Consult with AI"]);
+    // One terminal: the CLI. No loop terminal, and no registrar exists to call.
+    assert.strictEqual(run.terminals.length, 1);
+    const [cli] = run.terminals;
+    assert.strictEqual(cli.program, "copilot");
+    assert.match(cli.name, /^Consult/);
+    assert.deepStrictEqual(cli.args.slice(0, 3), ["--model", "gpt-5-6-luna", "-i"]);
+    assert.match(cli.args[3], /dabbler consult --sessions-dir docs\/sessions --session 7/);
+    assert.doesNotMatch(cli.args[3], /session wait/);
+
+    // A model the installed CLI refuses is refused here as at Start: nothing opens.
+    const refused = driveUi({ engineKnowsModel: async (_choice, model) => model });
+    assert.strictEqual(await runConsultWithAi(makeRepository(), refused.ui), false);
+    assert.strictEqual(refused.errors.length, 1);
+    assert.match(refused.errors[0], /does not know 'haiku'/);
+    assert.strictEqual(refused.terminals.length, 0);
   });
 
   test("passes a dated model id exactly as it was chosen", () => {

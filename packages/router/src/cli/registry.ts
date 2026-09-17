@@ -11,6 +11,7 @@ import { authVerb } from "./auth.ts";
 import { bootstrapVerb } from "./bootstrap.ts";
 import { configurationVerb } from "./configuration.ts";
 import { configureVerb } from "./configure.ts";
+import { consultVerb } from "./consult.ts";
 import { contractdocVerb } from "./contractdoc.ts";
 import { copilotVerb } from "./copilot.ts";
 import { depsVerb } from "./deps.ts";
@@ -39,6 +40,7 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   bootstrap: bootstrapVerb,
   configuration: configurationVerb,
   configure: configureVerb,
+  consult: consultVerb,
   contractdoc: contractdocVerb,
   copilot: copilotVerb,
   deps: depsVerb,

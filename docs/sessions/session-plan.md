@@ -12191,3 +12191,215 @@ Existing tests that assert the removed template step or the `no-verdict` stop
 on an empty change are changed rather than joined.
 
 **Releasable.** Yes, a minor, because new repositories plan differently.
+
+### Session 203 of 204: A non-goal that turns out to be wrong is amended, not disputed
+
+Scope: whole repository
+
+**Why.** On 2026-09-17 the hello-world solution at `../csv-parser` ran ten
+sessions and recorded its friction in `docs/notes/dabbler-issues.md`. Two of
+its four entries are the same defect, met twice:
+
+1. **Session 8 declared `person`, `csv-deserializer` and `persistence` as
+   non-goals.** Making the console app meet its own declared contract then
+   required one line in `modules/persistence/CsvParser.Persistence.csproj`:
+   `PrivateAssets="all"` hides a package from a consumer's runtime as well as
+   its compile surface, so the app built and died on first run with a
+   `FileNotFoundException` for `Microsoft.EntityFrameworkCore`. The fix is
+   `PrivateAssets="compile"`, and it is in an excluded module.
+2. **Verification oscillated.** Round 3 blocked the touch as a non-goal
+   violation. The file was reverted. Round 4 blocked the reverted state,
+   because the console app could no longer run. Same one line, two
+   consecutive rounds, mutually exclusive demands. Both rounds were correct
+   on their own terms.
+3. **There was no amendment to make.** `session plan amend` changes a
+   not-yet-accepted step's `--files`/`--checks-file`, or the run's
+   `--max-rounds`. Nothing reaches `non_goals`.
+4. **A decision recorded between the rounds changed nothing**, because the
+   verifier never reads it.
+
+The only exit taken was to dispute a finding that was true. That is the wrong
+shape of exit: it teaches the AI to reject correct findings, and it launders a
+scope change through the adjudicator instead of recording it as one. A plan's
+non-goals are declared before the work and can be falsified by the work.
+
+**What a non-goal is today.** It reaches the reviewer twice and can never
+move: `workPlanBlock` in `verify/prompts.ts` puts it in every round's task
+block under "what this session will NOT do. Work that a named one covers is
+unreviewed surface nobody asked for", and `nonGoalsLine` in `drive.ts` adds
+"Non-goals of this session, which the reviewer holds the work to".
+
+**What -- a declared non-goal can be dropped, with a reason.**
+
+    dabbler session plan amend --drop-non-goal "<text>" --reason "<why>"
+
+- **Drop only. Nothing adds a non-goal mid-session**, because adding one
+  would put finished, reviewed work retroactively out of scope.
+- The text must match a declared non-goal. One that matches none refuses and
+  names what is declared, so the next call is typeable from the refusal.
+- Not allowed beside `--step` or `--max-rounds`, the same one-amendment-per-
+  call shape those two already hold each other to. `--reason` is required, as
+  it is for both of them.
+- Recorded in `amendments.jsonl`, folded into the activity log and read out at
+  the close, like every other amendment.
+
+**The AI runs it, and the reviewer still judges it.** This is not an operator
+gate. A stop whose only forward exit is to argue that a true finding is false
+is a deadlock wearing a dispute's clothes, and the record is kept honest by
+what the reviewer is shown, not by who is allowed to type. Which leads to:
+
+**What -- the reviewer sees the drop and its reason.** The round's task block
+carries dropped non-goals beside the surviving ones, each with the reason
+given. The reviewer then judges the *reason* -- which is a thing it can
+sensibly judge -- instead of meeting an unexplained violation of a constraint
+it was told to hold the work to.
+
+**What -- decisions recorded during the session reach the round.** The
+verifier reads no part of `decisions-log.md` today. The decisions recorded
+during *this* session, and only those, go into the round's task block. This
+adds no gate and no new record: it shows the reviewer what the session already
+wrote down.
+
+**What -- a round that contradicts its own prior demand says so.**
+`priorFindingsBlock` already carries every prior round's findings, so round 4
+had round 3 in front of it and contradicted it anyway. The block's instructions
+gain a line: where the remediation did exactly what a prior round demanded and
+that created a new defect, say that, rather than raising it as a fresh finding.
+This is a wording change to a prompt and carries no test of its own -- rule 4
+bars asserting exact strings, and a test that the model obeys a sentence is a
+test of the model.
+
+**Non-goals.** No command adds a non-goal. No change to how a plan declares
+non-goals in the first place, and none to `session declare`'s typed flags. The
+dispute and adjudication path is unchanged: a reviewer that objects to a drop's
+reason is met the way any blocking finding is met. Nothing here reads or
+writes `PrivateAssets`, which is MSBuild's own semantics and not the
+framework's business.
+
+**Tests.**
+- `--drop-non-goal` naming a declared non-goal records the amendment, and the
+  plan the verifier reads no longer holds the work to it.
+- `--drop-non-goal` naming text that is declared nowhere refuses, and the
+  refusal names what is declared.
+- `--drop-non-goal` beside `--step`, and beside `--max-rounds`, refuses as a
+  usage error.
+- The round's task block carries a dropped non-goal with its reason.
+- The round's task block carries the decisions recorded during that session.
+
+**Releasable.** Yes, a minor: a new amendment an operator and an AI can both
+run, and a change to what every verification round is told.
+
+### Session 204 of 204: An instruction says what it means
+
+Scope: whole repository
+
+**Why -- the loop does not stop when the session does.** The same
+`../csv-parser` run chained nine sessions with no one asking it to. Its
+ledger, in `docs/sessions/sessions.json`:
+
+| | closed | next started | gap |
+| --- | --- | --- | --- |
+| 1 to 2 | 12:57:41 | 12:58:01 | 19.7 s |
+| 2 to 3 | 13:03:03 | 13:03:26 | 23.0 s |
+| 3 to 4 | 13:20:19 | 13:20:36 | 16.7 s |
+| 4 to 5 | 13:25:09 | 13:25:25 | 15.9 s |
+| 5 to 6 | 13:28:05 | 13:28:21 | 16.3 s |
+| 6 to 7 | 13:34:22 | 13:34:38 | 16.1 s |
+| 7 to 8 | 13:36:44 | 13:37:00 | 16.4 s |
+| 8 to 9 | 15:23:29 | 15:23:47 | 18.9 s |
+| 9 to 10 | 15:31:36 | 15:36:22 | 4 m 46 s |
+
+Sixteen to twenty-three seconds, eight times running, is machine cadence. The
+four-minute gap before session 10 is what a person actually looks like.
+
+Every sentence the framework writes in prose says to stop. The managed body:
+"**`done`** -- the session is over and closed. Stop." `driving-a-session.md`:
+"| `done` | the session is closed | stop |". The sentence the extension types
+into the CLI at launch: "Stop when it prints `done`." The instruction itself
+says something else.
+
+1. **The close-time `done` is silent.** `phaseClose` in `drive.ts` issues a
+   bare `{ kind: "done" }` -- no `ask`, no `answer_command`. Session 9's, from
+   its own run directory, is four fields and nothing else. An AI that has spent
+   the whole session being taught one rule -- read `ask`, do it, answer, re-arm
+   the waiter -- is handed an instruction with no `ask` at all. It re-arms the
+   waiter to find out what that meant.
+2. **That second call lands on the idle instruction.** `sessionWait` reads
+   `currentSession`, which the close set to null, and prints `idleInstruction`
+   instead. Its `ask` is: *"Nothing is in flight, and there is nothing to do.
+   `dabbler session start --engine <engine> --provider <provider>` begins the
+   next one."*
+
+So the framework hands the AI an instruction of kind `done` whose `ask` field
+is the command to start the next session, and the AI does what it has been
+told to do all session. That text is honest for the reader it was written for
+-- a person who typed `session next` on an idle repository. It is an
+invitation when a waiter prints it. Nothing here was designed: session 195
+removed Start Unattended Session because the operator never asked for it, and
+the framework has no chaining feature. This is a docstring for a human, read
+by an AI in a loop.
+
+**What -- the close says the loop is over.** Every `done` the close issues
+carries an `ask` that says the session is closed, that this is the end of the
+loop, and to stop and tell the operator. It carries no `answer_command`,
+because it is owed no answer. An instruction states its own meaning; none of
+the others rely on the AI remembering the managed body, and this one no longer
+does either.
+
+**What -- a waiter knows the difference between "closed" and "idle".** The
+waiter holds the session it is watching. When `currentSession` goes null
+afterwards, it prints that session's own `done` -- the one the close wrote --
+rather than the idle instruction. Only a waiter that never saw a session at
+all reports an idle repository.
+
+**What -- no waiter prints a command that starts a session.** A waiter that
+finds nothing in flight says so and says to tell the operator. `session next`
+and the terminal keep the `session start` hint, because a person reads those.
+This is the whole of the fix for the chaining: the loop cannot be handed the
+door it is not meant to open.
+
+**Why -- three surfaces that name something that is gone or say nothing
+useful.** The same notes file reports hand-authoring a `docs/modules.yaml` on
+an imported plan's say-so, then finding that `dabbler deps` reads a different
+file entirely.
+
+- **`deps show` with no declaration reads as a missing file.** It says
+  `deps: this repository declares no solution-dependencies.json` and stops
+  there. It gains what the file is *for* -- which repository produces a
+  package a build file pins, the one fact no build file can express -- and
+  that a solution living in one repository needs none. `deps check` and
+  `deps source`'s equivalents say the same.
+- **`deps --help` names no schema.** `packages/router/schemas/solution-
+  dependencies.schema.json` has existed all along and nothing points at it.
+  The help names it, and says in one line that `scaffold` creates *another*
+  repository rather than this one's declaration.
+- **`route.ts` sends an operator to a retired file.** `PromptTooLargeError`
+  still advises "Map the session to a module in `docs/modules.yaml` so
+  verification builds a bounded scope". Session 172 made the build files the
+  solution, and `session start` already prints that `docs/modules.yaml` is no
+  longer read. The remaining two moves -- split the session, or route to a
+  model with a larger window -- are real and stay.
+
+**Non-goals.** **No chaining feature and no setting for one.** Whether a
+session should be able to run the next one is a product question the operator
+has not decided, and a session that fixed a leak by building the pipe would be
+deciding it here. No change to what `session next` prints for a person. No
+change to the close, the ledger, or anything `currentSession` means. Nothing
+about `docs/modules.yaml` is revived.
+
+**Tests.**
+- The `done` the close issues carries an `ask` and no `answer_command`.
+- A waiter whose session closes under it prints that session's `done`, not the
+  idle instruction.
+- A waiter on a repository that has never had a session names no `session
+  start` command.
+- `session next` on an idle repository still names `session start`: the
+  person's path is unchanged.
+- `deps show` with no declaration says what the file is for and that one
+  repository needs none.
+
+`deps --help` and the `PromptTooLargeError` wording are corrected with the
+docs and carry no test: proving a string does not contain a word is the
+source-text assertion rule 4 sends to ESLint.
+
+**Releasable.** Yes, a minor: the mailbox loop stops where it is meant to.

@@ -44,6 +44,14 @@ engine does what the instruction says, runs the command it names, and
 starts the waiter again — until it prints `done`. Nobody calls anything to
 move the session on: that is the loop's.
 
+**A waiter holds the session it is watching.** When the close lands under
+one, the waiter prints that session's own `done` — the one the close
+wrote, with its `ask` — and not a fresh reading of an empty repository. A
+waiter that never saw a session says nothing is in flight and to tell the
+operator, and it names no command: a waiter is a loop, and a loop handed
+`dabbler session start` starts a session nobody asked for. `session next`
+and the terminal still name it, because a person reads those.
+
 **The engine stays in its own CLI.** Nothing spawns Claude Code or a
 Copilot seat; you are already talking to one, in the terminal you like,
 with your own context, your own scrollback and your own interrupt key —
@@ -660,9 +668,17 @@ dabbler: session 001 complete.
   "schema_version": 1,
   "seq": 8,
   "session_number": 1,
-  "kind": "done"
+  "issued_at": "2026-09-05T11:31:48-04:00",
+  "kind": "done",
+  "ask": "Session 001 is closed: the work is landed, verified and recorded. This is the end of the loop -- there is nothing to answer and no waiter to start again. Stop, and tell the operator the session is done."
 }
 ```
+
+It states its own meaning, as every other instruction does: the session is
+closed, the loop ends here, tell the operator. It carries no
+`answer_command`, because a closed session is owed no answer — and it
+names no command at all, so nothing in the loop is handed the next
+`session start`. That one is the operator's to type.
 
 Behind that, in the close's own log:
 

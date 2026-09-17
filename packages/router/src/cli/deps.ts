@@ -51,6 +51,19 @@ const EXIT_OK = 0;
 const EXIT_REFUSED = 1;
 const EXIT_USAGE = 2;
 
+/**
+ * What the declaration is FOR, in the one sentence all three surfaces use.
+ *
+ * "This repository declares no solution-dependencies.json" reads as a missing
+ * file to someone who has never declared one, and the reply to a missing file
+ * is to write it. The fact the file carries is the one a build file cannot:
+ * a `<PackageReference>` names a package and never says who builds it.
+ */
+const WHAT_THE_FILE_IS_FOR =
+  `${DEPS_FILENAME} names which repository of this solution PRODUCES a package ` +
+  "this repository's build files pin -- the one fact no build file can express. " +
+  "A solution that lives entirely in this repository needs none.";
+
 const COMMANDS = [
   "check",
   "show",
@@ -76,6 +89,10 @@ function usage(): string {
     "  locate    say where a producing repository is: a local folder, a remote, or both",
     "  clone     clone a producer's declared remote and record where it landed",
     "  scaffold  create a repository that declares only its membership in this solution",
+    "            -- ANOTHER repository of this solution, not this one's declaration",
+    "",
+    `${DEPS_FILENAME} is validated against`,
+    "packages/router/schemas/solution-dependencies.schema.json.",
     "",
     "options:",
     "  --package ID             the package `source` and `restore` act on",
@@ -215,7 +232,7 @@ function run(argv: string[]): number {
     // a reader to treat "declares nothing" as "declares no edges" -- which
     // are the same shape and not the same fact.
     if (deps === null) {
-      writeErr(`deps: this repository declares no ${DEPS_FILENAME}\n`);
+      writeErr(`deps: this repository declares no ${DEPS_FILENAME}. ${WHAT_THE_FILE_IS_FOR}\n`);
       writeOut("null\n");
       return EXIT_OK;
     }
@@ -237,7 +254,7 @@ function run(argv: string[]): number {
 
   if (deps === null) {
     writeOut(
-      `deps: this repository declares no ${DEPS_FILENAME}. ` +
+      `deps: this repository declares no ${DEPS_FILENAME}. ${WHAT_THE_FILE_IS_FOR} ` +
         `${self.refs.length} direct dependenc(ies) were read from its build ` +
         "files; whether any of them is built by one of your own repositories " +
         "is not derivable from a build file.\n",
@@ -506,7 +523,7 @@ function toSource(root: string, packageId: string): number {
     writeErr(
       `deps: ${DEPS_FILENAME} declares no edge for ${packageId}. Source mode ` +
         "switches a declared edge; an undeclared reference has no producer to " +
-        "point at.\n",
+        `point at. ${WHAT_THE_FILE_IS_FOR}\n`,
     );
     return EXIT_REFUSED;
   }

@@ -65,8 +65,10 @@ function refuse(command: unknown, args: unknown): void {
   const argv = Array.isArray(args) ? args.map(String).join(" ") : "";
   throw new Error(
     `git spawned outside a walkthrough by ${entry || "<no entry file>"}: git ${argv}` +
-      " -- feed the answer through journal.setGitSource (test/support/answers.ts)" +
-      " or move the test into a walk-*.test.ts file",
+      " -- feed the answer through journal.setGitSource (test/support/answers.ts)." +
+      " A test that genuinely needs a real repository is added to the WALKTHROUGHS" +
+      " list in test/support/no-git.ts, which is a deliberate edit beside the reason" +
+      " the list exists; renaming the file does not do it.",
   );
 }
 

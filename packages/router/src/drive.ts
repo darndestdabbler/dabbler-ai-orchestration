@@ -957,6 +957,27 @@ export function idleInstruction(now: string): DriverInstruction {
   };
 }
 
+/**
+ * What the `done` a close issues says: the loop ends here.
+ *
+ * Every other instruction states its own meaning, and this one used to be
+ * four fields and nothing else -- no `ask` at all, handed to an AI that had
+ * spent the whole session being taught to read `ask`, do it, answer, and
+ * wait again. It re-armed the waiter to find out what a bare `done` meant.
+ *
+ * It names no command on purpose. A session that has closed is owed no
+ * answer, and the one command that would follow -- the next `session start`
+ * -- is the operator's to type and not a loop's to be handed.
+ */
+export function closedAsk(sessionNumber: number): string {
+  return (
+    `Session ${sessionDisplayNumber(sessionNumber)} is closed: the work is ` +
+    "landed, verified and recorded. This is the end of the loop -- there is " +
+    "nothing to answer and no waiter to start again. Stop, and tell the " +
+    "operator the session is done."
+  );
+}
+
 /** What a refused start says, in the one sentence that names the door in. */
 export const REFUSE_START_REASON =
   "dabbler: refused -- `session next` advances a session and does not start " +
@@ -1378,6 +1399,17 @@ class Driver {
       ...(instruction.reasons ? { reasons: instruction.reasons.length } : {}),
     });
     return instruction;
+  }
+
+  /**
+   * The instruction that ends the session, in the one place it is built.
+   *
+   * It carries an `ask` and no `answer_command`: the session is closed, so
+   * nothing is owed an answer, and an instruction that said nothing at all
+   * left the reader to guess what a bare `done` meant.
+   */
+  private issueDone(): DriverInstruction {
+    return this.issue({ kind: "done", ask: closedAsk(this.sessionNumber) });
   }
 
   /**
@@ -3274,7 +3306,7 @@ class Driver {
       );
       if (row?.["status"] === "complete") {
         this.log("close-collected", { session: sessionDisplayNumber(this.sessionNumber) });
-        this.issue({ kind: "done" });
+        this.issueDone();
         this.setPhase("complete");
         return;
       }
@@ -3299,7 +3331,7 @@ class Driver {
         }`,
       );
     }
-    this.issue({ kind: "done" });
+    this.issueDone();
     this.setPhase("complete");
   }
 
@@ -3378,10 +3410,8 @@ class Driver {
               // Nothing more is expected, and the pull says so in the one
               // shape it says everything: the `done` the close issued.
               if (this.pull) {
-                const done =
-                  readInstruction(this.repoRoot, this.sessionNumber) ??
-                  this.issue({ kind: "done" });
-                throw new Awaiting(done.kind === "done" ? done : this.issue({ kind: "done" }));
+                const done = readInstruction(this.repoRoot, this.sessionNumber) ?? this.issueDone();
+                throw new Awaiting(done.kind === "done" ? done : this.issueDone());
               }
               return EXIT_OK;
           }
@@ -3689,11 +3719,60 @@ export function noLoopMessage(
 }
 
 /**
+ * What a waiter says on a repository where nothing is in flight and nothing
+ * ever was under this waiter.
+ *
+ * The idle instruction's own ask names `dabbler session start`, which is
+ * right for the reader it was written for -- a person who typed `session
+ * next` on an idle repository -- and is an invitation when a LOOP reads it.
+ * A waiter is a loop, so this one names no command at all: whether a session
+ * runs the next one is the operator's decision to make by typing it.
+ *
+ * Session 0 and seq 0 for the same reason the idle instruction uses them:
+ * there is no session behind this, and a reader that treats 0 as one will
+ * find no record for it.
+ */
+export function waiterIdleInstruction(now: string): DriverInstruction {
+  return {
+    schema_version: DRIVER_SCHEMA_VERSION,
+    seq: 0,
+    session_number: 0,
+    issued_at: now,
+    kind: "done",
+    ask:
+      "Nothing is in flight in this repository and there is nothing to wait " +
+      "for. Stop, and tell the operator.",
+  };
+}
+
+/**
+ * The last thing a waiter prints when the session it was watching is gone.
+ *
+ * A waiter HOLDS the session it has been watching, so a close that lands
+ * under it is not the same event as an empty repository: the close wrote a
+ * `done` into that session's run directory, and that instruction -- with its
+ * own ask -- is what ends this waiter. Only a waiter that never saw a
+ * session, or one whose session left no readable `done`, reports an idle
+ * repository.
+ */
+export function waiterEnd(repoRoot: string, watching: number | null, now: string): DriverInstruction {
+  if (watching === null) return waiterIdleInstruction(now);
+  let closed: DriverInstruction | null;
+  try {
+    closed = readInstruction(repoRoot, watching);
+  } catch {
+    closed = null;
+  }
+  return closed?.kind === "done" ? closed : waiterIdleInstruction(now);
+}
+
+/**
  * Wait for the instruction owed an answer, print it as JSON, and return. The AI
  * runs this in the background, so its chat stays free while it waits, and runs
- * it again after each answer. With nothing in flight it prints the idle `done`;
- * with no loop driving the session it says so and names the command that
- * starts one.
+ * it again after each answer. A session that closes under the waiter ends it
+ * with that session's own `done`; with nothing in flight and no session ever
+ * watched it says so; with no loop driving the session it says so and names
+ * the command that starts one.
  */
 export async function sessionWait(
   sessionsDir: string,
@@ -3705,12 +3784,14 @@ export async function sessionWait(
     return EXIT_USAGE;
   }
   const since = Date.now();
+  let watching: number | null = null;
   for (;;) {
     const current = readSessionState(sessionsDir)?.["currentSession"];
     if (typeof current !== "number") {
-      writeOut(`${JSON.stringify(idleInstruction(nowIso()), null, 2)}\n`);
+      writeOut(`${JSON.stringify(waiterEnd(repoRoot, watching, nowIso()), null, 2)}\n`);
       return EXIT_OK;
     }
+    watching = current;
     const reading = waiterReading(repoRoot, current, since);
     if (reading === "no-loop") {
       let run: DriverRun | null;

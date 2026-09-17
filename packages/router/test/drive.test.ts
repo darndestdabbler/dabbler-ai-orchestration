@@ -22,6 +22,7 @@ import {
   REGISTER_REFUSE_START,
   REGISTER_START,
   alreadyRewoundFor,
+  closedAsk,
   disputedFindingsBrief,
   dispositionRefusals,
   idleInstruction,
@@ -43,6 +44,7 @@ import {
   stepChangedPaths,
   unchangedStepFiles,
   noLoopMessage,
+  waiterEnd,
   waiterReading,
   type RegistrationFacts,
   type StepSpec,
@@ -438,6 +440,54 @@ describe("what `next` answers when nothing is in flight", () => {
 
   it("says how to begin the next one", () => {
     assert.match(String(idleInstruction("2026-09-05T03:00:00-04:00").ask), /session start/);
+  });
+});
+
+describe("waiterEnd", () => {
+  const now = "2026-09-17T12:00:00-04:00";
+
+  it("ends a waiter whose session closed under it with that session's own done", () => {
+    // The chaining defect, in one call: the close set `currentSession` to
+    // null, and a waiter that answered "nothing in flight" printed the idle
+    // instruction -- whose ask is `session start`. The session it was
+    // watching wrote a `done` of its own, and that is the honest end.
+    const root = tempDir("waiter-end-");
+    const done = {
+      schema_version: 1,
+      seq: 9,
+      session_number: 1,
+      issued_at: "2026-09-17T11:59:00-04:00",
+      kind: "done",
+      ask: closedAsk(1),
+    } as unknown as DriverInstruction;
+    mkdirSync(dirname(instructionPath(root, 1)), { recursive: true });
+    writeFileSync(instructionPath(root, 1), JSON.stringify(done));
+    assert.equal(waiterEnd(root, 1, now).seq, 9);
+    assert.equal(waiterEnd(root, 1, now).ask, closedAsk(1));
+  });
+
+  it("names no command on a repository this waiter never saw a session on", () => {
+    // A waiter is a loop, and a loop handed `session start` starts one.
+    const idle = waiterEnd(tempDir("waiter-idle-"), null, now);
+    assert.equal(idle.kind, "done");
+    assert.equal(idle.session_number, 0);
+    assert.doesNotMatch(String(idle.ask), /session start/);
+  });
+});
+
+describe("closedAsk", () => {
+  it("says the session is closed, that the loop ends, and names no command to run", () => {
+    // What the close's `done` used to carry was four fields and no `ask` at
+    // all. An AI taught all session to read `ask`, do it, answer and wait
+    // again re-armed its waiter to find out what that meant -- and the
+    // waiter, with the session now closed, printed the idle instruction,
+    // whose ask is `dabbler session start`. So the sentence has to state its
+    // own meaning, and it has to hand back no command: a session that has
+    // closed is owed no answer, and the next start is the operator's to type.
+    const ask = closedAsk(7);
+    assert.match(ask, /007 is closed/);
+    assert.match(ask, /Stop/);
+    assert.doesNotMatch(ask, /dabbler/);
   });
 });
 

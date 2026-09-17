@@ -125,6 +125,21 @@ describe("dabbler deps", () => {
     assert.equal(result.code, 0, result.err);
     assert.match(result.out, /Newtonsoft\.Json.*read as external/);
   });
+
+  it("says what the declaration is for, and that one repository needs none, where `show` finds none", async () => {
+    // "declares no solution-dependencies.json" reads as a missing file to
+    // someone who has never declared one, and the reply to a missing file is
+    // to write it -- which is how a hand-authored declaration gets invented.
+    const { sessionsDir } = makeAnsweredSandbox({
+      "App.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>\n',
+    });
+    const result = await run(() => depsVerb(["show", "--sessions-dir", sessionsDir]));
+    assert.equal(result.code, 0, result.err);
+    // The parser's side of it is unchanged: no declaration is still `null`.
+    assert.equal(result.out.trim(), "null");
+    assert.match(result.err, /PRODUCES a package/);
+    assert.match(result.err, /entirely in this repository needs none/);
+  });
 });
 
 describe("dabbler session, the whole surface", () => {

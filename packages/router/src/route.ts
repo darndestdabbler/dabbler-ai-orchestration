@@ -185,11 +185,9 @@ export function buildPrompt(
         `${budgetTokens} tokens (${budgetTokens * CHARS_PER_TOKEN} ` +
         `chars, ${Math.trunc(INPUT_BUDGET_FRACTION * 100)}% of the model's ` +
         `${maxInput}-token window) -- an overrun of ` +
-        `${estimatedTokens - budgetTokens} tokens. Map the session to ` +
-        "a module in docs/modules.yaml so verification builds a bounded " +
-        "scope instead of a whole-session bundle, split the session, or " +
-        "route to a model with a larger window. The prompt is never " +
-        "silently truncated to fit.",
+        `${estimatedTokens - budgetTokens} tokens. The moves are to ` +
+        "split the session, or to route to a model with a larger window. " +
+        "The prompt is never silently truncated to fit.",
     );
   }
 

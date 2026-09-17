@@ -10,6 +10,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.12.0] — 2026-09-17
+
+**An instruction says what it means, so the loop stops where the session
+does.**
+
+### Changed
+
+- The `done` that ends a session says so: the session is closed, this is
+  the end of the loop, stop and tell the operator. It used to be four
+  fields and no `ask` at all, handed to an assistant that had spent the
+  whole session being taught to read `ask`, do it, answer and wait again.
+  It carries no `answer_command`, because a closed session is owed no
+  answer.
+- A waiter whose session closes under it prints that session's own `done`
+  rather than starting over on an empty repository. The instruction it
+  used to print there was written for a person typing `session next`, and
+  its text is `dabbler session start` — an invitation, read by a loop.
+- No waiter names a command that starts a session. One that finds nothing
+  in flight says so and says to tell the operator. `session next` and the
+  terminal keep the hint, because a person reads those.
+- Four messages that pointed at something retired, or said nothing useful,
+  say what is true now: `deps show` and `deps check` with no declaration
+  explain what `solution-dependencies.json` is for and that a solution in
+  one repository needs none; `deps --help` names the schema and says that
+  `scaffold` creates another repository; the prompt-too-large refusal no
+  longer sends anyone to the retired `docs/modules.yaml`; and the test
+  suite's git guard names the walkthrough list it actually honours instead
+  of offering a rename that has been refused since session 122.
+
 ## [3.11.0] — 2026-09-17
 
 **A non-goal that turns out to be wrong is amended, not disputed.**

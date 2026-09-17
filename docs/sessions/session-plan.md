@@ -11363,3 +11363,145 @@ is declared at all.
 
 **Releasable.** Yes, a patch, 3.3.7. It publishes only if both proofs
 passed, since each one stops the session before the push when it fails.
+
+### Session 191 of 192: API Keys, grouped, and the project's choice wins
+
+Scope: whole repository
+
+**Why.** Two things about the provider keys, both raised by the operator on
+2026-09-17.
+
+The Solution Explorer's Configuration node lists one key row per provider
+directly beside the two participants (`childrenOf`, case `configuration`, in
+`solutionTreeModel.ts`). Expanding Configuration to change a model -- the
+common reason to open it -- puts three rows about keys in the way, and keys
+are set about once per machine.
+
+The hover on those rows says *"DABBLER_OPENAI_API_KEY is set in the
+environment, which outranks any credential named here."* That is true to the
+code and wrong as policy. Session 159 ruled the order process environment,
+then the checkout's reference, then the person's default, "because that is how
+CI injects a key". Everywhere else in this framework the checkout outranks the
+person, and a `DABBLER_*_API_KEY` set at user scope is exactly a personal,
+machine-wide default. It shadows every repository's committed choice of key
+-- and so which account is billed -- on every repository on the machine. That
+is the shape session 157 retired `DABBLER_TRANSPORT` for. The CI argument does
+not survive the new order either: a CI machine holds no stored credentials,
+and where nothing names one, the variable still supplies the key.
+
+**What -- the order, reversed by operator decision.** Resolution becomes the
+checkout's reference (`dabbler.credentials.<provider>` in
+`.vscode/settings.json`), then the person's reference (`preferences.json`),
+then the provider's environment variable as the floor. The reversal of session
+159's ruling is recorded as a decision before the run of record, naming this
+reason. `credentialReferenceFor` keeps its two layers; `providerSecret` reads
+the variable only where no layer named a credential. In `providerKeyStop`, the
+early return that let a set variable excuse a dangling or mismatched
+reference goes: a reference that names a credential this machine does not
+hold, or one stored for another vendor, is a stop whether or not the variable
+is set, because falling to the variable would change the billed account
+without saying so. The two checks for a key pasted into a file stay exactly
+as they are.
+
+Every sentence that states the old order changes with it: the dangling
+reference's refusal in `credentials.ts` ("also works and outranks the
+reference"), the explanation in `cli/configuration.ts`, `cli/auth.ts`'s
+report where the variable is set, the pane row's hover and description in
+`solutionTreeModel.ts`, and the *Resolution* paragraph of
+`docs/design/credential-store.md`. The projection's `fromEnvironment` means
+"the variable is what supplies the key", which is now false wherever a
+reference is named.
+
+**What -- the group.** Configuration gains one collapsed **API Keys** node, and
+the per-provider rows move under it unchanged. It appears only when the
+projection carries credentials. Its description summarises availability ("2 of
+3 available", where available is supplied by the variable or held on this
+machine), and it takes the attention tone when any child carries a stop, so
+collapsing the rows never hides the one that needs acting on.
+
+**Non-goals.** Where a value is stored, or the store itself. Per-project
+values: a project names a credential, and the value stays in this person's
+store. A CI-only override layer. Copilot bring-your-own-key. Rewriting the
+historical `docs/uat/uat-credential-store-walk.md`, which records what was
+true when it was walked.
+
+**Tests.** One that a named reference beats a set variable, at both layers.
+One that the variable supplies the key where nothing is named. One that a
+dangling reference is a stop with the variable set. The existing tests that
+assert the old order are changed rather than joined by new ones. One that the
+API Keys node holds the credential rows, summarises availability, and takes
+the attention tone from a child's stop.
+
+**Releasable.** Yes, a minor, because the precedence change is observable.
+
+### Session 192 of 192: Consult with AI
+
+Scope: whole repository
+
+**Why.** The framework has no way into planning. Adding a session, amending
+the plan, or diagnosing a stop the framework cannot clear is done today by an
+operator opening an ad hoc chat and explaining the repository's layout from
+scratch. Session 190 was planned exactly that way, as commit `0a4dc1a8`. The
+chat has no guidance on where the plans are, which verbs change them, or where
+its licence ends. And every CLI opened in this repository loads the managed
+`AGENTS.md`, which tells it it is the orchestrator and to run the waiter,
+which is the wrong instruction for a conversation that is not driving a
+session.
+
+**What -- the brief.** A router verb, `dabbler consult --sessions-dir <dir>
+[--session <N>]`, prints what a consulting AI reads first. It changes nothing
+and bills nothing. It is computed from the same state `dabbler status` reads,
+so its facts live in one implementation:
+- **Where things are.** The sessions root, `session-plan.md`,
+  `project-work-plan.md`, the ledger, and a session's `run.json`, with which
+  of them are the router's alone.
+- **What is true now.** The current session and its state. For a stopped
+  one, the stop's kind, its reasons, and its forward exits (`verify reopen`,
+  `session plan amend`, Resume), with `session cancel --force` named as the
+  person's verb only.
+- **How to plan a session.** The heading and section shape the plan uses,
+  the next free number, and that a planned session is committed as a plain
+  commit.
+- **The licence.** A consult answers questions, reads anything, and edits
+  and commits the plan files. It changes no code, no record and no verdict.
+  Work that changes code becomes a planned session, never a consult's own
+  edit. A fix the framework needs to clear a stop is planned the same way.
+
+**What a consult may do while a session is in progress** is measured in this
+session rather than assumed. The session runs a `session-plan.md` edit against
+a session mid-step and against one stopped between instructions, and records
+whether either disturbs the tree check or lands in that session's diff. The
+brief permits plan edits only in the states the measurement shows are safe.
+In every other state it tells the AI to draft the text in the chat and wait
+for the session to close.
+
+**What -- the launch.** Work Explorer gains **Consult with AI** on the
+repository node and on a session node, the latter passing `--session`. It
+asks for a vehicle and a model through the same choices and the same
+model-refusal check Start uses (`engineOrder`, `chosenAuthoringModel`,
+`engineRefusesModel`), defaulting to the authoring choice so that picking a
+stronger model is one change. It opens the engine CLI in its own terminal,
+named for the consult, through `engineTerminalFor`'s shape with a different
+opening sentence: run `dabbler consult` and read it before anything else,
+then ask the operator what they need. It registers no session and starts no
+loop.
+
+The managed `AGENTS.md` body in `bootstrap/templates.ts` gains one short
+paragraph: an AI opened to consult is not the orchestrator, runs no waiter,
+and reads `dabbler consult` for its brief. This repository's `AGENTS.md` is
+re-rendered with `dabbler bootstrap`.
+
+**Non-goals.** Any gate enforcing the licence: it is guidance, in line with the
+standing rule against over-gating AI process. A chat panel of the extension's
+own. Remembering a consult's vehicle and model as a preference. Plan edits
+through a structured verb: the plan is prose, and a person reviews the commit.
+
+**Tests.** One that the brief for a repository with no session in progress
+names the plan files and the next free session number. One that for a stopped
+session it names the stop's kind and forward exits. One that the brief's
+permission for plan edits follows the in-progress state as measured. One that
+Consult with AI opens the chosen CLI with the chosen model and the consult
+sentence, and registers nothing. One that the menu entry is contributed on
+both node kinds.
+
+**Releasable.** Yes, a minor.

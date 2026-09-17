@@ -231,6 +231,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 191 | API Keys, grouped, and the project's choice wins | yes | 2026-09-17 |
 | 192 | Friction only where a session would not succeed | yes | 2026-09-17 |
 | 193 | Consult with AI | yes | 2026-09-17 |
+| 194 | Choose the model from a list | yes | 2026-09-17 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2647,3 +2648,13 @@ Give planning a way in. A new router verb, `dabbler consult --sessions-dir <dir>
 **Amended after acceptance:**
 
 - 2026-09-17 — step 'agents-paragraph': its checks: The whole bootstrap file includes the commit-guard hook test, which needs sh on PATH and fails in the check environment independent of this change; the instruction-file tests are the ones this step's template change touches (claude-code (anthropic, claude-opus-5))
+
+### Session 194 — Choose the model from a list
+
+**Releasable: yes.**
+
+Make the model question in Start Session, Start Unattended and Consult with AI a list rather than a free-text box. In tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts one exported function, `modelPickItems(root, choice, chosen)`, reads `solutionConfiguration(root, { engine: choice.engine })` exactly as `engineModelRefusal` does and returns either the QuickPick items or null: null where the candidates are empty or the reading is the alias floor (`ENUMERATION_CLI_ALIASES`); otherwise the candidates labelled through `modelItems` (exported from configurationCommands.ts, its wording unchanged) with `chosen` moved first and marked by `modelItems`' own 'what you chose', an item for the engine's default (empty model) only where `choice.modelRequired` is false, and a final *Enter a model id…* item. `defaultSessionRunUi().askModel` shows that pick; *Enter a model id…* and a null reading open today's input box, with the aliases as the placeholder where the reading is the alias floor. `askModel` has no repository root today and cannot read the candidates without one, so its signature gains a leading `root` argument and the three callers (`runStartSession`, `runStartUnattendedSession`, `runConsultWithAi`) pass `repository.root` and change nothing else; both refusals still run after the choice. Releasable as a patch: version.json and the manifests it stamps move to 3.6.1, with a CHANGELOG entry.
+
+**Amended after acceptance:**
+
+- 2026-09-17 — step 'model-pick-tests': its files: The catalog fixture the engineModelRefusal tests use lives in solutionTreeModel.test.ts; the tests sit beside them there rather than duplicating it in commandFlows.test.ts (claude-code (anthropic, claude-opus-5))

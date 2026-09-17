@@ -22,11 +22,16 @@ import {
   repositoryTarget,
   workspaceFileIn,
 } from "../../commands/openRepository";
+import * as vscode from "vscode";
 import {
   ENGINES,
+  ENTER_MODEL_ID,
+  defaultSessionRunUi,
   engineModelRefusal,
+  modelPickItems,
   runConsultWithAi,
   type EngineChoice,
+  type ModelPickItem,
   type SessionRunUi,
 } from "../../commands/sessionCommands";
 import type { SessionsRepository } from "../../utils/fileSystem";
@@ -890,6 +895,7 @@ suite("solutionTreeModel: what a configuration reading costs", () => {
             scope: { providers: ["anthropic", "openai"] },
             models: [
               catalogRow("a-author", "anthropic"),
+              catalogRow("a-second", "anthropic"),
               catalogRow("o-reviewer", "openai"),
             ],
             retired: [],
@@ -957,6 +963,59 @@ suite("solutionTreeModel: what a configuration reading costs", () => {
     assert.strictEqual(errors.length, 1);
     assert.ok(errors[0].includes("not-a-model-anywhere"), errors[0]);
     assert.strictEqual(opened.length, 0);
+  });
+
+  test("the model question offers the engine's candidates, the chosen one first", () => {
+    const claude = ENGINES.find((entry) => entry.engine === "claude-code") as EngineChoice;
+    const items = modelPickItems(root, claude, "a-second");
+    assert.ok(items);
+    assert.deepStrictEqual(
+      items.map((item) => item.model),
+      ["a-second", "a-author", "", undefined],
+    );
+    assert.strictEqual(items[0].detail, "what you chose");
+    assert.strictEqual(items[3].label, ENTER_MODEL_ID);
+    // A seat is nothing without a model, so it is offered no default.
+    const required = modelPickItems(root, { ...claude, modelRequired: true }, "");
+    assert.deepStrictEqual(required?.map((item) => item.model), ["a-author", "a-second", undefined]);
+  });
+
+  test("the model question falls back to the text box on 'Enter a model id…', no list, or the alias floor", async () => {
+    const window = vscode.window as unknown as Record<string, unknown>;
+    const [pick, input] = [window.showQuickPick, window.showInputBox];
+    const picks: unknown[] = [];
+    const boxes: Array<{ placeHolder?: string }> = [];
+    window.showInputBox = async (options: { placeHolder?: string }) => {
+      boxes.push(options);
+      return "typed-id";
+    };
+    try {
+      const claude = ENGINES.find((entry) => entry.engine === "claude-code") as EngineChoice;
+      const seat = ENGINES.find((entry) => entry.engine === "copilot") as EngineChoice;
+      window.showQuickPick = async (items: ModelPickItem[]) => {
+        picks.push(items);
+        return items.find((item) => item.label === ENTER_MODEL_ID);
+      };
+      const ui = defaultSessionRunUi();
+      assert.strictEqual(await ui.askModel(root, claude, ""), "typed-id");
+      assert.deepStrictEqual([picks.length, boxes.length], [1, 1]);
+      // This machine has read nothing for the seat: no pick, the box.
+      assert.strictEqual(await ui.askModel(root, seat, ""), "typed-id");
+      assert.deepStrictEqual([picks.length, boxes.length], [1, 2]);
+      // Nothing enumerated for Claude Code: the aliases are the reading, and
+      // the box shows them rather than offering them as the whole choice.
+      const catalog = process.env.DABBLER_CATALOG_PATH as string;
+      const record = JSON.parse(fs.readFileSync(catalog, "utf8"));
+      record.transports.api.models = [catalogRow("o-reviewer", "openai")];
+      fs.writeFileSync(catalog, JSON.stringify(record), "utf8");
+      assert.strictEqual(modelPickItems(root, claude, ""), null);
+      assert.strictEqual(await ui.askModel(root, claude, ""), "typed-id");
+      assert.deepStrictEqual([picks.length, boxes.length], [1, 3]);
+      assert.ok(boxes[2].placeHolder?.includes("sonnet"), boxes[2].placeHolder);
+    } finally {
+      window.showQuickPick = pick;
+      window.showInputBox = input;
+    }
   });
 
   test("reaches no vendor and no CLI, and renders the dated record it read", () => {

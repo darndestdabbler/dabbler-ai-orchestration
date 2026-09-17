@@ -10,6 +10,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.6.1] — 2026-09-17
+
+**Choose the model from a list.**
+
+### Changed
+
+- **Start Session, Start Unattended Session and Consult with AI ask for the
+  model with a list** of the models this machine has read for the engine you
+  picked, described the way the Configuration section describes them. The
+  model you already chose comes first. An engine that runs without a model
+  also offers its own default; a Copilot seat does not. **Enter a model id…**
+  still opens the text box, for an id the CLI knows before this machine's
+  list does. Where nothing has been read, or only the CLI's aliases, the text
+  box opens as before. A model the list or the CLI refuses is still refused
+  before anything is launched.
+
 ## [3.6.0] — 2026-09-17
 
 **Consult with AI: a way into planning that drives nothing.**

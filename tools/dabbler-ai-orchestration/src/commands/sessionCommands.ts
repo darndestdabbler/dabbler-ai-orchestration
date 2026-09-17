@@ -43,6 +43,8 @@ import { type DriveHandle, launchDriver } from "../router/driveProcess";
 import { resolveRouterCli } from "../router/terminalShim";
 import { ensureDabblerTerminal, terminalLocation } from "../router/dabblerTerminal";
 import { asRepositoryNode, asSessionNode } from "./workExplorerTreeCommands";
+import { modelItems } from "./configurationCommands";
+import type { ConfigurationModel, ConfigurationRole } from "../providers/solutionTreeModel";
 
 /**
  * The repository a clicked row belongs to, whichever row kind it is.
@@ -338,6 +340,22 @@ export async function engineRefusesModel(
   );
 }
 
+/**
+ * The authoring list read for the engine ABOUT to be launched, not for
+ * whatever the ledger or the preference names: an operator starting a
+ * Copilot session from a window whose last session ran Claude Code would
+ * otherwise be held to, and offered, the wrong CLI's list.
+ */
+function engineAuthoringReading(root: string, engine: string): ConfigurationRole | undefined {
+  const configuration = solutionConfiguration(root, { engine }) as { authoring?: ConfigurationRole } | null;
+  return configuration?.authoring;
+}
+
+/** The ids a reading lists, blanks dropped. */
+function listedModels(authoring: ConfigurationRole | undefined): ConfigurationModel[] {
+  return (authoring?.candidates ?? []).filter((row) => String(row.model ?? "") !== "");
+}
+
 export function engineModelRefusal(
   repository: SessionsRepository,
   choice: EngineChoice,
@@ -345,26 +363,12 @@ export function engineModelRefusal(
 ): string | null {
   const wanted = model.trim();
   if (wanted === "") return null;
-  // Read for the engine ABOUT to be launched, not for whatever the ledger or
-  // the preference names: an operator starting a Copilot session from a
-  // window whose last session ran Claude Code would otherwise be held to the
-  // wrong CLI's list.
-  const configuration = solutionConfiguration(repository.root, {
-    engine: choice.engine,
-  }) as {
-    authoring?: {
-      enumeration?: string;
-      candidates?: Array<{ model?: string }>;
-    };
-  } | null;
-  const authoring = configuration?.authoring;
+  const authoring = engineAuthoringReading(repository.root, choice.engine);
   // The floor is the CLI's own always-accepted names on a machine that could
   // enumerate nothing. Holding a choice to three names there would refuse
   // every operator whose machine has no key for their engine's vendor.
   if (authoring?.enumeration === ENUMERATION_CLI_ALIASES) return null;
-  const offered = (authoring?.candidates ?? [])
-    .map((row) => String(row.model ?? ""))
-    .filter((id) => id !== "");
+  const offered = listedModels(authoring).map((row) => row.model);
   if (offered.length === 0 || offered.includes(wanted)) return null;
   return (
     `${choice.label} has no '${wanted}' in the list this machine has read for ` +
@@ -375,6 +379,36 @@ export function engineModelRefusal(
     "chose -- which is why this is checked before the terminal opens rather " +
     "than read out of it afterwards."
   );
+}
+
+/** One row of the model question; `model` undefined is the row that opens the text box. */
+export type ModelPickItem = vscode.QuickPickItem & { model?: string };
+
+export const ENTER_MODEL_ID = "Enter a model id…";
+
+/**
+ * The model question as a list: the engine's candidates, what this checkout
+ * chose first, the engine's own default where the engine has one, and a way
+ * to type an id the CLI knows before this machine's list does.
+ *
+ * Null where there is no list to offer -- nothing read, or only the alias
+ * floor -- because an empty pick is a broken pane and three aliases offered
+ * as the whole choice would hide every other id the CLI accepts.
+ */
+export function modelPickItems(root: string, choice: EngineChoice, chosen: string): ModelPickItem[] | null {
+  const authoring = engineAuthoringReading(root, choice.engine);
+  const listed = listedModels(authoring);
+  if (authoring?.enumeration === ENUMERATION_CLI_ALIASES || listed.length === 0) return null;
+  const ordered = [...listed.filter((row) => row.model === chosen), ...listed.filter((row) => row.model !== chosen)];
+  const items: ModelPickItem[] = modelItems(ordered, authoring?.provider, chosen).map((item) => ({
+    ...item,
+    model: item.label,
+  }));
+  if (!choice.modelRequired) {
+    items.push({ label: "The engine's default", description: "no `--model` is passed", model: "" });
+  }
+  items.push({ label: ENTER_MODEL_ID, description: "for an id the CLI knows that this list does not" });
+  return items;
 }
 
 /** The terminal Start opens for a choice, or the refusal when a seat has no model. */
@@ -479,7 +513,7 @@ export interface SessionRunUi {
    * asked to retype it here would have two places saying what the next
    * session authors with and no reason to believe either.
    */
-  askModel: (choice: EngineChoice, chosen: string, purpose?: string) => Thenable<string | undefined>;
+  askModel: (root: string, choice: EngineChoice, chosen: string, purpose?: string) => Thenable<string | undefined>;
   /** One line of text from the person; undefined when the box was dismissed. */
   askText: (title: string, prompt: string, value?: string) => Thenable<string | undefined>;
   /** A yes-or-no the person answers, modally; true only for the named action. */
@@ -644,20 +678,35 @@ export function defaultSessionRunUi(
           },
         )
         .then((picked) => picked?.entry),
-    askModel: (choice, chosen, purpose = "Start session") =>
-      vscode.window.showInputBox({
-        title: `${purpose} — model for ${choice.label}`,
+    askModel: async (root, choice, chosen, purpose = "Start session") => {
+      const title = `${purpose} — model for ${choice.label}`;
+      const items = modelPickItems(root, choice, chosen);
+      if (items !== null) {
+        const picked = await vscode.window.showQuickPick(items, { title, ignoreFocusOut: true });
+        if (picked === undefined) return undefined;
+        if (picked.model !== undefined) return picked.model;
+      }
+      // On the floor the aliases are what the CLI always accepts, so they are
+      // the example worth showing.
+      const aliases =
+        items === null
+          ? listedModels(engineAuthoringReading(root, choice.engine)).map((row) => row.model)
+          : [];
+      return vscode.window.showInputBox({
+        title,
         prompt: choice.modelRequired
           ? purpose === CONSULT_PURPOSE
             ? "Required: the seat's model. It is passed to the CLI; nothing is recorded."
             : "Required: the seat's model. It is passed to the CLI and recorded on the ledger."
           : "Optional: leave empty for the engine's default. It is passed to the CLI as `--model`.",
-        placeHolder: choice.modelRequired ? "e.g. gpt-5-6-luna" : "e.g. haiku",
+        placeHolder:
+          aliases.length > 0 ? `e.g. ${aliases.join(", ")}` : choice.modelRequired ? "e.g. gpt-5-6-luna" : "e.g. haiku",
         // What the Configuration section already chose, so the pane and this
         // box are one answer rather than two.
         value: chosen,
         ignoreFocusOut: true,
-      }),
+      });
+    },
     askText: (title, prompt, value) =>
       vscode.window.showInputBox({ title, prompt, value, ignoreFocusOut: true }),
     confirm: (message, action) =>
@@ -828,7 +877,7 @@ export async function runStartSession(
 ): Promise<boolean> {
   const picked = await ui.pickEngine();
   if (!picked) return false;
-  const model = await ui.askModel(picked, chosenAuthoringModel(repository.root));
+  const model = await ui.askModel(repository.root, picked, chosenAuthoringModel(repository.root));
   if (model === undefined) return false;
   // Two questions, and they are different questions. One asks what this
   // machine has READ for this engine; the other asks the INSTALLED CLI, which
@@ -891,7 +940,7 @@ export async function runConsultWithAi(
   const purpose = CONSULT_PURPOSE;
   const picked = await ui.pickEngine(purpose);
   if (!picked) return false;
-  const model = await ui.askModel(picked, chosenAuthoringModel(repository.root), purpose);
+  const model = await ui.askModel(repository.root, picked, chosenAuthoringModel(repository.root), purpose);
   if (model === undefined) return false;
   const impossible =
     engineModelRefusal(repository, picked, model) ??
@@ -931,7 +980,7 @@ export async function runStartUnattendedSession(
   }
   const picked = await ui.pickEngine();
   if (!picked) return false;
-  const model = await ui.askModel(picked, chosenAuthoringModel(repository.root));
+  const model = await ui.askModel(repository.root, picked, chosenAuthoringModel(repository.root));
   if (model === undefined) return false;
   const args = driveArguments(picked, model);
   if (typeof args === "string") {

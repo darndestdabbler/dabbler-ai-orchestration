@@ -178,7 +178,7 @@ function engineItems(
  * session 144 exists to stop this surface making. The wording is the row's
  * own -- one vocabulary, so the pick and the row cannot come to disagree.
  */
-function modelItems(
+export function modelItems(
   models: readonly ConfigurationModel[],
   /** The provider the work is authored by, so each option can be labelled against it. */
   authorProvider: string | null | undefined,

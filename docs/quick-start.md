@@ -480,11 +480,11 @@ it never guesses a status from which files exist.
 
 Row actions: the repository row opens the four sessions-root artifacts
 (plan, activity log, change log, ledger) and carries **Start Session** and
-**Close Session**. Start launches `dabbler session drive` — the framework
-runs the session and calls the engine you pick once per step; nothing is
-copied for you to paste anywhere — and while it runs the status bar shows
-**Stop** and **Send to engine**. That whole flow, what you will see and
-what each button does, is in [driving-a-session.md](driving-a-session.md).
+**Close Session**. Start registers the session, starts the framework's loop
+in a terminal of its own, and opens the engine you pick in its own CLI,
+which answers each instruction the loop writes; nothing is copied for you
+to paste anywhere. That whole flow, and what you will see, is in
+[driving-a-session.md](driving-a-session.md).
 A session row opens the plan at its own section, and carries cancel or
 restore — a cancellation is a decision about one session.
 

@@ -232,6 +232,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 192 | Friction only where a session would not succeed | yes | 2026-09-17 |
 | 193 | Consult with AI | yes | 2026-09-17 |
 | 194 | Choose the model from a list | yes | 2026-09-17 |
+| 195 | Remove Start Unattended Session | yes | 2026-09-17 |
+| 196 | Uncommitted changes at Start are a question, not a dead end | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2658,3 +2660,9 @@ Make the model question in Start Session, Start Unattended and Consult with AI a
 **Amended after acceptance:**
 
 - 2026-09-17 — step 'model-pick-tests': its files: The catalog fixture the engineModelRefusal tests use lives in solutionTreeModel.test.ts; the tests sit beside them there rather than duplicating it in commandFlows.test.ts (claude-code (anthropic, claude-opus-5))
+
+### Session 195 — Remove Start Unattended Session
+
+**Releasable: yes.**
+
+Remove Start Unattended Session from the VS Code extension, with everything only it used. In tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts: runStartUnattendedSession and its registration; Stop and Send (runStopDrive, runSendToEngine, chooseDrive, interruptDrive, sessionsDirOf, DEFAULT_STOP_REASON, the dabbler.stopDrive and dabbler.sendToEngine registrations and the status-bar items); the Drives registry, sharedDrives and the DRIVING_CONTEXT key; DriveLauncher, defaultDriveLauncher and driveArguments; the "Dabbler: Engine" channel (ENGINE_CHANNEL_NAME, engineOutputChannel, the dabbler.showEngineOutput command) and the SessionRunUi members only they used (engineLine, pickDrive, askText), so registerSessionCommands no longer takes a launcher or a registry. launchDriver stays. extension.ts drops the sharedDrives subscription; ActionRegistry.ts drops the Start Unattended row; package.json drops the three commands, their palette and context-menu entries, and the dabbler-drive language and grammar, whose syntaxes file is deleted since only the engine channel used it. The tests of the removed commands go with them (the driven-session suite and its fakes in commandFlows.test.ts, the dabbler.driving assertion in actionRegistry.test.ts, the stopDrive example in workExplorerTreeModel.test.ts); no new test. docs/driving-a-session.md loses its Start Unattended Session section and the Engine-channel sentence, and docs/quick-start.md, docs/design/command-ownership.md and the file's own header comment stop offering it or Stop and Send. Releasable as a minor, because a command the extension offered is removed: version.json moves to 3.7.0, stamped into the manifests with npm run stamp:version, with a CHANGELOG entry.

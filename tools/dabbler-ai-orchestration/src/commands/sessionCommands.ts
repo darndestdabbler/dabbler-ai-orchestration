@@ -1,4 +1,4 @@
-// Start, Stop, Send, Close -- the engine stays in the person's own CLI.
+// Start, Resume, Consult, Close -- the engine stays in the person's own CLI.
 //
 // Start registers the session, starts the framework's loop (`session run
 // --mailbox`), and opens a terminal running the engine's own CLI,
@@ -17,13 +17,6 @@
 // moved after it is created, so the setting is read when each one opens
 // and never after.
 //
-// **Start Unattended Session is the other half** (D252): headless `session
-// drive` as a child process, streaming into "Dabbler: Engine", for CI and
-// overnight runs. It is the only thing Stop and Send apply to -- they are
-// `session interrupt`, which ends an invocation the FRAMEWORK made, and
-// under the interactive default the framework never invokes anybody. Both
-// stay gated on `dabbler.driving`, which only an unattended drive sets.
-//
 // The driver is a child process rather than an in-process call, and the
 // reason is stated once in `router/driveProcess.ts`.
 
@@ -38,8 +31,7 @@ import {
 } from "dabbler-ai-router";
 import { SESSIONS_REL, type SessionsRepository } from "../utils/fileSystem";
 import { productionRouter, solutionConfiguration } from "../router/host";
-import { routerOutputChannel } from "../router/commandLog";
-import { type DriveHandle, launchDriver } from "../router/driveProcess";
+import { launchDriver } from "../router/driveProcess";
 import { resolveRouterCli } from "../router/terminalShim";
 import { ensureDabblerTerminal, terminalLocation } from "../router/dabblerTerminal";
 import { asRepositoryNode, asSessionNode } from "./workExplorerTreeCommands";
@@ -60,11 +52,6 @@ export function repositoryOf(arg: unknown): SessionsRepository | undefined {
 }
 
 const CHANNEL_NAME = "Dabbler Session";
-export const ENGINE_CHANNEL_NAME = "Dabbler: Engine";
-/** The context key the palette entries for Stop and Send are gated on. */
-export const DRIVING_CONTEXT = "dabbler.driving";
-/** What Stop records when the person accepts the box as it is offered. */
-export const DEFAULT_STOP_REASON = "Stopped from the Work Explorer";
 
 /** Engine and provider travel together: identity resolves through the pair. */
 export interface EngineChoice {
@@ -514,17 +501,11 @@ export interface SessionRunUi {
    * session authors with and no reason to believe either.
    */
   askModel: (root: string, choice: EngineChoice, chosen: string, purpose?: string) => Thenable<string | undefined>;
-  /** One line of text from the person; undefined when the box was dismissed. */
-  askText: (title: string, prompt: string, value?: string) => Thenable<string | undefined>;
   /** A yes-or-no the person answers, modally; true only for the named action. */
   confirm: (message: string, action: string) => Thenable<boolean>;
-  /** Which of several running drives; undefined when dismissed. */
-  pickDrive: (roots: readonly string[]) => Thenable<string | undefined>;
   report: (title: string, body: string) => void;
   showErrorMessage: (message: string) => unknown;
   showInformationMessage: (message: string) => unknown;
-  /** One line the driver printed, shown as it arrives. */
-  engineLine: (line: string) => void;
   /** Open the person's own CLI, interactively, and show it. */
   openTerminal: (terminal: EngineTerminal) => unknown;
   /** Open the framework's loop in the panel, without the focus, replacing this repository's last one. */
@@ -564,72 +545,8 @@ export interface SessionRunUi {
   withProgress: <T>(title: string, work: () => Promise<T>) => Promise<T>;
 }
 
-/** How Start reaches the driver: a process, or nothing when the bundle is not there. */
-export interface DriveLauncher {
-  launch(root: string, args: readonly string[], onLine: (line: string) => void): DriveHandle | null;
-}
-
-/**
- * The drives this window started, by repository root. One per repository:
- * the driver holds the session in flight, and a second would be refused by
- * the router anyway -- refusing it here says why before anything spawns.
- */
-export class Drives implements vscode.Disposable {
-  private readonly handles = new Map<string, DriveHandle>();
-  private readonly changed = new vscode.EventEmitter<void>();
-  readonly onDidChange = this.changed.event;
-
-  running(root: string): DriveHandle | undefined {
-    return this.handles.get(root);
-  }
-
-  roots(): string[] {
-    return [...this.handles.keys()];
-  }
-
-  add(handle: DriveHandle): void {
-    this.handles.set(handle.root, handle);
-    this.changed.fire();
-    void handle.exited.then(() => {
-      if (this.handles.get(handle.root) === handle) {
-        this.handles.delete(handle.root);
-        this.changed.fire();
-      }
-    });
-  }
-
-  /** The window is going away; a driver nobody can see or stop must not outlive it. */
-  dispose(): void {
-    for (const handle of this.handles.values()) handle.kill();
-    this.handles.clear();
-    this.changed.fire();
-  }
-}
-
-let shared: Drives | undefined;
-
-/** The window's one registry: every launcher and every button read the same drives. */
-export function sharedDrives(): Drives {
-  if (!shared) shared = new Drives();
-  return shared;
-}
-
-let engineChannel: vscode.OutputChannel | undefined;
-
 function channel(): vscode.OutputChannel {
   return vscode.window.createOutputChannel(CHANNEL_NAME);
-}
-
-/**
- * The channel the driver streams into, under the language whose grammar
- * colours it: `dabbler [time] event` in one class, the engine's `│` lines in
- * another. A plain `OutputChannel` and not a `LogOutputChannel` -- that one
- * stamps a clock of its own beside the driver's and offers levels instead of
- * a palette, so the two line kinds would still read alike.
- */
-export function engineOutputChannel(): vscode.OutputChannel {
-  if (!engineChannel) engineChannel = vscode.window.createOutputChannel(ENGINE_CHANNEL_NAME, "dabbler-drive");
-  return engineChannel;
 }
 
 /**
@@ -707,12 +624,8 @@ export function defaultSessionRunUi(
         ignoreFocusOut: true,
       });
     },
-    askText: (title, prompt, value) =>
-      vscode.window.showInputBox({ title, prompt, value, ignoreFocusOut: true }),
     confirm: (message, action) =>
       vscode.window.showWarningMessage(message, { modal: true }, action).then((picked) => picked === action),
-    pickDrive: (roots) =>
-      vscode.window.showQuickPick(roots, { title: "Which driven session?", ignoreFocusOut: true }),
     report: (title, body) => {
       const out = channel();
       out.appendLine(`--- ${title} ---`);
@@ -721,7 +634,6 @@ export function defaultSessionRunUi(
     },
     showErrorMessage: (m) => vscode.window.showErrorMessage(m),
     showInformationMessage: (m) => vscode.window.showInformationMessage(m),
-    engineLine: (line) => engineOutputChannel().appendLine(line),
     openTerminal: (spec) => {
       // The first editor column under `editor`, so that the framework's
       // terminal -- which asks for `Beside` -- lands in the second and the
@@ -785,31 +697,6 @@ export function defaultSessionRunUi(
         ),
       ),
   };
-}
-
-/** The bundled command on the editor's own Node, echoed to the command log first. */
-export function defaultDriveLauncher(): DriveLauncher {
-  return {
-    launch: (root, args, onLine) => {
-      const cli = resolveRouterCli();
-      if (cli === null) return null;
-      const log = routerOutputChannel();
-      log.appendLine(`[${new Date().toLocaleTimeString()}] Running:`);
-      log.appendLine(`dabbler ${args.join(" ")}`);
-      return launchDriver({ execPath: process.execPath, cli, cwd: root, args }, onLine);
-    },
-  };
-}
-
-/** The `session drive` arguments for a choice, or the refusal when a seat has no model. */
-export function driveArguments(choice: EngineChoice, model: string): string[] | string {
-  const trimmed = model.trim();
-  if (choice.modelRequired && trimmed === "") {
-    return `${choice.label} is a seat and needs a model; nothing was launched.`;
-  }
-  const args = ["session", "drive", "--engine", choice.engine, "--provider", choice.provider];
-  if (trimmed !== "") args.push("--model", trimmed);
-  return args;
 }
 
 /**
@@ -959,147 +846,6 @@ export async function runConsultWithAi(
 }
 
 /**
- * The unattended half: headless `session drive`, for CI and overnight runs.
- *
- * It is the same command Start used to be, kept because a driven engine is
- * a measured capability and retiring it would leave nothing for a run
- * nobody is sitting in front of (D252). Stop and Send belong to this and
- * to nothing else.
- */
-export async function runStartUnattendedSession(
-  repository: SessionsRepository,
-  ui: SessionRunUi,
-  launcher: DriveLauncher,
-  drives: Drives,
-): Promise<boolean> {
-  if (drives.running(repository.root)) {
-    ui.showErrorMessage(
-      `A session is already being driven in ${repository.label} — Stop it before starting another.`,
-    );
-    return false;
-  }
-  const picked = await ui.pickEngine();
-  if (!picked) return false;
-  const model = await ui.askModel(repository.root, picked, chosenAuthoringModel(repository.root));
-  if (model === undefined) return false;
-  const args = driveArguments(picked, model);
-  if (typeof args === "string") {
-    ui.showErrorMessage(args);
-    return false;
-  }
-  const handle = launcher.launch(repository.root, args, ui.engineLine);
-  if (handle === null) {
-    ui.showErrorMessage("The bundled `dabbler` command was not found beside the extension; nothing was launched.");
-    return false;
-  }
-  drives.add(handle);
-  ui.engineLine(`--- ${repository.label}: dabbler ${args.join(" ")} ---`);
-  void handle.exited.then((code) => {
-    ui.engineLine(`--- ${repository.label}: driver exited (${code === null ? "killed" : code}) ---`);
-    if (code === 0) {
-      ui.showInformationMessage(`${repository.label}: the driven session closed.`);
-    } else if (code !== null) {
-      ui.showErrorMessage(
-        `${repository.label}: the driver stopped — the session's task rows say why, and Dabbler: Engine has the log.`,
-      );
-    }
-  });
-  return true;
-}
-
-async function chooseDrive(
-  repository: SessionsRepository | undefined,
-  ui: SessionRunUi,
-  drives: Drives,
-): Promise<string | undefined> {
-  if (repository) {
-    if (drives.running(repository.root)) return repository.root;
-    ui.showInformationMessage(`Nothing is being driven in ${repository.label}.`);
-    return undefined;
-  }
-  const roots = drives.roots();
-  if (roots.length === 0) {
-    ui.showInformationMessage("Nothing is being driven in this window.");
-    return undefined;
-  }
-  return roots.length === 1 ? roots[0] : ui.pickDrive(roots);
-}
-
-async function interruptDrive(
-  root: string,
-  reason: string,
-  stop: boolean,
-  ui: SessionRunUi,
-  router: Router,
-): Promise<boolean> {
-  const result = await router.session.interrupt({
-    repoRoot: root,
-    sessionsDir: sessionsDirOf(root),
-    reason,
-    stop,
-  });
-  if (!result.ok) {
-    ui.showErrorMessage(`${stop ? "Stop" : "Send"} refused: ${result.message.trim() || `exit ${result.exitCode}`}`);
-    return false;
-  }
-  ui.engineLine(`--- ${stop ? "stop" : "send"}: ${reason} ---`);
-  ui.showInformationMessage(
-    stop
-      ? "Stop requested — it takes effect when the driver next reaches the engine; the task rows show it."
-      : "Sent — the driver ends the engine's invocation and re-invokes it with your text; if nothing is running right now, the engine reads it with its next instruction.",
-  );
-  return true;
-}
-
-function sessionsDirOf(root: string): string {
-  return path.join(root, SESSIONS_REL);
-}
-
-/**
- * Stop halts the loop: `session interrupt --stop` with the person's reason.
- * The driver ends the engine's invocation, records `interrupted` on the
- * session's run state -- which the task rows show -- and exits; the same
- * Start resumes from the phase it reached.
- */
-export async function runStopDrive(
-  repository: SessionsRepository | undefined,
-  ui: SessionRunUi,
-  router: Router,
-  drives: Drives,
-): Promise<boolean> {
-  const root = await chooseDrive(repository, ui, drives);
-  if (root === undefined) return false;
-  const reason = await ui.askText(
-    "Stop the driver",
-    "Why? Recorded with the stop and shown on the session's task row.",
-    DEFAULT_STOP_REASON,
-  );
-  if (reason === undefined) return false;
-  return interruptDrive(root, reason.trim() === "" ? DEFAULT_STOP_REASON : reason.trim(), true, ui, router);
-}
-
-/**
- * Send redirects the engine: `session interrupt` with the person's text as
- * the reason. The driver ends the invocation and re-invokes the engine on
- * the same instruction with the text first among its reasons.
- */
-export async function runSendToEngine(
-  repository: SessionsRepository | undefined,
-  ui: SessionRunUi,
-  router: Router,
-  drives: Drives,
-): Promise<boolean> {
-  const root = await chooseDrive(repository, ui, drives);
-  if (root === undefined) return false;
-  const text = await ui.askText(
-    "Send to the engine",
-    "The engine is interrupted and re-invoked with this as the reason.",
-  );
-  if (text === undefined || text.trim() === "") return false;
-  return interruptDrive(root, text.trim(), false, ui, router);
-}
-
-/**
  * Close the session, and show the gate rows.
  *
  * No decision is asked because none exists: the gates decide, and a refusal
@@ -1129,49 +875,12 @@ export async function runCloseSession(
   return result.ok;
 }
 
-/**
- * Stop and Send as buttons: status bar items that exist while a drive runs,
- * beside one that names it and opens the engine's output.
- */
-function statusBar(context: vscode.ExtensionContext, drives: Drives): void {
-  const label = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 30);
-  label.command = "dabbler.showEngineOutput";
-  const stop = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 29);
-  stop.text = "$(debug-stop) Stop";
-  stop.tooltip = "Stop the driven session (session interrupt --stop)";
-  stop.command = "dabbler.stopDrive";
-  const send = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 28);
-  send.text = "$(comment) Send to engine";
-  send.tooltip = "Interrupt the engine and re-invoke it with your text (session interrupt)";
-  send.command = "dabbler.sendToEngine";
-  const render = (): void => {
-    const roots = drives.roots();
-    void vscode.commands.executeCommand("setContext", DRIVING_CONTEXT, roots.length > 0);
-    if (roots.length === 0) {
-      label.hide();
-      stop.hide();
-      send.hide();
-      return;
-    }
-    label.text = `$(sync~spin) Driving ${roots.length === 1 ? String(roots[0]).split(/[\\/]/).pop() : `${roots.length} sessions`}`;
-    label.tooltip = roots.join("\n");
-    label.show();
-    stop.show();
-    send.show();
-  };
-  render();
-  context.subscriptions.push(label, stop, send, drives.onDidChange(render));
-}
-
 export function registerSessionCommands(
   context: vscode.ExtensionContext,
   router: Router = productionRouter(),
   ui: SessionRunUi = defaultSessionRunUi(),
-  launcher: DriveLauncher = defaultDriveLauncher(),
-  drives: Drives = sharedDrives(),
-): Drives {
+): void {
   context.subscriptions.push(
-    drives,
     vscode.commands.registerCommand("dabblerSessionSets.startSession", async (arg: unknown) => {
       const repository = repositoryOf(arg);
       if (!repository) return;
@@ -1180,16 +889,6 @@ export function registerSessionCommands(
       // terminal rather than here.
       await runStartSession(repository, ui);
     }),
-    vscode.commands.registerCommand(
-      "dabbler.startUnattendedSession",
-      async (arg: unknown) => {
-        const node = asRepositoryNode(arg);
-        if (!node) return;
-        if (await runStartUnattendedSession(node.repository, ui, launcher, drives)) {
-          engineOutputChannel().show(true);
-        }
-      },
-    ),
     vscode.commands.registerCommand("dabblerSessionSets.resumeSession", async (arg: unknown) => {
       const repository = repositoryOf(arg);
       if (!repository) return;
@@ -1200,15 +899,6 @@ export function registerSessionCommands(
       if (!repository) return;
       await runConsultWithAi(repository, ui, asSessionNode(arg)?.session.number);
     }),
-    vscode.commands.registerCommand("dabbler.stopDrive", async (arg: unknown) => {
-      await runStopDrive(asRepositoryNode(arg)?.repository, ui, router, drives);
-    }),
-    vscode.commands.registerCommand("dabbler.sendToEngine", async (arg: unknown) => {
-      await runSendToEngine(asRepositoryNode(arg)?.repository, ui, router, drives);
-    }),
-    vscode.commands.registerCommand("dabbler.showEngineOutput", () => {
-      engineOutputChannel().show(true);
-    }),
     vscode.commands.registerCommand(
       "dabblerSessionSets.closeSession",
       async (arg: unknown) => {
@@ -1218,6 +908,4 @@ export function registerSessionCommands(
       },
     ),
   );
-  statusBar(context, drives);
-  return drives;
 }

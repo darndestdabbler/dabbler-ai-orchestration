@@ -238,14 +238,9 @@ suite("ActionRegistry: package.json menu registry", () => {
     }
   });
 
-  test("no declared command hands anyone a prompt to paste; Stop and Send exist only while driving", () => {
+  test("no declared command hands anyone a prompt to paste", () => {
     for (const command of manifest.contributes.commands as Array<{ command: string; title: string }>) {
       assert.doesNotMatch(`${command.command} ${command.title}`, /copy|prompt|paste|respecif/i, command.command);
-    }
-    const palette = manifest.contributes.menus["commandPalette"] ?? [];
-    for (const id of ["dabbler.stopDrive", "dabbler.sendToEngine"]) {
-      const entry = palette.find((e) => e.command === id);
-      assert.strictEqual(entry?.when, "dabbler.driving", id);
     }
   });
 

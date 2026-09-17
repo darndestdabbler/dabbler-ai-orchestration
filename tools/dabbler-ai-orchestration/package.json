@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: solutions, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
-  "version": "3.6.1",
+  "version": "3.7.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -92,11 +92,6 @@
       {
         "command": "dabblerSessionSets.startSession",
         "title": "Start Session",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.startUnattendedSession",
-        "title": "Start Unattended Session",
         "category": "Dabbler"
       },
       {
@@ -253,23 +248,6 @@
         "icon": "$(new-folder)"
       },
       {
-        "command": "dabbler.stopDrive",
-        "title": "Stop Driven Session",
-        "category": "Dabbler",
-        "icon": "$(debug-stop)"
-      },
-      {
-        "command": "dabbler.sendToEngine",
-        "title": "Send to Engine",
-        "category": "Dabbler",
-        "icon": "$(comment)"
-      },
-      {
-        "command": "dabbler.showEngineOutput",
-        "title": "Show Engine Output",
-        "category": "Dabbler"
-      },
-      {
         "command": "dabbler.showFrameworkTerminal",
         "title": "Show Framework Terminal",
         "category": "Dabbler"
@@ -332,14 +310,6 @@
         {
           "command": "dabblerWorkExplorer.activateSession",
           "when": "false"
-        },
-        {
-          "command": "dabbler.stopDrive",
-          "when": "dabbler.driving"
-        },
-        {
-          "command": "dabbler.sendToEngine",
-          "when": "dabbler.driving"
         }
       ],
       "view/title": [
@@ -364,11 +334,6 @@
           "command": "dabblerSessionSets.startSession",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-startSession;/",
           "group": "6_session@601"
-        },
-        {
-          "command": "dabbler.startUnattendedSession",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-startUnattendedSession;/",
-          "group": "6_session@603"
         },
         {
           "command": "dabblerSessionSets.closeSession",
@@ -598,22 +563,7 @@
           "markdownDescription": "When this solution's sessions publish. It is the solution's answer, so it belongs in the workspace's `.vscode/settings.json`, where the framework reads it; **Ship by Default** and **Release on Request** on the Solution Explorer's solution row, and `dabbler configure --release`, write it there. No session publishes without a VERIFIED verdict either way."
         }
       }
-    },
-    "languages": [
-      {
-        "id": "dabbler-drive",
-        "aliases": [
-          "Dabbler drive"
-        ]
-      }
-    ],
-    "grammars": [
-      {
-        "language": "dabbler-drive",
-        "scopeName": "source.dabbler-drive",
-        "path": "./syntaxes/dabbler-drive.tmLanguage.json"
-      }
-    ]
+    }
   },
   "scripts": {
     "compile": "node esbuild.js",
@@ -631,7 +581,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.9",
-    "dabbler-ai-router": "3.6.1",
+    "dabbler-ai-router": "3.7.0",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",

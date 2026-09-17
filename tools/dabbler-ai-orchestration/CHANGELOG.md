@@ -10,6 +10,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.7.0] — 2026-09-17
+
+**Start Unattended Session is gone.**
+
+### Removed
+
+- **Start Unattended Session**, from the Work Explorer's repository row and
+  the command palette, with what only it used: **Stop Driven Session**,
+  **Send to Engine**, **Show Engine Output**, their status bar items, and the
+  "Dabbler: Engine" output channel. Start Session is the one way the
+  extension starts a session. `dabbler session drive` still drives a session
+  from a terminal or CI.
+
 ## [3.6.1] — 2026-09-17
 
 **Choose the model from a list.**

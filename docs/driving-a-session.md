@@ -746,22 +746,10 @@ which you are reading. The Dabbler terminal says `job-started` and
 and `job-finished … exit=0`, because the CLI is the side that collected the
 exit code. Every block in this section says which of the two it came from.
 
-**It never carries engine chat.** Not one line of it, ever. Under `session
-next` the framework does not see your chat at all — you are reading it in
-your own CLI — and under unattended `drive` the engine's stream goes to
-the "Dabbler: Engine" output channel instead. Chat in the CLI, work in the
-Dabbler terminal; there is no setting to get this wrong.
-
-### Start Unattended Session
-
-**Start Unattended Session** is the other launcher: headless `session
-drive`, as a child process, streaming into "Dabbler: Engine". It is for CI
-and overnight runs — the case where nobody is at a keyboard.
-
-**Stop** and **Send** belong to that and to nothing else. They are
-`session interrupt`, which ends an invocation the *framework* made; when
-your own CLI is the engine there is no such invocation, and the interrupt
-is your own Esc.
+**It never carries engine chat.** Not one line of it, ever. The framework
+does not see your chat at all — you are reading it in your own CLI. Chat in
+the CLI, work in the Dabbler terminal; there is no setting to get this
+wrong.
 
 ### When the framework stops, it says so
 

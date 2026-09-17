@@ -8,7 +8,6 @@ import {
   closeLoopOnSessionEnd,
   defaultSessionRunUi,
   registerSessionCommands,
-  sharedDrives,
 } from "./commands/sessionCommands";
 import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
 import { installTerminalShim } from "./router/terminalShim";
@@ -207,11 +206,6 @@ export function activate(context: vscode.ExtensionContext): void {
   // repository bootstrapped after activation, a second folder or a worktree
   // is not left without one.
   context.subscriptions.push(disposeDabblerTerminals(), watchClosedTerminals());
-  // The drivers this window started end with it. The registry always had
-  // the dispose that kills them; nothing registered it, so a driver -- and
-  // the engine, the suite or the verification round under it -- outlived
-  // the window that could see and stop it.
-  context.subscriptions.push(sharedDrives());
   for (const root of discoverRoots()) {
     if (hasSessionsRoot(root)) openDabblerTerminal(root);
   }
@@ -427,9 +421,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerWorkExplorerTreeCommands(context),
   );
   safeRegister("openFileCommands", () => registerOpenFileCommands(context));
-  // Start launches the driver, Stop and Send interrupt it, Close runs the
-  // gates. The drives registry is a subscription, so a driver this window
-  // started dies with the window rather than running on unseen.
+  // Start, Resume and Consult open the engine's own CLI; Close runs the gates.
   safeRegister("sessionCommands", () => {
     registerSessionCommands(
       context,

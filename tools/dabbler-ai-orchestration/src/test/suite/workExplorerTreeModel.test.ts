@@ -294,12 +294,12 @@ suite("workExplorerTreeModel: tokens", () => {
     );
     assert.strictEqual(
       actionToken({
-        id: "dabbler.stopDrive",
+        id: "dabbler.consultWithAi",
         label: "",
         group: 0,
         when: () => true,
       }),
-      "act-stopDrive",
+      "act-consultWithAi",
     );
   });
 });

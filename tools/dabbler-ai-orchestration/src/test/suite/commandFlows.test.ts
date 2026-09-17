@@ -19,26 +19,19 @@ import {
   runSetUpProjectFlow,
 } from "../../commands/bootstrapProject";
 import {
-  DEFAULT_STOP_REASON,
-  Drives,
   ENGINES,
-  type DriveLauncher,
   type EngineTerminal,
   type SessionRegistrar,
   type SessionRunUi,
   closeLoopOnSessionEnd,
   defaultSessionRunUi,
-  engineOutputChannel,
   engineTerminalFor,
   isEngineTerminalOf,
   loopTerminalFor,
   repositoryOf,
   runConsultWithAi,
   runResumeSession,
-  runSendToEngine,
   runStartSession,
-  runStartUnattendedSession,
-  runStopDrive,
 } from "../../commands/sessionCommands";
 import { ROUTER_VERSION } from "dabbler-ai-router";
 import { prerequisiteReport, type ToolProbe } from "../../commands/troubleshoot";
@@ -51,7 +44,6 @@ import {
   type ConfigurationUi,
 } from "../../commands/configurationCommands";
 import type { ConfigurationModel } from "../../providers/solutionTreeModel";
-import type { DriveHandle } from "../../router/driveProcess";
 import { openDabblerTerminal } from "../../router/dabblerTerminal";
 import { cancellableSessionOf } from "../../commands/cancelLifecycleCommands";
 import { sessionNumberOf, specSectionTargetFor } from "../../commands/openFile";
@@ -381,32 +373,17 @@ suite("set up new project", () => {
   });
 });
 
-// --- the driven session: Start launches, Stop and Send interrupt -----------
-
-interface FakeDrive {
-  handle: DriveHandle;
-  exit: (code: number | null) => void;
-}
-
-function fakeDrive(root: string): FakeDrive {
-  let exit: (code: number | null) => void = () => undefined;
-  const exited = new Promise<number | null>((resolve) => {
-    exit = resolve;
-  });
-  return { handle: { root, exited, kill: () => exit(null) }, exit };
-}
+// --- Start, Resume and Consult open the engine's own CLI ------------------
 
 function driveUi(overrides: Partial<SessionRunUi> = {}): {
   ui: SessionRunUi;
   errors: string[];
   infos: string[];
-  engine: string[];
   /** Every terminal the UI was asked to open. */
   terminals: EngineTerminal[];
 } {
   const errors: string[] = [];
   const infos: string[] = [];
-  const engine: string[] = [];
   const terminals: EngineTerminal[] = [];
   const ui: SessionRunUi = {
     // Answers "it did not refuse" unless a test says otherwise. A suite that
@@ -416,13 +393,10 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     closeEngineTerminals: () => undefined,
     pickEngine: async () => ENGINES[0],
     askModel: async () => "haiku",
-    askText: async (_title, _prompt, value) => value ?? "look at src/widget.py again",
     confirm: async () => false,
-    pickDrive: async (roots) => roots[0],
     report: () => undefined,
     showErrorMessage: (m: string) => errors.push(m),
     showInformationMessage: (m: string) => infos.push(m),
-    engineLine: (line) => engine.push(line),
     openTerminal: (terminal) => {
       terminals.push(terminal);
       return undefined;
@@ -435,7 +409,7 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     withProgress: (_title, work) => work(),
     ...overrides,
   };
-  return { ui, errors, infos, engine, terminals };
+  return { ui, errors, infos, terminals };
 }
 
 /** A registrar that answers `code` and records what it was asked to register. */
@@ -450,20 +424,6 @@ function registrarOf(code: number | null = 0, output = ""): SessionRegistrar & {
 }
 
 const CLI = "D:\\ext\\dabbler.cjs";
-
-function launcherOf(drives: Map<string, FakeDrive>): DriveLauncher & { launched: Array<{ root: string; args: string[] }> } {
-  const launched: Array<{ root: string; args: string[] }> = [];
-  return {
-    launched,
-    launch: (root, args, onLine) => {
-      launched.push({ root, args: [...args] });
-      const drive = fakeDrive(root);
-      drives.set(root, drive);
-      onLine("dabbler [00:00:00] engine-invoked seq=1 invocation=1/24");
-      return drive.handle;
-    },
-  };
-}
 
 /** What the stub records of one `window.createTerminal` call. */
 interface FakeTerminal {
@@ -632,7 +592,6 @@ suite("Start opens the person's own CLI", () => {
     // the rebuild-per-CLI rule below belongs to it alone.
     settings.__setConfig("dabbler", "terminalLocation", "panel");
     const repository = makeRepository();
-    const launcher = launcherOf(new Map());
     const register = registrarOf();
     const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
     terminals.length = 0;
@@ -669,7 +628,6 @@ suite("Start opens the person's own CLI", () => {
     assert.match(cli.options.shellArgs[0], /dabbler session wait --sessions-dir docs\/sessions/);
     assert.doesNotMatch(cli.options.shellArgs[0], /session (start|next)|--engine|--provider|--model/);
     assert.deepStrictEqual(cli.sent, []);
-    assert.deepStrictEqual(launcher.launched, []);
 
     // The Dabbler terminal, split off the CLI and shown.
     const dabbler = terminals[2];
@@ -702,7 +660,6 @@ suite("Start opens the person's own CLI", () => {
     // And the one it replaced is gone rather than left behind.
     assert.strictEqual(dabbler.disposed, 1);
     assert.strictEqual(dabbler.shown, 1);
-    assert.deepStrictEqual(launcher.launched, []);
   });
 
   test("a registration the router refuses opens nothing, and says why in the router's words", async () => {
@@ -837,105 +794,6 @@ suite("Start opens the person's own CLI", () => {
     const dismissed = driveUi({ pickEngine: async () => undefined });
     assert.strictEqual(await runStartSession(repository, dismissed.ui, register, CLI), false);
     assert.deepStrictEqual(register.calls, []);
-  });
-});
-
-suite("the driven session", () => {
-  test("Start Unattended launches `session drive` for the chosen engine at the repository root and shows what the driver prints", async () => {
-    const repository = makeRepository();
-    const spawned = new Map<string, FakeDrive>();
-    const launcher = launcherOf(spawned);
-    const { ui, engine, infos } = driveUi();
-    const drives = new Drives();
-
-    assert.strictEqual(await runStartUnattendedSession(repository, ui, launcher, drives), true);
-    assert.deepStrictEqual(launcher.launched, [
-      {
-        root: repository.root,
-        args: ["session", "drive", "--engine", "claude-code", "--provider", "anthropic", "--model", "haiku"],
-      },
-    ]);
-    // The driver's line reached the engine channel as it was printed.
-    assert.ok(engine.some((line) => line.includes("engine-invoked")));
-    assert.ok(drives.running(repository.root));
-
-    // A second Start on the same repository launches nothing.
-    const again = driveUi();
-    assert.strictEqual(await runStartUnattendedSession(repository, again.ui, launcher, drives), false);
-    assert.strictEqual(launcher.launched.length, 1);
-    assert.ok(again.errors[0].includes("already being driven"));
-
-    // When the driver exits, the drive is over and the person is told.
-    spawned.get(repository.root)!.exit(0);
-    await new Promise((resolve) => setImmediate(resolve));
-    assert.strictEqual(drives.running(repository.root), undefined);
-    assert.ok(infos.some((m) => m.includes("closed")));
-  });
-
-  test("a seat without a model launches nothing, and a dismissed pick launches nothing", async () => {
-    const repository = makeRepository();
-    const launcher = launcherOf(new Map());
-    const copilot = ENGINES.find((e) => e.engine === "copilot")!;
-    const seat = driveUi({ pickEngine: async () => copilot, askModel: async () => "" });
-    assert.strictEqual(
-      await runStartUnattendedSession(repository, seat.ui, launcher, new Drives()),
-      false,
-    );
-    assert.ok(seat.errors[0].includes("needs a model"));
-    const dismissed = driveUi({ pickEngine: async () => undefined });
-    assert.strictEqual(
-      await runStartUnattendedSession(repository, dismissed.ui, launcher, new Drives()),
-      false,
-    );
-    assert.deepStrictEqual(launcher.launched, []);
-  });
-
-  test("Stop is `session interrupt --stop` with the person's reason, and only while something is driven", async () => {
-    const repository = makeRepository();
-    const { router, interruptOptions } = fakeRouter(0, "interrupt: stop requested");
-    const drives = new Drives();
-    const idle = driveUi();
-    assert.strictEqual(await runStopDrive(repository, idle.ui, router, drives), false);
-    assert.strictEqual(interruptOptions.length, 0);
-    assert.ok(idle.infos[0].includes("Nothing is being driven"));
-
-    drives.add(fakeDrive(repository.root).handle);
-    const { ui } = driveUi();
-    assert.strictEqual(await runStopDrive(repository, ui, router, drives), true);
-    assert.strictEqual(interruptOptions.length, 1);
-    assert.strictEqual(interruptOptions[0].stop, true);
-    assert.strictEqual(interruptOptions[0].reason, DEFAULT_STOP_REASON);
-    assert.strictEqual(interruptOptions[0].repoRoot, repository.root);
-    assert.strictEqual(interruptOptions[0].sessionsDir, repository.sessionsDir);
-  });
-
-  test("Send is `session interrupt` with the text, and an empty box sends nothing", async () => {
-    const repository = makeRepository();
-    const { router, interruptOptions } = fakeRouter(0, "interrupt: requested");
-    const drives = new Drives();
-    drives.add(fakeDrive(repository.root).handle);
-    const { ui } = driveUi();
-    assert.strictEqual(await runSendToEngine(undefined, ui, router, drives), true);
-    assert.deepStrictEqual(
-      interruptOptions.map((o) => [o.reason, o.stop]),
-      [["look at src/widget.py again", false]],
-    );
-    const empty = driveUi({ askText: async () => "   " });
-    assert.strictEqual(await runSendToEngine(repository, empty.ui, router, drives), false);
-    assert.strictEqual(interruptOptions.length, 1);
-    // A refusal from the verb is shown, not swallowed.
-    const refused = fakeRouter(3, "interrupt: refused -- session 001 is not being driven");
-    const shown = driveUi();
-    assert.strictEqual(await runSendToEngine(repository, shown.ui, refused.router, drives), false);
-    assert.ok(shown.errors[0].includes("not being driven"));
-  });
-
-  test("the engine channel is created under the language its grammar colours", () => {
-    // The contributed grammar reaches the channel by language id and no
-    // other way: without it the driver's lines and the engine's arrive in
-    // one undifferentiated colour. A channel created plain records none.
-    const created = engineOutputChannel() as unknown as { languageId?: string };
-    assert.strictEqual(created.languageId, "dabbler-drive");
   });
 });
 

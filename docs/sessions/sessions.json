@@ -3775,7 +3775,7 @@
     {
       "number": 191,
       "title": "API Keys, grouped, and the project's choice wins",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-17T03:51:58.879000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -3784,7 +3784,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.3.7",
-      "completedAt": null,
+      "completedAt": "2026-09-17T04:03:17.946000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,

@@ -11434,79 +11434,7 @@ the attention tone from a child's stop.
 
 **Releasable.** Yes, a minor, because the precedence change is observable.
 
-### Session 192 of 192: Consult with AI
-
-Scope: whole repository
-
-**Why.** The framework has no way into planning. Adding a session, amending
-the plan, or diagnosing a stop the framework cannot clear is done today by an
-operator opening an ad hoc chat and explaining the repository's layout from
-scratch. Session 190 was planned exactly that way, as commit `0a4dc1a8`. The
-chat has no guidance on where the plans are, which verbs change them, or where
-its licence ends. And every CLI opened in this repository loads the managed
-`AGENTS.md`, which tells it it is the orchestrator and to run the waiter,
-which is the wrong instruction for a conversation that is not driving a
-session.
-
-**What -- the brief.** A router verb, `dabbler consult --sessions-dir <dir>
-[--session <N>]`, prints what a consulting AI reads first. It changes nothing
-and bills nothing. It is computed from the same state `dabbler status` reads,
-so its facts live in one implementation:
-- **Where things are.** The sessions root, `session-plan.md`,
-  `project-work-plan.md`, the ledger, and a session's `run.json`, with which
-  of them are the router's alone.
-- **What is true now.** The current session and its state. For a stopped
-  one, the stop's kind, its reasons, and its forward exits (`verify reopen`,
-  `session plan amend`, Resume), with `session cancel --force` named as the
-  person's verb only.
-- **How to plan a session.** The heading and section shape the plan uses,
-  the next free number, and that a planned session is committed as a plain
-  commit.
-- **The licence.** A consult answers questions, reads anything, and edits
-  and commits the plan files. It changes no code, no record and no verdict.
-  Work that changes code becomes a planned session, never a consult's own
-  edit. A fix the framework needs to clear a stop is planned the same way.
-
-**What a consult may do while a session is in progress** is measured in this
-session rather than assumed. The session runs a `session-plan.md` edit against
-a session mid-step and against one stopped between instructions, and records
-whether either disturbs the tree check or lands in that session's diff. The
-brief permits plan edits only in the states the measurement shows are safe.
-In every other state it tells the AI to draft the text in the chat and wait
-for the session to close.
-
-**What -- the launch.** Work Explorer gains **Consult with AI** on the
-repository node and on a session node, the latter passing `--session`. It
-asks for a vehicle and a model through the same choices and the same
-model-refusal check Start uses (`engineOrder`, `chosenAuthoringModel`,
-`engineRefusesModel`), defaulting to the authoring choice so that picking a
-stronger model is one change. It opens the engine CLI in its own terminal,
-named for the consult, through `engineTerminalFor`'s shape with a different
-opening sentence: run `dabbler consult` and read it before anything else,
-then ask the operator what they need. It registers no session and starts no
-loop.
-
-The managed `AGENTS.md` body in `bootstrap/templates.ts` gains one short
-paragraph: an AI opened to consult is not the orchestrator, runs no waiter,
-and reads `dabbler consult` for its brief. This repository's `AGENTS.md` is
-re-rendered with `dabbler bootstrap`.
-
-**Non-goals.** Any gate enforcing the licence: it is guidance, in line with the
-standing rule against over-gating AI process. A chat panel of the extension's
-own. Remembering a consult's vehicle and model as a preference. Plan edits
-through a structured verb: the plan is prose, and a person reviews the commit.
-
-**Tests.** One that the brief for a repository with no session in progress
-names the plan files and the next free session number. One that for a stopped
-session it names the stop's kind and forward exits. One that the brief's
-permission for plan edits follows the in-progress state as measured. One that
-Consult with AI opens the chosen CLI with the chosen model and the consult
-sentence, and registers nothing. One that the menu entry is contributed on
-both node kinds.
-
-**Releasable.** Yes, a minor.
-
-### Session 193 of 193: Friction only where a session would not succeed
+### Session 192 of 193: Friction only where a session would not succeed
 
 Scope: whole repository
 
@@ -11600,3 +11528,75 @@ The existing tests asserting the removed refusals are changed rather than
 joined.
 
 **Releasable.** Yes, a minor, because which starts are refused changes.
+
+### Session 193 of 193: Consult with AI
+
+Scope: whole repository
+
+**Why.** The framework has no way into planning. Adding a session, amending
+the plan, or diagnosing a stop the framework cannot clear is done today by an
+operator opening an ad hoc chat and explaining the repository's layout from
+scratch. Session 190 was planned exactly that way, as commit `0a4dc1a8`. The
+chat has no guidance on where the plans are, which verbs change them, or where
+its licence ends. And every CLI opened in this repository loads the managed
+`AGENTS.md`, which tells it it is the orchestrator and to run the waiter,
+which is the wrong instruction for a conversation that is not driving a
+session.
+
+**What -- the brief.** A router verb, `dabbler consult --sessions-dir <dir>
+[--session <N>]`, prints what a consulting AI reads first. It changes nothing
+and bills nothing. It is computed from the same state `dabbler status` reads,
+so its facts live in one implementation:
+- **Where things are.** The sessions root, `session-plan.md`,
+  `project-work-plan.md`, the ledger, and a session's `run.json`, with which
+  of them are the router's alone.
+- **What is true now.** The current session and its state. For a stopped
+  one, the stop's kind, its reasons, and its forward exits (`verify reopen`,
+  `session plan amend`, Resume), with `session cancel --force` named as the
+  person's verb only.
+- **How to plan a session.** The heading and section shape the plan uses,
+  the next free number, and that a planned session is committed as a plain
+  commit.
+- **The licence.** A consult answers questions, reads anything, and edits
+  and commits the plan files. It changes no code, no record and no verdict.
+  Work that changes code becomes a planned session, never a consult's own
+  edit. A fix the framework needs to clear a stop is planned the same way.
+
+**What a consult may do while a session is in progress** is measured in this
+session rather than assumed. The session runs a `session-plan.md` edit against
+a session mid-step and against one stopped between instructions, and records
+whether either disturbs the tree check or lands in that session's diff. The
+brief permits plan edits only in the states the measurement shows are safe.
+In every other state it tells the AI to draft the text in the chat and wait
+for the session to close.
+
+**What -- the launch.** Work Explorer gains **Consult with AI** on the
+repository node and on a session node, the latter passing `--session`. It
+asks for a vehicle and a model through the same choices and the same
+model-refusal check Start uses (`engineOrder`, `chosenAuthoringModel`,
+`engineRefusesModel`), defaulting to the authoring choice so that picking a
+stronger model is one change. It opens the engine CLI in its own terminal,
+named for the consult, through `engineTerminalFor`'s shape with a different
+opening sentence: run `dabbler consult` and read it before anything else,
+then ask the operator what they need. It registers no session and starts no
+loop.
+
+The managed `AGENTS.md` body in `bootstrap/templates.ts` gains one short
+paragraph: an AI opened to consult is not the orchestrator, runs no waiter,
+and reads `dabbler consult` for its brief. This repository's `AGENTS.md` is
+re-rendered with `dabbler bootstrap`.
+
+**Non-goals.** Any gate enforcing the licence: it is guidance, in line with the
+standing rule against over-gating AI process. A chat panel of the extension's
+own. Remembering a consult's vehicle and model as a preference. Plan edits
+through a structured verb: the plan is prose, and a person reviews the commit.
+
+**Tests.** One that the brief for a repository with no session in progress
+names the plan files and the next free session number. One that for a stopped
+session it names the stop's kind and forward exits. One that the brief's
+permission for plan edits follows the in-progress state as measured. One that
+Consult with AI opens the chosen CLI with the chosen model and the consult
+sentence, and registers nothing. One that the menu entry is contributed on
+both node kinds.
+
+**Releasable.** Yes, a minor.

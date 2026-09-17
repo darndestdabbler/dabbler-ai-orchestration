@@ -347,6 +347,10 @@
         "startedAt": { "type": ["string", "null"] },
         "completedAt": { "type": ["string", "null"] },
         "verificationVerdict": { "type": ["string", "null"] },
+        "noChange": {
+          "type": "boolean",
+          "description": "The session closed having changed nothing, so it carries no verdict because there was nothing to verify. Present only on such a session."
+        },
         "modules": {
           "type": "array",
           "minItems": 1,

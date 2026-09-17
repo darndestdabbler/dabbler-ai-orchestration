@@ -213,6 +213,10 @@ export type ProgressProjectionSession = {
   completedAt: string | null;
   verificationVerdict: string | null;
   /**
+   * The session closed having changed nothing, so it carries no verdict because there was nothing to verify. Present only on such a session.
+   */
+  noChange?: boolean;
+  /**
    * The module(s) the session's declaration named, by slug. Present only for a session of a multi-module solution; a single-module row carries no member, so nothing changes in what it projects.
    */
   modules?: string[];

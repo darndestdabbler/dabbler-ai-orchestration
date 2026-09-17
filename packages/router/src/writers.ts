@@ -519,7 +519,12 @@ export function recordSessionVerification(
  */
 export function flipStateToClosed(
   sessionsDir: string,
-  options: { readonly verdict?: string | null; readonly forced?: boolean } = {},
+  options: {
+    readonly verdict?: string | null;
+    readonly forced?: boolean;
+    /** The session changed nothing: its record says so, as `noChange`. */
+    readonly noChange?: boolean;
+  } = {},
 ): Record<string, unknown> {
   const forced = options.forced ?? false;
   const verdict =
@@ -551,6 +556,7 @@ export function flipStateToClosed(
       record["status"] = STATUS_COMPLETE;
       record["completedAt"] = now;
       if (verdict !== null) record["verificationVerdict"] = verdict;
+      if (options.noChange === true) record["noChange"] = true;
     } else if (
       forced &&
       record["status"] !== STATUS_COMPLETE &&

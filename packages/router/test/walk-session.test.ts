@@ -572,6 +572,89 @@ describe("a pulled session whose framework jobs end inside the call", () => {
   });
 });
 
+describe("a driven session whose steps change nothing", () => {
+  it("closes without a verification round, a stop or a run of record, and says it changed nothing", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(
+      {
+        ...SEED,
+        "docs/sessions/activity-log.json": '{ "totalSessions": 2, "entries": [] }\n',
+        "docs/sessions/project-work-plan.md": "# Work plan\n",
+      },
+      { origin: true },
+    );
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+    assert.equal(
+      (await capture(() =>
+        Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
+      )).value,
+      EXIT_OK,
+    );
+    // The framework's own files are already tracked, as in any repository past
+    // its first session: what the session writes to them later is bookkeeping,
+    // never work.
+    gitOut(repo, "add", "--", "docs/sessions");
+    gitOut(repo, "commit", "-q", "-m", "Record the registration");
+    gitOut(repo, "push", "-q");
+    // The work was already done: the step's check passes on the tree as it is.
+    const already = {
+      ...PLAN,
+      task: "Confirm widget() returns 1.",
+      steps: [
+        {
+          id: "widget",
+          ask: "Confirm widget() returns 1.",
+          files: ["src/widget.py"],
+          checks: [
+            {
+              argv: [
+                NODE,
+                "-e",
+                "process.exit(require('fs').readFileSync('src/widget.py','utf8').includes('return 1') ? 0 : 1)",
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const plan = await next(sessionsDir);
+    assert.equal(await answerPlan(sessionsDir, plan.instruction?.seq ?? 0, already), EXIT_OK);
+    const step = await next(sessionsDir);
+    assert.equal(step.instruction?.step_id, "widget");
+    assert.equal((await answerStep(sessionsDir, step.instruction?.seq ?? 0, "widget", [])).code, EXIT_OK);
+    // Tracked and changed since HEAD: the plan's declaration rewrote them.
+    const tracked = gitOut(repo, "status", "--porcelain", "--", "docs/sessions");
+    assert.match(tracked, /^ M docs\/sessions\/activity-log\.json$/m);
+    assert.match(tracked, /^ M docs\/sessions\/project-work-plan\.md$/m);
+
+    let instruction: DriverInstruction | null = null;
+    let err = "";
+    for (let call = 0; call < 10 && instruction?.kind !== "done"; call += 1) {
+      await settleJobs();
+      ({ instruction, err } = await next(sessionsDir));
+    }
+    assert.equal(instruction?.kind, "done", err);
+    const run = readRun(repo, 1);
+    assert.equal(run?.phase, "complete");
+    assert.equal(run?.stop, null);
+    assert.deepEqual(run?.stop_history ?? [], []);
+    const jobs = readdirSync(join(repo, ".dabbler", "runs", "s1", "driver", "jobs"));
+    assert.deepEqual(
+      jobs.filter((name) => !name.startsWith("close")),
+      [],
+      "the close is the only framework job",
+    );
+    assert.deepEqual(readRounds(repo, 1), []);
+    const sessions = readSessionState(sessionsDir)?.["sessions"] as Record<string, unknown>[];
+    const record = sessions.find((row) => row["number"] === 1);
+    assert.equal(record?.["status"], "complete");
+    assert.equal(record?.["noChange"], true);
+  });
+});
+
 describe("a red run of record, fixed, verified again, then run again", () => {
   it("judges the fix before the suite runs again, and in that order: checks, a second round, the suite", async () => {
     setProviderKeys();

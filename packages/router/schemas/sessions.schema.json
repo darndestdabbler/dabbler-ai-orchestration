@@ -63,6 +63,10 @@
           "type": ["string", "null"],
           "description": "Canonical tokens are VERIFIED / ISSUES_FOUND / REMEDIATED_AT_CAP (plus the retired WAIVED, still read from historical records and refused by every writer). Typed string rather than enum because operators have shipped extension tokens that readers PREFIX-MATCH; the sanctioned writer (verdict.validate_session_verdict) fails closed against an exact allowlist, so a confabulated non-verdict can never persist here. Readers stay lenient; the writer is strict."
         },
+        "noChange": {
+          "type": "boolean",
+          "description": "The session closed having changed nothing: its steps were accepted, the framework measured no change against the commit its plan was accepted on, and no verification round, run of record, land or release ran. Absent for a session that changed something."
+        },
         "verification": {
           "type": ["object", "null"],
           "description": "The round summary that must ride with the verdict: verifier identity, round count, cost. Shape owned by the verification writer."

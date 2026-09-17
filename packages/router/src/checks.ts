@@ -715,7 +715,7 @@ const IGNORE_BASENAME_PATTERNS: readonly string[] = [
  * What may legitimately be dirty in the session directory at close time:
  * the files the close will commit, plus the lock the close is holding.
  */
-const SET_BOOKKEEPING_BASENAMES: ReadonlySet<string> = new Set([
+export const SET_BOOKKEEPING_BASENAMES: ReadonlySet<string> = new Set([
   ...LIFECYCLE_WRITTEN_FILES,
   ".lifecycle.lock",
 ]);

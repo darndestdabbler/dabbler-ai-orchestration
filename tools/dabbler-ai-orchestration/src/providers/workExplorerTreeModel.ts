@@ -538,7 +538,11 @@ function sessionTooltip(node: SessionNode): string {
     session.status.replace("-", " "),
   ];
   const verdict = session.verificationVerdict;
-  if (typeof verdict === "string" && verdict.trim() !== "") {
+  // A session that changed nothing had nothing to verify: it says so where a
+  // verdict would be, rather than reading as a session nobody verified.
+  if (session.noChange === true) {
+    lines.push("", "Verification: no change");
+  } else if (typeof verdict === "string" && verdict.trim() !== "") {
     lines.push(
       "",
       isRecognizedVerdictToken(verdict)

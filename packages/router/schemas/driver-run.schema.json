@@ -73,6 +73,11 @@
       "pattern": "^[0-9a-f]{40}$",
       "description": "The tree object the working tree was at after the last accepted step, which is what the next report's `files_changed` is measured against. Null before the first step."
     },
+    "plan_head": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The commit HEAD was at when the plan was accepted. A session whose HEAD is still this commit, which has no verification round and whose working tree differs from HEAD in nothing but the framework's own files, changed nothing: it closes without a round. Null or absent before the plan is accepted."
+    },
     "stop": {
       "type": ["object", "null"],
       "additionalProperties": false,

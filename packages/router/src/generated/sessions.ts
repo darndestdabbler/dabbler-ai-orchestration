@@ -28,6 +28,10 @@ export type SessionsSessionRecord = {
    */
   verificationVerdict?: string | null;
   /**
+   * The session closed having changed nothing: its steps were accepted, the framework measured no change against the commit its plan was accepted on, and no verification round, run of record, land or release ran. Absent for a session that changed something.
+   */
+  noChange?: boolean;
+  /**
    * The round summary that must ride with the verdict: verifier identity, round count, cost. Shape owned by the verification writer.
    */
   verification?: Record<string, unknown> | null;

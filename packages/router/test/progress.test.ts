@@ -208,6 +208,13 @@ describe("the source of a projection's sessions", () => {
     assert.equal(rows[0]["iconKey"], "in-progress");
     assert.equal(rows[0]["inFlight"], true);
     assert.equal(rows[1]["iconKey"], "not-started");
+    // A session that closed having changed nothing says so, and only that one.
+    assert.equal("noChange" in rows[0], false);
+    flipStateToClosed(sessionsDir, { noChange: true });
+    const closed = sessions(sessionsDir);
+    assert.equal(closed[0]["noChange"], true);
+    assert.equal(closed[0]["verificationVerdict"], null);
+    assert.equal("noChange" in closed[1], false);
   });
 
   it("names who the standing stop is for, so no surface offers a person the engine's own command", () => {

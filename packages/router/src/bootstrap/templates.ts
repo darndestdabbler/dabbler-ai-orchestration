@@ -259,7 +259,11 @@ export const PLAN_PROMPT =
   "parent `pom.xml` -- and reaches a sibling by project reference: a\n" +
   "`<ProjectReference>` for .NET, a dependency at `${project.version}` for\n" +
   "Maven. Who depends on a module is read from those references, never\n" +
-  "written. The sessions that build the modules write their projects.\n" +
+  "written. The first numbered session, the skeleton, writes the projects.\n" +
+  "\n" +
+  "This session writes the plan and nothing else: it creates, edits or\n" +
+  "deletes no code, project, build file, test, `dabbler.yaml` suite or\n" +
+  "packaging.\n" +
   "\n" +
   "- **Import:** if the operator points you at an existing plan (a doc, a\n" +
   "  ticket, notes), bring its content into that path in this same shape,\n" +
@@ -289,11 +293,18 @@ export const DECOMPOSITION_PROMPT =
   "slugs, no directories.\n" +
   "\n" +
   "Hard requirements (do not deviate):\n" +
-  "- **Production split:** the plan's *Production split* names the parts that\n" +
-  "  run separately. Create their projects, write `packaging.pack` in\n" +
-  "  `dabbler.yaml` to produce the plan's *Handoff artifacts*, and where only\n" +
-  "  the API tier may reach the database, add that rule as an architecture\n" +
-  "  test in the solution's own tests.\n" +
+  "- **Plans only:** this session writes the plan and the session list, and\n" +
+  "  creates, edits or deletes no code, project, build file, test,\n" +
+  "  `dabbler.yaml` suite or packaging.\n" +
+  "- **The skeleton comes first:** the first numbered session is the\n" +
+  "  skeleton. For .NET it writes the solution file and every project the\n" +
+  "  plan names, with their references; for Maven or Gradle, the parent\n" +
+  "  build and every module. Either way it declares the test suite in\n" +
+  "  `dabbler.yaml` under `testing.suites`, writes `packaging.pack` where the\n" +
+  "  plan names *Handoff artifacts*, and adds the architecture test the plan\n" +
+  "  requires -- where only the API tier may reach the database, that rule.\n" +
+  "  Later sessions fill the modules in and never re-create what the\n" +
+  "  skeleton made.\n" +
   "- **Numbering:** continue from the highest session number the plan already\n" +
   "  declares. Numbers are never reused and never renumbered, including for\n" +
   "  cancelled sessions.\n" +
@@ -368,11 +379,15 @@ export const BOOTSTRAP_PLAN =
   "   a `.csproj` listed in the root solution file for .NET, or a Maven module\n" +
   "   listed in the parent `pom.xml`, each reaching a sibling by project\n" +
   "   reference -- a `<ProjectReference>`, or a dependency at\n" +
-  "   `${project.version}`. The sessions that build the modules write the\n" +
-  "   projects.\n" +
+  "   `${project.version}`. The first numbered session, the skeleton, writes\n" +
+  "   the projects.\n" +
   "4. Cross-provider verification.\n" +
   "5. Full test suite, recorded as the run of record.\n" +
   "6. Close-out.\n" +
+  "\n" +
+  "This session writes the plan and nothing else: it creates, edits or\n" +
+  "deletes no code, project, build file, test, `dabbler.yaml` suite or\n" +
+  "packaging.\n" +
   "\n" +
   "**Creates:** `docs/planning/solution-plan.md`. A later revision is just\n" +
   "another plan session that amends the same file.\n" +
@@ -398,19 +413,26 @@ export const BOOTSTRAP_PLAN =
   "   means. Order sessions so earlier ones unblock later ones — a module\n" +
   "   before the modules that depend on it — and keep at most ~3 work steps\n" +
   "   per session.\n" +
-  "4. Create the projects the plan's *Production split* names, write\n" +
-  "   `packaging.pack` in `dabbler.yaml` to produce its *Handoff artifacts*,\n" +
-  "   and where only the API tier may reach the database, add that rule as\n" +
-  "   an architecture test in the solution's own tests. Declare the test\n" +
-  "   suite in `dabbler.yaml` under `testing.suites` in the same session as\n" +
-  "   the first project, even before any tests exist: a repository that\n" +
-  "   builds code with no suite declared stops at the run of record.\n" +
-  "5. Cross-provider verification.\n" +
-  "6. Full test suite, recorded as the run of record.\n" +
-  "7. Close-out.\n" +
+  "\n" +
+  "   The first numbered session is the skeleton. For .NET it writes the\n" +
+  "   solution file and every project the plan names, with their\n" +
+  "   references; for Maven or Gradle, the parent build and every module.\n" +
+  "   Either way it declares the test suite in `dabbler.yaml` under\n" +
+  "   `testing.suites`, even before any tests exist, writes `packaging.pack`\n" +
+  "   where the plan names *Handoff artifacts*, and adds the architecture\n" +
+  "   test the plan requires -- where only the API tier may reach the\n" +
+  "   database, that rule. Later sessions fill the modules in and never\n" +
+  "   re-create what the skeleton made.\n" +
+  "4. Cross-provider verification.\n" +
+  "5. Full test suite, recorded as the run of record.\n" +
+  "6. Close-out.\n" +
+  "\n" +
+  "This session writes the plan and nothing else: it creates, edits or\n" +
+  "deletes no code, project, build file, test, `dabbler.yaml` suite or\n" +
+  "packaging.\n" +
   "\n" +
   "**Creates:** the numbered session list the rest of this repository runs,\n" +
-  "the projects the production split names, and the pack that hands them over.\n" +
+  "starting with the skeleton session.\n" +
   "\n" +
   "> Do NOT hand-author `sessions.json`. The first `session start`\n" +
   "> bootstraps it from this plan — state files are the writers' job.\n";

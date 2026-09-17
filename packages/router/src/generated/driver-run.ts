@@ -68,6 +68,10 @@ export type DriverRun = {
    */
   baseline_tree: string | null;
   /**
+   * The commit HEAD was at when the plan was accepted. A session whose HEAD is still this commit, which has no verification round and whose working tree differs from HEAD in nothing but the framework's own files, changed nothing: it closes without a round. Null or absent before the plan is accepted.
+   */
+  plan_head?: string | null;
+  /**
    * Null while the loop runs or after it completed. Set when it halted short of the close, with the reason in words; the session stays in flight and this is what the operator reads.
    */
   stop: {

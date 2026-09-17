@@ -113,6 +113,7 @@ import {
   readWorktreeStatus,
   renderGateRow,
   runGates,
+  sessionChangedNothing,
 } from "./gates.ts";
 import { PackagingConfigError, loadDeclaration, loadTagRelease } from "./packaging.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
@@ -2402,7 +2403,10 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
       writeErr(`close: refused -- ${switched}\n`);
       return EXIT_GATE_FAILED;
     }
-    const results = runGates(sessionsDir, { forced });
+    // Measured here and not taken from the driver: the close is the verb that
+    // passes the evidence gates, so it reads the same fact the driver did.
+    const noChange = sessionChangedNothing(sessionsDir);
+    const results = runGates(sessionsDir, { forced, noChange });
     const width = Math.max(...results.map((row) => row.name.length));
     for (const row of results) {
       // One bullet per gate, a level in from the close's own sentences: the
@@ -2436,6 +2440,7 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
     flipStateToClosed(sessionsDir, {
       verdict: verdict === null || verdict === undefined ? null : String(verdict),
       forced,
+      noChange,
     });
     writeOut(
       `close: session ${sessionDisplayNumber(current)} of ` +
@@ -2856,6 +2861,40 @@ export function callerIsEngine(env: NodeJS.ProcessEnv = process.env): boolean {
   return Boolean(env["DABBLER_DRIVEN"]) || Boolean(env["CLAUDECODE"]);
 }
 
+/** The framework's own files a cancellation commits, and nothing else. */
+const CANCEL_COMMIT_BASENAMES: readonly string[] = [
+  "sessions.json",
+  "activity-log.json",
+  "project-work-plan.md",
+];
+
+/**
+ * Commit the cancellation's own record: those of the three files that exist
+ * and are changed, by path, so anything else uncommitted -- staged or not --
+ * is left exactly as it was. Nothing is pushed. Returns why the commit
+ * failed, or null.
+ */
+function commitCancellation(sessionsDir: string, sessionNumber: number): string | null {
+  const repoRoot = repoRootFor(sessionsDir);
+  if (repoRoot === null) return null;
+  const paths = CANCEL_COMMIT_BASENAMES.map((name) => resolve(sessionsDir, name)).filter(isFile);
+  if (paths.length === 0) return null;
+  const changed = runGit(repoRoot, ["status", "--porcelain", "--", ...paths]);
+  if (changed.code !== 0 || changed.stdout.trim() === "") return null;
+  runGit(repoRoot, ["add", "--", ...paths]);
+  const committed = runGit(repoRoot, [
+    "commit",
+    "-m",
+    `Cancel session ${sessionNumber} of ${basename(sessionsDir)}`,
+    "--",
+    ...paths,
+  ]);
+  if (committed.code !== 0 && !`${committed.stdout}${committed.stderr}`.toLowerCase().includes("nothing to commit")) {
+    return committed.stderr.trim() || committed.stdout.trim();
+  }
+  return null;
+}
+
 export function cancel(
   sessionsDir: string,
   sessionNumber: number,
@@ -2911,6 +2950,11 @@ export function cancel(
     } catch (error) {
       if (!(error instanceof SessionStateInvariantError)) throw error;
       writeErr(`cancel: refused -- ${error.message}\n`);
+      return EXIT_GATE_FAILED;
+    }
+    const committed = commitCancellation(sessionsDir, sessionNumber);
+    if (committed !== null) {
+      writeErr(`cancel: state written but commit failed: ${committed}\n`);
       return EXIT_GATE_FAILED;
     }
     writeOut(`${dumps({ session: sessionNumber, status: STATUS_CANCELLED })}\n`);

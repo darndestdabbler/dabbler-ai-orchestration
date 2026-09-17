@@ -10,6 +10,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.10.0] — 2026-09-17
+
+**Plans first, code in sessions, and no dead ends.**
+
+### Changed
+
+- In a newly bootstrapped repository, sessions 1 and 2 only write plans:
+  session 1 writes or imports the solution plan, and session 2 challenges
+  it and writes the numbered sessions. Neither creates code, projects,
+  build files, tests, a test suite or packaging. Session 2 now plans the
+  first numbered session as the skeleton: the solution or parent build
+  and every project or module, the declared test suite, the packaging and
+  any required architecture test. Later sessions fill it in. Repositories
+  already past session 2 are unchanged.
+- `dabbler session cancel` commits the framework's own files
+  (`sessions.json`, `activity-log.json`, `project-work-plan.md`) under
+  `Cancel session <N> of <sessions>`, as the close does. It commits
+  nothing else and pushes nothing.
+
+### Fixed
+
+- A driven session whose steps change nothing no longer stops at a
+  verification that refuses an empty change. It goes straight to the
+  close, which records it as *no change*, with no review round, run of
+  record, land or release. The Work Explorer shows *no change* where the
+  verdict would be.
+- When no loop is driving a stopped session, `dabbler session wait` says
+  why the session stopped and what to do next: Resume Session in VS
+  Code, or restart the loop in a terminal, then the stop's own options.
+
 ## [3.9.3] — 2026-09-17
 
 **The extension suite runs where the machine cannot answer for it.**

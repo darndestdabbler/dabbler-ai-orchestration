@@ -585,6 +585,19 @@ suite("workExplorerTreeModel: session descriptor", () => {
     });
     assert.ok(d.tooltip!.includes("not a recognized verdict"));
   });
+
+  test("a session that closed having changed nothing says no change, and is neither severe nor unverified", () => {
+    const session = makeSession({
+      status: "complete",
+      iconKey: "complete",
+      verificationVerdict: null,
+      noChange: true,
+    });
+    const d = sessionDescriptor({ kind: "session", repository, session });
+    assert.ok(d.tooltip!.includes("Verification: no change"), d.tooltip);
+    assert.strictEqual(severityOf(session), null);
+    assert.ok(!hasToken(d.contextValue ?? "", "severity-verification"), d.contextValue);
+  });
 });
 
 suite("workExplorerTreeModel: severity", () => {

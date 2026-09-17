@@ -11,7 +11,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { describe, it } from "node:test";
 
-import { instructionPath, loopPath, reportPath } from "../src/driver.ts";
+import { instructionPath, loopPath, renderStop, reportPath } from "../src/driver.ts";
 import {
   LOOP_STALE_MS,
   MAX_REJECTIONS,
@@ -42,6 +42,7 @@ import {
   staleJobDisposition,
   stepChangedPaths,
   unchangedStepFiles,
+  noLoopMessage,
   waiterReading,
   type RegistrationFacts,
   type StepSpec,
@@ -104,6 +105,22 @@ describe("whether a loop is driving the session", () => {
     mkdirSync(dirname(instructionPath(root, 1)), { recursive: true });
     writeFileSync(instructionPath(root, 1), JSON.stringify(INSTRUCTION));
     assert.equal((waiterReading(root, 1, now, now + LOOP_STALE_MS) as DriverInstruction).seq, 4);
+  });
+
+  it("says why no loop is driving in the stop's own words, Resume Session first, and only the restart with no stop", () => {
+    const stop = { kind: "close" as const, reason: "the close refused: verification_clean failed", at: "2026-09-17T11:00:00-04:00" };
+    const run = { stop, phase: "close" as const, engine: "cli" };
+    const said = noLoopMessage("docs/sessions", 1, run);
+    const words = renderStop(stop, { session_number: 1, phase: "close", engine: "cli" });
+    assert.ok(said.includes(words.happened), said);
+    assert.ok(said.includes(words.ways), said);
+    const resume = said.indexOf("Resume Session in VS Code");
+    assert.ok(resume > said.indexOf(words.happened), said);
+    assert.ok(resume < said.indexOf(words.ways), said);
+    assert.ok(said.includes("dabbler session run --mailbox --sessions-dir docs/sessions"), said);
+    const idle = noLoopMessage("docs/sessions", 1, { stop: null, phase: "work", engine: "cli" });
+    assert.doesNotMatch(idle, /paused/);
+    assert.match(idle, /dabbler session run --mailbox --sessions-dir docs\/sessions/);
   });
 });
 

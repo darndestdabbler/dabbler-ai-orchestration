@@ -909,6 +909,55 @@ describe("cancelling and restoring through the verb", () => {
     }
   });
 
+  it("commits the framework's own three files under its message, and leaves every other change uncommitted", async () => {
+    const repo = tempDir("cancel-commit-");
+    seed(repo, {
+      ...SEED,
+      "docs/sessions/project-work-plan.md": "# Work plan\n",
+      "docs/sessions/activity-log.json": '{ "entries": [] }\n',
+    });
+    const sessionsDir = join(repo, "docs", "sessions");
+    const calls: string[][] = [];
+    const recorded = (answer: { stdout?: string; code?: number }) => (args: readonly string[]) => {
+      calls.push([...args]);
+      return answer;
+    };
+    const restoreGit = cleanRepoAnswers(repo, [
+      // The three framework files are changed, and so is src/widget.py.
+      [
+        (args) => args[0] === "status" && args.includes("--"),
+        recorded({
+          stdout:
+            " M docs/sessions/activity-log.json\n M docs/sessions/project-work-plan.md\n?? docs/sessions/sessions.json\n",
+        }),
+      ],
+      [(args) => ["add", "commit", "push", "stash", "checkout", "reset", "restore"].includes(args[0]!), recorded({})],
+    ]);
+    try {
+      registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+      writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+
+      const result = await run(() => cancel(sessionsDir, 1, { reason: "stop", force: true }));
+      assert.equal(result.code, EXIT_OK, result.err);
+
+      const named = (args: readonly string[]): string[] =>
+        args.slice(args.indexOf("--") + 1).map((path) => path.split("\\").join("/").split("/").slice(-1)[0]!).sort();
+      const THREE = ["activity-log.json", "project-work-plan.md", "sessions.json"];
+      const commit = calls.find((args) => args[0] === "commit");
+      assert.ok(commit, JSON.stringify(calls));
+      assert.equal(commit[commit.indexOf("-m") + 1], "Cancel session 1 of sessions");
+      // By pathspec, so nothing else staged rides along.
+      assert.deepEqual(named(commit), THREE);
+      assert.deepEqual(named(calls.find((args) => args[0] === "add")!), THREE);
+      // The unrelated change is never named, and nothing is pushed or unwound.
+      assert.ok(!calls.some((args) => args.some((arg) => arg.includes("widget.py"))), JSON.stringify(calls));
+      assert.deepEqual(calls.map((args) => args[0]), ["status", "add", "commit"]);
+      assert.equal(readFileSync(join(repo, "src", "widget.py"), "utf8"), "def widget():\n    return 2\n");
+    } finally {
+      restoreGit();
+    }
+  });
+
   it("refuses a session number the record does not carry", async () => {
     const state = stateDir();
     try {

@@ -1624,6 +1624,8 @@ export function buildProjection(
       startedAt: entry["startedAt"] ?? null,
       completedAt: entry["completedAt"] ?? null,
       verificationVerdict: entry["verificationVerdict"] ?? null,
+      // Present only on a session that closed having changed nothing.
+      ...(entry["noChange"] === true ? { noChange: true } : {}),
       // Present only on a session whose declaration named modules -- a
       // multi-module solution's -- so a single-module row projects exactly
       // what it always has.

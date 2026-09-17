@@ -50,6 +50,7 @@ import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
 import { readRun } from "./driver.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
+import { changeIsEmpty } from "./facts.ts";
 import {
   repoRelativePath,
   repoRootFor,
@@ -903,6 +904,79 @@ export function checkVerdictVocabulary(sessionsDir: string): Check {
   return judgeVerdictTokens(tokens);
 }
 
+// --- a session that changed nothing -------------------------------------------
+
+/** What deciding that a session changed nothing reads. */
+export interface NoChangeFacts {
+  /** How many verification rounds the session has; null when none could be read. */
+  readonly rounds: number | null;
+  /** The commit the driver recorded when it accepted the plan, or null. */
+  readonly planHead: string | null;
+  /** The commit HEAD is at now, or null. */
+  readonly head: string | null;
+  /** Whether the working tree differs from HEAD in nothing but the framework's own files. */
+  readonly empty: boolean;
+}
+
+/**
+ * A driven session changed nothing: no round was ever opened, HEAD is still
+ * the commit its plan was accepted on, and the tree adds nothing to HEAD.
+ *
+ * test-dabbler-orchestration-terminals session 3: a session whose work was
+ * already done accepted every step, found nothing to review, and stopped at
+ * a verification that refuses an empty change -- with no way forward. All
+ * three facts are needed: a round means something was reviewed, a moved HEAD
+ * means something was committed, and a non-empty tree means something is
+ * about to be.
+ */
+export function judgeNoChange(facts: NoChangeFacts): boolean {
+  return (
+    facts.rounds === 0 &&
+    facts.planHead !== null &&
+    facts.planHead === facts.head &&
+    facts.empty
+  );
+}
+
+/** Ask the ledger, the run and git, stopping where the judge would have. */
+export function readNoChangeFacts(sessionsDir: string): NoChangeFacts {
+  const none: NoChangeFacts = { rounds: null, planHead: null, head: null, empty: false };
+  const root = repoRootFor(sessionsDir);
+  const current = currentSession(sessionsDir);
+  if (root === null || typeof current !== "number") return none;
+  let rounds: number;
+  try {
+    rounds = readRounds(root, current).length;
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    return none;
+  }
+  const planHead = readRun(root, current)?.plan_head ?? null;
+  if (rounds !== 0 || planHead === null) return { ...none, rounds, planHead };
+  const headRun = runGit(root, ["rev-parse", "HEAD"]);
+  const head = headRun.code === 0 ? headRun.stdout.trim() : null;
+  if (head !== planHead) return { rounds, planHead, head, empty: false };
+  return { rounds, planHead, head, empty: changeIsEmpty(root) };
+}
+
+/** The in-flight session changed nothing, by `judgeNoChange`. */
+export function sessionChangedNothing(sessionsDir: string): boolean {
+  return judgeNoChange(readNoChangeFacts(sessionsDir));
+}
+
+/**
+ * The gates a session that changed nothing passes without their evidence:
+ * there was nothing to verify, to run the suite against, or to release.
+ */
+export const NO_CHANGE_GATES: ReadonlySet<string> = new Set([
+  "verification_clean",
+  "test_run_fresh",
+  GATE_PUBLISHED_WHEN_RELEASABLE,
+]);
+
+/** The remediation a gate passed for a session that changed nothing carries. */
+export const NO_CHANGE_REMEDIATION = "no change";
+
 // --- Driver -------------------------------------------------------------------
 
 export type Predicate = (sessionsDir: string, config?: RouterConfig | null) => Check;
@@ -994,6 +1068,12 @@ export interface RunGatesOptions {
   readonly omit?: readonly string[];
   /** The gates to run; `GATE_CHECKS` unless a test hands in its own. */
   readonly gates?: readonly (readonly [string, Predicate])[];
+  /**
+   * The session changed nothing (`sessionChangedNothing`), so the gates in
+   * `NO_CHANGE_GATES` pass saying so rather than asking for evidence no
+   * change could produce. The rest are asked as always.
+   */
+  readonly noChange?: boolean;
 }
 
 /**
@@ -1011,6 +1091,10 @@ export function runGates(
   const results: GateResult[] = [];
   for (const [name, predicate] of options.gates ?? GATE_CHECKS) {
     if (omit.has(name)) continue;
+    if (options.noChange === true && NO_CHANGE_GATES.has(name)) {
+      results.push({ name, passed: true, remediation: NO_CHANGE_REMEDIATION, inapplicable: false });
+      continue;
+    }
     if (forced && !EVIDENCE_GATES.has(name)) {
       results.push({
         name,

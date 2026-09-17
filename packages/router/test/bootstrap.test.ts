@@ -31,6 +31,7 @@ import {
   TRANSPORT_ENV_VAR,
 } from "../src/config.ts";
 import { EXIT_BLOCKING } from "../src/contracts/exitCodes.ts";
+import { parseStepTexts } from "../src/session.ts";
 import { SETTINGS_RELPATH } from "../src/settings.ts";
 import { capture } from "../src/output.ts";
 import { writePreferences } from "../src/preferences.ts";
@@ -420,13 +421,18 @@ describe("the commit guard", () => {
   });
 });
 
-/** The directory `sh` lives in, so a PATH of one fake binary can still find the shell. */
+/**
+ * The directory `sh` lives in, so a PATH of one fake binary can still find the
+ * shell. A Windows PATH often carries only Git's `cmd`, so each entry's sibling
+ * `usr/bin` -- where Git keeps its `sh` -- is asked after PATH itself.
+ */
 function shellDir(): string {
   const executable = process.platform === "win32" ? "sh.exe" : "sh";
-  for (const dir of (process.env["PATH"] ?? "").split(delimiter)) {
-    if (dir !== "" && existsSync(join(dir, executable))) return dir;
+  const path = (process.env["PATH"] ?? "").split(delimiter).filter((dir) => dir !== "");
+  for (const dir of [...path, ...path.map((entry) => join(entry, "..", "usr", "bin"))]) {
+    if (existsSync(join(dir, executable))) return dir;
   }
-  throw new Error("no sh on PATH: the hook test needs a POSIX shell");
+  throw new Error("no sh on PATH or beside it: the hook test needs a POSIX shell");
 }
 
 describe("the scaffolded setup sessions", () => {
@@ -446,7 +452,7 @@ describe("the scaffolded setup sessions", () => {
     assert.doesNotMatch(text, /Ask the operator/);
   });
 
-  it("asks how production is split in session 1, and hands it over in session 2", () => {
+  it("asks how production is split in session 1, and has session 2 plan the skeleton rather than build it", () => {
     const text = readFileSync(scaffoldBootstrapSessions(tempDir("bootstrap-"))[0] as string, "utf8");
     const [first, second] = text.split("### Session 2:") as [string, string];
     // Asked before any module is proposed, with the default offered.
@@ -456,9 +462,24 @@ describe("the scaffolded setup sessions", () => {
     assert.match(first, /\*Production split\*/);
     assert.match(first, /\*Handoff artifacts\*/);
     assert.match(first, /dotnet ef migrations script --idempotent/);
-    // Session 2 builds what the split names and packs its handoff artifacts.
-    assert.match(second, /`packaging\.pack`/);
-    assert.match(second, /architecture\s+test/);
+    // Neither setup session creates anything but a plan: no step of either
+    // opens with a verb that builds.
+    for (const session of [first, second]) {
+      const steps = parseStepTexts(session.slice(session.indexOf("\n1. ")));
+      assert.ok(steps.length > 0, session);
+      for (const step of steps) assert.doesNotMatch(step, /^(Create|Write|Add|Declare)\b/, step);
+      assert.match(session, /creates, edits or\s+deletes no code, project, build file, test/);
+    }
+    // The skeleton is an instruction for the first numbered session, carrying
+    // the projects, the suite and the pack.
+    const skeleton = parseStepTexts(second.slice(second.indexOf("\n1. "))).find((step) =>
+      /first numbered session is the skeleton/.test(step),
+    );
+    assert.ok(skeleton, second);
+    assert.match(skeleton, /solution file/);
+    assert.match(skeleton, /`testing\.suites`/);
+    assert.match(skeleton, /`packaging\.pack`/);
+    assert.doesNotMatch(second, /\*\*Creates:\*\*[^\n]*projects/);
   });
 
   it("never overwrites a plan the repository already has", () => {

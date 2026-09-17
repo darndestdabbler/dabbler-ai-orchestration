@@ -26,7 +26,7 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, lstatSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { shlexSplit } from "./checks.ts";
+import { SET_BOOKKEEPING_BASENAMES, shlexSplit } from "./checks.ts";
 import {
   hiddenSpawn,
   nowIso,
@@ -153,9 +153,6 @@ export const CONTROL_DETAIL_LIMIT = 1500;
 
 export const KIND_TESTS = "tests";
 
-const BOOKKEEPING_BASENAMES: ReadonlySet<string> = new Set(
-  LIFECYCLE_WRITTEN_FILES,
-);
 
 export class FactsError extends Error {
   constructor(message: string) {
@@ -265,7 +262,8 @@ function untrackedContents(
   for (const rel of result.stdout.split("\0").filter((path) => path !== "")) {
     const parts = rel.replace(/\\/g, "/").split("/");
     const basename = parts[parts.length - 1] ?? rel;
-    if (BOOKKEEPING_BASENAMES.has(basename)) {
+    // The lifecycle lock too: the close measures the change while holding it.
+    if (SET_BOOKKEEPING_BASENAMES.has(basename)) {
       bookkeeping.push(rel);
       continue;
     }
@@ -342,21 +340,11 @@ function renderEvidence(
   return parts.join("\n");
 }
 
-/** Round 1: full working-tree evidence vs HEAD. */
-export function assembleEvidence(
-  repoRoot: string,
-  _sessionsDir: string,
-  _sessionNumber: number,
-): string {
+/** The working tree's diff against HEAD at one context width, memoised per width. */
+function diffVsHead(repoRoot: string): (context: number) => string {
   const pathspecs = buildDiffPathspecs();
-  const statusRun = runGit(repoRoot, ["status", "--short"]);
-  if (statusRun.code !== 0) {
-    throw new FactsError(`git status failed: ${statusRun.stderr}`);
-  }
-  // Memoised, because the ladder may ask for a width the emptiness probe
-  // already paid for.
   const diffs = new Map<number, string>();
-  const diffAt = (context: number): string => {
+  return (context) => {
     const seen = diffs.get(context);
     if (seen !== undefined) return seen;
     const diffRun = runGit(repoRoot, [
@@ -374,15 +362,47 @@ export function assembleEvidence(
     diffs.set(context, diffRun.stdout);
     return diffRun.stdout;
   };
+}
+
+/**
+ * The working tree changes nothing against HEAD: no diff and no untracked
+ * file, the lifecycle's own files aside.
+ *
+ * The one statement of "there is no change". `verify` refuses on it and a
+ * driven session that changed nothing closes on it, so the two can never
+ * disagree about the same tree. Emptiness is a property of the change, not
+ * of the context width: judged once, at the floor, where a diff that is empty
+ * is empty at every rung.
+ */
+export function changeIsEmpty(
+  repoRoot: string,
+  diffAt: (context: number) => string = diffVsHead(repoRoot),
+): boolean {
+  if (diffAt(DIFF_CONTEXT_LADDER[DIFF_CONTEXT_LADDER.length - 1]!).trim() !== "") return false;
+  const { inlined } = untrackedContents(repoRoot, buildDiffPathspecs());
+  return inlined.length === 0;
+}
+
+/** Round 1: full working-tree evidence vs HEAD. */
+export function assembleEvidence(
+  repoRoot: string,
+  _sessionsDir: string,
+  _sessionNumber: number,
+): string {
+  const pathspecs = buildDiffPathspecs();
+  const statusRun = runGit(repoRoot, ["status", "--short"]);
+  if (statusRun.code !== 0) {
+    throw new FactsError(`git status failed: ${statusRun.stderr}`);
+  }
+  // Memoised, because the ladder may ask for a width the emptiness probe
+  // already paid for.
+  const diffAt = diffVsHead(repoRoot);
   const { inlined, omitted, bookkeeping } = untrackedContents(
     repoRoot,
     pathspecs,
   );
   const allBookkeeping = [...bookkeeping, ...trackedBookkeeping(repoRoot)];
-  // Emptiness is a property of the change, not of the context width: judged
-  // once, at the floor, where a diff that is empty is empty at every rung.
-  if (diffAt(DIFF_CONTEXT_LADDER[DIFF_CONTEXT_LADDER.length - 1]!).trim() ===
-      "" && inlined.length === 0) {
+  if (changeIsEmpty(repoRoot, diffAt)) {
     throw new EvidenceEmptyError(
       "the evidence bundle is empty (no diff vs HEAD, no untracked " +
         "files). If the session's work is already committed, verify " +

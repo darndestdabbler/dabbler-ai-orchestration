@@ -106,6 +106,7 @@ import {
   codeEcosystems,
   judgeSuiteDeclaration,
   rewindPhaseFor,
+  sessionChangedNothing,
 } from "./gates.ts";
 import type {
   DriverDisposition,
@@ -1926,6 +1927,11 @@ class Driver {
         );
       }
     }
+    // After the declaration, which is the last thing acceptance writes: a
+    // HEAD still at this commit when the steps are done means none of them
+    // committed anything.
+    const head = runGit(this.repoRoot, ["rev-parse", "HEAD"]);
+    this.run = { ...this.run, plan_head: head.code === 0 ? head.stdout.trim() : null };
     this.setPhase(PHASE_WORK);
   }
 
@@ -2436,6 +2442,15 @@ class Driver {
   // --- verification ----------------------------------------------------------
 
   private async phaseVerify(): Promise<void> {
+    // A session that changed nothing has nothing to review, test, land or
+    // release, and `verify` refuses an empty change: sending it there is a
+    // stop with no way forward. The close reads the same fact and passes its
+    // evidence gates as no change.
+    if (sessionChangedNothing(this.sessionsDir)) {
+      this.log("no-change");
+      this.setPhase("close");
+      return;
+    }
     // Two of the three reasons a further round cannot open are instructions
     // to ADVANCE, and both are answers the ledger already holds. A terminal
     // row stands, or the cap is reached over a clean round: `verify` would
@@ -3640,6 +3655,34 @@ export function waiterReading(
 }
 
 /**
+ * What a waiter says when no loop is driving. A recorded stop is why the loop
+ * ended, so it is said in `renderStop`'s own words, after the restart: the
+ * stop's moves are answered once a loop is driving again. With no stop, the
+ * restart alone.
+ */
+export function noLoopMessage(
+  sessionsDir: string,
+  sessionNumber: number,
+  run: Pick<DriverRun, "stop" | "phase" | "engine"> | null,
+): string {
+  const opening =
+    `wait: no loop is driving session ${sessionDisplayNumber(sessionNumber)}, so no instruction is coming. `;
+  const restart = `dabbler session run --mailbox --sessions-dir ${sessionsDir}`;
+  const stop = run?.stop ?? null;
+  if (stop === null) {
+    return `${opening}Tell the operator; Resume Session starts it, or in a terminal of its own: ${restart}\n`;
+  }
+  const words = renderStop(stop, { session_number: sessionNumber, phase: run!.phase, engine: run!.engine });
+  return (
+    `${opening}${words.headline}. ${words.happened}\n` +
+    "Tell the operator. The ways on:\n" +
+    `  - Resume Session in VS Code, or in a terminal of its own: ${restart}\n` +
+    `    The loop starts again from phase '${run!.phase}'.` +
+    `${words.ways}\n`
+  );
+}
+
+/**
  * Wait for the instruction owed an answer, print it as JSON, and return. The AI
  * runs this in the background, so its chat stays free while it waits, and runs
  * it again after each answer. With nothing in flight it prints the idle `done`;
@@ -3664,11 +3707,13 @@ export async function sessionWait(
     }
     const reading = waiterReading(repoRoot, current, since);
     if (reading === "no-loop") {
-      writeErr(
-        `wait: no loop is driving session ${sessionDisplayNumber(current)}, so no instruction is coming. ` +
-          "Tell the operator; Resume Session starts it, or in a terminal of its own: " +
-          `dabbler session run --mailbox --sessions-dir ${sessionsDir}\n`,
-      );
+      let run: DriverRun | null;
+      try {
+        run = readRun(repoRoot, current);
+      } catch {
+        run = null;
+      }
+      writeErr(noLoopMessage(sessionsDir, current, run));
       return EXIT_BOUNDARY;
     }
     if (reading !== null) {

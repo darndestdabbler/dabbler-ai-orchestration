@@ -16,6 +16,7 @@ import {
   classifyPushFailure,
   judgeFreshness,
   judgeLatestRound,
+  judgeNoChange,
   judgePackagingRecord,
   judgePushState,
   judgeSuiteDeclaration,
@@ -26,6 +27,7 @@ import {
   parseRevListCount,
   previewPaths,
   runGates,
+  type NoChangeFacts,
   type PushFacts,
   type VerificationFacts,
 } from "../src/gates.ts";
@@ -406,5 +408,28 @@ describe("the gate row every screen shows", () => {
     assert.ok(
       renderGateRow(row({ remediation: "skipped by --force (bookkeeping gate)" })).includes("--force"),
     );
+  });
+});
+
+describe("a session that changed nothing: the judge over its facts", () => {
+  const HEAD = "a".repeat(40);
+  const facts = (overrides: Partial<NoChangeFacts>): NoChangeFacts => ({
+    rounds: 0,
+    planHead: HEAD,
+    head: HEAD,
+    empty: true,
+    ...overrides,
+  });
+
+  it("holds only with no round, HEAD at the plan's commit, and an empty tree", () => {
+    assert.equal(judgeNoChange(facts({})), true);
+    // A round means something was reviewed.
+    assert.equal(judgeNoChange(facts({ rounds: 1 })), false);
+    assert.equal(judgeNoChange(facts({ rounds: null })), false);
+    // A moved HEAD means something was committed; no recorded commit, nothing to compare.
+    assert.equal(judgeNoChange(facts({ head: "b".repeat(40) })), false);
+    assert.equal(judgeNoChange(facts({ planHead: null, head: null })), false);
+    // A tree that differs from HEAD is a change about to be made.
+    assert.equal(judgeNoChange(facts({ empty: false })), false);
   });
 });

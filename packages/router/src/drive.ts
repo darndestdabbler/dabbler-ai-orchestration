@@ -1,0 +1,3977 @@
+// `dabbler session drive` -- the framework runs the session; the engine
+// answers.
+//
+// The typed lifecycle asks an engine to follow nine steps in prose, and a
+// less capable engine wanders off them. Here the framework owns the
+// control flow and calls the engine once per thing it needs: a work plan,
+// then each step, then a disposition of whatever the verifier found. Every
+// answer the loop acts on is JSON against a schema (`driver.ts`), judged
+// mechanically and refused with reasons; prose the engine writes is for
+// people and is never read here; code and tests are compiled and run, never
+// interpreted. Every phase that already exists as a verb -- register,
+// declare, affected, the evidence record, verify, the run of record, the
+// close -- is called as that verb, so the record a driven session leaves is
+// the record a typed one leaves, and the task rows move for the same
+// reasons.
+//
+// The engine is reached through one interface, `Engine.invoke`, and the
+// adapters behind it -- the three CLIs' measured argv shapes, the operator's
+// own command -- are `engines.ts`. What this module owns of the exchange
+// is the transcript (every line the engine prints, verbatim, whether or not
+// `driver.engine_output` shows it) and the interrupt: a request written to
+// the ledger by `session interrupt` ends the running invocation, and the
+// same instruction is re-issued as `kind: interrupt` carrying the reason, so
+// the engine keeps everything up to its last completed step and reads what
+// changed. One path for every interrupter -- a person, a gate, a finding
+// that arrived mid-step.
+//
+// Bounded twice. A step is refused at most three times before the loop
+// stops, and the engine is invoked at most `driver.max_invocations` times
+// per session -- on a seat every invocation is a premium request, and each
+// is reported against the bound as it is spent. A stopped loop closes
+// nothing: the session stays in flight, `run.json` says why, and a re-run
+// continues from the phase it reached.
+
+import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+
+import {
+  checkRunGreen,
+  loadSelectionConfig,
+  makeCheck,
+  selectTests,
+  targetedCommand,
+  timeoutFor,
+  execute as executeCheck,
+} from "./checks.ts";
+import { divertOut, writeErr, writeOut } from "./output.ts";
+import {
+  ConfigError,
+  DEFAULT_ENGINE_OUTPUT,
+  type RouterConfig,
+  driverEngineOutput,
+  driverInvocationCap,
+  loadConfig,
+  verificationRoundCap,
+  PROJECT_CONFIG_FILENAME,
+} from "./config.ts";
+import {
+  DISPOSITION_SCHEMA,
+  DRIVER_SCHEMA_VERSION,
+  PHASE_WORK,
+  REPORT_SCHEMA,
+  WATCHER_OUTSTANDING,
+  WORK_PLAN_SCHEMA,
+  instructionPath,
+  loopPath,
+  clearDispositions,
+  readDispositions,
+  readInstruction,
+  readReport,
+  readRun,
+  readWatcher,
+  readWorkPlan,
+  isWorkPhase,
+  judgeWorkPlanHold,
+  judgeWorkPlanNonGoals,
+  planPath,
+  takeInterrupt,
+  transcriptPath,
+  writeInstruction,
+  writeRun,
+  appendSupervision,
+  progressResumed,
+  renderStop,
+  releaseOfPlan,
+} from "./driver.ts";
+import { RELEASE_SHIP_BY_DEFAULT, releaseMode } from "./settings.ts";
+import { readRawSessionState } from "./sessionState.ts";
+import { repoRootFromSessionsDir } from "./evidence.ts";
+import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
+import { detectEcosystems } from "./bootstrap/detect.ts";
+import { ensureRootFiles, ignoreBuildOutput } from "./ecosystem.ts";
+import { readProjectGraph } from "./projectGraph.ts";
+import { BUILT_IN_ENGINES, builtInEngine, engineAliases, mailboxEngine } from "./engines.ts";
+import type { Engine, EngineOutcome, EngineOutput } from "./engines.ts";
+import {
+  EVIDENCE_SERVED,
+  FIDELITY_UNKNOWN,
+  observedFidelity,
+} from "./selection.ts";
+import { SESSION_PLAN_FILENAME } from "./evidence.ts";
+import {
+  SET_BOOKKEEPING_COMMIT_BASENAMES,
+  type EvidencePhase,
+  checkVerificationClean,
+  codeEcosystems,
+  judgeSuiteDeclaration,
+  rewindPhaseFor,
+  sessionChangedNothing,
+} from "./gates.ts";
+import type {
+  DriverDisposition,
+  DriverInstruction,
+  DriverReport,
+  DriverRun,
+  DriverWorkPlan,
+} from "./generated/index.ts";
+import { type Job, endJob, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
+import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
+import { tryWriteProjection } from "./projection.ts";
+import {
+  changedPathsBetween,
+  headBranch,
+  nowIso,
+  repoRelativePath,
+  repoRootFor,
+  resolveTrunk,
+  runGit,
+  snapshotWorktreeTree,
+  treeWithPaths,
+} from "./journal.ts";
+import {
+  LedgerError,
+  OUTCOME_PUBLISHED,
+  type Row,
+  latestRound,
+  readDisputes,
+  readPackaging,
+  readRounds,
+} from "./ledger.ts";
+import { readSessionState, sessionDisplayNumber, stalledAfterSeconds } from "./progress.ts";
+import {
+  EXIT_BOUNDARY,
+  EXIT_GATE_FAILED,
+  EXIT_OK,
+  EXIT_USAGE,
+  declare,
+  extractSpecExcerpt,
+  start,
+  acquireLockWithTimeout,
+  releaseLock,
+  reviewingVehicleRefusal,
+  type DeclareRefusalCause,
+} from "./session.ts";
+import { resolveSessionOrchestratorIdentity } from "./identity.ts";
+import {
+  STAGE_FINAL_FULL,
+  STAGE_FINAL_TARGETED,
+  closedSessionSeconds,
+  evaluateFreshness,
+  runsWholeAtClose,
+  wholeRunsOwedBeforeRelease,
+  loadSuitesChecked,
+  readRecords,
+  suiteRequiredForClose,
+  surfaceDigest,
+  treeDigest,
+} from "./testEvidence.ts";
+import { judgeDisputeEvidence, recordDispute } from "./verify/disputes.ts";
+import {
+  EXIT_BLOCKING,
+  EXIT_CALL_FAILED,
+  EXIT_OK as VERIFY_OK,
+  EXIT_UNRESOLVED,
+} from "./verify/errors.ts";
+import {
+  NO_ROUND_CAP_CLEAN,
+  NO_ROUND_CAP_DISPUTED,
+  NO_ROUND_TERMINAL,
+  capDisputedRefusal,
+  noRoundReason,
+} from "./verify/rounds.ts";
+import { readTaskDeclaration, releasabilityOf, sessionIsReleasable } from "./writers.ts";
+
+// --- The engine --------------------------------------------------------------
+
+// The interface and the adapters live in `engines.ts`; they are re-exported
+// here because the loop is what a caller holds.
+export {
+  type Engine,
+  type EngineInvocation,
+  type EngineOutcome,
+  type EngineOutput,
+  INSTRUCTION_ENV_VAR,
+  INSTRUCTION_PLACEHOLDER,
+  builtInEngine,
+  commandEngine,
+} from "./engines.ts";
+
+// --- The run -----------------------------------------------------------------
+
+export interface DriveOptions {
+  readonly engine: string;
+  readonly provider?: string | null;
+  readonly model?: string | null;
+  readonly effort?: string | null;
+  readonly adapter: Engine;
+  /** Overrides `driver.engine_output`: show the engine's output as it runs, or only record it. */
+  readonly engineOutput?: EngineOutput | null;
+  /** Overrides `driver.max_invocations`; a re-run past a budget stop passes a larger one. */
+  readonly maxInvocations?: number | null;
+  readonly transport?: string | null;
+}
+
+/** What `dabbler session next` takes: no adapter, because there is no engine to invoke. */
+export interface NextOptions {
+  /** Required only when no session is in flight yet; `next` then registers one. */
+  readonly engine?: string | null;
+  readonly provider?: string | null;
+  readonly model?: string | null;
+  readonly effort?: string | null;
+  readonly transport?: string | null;
+  /**
+   * How long this call waits on a running job before it answers `wait`; not
+   * at all when absent. The CLI passes `WAIT_IN_CALL_MS`. A walkthrough whose
+   * jobs run only when it settles them passes nothing, because a job in this
+   * process cannot end while this process waits on it.
+   */
+  readonly waitInCallMs?: number | null;
+}
+
+/**
+ * The loop's own options. `push` invokes an engine between moves; `pull`
+ * returns the instruction and lets the person's own CLI be the engine.
+ * There is one loop under both.
+ */
+interface DriverOptions extends Omit<DriveOptions, "engine" | "adapter"> {
+  readonly engine: string | null;
+  readonly adapter: Engine | null;
+  readonly mode: "push" | "pull";
+  readonly waitInCallMs?: number | null;
+}
+
+export const MAX_REJECTIONS = 3;
+
+/** git's own convention for a subject line, and what hosting UIs truncate past. */
+export const COMMIT_SUBJECT_WIDTH = 72;
+
+/**
+ * The landed commit's message: the session's title as the subject, the task
+ * paragraph as the body.
+ *
+ * The subject used to be the whole task paragraph on one line -- some 770
+ * characters that `git log --oneline` wrapped and every hosting UI cut --
+ * while the close commit beside it had a short subject, so the framework
+ * plainly knew how to write one. The title comes from the session's row in
+ * sessions.json; where a row has none, the task's first line stands in. A
+ * subject that would still run past the width is cut there, because the
+ * body carries the whole paragraph anyway.
+ */
+export function landCommitMessage(
+  sessionNumber: number,
+  title: string | null,
+  task: string,
+): { readonly subject: string; readonly body: string } {
+  const body = task.trim();
+  const named = (title ?? "").trim() || body.split("\n")[0]?.trim() || "driven session";
+  const full = `Session ${sessionNumber}: ${named}`;
+  const subject =
+    full.length <= COMMIT_SUBJECT_WIDTH
+      ? full
+      : `${full.slice(0, COMMIT_SUBJECT_WIDTH - 1).trimEnd()}…`;
+  return { subject, body };
+}
+
+/**
+ * Whether this driver still holds the lease on the run it is about to write.
+ *
+ * Two drivers wrote one run on 2026-09-02 and phases were skipped silently.
+ * A save whose in-memory epoch is BEHIND the file's is that second driver:
+ * something else took the lease while this process was working, so this
+ * process's view of the run is stale and advancing state from it would
+ * overwrite what the holder wrote. Equal is the ordinary case -- one driver,
+ * saving repeatedly -- and a disk epoch behind the caller's cannot happen
+ * without the file having been rewound, which is not this fence's to judge.
+ */
+/**
+ * How a project reaches a sibling, which every plan is told. The build files
+ * are the solution: the framework reads them, and writes only the root files
+ * a solution of several projects lacks.
+ */
+export const SIBLING_REFERENCE =
+  "A project reaches a sibling by project reference: in .NET a <ProjectReference> to the sibling's project, with both projects listed in the solution file at the root; " +
+  "in Maven a <dependency> on the sibling at ${project.version}, with both modules listed under <modules> in the parent pom.xml and built in one reactor run. " +
+  "A step that writes a project adds it to that root file; where there is none yet, the framework writes the root build files, and ignores what the build writes, before the step's checks run.\n";
+
+export function judgeLease(mine: number, onDisk: number): { readonly refusal: string | null } {
+  if (onDisk <= mine) return { refusal: null };
+  return {
+    refusal:
+      `another driver holds the lease (epoch ${onDisk}; this process took ${mine}). ` +
+      "A stale attempt does not advance the run; its record ends here.",
+  };
+}
+
+/**
+ * The epoch a driver takes when it registers or resumes: one past whatever
+ * stood. Taking the same one would let two processes both believe they hold
+ * the run, which is the fence's whole subject.
+ */
+export function nextLeaseEpoch(existing: number | null | undefined): number {
+  return (existing ?? 1) + 1;
+}
+
+/**
+ * What the tree moved that belongs to a step.
+ *
+ * The ledger's own bookkeeping is not a step's work: it is written by the
+ * lifecycle on the way past, and counting it would make every step's report
+ * omit a file it never touched. Canonical, because git answers with its own
+ * spelling of the root while the sessions directory is whatever the caller
+ * was handed.
+ */
+export function stepChangedPaths(diff: readonly string[], sessionsRel: string): string[] {
+  return diff.filter((path) => {
+    const canonical = path.split("\\").join("/");
+    const name = canonical.split("/").pop() ?? canonical;
+    return !(canonical.startsWith(`${sessionsRel}/`) && SET_BOOKKEEPING_COMMIT_BASENAMES.includes(name));
+  });
+}
+
+/**
+ * A report that answered an earlier instruction and was judged then.
+ *
+ * It is still on disk because nothing removes it, and the next instruction
+ * was issued over it. The sample's engine called `next` with the previous,
+ * already-accepted report in place and was charged one of the step's three
+ * refusals for a report it had not written. A spent report is no report.
+ */
+export function reportIsSpent(report: DriverReport | null, instruction: DriverInstruction): boolean {
+  return report !== null && report.seq < instruction.seq;
+}
+
+/**
+ * The threshold multiple an outstanding instruction has newly passed, or null.
+ *
+ * Strictly past the threshold, matching the watcher rule itself: asking it at
+ * exactly the threshold would spend its probe on a `quiet` and count that
+ * multiple as said. Once per multiple, and never the same multiple twice.
+ */
+export function overdueMultiple(
+  issuedAtMs: number,
+  nowMs: number,
+  thresholdSeconds: number,
+  alreadySaid: number,
+): number | null {
+  if (!Number.isFinite(issuedAtMs) || thresholdSeconds <= 0) return null;
+  const elapsed = Math.trunc((nowMs - issuedAtMs) / 1000);
+  const multiple = Math.trunc(elapsed / thresholdSeconds);
+  return elapsed > thresholdSeconds && multiple > alreadySaid ? multiple : null;
+}
+
+/**
+ * Whether a report answers the instruction it was handed at all.
+ *
+ * Read before the tree is: a report about something else cannot be measured
+ * against this change set, and reading the tree to say so would be work
+ * spent on an answer already known to be the wrong one. `"blocked"` is the
+ * engine saying the step cannot be done; `"ok"` sends it on to the files.
+ * A spent report is judged as none written; one AHEAD of the instruction,
+ * or for another step, is refused as the wrong answer it is.
+ */
+export function judgeReportShape(
+  report: DriverReport | null,
+  instruction: DriverInstruction,
+  spec: StepSpec,
+): string[] | "blocked" | "ok" {
+  if (report === null || reportIsSpent(report, instruction)) {
+    return [
+      refusal(
+        RULE.noReport,
+        `no report was written for instruction ${instruction.seq}; the answer is ` +
+          `\`${instruction.answer_command}\``,
+      ),
+    ];
+  }
+  const reasons: string[] = [];
+  if (report.seq !== instruction.seq) {
+    reasons.push(
+      refusal(
+        RULE.reportSeq,
+        `the report answers seq ${report.seq}; instruction ${instruction.seq} is outstanding`,
+      ),
+    );
+  }
+  if (report.step_id !== spec.id) {
+    reasons.push(
+      refusal(
+        RULE.reportStep,
+        `the report is for step '${report.step_id}'; the instruction asked for '${spec.id}'`,
+      ),
+    );
+  }
+  if (reasons.length > 0) return reasons;
+  return report.status === "blocked" ? "blocked" : "ok";
+}
+
+/**
+ * The files a report stands for: the diff itself when it named none
+ * (`files_from_diff` with an empty list), its own list otherwise. Listing what
+ * changed is the framework's to do; a report that lists files -- flagged or not
+ * -- is held to them.
+ */
+export function reportedFiles(report: DriverReport, changed: readonly string[]): readonly string[] {
+  return report.files_from_diff === true && report.files_changed.length === 0 ? changed : report.files_changed;
+}
+
+/**
+ * Whether the report names exactly what the tree moved.
+ *
+ * `exists` is the one read, passed in: a named file the tree did not change
+ * is a different refusal depending on whether it is there at all.
+ */
+export function judgeReportFiles(
+  report: DriverReport,
+  changed: readonly string[],
+  exists: (file: string) => boolean,
+): string[] {
+  const reasons: string[] = [];
+  for (const file of report.files_changed) {
+    if (changed.includes(file)) continue;
+    reasons.push(
+      exists(file)
+        ? refusal(
+            RULE.filesChangedUnchanged,
+            `files_changed names '${file}', which the tree did not change since the last accepted step`,
+          )
+        : refusal(RULE.filesChangedMissingFile, `files_changed names '${file}', which does not exist`),
+    );
+  }
+  for (const file of changed) {
+    if (report.files_changed.includes(file)) continue;
+    // The refusal names the way out, because an engine that cannot see the
+    // edge does not have one: a change made while the loop was stopped -- a
+    // repair somebody did by hand -- belongs to no step, and reporting it
+    // inside one is what this rule refuses. Session 66 met this and folded
+    // the repair into a step it was not part of.
+    reasons.push(
+      refusal(
+        RULE.filesChangedOmits,
+        `files_changed omits '${file}', which the tree changed. If it was repaired while ` +
+          "the run was stopped, it belongs to no step: `dabbler session rebaseline " +
+          '--reason "<what was repaired>"` records it and moves the baseline',
+      ),
+    );
+  }
+  return reasons;
+}
+
+/**
+ * The step files the tree left byte-identical, which is not a refusal.
+ *
+ * The work can be done and the diff empty -- session 62's managed body,
+ * where bootstrap rewrote CLAUDE.md with content identical to
+ * what stood. Refusing made the step unanswerable: omitting the file failed
+ * a must-include while naming it failed the unchanged rule. A declared file
+ * that DID change and is missing from the report is still refused, and the
+ * step's checks remain the gate on the work itself.
+ */
+export function unchangedStepFiles(
+  spec: StepSpec,
+  report: DriverReport,
+  changed: readonly string[],
+): string[] {
+  return spec.files.filter(
+    (file) => !report.files_changed.includes(file) && !changed.includes(file),
+  );
+}
+/**
+ * The local executor's receipt: the same record the candidate mode writes,
+ * from the machine that ran the full check itself. One shape, two executors
+ * -- which is what makes the delegation auditable in a repository that will
+ * never have CI.
+ *
+ * The branch is read from HEAD, never assumed: this used to write the
+ * literal `master`, and three receipts in a repository whose trunk is `main`
+ * named a branch that did not exist. A detached HEAD names no branch, and
+ * the answer then is a refusal rather than a guess.
+ *
+ * **`headBranch` here and `resolveTrunk` in `candidateTrunk`, deliberately.**
+ * A receipt names the branch the check actually ran on, and resolving that
+ * to the trunk would make it name a branch the test did not run on -- which
+ * is the one thing a receipt exists not to do. The rule is `resolveTrunk`
+ * everywhere it answers "which branch is this repository's"; this asks a
+ * different question, and the exception is written down so it is a rule with
+ * an exception rather than a rule with drift.
+ */
+export function localGateReceipt(
+  repoRoot: string,
+): { receipt: Record<string, unknown>; refusal: null } | { receipt: null; refusal: string } {
+  const branch = headBranch(repoRoot);
+  if (branch === null) {
+    return { receipt: null, refusal: "HEAD is detached, so there is no branch for the receipt to name" };
+  }
+  const tested = runGit(repoRoot, ["rev-parse", "HEAD"]).stdout;
+  return {
+    receipt: {
+      mode: "local",
+      branch,
+      base_sha: tested,
+      tested_sha: tested,
+      executor: "local",
+      pushed_at: nowIso(),
+    },
+    refusal: null,
+  };
+}
+
+/**
+ * The trunk a candidate is gated onto, at `origin`: `resolveTrunk`'s reading
+ * and no other.
+ *
+ * It was the literal `origin/master` once, so a repository whose trunk was
+ * named anything else polled a ref that does not exist for twenty-five
+ * minutes and stopped. Reading HEAD fixed the constant and kept the shape of
+ * the bug: HEAD on a local branch origin has never heard of resolves to a
+ * remote ref that will never move, and `phaseGateWait` waits out its whole
+ * budget on it. The clause that makes the rule safe is *when origin has it*,
+ * and `resolveTrunk` is where that clause lives.
+ */
+export function candidateTrunk(
+  repoRoot: string,
+): { trunk: string; refusal: null } | { trunk: null; refusal: string } {
+  const reading = resolveTrunk(repoRoot);
+  if (reading.trunk === null) {
+    return {
+      trunk: null,
+      refusal:
+        reading.refusal ??
+        "there is no branch at origin for the candidate to be gated onto",
+    };
+  }
+  return { trunk: reading.trunk, refusal: null };
+}
+
+/** How often the push loop looks at a running job; a pull call never waits. */
+const JOB_POLL_MS = 250;
+/**
+ * How long `session next` holds a call open on the framework's own job
+ * before it answers `wait`. Under the shell-call limit of the engines that
+ * run it (Claude Code's default is 120 seconds), so the call returns before
+ * the engine gives up on it; a job that ends inside it costs no sleep at all.
+ */
+export const WAIT_IN_CALL_MS = 45_000;
+/** What a `wait` asks for once the call has already waited: the next call waits again. */
+const WAIT_RETRY_SECONDS = 5;
+/** What a `wait` tells the engine to leave the framework's work alone for. */
+const VERIFY_RETRY_SECONDS = 60;
+const SUITE_RETRY_SECONDS = 60;
+/** The shortest run-of-record wait worth naming: under it, the call costs more than the wait. */
+const SUITE_RETRY_FLOOR_SECONDS = 10;
+
+/**
+ * What the run-of-record `wait` says for `suite`: a quarter over the suite's
+ * last recorded duration, rounded up, never under the floor and never over
+ * the constant a suite with no history gets.
+ *
+ * Every such wait said 60. A four-second suite got the same number as a
+ * twenty-minute one, and the engine that noticed learned to watch the job's
+ * status file and call `next` at fourteen seconds instead -- which is the
+ * framework teaching an engine that its numbers are not worth reading. The
+ * newest row for the suite is the one that counts; a row with no duration
+ * says nothing.
+ */
+export function suiteRetrySeconds(
+  records: readonly { suite: string; durationSeconds: number | null }[],
+  suite: string,
+  fallback: number = SUITE_RETRY_SECONDS,
+): number {
+  let last: number | null = null;
+  for (const record of records) {
+    if (record.suite === suite && record.durationSeconds !== null) last = record.durationSeconds;
+  }
+  if (last === null) return fallback;
+  return Math.min(fallback, Math.max(SUITE_RETRY_FLOOR_SECONDS, Math.ceil(last * 1.25)));
+}
+const CLOSE_RETRY_SECONDS = 15;
+// A pack and a push to a feed are a build and a network call; the suite is
+// the nearest thing to either in this file, so this takes the suite's number.
+const PUBLISH_RETRY_SECONDS = 60;
+/** How often a running invocation looks for an interrupt request. */
+const INTERRUPT_POLL_MS = 500;
+/** What a deferred Send reads as, first among the next instruction's reasons. */
+const SENT_PREFIX = "sent: ";
+
+/**
+ * How many stops `run.json` remembers. Enough to see a loop going nowhere
+ * and no more: this is state, and the history of a run is its transcripts.
+ */
+const STOP_HISTORY_CAP = 8;
+/** How many engine executions' model evidence the run keeps; the recent end. */
+const MODEL_EVIDENCE_CAP = 32;
+
+/**
+ * How many rewinds a run remembers, and the reason it is the same number as
+ * the stop history: both are read to see the loop going nowhere, and both
+ * are state rather than history -- the transcripts are where a run's whole
+ * account lives.
+ */
+const REWIND_HISTORY_CAP = 8;
+
+/**
+ * The rules a refusal can come from, by name.
+ *
+ * Every reason a judge produces says which rule produced it, and the slug
+ * is what a person, `dabbler triage` and the `rejected-thrice` stop that
+ * quotes the last reasons all work from. They are here, written once each,
+ * because a name typed at its use site is a name that drifts from the rule
+ * it belongs to -- and a rule nobody can cite is one nobody can dispute.
+ */
+const RULE = {
+  noReport: "no-report",
+  reportSeq: "report-seq",
+  reportStep: "report-step",
+  filesChangedUnchanged: "files-changed-unchanged",
+  filesChangedMissingFile: "files-changed-missing-file",
+  filesChangedOmits: "files-changed-omits",
+  checkFailed: "check-failed",
+  configMalformed: "config-malformed",
+  noWorkPlan: "no-work-plan",
+  /** The plan names nothing it will not do. */
+  planNonGoals: "plan-non-goals",
+  /** The plan holds its release with no reason. */
+  planHold: "plan-hold",
+} as const;
+
+/** One refusal, carrying the name of the rule that refused it. */
+function refusal(rule: string, reason: string): string {
+  return `[${rule}] ${reason}`;
+}
+
+/**
+ * The suites a configuration declares, or the refusal of a configuration
+ * whose suites do not load: parseable text in the wrong shape is repaired by
+ * the same step as text that does not parse.
+ */
+function checkedSuites(config: unknown): ReturnType<typeof loadSuitesChecked> {
+  const loaded = loadSuitesChecked(config);
+  if (loaded.errors.length > 0) {
+    throw new ConfigError(`testing.suites is malformed: ${loaded.errors.join("; ")}`);
+  }
+  return loaded;
+}
+
+/** What a configuration that does not load asks for, in the loader's own words. */
+function configurationRefusal(error: ConfigError): string {
+  return (
+    `the repository's configuration does not load: ${error.message}. Repair ` +
+    `${PROJECT_CONFIG_FILENAME}, or the file the message names`
+  );
+}
+
+/**
+ * The command that runs the tests named after `changed`, one per suite that
+ * declares `select` and owns at least one of them. A declaration that does
+ * not parse names nothing here: the controls refuse it before a round.
+ */
+export function namedTestCommands(
+  repoRoot: string,
+  config: unknown,
+  changed: readonly string[],
+): Array<{ readonly suite: string; readonly command: string }> {
+  const selection = loadSelectionConfig(config);
+  const suites = loadSuitesChecked(config);
+  if (!selection.ok || !suites.ok) return [];
+  const result = selectTests(repoRoot, changed, selection.config);
+  return suites.suites
+    .filter((suite) => suite.select !== undefined)
+    .map((suite) => ({
+      suite: suite.name,
+      command: targetedCommand(suite.command, result.forSuite(suite.name), suite),
+    }))
+    .filter((entry) => entry.command !== "");
+}
+
+
+/**
+ * Where a refused publish sends the run back to, read off the record rather
+ * than out of the refusal's prose.
+ *
+ * `packageSession` runs the close's gates as its own preconditions and
+ * writes their rows into the refused packaging row, so the answer is
+ * structured and the driver never parses a sentence. Only the LAST row is
+ * read: a session may be refused, fixed and refused again, and what is to
+ * be remade is what failed this time.
+ *
+ * Null where the refusal is not about an earlier phase's evidence -- a
+ * missing credential, a feed that would not take the artifact, a tag that
+ * names the wrong commit -- because no phase remakes any of those, and a
+ * rewind that could not fix anything would be a loop.
+ */
+export function rewindFromPackaging(rows: readonly Row[]): EvidencePhase | null {
+  const last = rows.length > 0 ? rows[rows.length - 1] : null;
+  if (last === null || last === undefined) return null;
+  const gates = last["gates"];
+  if (!Array.isArray(gates)) return null;
+  return rewindPhaseFor(gates as { name: string; passed?: boolean }[]);
+}
+
+/**
+ * Whether the run has already been sent back for this exact refusal.
+ *
+ * The bound on the rewind, and it is the classifier's bound rather than a
+ * new one: the same refusal met twice is a loop going nowhere. It has to be
+ * asked separately because a rewind throws nothing -- no `Stop` is
+ * constructed, so `stop_history` gains no row and `judgeStopClass` never
+ * sees it. Compared against the UNDECORATED refusal, for the reason the
+ * stop history keeps one.
+ */
+export function alreadyRewoundFor(
+  rewinds: readonly { readonly reason: string }[] | null | undefined,
+  refusal: string,
+): boolean {
+  if (!rewinds) return false;
+  return rewinds.some((row) => row.reason === refusal);
+}
+
+type StopKind = NonNullable<DriverRun["stop"]>["kind"];
+type StopCode = NonNullable<NonNullable<DriverRun["stop"]>["code"]>;
+
+/**
+ * The loop halting short of the close, with the reason a person reads.
+ *
+ * Written out longhand rather than as a parameter property, and so is the
+ * driver below: `selfArgv` re-enters this router on a bare `node`, whose
+ * type stripping refuses a parameter property outright. A file the CLI
+ * imports may not use one, or the framework cannot start its own work.
+ */
+class Stop extends Error {
+  readonly kind: StopKind;
+  /**
+   * Which refusal this was, where the kind is too coarse for a person to
+   * act on. Named at the sites that need distinguishing and nowhere else:
+   * a stop with no code is its kind, and adding one to a site whose kind
+   * already says everything would only give the rendering a second key to
+   * disagree with itself on.
+   */
+  readonly code: StopCode | null;
+  /**
+   * The substance a person needs to answer this stop, where the reason
+   * cannot carry it: the findings, the grounds, the evidence.
+   *
+   * It is printed with the stop and nowhere else. The reason
+   * on `run.json` stays what the deadlock classifier compares -- short, and
+   * identical when the same impasse is met twice -- and a brief that grew
+   * a timestamp or a path would make every stop look like a first.
+   */
+  readonly brief: string | null;
+
+  constructor(
+    kind: StopKind,
+    reason: string,
+    code: StopCode | null = null,
+    brief: string | null = null,
+  ) {
+    super(reason);
+    this.kind = kind;
+    this.code = code;
+    this.brief = brief;
+    this.name = "Stop";
+  }
+}
+
+/**
+ * The pull's unwind: an instruction has been issued and this call is over.
+ *
+ * `dabbler session next` advances one move. When a phase reaches the point
+ * where it would wait -- for the engine's answer, or for the framework's own
+ * long work -- it throws this instead, and the verb prints the instruction
+ * it carries. `run.json` holds everything the next call needs to re-enter
+ * the same phase at the same place.
+ */
+class Awaiting extends Error {
+  readonly instruction: DriverInstruction;
+
+  constructor(instruction: DriverInstruction) {
+    super(`awaiting the answer to instruction ${instruction.seq}`);
+    this.instruction = instruction;
+    this.name = "Awaiting";
+  }
+}
+
+/** One step as the loop measures it: a plan step, or a fix round's own. */
+export interface StepSpec {
+  readonly id: string;
+  readonly ask: string;
+  readonly files: readonly string[];
+  readonly checks: ReadonlyArray<{ readonly argv: readonly string[] }>;
+  /** A work-plan step is remembered as accepted; a fix step is not a plan step. */
+  readonly fromPlan: boolean;
+}
+
+function clock(): string {
+  return nowIso("seconds").slice(11, 19);
+}
+
+function tail(text: string, limit = 600): string {
+  const trimmed = text.trim();
+  return trimmed.length <= limit ? trimmed : trimmed.slice(-limit);
+}
+
+function describeFinding(index: number, finding: Row): string {
+  const cited = Array.isArray(finding["evidencePaths"])
+    ? (finding["evidencePaths"] as unknown[]).map(String)
+    : [];
+  return (
+    `[${index}] ${String(finding["severity"] ?? "unknown")}` +
+    `${finding["blocking"] === true ? ", blocking" : ""}: ` +
+    String(finding["description"] ?? "").trim() +
+    (cited.length > 0 ? ` -- cited: ${cited.join(", ")}` : "")
+  );
+}
+
+/**
+ * Why a disposition set cannot be recorded, one reason per refused dispute,
+ * judged by the rule `recordDispute` applies, so a set this accepts is never
+ * refused when its disputes are written. Empty when every dispute can be.
+ */
+export function dispositionRefusals(repoRoot: string, set: DriverDisposition): string[] {
+  return set.dispositions
+    .filter((entry) => entry.action === "reject")
+    .map((entry) => [entry.finding_index, judgeDisputeEvidence(repoRoot, entry.evidence_paths ?? []).refusal] as const)
+    .filter(([, refusal]) => refusal !== "")
+    .map(([index, refusal]) => `finding ${index}: ${refusal}`);
+}
+
+/**
+ * What a person needs to judge a standing dispute: each contested finding,
+ * the grounds the engine filed against it, and what that argument cites.
+ *
+ * Read from the record, said in the record's own words, and decided by
+ * nothing here. An adjudication is the operator's tie-break between a
+ * verifier and an engine, and a summary that leaned either way would be the
+ * framework voting in a question it raised.
+ */
+export function disputedFindingsBrief(latest: Row, disputes: readonly Row[]): string {
+  const findings = Array.isArray(latest["findings"]) ? (latest["findings"] as Row[]) : [];
+  const round = Number(latest["round"]);
+  const standing = disputes.filter((row) => Number(row["round"]) === round);
+  if (standing.length === 0) return "";
+  const blocks = standing.map((dispute) => {
+    const index = Number(dispute["finding_index"]);
+    const cited = Array.isArray(dispute["evidence_paths"])
+      ? (dispute["evidence_paths"] as unknown[]).map(String)
+      : [];
+    return (
+      `${describeFinding(index, findings[index] ?? {})}\n` +
+      `  Disputed on: ${String(dispute["grounds"] ?? "").trim()}\n` +
+      `  Citing: ${cited.length > 0 ? cited.join(", ") : "(nothing)"}`
+    );
+  });
+  return (
+    `The ${standing.length} dispute(s) standing over round ${round}, as the ` +
+    `record holds them:\n\n${blocks.join("\n\n")}`
+  );
+}
+
+/**
+ * What a registration call does, decided from the three facts it can read.
+ *
+ * **`next` advances a session; it does not create one.** The decision used to
+ * live tangled with the reading of it, and the tangle is exactly what let an
+ * engine start work nobody asked for: the launch prompt hands the engine one
+ * command line carrying `--engine`, so an engine that re-runs the line it was
+ * given, once, after `done`, arrives here with the flags still on it and
+ * nothing in flight -- and `start` was called. The other ending was no better:
+ * an engine that correctly dropped the flags got a usage refusal, so both ways
+ * out of the documented "call it until it says done" loop were wrong.
+ *
+ * Precedence is the order below and it matters. A close still being collected
+ * outranks everything, because registering underneath one would start the NEXT
+ * session while this one's close is in flight -- which is the bug this
+ * ordering was already written to prevent, and it is kept whole.
+ */
+export const REGISTER_COLLECT = "collect";
+export const REGISTER_CONTINUE = "continue";
+export const REGISTER_START = "start";
+export const REGISTER_REFUSE_START = "refuse-start";
+export const REGISTER_IDLE = "idle";
+
+export type RegistrationOutcome =
+  | typeof REGISTER_COLLECT
+  | typeof REGISTER_CONTINUE
+  | typeof REGISTER_START
+  | typeof REGISTER_REFUSE_START
+  | typeof REGISTER_IDLE;
+
+/** The four facts a registration reads, and nothing else. */
+export interface RegistrationFacts {
+  /** An identity was named on this call: `--engine` (with `--provider`). */
+  readonly engineNamed: boolean;
+  /** The ledger says a session is in flight. */
+  readonly inFlight: boolean;
+  /** A close was written and has not been collected yet. */
+  readonly closing: boolean;
+  /**
+   * The call is a pull -- `session next`, the engine asking for its next move.
+   *
+   * It is the whole difference between the two starts. `session drive` is a
+   * launcher: a person typed it to begin work, and registering is its job. An
+   * engine calling `next` is mid-conversation, and the flags on its command
+   * line are left over from the launch rather than a request for new work.
+   */
+  readonly pull: boolean;
+}
+
+/**
+ * Which of the four a registration is.
+ *
+ * `continue` covers both in-flight cases; whether the identity is re-written
+ * follows from `engineNamed`, which the caller already holds. Re-registering
+ * the session in flight under the SAME identity is silent and idempotent and
+ * is how a pull legitimately continues -- it is not a start, and nothing here
+ * may turn it into one.
+ */
+export function judgeRegistration(facts: RegistrationFacts): RegistrationOutcome {
+  if (facts.closing) return REGISTER_COLLECT;
+  if (facts.inFlight) return REGISTER_CONTINUE;
+  if (facts.engineNamed) {
+    return facts.pull ? REGISTER_REFUSE_START : REGISTER_START;
+  }
+  return REGISTER_IDLE;
+}
+
+/**
+ * The answer to `next` when nothing is in flight and nothing was asked for.
+ *
+ * A `done`, and built here rather than issued: `issue` writes into a session's
+ * own run directory, and an idle call has no session to write into. Nothing is
+ * recorded, which is the point -- asking an empty repository what to do next
+ * is not an event in any session's life.
+ *
+ * `session_number` is 0 because there is no session. Every other kind carries
+ * a real one; this is the only instruction that can honestly name none, and a
+ * reader that treats 0 as a session will find no record for it.
+ */
+export function idleInstruction(now: string): DriverInstruction {
+  return {
+    schema_version: DRIVER_SCHEMA_VERSION,
+    seq: 0,
+    session_number: 0,
+    issued_at: now,
+    kind: "done",
+    ask:
+      "Nothing is in flight, and there is nothing to do. `dabbler session " +
+      "start --engine <engine> --provider <provider>` begins the next one.",
+  };
+}
+
+/**
+ * What the `done` a close issues says: the loop ends here.
+ *
+ * Every other instruction states its own meaning, and this one used to be
+ * four fields and nothing else -- no `ask` at all, handed to an AI that had
+ * spent the whole session being taught to read `ask`, do it, answer, and
+ * wait again. It re-armed the waiter to find out what a bare `done` meant.
+ *
+ * It names no command on purpose. A session that has closed is owed no
+ * answer, and the one command that would follow -- the next `session start`
+ * -- is the operator's to type and not a loop's to be handed.
+ */
+export function closedAsk(sessionNumber: number): string {
+  return (
+    `Session ${sessionDisplayNumber(sessionNumber)} is closed: the work is ` +
+    "landed, verified and recorded. This is the end of the loop -- there is " +
+    "nothing to answer and no waiter to start again. Stop, and tell the " +
+    "operator the session is done."
+  );
+}
+
+/** What a refused start says, in the one sentence that names the door in. */
+export const REFUSE_START_REASON =
+  "dabbler: refused -- `session next` advances a session and does not start " +
+  "one. Nothing is in flight; `dabbler session start --engine <engine> " +
+  "--provider <provider>` is the door in, and every later call carries no " +
+  "identity flags.\n";
+
+class Driver {
+  private readonly sessionsDir: string;
+  private readonly options: DriverOptions;
+  private readonly repoRoot: string;
+  private sessionNumber = 0;
+  private run!: DriverRun;
+  /**
+   * Registration found nothing in flight and nothing asked for.
+   *
+   * There is no run and no session number behind this driver, so nothing may
+   * ask it to advance -- the caller answers with `idleInstruction` instead.
+   */
+  private idle = false;
+  private plan: DriverWorkPlan | null = null;
+  /** Sends that arrived with no invocation to end; the next instruction carries them. */
+  private deferred: string[] = [];
+  /**
+   * The step the loop is on, or null between steps.
+   *
+   * Tracked here rather than passed to `Stop`, because a stop raised inside
+   * a step is not always raised by the step's own code: a tree that cannot
+   * be snapshotted, an engine that will not run and an interrupt all unwind
+   * from underneath it, and each of them is still "the loop was on this
+   * step" to whoever reads the record.
+   */
+  private currentStep: string | null = null;
+  /**
+   * Pull mode only: whether the outstanding answer has been judged in this
+   * call. One call judges one answer; every later call site in the same
+   * call issues rather than reading the same answer twice.
+   */
+  private answered = false;
+
+  constructor(sessionsDir: string, options: DriverOptions, repoRoot: string) {
+    this.sessionsDir = sessionsDir;
+    this.options = options;
+    this.repoRoot = repoRoot;
+  }
+
+  /**
+   * The repository's configuration, read when it is acted on.
+   *
+   * One driver lives for a whole session under `session run --mailbox`, and
+   * a step may declare a suite in `dabbler.yaml` while it runs. An answer
+   * kept from the process's start is the answer before that step, and the
+   * run of record would ask for the suite the file already declares.
+   */
+  private config(): RouterConfig {
+    return loadConfig(undefined, this.repoRoot);
+  }
+
+  private get pull(): boolean {
+    return this.options.mode === "pull";
+  }
+
+  // --- output and state ------------------------------------------------------
+
+  private log(event: string, fields: Record<string, unknown> = {}): void {
+    const extra = Object.entries(fields)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => `${key}=${typeof value === "string" ? value : JSON.stringify(value)}`)
+      .join(" ");
+    writeOut(`dabbler [${clock()}] ${event}${extra ? ` ${extra}` : ""}\n`);
+  }
+
+  private save(): void {
+    // Atomic under the lifecycle lock: the fence below is check-then-write,
+    // and two drivers hitting the window between them was the whole
+    // incident. The lock makes the pair one act.
+    let lock: string | null = null;
+    try {
+      lock = acquireLockWithTimeout(this.sessionsDir, `driver-save/${process.pid}`);
+    } catch {
+      // Fail CLOSED: a save that cannot take the lock while another writer
+      // holds it is exactly the stale attempt the fence exists for. Stopping
+      // loses nothing -- the winner drives on.
+      appendSupervision(this.repoRoot, this.sessionNumber, {
+        event: "stale-save-refused",
+        cause: "lifecycle lock contended",
+        phase: this.run.phase,
+      });
+      throw new Stop(
+        "interrupted",
+        "the lifecycle lock is contended: another driver is writing this run, and a stale attempt does not advance it.",
+      );
+    }
+    try {
+    const mine = this.run.lease_epoch ?? 1;
+    let disk: number;
+    try {
+      disk = readRun(this.repoRoot, this.sessionNumber)?.lease_epoch ?? 1;
+    } catch {
+      disk = mine;
+    }
+    const lease = judgeLease(mine, disk);
+    if (lease.refusal !== null) {
+      // The refusal is a supervision event before it is a stop, so the
+      // record says which epoch lost.
+      appendSupervision(this.repoRoot, this.sessionNumber, {
+        event: "stale-save-refused",
+        my_epoch: mine,
+        disk_epoch: disk,
+        phase: this.run.phase,
+      });
+      throw new Stop("interrupted", lease.refusal);
+    }
+    this.run = writeRun(this.repoRoot, this.sessionNumber, {
+      ...this.run,
+      updated_at: nowIso(),
+    });
+    } finally {
+      if (lock !== null) releaseLock(lock);
+    }
+  }
+
+  private setPhase(phase: DriverRun["phase"]): void {
+    this.run = { ...this.run, phase };
+    this.save();
+    this.log("phase", { phase });
+    // The first green event, said once: the loop has moved past the phase
+    // it paused in, and nothing stands in the stop's place. The rule is the
+    // router's (`progressResumed`), so the terminal reading the record
+    // cannot say it differently; the marker is the record's, so the pull's
+    // fresh process finds what the resuming one left.
+    const past = this.run.resumed_from ?? null;
+    if (past !== null && progressResumed({ stop: past, phase: past.phase }, this.run)) {
+      this.run = { ...this.run, resumed_from: null };
+      this.save();
+      this.log("progress-resumed", { past: past.kind, from: past.phase, phase });
+      appendSupervision(this.repoRoot, this.sessionNumber, {
+        event: "progress-resumed",
+        past_stop: past.kind,
+        from_phase: past.phase,
+        phase,
+      });
+    }
+  }
+
+  // --- register --------------------------------------------------------------
+
+  /** The name `run.json` records the engine under, and resumes are held to. */
+  private engineName(): string | null {
+    return this.options.adapter?.name ?? this.options.engine ?? null;
+  }
+
+  /**
+   * The session whose close ran but whose result nobody has collected.
+   *
+   * Only the close takes a session out of flight, and under the pull it does
+   * so from a job the call that started it did not wait for. The call that
+   * comes back therefore finds nothing in flight and a run still standing at
+   * `close`: that run is this session, and it is owed its `done`.
+   */
+  private uncollectedClose(): number | null {
+    const rows = readSessionState(this.sessionsDir)?.["sessions"];
+    if (!Array.isArray(rows)) return null;
+    const numbers = rows
+      .map((row) => (row as Row)["number"])
+      .filter((value): value is number => typeof value === "number")
+      .sort((left, right) => right - left);
+    for (const number of numbers) {
+      try {
+        if (readRun(this.repoRoot, number)?.phase === "close") return number;
+      } catch (error) {
+        // A run this reader refuses is not the one being collected here;
+        // the refusal belongs to whoever opens it deliberately.
+        if (!(error instanceof LedgerError)) throw error;
+      }
+    }
+    return null;
+  }
+
+  /** Whether registration found nothing in flight and nothing asked for. */
+  isIdle(): boolean {
+    return this.idle;
+  }
+
+  /** Register (or re-register) and load or open the run's state. */
+  async register(): Promise<number> {
+    // A pull call that names no engine is a person continuing a session
+    // already in flight: its identity is on the record, and re-registering
+    // would only ask them to repeat it.
+    const inFlight = readSessionState(this.sessionsDir)?.["currentSession"];
+    // A standing close is read in BOTH modes. It used to be pull-only, which
+    // made `closing` structurally false for every push call -- so `session
+    // drive`, launched at the boundary where a pull loop has closed a session
+    // and not yet collected it, classified the repository as startable and
+    // opened session N+1 instead of finishing session N. That is this
+    // session's own defect surviving on the unattended entrypoint, and it is
+    // what round 1 caught.
+    const closing = typeof inFlight === "number" ? null : this.uncollectedClose();
+    // The facts are read here; which case they are is decided in one pure
+    // function above, so the rule can be exercised from literal inputs
+    // without a repository on disk.
+    const outcome = judgeRegistration({
+      engineNamed: this.options.engine !== null,
+      inFlight: typeof inFlight === "number",
+      closing: closing !== null,
+      pull: this.pull,
+    });
+    if (outcome === REGISTER_REFUSE_START) {
+      writeErr(REFUSE_START_REASON);
+      return EXIT_USAGE;
+    }
+    if (outcome === REGISTER_IDLE) {
+      // Not a refusal. An engine told to call `next` until it says `done` has
+      // to be able to reach `done`; ending its loop on a usage error was the
+      // other half of the defect this session fixes.
+      this.idle = true;
+      return EXIT_OK;
+    }
+    // Re-registration of the session in flight, and only that: `collect` is a
+    // close still being gathered, and registering underneath it would start
+    // the NEXT session while this one's close is in flight.
+    if (
+      (outcome === REGISTER_START || outcome === REGISTER_CONTINUE) &&
+      this.options.engine !== null
+    ) {
+      const code = await start(this.sessionsDir, {
+        engine: this.options.engine,
+        provider: this.options.provider ?? null,
+        model: this.options.model ?? null,
+        effort: this.options.effort ?? null,
+      });
+      if (code !== EXIT_OK) return code;
+    }
+    const state = readSessionState(this.sessionsDir);
+    const current = closing ?? (state ? state["currentSession"] : null);
+    if (typeof current !== "number") {
+      writeErr("dabbler: refused -- no session is in flight after registration.\n");
+      return EXIT_BOUNDARY;
+    }
+    this.sessionNumber = current;
+    // Nothing is cleared here, in either mode. What this guard was reaching
+    // for is a request written for a run that has already ended, and the
+    // right test for that is whether the request has been READ -- which is
+    // what `takeInterrupt` answers wherever the driver next looks. Dropping
+    // it on the way in made `session interrupt --stop` unusable against a
+    // pulled session and, exactly as much, threw away a Send made between
+    // two of a push run's own invocations: one bug, in two modes.
+
+    const existing = readRun(this.repoRoot, current);
+    const cap = this.options.maxInvocations ?? driverInvocationCap(this.config());
+    if (existing === null) {
+      const now = nowIso();
+      this.run = {
+        schema_version: DRIVER_SCHEMA_VERSION,
+        session_number: current,
+        engine: this.engineName() ?? "cli",
+        phase: "plan",
+        seq: 0,
+        invocations: 0,
+        max_invocations: cap,
+        accepted_steps: [],
+        baseline_tree: null,
+        stop: null,
+        verification: this.verificationSettings(null),
+        started_at: now,
+        updated_at: now,
+      };
+      this.save();
+      // Under the pull there is no engine the framework invokes and no
+      // invocation bound it holds anyone to, so the line says the mode and
+      // nothing that reads as a budget: `engine=cli max_invocations=24` was
+      // read by engines as a limit on their own calls.
+      this.log("run-started", {
+        session: sessionDisplayNumber(current),
+        ...(this.options.mode === "pull"
+          ? { mode: "pull" }
+          : { engine: this.run.engine, max_invocations: cap }),
+      });
+      return EXIT_OK;
+    }
+    const named = this.engineName();
+    if (named !== null && existing.engine !== named) {
+      writeErr(
+        `dabbler: refused -- session ${sessionDisplayNumber(current)} is being driven ` +
+          `through '${existing.engine}', and this run names '${named}'. ` +
+          "One engine's session store carries a run; finish it with the engine it started with.\n",
+      );
+      return EXIT_BOUNDARY;
+    }
+    // Three refusals of one answer stopped the loop, and a person asking
+    // again is the intervention the bound existed to force. The failed
+    // answer is not judged a fourth time: it is left behind, the count
+    // starts over, and the phase issues its instruction afresh. Without
+    // this the pull cannot resume a `rejected-thrice` stop at all -- every
+    // call would rejudge the same answer and stop again on the spot.
+    const afterRefusals = existing.stop?.kind === "rejected-thrice";
+    if (afterRefusals) this.answered = true;
+    this.run = {
+      ...existing,
+      max_invocations: this.options.maxInvocations ?? existing.max_invocations,
+      verification: this.verificationSettings(existing.verification ?? null),
+      ...(afterRefusals ? { rejections: 0 } : {}),
+      // Taking the lease: this process's first write bumps the epoch, and
+      // any driver still holding the old number is refused at its next
+      // save. One writer per run, enforced by the record itself.
+      lease_epoch: nextLeaseEpoch(existing.lease_epoch),
+      stop: null,
+      // What was resumed past, kept on the record until the phase moves on:
+      // that move is the one honest "progress resumed", and under the pull
+      // the process that resumes is never the one that advances. A call
+      // that finds no stop carries the marker an earlier one left.
+      ...(existing.stop
+        ? {
+            resumed_from: {
+              kind: existing.stop.kind,
+              at: existing.stop.at,
+              step_id: existing.stop.step_id ?? null,
+              phase: existing.phase,
+            },
+          }
+        : {}),
+    };
+    this.save();
+    appendSupervision(this.repoRoot, this.sessionNumber, {
+      event: "lease-taken",
+      lease_epoch: this.run.lease_epoch,
+      phase: this.run.phase,
+    });
+    this.log("run-resumed", {
+      session: sessionDisplayNumber(current),
+      phase: this.run.phase,
+      ...(this.options.mode === "pull"
+        ? { mode: "pull" }
+        : { invocations: this.run.invocations, max_invocations: this.run.max_invocations }),
+      ...(existing.stop ? { after: existing.stop.kind } : {}),
+      ...(afterRefusals ? { refusals: "reset; the step is asked afresh" } : {}),
+    });
+    return EXIT_OK;
+  }
+
+  /**
+   * The round cap and transport this run verifies under.
+   *
+   * The transport is the run's, not a call's: under the pull the call that
+   * reaches verification is whichever `next` happens to get there, following
+   * an `answer_command` that names it, so a transport typed once would
+   * otherwise be dropped for the round it was typed for.
+   *
+   * The CAP is not typeable here at all. It came off any `next` call and
+   * always won -- so `--max-rounds 1` with four rounds run routed the tree
+   * straight to its at-cap branch, a verification-reducing act with no
+   * reason anywhere on the record and reachable by anyone who typed a
+   * command. It now comes from `verification.settings.max_rounds` and moves
+   * only through `dabbler session plan amend --max-rounds`, which states a
+   * reason beside who was working. What is carried here is what the run already
+   * holds, and nothing else may set it.
+   */
+  private verificationSettings(existing: DriverRun["verification"]): DriverRun["verification"] {
+    const maxRounds = existing?.max_rounds ?? null;
+    const transport = this.options.transport ?? existing?.transport ?? null;
+    if (maxRounds === null && transport === null) return null;
+    return { max_rounds: maxRounds, transport };
+  }
+
+  // --- the conversation ------------------------------------------------------
+
+  /** The answer command, rendered for the seq an instruction is issued under. */
+  private answerCommand(kind: "step" | "file", stepId?: string): (seq: number) => string {
+    return (seq) => {
+      const head = `dabbler session report --sessions-dir ${this.sessionsDir} --seq ${seq}`;
+      if (kind === "file") return `${head} --answer-file <path to the JSON you wrote>`;
+      return (
+        `${head} --step ${stepId} --status done ` +
+        "[--files <every file you created, changed or deleted, comma-separated, repository-relative>] " +
+        '--notes "<one line>" [--tests "<the test command you ran>"]'
+      );
+    };
+  }
+
+  /** What a `wait` tells the engine to run when the time is up. */
+  private nextCommand(): string {
+    return `dabbler session next --sessions-dir ${this.sessionsDir}`;
+  }
+
+  /**
+   * The refusals the outstanding answer has had, out of `MAX_REJECTIONS`.
+   *
+   * On `run.json` rather than in a phase's local, because a pull call ends
+   * between the refusal and the answer to it: a count this process held
+   * would start again at zero every time the person's CLI came back, and
+   * "refused three times" would never be reached.
+   */
+  private get rejections(): number {
+    return this.run.rejections ?? 0;
+  }
+
+  private setRejections(count: number): void {
+    this.run = { ...this.run, rejections: count };
+    this.save();
+  }
+
+  private issue(fields: Record<string, unknown>): DriverInstruction {
+    const seq = this.run.seq + 1;
+    const command = fields["answer_command"];
+    const instruction = writeInstruction(this.repoRoot, this.sessionNumber, {
+      schema_version: DRIVER_SCHEMA_VERSION,
+      seq,
+      session_number: this.sessionNumber,
+      issued_at: nowIso(),
+      ...fields,
+      ...(typeof command === "function" ? { answer_command: command(seq) } : {}),
+    });
+    this.run = { ...this.run, seq };
+    this.save();
+    this.log("instruction-issued", {
+      seq,
+      kind: instruction.kind,
+      step: instruction.step_id,
+      ...(instruction.reasons ? { reasons: instruction.reasons.length } : {}),
+    });
+    return instruction;
+  }
+
+  /**
+   * The instruction that ends the session, in the one place it is built.
+   *
+   * It carries an `ask` and no `answer_command`: the session is closed, so
+   * nothing is owed an answer, and an instruction that said nothing at all
+   * left the reader to guess what a bare `done` meant.
+   */
+  private issueDone(): DriverInstruction {
+    return this.issue({ kind: "done", ask: closedAsk(this.sessionNumber) });
+  }
+
+  /**
+   * One invocation of the engine on `instruction`. Returns null when the
+   * engine returned on its own, and the interrupt's reason when the driver
+   * ended it -- polled from the ledger while the engine runs, because the
+   * request is written by another process (`session interrupt`, or the
+   * extension's Stop) and this one holds the child.
+   */
+  private async invoke(instruction: DriverInstruction): Promise<string | null> {
+    // An engine the framework does not pay for (the mailbox: the AI answers
+    // from its own CLI) is not held to the budget, as the pull is not.
+    const metered = this.options.adapter?.metered !== false;
+    if (metered && this.run.invocations >= this.run.max_invocations) {
+      throw new Stop(
+        "budget",
+        `the engine has been invoked ${this.run.invocations} time(s), which is ` +
+          `driver.max_invocations (${this.run.max_invocations}); re-run with ` +
+          "--max-invocations <larger> to continue, which is a decision to spend more",
+      );
+    }
+    const invocation = this.run.invocations + 1;
+    const first = this.run.invocations === 0;
+    // An unmetered engine spends nothing of the framework's, so nothing is counted.
+    if (metered) {
+      this.run = { ...this.run, invocations: invocation };
+      this.save();
+    }
+
+    const transcript = transcriptPath(this.repoRoot, this.sessionNumber, invocation);
+    mkdirSync(dirname(transcript), { recursive: true });
+    const started = Date.now();
+    appendFileSync(
+      transcript,
+      `# engine ${this.run.engine}; instruction ${instruction.seq} (${instruction.kind}` +
+        `${instruction.step_id ? `, ${instruction.step_id}` : ""}); invocation ${invocation}; ${nowIso()}\n`,
+      "utf8",
+    );
+    const streaming = this.engineOutput() === "stream";
+    this.log("engine-invoked", {
+      seq: instruction.seq,
+      invocation: `${invocation}/${this.run.max_invocations}`,
+      first,
+      output: this.engineOutput(),
+    });
+
+    const controller = new AbortController();
+    let reason: string | null = null;
+    let stopRequested = false;
+    // The watcher, on the one channel a headless run has. Under the pull the
+    // terminal asks the rule itself; here the driver holds the child and
+    // this poll is the only thing awake while the engine runs, so it asks
+    // the same rule and says the answer in the same words.
+    //
+    // The elapsed test is done from the instruction in hand, and the rule --
+    // whose tree probe costs a git call -- is asked only when a further
+    // threshold has actually passed. So the probe runs once per threshold,
+    // not once per 500ms poll.
+    const threshold = stalledAfterSeconds(this.repoRoot);
+    const issued = Date.parse(instruction.issued_at);
+    let saidMultiple = 0;
+    const poll = setInterval(() => {
+      const multiple = reason === null ? overdueMultiple(issued, Date.now(), threshold, saidMultiple) : null;
+      if (multiple !== null) {
+        saidMultiple = multiple;
+        const reading = readWatcher(this.repoRoot, this.sessionNumber, threshold);
+        const quiet = reading.state === WATCHER_OUTSTANDING;
+        if (quiet) {
+          this.log("watcher", {
+            since: `${reading.sinceSeconds}s`,
+            state: reading.state,
+            ...(reading.clock ? { clock: reading.clock } : {}),
+          });
+        }
+        // Overdue whether or not the tree moved: an AI that changed files and
+        // then went silent is still owed an answer. On the record for the
+        // extension to show; nothing types into the AI's chat, where a typed
+        // nudge would be logged as the operator's words.
+        appendSupervision(this.repoRoot, this.sessionNumber, {
+          event: "instruction-overdue",
+          seq: instruction.seq,
+          step: instruction.step_id ?? null,
+          outstanding_seconds: Math.trunc((Date.now() - issued) / 1000),
+          tree_quiet: quiet,
+        });
+      }
+      if (reason !== null) return;
+      const request = takeInterrupt(this.repoRoot, this.sessionNumber);
+      if (request === null) return;
+      reason = request.reason;
+      stopRequested = request.stop;
+      this.log(request.stop ? "engine-stopping" : "engine-interrupting", {
+        seq: instruction.seq,
+        invocation,
+        reason,
+      });
+      controller.abort(reason);
+    }, INTERRUPT_POLL_MS);
+    const adapter = this.options.adapter;
+    if (adapter === null) {
+      // Unreachable: the pull never invokes anybody. It is here so that a
+      // future caller which forgets an adapter is told, rather than
+      // silently taking the push path with nothing on the other end.
+      throw new Stop("engine", "this run has no engine adapter to invoke");
+    }
+    if (metered) {
+      appendSupervision(this.repoRoot, this.sessionNumber, {
+        event: "continuation-spent",
+        invocation,
+        of_budget: this.run.max_invocations,
+      });
+    }
+    let outcome;
+    try {
+      outcome = await adapter.invoke({
+        instruction,
+        instructionPath: instructionPath(this.repoRoot, this.sessionNumber),
+        repoRoot: this.repoRoot,
+        sessionsDir: this.sessionsDir,
+        sessionNumber: this.sessionNumber,
+        invocation,
+        first,
+        resumeId: this.run.engine_session_id ?? null,
+        signal: controller.signal,
+        emit: (line: string, display?: string | null) => {
+          appendFileSync(transcript, `${line}\n`, "utf8");
+          const shown = display === undefined ? line : display;
+          if (streaming && shown !== null) writeOut(`  │ ${shown}\n`);
+        },
+      });
+    } finally {
+      clearInterval(poll);
+    }
+    const seconds = Math.round((Date.now() - started) / 1000);
+    // The conversation the engine opened, kept so every later invocation --
+    // including one after a stop, in another process on another day --
+    // names it rather than asking for whatever ran here most recently.
+    if (outcome.sessionId && this.run.engine_session_id !== outcome.sessionId) {
+      this.run = { ...this.run, engine_session_id: outcome.sessionId };
+      this.save();
+      this.log("engine-session", { id: outcome.sessionId });
+    }
+    const interrupted = reason !== null && outcome.interrupted === true;
+    appendFileSync(
+      transcript,
+      (interrupted ? `# interrupted (${reason}); ` : "# ") +
+        `exit ${outcome.exitCode === null ? "none" : outcome.exitCode}` +
+        `${outcome.error ? ` (${outcome.error})` : ""} after ${seconds}s\n`,
+      "utf8",
+    );
+    this.log(interrupted ? "engine-interrupted" : "engine-returned", {
+      seq: instruction.seq,
+      exit: outcome.exitCode,
+      seconds,
+      transcript: relative(this.repoRoot, transcript).replace(/\\/g, "/"),
+    });
+    if (outcome.error) {
+      throw new Stop("engine", `the engine could not be run: ${outcome.error}`);
+    }
+    // **What actually answered, once per engine execution.**
+    //
+    // Recorded whatever it says, including that it said nothing: "the engine
+    // did not say" and "it served what was asked" are different facts, and a
+    // record that only kept the interesting case would leave a reader unable
+    // to tell the two apart. The GRADE is selection's one rule, asked here
+    // rather than restated -- including the alias case, where `--model
+    // haiku` resolving to `claude-haiku-4-5-20251001` is the CLI resolving
+    // its own name and not a substitution.
+    this.recordModelEvidence(invocation, outcome);
+    // **A refusal of the model is a refusal, whatever the exit code says.**
+    //
+    // `claude` prints its `unrecognized_model` marker, answers with an
+    // ordinary message explaining the problem, and exits 0 -- its own
+    // `result` event carries `subtype: "success"` beside `is_error: true`.
+    // Every status a caller could read therefore says the run went fine,
+    // and carrying on would begin a session authored by whatever the CLI
+    // fell back to: a model the operator did not choose, on a ledger that
+    // names the one they did.
+    if (outcome.refusedModel) {
+      throw new Stop(
+        "engine",
+        `${this.run.engine} refused the model this session was registered ` +
+          `with: it does not recognise '${outcome.refusedModel}'. It validates ` +
+          "against its own bundled catalog rather than against a provider's " +
+          "list, so a model a vendor serves can still be one this installation " +
+          "does not know -- update the CLI, or choose another. `dabbler " +
+          "configuration options` lists what this machine may choose, and " +
+          "`dabbler configure --authoring-model <id>` sets it. Nothing was " +
+          "authored: the invocation exited 0 and did no work.",
+      );
+    }
+    if (stopRequested) throw new Stop("interrupted", String(reason));
+    // Taken by the poll, but the engine returned on its own before the
+    // abort reached it: the request still travels with the next instruction.
+    if (reason !== null && !interrupted) this.defer(reason);
+    return interrupted ? reason : null;
+  }
+
+  /**
+   * What answered this invocation, on the run's own record.
+   *
+   * On `run.json` and not in a structure of its own: an engine execution
+   * already has a record, and a second home for one fact is a second place
+   * for it to be wrong. Capped like `stop_history`, oldest dropped, because
+   * what a reader wants is the recent end.
+   */
+  private recordModelEvidence(invocation: number, outcome: EngineOutcome): void {
+    const requested = this.options.model ?? null;
+    const served = outcome.servedModel ?? null;
+    const alias = engineAliases(this.run.engine).includes(requested ?? "");
+    // The engine's own statement of what ran is a SERVED fact. A transport
+    // that only echoes what it was told never reaches here with an id at
+    // all, so an echo is recorded as the absence it is.
+    const observation = {
+      requested: requested ?? "",
+      served: served?.id ?? null,
+      evidence: EVIDENCE_SERVED,
+      requestedIsAlias: alias,
+    } as const;
+    const note =
+      served === null
+        ? `${this.run.engine} states no model for an execution, so what ran ` +
+          "cannot be established from this invocation; nothing here reads that " +
+          "as agreement."
+        : served.id === null
+          ? `the execution named ${served.named.length} models ` +
+            `(${served.named.join(", ")}), so 'the model that ran' has no single answer.`
+          : null;
+    const entry = {
+      invocation,
+      requested,
+      served: served?.id ?? null,
+      canonical: served?.canonical ?? null,
+      ...(served === null ? {} : { named: [...served.named] }),
+      ...(served === null ? {} : { evidence: EVIDENCE_SERVED as "served" }),
+      fidelity:
+        requested === null || served?.id === null || served === null
+          ? FIDELITY_UNKNOWN
+          : observedFidelity(observation),
+      ...(note === null ? {} : { note }),
+      at: nowIso(),
+    };
+    const held = this.run.model_evidence ?? [];
+    this.run = {
+      ...this.run,
+      model_evidence: [...held, entry].slice(-MODEL_EVIDENCE_CAP),
+    };
+    this.save();
+  }
+
+  /**
+   * A request that arrived at a phase boundary. A stop halts the loop here;
+   * a plain one is kept for the next instruction (`withPendingRequest`).
+   */
+  private honourPendingStop(): void {
+    const pending = takeInterrupt(this.repoRoot, this.sessionNumber);
+    if (pending === null) return;
+    if (pending.stop) throw new Stop("interrupted", pending.reason);
+    this.defer(pending.reason);
+  }
+
+  private engineOutput(): EngineOutput {
+    if (this.options.engineOutput) return this.options.engineOutput;
+    try {
+      return driverEngineOutput(this.config());
+    } catch (error) {
+      // How the engine's output is shown must not stand between a malformed
+      // configuration and the invocation that repairs it: thrown here, the
+      // fix step could never be issued to an engine.
+      if (!(error instanceof ConfigError)) throw error;
+      return DEFAULT_ENGINE_OUTPUT;
+    }
+  }
+
+  /**
+   * Issue an instruction and invoke the engine on it until the engine
+   * returns on its own. An interrupted invocation is followed by the same
+   * instruction re-issued as `kind: interrupt` -- a new seq, the reason
+   * first among its `reasons`, the answer still owed -- and the engine is
+   * invoked again, continuing its own session. The instruction returned is
+   * the one the answer must name.
+   */
+  private async converse(fields: Record<string, unknown>): Promise<DriverInstruction> {
+    if (this.pull) return this.pullConverse(fields);
+    let instruction = this.issue(this.withPendingRequest(fields));
+    for (;;) {
+      const reason = await this.invoke(instruction);
+      if (reason === null) return instruction;
+      const previous = Array.isArray(fields["reasons"]) ? (fields["reasons"] as string[]) : [];
+      instruction = this.issue(
+        this.withPendingRequest({
+          ...fields,
+          kind: "interrupt",
+          reasons: [`interrupted: ${reason}`, ...previous],
+        }),
+      );
+    }
+  }
+
+  /**
+   * The same exchange with nobody to invoke: the engine is the person's own
+   * CLI, and it has already had its turn.
+   *
+   * Two answers and no third. The instruction the ledger holds is the one
+   * this call site issued -- its seq is the one last issued, and it names
+   * the same step and round -- so the answer to it is on disk and the phase
+   * judges it exactly as the push loop does. Otherwise there is nothing to
+   * judge here yet: issue, and unwind. One call judges one answer, so every
+   * later call site in the same call issues, which is what makes `next`
+   * advance one move rather than replay the same one.
+   */
+  private pullConverse(fields: Record<string, unknown>): DriverInstruction {
+    const outstanding = readInstruction(this.repoRoot, this.sessionNumber);
+    if (!this.answered && outstanding !== null && this.isOutstandingFor(outstanding, fields)) {
+      this.answered = true;
+      return outstanding;
+    }
+    throw new Awaiting(this.issue(this.withPendingRequest(fields)));
+  }
+
+  /** Whether the ledger's instruction is the one this call site issued. */
+  private isOutstandingFor(
+    instruction: DriverInstruction,
+    fields: Record<string, unknown>,
+  ): boolean {
+    if (instruction.seq !== this.run.seq) return false;
+    // A `wait` owes no written answer and a `done` owes nothing at all.
+    if (instruction.kind === "wait" || instruction.kind === "done") return false;
+    const step = (fields["step_id"] as string | undefined) ?? null;
+    const round = (fields["round"] as number | undefined) ?? null;
+    return (instruction.step_id ?? null) === step && (instruction.round ?? null) === round;
+  }
+
+  /**
+   * A request that arrived while no invocation was running -- a Send made
+   * between steps, or while the tests or a verification round ran. A stop
+   * halts the loop here. A plain one had nothing to end, and it is not
+   * lost: it travels with the next instruction, first among its `reasons`
+   * as `sent: <text>`, so the engine reads it exactly as it would have
+   * after an interrupt. The person was told "Sent", and it is.
+   */
+  private withPendingRequest(fields: Record<string, unknown>): Record<string, unknown> {
+    const pending = takeInterrupt(this.repoRoot, this.sessionNumber);
+    if (pending !== null) {
+      if (pending.stop) throw new Stop("interrupted", pending.reason);
+      this.defer(pending.reason);
+    }
+    if (this.deferred.length === 0) return fields;
+    const sent = this.deferred.map((reason) => `${SENT_PREFIX}${reason}`);
+    this.deferred = [];
+    const previous = Array.isArray(fields["reasons"]) ? (fields["reasons"] as string[]) : [];
+    return { ...fields, reasons: [...sent, ...previous] };
+  }
+
+  private defer(reason: string): void {
+    this.deferred.push(reason);
+    this.log("interrupt-deferred", { reason, why: "no invocation was running; it travels with the next instruction" });
+  }
+
+  // --- plan ------------------------------------------------------------------
+
+  /**
+   * One sentence, only where the repository builds code and declares no
+   * suite: the freshness gate refuses such a close, and the plan is where
+   * the engine can still do something about it.
+   */
+  private suiteGap(): string {
+    const loaded = loadSuitesChecked(this.config());
+    if (!loaded.ok || loaded.suites.some((suite) => suite.expensive)) return "";
+    let code: string[] = [];
+    try {
+      code = detectEcosystems(this.repoRoot).map((eco) => eco.key);
+    } catch {
+      return "";
+    }
+    if (code.length === 0) return "";
+    return (
+      `This repository builds ${code.join(", ")} code and ${PROJECT_CONFIG_FILENAME} declares no test ` +
+      "suite: one of this plan's steps declares one under testing.suites, or the close refuses.\n"
+    );
+  }
+
+  /** The one plan member this checkout's `dabbler.release` reads, as the plan ask names it. */
+  private releaseMemberAsk(): string {
+    const bump =
+      "A releasing session bumps the version in the manifest as part of its work -- patch unless the " +
+      "change adds a capability (minor) or breaks a consumer (major) -- and its task paragraph says which\n";
+    if (releaseMode(this.repoRoot) === RELEASE_SHIP_BY_DEFAULT) {
+      return (
+        "  hold_release  optional: the ONE reason this session publishes nothing -- the later session, " +
+        "sibling module or first release's go-live the work waits on. This solution ships by default: once " +
+        "new or fixed functionality can be delivered, it is delivered, so hold only for the first release " +
+        "or a stated dependency, and say which. " +
+        bump
+      );
+    }
+    return (
+      "  release     optional: the ONE reason this session publishes now. This solution releases on " +
+      "request, so a plan without it publishes nothing: name it when the work is ready to be delivered. " +
+      bump
+    );
+  }
+
+  private planAsk(): string {
+    let excerpt = "";
+    try {
+      excerpt = extractSpecExcerpt(
+        readFileSync(join(this.sessionsDir, SESSION_PLAN_FILENAME), "utf8"),
+        this.sessionNumber,
+      );
+    } catch {
+      excerpt = "";
+    }
+    const number = sessionDisplayNumber(this.sessionNumber);
+    return (
+      `Plan session ${number} of this repository. Its section of the session plan ` +
+      `(${SESSION_PLAN_FILENAME}) follows between the markers. Read the repository as ` +
+      "you need to, but change nothing yet: the declaration comes before the work.\n\n" +
+      "--- session plan ---\n" +
+      (excerpt.trim() || "(the plan has no section for this session; plan from the repository)") +
+      "\n--- end ---\n\n" +
+      // The operator's sentence, verbatim, and the reviewer reads the same one
+      // every round: the two roles are held to one rule.
+      "Over-engineering is strictly forbidden. The value AI brings to a solution is measured as " +
+      "much by the simplicity and clarity of its design and implementation as by the alignment " +
+      "of the solution with the stated requirements and objectives.\n\n" +
+      "Answer with a work plan as JSON, written to a file outside the tracked tree " +
+      "(for example .dabbler/scratch/plan.json), then run the answer command. The file " +
+      "carries exactly these members and no other:\n" +
+      "  task        one paragraph: what this session will do -- it becomes the declaration\n" +
+      this.releaseMemberAsk() +
+      "  non_goals   a list of at least one: what this session will NOT do -- the exclusions its section of the session plan states, or the nearest concrete boundary of the task where it states none. An engine that cannot name one has not understood the scope; the reviewer holds the work to the list\n" +
+      '  steps       an ordered list; each step is {"id": "<lowercase-slug>", "ask": "<what ' +
+      'to do, in words>", "files": ["<every repository-relative file the step creates or ' +
+      'changes>"], "checks": [{"argv": ["<program>", "<argument>", ...]}]}\n' +
+      "Every step has at least one check, and a check is argv the framework spawns with no " +
+      "shell: exit 0 proves the step. A check may name `dabbler` bare: the folder the shim " +
+      "lives in is first on PATH wherever a session runs, in a terminal the extension opened " +
+      "and under a driver it started. A check runs in a built environment -- PATH, HOME, the " +
+      "toolchain roots, a scratch TEMP -- and sees no credential; a driver job (verification, " +
+      "the run of record, the publish) inherits the shell, so do not assert a credential from " +
+      "a check. A step whose product is prose still has a mechanical " +
+      "check. Keep steps small, one concern each; the files a step lists are exactly the " +
+      "files it will touch, because its report is measured against them.\n" +
+      "Tests are named after what they test: a source file's tests are the test file named after " +
+      "it (CsvSerializer.cs and CsvSerializerTests.cs, checks.ts and checks.test.ts). A new public " +
+      "method gets a test named after it in that file, a changed one has its tests updated or " +
+      "confirmed, and a removed one takes its tests with it; the framework runs them after each " +
+      "step's checks.\n" +
+      SIBLING_REFERENCE +
+      this.suiteGap() +
+      "One member is optional and is left out of a single-repository session:\n" +
+      '  repositories  other repositories of this SOLUTION the plan needs to exist: [{"id": ' +
+      '"<repository id>", "path": "<optional, relative to this root>"}]. Each is placed when ' +
+      "this plan is accepted -- created beside this one, declaring which solution it is in " +
+      "and nothing else -- so finishing this repository leaves the next one visible in the " +
+      "Solution Explorer. One that already declares itself is left alone, and placing a " +
+      "repository never declares a dependency on it. Name it only when this plan's own steps " +
+      "need those repositories on disk; a plan for one repository of a many-repository " +
+      "solution leaves it out.\n" +
+      "Do not include schema_version, session_number or recorded_at: the framework stamps them.\n" +
+      // Said here because the sample's engine failed a step three times
+      // rather than change a check it had correctly diagnosed: the verb
+      // existed and nothing in the instruction named it.
+      "Once this plan is accepted, a step's files or checks are changed -- not by editing " +
+      "the record -- with `dabbler session plan amend --step <id> --files <a,b> | " +
+      '--checks-file <path> --reason "<why>"`, which is on the record.'
+    );
+  }
+
+  private async phasePlan(): Promise<void> {
+    let plan = readWorkPlan(this.repoRoot, this.sessionNumber);
+    let reasons: string[] = [];
+    while (plan === null) {
+      const instruction = await this.converse({
+        // An instruction is a rejection exactly when it carries reasons.
+        kind: reasons.length > 0 ? "rejection" : "step",
+        step_id: "plan",
+        ask: this.planAsk(),
+        ...(reasons.length > 0 ? { reasons } : {}),
+        answer_schema: WORK_PLAN_SCHEMA,
+        answer_command: this.answerCommand("file"),
+      });
+      plan = readWorkPlan(this.repoRoot, this.sessionNumber);
+      if (plan !== null) {
+        // The schema accepted it; what a schema cannot say may still refuse
+        // it. A refused plan is handed back with the judge's own words, and
+        // the file is removed so the next answer is judged afresh.
+        const planReasons = [
+          ...judgeWorkPlanNonGoals(plan).map((reason) => refusal(RULE.planNonGoals, reason)),
+          ...judgeWorkPlanHold(plan).map((reason) => refusal(RULE.planHold, reason)),
+        ];
+        if (planReasons.length === 0) break;
+        unlinkSync(planPath(this.repoRoot, this.sessionNumber));
+        plan = null;
+        reasons = planReasons;
+      } else {
+        reasons = [
+          refusal(
+            RULE.noWorkPlan,
+            `no work plan was written for instruction ${instruction.seq}; the answer is ` +
+              `\`${instruction.answer_command}\``,
+          ),
+        ];
+      }
+      this.setRejections(this.rejections + 1);
+      this.log("plan-rejected", { seq: instruction.seq, rejection: this.rejections, reasons });
+      if (this.rejections >= MAX_REJECTIONS) {
+        throw new Stop(
+          "rejected-thrice",
+          refusal(RULE.noWorkPlan, `no work plan was written after ${MAX_REJECTIONS} instructions`),
+        );
+      }
+    }
+    this.plan = plan;
+    this.setRejections(0);
+    const release = releaseOfPlan(plan, releaseMode(this.repoRoot));
+    this.log("plan-accepted", {
+      steps: plan.steps.map((step) => step.id),
+      hold: release.holdReason,
+      non_goals: (plan.non_goals ?? []).length,
+    });
+    this.placePlannedRepositories(plan);
+
+    if (readTaskDeclaration(this.sessionsDir, this.sessionNumber) === null) {
+      // The refusal's own words travel into the stop: the toast shows the
+      // stop's first sentence, and "its reason is above" is not a reason.
+      const refused: { message: string; cause: DeclareRefusalCause } = { message: "", cause: "other" };
+      const code = declare(this.sessionsDir, {
+        task: plan.task,
+        releasable: release.releasable,
+        holdReason: release.holdReason,
+        sessionNumber: this.sessionNumber,
+        onRefusal: (message, cause) => {
+          refused.message = message;
+          refused.cause = cause;
+        },
+      });
+      if (code !== EXIT_OK) {
+        // A tree that already carries work is the tree's stop, not the
+        // engine's: `start` asks the same question first, so reaching it
+        // here means the tree moved between the registration and the plan.
+        throw new Stop(
+          refused.cause === "tree" ? "tree" : "engine",
+          `the declaration was refused: ${refused.message === "" ? "its reason is above" : refused.message}` +
+            " -- a plan is answered before any file changes",
+        );
+      }
+    }
+    // After the declaration, which is the last thing acceptance writes: a
+    // HEAD still at this commit when the steps are done means none of them
+    // committed anything.
+    const head = runGit(this.repoRoot, ["rev-parse", "HEAD"]);
+    this.run = { ...this.run, plan_head: head.code === 0 ? head.stdout.trim() : null };
+    this.setPhase(PHASE_WORK);
+  }
+
+  /**
+   * Put the repositories the plan says it needs on this machine.
+   *
+   * At plan acceptance, because that is the moment the plan exists and the
+   * work has not started: a multi-repository plan that names its next
+   * repository only in prose leaves the operator to remember it, which is
+   * the thing this answers. Each one is a directory, a `git init` and a
+   * declaration of which solution it is in -- no edge, no `produces`, no
+   * version -- so what appears in the Solution Explorer is a placemarker and
+   * never a claim nobody made.
+   *
+   * The rule for WHERE it goes and whether this repository's edge points at
+   * it is `placeMember`'s, shared with `dabbler deps scaffold`. One that is
+   * already declared is left exactly as it stands.
+   */
+  private placePlannedRepositories(plan: DriverWorkPlan): void {
+    const wanted = plan.repositories ?? [];
+    if (wanted.length === 0) return;
+    for (const entry of wanted) {
+      try {
+        const placed = placeMember(this.repoRoot, entry.id, entry.path ?? null);
+        this.log("repository-placed", {
+          repository: entry.id,
+          root: placed.root,
+          created: placed.created,
+          ...(placed.linked ? { edge: "this repository's edge now points there" } : {}),
+        });
+      } catch (error) {
+        if (!(error instanceof SolutionDepsError)) throw error;
+        // A plan naming repositories in a repository that declares no
+        // solution cannot be honoured, and going on would leave the
+        // Explorer saying nothing while the plan says otherwise.
+        throw new Stop(
+          "engine",
+          `the work plan asks for repository '${entry.id}', and it could not be ` +
+            `placed: ${error.message}`,
+        );
+      }
+    }
+    tryWriteProjection(this.repoRoot);
+  }
+
+  // --- steps -----------------------------------------------------------------
+
+  private requirePlan(): DriverWorkPlan {
+    if (this.plan === null) {
+      this.plan = readWorkPlan(this.repoRoot, this.sessionNumber);
+    }
+    if (this.plan === null) {
+      throw new Stop("engine", "the work plan is missing from the ledger; re-run to plan again");
+    }
+    return this.plan;
+  }
+
+  private async phaseSteps(): Promise<void> {
+    const plan = this.requirePlan();
+    for (const step of plan.steps) {
+      if (this.run.accepted_steps.includes(step.id)) continue;
+      await this.runStep({ ...step, fromPlan: true });
+    }
+    this.setPhase("preverify");
+  }
+
+  /**
+   * The plan's non-goals under every step's ask, so the author holds them
+   * during the work and not only before it. A step asked before a plan is
+   * accepted -- there is none -- carries nothing.
+   *
+   * Read from disk ahead of the cached plan: `plan amend --drop-non-goal`
+   * writes there and the driver's copy does not move, so a cached read made
+   * the ask and the verification round disagree about the same plan -- the
+   * ask still naming a non-goal the round had been told was dropped.
+   */
+  private nonGoalsLine(): string {
+    const nonGoals =
+      (readWorkPlan(this.repoRoot, this.sessionNumber) ?? this.plan)?.non_goals ?? [];
+    if (nonGoals.length === 0) return "";
+    return `\n\nNon-goals of this session, which the reviewer holds the work to: ${nonGoals.join("; ")}`;
+  }
+
+  private stepAsk(spec: StepSpec, rejected: boolean): string {
+    return (
+      spec.ask +
+      this.nonGoalsLine() +
+      "\n\nWhen the step is done, report with the answer command. --files may be left out: " +
+      "the framework takes the step's files from what changed. Named, it lists every file " +
+      "you created, changed or deleted in this step and nothing else -- a deleted file is " +
+      "a change to name. Use --status blocked only if the step cannot be done, " +
+      "and say why in --notes." +
+      (rejected
+        ? "\n\nThe previous report for this step was refused for the reasons listed under " +
+          "`reasons`. Put them right and report again, with THIS instruction's seq."
+        : "")
+    );
+  }
+
+  /**
+   * A step the driver made up rather than read from the plan -- the fix
+   * after a red run of record -- asked until accepted, and then the phase
+   * its acceptance sets.
+   *
+   * Written on the run first and cleared last. A plan step needs nothing
+   * like this: `phaseSteps` walks the plan on a resume and re-asks what was
+   * not accepted. A synthesised step has no plan to be walked from, and
+   * before this the run-of-record phase re-entered from its head on the
+   * resuming call, ran the suite again and landed -- the fix's report was
+   * never judged, its checks never ran and the repaired tree was never
+   * verified. The loop head reads `pending_step` before any phase's own
+   * work, so the outstanding answer is judged first under either mode.
+   */
+  private async runSynthesisedStep(id: string, ask: string, then: DriverRun["phase"]): Promise<void> {
+    this.run = { ...this.run, pending_step: { id, ask, then } };
+    this.save();
+    await this.runStep({ id, ask, files: [], checks: this.allPlanChecks(), fromPlan: false });
+    this.run = { ...this.run, pending_step: null };
+    this.save();
+    this.setPhase(then);
+  }
+
+  /**
+   * A configuration that stopped loading while one of the framework's own
+   * phases ran.
+   *
+   * Read where it is acted on, `dabbler.yaml` can be left malformed
+   * mid-session. That is a step to repair it, never a crash and never a stop
+   * with no exit. It is only recorded here: the loop head issues it, inside
+   * the same guard, so a repair that still leaves the file broken asks
+   * again rather than throwing out of this handler. It returns to where the
+   * pending step it replaces was going, or to the plan or the steps when
+   * those are what met it, and otherwise to `preverify`, as the run of record's own fix step
+   * does, so every check, verification and the suite run again over the
+   * repaired file. A step's own answer never reaches here: `judge` refuses
+   * it, so the step that broke the file is the step asked to repair it.
+   */
+  private pendConfigurationFix(error: ConfigError): void {
+    this.log("configuration-malformed", { reason: error.message });
+    const pending = this.run.pending_step ?? null;
+    const phase = this.run.phase;
+    const then = pending?.then ?? (phase === "plan" || isWorkPhase(phase) ? phase : "preverify");
+    this.run = {
+      ...this.run,
+      pending_step: {
+        id: "fix-configuration",
+        ask: `${configurationRefusal(error)}; the framework will run every step's checks, verification and the suite again.`,
+        then,
+      },
+    };
+    this.save();
+  }
+
+  /** Ask for a step until its report is accepted, refused three times, or blocked. */
+  private async runStep(spec: StepSpec): Promise<void> {
+    // Cleared on the way out and NOT in a `finally`: a `finally` runs while
+    // a `Stop` is still unwinding, so the loop's own handler would read null
+    // for every stop raised inside a step -- which is every stop that most
+    // wants a step's name on it.
+    this.currentStep = spec.id;
+    await this.askForStep(spec);
+    this.currentStep = null;
+  }
+
+  /**
+   * The step as the plan on disk now declares it, or the spec as issued.
+   *
+   * Only a step that came FROM the plan is refreshed: a step the driver
+   * synthesised has no entry to be amended, and reading one in would be
+   * reading somebody else's step.
+   */
+  private amendedSpec(spec: StepSpec): StepSpec {
+    if (!spec.fromPlan) return spec;
+    const plan = readWorkPlan(this.repoRoot, this.sessionNumber);
+    const amended = plan?.steps.find((step) => step.id === spec.id);
+    if (amended === undefined) return spec;
+    this.plan = plan;
+    return { ...amended, fromPlan: true };
+  }
+
+  private async askForStep(spec: StepSpec): Promise<void> {
+    if (this.run.baseline_tree === null) {
+      const tree = snapshotWorktreeTree(this.repoRoot);
+      if (tree === null) throw new Stop("engine", "could not snapshot the working tree");
+      this.run = { ...this.run, baseline_tree: tree };
+      this.save();
+    }
+    let reasons: string[] = [];
+    for (;;) {
+      // An amendment to THIS step lands here, and nowhere else it could.
+      // `session plan amend` writes the plan and says the next instruction
+      // is measured against the new step; a loop holding the plan it read
+      // when it started made that sentence false in the one mode that
+      // needs it -- an unattended `drive` runs for the whole session in one
+      // process, so a step amended after a refusal was still judged against
+      // the step that was refused, forever. Re-read by id; a step the plan
+      // no longer declares keeps the spec it was issued with.
+      spec = this.amendedSpec(spec);
+      const instruction = await this.converse({
+        kind: reasons.length > 0 ? "rejection" : "step",
+        step_id: spec.id,
+        ask: this.stepAsk(spec, reasons.length > 0),
+        ...(reasons.length > 0 ? { reasons } : {}),
+        answer_schema: REPORT_SCHEMA,
+        answer_command: this.answerCommand("step", spec.id),
+      });
+      const report = readReport(this.repoRoot, this.sessionNumber);
+      // Under the pull, a call with nothing new to judge is a call asking
+      // what is outstanding: the instruction is printed again, same seq,
+      // and no refusal is spent. Under the push the engine was invoked and
+      // wrote nothing, which is the refusal `judge` makes of it.
+      if (this.pull && (report === null || reportIsSpent(report, instruction))) {
+        this.log("instruction-outstanding", { seq: instruction.seq, step: spec.id });
+        throw new Awaiting(instruction);
+      }
+      const judged = await this.judge(report, instruction, spec);
+      if (judged === "blocked") {
+        throw new Stop(
+          "blocked",
+          `the engine reported step '${spec.id}' blocked: ${String(report?.notes ?? "")}`,
+        );
+      }
+      if (judged.length === 0) {
+        const tree = snapshotWorktreeTree(this.repoRoot);
+        if (tree === null) throw new Stop("engine", "could not snapshot the working tree");
+        this.run = {
+          ...this.run,
+          baseline_tree: tree,
+          accepted_steps: spec.fromPlan
+            ? [...this.run.accepted_steps, spec.id]
+            : this.run.accepted_steps,
+        };
+        this.setRejections(0);
+        this.log("report-accepted", { seq: instruction.seq, step: spec.id, files: report?.files_changed });
+        return;
+      }
+      reasons = judged;
+      this.setRejections(this.rejections + 1);
+      this.log("report-rejected", { seq: instruction.seq, step: spec.id, rejection: this.rejections, reasons });
+      if (this.rejections >= MAX_REJECTIONS) {
+        throw new Stop(
+          "rejected-thrice",
+          `step '${spec.id}' was refused ${MAX_REJECTIONS} times; the last reasons: ` +
+            reasons.join(" | "),
+        );
+      }
+    }
+  }
+
+  /** The report's substance against the step: [] accepts, reasons refuse. */
+  private async judge(
+    report: DriverReport | null,
+    instruction: DriverInstruction,
+    spec: StepSpec,
+  ): Promise<string[] | "blocked"> {
+    const shape = judgeReportShape(report, instruction, spec);
+    if (shape !== "ok") return shape;
+    const answered = report as DriverReport;
+
+    // Before the checks, which build: output nothing ignores is a check that
+    // changed the tree it was measuring.
+    this.writeRootFiles();
+    const current = snapshotWorktreeTree(this.repoRoot);
+    if (current === null) throw new Stop("engine", "could not snapshot the working tree");
+    const diff = changedPathsBetween(this.repoRoot, String(this.run.baseline_tree), current);
+    if (diff === null) throw new Stop("engine", "could not diff the working tree against the last accepted step");
+    const changed = stepChangedPaths(diff, repoRelativePath(this.repoRoot, this.sessionsDir));
+    const judged = { ...answered, files_changed: [...reportedFiles(answered, changed)] };
+    const reasons = judgeReportFiles(judged, changed, (file) =>
+      existsSync(join(this.repoRoot, file)),
+    );
+    for (const file of unchangedStepFiles(spec, judged, changed)) {
+      this.log("step-file-unchanged", { step: spec.id, file });
+    }
+    if (reasons.length > 0) return reasons;
+
+    // Read once for this judgement. A step that left it malformed is refused,
+    // so the step that broke the file is the step asked to repair it and
+    // nothing it or the plan still owes is skipped.
+    let config: RouterConfig;
+    try {
+      config = this.config();
+      checkedSuites(config);
+    } catch (error) {
+      if (!(error instanceof ConfigError)) throw error;
+      this.log(RULE.configMalformed, { step: spec.id, reason: error.message });
+      return [refusal(RULE.configMalformed, configurationRefusal(error))];
+    }
+
+    for (const [index, check] of spec.checks.entries()) {
+      const argv = [...check.argv];
+      const declared = makeCheck({ name: `${spec.id} check ${index + 1}`, argv, kind: "control" });
+      const run = await executeCheck(this.repoRoot, declared, argv.join(" "), {
+        stage: "driver",
+        treeDigest: current,
+        timeoutSeconds: timeoutFor(declared, config),
+      });
+      const green = checkRunGreen(run);
+      // The log event and the rule are the same fact, so they are the same
+      // string: a log line saying one thing while the refusal says another
+      // is two names for one failure.
+      this.log(green ? "check-passed" : RULE.checkFailed, { step: spec.id, argv });
+      if (!green) {
+        reasons.push(
+          refusal(
+            RULE.checkFailed,
+            `check failed: ${argv.join(" ")} -> exit ${run.exitCode === null ? "none (timed out)" : run.exitCode}` +
+              (run.treeMutated ? " (the check changed the tree)" : "") +
+              (run.output.trim() ? `\n${tail(run.output)}` : ""),
+          ),
+        );
+      }
+    }
+    if (reasons.length === 0) reasons.push(...(await this.namedTestRefusals(spec.id, changed, current, config)));
+    return reasons;
+  }
+
+  /**
+   * The tests named after what the step changed, run once its own checks
+   * pass, for every suite that declares how to run a selection. A red run
+   * refuses the report the way a failed check does. A suite without `select`
+   * runs nothing here; the end of the session runs it.
+   */
+  private async namedTestRefusals(
+    stepId: string,
+    changed: readonly string[],
+    tree: string,
+    config: RouterConfig,
+  ): Promise<string[]> {
+    const reasons: string[] = [];
+    for (const { suite, command } of namedTestCommands(this.repoRoot, config, changed)) {
+      const declared = makeCheck({ name: `${stepId} named tests of ${suite}`, command });
+      const run = await executeCheck(this.repoRoot, declared, command, {
+        stage: "driver",
+        treeDigest: tree,
+        timeoutSeconds: timeoutFor(declared, config),
+      });
+      const green = checkRunGreen(run);
+      this.log(green ? "named-tests-passed" : RULE.checkFailed, { step: stepId, suite, command });
+      if (!green) {
+        reasons.push(
+          refusal(
+            RULE.checkFailed,
+            `named tests failed: ${command} -> exit ${run.exitCode === null ? "none (timed out)" : run.exitCode}` +
+              (run.treeMutated ? " (the run changed the tree)" : "") +
+              (run.output.trim() ? `\n${tail(run.output)}` : ""),
+          ),
+        );
+      }
+    }
+    return reasons;
+  }
+
+  // --- the tests -------------------------------------------------------------
+
+  private expensiveSuites() {
+    const loaded = checkedSuites(this.config());
+    return loaded.suites.filter((suite) => suite.expensive);
+  }
+
+  private allPlanChecks(): StepSpec["checks"] {
+    return this.requirePlan().steps.flatMap((step) => step.checks);
+  }
+
+  /**
+   * No targeted suite runs here. Measured over sessions 70-77 a session-wide
+   * selection before verification cost 353-625 s per session and twice cost
+   * MORE than the full suite it approximates; the tests named after what a
+   * step changed run with that step instead, and the suites run at the end.
+   * The verifier reviews without writing or running one. The phase name
+   * stays so an old record's `preverify` rows and stops still read as what
+   * they were.
+   */
+  private async phasePreverify(): Promise<void> {
+    this.writeRootFiles();
+    this.setPhase("verify");
+  }
+
+  /**
+   * The root build files a solution of several projects needs, written where
+   * absent, and the output its ecosystem's build writes ignored -- before a
+   * step's checks, which build, and before a round, the one moment every path
+   * into one passes. They are part of the tree the round reviews and the land
+   * commits, and the step baseline moves past exactly them, so no step has to
+   * account for what the framework wrote.
+   */
+  private writeRootFiles(): void {
+    const graph = readProjectGraph(this.repoRoot);
+    const written = ensureRootFiles(this.repoRoot, graph);
+    const wrote = [
+      ...new Set([...(written?.written ?? []), ...(written?.changed ?? []), ...ignoreBuildOutput(this.repoRoot, graph)]),
+    ];
+    if (wrote.length === 0) return;
+    const tree =
+      this.run.baseline_tree === null
+        ? snapshotWorktreeTree(this.repoRoot)
+        : treeWithPaths(this.repoRoot, String(this.run.baseline_tree), wrote);
+    if (tree !== null) this.run = { ...this.run, baseline_tree: tree };
+    this.save();
+    this.log("root-files", { wrote });
+  }
+
+  // --- the framework's own long work -----------------------------------------
+
+  /**
+   * Run one of the framework's own verbs and hand back its exit code, from
+   * a call that does not wait for it.
+   *
+   * A verification round, the complete suite and the close each outlast an
+   * engine's tool timeout, so none of them may run inside the call that
+   * starts them. The job is started detached, its record goes on `run.json`,
+   * and the phase is re-entered later: in pull mode by the engine's next
+   * `dabbler session next`, in push mode by this loop's own poll, which is
+   * free to sit here because nothing is timing it. One mechanism, two
+   * cadences.
+   *
+   * The verb is spawned rather than called: it is the same code either way
+   * (`selfArgv` re-enters this router), and a spawned verb can be waited on
+   * from a process that has already exited.
+   */
+  private async longWork(options: {
+    readonly name: string;
+    readonly argv: readonly string[];
+    readonly retryAfterSeconds: number;
+    readonly stopKind: StopKind;
+  }): Promise<number> {
+    // A job outstanding under ANOTHER name is one of two very different
+    // things, and sessions 78 and 81 paid for conflating them. Still
+    // RUNNING: this call site is behind the walk that started it -- a
+    // re-entered phase walks its suites in order, and a site reached while
+    // a later one's job runs already finished; EXIT_OK, as always. Already
+    // EXITED: that is stale cross-phase state -- an uncollected
+    // verification job after an adjudication settled the phase by terminal
+    // row -- and treating it as "this site finished" fake-greened
+    // run-of-record and the close, twice. Stale is collected, logged and
+    // cleared, and this call site starts its own work.
+    if (this.run.job !== null && this.run.job !== undefined && this.run.job.name !== options.name) {
+      const stale = this.run.job;
+      if (staleJobDisposition(stale.name, options.name, pollJob(this.repoRoot, stale).state) === "behind") {
+        return EXIT_OK;
+      }
+      this.run = { ...this.run, job: null };
+      this.save();
+      this.log("job-finished-stale", { name: stale.name, log: stale.log });
+      appendSupervision(this.repoRoot, this.sessionNumber, {
+        event: "stale-job-collected",
+        name: stale.name,
+        collected_by: options.name,
+      });
+    }
+    let job: Job | null = this.run.job ?? null;
+    if (job === null) {
+      job = startJob(this.repoRoot, this.sessionNumber, {
+        name: options.name,
+        argv: options.argv,
+        retryAfterSeconds: options.retryAfterSeconds,
+      });
+      this.run = { ...this.run, job };
+      this.save();
+      this.log("job-started", { name: job.name, pid: job.pid, log: job.log });
+    }
+    const waitingSince = Date.now();
+    for (;;) {
+      const state = pollJob(this.repoRoot, job);
+      if (state.state === "exited") {
+        this.run = { ...this.run, job: null };
+        this.save();
+        this.log("job-finished", { name: job.name, exit: state.exitCode, log: job.log });
+        if (state.exitCode === null) {
+          // No code means the verb was killed or never spawned; whatever it
+          // forked before that may still be running, and the runner -- if
+          // it is still there to be the root of that tree -- is ended.
+          endJob(job);
+          throw new Stop(
+            options.stopKind,
+            `${options.name} ended without an exit code; its log is ${job.log}`,
+          );
+        }
+        return state.exitCode;
+      }
+      if (state.state === "vanished") {
+        this.run = { ...this.run, job: null };
+        this.save();
+        throw new Stop(
+          options.stopKind,
+          `${options.name} vanished: nothing is running under pid ${job.pid} and it ` +
+            `recorded no result. Its log is ${job.log}; re-run to start it again`,
+        );
+      }
+      if (this.pull) {
+        // Held open on the job rather than handed back at once: a job that
+        // ends inside the bound costs the engine no sleep. A stop asked for
+        // meanwhile is honoured here, and ends the job with the run.
+        if (Date.now() - waitingSince < (this.options.waitInCallMs ?? 0)) {
+          this.honourPendingStop();
+          await new Promise((resolve) => setTimeout(resolve, JOB_POLL_MS));
+          continue;
+        }
+        throw new Awaiting(
+          this.issue(
+            this.withPendingRequest({
+              kind: "wait",
+              retry_after_seconds: WAIT_RETRY_SECONDS,
+              log: job.log,
+              answer_command: () => this.nextCommand(),
+            }),
+          ),
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, JOB_POLL_MS));
+    }
+  }
+
+  // --- verification ----------------------------------------------------------
+
+  private async phaseVerify(): Promise<void> {
+    // A session that changed nothing has nothing to review, test, land or
+    // release, and `verify` refuses an empty change: sending it there is a
+    // stop with no way forward. The close reads the same fact and passes its
+    // evidence gates as no change.
+    if (sessionChangedNothing(this.sessionsDir)) {
+      this.log("no-change");
+      this.setPhase("close");
+      return;
+    }
+    // Two of the three reasons a further round cannot open are instructions
+    // to ADVANCE, and both are answers the ledger already holds. A terminal
+    // row stands, or the cap is reached over a clean round: `verify` would
+    // refuse, in words that say "close the session", and the driver's next
+    // move is the run of record. Asking first spends no job, and -- before
+    // this -- a session whose run of record failed AFTER a clean at-cap
+    // verification could never close at all: the fix cycles back through
+    // preverify to here, and the refusal is the same one forever.
+    //
+    // The third, disputes at the cap, is still not the driver's to ANSWER
+    // -- adjudication is a person routing findings to a third provider, and
+    // the tie-break between a verifier and an engine is theirs. What the
+    // driver does is put the question, in the place they answer questions,
+    // and stop. It used to fall through to the job, which spawned a verb to
+    // print a refusal the record already implied.
+    const noRound = noRoundReason(
+      this.repoRoot,
+      this.sessionNumber,
+      readRounds(this.repoRoot, this.sessionNumber),
+      this.run.verification?.max_rounds || verificationRoundCap(this.config()),
+    );
+    if (noRound === NO_ROUND_TERMINAL || noRound === NO_ROUND_CAP_CLEAN) {
+      // With one condition, which `verify`'s own message cannot state and
+      // the close's own gate already answers: is this still the tree that
+      // was reviewed? "There is nothing left to verify" is true of an
+      // unmoved tree and false of a repaired one, and routing a repaired
+      // tree onward would carry it to a close that refuses it later and
+      // more confusingly. The gate is ASKED rather than restated -- there
+      // is one rule for "is the tree the verified one" and it lives there.
+      const [clean, why] = checkVerificationClean(this.sessionsDir);
+      if (clean) {
+        this.log("verification-settled", { reason: noRound });
+        this.setPhase("run-of-record");
+        return;
+      }
+      // The verb named here is `verify reopen`, not `plan amend
+      // --max-rounds`. The amendment moves the cap and is answered only
+      // BEFORE the cap is reached: once `terminateAtCap` has written its
+      // row, the terminal is read ahead of the cap and a raised number
+      // changes nothing. Session 137 was sent here, took that advice, had
+      // it accepted and recorded, and did not move.
+      throw new Stop(
+        "verification",
+        `no further verification round may open (${noRound}), and this is not the ` +
+          `tree that was verified: ${why} A cap terminal is a spent round budget ` +
+          "rather than a judgment, so an operator may buy the review this change " +
+          'has not had: `dabbler verify reopen --rounds 1 --reason "<why>"`, ' +
+          "which is recorded as the decision to spend another round that it is. " +
+          "Putting the tree back is the other answer.",
+        "cap-terminal-tree-moved",
+      );
+    }
+    if (noRound === NO_ROUND_CAP_DISPUTED) {
+      // Asked before anything is spawned, because the answer is on the
+      // record already and the job would only re-read it to print a
+      // refusal. The question goes where the operator answers questions,
+      // carrying what they need to answer it, and the stop that follows
+      // offers the same ways on. Nothing here judges the dispute.
+      const rounds = readRounds(this.repoRoot, this.sessionNumber);
+      const latest = rounds[rounds.length - 1] as Row;
+      throw new Stop(
+        "verification",
+        capDisputedRefusal(
+          this.sessionsDir,
+          this.run.verification?.max_rounds || verificationRoundCap(this.config()),
+          latest["round"],
+        ),
+        "cap-disputed",
+        disputedFindingsBrief(latest, readDisputes(this.repoRoot, this.sessionNumber)),
+      );
+    }
+    const code = await this.longWork({
+      name: "verification",
+      argv: [
+        ...selfArgv(),
+        "verify",
+        "--sessions-dir",
+        this.sessionsDir,
+        // Off the run, not off this call: the call that reaches this phase
+        // is rarely the one the person typed the flags on.
+        ...(this.run.verification?.max_rounds != null
+          ? ["--max-rounds", String(this.run.verification.max_rounds)]
+          : []),
+        ...(this.run.verification?.transport
+          ? ["--transport", this.run.verification.transport]
+          : []),
+      ],
+      retryAfterSeconds: VERIFY_RETRY_SECONDS,
+      stopKind: "verification",
+    });
+    if (code === VERIFY_OK) {
+      this.log("verification-passed");
+      this.setPhase("run-of-record");
+      return;
+    }
+    if (code === EXIT_BLOCKING) {
+      // The loop's own word for the round that did not pass. Without it the
+      // only thing the channel says here is `phase phase=dispositions`, which
+      // reads exactly like `phase phase=steps` -- the worst outcome a session
+      // has, in the colour of ordinary progress. The verb's own verdict line
+      // is above this one, and it is the verb's; this is the driver's.
+      this.log("verification-blocking");
+      this.setPhase("dispositions");
+      return;
+    }
+    // Neither passed nor found anything: verify REFUSED, and its reason is
+    // in the log it just wrote. Reading it is the whole of what follows --
+    // a refusal the driver can answer, and a stop that says which refusal
+    // it was.
+    const reason = jobLogTail(this.repoRoot, this.sessionNumber, "verification");
+
+    // A reviewer that cannot be reached is said in the start's own sentence,
+    // with the repair, rather than as a log tail or a model to choose.
+    if (code !== EXIT_UNRESOLVED) {
+      const unreachable = this.reviewerUnreachable();
+      if (unreachable !== null) throw new Stop("verification", unreachable, "reviewer-unreachable");
+    }
+
+    // The stale-evidence heal that stood here went with the targeted
+    // selection and the gate that demanded it; `verify` no longer refuses
+    // over missing targeted evidence, so there is nothing left for the
+    // loop to answer by re-entering preverify.
+
+    // The cap, reached over findings that cannot be shown remediated. It is
+    // terminal by construction and no re-run changes it: the findings and
+    // what they cite are in the reason, and the next planning session is
+    // where they are read. Said in its own words rather than as one more
+    // refusal, because "run it again" is the one thing that will not work.
+    if (code === EXIT_UNRESOLVED) {
+      throw new Stop(
+        "verification",
+        "the round cap is reached and blocking findings cannot be shown " +
+          `remediated; nothing lands but the record. ${reason}`,
+        "cap-unresolved",
+      );
+    }
+
+    // The provider could not be reached, which is not a round that failed
+    // to produce a verdict: nothing was asked and nothing was written, the
+    // tree is not the problem, and the move is to try again or to change
+    // what is routed to -- neither of which is "put the round right".
+    // `verify` says so with its own exit: EXIT_CALL_FAILED is the routed
+    // call failing, and it is the one exit here that means exactly that.
+    // EXIT_UNAVAILABLE is deliberately NOT read as reachability: three
+    // unlike causes share it -- no candidate provider, evidence the round
+    // could not use, and a truncated reply -- and naming it after one of
+    // them would be the coarse-kind fault this session exists to fix, one
+    // level down.
+    if (code === EXIT_CALL_FAILED) {
+      throw new Stop(
+        "verification",
+        `the verification call could not be completed (exit ${code}): ` +
+          (reason || "it wrote no reason; its log is under the run's jobs directory"),
+        "provider-unreachable",
+      );
+    }
+
+    // A stop, and it says WHICH refusal: a red control and stale evidence
+    // are different moves for a person, and one sentence for both hides
+    // which one to make.
+    throw new Stop(
+      "verification",
+      `dabbler verify refused (exit ${code}): ` +
+        (reason || "it wrote no reason; its log is under the run's jobs directory"),
+      "no-verdict",
+    );
+  }
+
+  /** The start's refusal of the reviewing vehicle, asked again now; null where it is reachable or cannot be asked. */
+  private reviewerUnreachable(): string | null {
+    try {
+      const author = resolveSessionOrchestratorIdentity(this.sessionsDir, this.sessionNumber);
+      return reviewingVehicleRefusal(this.config(), this.repoRoot, author.effectiveProvider).refusal;
+    } catch {
+      // An identity or configuration that cannot be read is the round's own
+      // refusal to report, and it already has one.
+      return null;
+    }
+  }
+
+  private dispositionAsk(round: number): string {
+    return (
+      `Verification round ${round} found what is listed under \`reasons\`, numbered. Answer ` +
+      "with a disposition for every finding marked blocking (and any other you choose), as " +
+      "JSON written to a file outside the tracked tree, then run the answer command. The " +
+      'file carries exactly: {"dispositions": [{"finding_index": <number>, "action": "fix"} ' +
+      'or {"finding_index": <number>, "action": "reject", "reason": "<why the finding is ' +
+      'wrong>", "evidence_paths": ["<repository-relative path, optionally path:START-END>"]}]}. ' +
+      "A reject becomes a dispute the next round must engage, and a dispute without evidence " +
+      "is refused. Change no file now: the fixes are asked for as a step after your answer."
+    );
+  }
+
+  private async phaseDispositions(): Promise<void> {
+    const round = latestRound(this.repoRoot, this.sessionNumber);
+    if (round === null || round["blocking"] !== true) {
+      this.setPhase("verify");
+      return;
+    }
+    const roundNumber = Number(round["round"]);
+    const findings = Array.isArray(round["findings"]) ? (round["findings"] as Row[]) : [];
+    let set = readDispositions(this.repoRoot, this.sessionNumber);
+    if (set !== null && set.round !== roundNumber) set = null;
+
+    // A stored answer is judged like a new one: a loop resumed after a
+    // refusal would otherwise record the same refused dispute again.
+    let refusals: string[] = set === null ? [] : dispositionRefusals(this.repoRoot, set);
+    if (refusals.length > 0) set = null;
+    while (set === null) {
+      const instruction = await this.converse({
+        kind: "rejection",
+        round: roundNumber,
+        ask: this.dispositionAsk(roundNumber),
+        reasons: [
+          ...findings.map((finding, index) => describeFinding(index, finding)),
+          ...refusals,
+        ],
+        answer_schema: DISPOSITION_SCHEMA,
+        answer_command: this.answerCommand("file"),
+      });
+      const answered = readDispositions(this.repoRoot, this.sessionNumber);
+      refusals = [];
+      if (answered === null || answered.round !== roundNumber || answered.seq !== instruction.seq) {
+        refusals.push(
+          `no disposition of round ${roundNumber} answered instruction ${instruction.seq}; ` +
+            `the answer is \`${instruction.answer_command}\``,
+        );
+      } else {
+        refusals.push(...dispositionRefusals(this.repoRoot, answered));
+        if (refusals.length === 0) set = answered;
+      }
+      if (set !== null) break;
+      this.setRejections(this.rejections + 1);
+      this.log("dispositions-rejected", { seq: instruction.seq, rejection: this.rejections, reasons: refusals });
+      if (this.rejections >= MAX_REJECTIONS) {
+        throw new Stop(
+          "rejected-thrice",
+          `round ${roundNumber}'s findings were not dispositioned after ${MAX_REJECTIONS} instructions`,
+        );
+      }
+    }
+    this.setRejections(0);
+    this.log("dispositions-accepted", {
+      round: roundNumber,
+      fix: set.dispositions.filter((entry) => entry.action === "fix").map((entry) => entry.finding_index),
+      reject: set.dispositions.filter((entry) => entry.action === "reject").map((entry) => entry.finding_index),
+    });
+
+    const recorded = readDisputes(this.repoRoot, this.sessionNumber);
+    for (const entry of set.dispositions) {
+      if (entry.action !== "reject") continue;
+      const already = recorded.some(
+        (row) => Number(row["round"]) === roundNumber && Number(row["finding_index"]) === entry.finding_index,
+      );
+      if (already) continue;
+      const outcome = recordDispute(this.sessionsDir, {
+        roundNumber,
+        findingIndex: entry.finding_index,
+        grounds: String(entry.reason),
+        evidence: [...(entry.evidence_paths ?? [])],
+      });
+      if (outcome.exit !== EXIT_OK) {
+        // In the refusing verb's own words. An exit code alone sent
+        // session 144's operator to look for a reason that was on a
+        // stream nothing kept, and the reason -- an evidence file over
+        // the inline cap -- is exactly what says how to answer it.
+        throw new Stop(
+          "verification",
+          `the dispute of finding ${entry.finding_index} was refused ` +
+            `(exit ${outcome.exit}): ${outcome.refusal}`,
+          "dispute-refused",
+        );
+      }
+      this.log("dispute-recorded", { round: roundNumber, finding: entry.finding_index });
+    }
+    this.setPhase(set.dispositions.some((entry) => entry.action === "fix") ? "fix" : "verify");
+  }
+
+  private async phaseFix(): Promise<void> {
+    const round = latestRound(this.repoRoot, this.sessionNumber);
+    const set = readDispositions(this.repoRoot, this.sessionNumber);
+    if (round === null || set === null || set.round !== Number(round["round"])) {
+      this.setPhase("dispositions");
+      return;
+    }
+    const roundNumber = Number(round["round"]);
+    const findings = Array.isArray(round["findings"]) ? (round["findings"] as Row[]) : [];
+    const chosen = set.dispositions
+      .filter((entry) => entry.action === "fix")
+      .map((entry) => describeFinding(entry.finding_index, findings[entry.finding_index] ?? {}));
+    await this.runStep({
+      id: `fix-round-${roundNumber}`,
+      ask:
+        `Verification round ${roundNumber} found the following, and you chose to fix each ` +
+        "of them:\n" +
+        chosen.map((line) => `  ${line}`).join("\n") +
+        "\n\nMake the fixes. The framework will run every step's checks and another " +
+        "verification round on what you changed; the complete suite follows as the run of record.",
+      files: [],
+      checks: this.allPlanChecks(),
+      fromPlan: false,
+    });
+    // Spent. The next pass through dispositions asks the engine rather than
+    // re-acting on an answer it has already used -- which is what turned a
+    // cap that wrote no round into a loop.
+    clearDispositions(this.repoRoot, this.sessionNumber);
+    this.setPhase("preverify");
+  }
+
+  // --- the run of record, the landing, the close -----------------------------
+
+  /**
+   * The complete suites, one job each, against the verified tree.
+   *
+   * The walk restarts at the first suite on every invocation, and under the
+   * pull every invocation is a fresh process -- so it has to know which
+   * suites it has already run, and it knows that from the record rather
+   * than from which job happens to be standing. A suite that already holds
+   * a green `final-full` record bound to the tree in hand is done: the same
+   * fact the close gate reads, asked here first. Without it a second
+   * expensive suite livelocked this phase on its own tail (session 92): the
+   * first site always found the second suite's exited job, read it as a
+   * cross-phase leftover, discarded it and ran the first suite again, so
+   * the second suite's completion could never be collected by the site
+   * that owned it. Deterministic, and invisible while a repository had one
+   * suite.
+   */
+  private async phaseRunOfRecord(): Promise<void> {
+    // Every expensive suite runs, against the verified tree.
+    const suites = this.expensiveSuites();
+    // Said, rather than left to a gate's N/A: a reader of the record could
+    // not otherwise tell a suite that was skipped from one that was green.
+    if (suites.length === 0) {
+      // The close's own question, asked before the land: refused there, the
+      // verified tree is already pushed and no exit leaves it verified.
+      const declared = judgeSuiteDeclaration(loadSuitesChecked(this.config()), codeEcosystems(this.repoRoot));
+      if (declared !== null && !declared[0]) {
+        this.log("run-of-record-undeclared", { reason: declared[1] });
+        await this.runSynthesisedStep(
+          "fix-run-of-record",
+          `The run of record has nothing to run: ${declared[1]}. The framework will run ` +
+            "every step's checks, verification and the suite again.",
+          "preverify",
+        );
+        return;
+      }
+      this.log("run-of-record-none", { reason: "no suite declared; nothing to run" });
+    }
+    const records = readRecords(this.repoRoot);
+    const sessionSeconds = closedSessionSeconds(readSessionState(this.sessionsDir));
+    for (const suite of suites) {
+      const jobName = `run of record: ${suite.name}`;
+      // Whole, or the tests the session's changes select: the same rule the
+      // close's freshness gate and the land read.
+      const owed = runsWholeAtClose(suite, records, sessionSeconds, this.sessionNumber);
+      const stage = owed.whole ? STAGE_FINAL_FULL : STAGE_FINAL_TARGETED;
+      const standing = evaluateFreshness(this.sessionsDir, null, [suite], {
+        repoRoot: this.repoRoot,
+      }).find((verdict) => verdict.suite === suite.name);
+      // The record is written by the verb as it finishes, a moment before
+      // its runner exits, so this suite's own job can still stand on the
+      // run beside a green record. It is collected here, by the site that
+      // owns it; stepped over, the close would find it and read it as a
+      // cross-phase leftover. One still running is waited on below.
+      const own = this.run.job?.name === jobName ? this.run.job : null;
+      const polled = own === null ? null : pollJob(this.repoRoot, own);
+      if (standing?.passed && (polled === null || polled.state === "exited")) {
+        if (own !== null && polled !== null && polled.state === "exited") {
+          this.run = { ...this.run, job: null };
+          this.save();
+          this.log("job-finished", { name: own.name, exit: polled.exitCode, log: own.log });
+        }
+        this.log("run-of-record-standing", { suite: suite.name, reason: standing.reason });
+        continue;
+      }
+      this.log("run-of-record", { suite: suite.name, stage, why: owed.reason, command: suite.command });
+      const code = await this.longWork({
+        name: jobName,
+        argv: [
+          ...selfArgv(),
+          "test-evidence",
+          "run",
+          "--sessions-dir",
+          this.sessionsDir,
+          "--suite",
+          suite.name,
+          "--stage",
+          stage,
+        ],
+        retryAfterSeconds: suiteRetrySeconds(readRecords(this.repoRoot), suite.name),
+        stopKind: "tests",
+      });
+      if (code === EXIT_OK) continue;
+      if (code !== 1) {
+        throw new Stop("tests", `the run of record for ${suite.name} could not be recorded (exit ${code})`);
+      }
+      this.log("tests-failed", { command: suite.command });
+      const failed = readRecords(this.repoRoot).filter((row) => row.suite === suite.name && row.stage === stage).at(-1);
+      await this.runSynthesisedStep(
+        "fix-run-of-record",
+        `The run of record failed: \`${failed?.command || suite.command}\`, the ` +
+          `${owed.whole ? "complete" : "targeted"} ${suite.name} suite ` +
+          "against the verified tree. Fix the cause. The framework will run every step's " +
+          "checks, verification and the suite again.",
+        "preverify",
+      );
+      return;
+    }
+    this.setPhase("land");
+  }
+
+  /**
+   * Whether this repository declares the candidate gate: `release.gate:
+   * candidate` in `dabbler.yaml`. Read raw and defensively -- an absent or
+   * unreadable declaration is today's direct land, so nothing changes under
+   * anyone silently.
+   */
+  private gateIsCandidate(): boolean {
+    try {
+      const text = readFileSync(join(this.repoRoot, "dabbler.yaml"), "utf8");
+      const match = /^release:\s*$[\s\S]*?^\s+gate:\s*candidate\s*$/m.exec(text);
+      return match !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * What the land judges: the suites it owes with their latest run of
+   * record and their surfaces now, the whole tree now, the paths that moved
+   * since the verified tree.
+   */
+  private landFacts(): LandFacts {
+    const loaded = checkedSuites(this.config());
+    const owed = loaded.suites.filter((suite) => suite.expensive && suiteRequiredForClose(suite));
+    const runs = readRecords(this.repoRoot);
+    const sessionSeconds = closedSessionSeconds(readSessionState(this.sessionsDir));
+    const suites: LandSuiteFact[] = owed.map((suite) => {
+      const stage = runsWholeAtClose(suite, runs, sessionSeconds, this.sessionNumber).whole
+        ? STAGE_FINAL_FULL
+        : STAGE_FINAL_TARGETED;
+      const latest = runs.filter((row) => row.suite === suite.name && row.stage === stage).at(-1);
+      return {
+        name: suite.name,
+        latest:
+          latest === undefined
+            ? null
+            : {
+                outcome: latest.outcome,
+                treeDigest: latest.treeDigest,
+                surfaceDigest: latest.surfaceDigest,
+                recordedAt: latest.recordedAt,
+              },
+        surfaceNow: surfaceDigest(this.repoRoot, suite.covers, { sessionsDir: this.sessionsDir }),
+      };
+    });
+    let moved: string[] | null = null;
+    const round = latestRound(this.repoRoot, this.sessionNumber);
+    const verifiedTree = typeof round?.["completion_tree"] === "string" ? round["completion_tree"] : null;
+    const now = snapshotWorktreeTree(this.repoRoot);
+    if (verifiedTree !== null && now !== null) {
+      moved = changedPathsBetween(this.repoRoot, verifiedTree, now);
+    }
+    return {
+      treeNow: treeDigest(this.repoRoot, { sessionsDir: this.sessionsDir }),
+      suites,
+      moved,
+    };
+  }
+
+  private phaseLand(): void {
+    const rows = readSessionState(this.sessionsDir)?.["sessions"];
+    const row = (Array.isArray(rows) ? rows : []).find(
+      (entry): entry is Record<string, unknown> =>
+        typeof entry === "object" && entry !== null && (entry as Record<string, unknown>)["number"] === this.sessionNumber,
+    );
+    const message = landCommitMessage(
+      this.sessionNumber,
+      typeof row?.["title"] === "string" ? (row["title"] as string) : null,
+      this.requirePlan().task,
+    );
+    // Tested bytes are the landed bytes: judged before anything is added or
+    // committed, and refused by name -- the suite whose run the tree moved
+    // after, and the paths that moved.
+    const refusal = judgeLandReadiness(this.landFacts());
+    if (refusal !== null) {
+      throw new Stop("land", `the tree is not the tree the run of record tested: ${refusal}`);
+    }
+    runGit(this.repoRoot, ["add", "-A", "--", "."]);
+    // Two `-m`s: git joins them with the blank line a subject and a body
+    // are separated by, and quotes nothing on the way.
+    const committed = runGit(this.repoRoot, ["commit", "-m", message.subject, "-m", message.body]);
+    if (committed.code !== 0) {
+      // git says "nothing to commit" on stdout and exits 1; that is a session
+      // whose work is already committed, which is not a failure to land.
+      const output = `${committed.stdout}\n${committed.stderr}`.toLowerCase();
+      if (!output.includes("nothing to commit")) {
+        throw new Stop("land", `git commit failed: ${tail(committed.stderr || committed.stdout, 300)}`);
+      }
+    }
+    if (!existsSync(join(this.repoRoot, ".dabbler", "local-only"))) {
+      // Asked before the push rather than read out of its failure. git
+      // answers a repository with no remote with `fatal: No configuration
+      // push destination`, and that is two wrong words in one line: nothing
+      // was fatal -- the commit landed and the session is intact -- and the
+      // problem is not a missing configuration but a repository nobody has
+      // given anywhere to push to, which is the ordinary state of a
+      // repository on its first day. A session stopped by it should be told
+      // what to do, not handed git's diagnosis of its own internals.
+      const remotes = runGit(this.repoRoot, ["remote"]);
+      if (remotes.code !== 0 || remotes.stdout.trim() === "") {
+        throw new Stop(
+          "land",
+          "this repository has no remote, so there is nowhere to push. The " +
+            "commit landed and nothing is lost. Either add a remote (`git " +
+            "remote add origin <url>` and push once to set the upstream), " +
+            "or say the repository is local by creating the empty file " +
+            "`.dabbler/local-only`, which makes the land commit and stop " +
+            "there.",
+        );
+      }
+      if (this.gateIsCandidate()) {
+        // The merge gate: master only moves to a full-check-green exact
+        // SHA, so the land pushes candidate/s<N> at the tested SHA and the
+        // gate workflow fast-forwards master on green. The receipt is the
+        // record the delegation stands on.
+        const trunkRead = candidateTrunk(this.repoRoot);
+        if (trunkRead.trunk === null) {
+          throw new Stop("land", `no candidate can be pushed: ${trunkRead.refusal}`);
+        }
+        const trunk = trunkRead.trunk;
+        const tested = runGit(this.repoRoot, ["rev-parse", "HEAD"]).stdout;
+        const base = runGit(this.repoRoot, ["rev-parse", `origin/${trunk}`]).stdout;
+        const branch = `candidate/s${this.sessionNumber}`;
+        const pushed = runGit(this.repoRoot, ["push", "origin", `HEAD:refs/heads/${branch}`]);
+        if (pushed.code !== 0) {
+          throw new Stop("land", `the candidate push was refused: ${tail(pushed.stderr, 300)}`);
+        }
+        const receipt = {
+          mode: "candidate",
+          branch,
+          trunk,
+          base_sha: base,
+          tested_sha: tested,
+          executor: "ci",
+          pushed_at: nowIso(),
+          landed_sha: tested,
+        };
+        const receiptPath = join(
+          this.repoRoot, ".dabbler", "runs", `s${this.sessionNumber}`, "driver", "gate-receipt.json",
+        );
+        mkdirSync(dirname(receiptPath), { recursive: true });
+        writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+        this.log("candidate-pushed", { branch, tested: tested.slice(0, 12) });
+        this.setPhase("gate-wait");
+        return;
+      }
+      const pushed = runGit(this.repoRoot, ["push"]);
+      if (pushed.code !== 0) {
+        // A push that reached a remote and was refused keeps git's own
+        // words: a rejected non-fast-forward, a credential, a protected
+        // branch. That text IS the diagnosis there, and rewriting it would
+        // cost the operator the one string worth searching for.
+        throw new Stop("land", `the push was refused: ${tail(pushed.stderr, 300)}`);
+      }
+    }
+    const local = localGateReceipt(this.repoRoot);
+    if (local.receipt === null) {
+      throw new Stop("land", `no gate receipt can be written: ${local.refusal}`);
+    }
+    const localReceipt = {
+      ...local.receipt,
+      landed_sha: local.receipt["tested_sha"],
+    };
+    const localReceiptPath = join(
+      this.repoRoot, ".dabbler", "runs", `s${this.sessionNumber}`, "driver", "gate-receipt.json",
+    );
+    mkdirSync(dirname(localReceiptPath), { recursive: true });
+    writeFileSync(localReceiptPath, `${JSON.stringify(localReceipt, null, 2)}\n`, "utf8");
+    this.log("landed", { commit: runGit(this.repoRoot, ["rev-parse", "--short", "HEAD"]).stdout });
+    this.setPhase("publish");
+  }
+
+  /**
+   * Wait for the gate to move the trunk to the tested SHA, then act on it.
+   *
+   * The poll is git-only -- `merge-base --is-ancestor tested origin/<trunk>`
+   * needs no CI vendor's API -- so the same wait works against any host the
+   * gate workflow runs on. Green pulls the trunk forward and the lifecycle
+   * proceeds; a poll that runs out says where to look and stops, which
+   * routes the red run's failures into remediation the way every stop does.
+   */
+  private async phaseGateWait(): Promise<void> {
+    const receiptPath = join(
+      this.repoRoot, ".dabbler", "runs", `s${this.sessionNumber}`, "driver", "gate-receipt.json",
+    );
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as {
+      tested_sha: string;
+      trunk?: string;
+    };
+    // The receipt names the trunk it was pushed against; a receipt written
+    // before it did is read the way it was written, from HEAD.
+    const trunk = receipt.trunk ?? candidateTrunk(this.repoRoot).trunk;
+    if (trunk === null) {
+      throw new Stop("land", "the candidate gate has no trunk to watch: HEAD is detached");
+    }
+    const script =
+      "const {execFileSync}=require('node:child_process');" +
+      "const sha=process.argv[1];const trunk=process.argv[2];const until=Date.now()+25*60*1000;" +
+      "const tick=()=>{try{execFileSync('git',['fetch','origin',trunk],{stdio:'ignore'});" +
+      "execFileSync('git',['merge-base','--is-ancestor',sha,'origin/'+trunk],{stdio:'ignore'});" +
+      "process.exit(0);}catch{}" +
+      "if(Date.now()>until){console.error('the gate did not move '+trunk+' to '+sha+' in 25 minutes; read the candidate-gate run');process.exit(3);}" +
+      "setTimeout(tick,30000);};tick();";
+    const code = await this.longWork({
+      name: "candidate gate",
+      argv: [process.execPath, "-e", script, receipt.tested_sha, trunk],
+      retryAfterSeconds: 60,
+      stopKind: "land",
+    });
+    if (code !== EXIT_OK) {
+      throw new Stop(
+        "land",
+        "the candidate gate did not go green; the run's failure list is the " +
+          "remediation input, and the branch is still standing with it.",
+      );
+    }
+    const pulled = runGit(this.repoRoot, ["pull", "--ff-only"]);
+    if (pulled.code !== 0) {
+      throw new Stop("land", `master moved but the pull was refused: ${tail(pulled.stderr, 300)}`);
+    }
+    this.log("landed", { commit: runGit(this.repoRoot, ["rev-parse", "--short", "HEAD"]).stdout });
+    this.setPhase("publish");
+  }
+
+  /**
+   * Step (f), for a session that declared it may publish.
+   *
+   * **Between the land and the close, and it cannot be anywhere else.**
+   * `packageSession` asks the close's own gates before it packs, and two of
+   * them -- `working_tree_clean` and `pushed_to_remote` -- are false until
+   * the commit and the push have happened. The field report from csv-model
+   * proposed putting this before the land; there it would refuse every
+   * time. After the close is no good either: `packaging` requires a session
+   * in flight, and the close ends the flight. One window exists, and this
+   * is it.
+   *
+   * Until now nothing occupied that window under the driven lifecycle. The
+   * verb existed, the declaration was accepted, the gates passed, and no
+   * phase ever called it -- so a session that declared itself releasable
+   * landed, closed `VERIFIED` and shipped nothing, while the guidance told
+   * the engine the framework had done the publishing. That is the defect
+   * this phase closes, and `published_when_releasable` is what stops it
+   * reopening quietly the next time this phase does not run.
+   *
+   * A session that is not releasable passes straight through, silently:
+   * there is nothing to say about a step that does not apply.
+   *
+   * What the pack writes lands in `.dabbler/runs/s<N>/package/`, which is
+   * inside the ignored run directory -- so the artifact cannot dirty the
+   * tree the gates just called clean. That is a property of where the
+   * output goes rather than of this phase, and it is stated here because
+   * this is the phase that would break if it ever changed.
+   */
+  private async phasePublish(): Promise<void> {
+    // A session that would ship runs whole, first, every suite whose run of
+    // record was targeted. A red whole run holds the release rather than
+    // stopping the session, and the check below then reads the hold.
+    if (sessionIsReleasable(this.sessionsDir, this.sessionNumber)) await this.wholeRunsBeforeRelease();
+    // The DECLARATION, which is what `packageSession` and the close gate
+    // both read. The plan carries a `releasable` too and the engine writes
+    // it, and `phasePlan` turns it into a declaration only when there is
+    // not one already -- so an operator who declared the session before it
+    // was driven can disagree with the plan, and the two disagreeing is
+    // worse in both directions: reading the plan here publishes what was
+    // declared not-releasable, or skips a publish the close then demands a
+    // packaging row for. The plan may PROPOSE it; the declaration decides.
+    if (!sessionIsReleasable(this.sessionsDir, this.sessionNumber)) {
+      const releasability = releasabilityOf(this.sessionsDir, this.sessionNumber);
+      this.log("publish-skipped", {
+        reason: releasability.hold ?? "not declared releasable",
+      });
+      this.setPhase("close");
+      return;
+    }
+    // Already published -- by `dabbler packaging` run directly, or by a job
+    // this run no longer holds -- is collected, never published again: a
+    // second push of the same version is refused by every feed, on every call.
+    if ((this.run.job ?? null) === null) {
+      const last = readPackaging(this.repoRoot, this.sessionNumber).at(-1);
+      if (last?.["outcome"] === OUTCOME_PUBLISHED) {
+        this.log("published", { session: sessionDisplayNumber(this.sessionNumber), collected: true });
+        this.setPhase("close");
+        return;
+      }
+    }
+    const code = await this.longWork({
+      name: "publish",
+      argv: [...selfArgv(), "packaging", "--sessions-dir", this.sessionsDir],
+      retryAfterSeconds: PUBLISH_RETRY_SECONDS,
+      stopKind: "publish",
+    });
+    if (code !== EXIT_OK) {
+      // A stop, and it says WHICH refusal -- read from the publish job's own
+      // log, the way `phaseVerify` reads verification's.
+      //
+      // What stood here was a string literal, on the reasoning that
+      // packaging had already written its refusal to its own log and its own
+      // record, so restating it would be a second copy that drifts. The
+      // reasoning is sound about AUTHORING a second sentence and wrong about
+      // this: quoting the one source at throw time is not a copy of it.
+      //
+      // The cost of the literal was not the wording: six distinct refusals
+      // read as one, and the rewind below keys on the refusal too.
+      const refused = jobLogTail(this.repoRoot, this.sessionNumber, "publish");
+
+      // Refused on an earlier phase's evidence: go back and make it, rather
+      // than stopping and handing the operator the five verbs the managed
+      // body says are not theirs to run. `gates.ts` states which phase makes
+      // which gate's evidence; this reads that, and states it nowhere.
+      //
+      // **A rewind is not a stop, and that is what has to be bounded here.**
+      // It throws nothing, so `stop_history` never sees it: a rewind that
+      // fixes nothing would come back to this line unchanged, rewind again,
+      // and go round for as long as anyone kept calling `next` -- paying for
+      // a verification round or a whole suite each time.
+      //
+      // So the run remembers what it has already gone back for: one rewind
+      // per distinct refusal. A refusal already in `rewinds` means going
+      // back did not fix it, and going back again would not either -- so the
+      // loop stops, with that refusal in the stop, where a person can see it. A refusal not in the list is a different problem, and going
+      // back for it is progress by the same definition the classifier reads.
+      const rewind = rewindFromPackaging(readPackaging(this.repoRoot, this.sessionNumber));
+      const rewound = this.run.rewinds ?? [];
+      if (rewind !== null && !alreadyRewoundFor(rewound, refused)) {
+        this.log("publish-rewound", { to: rewind, why: refused.slice(0, 300) });
+        this.run = {
+          ...this.run,
+          rewinds: [...rewound, { to: rewind, reason: refused, at: nowIso() }].slice(
+            -REWIND_HISTORY_CAP,
+          ),
+        };
+        this.setPhase(rewind);
+        return;
+      }
+      if (rewind !== null) {
+        throw new Stop(
+          "publish",
+          `the packaging run did not publish, and the run has already been sent back to ` +
+            `'${rewind}' once for this refusal without clearing it: ${refused}`,
+        );
+      }
+
+      throw new Stop(
+        "publish",
+        `the packaging run did not publish: ${
+          refused ||
+          "it wrote no reason; its log is under the run's jobs directory and " +
+            "the attempt is in the session's packaging record"
+        }`,
+      );
+    }
+    this.log("published", { session: sessionDisplayNumber(this.sessionNumber) });
+    this.setPhase("close");
+  }
+
+  /**
+   * The whole of every suite whose run of record this session was targeted,
+   * before anything is packaged. A red run stops nothing: `releasabilityOf`
+   * reads it as a hold naming the suite, the publish passes through, and
+   * the session closes with the failure on its record. CI's full run after
+   * the push is not this; it is unchanged.
+   */
+  private async wholeRunsBeforeRelease(): Promise<void> {
+    const declared = this.expensiveSuites();
+    for (const name of wholeRunsOwedBeforeRelease(readRecords(this.repoRoot), this.sessionNumber)) {
+      const suite = declared.find((entry) => entry.name === name);
+      if (suite === undefined) continue;
+      this.log("whole-run-before-release", { suite: name, command: suite.command });
+      const code = await this.longWork({
+        name: `whole run before release: ${name}`,
+        argv: [
+          ...selfArgv(),
+          "test-evidence",
+          "run",
+          "--sessions-dir",
+          this.sessionsDir,
+          "--suite",
+          name,
+          "--stage",
+          STAGE_FINAL_FULL,
+        ],
+        retryAfterSeconds: suiteRetrySeconds(readRecords(this.repoRoot), name),
+        stopKind: "tests",
+      });
+      if (code === 1) {
+        this.log("tests-failed", { command: suite.command, holds: "the release" });
+        continue;
+      }
+      if (code !== EXIT_OK) {
+        throw new Stop("tests", `the whole run of ${name} before the release could not be recorded (exit ${code})`);
+      }
+    }
+  }
+
+  private async phaseClose(): Promise<void> {
+    // Already closed -- by `dabbler session close` run directly, or by a job
+    // this run no longer holds -- is collected, never closed again: the verb
+    // refuses a session that is not in flight, on every call.
+    if ((this.run.job ?? null) === null) {
+      const rows = readSessionState(this.sessionsDir)?.["sessions"];
+      const row = (Array.isArray(rows) ? rows : []).find(
+        (entry): entry is Record<string, unknown> =>
+          typeof entry === "object" && entry !== null && (entry as Record<string, unknown>)["number"] === this.sessionNumber,
+      );
+      if (row?.["status"] === "complete") {
+        this.log("close-collected", { session: sessionDisplayNumber(this.sessionNumber) });
+        this.issueDone();
+        this.setPhase("complete");
+        return;
+      }
+    }
+    const code = await this.longWork({
+      name: "close",
+      argv: [...selfArgv(), "session", "close", "--sessions-dir", this.sessionsDir],
+      retryAfterSeconds: CLOSE_RETRY_SECONDS,
+      stopKind: "close",
+    });
+    if (code !== EXIT_OK) {
+      // The same literal, in the same place, for the same reason as publish's
+      // -- and the same fix. The close prints its gate rows and their
+      // remediations before it refuses, so its log tail is the list of what
+      // failed; carrying it makes two unlike close refusals two stops rather
+      // than one impasse, and gives each its own triage.
+      const refused = jobLogTail(this.repoRoot, this.sessionNumber, "close");
+      throw new Stop(
+        "close",
+        `the close refused: ${
+          refused || "it wrote no reason; its log is under the run's jobs directory"
+        }`,
+      );
+    }
+    this.issueDone();
+    this.setPhase("complete");
+  }
+
+  // --- the loop --------------------------------------------------------------
+
+  /**
+   * The one loop, under both modes. It runs phase by phase and ends when
+   * the session is over, when a Stop lands, or -- under the pull only --
+   * when a phase unwinds with something to ask for.
+   */
+  private async loop(): Promise<number> {
+    try {
+      for (;;) {
+        // A stop asked for while the framework's own phase was running (a
+        // verification round, the suite) takes effect at this boundary.
+        if (this.run.phase !== "complete") this.honourPendingStop();
+        try {
+          // A synthesised step whose answer is outstanding is judged before
+          // the phase it was issued from does anything else.
+          const pending = this.run.pending_step ?? null;
+          if (pending !== null && this.run.phase !== "complete") {
+            await this.runSynthesisedStep(pending.id, pending.ask, pending.then);
+            continue;
+          }
+          // Dispatched on the canonical name, so a run recorded under the old
+          // one resumes into the phase it stopped in without its record being
+          // rewritten to be readable. `isWorkPhase` is the only place either
+          // name is recognised.
+          switch (isWorkPhase(this.run.phase) ? PHASE_WORK : this.run.phase) {
+            case "plan":
+              await this.phasePlan();
+              break;
+            case PHASE_WORK:
+              await this.phaseSteps();
+              break;
+            case "preverify":
+              await this.phasePreverify();
+              break;
+            case "verify":
+              await this.phaseVerify();
+              break;
+            case "dispositions":
+              await this.phaseDispositions();
+              break;
+            case "fix":
+              await this.phaseFix();
+              break;
+            case "run-of-record":
+              await this.phaseRunOfRecord();
+              break;
+            case "land":
+              this.phaseLand();
+              break;
+            case "gate-wait":
+              await this.phaseGateWait();
+              break;
+            case "publish":
+              await this.phasePublish();
+              break;
+            case "close":
+              await this.phaseClose();
+              break;
+            case "complete":
+              this.log("session-complete", {
+                session: sessionDisplayNumber(this.sessionNumber),
+                invocations: this.run.invocations,
+              });
+              // The invocation count is the framework's own spending, and
+              // under the pull it spent none: the engine was the person's CLI
+              // and its bill is theirs. Saying "0 engine invocations" there
+              // would read as a session that did nothing.
+              writeOut(
+                `dabbler: session ${sessionDisplayNumber(this.sessionNumber)} complete` +
+                  (this.pull ? ".\n" : ` after ${this.run.invocations} engine invocation(s).\n`),
+              );
+              // Nothing more is expected, and the pull says so in the one
+              // shape it says everything: the `done` the close issued.
+              if (this.pull) {
+                const done = readInstruction(this.repoRoot, this.sessionNumber) ?? this.issueDone();
+                throw new Awaiting(done.kind === "done" ? done : this.issueDone());
+              }
+              return EXIT_OK;
+          }
+        } catch (error) {
+          if (!(error instanceof ConfigError)) throw error;
+          this.pendConfigurationFix(error);
+        }
+      }
+    } catch (error) {
+      if (!(error instanceof Stop)) throw error;
+      // A stop abandons the run, and a job still running under it -- the
+      // suite, a verification round, the close -- is abandoned with it. It
+      // is ended here, in the one place every Stop passes through, rather
+      // than at each site that can throw one: a `session interrupt --stop`
+      // read while the pull was waiting on the job is the common case, and
+      // the job it would otherwise leave behind is exactly the tree found
+      // squatting on the operator's machine 38 hours later.
+      const abandoned = this.run.job ?? null;
+      if (abandoned !== null) {
+        endJob(abandoned);
+        this.run = { ...this.run, job: null };
+        this.log("job-ended", { name: abandoned.name, pid: abandoned.pid, reason: error.message });
+      }
+      const entry = {
+        kind: error.kind,
+        code: error.code,
+        reason: error.message,
+        at: nowIso(),
+        step_id: this.currentStep,
+      };
+      const history = this.run.stop_history ?? [];
+      this.run = {
+        ...this.run,
+        stop: {
+          kind: entry.kind,
+          code: entry.code,
+          reason: entry.reason,
+          at: entry.at,
+          step_id: entry.step_id,
+        },
+        stop_history: [...history, entry].slice(-STOP_HISTORY_CAP),
+        // A stop landing before the phase moved on is the replacement that
+        // silences "progress resumed": this pause is spoken, and it says
+        // all there is to say.
+        resumed_from: null,
+      };
+      this.save();
+      // The words are the router's one rendering of a stop, shared with the
+      // status row and the terminal; what is on disk is the record above.
+      const words = renderStop(this.run.stop as NonNullable<DriverRun["stop"]>, this.run);
+      // The whole rendering, ways on included. The command that met the
+      // stop is the surface a person is already looking at, and printing
+      // three of the four things it knows sent one operator to look for
+      // the fourth in a record they had no reason to know existed.
+      writeErr(
+        `dabbler: ${words.headline} in phase '${this.run.phase}' after ` +
+          `${this.run.invocations} invocation(s).\n${words.happened}\n` +
+          // The stop's own substance -- the findings a dispute stands over,
+          // their grounds, what they cite -- printed where the person is.
+          (error.brief ? `\n${error.brief}\n\n` : "") +
+          `${words.ended} ${words.next}${words.ways}\n`,
+      );
+      return EXIT_GATE_FAILED;
+    }
+  }
+
+  /**
+   * One move: the loop, run until it has something to ask for, handing back
+   * the instruction rather than invoking anybody with it.
+   */
+  async advance(): Promise<{ code: number; instruction: DriverInstruction | null }> {
+    try {
+      return { code: await this.loop(), instruction: null };
+    } catch (error) {
+      if (!(error instanceof Awaiting)) throw error;
+      return { code: EXIT_OK, instruction: error.instruction };
+    }
+  }
+
+  /**
+   * Push: the same move, with the engine invoked between phases instead of
+   * a person's CLI calling back.
+   *
+   * There is deliberately nothing to iterate here. The engine's invocation
+   * is inside `converse` and a job's poll is inside `longWork`, so under
+   * the push a move only ends when the session does -- `drive` is one call
+   * of exactly what `next` calls, and that is what makes them one loop
+   * rather than two that agree.
+   */
+  async drive(): Promise<number> {
+    return (await this.advance()).code;
+  }
+}
+
+/** Everything both entry points do before the loop: the repository and its config. */
+async function withDriver(
+  sessionsDir: string,
+  options: DriverOptions,
+  run: (driver: Driver) => Promise<number>,
+): Promise<number> {
+  const repoRoot = repoRootFor(sessionsDir);
+  if (repoRoot === null) {
+    writeErr(`dabbler: not inside a git repository: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  try {
+    // Read here only to refuse a malformed configuration before anything is
+    // registered; the driver reads it again wherever it acts on it. Always
+    // the repository under `--sessions-dir`, never the one the command was
+    // typed in: a config resolved from the working directory would run
+    // another repository's suite against this tree and record it as this
+    // session's evidence.
+    loadConfig(undefined, repoRoot);
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    writeErr(`dabbler: ${error.message}\n`);
+    return EXIT_USAGE;
+  }
+  const driver = new Driver(sessionsDir, options, repoRoot);
+  try {
+    const registered = await driver.register();
+    if (registered !== EXIT_OK) return registered;
+    return await run(driver);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    writeErr(`dabbler: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+}
+
+/**
+ * Drive the session that is next, from registration to close. The exit
+ * code is the close's when the loop reaches it, and a gate failure when it
+ * stops short -- the stop is on `run.json`, in words.
+ */
+export async function driveSession(sessionsDir: string, options: DriveOptions): Promise<number> {
+  return withDriver(sessionsDir, { ...options, mode: "push" }, (driver) => driver.drive());
+}
+
+/**
+ * Advance the session one move and print the instruction to answer.
+ *
+ * The same loop `driveSession` runs, with the engine on the other side of
+ * the call: this returns as soon as it has something to ask for, and the
+ * person's own CLI does the work and calls it again. Stdout carries exactly
+ * one thing -- the instruction, as `driver-instruction` JSON -- so a
+ * parser reads it; everything the verbs on the way there would have printed
+ * is diverted to stderr, where the person still sees it.
+ *
+ * The invocation budget is not counted here. `driver.max_invocations`
+ * bounds what the FRAMEWORK spends invoking an engine, and under the pull
+ * it is the person's own CLI spending. The three-rejection bound stays:
+ * that one is about an answer that is not getting better.
+ */
+export async function sessionNext(sessionsDir: string, options: NextOptions): Promise<number> {
+  let instruction: DriverInstruction | null = null;
+  const code = await divertOut(() =>
+    withDriver(
+      sessionsDir,
+      {
+        engine: options.engine ?? null,
+        provider: options.provider ?? null,
+        model: options.model ?? null,
+        effort: options.effort ?? null,
+        adapter: null,
+        transport: options.transport ?? null,
+        mode: "pull",
+        waitInCallMs: options.waitInCallMs ?? null,
+      },
+      async (driver) => {
+        // Nothing in flight and nothing asked for: answer `done` without
+        // advancing. There is no run behind this driver to advance.
+        if (driver.isIdle()) {
+          instruction = idleInstruction(nowIso());
+          return EXIT_OK;
+        }
+        const outcome = await driver.advance();
+        instruction = outcome.instruction;
+        return outcome.code;
+      },
+    ),
+  );
+  if (instruction !== null) writeOut(`${JSON.stringify(instruction, null, 2)}\n`);
+  return code;
+}
+
+// --- wait: the AI's side of the mailbox ------------------------------------------
+
+/** How often `session wait` looks at the session's files: a local read, no model called. */
+export const SESSION_WAIT_POLL_MS = 1000;
+
+/**
+ * Whether `instruction` has its answer on disk. A plan is answered by the work
+ * plan being there (a refused one is removed and asked for afresh), a
+ * verification rejection by dispositions carrying its seq, and every other
+ * instruction by a report carrying its seq. A file caught mid-write, or one
+ * that does not validate, is no answer yet: the driver judges whatever is there
+ * once one lands.
+ */
+export function instructionAnswered(
+  repoRoot: string,
+  sessionNumber: number,
+  instruction: DriverInstruction,
+): boolean {
+  try {
+    if (instruction.answer_schema === WORK_PLAN_SCHEMA) {
+      return readWorkPlan(repoRoot, sessionNumber) !== null;
+    }
+    // The answer to THIS instruction: its own seq, never merely a later one.
+    if (instruction.answer_schema === DISPOSITION_SCHEMA) {
+      return readDispositions(repoRoot, sessionNumber)?.seq === instruction.seq;
+    }
+    return readReport(repoRoot, sessionNumber)?.seq === instruction.seq;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The instruction owed an answer, or null. A `done` is owed nothing and is
+ * returned so a waiter can end; a pull's `wait` is not the AI's to answer.
+ * Nothing is consumed: until its answer is on disk, every reader is owed the
+ * same instruction, so an AI that loses a step loses nothing.
+ */
+export function owedInstruction(repoRoot: string, sessionNumber: number): DriverInstruction | null {
+  let instruction: DriverInstruction | null;
+  try {
+    instruction = readInstruction(repoRoot, sessionNumber);
+  } catch {
+    return null;
+  }
+  if (instruction === null || instruction.kind === "wait") return null;
+  if (instruction.kind === "done") return instruction;
+  return instructionAnswered(repoRoot, sessionNumber, instruction) ? null : instruction;
+}
+
+/** How often the mailbox loop refreshes its heartbeat. */
+export const LOOP_HEARTBEAT_MS = 5000;
+
+/**
+ * How old a heartbeat may be and still say a loop is driving. Well past the
+ * refresh, because the loop's short synchronous git calls can delay a beat.
+ */
+export const LOOP_STALE_MS = 60_000;
+
+/**
+ * Whether a loop is driving this session: its heartbeat is younger than
+ * LOOP_STALE_MS. A terminal's name is not an answer -- one can outlive its
+ * process or be a different run's.
+ */
+export function loopAlive(repoRoot: string, sessionNumber: number, now: number = Date.now()): boolean {
+  try {
+    const beat = JSON.parse(readFileSync(loopPath(repoRoot, sessionNumber), "utf8")) as { at?: unknown };
+    const at = typeof beat.at === "string" ? Date.parse(beat.at) : Number.NaN;
+    return Number.isFinite(at) && now - at < LOOP_STALE_MS;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What a waiter that began at `since` reads now: the instruction owed, or
+ * `no-loop` once the grace is spent with no loop driving -- nothing will
+ * write an instruction then, and waiting on would wait forever -- or null to
+ * keep waiting.
+ */
+export function waiterReading(
+  repoRoot: string,
+  sessionNumber: number,
+  since: number,
+  now: number = Date.now(),
+  graceMs: number = LOOP_STALE_MS,
+): DriverInstruction | "no-loop" | null {
+  const owed = owedInstruction(repoRoot, sessionNumber);
+  if (owed !== null) return owed;
+  return now - since >= graceMs && !loopAlive(repoRoot, sessionNumber, now) ? "no-loop" : null;
+}
+
+/**
+ * What a waiter says when no loop is driving. A recorded stop is why the loop
+ * ended, so it is said in `renderStop`'s own words, after the restart: the
+ * stop's moves are answered once a loop is driving again. With no stop, the
+ * restart alone.
+ */
+export function noLoopMessage(
+  sessionsDir: string,
+  sessionNumber: number,
+  run: Pick<DriverRun, "stop" | "phase" | "engine"> | null,
+): string {
+  const opening =
+    `wait: no loop is driving session ${sessionDisplayNumber(sessionNumber)}, so no instruction is coming. `;
+  const restart = `dabbler session run --mailbox --sessions-dir ${sessionsDir}`;
+  const stop = run?.stop ?? null;
+  if (stop === null) {
+    return `${opening}Tell the operator; Resume Session starts it, or in a terminal of its own: ${restart}\n`;
+  }
+  const words = renderStop(stop, { session_number: sessionNumber, phase: run!.phase, engine: run!.engine });
+  return (
+    `${opening}${words.headline}. ${words.happened}\n` +
+    "Tell the operator. The ways on:\n" +
+    `  - Resume Session in VS Code, or in a terminal of its own: ${restart}\n` +
+    `    The loop starts again from phase '${run!.phase}'.` +
+    `${words.ways}\n`
+  );
+}
+
+/**
+ * What a waiter says on a repository where nothing is in flight and nothing
+ * ever was under this waiter.
+ *
+ * The idle instruction's own ask names `dabbler session start`, which is
+ * right for the reader it was written for -- a person who typed `session
+ * next` on an idle repository -- and is an invitation when a LOOP reads it.
+ * A waiter is a loop, so this one names no command at all: whether a session
+ * runs the next one is the operator's decision to make by typing it.
+ *
+ * Session 0 and seq 0 for the same reason the idle instruction uses them:
+ * there is no session behind this, and a reader that treats 0 as one will
+ * find no record for it.
+ */
+export function waiterIdleInstruction(now: string): DriverInstruction {
+  return {
+    schema_version: DRIVER_SCHEMA_VERSION,
+    seq: 0,
+    session_number: 0,
+    issued_at: now,
+    kind: "done",
+    ask:
+      "Nothing is in flight in this repository and there is nothing to wait " +
+      "for. Stop, and tell the operator.",
+  };
+}
+
+/**
+ * The last thing a waiter prints when the session it was watching is gone.
+ *
+ * A waiter HOLDS the session it has been watching, so a close that lands
+ * under it is not the same event as an empty repository: the close wrote a
+ * `done` into that session's run directory, and that instruction -- with its
+ * own ask -- is what ends this waiter. Only a waiter that never saw a
+ * session, or one whose session left no readable `done`, reports an idle
+ * repository.
+ */
+export function waiterEnd(repoRoot: string, watching: number | null, now: string): DriverInstruction {
+  if (watching === null) return waiterIdleInstruction(now);
+  let closed: DriverInstruction | null;
+  try {
+    closed = readInstruction(repoRoot, watching);
+  } catch {
+    closed = null;
+  }
+  return closed?.kind === "done" ? closed : waiterIdleInstruction(now);
+}
+
+/**
+ * Wait for the instruction owed an answer, print it as JSON, and return. The AI
+ * runs this in the background, so its chat stays free while it waits, and runs
+ * it again after each answer. A session that closes under the waiter ends it
+ * with that session's own `done`; with nothing in flight and no session ever
+ * watched it says so; with no loop driving the session it says so and names
+ * the command that starts one.
+ */
+export async function sessionWait(
+  sessionsDir: string,
+  pollMs: number = SESSION_WAIT_POLL_MS,
+): Promise<number> {
+  const repoRoot = repoRootFor(sessionsDir);
+  if (repoRoot === null) {
+    writeErr(`dabbler: not inside a git repository: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  const since = Date.now();
+  let watching: number | null = null;
+  for (;;) {
+    const current = readSessionState(sessionsDir)?.["currentSession"];
+    if (typeof current !== "number") {
+      writeOut(`${JSON.stringify(waiterEnd(repoRoot, watching, nowIso()), null, 2)}\n`);
+      return EXIT_OK;
+    }
+    watching = current;
+    const reading = waiterReading(repoRoot, current, since);
+    if (reading === "no-loop") {
+      let run: DriverRun | null;
+      try {
+        run = readRun(repoRoot, current);
+      } catch {
+        run = null;
+      }
+      writeErr(noLoopMessage(sessionsDir, current, run));
+      return EXIT_BOUNDARY;
+    }
+    if (reading !== null) {
+      writeOut(`${JSON.stringify(reading, null, 2)}\n`);
+      return EXIT_OK;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+}
+
+// --- run: one command, the whole session --------------------------------------
+
+export interface RunCliOptions {
+  readonly maxInvocations: number | null;
+  readonly showEngine: string | null;
+  /**
+   * The AI answers from its own CLI through `session wait`: the loop waits for
+   * each report through the mailbox engine, whatever engine is registered.
+   */
+  readonly mailbox?: boolean;
+}
+
+/**
+ * Drive the in-flight session to `done` in one command, identity from the
+ * record. The developer's vocabulary is start, interact, cancel: `run` is
+ * what makes the middle word optional. A registered built-in engine is
+ * invoked per instruction through the same adapter machinery the push has
+ * always had; an engine the framework cannot invoke non-interactively
+ * degrades to watcher-only -- the loop waits, renders the clock readings
+ * with their recommended actions, and never pretends a liveness it cannot
+ * provide.
+ */
+export async function runWholeSession(
+  sessionsDir: string,
+  options: RunCliOptions,
+): Promise<number> {
+  const state = readRawSessionState(sessionsDir);
+  const sessions = Array.isArray(state?.["sessions"])
+    ? (state?.["sessions"] as Array<Record<string, unknown>>)
+    : [];
+  const inFlight = sessions.find((row) => row["status"] === "in-progress");
+  if (inFlight === undefined) {
+    writeErr(
+      "run: no session is in flight. Register one first -- `dabbler session " +
+        "start --sessions-dir <dir> --engine <engine> --provider <provider>` " +
+        "-- and `run` takes it from there.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+  const orchestrator = typeof inFlight["orchestrator"] === "object" && inFlight["orchestrator"] !== null && !Array.isArray(inFlight["orchestrator"])
+    ? (inFlight["orchestrator"] as Record<string, unknown>)
+    : {};
+  const engine = typeof orchestrator["engine"] === "string" ? orchestrator["engine"] : "";
+  const sessionNumber = Number(inFlight["number"]);
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+
+  if (options.mailbox === true) {
+    appendSupervision(repoRoot, sessionNumber, { event: "session-run-started", engine, mode: "mailbox" });
+    const adapter = mailboxEngine((invocation) =>
+      instructionAnswered(invocation.repoRoot, invocation.sessionNumber, invocation.instruction),
+    );
+    // The heartbeat is how a waiter and Resume know a loop is driving.
+    const heartbeat = loopPath(repoRoot, sessionNumber);
+    const beat = (): void => {
+      try {
+        mkdirSync(dirname(heartbeat), { recursive: true });
+        writeFileSync(heartbeat, `${JSON.stringify({ pid: process.pid, at: new Date().toISOString() })}\n`, "utf8");
+      } catch {
+        // A missed beat reads as a stale heartbeat, which is what it is.
+      }
+    };
+    beat();
+    const timer = setInterval(beat, LOOP_HEARTBEAT_MS);
+    timer.unref();
+    try {
+      return await driveSession(sessionsDir, {
+        engine,
+        provider: typeof orchestrator["provider"] === "string" ? orchestrator["provider"] : null,
+        model: typeof orchestrator["model"] === "string" ? orchestrator["model"] : null,
+        effort: typeof orchestrator["effort"] === "string" ? orchestrator["effort"] : null,
+        adapter,
+        maxInvocations: options.maxInvocations,
+      });
+    } finally {
+      clearInterval(timer);
+      try {
+        unlinkSync(heartbeat);
+      } catch {
+        // Already gone.
+      }
+    }
+  }
+
+  if ((BUILT_IN_ENGINES as readonly string[]).includes(engine)) {
+    const adapter = builtInEngine(
+      engine,
+      typeof orchestrator["model"] === "string" ? orchestrator["model"] : null,
+    );
+    if (typeof adapter === "string") {
+      writeErr(`run: ${adapter}\n`);
+      return EXIT_USAGE;
+    }
+    appendSupervision(repoRoot, sessionNumber, {
+      event: "session-run-started",
+      engine,
+      mode: "invoke",
+      max_invocations: options.maxInvocations ?? null,
+    });
+    return driveSession(sessionsDir, {
+      engine,
+      provider: typeof orchestrator["provider"] === "string" ? orchestrator["provider"] : null,
+      model: typeof orchestrator["model"] === "string" ? orchestrator["model"] : null,
+      effort: typeof orchestrator["effort"] === "string" ? orchestrator["effort"] : null,
+      adapter,
+      engineOutput:
+        options.showEngine === null ? null : (options.showEngine as "stream" | "quiet"),
+      maxInvocations: options.maxInvocations,
+    });
+  }
+
+  // Watcher-only: this engine answers in a CLI the framework does not
+  // invoke. The loop still owns the waiting -- wait instructions sleep
+  // their own retry, and an outstanding step renders the clock reading so
+  // the silence is at least named.
+  appendSupervision(repoRoot, sessionNumber, {
+    event: "session-run-started",
+    engine,
+    mode: "watcher-only",
+  });
+  const threshold = 120;
+  for (;;) {
+    const code = await sessionNext(sessionsDir, { waitInCallMs: WAIT_IN_CALL_MS });
+    let instruction;
+    try {
+      instruction = readInstruction(repoRoot, sessionNumber);
+    } catch {
+      return code;
+    }
+    if (instruction === null) return code;
+    if (instruction.kind === "done") return EXIT_OK;
+    if (instruction.kind === "wait") {
+      const retry = Number(instruction.retry_after_seconds ?? 60);
+      await new Promise((resolve) => setTimeout(resolve, Math.max(5, retry) * 1000));
+      continue;
+    }
+    const reading = readWatcher(repoRoot, sessionNumber, threshold);
+    if (reading.state !== "quiet") {
+      writeErr(
+        `run: [${reading.clock ?? "watch"}] ${reading.state} for ` +
+          `${reading.sinceSeconds}s -- ${reading.recommended_action ?? ""}\n`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, threshold * 1000));
+  }
+}
+
+
+/**
+ * What a call site does about a standing job under another name.
+ *
+ * "behind": the job is still running, so this site is earlier in the same
+ * walk than the site that started it -- answer EXIT_OK and let the walk
+ * catch up. "stale": the job has exited (or vanished) uncollected, which is
+ * cross-phase leftover state; collect it, clear it, and do your own work.
+ * Pure so the rule is testable without a driver.
+ */
+export function staleJobDisposition(
+  standingName: string,
+  requestedName: string,
+  polledState: string,
+): "behind" | "stale" {
+  if (standingName === requestedName) return "behind";
+  return polledState === "running" ? "behind" : "stale";
+}

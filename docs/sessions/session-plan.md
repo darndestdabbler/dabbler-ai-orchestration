@@ -12358,7 +12358,7 @@ and the terminal keep the `session start` hint, because a person reads those.
 This is the whole of the fix for the chaining: the loop cannot be handed the
 door it is not meant to open.
 
-**Why -- three surfaces that name something that is gone or say nothing
+**Why -- four surfaces that name something that is gone or say nothing
 useful.** The same notes file reports hand-authoring a `docs/modules.yaml` on
 an imported plan's say-so, then finding that `dabbler deps` reads a different
 file entirely.
@@ -12379,13 +12379,28 @@ file entirely.
   solution, and `session start` already prints that `docs/modules.yaml` is no
   longer read. The remaining two moves -- split the session, or route to a
   model with a larger window -- are real and stay.
+- **The git guard offers a door that closed in session 122.** `no-git.ts`
+  refuses a git spawned outside a walkthrough with "feed the answer through
+  `journal.setGitSource` ... **or move the test into a `walk-*.test.ts`
+  file**". That second move has not worked since session 122 replaced the
+  regex `/^walk-.*\.test\.ts$/` with the explicit `WALKTHROUGHS` list, for
+  the reason stated beside it: the pattern let the exemption spread by naming
+  -- six files to eight, the suite 17 s to 157 s, the test count 1137 to 1144.
+  A renamed test is refused a second time and now also fails
+  `check-suite-cost.ts`, which holds the list and the files on disk to each
+  other in both directions. Session 203 met the refusal and its note recorded
+  the pattern, not the list. The message keeps the move that works and names
+  the list as the deliberate second one, so what it offers is what the guard
+  honours.
 
 **Non-goals.** **No chaining feature and no setting for one.** Whether a
 session should be able to run the next one is a product question the operator
 has not decided, and a session that fixed a leak by building the pipe would be
 deciding it here. No change to what `session next` prints for a person. No
 change to the close, the ledger, or anything `currentSession` means. Nothing
-about `docs/modules.yaml` is revived.
+about `docs/modules.yaml` is revived. **The `WALKTHROUGHS` list does not
+change and gains no member**: this session corrects what the guard SAYS, and
+the list is the budget it exists to hold.
 
 **Tests.**
 - The `done` the close issues carries an `ask` and no `answer_command`.
@@ -12398,8 +12413,10 @@ about `docs/modules.yaml` is revived.
 - `deps show` with no declaration says what the file is for and that one
   repository needs none.
 
-`deps --help` and the `PromptTooLargeError` wording are corrected with the
-docs and carry no test: proving a string does not contain a word is the
-source-text assertion rule 4 sends to ESLint.
+`deps --help`, the `PromptTooLargeError` wording and `no-git.ts`'s refusal
+are corrected with the docs and carry no test: proving a string does not
+contain a word is the source-text assertion rule 4 sends to ESLint, and
+`check-suite-cost.ts` already holds the `WALKTHROUGHS` list itself to the
+files on disk.
 
 **Releasable.** Yes, a minor: the mailbox loop stops where it is meant to.

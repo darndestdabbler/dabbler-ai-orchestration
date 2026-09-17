@@ -3964,7 +3964,7 @@
     {
       "number": 200,
       "title": "The extension suite does not read this machine's PATH",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-17T09:09:38.723000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -3973,7 +3973,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.5.0",
-      "completedAt": null,
+      "completedAt": "2026-09-17T09:16:07.063000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,

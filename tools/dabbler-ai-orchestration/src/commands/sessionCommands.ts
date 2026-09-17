@@ -1,0 +1,1174 @@
+// Start, Stop, Send, Close -- the engine stays in the person's own CLI.
+//
+// Start registers the session, starts the framework's loop (`session run
+// --mailbox`), and opens a terminal running the engine's own CLI,
+// interactively, at the repository root, with the one sentence a session
+// needs: keep `dabbler session wait` running in the background and answer
+// what it prints. The framework drives; nothing deterministic is left for the
+// person or the AI to type, and nothing is pasted anywhere: they keep their
+// own spinner, their own scrollback, their own chat and their own interrupt
+// key, which is what the staff already trust.
+//
+// Beside it is the *Dabbler* terminal: what the framework is doing while
+// they type. Two terminals is the arrangement, not one -- Start shows
+// both, and shows them without taking the caret. WHERE the pair opens is
+// `dabbler.terminalLocation`: two editor tabs side by side by default, or
+// split in the bottom panel as session 62 built it. A terminal cannot be
+// moved after it is created, so the setting is read when each one opens
+// and never after.
+//
+// **Start Unattended Session is the other half** (D252): headless `session
+// drive` as a child process, streaming into "Dabbler: Engine", for CI and
+// overnight runs. It is the only thing Stop and Send apply to -- they are
+// `session interrupt`, which ends an invocation the FRAMEWORK made, and
+// under the interactive default the framework never invokes anybody. Both
+// stay gated on `dabbler.driving`, which only an unattended drive sets.
+//
+// The driver is a child process rather than an in-process call, and the
+// reason is stated once in `router/driveProcess.ts`.
+
+import * as path from "path";
+import * as vscode from "vscode";
+import {
+  ENUMERATION_CLI_ALIASES,
+  MERGE_ORIGIN_FLAG,
+  loopAlive,
+  preflightRefusedModel,
+  type Router,
+} from "dabbler-ai-router";
+import { SESSIONS_REL, type SessionsRepository } from "../utils/fileSystem";
+import { productionRouter, solutionConfiguration } from "../router/host";
+import { routerOutputChannel } from "../router/commandLog";
+import { type DriveHandle, launchDriver } from "../router/driveProcess";
+import { resolveRouterCli } from "../router/terminalShim";
+import { ensureDabblerTerminal, terminalLocation } from "../router/dabblerTerminal";
+import { asRepositoryNode, asSessionNode } from "./workExplorerTreeCommands";
+
+/**
+ * The repository a clicked row belongs to, whichever row kind it is.
+ *
+ * Start Session is offered on the repository row and on the row for the
+ * session that would be registered next, and both rows carry the same
+ * repository. Narrowing to one node kind is what made the second offer do
+ * nothing at all when it was clicked: the menu appeared, the handler failed
+ * to recognise its argument, and the command returned silently.
+ */
+export function repositoryOf(arg: unknown): SessionsRepository | undefined {
+  return (asRepositoryNode(arg) ?? asSessionNode(arg))?.repository;
+}
+
+const CHANNEL_NAME = "Dabbler Session";
+export const ENGINE_CHANNEL_NAME = "Dabbler: Engine";
+/** The context key the palette entries for Stop and Send are gated on. */
+export const DRIVING_CONTEXT = "dabbler.driving";
+/** What Stop records when the person accepts the box as it is offered. */
+export const DEFAULT_STOP_REASON = "Stopped from the Work Explorer";
+
+/** Engine and provider travel together: identity resolves through the pair. */
+export interface EngineChoice {
+  readonly label: string;
+  readonly engine: string;
+  readonly provider: string;
+  readonly description: string;
+  /** A seat is nothing without one; elsewhere the engine's default stands. */
+  readonly modelRequired: boolean;
+}
+
+export const ENGINES: readonly EngineChoice[] = [
+  {
+    label: "Claude Code",
+    engine: "claude-code",
+    provider: "anthropic",
+    description: "anthropic",
+    modelRequired: false,
+  },
+  // Codex is not here, and `--engine codex` still registers and records
+  // (D268, D269). The distinction is what this list IS: not a set of names
+  // the ledger accepts, but a set of CLIs Start Session will LAUNCH. Every
+  // row below was measured against its own `--help`; codex never was --
+  // ENGINE_CLI's comment says so in as many words -- so offering the row
+  // would put an unmeasured launch in front of a person at the one command
+  // that starts their work, and the two UAT walkthroughs would transcribe
+  // a choice no walk has ever taken. Typing `dabbler session next` in a
+  // terminal is the documented loop and takes the name as it always did.
+  {
+    label: "GitHub Copilot",
+    engine: "copilot",
+    provider: "openai",
+    description: "openai — a seat also needs a model",
+    modelRequired: true,
+  },
+];
+
+/**
+ * The engines to offer, with the operator's default first.
+ *
+ * First and not only: the pane sets what the NEXT session is offered, and a
+ * list that hid the others would turn a default into a decision nobody can
+ * revisit at the moment they are being asked to make it.
+ */
+export function engineOrder(preferred: string | null): readonly EngineChoice[] {
+  if (preferred === null) return ENGINES;
+  const chosen = ENGINES.filter((entry) => entry.engine === preferred);
+  return [...chosen, ...ENGINES.filter((entry) => entry.engine !== preferred)];
+}
+
+/**
+ * How each engine's own CLI is launched interactively, and whether it has
+ * an argv slot for the opening sentence.
+ *
+ * **Measured against the installed CLIs' own `--help` on 2026-08-31, not
+ * assumed.**
+ *
+ * - `claude`: `Usage: claude [options] [command] [prompt]`, and "starts an
+ *   interactive session by default, use -p/--print for non-interactive
+ *   output". The positional IS the opening prompt, so it goes in argv.
+ * - `copilot`: `Usage: copilot [options] [command]` -- no positional, but
+ *   `-i, --interactive <prompt>` is "Start interactive mode and automatically
+ *   execute this prompt" (measured on 1.0.83, 2026-09-15). `-p, --prompt` is
+ *   the non-interactive one and is not what Start wants. The sentence used to
+ *   be typed at the prompt and left for the person's Enter, which is a
+ *   deterministic keypress on every Copilot start.
+ * - `codex`: NOT installed on the machine this was written on, so its help
+ *   was not read and nothing here claims to know it. It opens with no
+ *   prompt: an argv a CLI does not take is a launch that fails in front of
+ *   the person, and the sentence costs them one keypress instead. The
+ *   entry stays because a session already registered under the name is
+ *   still resumable; ENGINES no longer offers it, which is the difference
+ *   between resuming what exists and proposing it to someone new.
+ *
+ * **`modelFlag` is how the chosen model reaches the engine**, and it was
+ * missing entirely. `args` was `carriesPrompt ? [sentence] : []`, so the
+ * `--model` an operator typed was an argument to `dabbler session start` --
+ * which records identity on the ledger -- and never reached the CLI: a seat
+ * was RECORDED on one model while `copilot` ran on `auto`, and under Claude
+ * Code no model was asked for, recorded or passed at all. The router's own
+ * unattended driver has always done this correctly (`engineShape`); only the
+ * interactive launch was missing it. Both flags were measured on 2026-09-12:
+ * `claude --model` accepted 14 of 14 ids offered, and `copilot --model`
+ * refuses an unknown id with exit 1 before any billed call. `codex` carries
+ * null for the same reason its prompt slot is null -- its help has never been
+ * read here, and a flag a CLI may not take is a launch that fails in front of
+ * the person.
+ */
+const ENGINE_CLI: Readonly<
+  Record<string, { program: string; promptArgs: ((sentence: string) => string[]) | null; modelFlag: string | null }>
+> = {
+  "claude-code": { program: "claude", promptArgs: (sentence) => [sentence], modelFlag: "--model" },
+  copilot: { program: "copilot", promptArgs: (sentence) => ["-i", sentence], modelFlag: "--model" },
+  codex: { program: "codex", promptArgs: null, modelFlag: null },
+};
+
+/** What Start asks the editor to open: one CLI, interactively, in one repository. */
+export interface EngineTerminal {
+  readonly name: string;
+  readonly cwd: string;
+  readonly program: string;
+  readonly args: readonly string[];
+  /**
+   * Typed at the CLI's prompt and NOT sent, for a CLI whose argv has no
+   * slot for it. The person presses Enter, which is the one keypress that
+   * replaces copying and pasting a prompt.
+   */
+  readonly typed: string | null;
+  /** Added to the terminal's environment. */
+  readonly env?: Readonly<Record<string, string>>;
+}
+
+/**
+ * The whole instruction an engine needs, as the guide states it.
+ *
+ * Start has already registered the session and started the framework's loop,
+ * so the sentence carries no identity and asks for no `start` or `next`: both
+ * are deterministic and both are the framework's. The waiter runs in the
+ * background so the chat stays free for the person. The sessions root is
+ * repository-relative because the terminal opens at the repository root.
+ */
+export function openingSentence(): string {
+  const dir = SESSIONS_REL.replace(/\\/g, "/");
+  return (
+    `Run \`dabbler session wait --sessions-dir ${dir}\` as a background command, so this chat stays free. ` +
+    "Each time it prints an instruction, do what its `ask` says and answer with its `answer_command`, " +
+    "then run the waiter in the background again. Stop when it prints `done`."
+  );
+}
+
+/** Registers a session through the bundled router and waits for it: its exit code and what it printed. */
+export type SessionRegistrar = (
+  root: string,
+  args: readonly string[],
+) => Promise<{ readonly code: number | null; readonly output: string }>;
+
+/** `dabbler session start` on the editor's own Node, waited for. */
+export function defaultSessionRegistrar(cli: string | null = resolveRouterCli()): SessionRegistrar {
+  return async (root, args) => {
+    if (cli === null) {
+      return { code: null, output: "The bundled `dabbler` command was not found beside the extension." };
+    }
+    const lines: string[] = [];
+    const handle = launchDriver({ execPath: process.execPath, cli, cwd: root, args }, (line) => lines.push(line));
+    return { code: await handle.exited, output: lines.join("\n") };
+  };
+}
+
+/** The `session start` arguments for a choice: the identity, recorded by the framework rather than typed by anyone. */
+export function startArguments(choice: EngineChoice, model: string): string[] {
+  const args = [
+    "session",
+    "start",
+    "--sessions-dir",
+    SESSIONS_REL.replace(/\\/g, "/"),
+    "--engine",
+    choice.engine,
+    "--provider",
+    choice.provider,
+  ];
+  if (model.trim() !== "") args.push("--model", model.trim());
+  return args;
+}
+
+/**
+ * The terminal the framework's loop runs in: it drives the session and waits
+ * on the AI's answers. Named for the repository, so one repository's loop is
+ * never taken for another's.
+ */
+export function loopTerminalFor(repository: SessionsRepository, cli: string): EngineTerminal {
+  return {
+    name: `Framework loop — ${repository.label}`,
+    cwd: repository.root,
+    program: process.execPath,
+    args: [cli, "session", "run", "--mailbox", "--sessions-dir", SESSIONS_REL.replace(/\\/g, "/")],
+    typed: null,
+    // The program is the editor's own executable: without this it starts a second editor, not the loop.
+    env: { ELECTRON_RUN_AS_NODE: "1" },
+  };
+}
+
+/**
+ * Dispose every open loop terminal of this repository.
+ *
+ * Closing the tab does not end the loop -- the editor's own binary outlives
+ * its tab -- so this removes only what the operator sees. The loop exits by
+ * itself when its session closes, and Resume's heartbeat check keeps a second
+ * one from starting beside a loop still running.
+ */
+export function closeLoopTerminals(repository: SessionsRepository): void {
+  const spec = loopTerminalFor(repository, "");
+  for (const terminal of vscode.window.terminals ?? []) {
+    // The name it was created with: the tab's own is `Code`, taken from the
+    // executable, because the editor never sees this shell reach process-ready.
+    const options = terminal.creationOptions as vscode.TerminalOptions;
+    if (options.name === spec.name && launchedAs(options, spec)) terminal.dispose();
+  }
+}
+
+/** The last in-flight session per repository, so an end is a change and not a state. */
+const loopSessionSeen = new Map<string, number | null>();
+
+/** The session completing takes its loop terminal with it. */
+export function closeLoopOnSessionEnd(repository: SessionsRepository): void {
+  const before = loopSessionSeen.get(repository.root);
+  loopSessionSeen.set(repository.root, repository.currentSession);
+  if (typeof before === "number" && repository.currentSession === null) closeLoopTerminals(repository);
+}
+
+/**
+ * What this checkout already chose for the authoring model, or "".
+ *
+ * Read through the router at the moment it is asked for, exactly as the pane
+ * reads it: the answer is derived from a setting in this checkout and from
+ * this operator's own preferences, and a copy held anywhere in this window
+ * would be the stale one. A reading that cannot be taken is "" -- nobody
+ * chose -- because a Start box that refused to open over an unreadable
+ * preference would be refusing the one command that starts the work.
+ */
+export function chosenAuthoringModel(repoRoot: string): string {
+  const configuration = solutionConfiguration(repoRoot) as {
+    authoring?: {
+      declaredAtStart?: boolean;
+      chosen?: { model?: string } | null;
+    };
+  } | null;
+  const authoring = configuration?.authoring;
+  // A session in flight REPORTS its own model here; offering it back as the
+  // value for the next one would put a finished session's identity into a
+  // box that starts another.
+  if (!authoring || authoring.declaredAtStart) return "";
+  return authoring.chosen?.model ?? "";
+}
+
+/**
+ * Why this engine will not run on this model, or null.
+ *
+ * **The launch is the other door, and it was open.** `session start`
+ * revalidates a configured model before anything is billed, but the Start box
+ * takes free text and the terminal it opens belongs to the PERSON -- nothing
+ * here can read what their CLI prints, by design. So an operator who typed a
+ * stale id, a seat id under Claude Code, or a simple typo got a CLI that
+ * printed one warning line and carried on with a model nobody chose, while
+ * the ledger recorded the one they named.
+ *
+ * The check is the same rule at the same list: what the ENGINE's own record
+ * names, which is what the pane offers and what `dabbler configure` accepts.
+ *
+ * **It refuses on knowledge and never on the absence of it.** An empty list
+ * is a machine that has not read its catalog, and the alias floor is a
+ * reading that says in as many words that it does not know what the CLI
+ * accepts. Neither may stop an operator who is otherwise ready to work.
+ *
+ * **What it cannot close, and the record says so:** Claude Code validates
+ * against its own BUNDLED catalog, so a model a vendor serves and this
+ * machine has read can still be one the installed CLI does not know. Only
+ * the launch can find that out, and only by spending a turn.
+ */
+export async function engineRefusesModel(
+  ui: Pick<SessionRunUi, "engineKnowsModel">,
+  choice: EngineChoice,
+  model: string,
+): Promise<string | null> {
+  const refused = await Promise.resolve(ui.engineKnowsModel(choice, model)).catch(() => null);
+  if (refused === null) return null;
+  return (
+    `${choice.label} does not know '${refused}'. Its own bundled catalog is ` +
+    "what decides that, so a model your machine has read about can still be " +
+    "one this build of the CLI has never heard of -- and it exits 0 when it " +
+    "refuses one, prints a line and carries on with something else. Nothing " +
+    "was launched. `dabbler configuration options` lists what may be chosen, " +
+    "and updating the CLI is the other way this changes."
+  );
+}
+
+export function engineModelRefusal(
+  repository: SessionsRepository,
+  choice: EngineChoice,
+  model: string,
+): string | null {
+  const wanted = model.trim();
+  if (wanted === "") return null;
+  // Read for the engine ABOUT to be launched, not for whatever the ledger or
+  // the preference names: an operator starting a Copilot session from a
+  // window whose last session ran Claude Code would otherwise be held to the
+  // wrong CLI's list.
+  const configuration = solutionConfiguration(repository.root, {
+    engine: choice.engine,
+  }) as {
+    authoring?: {
+      enumeration?: string;
+      candidates?: Array<{ model?: string }>;
+    };
+  } | null;
+  const authoring = configuration?.authoring;
+  // The floor is the CLI's own always-accepted names on a machine that could
+  // enumerate nothing. Holding a choice to three names there would refuse
+  // every operator whose machine has no key for their engine's vendor.
+  if (authoring?.enumeration === ENUMERATION_CLI_ALIASES) return null;
+  const offered = (authoring?.candidates ?? [])
+    .map((row) => String(row.model ?? ""))
+    .filter((id) => id !== "");
+  if (offered.length === 0 || offered.includes(wanted)) return null;
+  return (
+    `${choice.label} has no '${wanted}' in the list this machine has read for ` +
+    `it. It offers ${offered.length}: ${offered.slice(0, 8).join(", ")}` +
+    `${offered.length > 8 ? ", and more" : ""}. Nothing was launched. The CLI ` +
+    "validates against its own bundled catalog and is the final authority, " +
+    "so a model it refuses is a session that starts on something nobody " +
+    "chose -- which is why this is checked before the terminal opens rather " +
+    "than read out of it afterwards."
+  );
+}
+
+/** The terminal Start opens for a choice, or the refusal when a seat has no model. */
+export function engineTerminalFor(
+  repository: SessionsRepository,
+  choice: EngineChoice,
+  model: string,
+  sentence: string = openingSentence(),
+  name: string = choice.label,
+): EngineTerminal | string {
+  const cli = ENGINE_CLI[choice.engine];
+  if (!cli) return `${choice.label} has no known CLI to open; nothing was launched.`;
+  if (choice.modelRequired && model.trim() === "") {
+    return `${choice.label} is a seat and needs a model; nothing was launched.`;
+  }
+  // The value the operator chose, spelled as they chose it. NOT normalised:
+  // `normalizeModelToken` drops the date suffix, and the date suffix is what
+  // makes a pin a pin -- a launch that quietly generalised `claude-opus-5-
+  // 20260901` to `claude-opus-5` would be answering with a model nobody
+  // named. The CLI is the authority on whether it knows the id, and it says
+  // so plainly when it does not.
+  const wanted = model.trim();
+  const modelArgs = cli.modelFlag !== null && wanted !== "" ? [cli.modelFlag, wanted] : [];
+  return {
+    name,
+    cwd: repository.root,
+    program: cli.program,
+    // The flag first and the prompt last: `claude`'s prompt is a POSITIONAL,
+    // so anything after it is read as part of it.
+    args: [...modelArgs, ...(cli.promptArgs !== null ? cli.promptArgs(sentence) : [])],
+    typed: cli.promptArgs !== null ? null : sentence,
+  };
+}
+
+/** How the engine and model boxes are titled for a consult. */
+export const CONSULT_PURPOSE = "Consult with AI";
+
+/**
+ * What an AI opened to consult is asked first: read the brief, then the
+ * operator. It names no waiter, because a consult drives nothing.
+ */
+export function consultSentence(session?: number): string {
+  const dir = SESSIONS_REL.replace(/\\/g, "/");
+  const about = session === undefined ? "" : ` --session ${session}`;
+  return (
+    `Run \`dabbler consult --sessions-dir ${dir}${about}\` and read what it prints before anything else. ` +
+    "Then ask me what I need."
+  );
+}
+
+/** The CLI Consult with AI opens: Start's construction, the consult sentence, and a name of its own. */
+export function consultTerminalFor(
+  repository: SessionsRepository,
+  choice: EngineChoice,
+  model: string,
+  session?: number,
+): EngineTerminal | string {
+  const about = session === undefined ? "" : ` (session ${session})`;
+  return engineTerminalFor(
+    repository,
+    choice,
+    model,
+    consultSentence(session),
+    `Consult — ${choice.label} — ${repository.label}${about}`,
+  );
+}
+
+/** Whether a terminal was created running `spec`'s program at `spec`'s root. */
+function launchedAs(options: vscode.TerminalOptions, spec: EngineTerminal): boolean {
+  const cwd = typeof options.cwd === "string" ? options.cwd : options.cwd?.fsPath;
+  if (options.shellPath !== spec.program || cwd === undefined) return false;
+  const [left, right] = [path.resolve(cwd), path.resolve(spec.cwd)];
+  return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
+
+/**
+ * Whether an open terminal is the CLI `spec` would open: the same engine name,
+ * program and repository root. A name alone is not enough -- two repositories
+ * open the same engine under the same label -- and the options a terminal was
+ * created with are what say where it was launched.
+ */
+export function isEngineTerminalOf(
+  terminal: {
+    readonly name: string;
+    readonly creationOptions: Readonly<vscode.TerminalOptions | vscode.ExtensionTerminalOptions>;
+  },
+  spec: EngineTerminal,
+): boolean {
+  return terminal.name === spec.name && launchedAs(terminal.creationOptions as vscode.TerminalOptions, spec);
+}
+
+export interface SessionRunUi {
+  /** `purpose` titles the pick; Start's when omitted. */
+  pickEngine: (purpose?: string) => Thenable<EngineChoice | undefined>;
+  /**
+   * The model to drive with; empty for the engine's default; undefined when
+   * the box was dismissed.
+   *
+   * `chosen` is what this checkout already chose -- what the Configuration
+   * section's *Set the Authoring Model* wrote -- offered as the value
+   * already in the box. An operator who set one in the pane and was then
+   * asked to retype it here would have two places saying what the next
+   * session authors with and no reason to believe either.
+   */
+  askModel: (choice: EngineChoice, chosen: string, purpose?: string) => Thenable<string | undefined>;
+  /** One line of text from the person; undefined when the box was dismissed. */
+  askText: (title: string, prompt: string, value?: string) => Thenable<string | undefined>;
+  /** A yes-or-no the person answers, modally; true only for the named action. */
+  confirm: (message: string, action: string) => Thenable<boolean>;
+  /** Which of several running drives; undefined when dismissed. */
+  pickDrive: (roots: readonly string[]) => Thenable<string | undefined>;
+  report: (title: string, body: string) => void;
+  showErrorMessage: (message: string) => unknown;
+  showInformationMessage: (message: string) => unknown;
+  /** One line the driver printed, shown as it arrives. */
+  engineLine: (line: string) => void;
+  /** Open the person's own CLI, interactively, and show it. */
+  openTerminal: (terminal: EngineTerminal) => unknown;
+  /** Open the framework's loop in the panel, without the focus, replacing this repository's last one. */
+  openLoopTerminal: (repository: SessionsRepository, terminal: EngineTerminal) => unknown;
+  /**
+   * Ask the installed CLI whether it knows this model. Answers the model it
+   * refused, or null for "it did not refuse" -- which covers no CLI, no
+   * answer, and an engine with no pre-flight.
+   *
+   * It is on this interface for the same reason `openTerminal` is: it runs a
+   * process on the machine, and a suite must be able to stand in for every
+   * one of those. Without the seam this suite would spawn the developer's
+   * own `claude` on every flow test, which is the one thing a test must
+   * never do -- it would pass here and mean nothing anywhere else.
+   */
+  engineKnowsModel: (choice: EngineChoice, model: string) => Thenable<string | null>;
+  /** Close every open terminal that is the CLI `spec` would open, in its repository. */
+  closeEngineTerminals: (spec: EngineTerminal) => void;
+  /**
+   * Show the framework's own terminal for this repository, split off the
+   * one just opened.
+   *
+   * Start's whole arrangement is the two of them side by side -- the chat
+   * on one side, what the framework is doing on the other -- and a
+   * terminal that existed but was never shown left the operator with only
+   * half of it.
+   */
+  showFrameworkTerminal: (repoRoot: string, beside: unknown) => void;
+  /**
+   * Run something slow where the operator can see it is running.
+   *
+   * Survey finding F12: the extension had ZERO progress call sites, and a
+   * close evaluates six gates while a verification round takes minutes. An
+   * editor that shows nothing for that long is indistinguishable from one
+   * that has hung, and an operator who believes it hung kills it.
+   */
+  withProgress: <T>(title: string, work: () => Promise<T>) => Promise<T>;
+}
+
+/** How Start reaches the driver: a process, or nothing when the bundle is not there. */
+export interface DriveLauncher {
+  launch(root: string, args: readonly string[], onLine: (line: string) => void): DriveHandle | null;
+}
+
+/**
+ * The drives this window started, by repository root. One per repository:
+ * the driver holds the session in flight, and a second would be refused by
+ * the router anyway -- refusing it here says why before anything spawns.
+ */
+export class Drives implements vscode.Disposable {
+  private readonly handles = new Map<string, DriveHandle>();
+  private readonly changed = new vscode.EventEmitter<void>();
+  readonly onDidChange = this.changed.event;
+
+  running(root: string): DriveHandle | undefined {
+    return this.handles.get(root);
+  }
+
+  roots(): string[] {
+    return [...this.handles.keys()];
+  }
+
+  add(handle: DriveHandle): void {
+    this.handles.set(handle.root, handle);
+    this.changed.fire();
+    void handle.exited.then(() => {
+      if (this.handles.get(handle.root) === handle) {
+        this.handles.delete(handle.root);
+        this.changed.fire();
+      }
+    });
+  }
+
+  /** The window is going away; a driver nobody can see or stop must not outlive it. */
+  dispose(): void {
+    for (const handle of this.handles.values()) handle.kill();
+    this.handles.clear();
+    this.changed.fire();
+  }
+}
+
+let shared: Drives | undefined;
+
+/** The window's one registry: every launcher and every button read the same drives. */
+export function sharedDrives(): Drives {
+  if (!shared) shared = new Drives();
+  return shared;
+}
+
+let engineChannel: vscode.OutputChannel | undefined;
+
+function channel(): vscode.OutputChannel {
+  return vscode.window.createOutputChannel(CHANNEL_NAME);
+}
+
+/**
+ * The channel the driver streams into, under the language whose grammar
+ * colours it: `dabbler [time] event` in one class, the engine's `│` lines in
+ * another. A plain `OutputChannel` and not a `LogOutputChannel` -- that one
+ * stamps a clock of its own beside the driver's and offers levels instead of
+ * a palette, so the two line kinds would still read alike.
+ */
+export function engineOutputChannel(): vscode.OutputChannel {
+  if (!engineChannel) engineChannel = vscode.window.createOutputChannel(ENGINE_CHANNEL_NAME, "dabbler-drive");
+  return engineChannel;
+}
+
+/**
+ * The Start Session pick.
+ *
+ * `chosen` is a THUNK for the engine this machine chose, read from the
+ * projection by the caller rather than from an editor setting here -- a
+ * thunk because this factory runs once at registration and the projection
+ * moves every time a declaration does. It is read from
+ * the caller rather than from an editor setting here: the choice lives in
+ * the user-level preferences beside the catalog so that `dabbler session
+ * start` typed in a terminal reads the same answer this pane does. Null
+ * where nobody has chosen, which is the first-run case and is not a default.
+ */
+export function defaultSessionRunUi(
+  chosen: () => string | null = () => null,
+): SessionRunUi {
+  return {
+    // The one editor-side effect here that is a PROCESS: it asks the
+    // installed CLI, which is the only thing that actually knows whether it
+    // will run on a model, and it bills nothing doing it.
+    engineKnowsModel: (choice, model) => preflightRefusedModel(choice.engine, model),
+    pickEngine: (purpose = "Start session") =>
+      vscode.window
+        .showQuickPick(
+          // The default the Configuration section set, first in the list and
+          // saying that it is the default. It is offered rather than
+          // applied: identity is recorded per session at `session start`,
+          // and a start that skipped the question would be choosing on the
+          // operator's behalf at the one moment they are being asked.
+          engineOrder(chosen()).map((entry) => ({
+            label: entry.label,
+            description:
+              entry.engine === chosen()
+                ? `${entry.description} — your default`
+                : entry.description,
+            entry,
+          })),
+          {
+            title: `${purpose} — which engine runs it?`,
+            placeHolder:
+              purpose === CONSULT_PURPOSE
+                ? "This engine reads the consult brief and answers you; nothing is driven."
+                : "The framework drives; this engine answers each step.",
+            ignoreFocusOut: true,
+          },
+        )
+        .then((picked) => picked?.entry),
+    askModel: (choice, chosen, purpose = "Start session") =>
+      vscode.window.showInputBox({
+        title: `${purpose} — model for ${choice.label}`,
+        prompt: choice.modelRequired
+          ? purpose === CONSULT_PURPOSE
+            ? "Required: the seat's model. It is passed to the CLI; nothing is recorded."
+            : "Required: the seat's model. It is passed to the CLI and recorded on the ledger."
+          : "Optional: leave empty for the engine's default. It is passed to the CLI as `--model`.",
+        placeHolder: choice.modelRequired ? "e.g. gpt-5-6-luna" : "e.g. haiku",
+        // What the Configuration section already chose, so the pane and this
+        // box are one answer rather than two.
+        value: chosen,
+        ignoreFocusOut: true,
+      }),
+    askText: (title, prompt, value) =>
+      vscode.window.showInputBox({ title, prompt, value, ignoreFocusOut: true }),
+    confirm: (message, action) =>
+      vscode.window.showWarningMessage(message, { modal: true }, action).then((picked) => picked === action),
+    pickDrive: (roots) =>
+      vscode.window.showQuickPick(roots, { title: "Which driven session?", ignoreFocusOut: true }),
+    report: (title, body) => {
+      const out = channel();
+      out.appendLine(`--- ${title} ---`);
+      out.appendLine(body.trimEnd());
+      out.show(true);
+    },
+    showErrorMessage: (m) => vscode.window.showErrorMessage(m),
+    showInformationMessage: (m) => vscode.window.showInformationMessage(m),
+    engineLine: (line) => engineOutputChannel().appendLine(line),
+    openTerminal: (spec) => {
+      // The first editor column under `editor`, so that the framework's
+      // terminal -- which asks for `Beside` -- lands in the second and the
+      // pair reads left to right.
+      //
+      // Under `panel` the panel is asked for BY NAME rather than left
+      // unsaid. Saying nothing means "wherever terminals open", and where
+      // terminals open is `terminal.integrated.defaultLocation` -- which
+      // an operator may well have set to `editor`. A setting called
+      // `panel` that puts the pair in the editor area because of another
+      // setting is a promise the name does not keep.
+      const location = {
+        location:
+          terminalLocation() === "editor"
+            ? { viewColumn: vscode.ViewColumn.One }
+            : vscode.TerminalLocation.Panel,
+      };
+      const terminal = vscode.window.createTerminal({
+        name: spec.name,
+        cwd: spec.cwd,
+        shellPath: spec.program,
+        shellArgs: [...spec.args],
+        ...(spec.env ? { env: { ...spec.env } } : {}),
+        ...location,
+      });
+      terminal.show();
+      // Typed, never sent: the person reads it and presses Enter. Whether a
+      // CLI that is still starting keeps what it was handed is a thing to
+      // watch on the walk -- the pty takes it either way, and the sentence
+      // is one line to retype if it does not.
+      if (spec.typed !== null) terminal.sendText(spec.typed, false);
+      return terminal;
+    },
+    openLoopTerminal: (repository, spec) => {
+      // The panel whatever `dabbler.terminalLocation` says, and without the
+      // caret: the editor area is the CLI's and the Dabbler terminal's.
+      closeLoopTerminals(repository);
+      const terminal = vscode.window.createTerminal({
+        name: spec.name,
+        cwd: spec.cwd,
+        shellPath: spec.program,
+        shellArgs: [...spec.args],
+        ...(spec.env ? { env: { ...spec.env } } : {}),
+        location: vscode.TerminalLocation.Panel,
+      });
+      terminal.show(true);
+      return terminal;
+    },
+    closeEngineTerminals: (spec) => {
+      for (const terminal of vscode.window.terminals ?? []) {
+        if (isEngineTerminalOf(terminal, spec)) terminal.dispose();
+      }
+    },
+    showFrameworkTerminal: (repoRoot, beside) =>
+      ensureDabblerTerminal(repoRoot, beside as vscode.Terminal | undefined),
+    withProgress: <T,>(title: string, work: () => Promise<T>): Promise<T> =>
+      Promise.resolve(
+        vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title },
+          () => work(),
+        ),
+      ),
+  };
+}
+
+/** The bundled command on the editor's own Node, echoed to the command log first. */
+export function defaultDriveLauncher(): DriveLauncher {
+  return {
+    launch: (root, args, onLine) => {
+      const cli = resolveRouterCli();
+      if (cli === null) return null;
+      const log = routerOutputChannel();
+      log.appendLine(`[${new Date().toLocaleTimeString()}] Running:`);
+      log.appendLine(`dabbler ${args.join(" ")}`);
+      return launchDriver({ execPath: process.execPath, cli, cwd: root, args }, onLine);
+    },
+  };
+}
+
+/** The `session drive` arguments for a choice, or the refusal when a seat has no model. */
+export function driveArguments(choice: EngineChoice, model: string): string[] | string {
+  const trimmed = model.trim();
+  if (choice.modelRequired && trimmed === "") {
+    return `${choice.label} is a seat and needs a model; nothing was launched.`;
+  }
+  const args = ["session", "drive", "--engine", choice.engine, "--provider", choice.provider];
+  if (trimmed !== "") args.push("--model", trimmed);
+  return args;
+}
+
+/**
+ * Resume Session: a session in flight left with a loop driving it and an AI
+ * waiting on it.
+ *
+ * The loop is restarted unless its heartbeat says one is driving: a terminal
+ * still open under the loop's name can be a process that has exited. The AI
+ * is not trusted by name either -- a CLI whose background waiter was
+ * interrupted sits at its prompt waiting on nothing -- so the recorded
+ * engine's terminal is replaced by a fresh one carrying the waiter sentence.
+ * The framework holds the session's state, so nothing the old chat knew is
+ * needed. With no recorded engine the operator is told the sentence.
+ */
+export async function runResumeSession(
+  repository: SessionsRepository,
+  ui: SessionRunUi,
+  cli: string | null = resolveRouterCli(),
+  alive: (repoRoot: string, sessionNumber: number) => boolean = loopAlive,
+): Promise<boolean> {
+  const session = repository.currentSession;
+  if (session === null) {
+    ui.showInformationMessage(`Nothing is in flight in ${repository.label}; Start Session is the way in.`);
+    return false;
+  }
+  if (cli === null) {
+    ui.showErrorMessage("The bundled `dabbler` command was not found beside the extension; nothing was resumed.");
+    return false;
+  }
+  const restarted = !alive(repository.root, session);
+  const loop = restarted ? ui.openLoopTerminal(repository, loopTerminalFor(repository, cli)) : undefined;
+  const number = String(session).padStart(3, "0");
+  const recorded = ENGINES.find((entry) => entry.engine === repository.orchestrator?.engine);
+  const terminal = recorded ? engineTerminalFor(repository, recorded, repository.orchestrator?.model ?? "") : null;
+  if (recorded === undefined || terminal === null || typeof terminal === "string") {
+    ui.showFrameworkTerminal(repository.root, loop);
+    ui.showInformationMessage(
+      `Session ${number}'s loop is running. Open your AI's CLI in ${repository.label} and give it: ${openingSentence()}`,
+    );
+    return true;
+  }
+  ui.closeEngineTerminals(terminal);
+  const opened = ui.openTerminal(terminal);
+  ui.showFrameworkTerminal(repository.root, opened);
+  ui.showInformationMessage(
+    `Session ${number} resumed: ${restarted ? "its loop was restarted" : "its loop was still running"}, ` +
+      `and ${recorded.label} was reopened waiting on it.`,
+  );
+  return true;
+}
+
+/**
+ * Start is the launch, and what it launches is the person's own CLI.
+ *
+ * The engine is the decision -- asked as one, in a pick -- and everything
+ * after it belongs to the person: their terminal, their chat, their Esc.
+ * A cancelled pick cancels the command, which is what cancelling a
+ * decision should do.
+ */
+export async function runStartSession(
+  repository: SessionsRepository,
+  ui: SessionRunUi,
+  register: SessionRegistrar = defaultSessionRegistrar(),
+  cli: string | null = resolveRouterCli(),
+): Promise<boolean> {
+  const picked = await ui.pickEngine();
+  if (!picked) return false;
+  const model = await ui.askModel(picked, chosenAuthoringModel(repository.root));
+  if (model === undefined) return false;
+  // Two questions, and they are different questions. One asks what this
+  // machine has READ for this engine; the other asks the INSTALLED CLI, which
+  // is the only thing that actually knows and says so when it refuses.
+  const impossible =
+    engineModelRefusal(repository, picked, model) ??
+    (await engineRefusesModel(ui, picked, model));
+  if (impossible !== null) {
+    ui.showErrorMessage(impossible);
+    return false;
+  }
+  const terminal = engineTerminalFor(repository, picked, model);
+  if (typeof terminal === "string") {
+    ui.showErrorMessage(terminal);
+    return false;
+  }
+  if (cli === null) {
+    ui.showErrorMessage("The bundled `dabbler` command was not found beside the extension; nothing was started.");
+    return false;
+  }
+  // Registering is the framework's, not the AI's: the identity is on the
+  // record before anything opens, and a refusal opens nothing.
+  const args = startArguments(picked, model);
+  let registered = await register(repository.root, args);
+  // Origin holds files this checkout has never had, on a history it does not
+  // share: whether they belong in this branch is the person's to say.
+  if (registered.code !== 0 && registered.output.includes(MERGE_ORIGIN_FLAG)) {
+    const said = registered.output.trim().split("\n").filter((line) => line.includes(MERGE_ORIGIN_FLAG)).join(" ");
+    if (!(await ui.confirm(said.replace(/^start: refused -- /, ""), "Merge and Start"))) return false;
+    registered = await register(repository.root, [...args, MERGE_ORIGIN_FLAG]);
+  }
+  if (registered.code !== 0) {
+    const said = registered.output.trim();
+    ui.showErrorMessage(`The session was not registered, so nothing was opened.${said === "" ? "" : ` ${said}`}`);
+    return false;
+  }
+  // The keys go to the framework: its loop drives the session and waits for
+  // each answer the AI gives from its own CLI.
+  ui.openLoopTerminal(repository, loopTerminalFor(repository, cli));
+  const opened = ui.openTerminal(terminal);
+  // The framework's own terminal, beside the CLI. Both, or the person is
+  // watching their engine work with no sight of what the framework is
+  // doing -- which is the arrangement this session exists to build.
+  ui.showFrameworkTerminal(repository.root, opened);
+  return true;
+}
+
+/**
+ * Consult with AI: the person's own CLI, opened to read the consult brief.
+ *
+ * The same engine and model questions as Start, and the same two refusals,
+ * so a model Start would refuse is refused here too. Nothing is registered
+ * and no loop is started: a consult drives no session.
+ */
+export async function runConsultWithAi(
+  repository: SessionsRepository,
+  ui: SessionRunUi,
+  session?: number,
+): Promise<boolean> {
+  const purpose = CONSULT_PURPOSE;
+  const picked = await ui.pickEngine(purpose);
+  if (!picked) return false;
+  const model = await ui.askModel(picked, chosenAuthoringModel(repository.root), purpose);
+  if (model === undefined) return false;
+  const impossible =
+    engineModelRefusal(repository, picked, model) ??
+    (await engineRefusesModel(ui, picked, model));
+  if (impossible !== null) {
+    ui.showErrorMessage(impossible);
+    return false;
+  }
+  const terminal = consultTerminalFor(repository, picked, model, session);
+  if (typeof terminal === "string") {
+    ui.showErrorMessage(terminal);
+    return false;
+  }
+  ui.openTerminal(terminal);
+  return true;
+}
+
+/**
+ * The unattended half: headless `session drive`, for CI and overnight runs.
+ *
+ * It is the same command Start used to be, kept because a driven engine is
+ * a measured capability and retiring it would leave nothing for a run
+ * nobody is sitting in front of (D252). Stop and Send belong to this and
+ * to nothing else.
+ */
+export async function runStartUnattendedSession(
+  repository: SessionsRepository,
+  ui: SessionRunUi,
+  launcher: DriveLauncher,
+  drives: Drives,
+): Promise<boolean> {
+  if (drives.running(repository.root)) {
+    ui.showErrorMessage(
+      `A session is already being driven in ${repository.label} — Stop it before starting another.`,
+    );
+    return false;
+  }
+  const picked = await ui.pickEngine();
+  if (!picked) return false;
+  const model = await ui.askModel(picked, chosenAuthoringModel(repository.root));
+  if (model === undefined) return false;
+  const args = driveArguments(picked, model);
+  if (typeof args === "string") {
+    ui.showErrorMessage(args);
+    return false;
+  }
+  const handle = launcher.launch(repository.root, args, ui.engineLine);
+  if (handle === null) {
+    ui.showErrorMessage("The bundled `dabbler` command was not found beside the extension; nothing was launched.");
+    return false;
+  }
+  drives.add(handle);
+  ui.engineLine(`--- ${repository.label}: dabbler ${args.join(" ")} ---`);
+  void handle.exited.then((code) => {
+    ui.engineLine(`--- ${repository.label}: driver exited (${code === null ? "killed" : code}) ---`);
+    if (code === 0) {
+      ui.showInformationMessage(`${repository.label}: the driven session closed.`);
+    } else if (code !== null) {
+      ui.showErrorMessage(
+        `${repository.label}: the driver stopped — the session's task rows say why, and Dabbler: Engine has the log.`,
+      );
+    }
+  });
+  return true;
+}
+
+async function chooseDrive(
+  repository: SessionsRepository | undefined,
+  ui: SessionRunUi,
+  drives: Drives,
+): Promise<string | undefined> {
+  if (repository) {
+    if (drives.running(repository.root)) return repository.root;
+    ui.showInformationMessage(`Nothing is being driven in ${repository.label}.`);
+    return undefined;
+  }
+  const roots = drives.roots();
+  if (roots.length === 0) {
+    ui.showInformationMessage("Nothing is being driven in this window.");
+    return undefined;
+  }
+  return roots.length === 1 ? roots[0] : ui.pickDrive(roots);
+}
+
+async function interruptDrive(
+  root: string,
+  reason: string,
+  stop: boolean,
+  ui: SessionRunUi,
+  router: Router,
+): Promise<boolean> {
+  const result = await router.session.interrupt({
+    repoRoot: root,
+    sessionsDir: sessionsDirOf(root),
+    reason,
+    stop,
+  });
+  if (!result.ok) {
+    ui.showErrorMessage(`${stop ? "Stop" : "Send"} refused: ${result.message.trim() || `exit ${result.exitCode}`}`);
+    return false;
+  }
+  ui.engineLine(`--- ${stop ? "stop" : "send"}: ${reason} ---`);
+  ui.showInformationMessage(
+    stop
+      ? "Stop requested — it takes effect when the driver next reaches the engine; the task rows show it."
+      : "Sent — the driver ends the engine's invocation and re-invokes it with your text; if nothing is running right now, the engine reads it with its next instruction.",
+  );
+  return true;
+}
+
+function sessionsDirOf(root: string): string {
+  return path.join(root, SESSIONS_REL);
+}
+
+/**
+ * Stop halts the loop: `session interrupt --stop` with the person's reason.
+ * The driver ends the engine's invocation, records `interrupted` on the
+ * session's run state -- which the task rows show -- and exits; the same
+ * Start resumes from the phase it reached.
+ */
+export async function runStopDrive(
+  repository: SessionsRepository | undefined,
+  ui: SessionRunUi,
+  router: Router,
+  drives: Drives,
+): Promise<boolean> {
+  const root = await chooseDrive(repository, ui, drives);
+  if (root === undefined) return false;
+  const reason = await ui.askText(
+    "Stop the driver",
+    "Why? Recorded with the stop and shown on the session's task row.",
+    DEFAULT_STOP_REASON,
+  );
+  if (reason === undefined) return false;
+  return interruptDrive(root, reason.trim() === "" ? DEFAULT_STOP_REASON : reason.trim(), true, ui, router);
+}
+
+/**
+ * Send redirects the engine: `session interrupt` with the person's text as
+ * the reason. The driver ends the invocation and re-invokes the engine on
+ * the same instruction with the text first among its reasons.
+ */
+export async function runSendToEngine(
+  repository: SessionsRepository | undefined,
+  ui: SessionRunUi,
+  router: Router,
+  drives: Drives,
+): Promise<boolean> {
+  const root = await chooseDrive(repository, ui, drives);
+  if (root === undefined) return false;
+  const text = await ui.askText(
+    "Send to the engine",
+    "The engine is interrupted and re-invoked with this as the reason.",
+  );
+  if (text === undefined || text.trim() === "") return false;
+  return interruptDrive(root, text.trim(), false, ui, router);
+}
+
+/**
+ * Close the session, and show the gate rows.
+ *
+ * No decision is asked because none exists: the gates decide, and a refusal
+ * is information the operator needs rather than something they authorise.
+ */
+export async function runCloseSession(
+  repository: SessionsRepository,
+  ui: SessionRunUi,
+  router: Router,
+): Promise<boolean> {
+  const result = await ui.withProgress(
+    `Closing the session in ${repository.label} — running the gates`,
+    () =>
+      router.session.close({
+        repoRoot: repository.root,
+        sessionsDir: repository.sessionsDir,
+      }),
+  );
+  // A refused close is not an error to hide behind a toast: its rows say
+  // which gate refused and what to do, and that is the whole value of it.
+  ui.report("session close", result.ok ? result.value.stdout : result.message);
+  if (!result.ok) {
+    ui.showErrorMessage(
+      "Close session refused — see the Dabbler Session output for the gate rows.",
+    );
+  }
+  return result.ok;
+}
+
+/**
+ * Stop and Send as buttons: status bar items that exist while a drive runs,
+ * beside one that names it and opens the engine's output.
+ */
+function statusBar(context: vscode.ExtensionContext, drives: Drives): void {
+  const label = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 30);
+  label.command = "dabbler.showEngineOutput";
+  const stop = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 29);
+  stop.text = "$(debug-stop) Stop";
+  stop.tooltip = "Stop the driven session (session interrupt --stop)";
+  stop.command = "dabbler.stopDrive";
+  const send = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 28);
+  send.text = "$(comment) Send to engine";
+  send.tooltip = "Interrupt the engine and re-invoke it with your text (session interrupt)";
+  send.command = "dabbler.sendToEngine";
+  const render = (): void => {
+    const roots = drives.roots();
+    void vscode.commands.executeCommand("setContext", DRIVING_CONTEXT, roots.length > 0);
+    if (roots.length === 0) {
+      label.hide();
+      stop.hide();
+      send.hide();
+      return;
+    }
+    label.text = `$(sync~spin) Driving ${roots.length === 1 ? String(roots[0]).split(/[\\/]/).pop() : `${roots.length} sessions`}`;
+    label.tooltip = roots.join("\n");
+    label.show();
+    stop.show();
+    send.show();
+  };
+  render();
+  context.subscriptions.push(label, stop, send, drives.onDidChange(render));
+}
+
+export function registerSessionCommands(
+  context: vscode.ExtensionContext,
+  router: Router = productionRouter(),
+  ui: SessionRunUi = defaultSessionRunUi(),
+  launcher: DriveLauncher = defaultDriveLauncher(),
+  drives: Drives = sharedDrives(),
+): Drives {
+  context.subscriptions.push(
+    drives,
+    vscode.commands.registerCommand("dabblerSessionSets.startSession", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      // No channel is shown: the engine is in the terminal that just
+      // opened, and the framework's own work goes to the Dabbler
+      // terminal rather than here.
+      await runStartSession(repository, ui);
+    }),
+    vscode.commands.registerCommand(
+      "dabbler.startUnattendedSession",
+      async (arg: unknown) => {
+        const node = asRepositoryNode(arg);
+        if (!node) return;
+        if (await runStartUnattendedSession(node.repository, ui, launcher, drives)) {
+          engineOutputChannel().show(true);
+        }
+      },
+    ),
+    vscode.commands.registerCommand("dabblerSessionSets.resumeSession", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      await runResumeSession(repository, ui);
+    }),
+    vscode.commands.registerCommand("dabbler.consultWithAi", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      await runConsultWithAi(repository, ui, asSessionNode(arg)?.session.number);
+    }),
+    vscode.commands.registerCommand("dabbler.stopDrive", async (arg: unknown) => {
+      await runStopDrive(asRepositoryNode(arg)?.repository, ui, router, drives);
+    }),
+    vscode.commands.registerCommand("dabbler.sendToEngine", async (arg: unknown) => {
+      await runSendToEngine(asRepositoryNode(arg)?.repository, ui, router, drives);
+    }),
+    vscode.commands.registerCommand("dabbler.showEngineOutput", () => {
+      engineOutputChannel().show(true);
+    }),
+    vscode.commands.registerCommand(
+      "dabblerSessionSets.closeSession",
+      async (arg: unknown) => {
+        const node = asRepositoryNode(arg);
+        if (!node) return;
+        await runCloseSession(node.repository, ui, router);
+      },
+    ),
+  );
+  statusBar(context, drives);
+  return drives;
+}

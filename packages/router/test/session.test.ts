@@ -453,6 +453,28 @@ describe("what a start refuses before a session exists", () => {
 });
 
 describe("registering a session", () => {
+  it("moves an earlier run's record for the same number under superseded-runs, and names it", async () => {
+    // A reset or a renumbering reuses a number, and the loop took the old
+    // completed run over as the new session's.
+    const state = stateDir();
+    seed(state.repo, {
+      ".dabbler/runs/s1/driver/run.json": '{"phase": "complete"}\n',
+      ".dabbler/runs/s1/rounds.jsonl": "{}\n",
+    });
+    try {
+      const started = await run(() =>
+        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
+      );
+      assert.equal(started.code, EXIT_OK, started.err);
+      const folder = /record for session \d+ was moved to (.+)$/m.exec(started.out)?.[1] ?? "";
+      assert.ok(folder.startsWith(join(state.repo, ".dabbler", "superseded-runs", "s1-")), started.out);
+      assert.equal(readFileSync(join(folder, "driver", "run.json"), "utf8"), '{"phase": "complete"}\n');
+      assert.equal(existsSync(join(state.repo, ".dabbler", "runs", "s1")), false);
+    } finally {
+      state.restore();
+    }
+  });
+
   it("continues silently under the identity on the record, twice over", async () => {
     // A pull sends the identity on every registering call, and an idempotent
     // path has to stay idempotent.

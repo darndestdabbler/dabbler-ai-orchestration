@@ -118,8 +118,10 @@ import {
 } from "./journal.ts";
 import {
   LedgerError,
+  MACHINE_DIRNAME,
   RUNS_DIRNAME,
   latestRound,
+  sessionRunDir,
 } from "./ledger.ts";
 import {
   SCHEMA_VERSION,
@@ -680,6 +682,21 @@ function undoChangesBeforeStart(repoRoot: string, paths: readonly string[]): str
       rmSync(join(repoRoot, ...path.split("/")), { force: true });
     }
   }
+  return folder;
+}
+
+/**
+ * Move a session number's existing run record whole to a folder outside
+ * `runs/`, where no reader of `runs/` sees it. Answers the folder, or null
+ * where there was no record.
+ */
+function supersedeRunRecord(repoRoot: string, sessionNumber: number): string | null {
+  const record = sessionRunDir(repoRoot, sessionNumber);
+  if (!isDirectory(record)) return null;
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const folder = join(repoRoot, ...MACHINE_DIRNAME.split("/"), "superseded-runs", `${basename(record)}-${stamp}`);
+  mkdirSync(dirname(folder), { recursive: true });
+  moveEntry(record, folder);
   return folder;
 }
 
@@ -1346,6 +1363,14 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     }
     // What the repository still declares that nothing reads: said, and refused never.
     for (const line of retiredDeclarationLines(repoRootFromSessionsDir(sessionsDir))) writeOut(`${line}\n`);
+    // Run records are keyed by number alone, so a number reused after a reset
+    // or a renumbering would hand this session another run's record.
+    if (current === null || requested !== current) {
+      const superseded = supersedeRunRecord(repoRootFromSessionsDir(sessionsDir), requested);
+      if (superseded !== null) {
+        writeOut(`start: an earlier run's record for session ${sessionDisplayNumber(requested)} was moved to ${superseded}\n`);
+      }
+    }
     registerSessionStart(sessionsDir, requested, {
       engine: identity.engine,
       provider: identity.provider,

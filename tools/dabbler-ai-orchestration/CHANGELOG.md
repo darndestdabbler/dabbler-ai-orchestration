@@ -10,6 +10,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.8.1] — 2026-09-17
+
+**A new session never inherits an earlier run's record.**
+
+### Fixed
+
+- Starting a session whose number was used before — after a reset, or after
+  a plan edit renumbered the sessions — no longer takes over the old run and
+  reports the new session as already closed. `dabbler session start` moves
+  the earlier record to `.dabbler/superseded-runs/s<N>-<time>/` before it
+  registers, and names that folder. Continuing or restoring a session keeps
+  its own run.
+
 ## [3.8.0] — 2026-09-17
 
 **Uncommitted changes at Start are a question, not a dead end.**

@@ -234,6 +234,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 194 | Choose the model from a list | yes | 2026-09-17 |
 | 195 | Remove Start Unattended Session | yes | 2026-09-17 |
 | 196 | Uncommitted changes at Start are a question, not a dead end | yes | 2026-09-17 |
+| 197 | A new session never inherits an earlier run's record | yes | 2026-09-17 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2677,3 +2678,9 @@ Make uncommitted changes at Start a question with a way through. In packages/rou
 
 - 2026-09-17 — step 'start-recovery': its files: writers.test.ts asserts the refusal's old words and must follow the new sentence (claude-code (anthropic, claude-opus-5))
 - 2026-09-17 — step 'start-session-asks': its files: the extension imports the router's flags through its package index, which must export the two new ones (claude-code (anthropic, claude-opus-5))
+
+### Session 197 — A new session never inherits an earlier run's record
+
+**Releasable: yes.**
+
+Make a fresh registration start with no run record. In packages/router/src/session.ts, `start`'s fresh-registration branch (no session in flight, or a different one requested) checks for `.dabbler/runs/s<N>/` via `sessionRunDir`; where it exists, it moves the folder whole with the existing `moveEntry` to `.dabbler/superseded-runs/s<N>-<timestamp>/` just before `registerSessionStart`, and prints one line naming that folder. A continuation of the session in flight and a restored session are left untouched. One test in packages/router/test/session.test.ts: a start that registers a session whose `runs/s<N>/` holds a completed run moves the folder under `superseded-runs/`, names it in its output, and leaves no `runs/s<N>/` behind. Releasable as a patch: version.json moves to 3.8.1, stamped into the manifests with `npm run stamp:version`, with a CHANGELOG entry.

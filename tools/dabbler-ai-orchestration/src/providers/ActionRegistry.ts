@@ -8,8 +8,9 @@
 // what can be done to that session. Widening one `when` to cover both
 // would make every entry's signature lie about what it reads.
 
-import type {
-  ProgressProjectionSession as SessionRecord,
+import {
+  loopAlive,
+  type ProgressProjectionSession as SessionRecord,
 } from "dabbler-ai-router";
 import type { SessionsRepository } from "../utils/fileSystem";
 
@@ -103,18 +104,15 @@ export const SESSION_ACTIONS: SessionAction[] = [
     // to bring it back. Only on the in-flight row, because `session run`
     // drives the session the record says is in flight and no other.
     //
-    // And not while the standing stop is the ENGINE's to clear. `session
-    // run` calls `next`, and one instruction has exactly one caller: the
-    // operator clicked this at a stop that was the engine's -- a dispute
-    // the framework had refused to write -- and became a second driver on
-    // a live loop. The lease held, so nothing was damaged; a surface that
-    // invites the click is still a race with a person in it. Where the
-    // stop is theirs, or nothing has stopped, the action is exactly where
-    // it was, and the blocked row's own words say who acts and why.
+    // And not while the standing stop is the ENGINE's to clear AND a loop
+    // is beating: a live loop hands that stop back to the engine, and a
+    // click would make a second driver on it. A stop ends the mailbox loop
+    // and its heartbeat, though, and with no loop nothing drives -- so there
+    // the action is offered, and it restarts the loop.
     when: (repository, session) =>
       repository.currentSession === session.number &&
       session.status === "in-progress" &&
-      session.stopActor !== "engine",
+      (session.stopActor !== "engine" || !loopAlive(repository.root, session.number)),
   },
   { id: CONSULT_WITH_AI, label: "Consult with AI", group: 904, when: () => true },
   {

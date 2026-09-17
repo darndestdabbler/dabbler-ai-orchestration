@@ -10,6 +10,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.9.1] — 2026-09-17
+
+**A refused dispute goes back to the AI, and Resume is there when the loop is not.**
+
+### Fixed
+
+- A dispute whose evidence cannot be recorded — a bare cite of a file over
+  the inline cap, or a path outside the repository — goes back to the AI as
+  a rejection carrying the refusal's own words, instead of stopping the
+  session. It counts toward the three refusals like any other answer.
+- A loop resumed after such a refusal asks for the dispositions again rather
+  than filing the same refused dispute and stopping in the same second.
+- Resume Session is offered at a stop that is the AI's to clear when no loop
+  is running, and restarts it. It stays hidden only while the loop beats.
+  The stop's own moves name it.
+
 ## [3.9.0] — 2026-09-17
 
 **One reviewer rule, and refusals that name the cause.**

@@ -1,5 +1,6 @@
 import * as assert from "assert";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import {
   REPOSITORY_ACTIONS,
@@ -132,20 +133,25 @@ suite("ActionRegistry: session actions", () => {
     assert.ok(!ids.includes("dabblerSessionSets.cancel"));
   });
 
-  test("Resume Session is withheld while the stop is the engine's to clear", () => {
-    // `session run` calls `next`, and one instruction has exactly one
-    // caller. The operator clicked this at a stop that was the engine's --
-    // a dispute the framework had refused to write -- and became a second
-    // driver on a live loop.
+  test("Resume Session is withheld at the engine's stop only while its loop beats", () => {
+    // A live loop hands the engine's stop back to the engine, and a click
+    // would be a second driver on it. A stop ends the loop, though, and
+    // with no heartbeat nothing drives: session 198 stopped with no button.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "resume-"));
     const offered = (stopActor?: "engine" | "operator" | "either") =>
       applicableSessionActions(
         makeRepository({
+          root,
           currentSession: 2,
           sessions: [makeSession({ number: 2, status: "in-progress", ...(stopActor ? { stopActor } : {}) })],
         }),
         makeSession({ number: 2, status: "in-progress", ...(stopActor ? { stopActor } : {}) }),
       ).map((a) => a.id);
 
+    assert.ok(offered("engine").includes("dabblerSessionSets.resumeSession"));
+    const driver = path.join(root, ".dabbler", "runs", "s2", "driver");
+    fs.mkdirSync(driver, { recursive: true });
+    fs.writeFileSync(path.join(driver, "loop.json"), JSON.stringify({ at: new Date().toISOString() }));
     assert.ok(!offered("engine").includes("dabblerSessionSets.resumeSession"));
     // Where the stop is genuinely theirs, or nothing has stopped at all,
     // the action is exactly where it was: this withholds a button in one
@@ -156,6 +162,7 @@ suite("ActionRegistry: session actions", () => {
     // And nothing else moves: cancelling a session is the person's verb
     // whatever the loop is doing.
     assert.ok(offered("engine").includes("dabblerSessionSets.cancel"));
+    fs.rmSync(root, { recursive: true, force: true });
   });
 });
 

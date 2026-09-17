@@ -1578,6 +1578,13 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "The fix becomes a step, and the next round reviews it -- one more " +
           "verification round when that step is done.",
       ),
+      {
+        label: "Where the loop has ended, Resume Session to start it again",
+        cost:
+          "Nothing but the restart: the loop asks the engine for the " +
+          "dispositions again, with the refusal as a reason.",
+        command: "dabbler session run --mailbox",
+      },
       cancelChoice(),
     ],
   },

@@ -236,6 +236,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 196 | Uncommitted changes at Start are a question, not a dead end | yes | 2026-09-17 |
 | 197 | A new session never inherits an earlier run's record | yes | 2026-09-17 |
 | 198 | One reviewer rule, and refusals that name the cause | yes | 2026-09-17 |
+| 199 | A refused dispute goes back to the AI, and Resume is there when the loop is not | yes | 2026-09-17 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2695,3 +2696,9 @@ Make review cross-vendor everywhere and make every refusal about an unreachable 
 **Amended after acceptance:**
 
 - 2026-09-17 — step 'start-refusal-cause': its files: The unread-seat stop must name the seat's free refresh, dabbler discovery refresh, which the start refusal and an existing driver test already use; route.ts named dabbler copilot refresh on the seat, a one-line fix to keep one refresh command. (claude-code (anthropic, claude-opus-5))
+
+### Session 199 — A refused dispute goes back to the AI, and Resume is there when the loop is not
+
+**Releasable: yes.**
+
+Make a refused dispute a rejection the AI corrects instead of a stop nobody can move, and offer Resume when no loop is running. In packages/router/src/verify/disputes.ts the evidence checks `recordDispute` applies (at least one cite, inside the repository, a `path:START-END` range, a bare cite no larger than DISPUTE_EVIDENCE_INLINE_CAP) become one exported judgment, `judgeDisputeEvidence`, which `recordDispute` calls. In packages/router/src/drive.ts, `phaseDispositions` judges every reject disposition with that same judgment in place of its own `resolveRepoRelative` check, through one small exported helper, `dispositionRefusals`: a refused dispute goes back to the engine as a rejection carrying the refusal's own sentence and counts toward MAX_REJECTIONS; a stored dispositions.json read at the start of the phase is judged the same way, and one it refuses is treated as unanswered and asked again with the refusal as a reason rather than recorded. A refusal from `recordDispute` that the judgment could not predict (a round or finding not recorded) stays the `dispute-refused` stop. In packages/router/src/driver.ts the `dispute-refused` stop's moves add Resume Session for where the loop has ended. In tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts Resume is withheld at an engine-owned stop only while `loopAlive` reads the session's heartbeat as beating. Releasable as a patch: version.json moves to 3.9.1, stamped with `npm run stamp:version`, with a CHANGELOG entry.

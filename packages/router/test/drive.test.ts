@@ -23,6 +23,7 @@ import {
   REGISTER_START,
   alreadyRewoundFor,
   disputedFindingsBrief,
+  dispositionRefusals,
   idleInstruction,
   judgeRegistration,
   rewindFromPackaging,
@@ -656,6 +657,31 @@ describe("the question a standing dispute puts to the operator", () => {
     assert.match(refusal, /the cap \(3\) is reached and round 2 carries disputed blocking finding\(s\)/);
     assert.match(refusal, /judged rather than terminated/);
     assert.match(refusal, /dabbler verify adjudicate --sessions-dir docs\/sessions/);
+  });
+});
+
+describe("a disposition set judged before its disputes are written", () => {
+  it("refuses a bare cite over the inline cap naming the range form, and accepts the same cite as a range", () => {
+    // Session 198's dispute cited the session plan whole: the phase accepted
+    // it, the write refused it, and the refusal was a stop the loop reused
+    // on resume. New answer or stored one, the phase asks this first.
+    const repo = tempDir();
+    seed(repo, { "docs/plan.md": "x".repeat(16 * 1024 + 1) });
+    const set = (evidence: string) => ({
+      schema_version: 1 as const,
+      session_number: 1,
+      seq: 3,
+      round: 1,
+      dispositions: [
+        { finding_index: 0, action: "fix" as const },
+        { finding_index: 1, action: "reject" as const, reason: "not a defect", evidence_paths: [evidence] },
+      ],
+      recorded_at: "2026-09-17T09:00:00-04:00",
+    });
+    const refusals = dispositionRefusals(repo, set("docs/plan.md"));
+    assert.equal(refusals.length, 1);
+    assert.match(refusals[0]!, /^finding 1: .*cite the relevant passage as docs\/plan\.md:START-END/);
+    assert.deepEqual(dispositionRefusals(repo, set("docs/plan.md:1-1")), []);
   });
 });
 

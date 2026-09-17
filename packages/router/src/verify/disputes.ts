@@ -121,6 +121,72 @@ function refusedDispute(exit: number, text: string): DisputeOutcome {
 }
 
 /**
+ * Whether a dispute's evidence can be recorded: the cites as the record keeps
+ * them, or the sentence that refuses them. The one rule for evidence, applied
+ * where a disposition is judged and again where the dispute is written, so an
+ * answer the first accepts is never refused by the second.
+ */
+export function judgeDisputeEvidence(
+  repoRoot: string,
+  evidence: readonly string[],
+): { readonly cited: readonly string[]; readonly refusal: string } {
+  const refused = (refusal: string) => ({ cited: [], refusal });
+  if (evidence.length === 0) {
+    return refused(
+      "verify dispute: refused -- a dispute is an argument from the " +
+        "record, not a complaint; prose-only disputes are refused. Cite " +
+        "at least one existing repo path with --evidence.",
+    );
+  }
+
+  const cited: string[] = [];
+  for (const raw of evidence) {
+    let [rel, why] = resolveRepoRelative(repoRoot, raw);
+    let suffix = "";
+    if (rel === null && why === "missing") {
+      // Not a bare path: accept `path:START[-END]` line-range cites, so a
+      // passage deep in a large file can be cited precisely.
+      const range = splitEvidenceRange(raw);
+      if (
+        range.start !== null &&
+        range.end !== null &&
+        range.start >= 1 &&
+        range.start <= range.end
+      ) {
+        [rel, why] = resolveRepoRelative(repoRoot, range.path);
+        if (rel !== null) suffix = `:${range.start}-${range.end}`;
+      }
+    }
+    if (rel === null) {
+      const reason =
+        why === "outside"
+          ? "is outside the repository"
+          : "does not name a file in the repository";
+      return refused(
+        `verify dispute: refused -- evidence path ${pythonRepr(raw)} ` +
+          `${reason}; a dispute cites the repo's own record.`,
+      );
+    }
+    if (!suffix) {
+      // A bare cite of an oversized file would silently drop its tail at
+      // render time; refuse it now, naming the exit.
+      const size = statSync(resolve(repoRoot, rel)).size;
+      if (size > DISPUTE_EVIDENCE_INLINE_CAP) {
+        return refused(
+          `verify dispute: refused -- ${rel} is ${size} bytes, ` +
+            "over the inline cap " +
+            `(${DISPUTE_EVIDENCE_INLINE_CAP}); cite the relevant ` +
+            `passage as ${rel}:START-END so it rides the prompt ` +
+            "whole instead of being truncated.",
+        );
+      }
+    }
+    cited.push(rel + suffix);
+  }
+  return { cited, refusal: "" };
+}
+
+/**
  * Record the orchestrator's rebuttal of one recorded finding. The dispute is
  * immutable and rides into the next round's prompt beside the finding it
  * contests, where the verifier must engage it -- UPHOLD or WITHDRAW --
@@ -155,61 +221,8 @@ export function recordDispute(
   if ((options.grounds || "").trim() === "") {
     return refusedDispute(EXIT_USAGE, "verify dispute: --grounds must be non-empty\n");
   }
-  if (options.evidence.length === 0) {
-    return refusedDispute(
-      EXIT_USAGE,
-      "verify dispute: refused -- a dispute is an argument from the " +
-        "record, not a complaint; prose-only disputes are refused. Cite " +
-        "at least one existing repo path with --evidence.\n",
-    );
-  }
-
-  const cited: string[] = [];
-  for (const raw of options.evidence) {
-    let [rel, why] = resolveRepoRelative(repoRoot, raw);
-    let suffix = "";
-    if (rel === null && why === "missing") {
-      // Not a bare path: accept `path:START[-END]` line-range cites, so a
-      // passage deep in a large file can be cited precisely.
-      const range = splitEvidenceRange(raw);
-      if (
-        range.start !== null &&
-        range.end !== null &&
-        range.start >= 1 &&
-        range.start <= range.end
-      ) {
-        [rel, why] = resolveRepoRelative(repoRoot, range.path);
-        if (rel !== null) suffix = `:${range.start}-${range.end}`;
-      }
-    }
-    if (rel === null) {
-      const reason =
-        why === "outside"
-          ? "is outside the repository"
-          : "does not name a file in the repository";
-      return refusedDispute(
-        EXIT_USAGE,
-        `verify dispute: refused -- evidence path ${pythonRepr(raw)} ` +
-          `${reason}; a dispute cites the repo's own record.\n`,
-      );
-    }
-    if (!suffix) {
-      // A bare cite of an oversized file would silently drop its tail at
-      // render time; refuse it now, naming the exit.
-      const size = statSync(resolve(repoRoot, rel)).size;
-      if (size > DISPUTE_EVIDENCE_INLINE_CAP) {
-        return refusedDispute(
-          EXIT_USAGE,
-          `verify dispute: refused -- ${rel} is ${size} bytes, ` +
-            "over the inline cap " +
-            `(${DISPUTE_EVIDENCE_INLINE_CAP}); cite the relevant ` +
-            `passage as ${rel}:START-END so it rides the prompt ` +
-            "whole instead of being truncated.\n",
-        );
-      }
-    }
-    cited.push(rel + suffix);
-  }
+  const { cited, refusal } = judgeDisputeEvidence(repoRoot, options.evidence);
+  if (refusal !== "") return refusedDispute(EXIT_USAGE, `${refusal}\n`);
 
   const rounds = readRounds(repoRoot, current);
   const target = rounds.find((row) => row["round"] === options.roundNumber);

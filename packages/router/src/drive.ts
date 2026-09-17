@@ -108,6 +108,7 @@ import {
   rewindPhaseFor,
 } from "./gates.ts";
 import type {
+  DriverDisposition,
   DriverInstruction,
   DriverReport,
   DriverRun,
@@ -164,7 +165,7 @@ import {
   surfaceDigest,
   treeDigest,
 } from "./testEvidence.ts";
-import { recordDispute, resolveRepoRelative } from "./verify/disputes.ts";
+import { judgeDisputeEvidence, recordDispute } from "./verify/disputes.ts";
 import {
   EXIT_BLOCKING,
   EXIT_CALL_FAILED,
@@ -817,6 +818,19 @@ function describeFinding(index: number, finding: Row): string {
     String(finding["description"] ?? "").trim() +
     (cited.length > 0 ? ` -- cited: ${cited.join(", ")}` : "")
   );
+}
+
+/**
+ * Why a disposition set cannot be recorded, one reason per refused dispute,
+ * judged by the rule `recordDispute` applies, so a set this accepts is never
+ * refused when its disputes are written. Empty when every dispute can be.
+ */
+export function dispositionRefusals(repoRoot: string, set: DriverDisposition): string[] {
+  return set.dispositions
+    .filter((entry) => entry.action === "reject")
+    .map((entry) => [entry.finding_index, judgeDisputeEvidence(repoRoot, entry.evidence_paths ?? []).refusal] as const)
+    .filter(([, refusal]) => refusal !== "")
+    .map(([index, refusal]) => `finding ${index}: ${refusal}`);
 }
 
 /**
@@ -2626,7 +2640,10 @@ class Driver {
     let set = readDispositions(this.repoRoot, this.sessionNumber);
     if (set !== null && set.round !== roundNumber) set = null;
 
-    let refusals: string[] = [];
+    // A stored answer is judged like a new one: a loop resumed after a
+    // refusal would otherwise record the same refused dispute again.
+    let refusals: string[] = set === null ? [] : dispositionRefusals(this.repoRoot, set);
+    if (refusals.length > 0) set = null;
     while (set === null) {
       const instruction = await this.converse({
         kind: "rejection",
@@ -2647,19 +2664,7 @@ class Driver {
             `the answer is \`${instruction.answer_command}\``,
         );
       } else {
-        for (const entry of answered.dispositions) {
-          if (entry.action !== "reject") continue;
-          for (const token of entry.evidence_paths ?? []) {
-            const [path] = token.split(":", 1);
-            const [rel, problem] = resolveRepoRelative(this.repoRoot, path as string);
-            if (rel === null) {
-              refusals.push(
-                `finding ${entry.finding_index}'s evidence '${token}' is ${problem}; a dispute ` +
-                  "cites a file in this repository",
-              );
-            }
-          }
-        }
+        refusals.push(...dispositionRefusals(this.repoRoot, answered));
         if (refusals.length === 0) set = answered;
       }
       if (set !== null) break;

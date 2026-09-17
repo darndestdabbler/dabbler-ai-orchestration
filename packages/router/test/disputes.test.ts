@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { adjudicationExclusions, resolveRepoRelative, undisputedBlockingIndices } from "../src/verify/disputes.ts";
+import { adjudicationExclusions, judgeDisputeEvidence, resolveRepoRelative, undisputedBlockingIndices } from "../src/verify/disputes.ts";
+import { DISPUTE_EVIDENCE_INLINE_CAP } from "../src/verify/prompts.ts";
 import { writePreferences } from "../src/preferences.ts";
 import { seatLadder } from "../src/route.ts";
 import { ROLE_AUXILIARY_REVIEWER } from "../src/selection.ts";
@@ -23,6 +24,18 @@ describe("resolving a cited path", () => {
     assert.deepEqual(resolveRepoRelative(repo, "src"), [null, "missing"]);
     assert.deepEqual(resolveRepoRelative(repo, "a.txt"), ["a.txt", null]);
     assert.deepEqual(resolveRepoRelative(repo, join(repo, "src", "a.py")), ["src/a.py", null]);
+  });
+});
+
+describe("judging a dispute's evidence", () => {
+  it("refuses a bare cite over the inline cap naming the range form, accepts the range, and refuses a missing or outside path", () => {
+    const repo = tempDir();
+    seed(repo, { "big.md": "x".repeat(DISPUTE_EVIDENCE_INLINE_CAP + 1), "a.txt": "one\n" });
+    assert.match(judgeDisputeEvidence(repo, ["big.md"]).refusal, /cite the relevant passage as big\.md:START-END/);
+    assert.deepEqual(judgeDisputeEvidence(repo, ["big.md:1-1", "a.txt"]), { cited: ["big.md:1-1", "a.txt"], refusal: "" });
+    assert.match(judgeDisputeEvidence(repo, ["nope.py"]).refusal, /does not name a file in the repository/);
+    assert.match(judgeDisputeEvidence(repo, ["../elsewhere.py"]).refusal, /outside the repository/);
+    assert.notEqual(judgeDisputeEvidence(repo, []).refusal, "");
   });
 });
 

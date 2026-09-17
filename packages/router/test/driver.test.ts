@@ -692,6 +692,9 @@ describe("a stop, as a person reads it", () => {
 
     assert.equal(renderStop(engineStop, pull).actor, "engine");
     assert.match(renderStop(engineStop, pull).next, /^Next: the engine/);
+    // A stop ends the mailbox loop, so the engine's stop still names the
+    // way to start it again.
+    assert.ok(renderStop(engineStop, pull).choices.some((choice) => /Resume Session/.test(choice.label) && /session run --mailbox/.test(choice.command)));
     assert.equal(renderStop(operatorStop, pull).actor, "operator");
     assert.equal(renderStop(operatorStop, pull).next, "Next: you.");
     // A tree that carried work when the declaration was made is the tree's

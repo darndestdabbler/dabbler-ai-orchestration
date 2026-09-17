@@ -3901,7 +3901,7 @@
     {
       "number": 197,
       "title": "A new session never inherits an earlier run's record",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-17T07:49:19.998000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -3910,7 +3910,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.5.0",
-      "completedAt": null,
+      "completedAt": "2026-09-17T07:56:10.341000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,

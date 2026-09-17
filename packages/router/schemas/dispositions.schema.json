@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dispositions.jsonl row (what was decided about one finding)",
+  "description": "One row per disposed finding under .dabbler/runs/<set>/s<N>/critique/<change-id>/dispositions.jsonl, appended only by router commands after validation. Safety/data-loss, boundary/auth, and exposed-contract findings are designated classes: accepting one rather than fixing it requires recorded human approval, and the schema refuses the row without it. A disposition is a record of a decision already taken through the router, never a channel for supplying a verdict by hand.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "change_id",
+    "check_id",
+    "attempt",
+    "disposition",
+    "severity",
+    "defect_class",
+    "recorded_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Frozen at v1. A reader that finds any other value refuses the row rather than interpreting it."
+    },
+    "change_id": { "type": "string", "minLength": 7 },
+    "check_id": { "type": "string", "minLength": 1 },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "recorded_at": { "type": "string", "minLength": 1 },
+    "disposition": {
+      "type": "string",
+      "enum": ["fixed", "accepted", "disputed", "escalated"]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "major", "minor"]
+    },
+    "defect_class": {
+      "type": "string",
+      "enum": [
+        "safety-data-loss",
+        "boundary-auth",
+        "contract-compatibility",
+        "logic-state",
+        "reliability-performance",
+        "maintainability-test"
+      ]
+    },
+    "rationale": { "type": "string", "minLength": 1 },
+    "human_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approver", "approved_at"],
+      "description": "Recorded by the router at an interactive prompt. Its presence in a file is not self-certifying; the writer validates before it is ever written.",
+      "properties": {
+        "approver": { "type": "string", "minLength": 1 },
+        "approved_at": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "disposition": { "const": "accepted" },
+          "defect_class": {
+            "enum": [
+              "safety-data-loss",
+              "boundary-auth",
+              "contract-compatibility"
+            ]
+          }
+        },
+        "required": ["disposition", "defect_class"]
+      },
+      "then": { "required": ["human_approval", "rationale"] }
+    }
+  ]
+}

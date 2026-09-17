@@ -361,7 +361,7 @@ describe("declaring a session's task list", () => {
     dirty = "?? widget.py\n";
     assert.throws(
       () => declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: true }),
-      /already carries 1 change/,
+      /haven't been committed: widget\.py\./,
     );
   });
 

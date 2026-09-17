@@ -262,9 +262,65 @@ describe("what a start refuses before a session exists", () => {
       );
       assert.notEqual(refused.code, EXIT_OK);
       assert.ok(refused.err.includes(`start: refused -- ${workBegunRefusal(1, [".vscode/launch.json"])}`), refused.err);
+      assert.match(refused.err, /--commit-changes .*--undo-changes/);
       assert.equal(readRawSessionState(state.sessionsDir), null);
     } finally {
       dirty();
+      state.restore();
+    }
+  });
+
+  it("commits and pushes the uncommitted changes with --commit-changes, then registers", async () => {
+    const state = stateDir();
+    const calls: string[][] = [];
+    let committed = false;
+    const answers = cleanRepoAnswers(state.repo, [
+      [(args) => { calls.push([...args]); return false; }, {}],
+      [["status", "--porcelain"], () => ({ stdout: committed ? "" : " M src/widget.py\n?? notes.txt\n" })],
+      [["commit"], () => { committed = true; return { code: 0 }; }],
+      [["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], { stdout: "origin/main" }],
+      [["push"], { code: 0 }],
+    ]);
+    try {
+      const started = await run(() =>
+        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic", commitChanges: true }),
+      );
+      assert.equal(started.code, EXIT_OK, started.err);
+      assert.ok(calls.some((args) => args.join(" ") === "add -- src/widget.py notes.txt"), JSON.stringify(calls));
+      assert.ok(calls.some((args) => args[0] === "commit" && /before session 1 started/.test(String(args[2]))));
+      assert.ok(calls.some((args) => args[0] === "push"));
+      assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
+    } finally {
+      answers();
+      state.restore();
+    }
+  });
+
+  it("undoes the uncommitted changes with --undo-changes, keeping a copy outside the repository, then registers", async () => {
+    const state = stateDir();
+    seed(state.repo, { "src/widget.py": "def widget():\n    return 2\n", "notes.txt": "keep me\n" });
+    const calls: string[][] = [];
+    const answers = cleanRepoAnswers(state.repo, [
+      [(args) => { calls.push([...args]); return false; }, {}],
+      [["status", "--porcelain"], () => ({ stdout: existsSync(join(state.repo, "notes.txt")) ? " M src/widget.py\n?? notes.txt\n" : "" })],
+      [["cat-file", "-e", "HEAD:src/widget.py"], { code: 0 }],
+      [["cat-file", "-e"], { code: 128 }],
+      [["checkout", "HEAD", "--"], { code: 0 }],
+    ]);
+    try {
+      const started = await run(() =>
+        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic", undoChanges: true }),
+      );
+      assert.equal(started.code, EXIT_OK, started.err);
+      const folder = /a copy of each file is in (.+)$/m.exec(started.out)?.[1] ?? "";
+      assert.ok(folder !== "" && !folder.startsWith(state.repo), started.out);
+      assert.equal(readFileSync(join(folder, "notes.txt"), "utf8"), "keep me\n");
+      assert.equal(readFileSync(join(folder, "src", "widget.py"), "utf8"), "def widget():\n    return 2\n");
+      assert.equal(existsSync(join(state.repo, "notes.txt")), false);
+      assert.ok(calls.some((args) => args.join(" ") === "checkout HEAD -- src/widget.py"), JSON.stringify(calls));
+      assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
+    } finally {
+      answers();
       state.restore();
     }
   });

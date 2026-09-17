@@ -394,6 +394,7 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     pickEngine: async () => ENGINES[0],
     askModel: async () => "haiku",
     confirm: async () => false,
+    choose: async () => undefined,
     report: () => undefined,
     showErrorMessage: (m: string) => errors.push(m),
     showInformationMessage: (m: string) => infos.push(m),
@@ -545,6 +546,33 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(await runStartSession(makeRepository(), agreed.ui, register, CLI), true);
     assert.deepStrictEqual(register.calls[2].slice(-1), ["--merge-origin"]);
     assert.strictEqual(agreed.terminals.length, 2);
+  });
+
+  test("asks what to do with uncommitted changes, and starts with the flag for the answer chosen", async () => {
+    const refusal =
+      "start: refused -- You can't start a session while there are new or changed files that haven't been " +
+      "committed: docs/sessions/session-plan.md. Next: commit them, or undo the changes.\n" +
+      "start: next -- run the same start with --commit-changes to commit and push them, or with --undo-changes to undo them.";
+    const register = (async (_root: string, args: readonly string[]) => {
+      register.calls.push([...args]);
+      return args.some((arg) => arg.endsWith("-changes")) ? { code: 0, output: "" } : { code: 2, output: refusal };
+    }) as SessionRegistrar & { calls: string[][] };
+    register.calls = [];
+
+    const asked: string[] = [];
+    const cancelled = driveUi({ choose: async (message) => { asked.push(message); return undefined; } });
+    assert.strictEqual(await runStartSession(makeRepository(), cancelled.ui, register, CLI), false);
+    assert.match(asked[0], /session-plan\.md/);
+    assert.deepStrictEqual(register.calls.length, 1);
+    assert.strictEqual(cancelled.terminals.length, 0);
+
+    for (const [answer, flag] of [["Commit and Push", "--commit-changes"], ["Undo the Changes", "--undo-changes"]]) {
+      register.calls = [];
+      const chosen = driveUi({ choose: async () => answer });
+      assert.strictEqual(await runStartSession(makeRepository(), chosen.ui, register, CLI), true);
+      assert.deepStrictEqual(register.calls[1].slice(-1), [flag]);
+      assert.strictEqual(chosen.terminals.length, 2);
+    }
   });
 
   test("Consult with AI opens the chosen CLI with the chosen model and the consult sentence, and registers nothing", async () => {

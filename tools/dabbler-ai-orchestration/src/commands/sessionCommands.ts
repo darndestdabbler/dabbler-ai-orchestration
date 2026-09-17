@@ -23,8 +23,10 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import {
+  COMMIT_CHANGES_FLAG,
   ENUMERATION_CLI_ALIASES,
   MERGE_ORIGIN_FLAG,
+  UNDO_CHANGES_FLAG,
   loopAlive,
   preflightRefusedModel,
   type Router,
@@ -503,6 +505,8 @@ export interface SessionRunUi {
   askModel: (root: string, choice: EngineChoice, chosen: string, purpose?: string) => Thenable<string | undefined>;
   /** A yes-or-no the person answers, modally; true only for the named action. */
   confirm: (message: string, action: string) => Thenable<boolean>;
+  /** A modal question with named answers; the one picked, or undefined for Cancel. */
+  choose: (message: string, actions: readonly string[]) => Thenable<string | undefined>;
   report: (title: string, body: string) => void;
   showErrorMessage: (message: string) => unknown;
   showInformationMessage: (message: string) => unknown;
@@ -626,6 +630,7 @@ export function defaultSessionRunUi(
     },
     confirm: (message, action) =>
       vscode.window.showWarningMessage(message, { modal: true }, action).then((picked) => picked === action),
+    choose: (message, actions) => vscode.window.showWarningMessage(message, { modal: true }, ...actions),
     report: (title, body) => {
       const out = channel();
       out.appendLine(`--- ${title} ---`);
@@ -789,6 +794,21 @@ export async function runStartSession(
   // record before anything opens, and a refusal opens nothing.
   const args = startArguments(picked, model);
   let registered = await register(repository.root, args);
+  // Uncommitted changes: committing them or undoing them is the framework's
+  // to do, once the person has said which.
+  if (registered.code !== 0 && registered.output.includes(COMMIT_CHANGES_FLAG)) {
+    const refusal = registered.output.split("\n").find((line) => line.startsWith("start: refused -- ")) ?? "";
+    const commit = "Commit and Push";
+    const undo = "Undo the Changes";
+    const answer = await ui.choose(
+      `${refusal.replace(/^start: refused -- /, "")}\n\n${commit} commits these files and pushes them. ` +
+        `${undo} restores the changed files and removes the new ones, keeping a copy of each ` +
+        "outside the repository, in this machine's per-user dabbler data folder.",
+      [commit, undo],
+    );
+    if (answer !== commit && answer !== undo) return false;
+    registered = await register(repository.root, [...args, answer === commit ? COMMIT_CHANGES_FLAG : UNDO_CHANGES_FLAG]);
+  }
   // Origin holds files this checkout has never had, on a history it does not
   // share: whether they belong in this branch is the person's to say.
   if (registered.code !== 0 && registered.output.includes(MERGE_ORIGIN_FLAG)) {

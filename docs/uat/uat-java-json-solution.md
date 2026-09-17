@@ -497,10 +497,15 @@ and the session argues with itself for rounds.
 **If you skip the commit, the next step refuses:**
 
 ```
-start: refused -- session 1 cannot declare its task list now: the working tree already
-         carries N change(s) (...). The declaration comes before the work -- one made after
-         it is a model deciding in hindsight what may be published. Commit or revert, then declare.
+start: refused -- You can't start a session while there are new or changed files that
+         haven't been committed: (...). Next: commit them, or undo the changes (copy
+         anything you want to keep outside the repository first).
+start: next -- run the same start with --commit-changes to commit and push them, or with
+         --undo-changes to undo them (a copy of each file is kept outside the repository).
 ```
+
+Start Session asks the same question in a dialog: **Commit and Push** or
+**Undo the Changes**.
 
 ---
 

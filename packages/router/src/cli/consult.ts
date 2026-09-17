@@ -128,6 +128,8 @@ export function consultBrief(sessionsDir: string, session?: number): string {
     "## The licence",
     "- Answer questions and read anything.",
     planEdits,
+    "- Every file this consult changes is committed and pushed before the consultation ends, never left in " +
+      "the tree: Start Session refuses a tree with uncommitted changes.",
     "- Change no code, no record under .dabbler/ or the router's files, and no verdict.",
     "- Work that changes code, including a fix the framework needs to clear a stop, becomes a planned session -- never your own edit.",
     "",

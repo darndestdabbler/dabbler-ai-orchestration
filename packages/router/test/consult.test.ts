@@ -73,4 +73,9 @@ describe("consultBrief", () => {
     assert.match(brief, /Do NOT edit the plan files now\. Session 1 is in progress/);
     assert.match(brief, /Draft the text in the chat/);
   });
+
+  it("says every file a consult changes is committed and pushed before it ends", () => {
+    const { sessionsDir } = repository();
+    assert.match(consultBrief(sessionsDir), /committed and pushed before the consultation ends, never left in the tree/);
+  });
 });

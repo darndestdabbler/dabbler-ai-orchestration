@@ -124,12 +124,11 @@ export class WorkBegunError extends SanctionedWriteError {
  * cannot start, which asks the same question earlier, at the moment the
  * condition is fully known and before any work. One sentence for both.
  */
-export function workBegunRefusal(number: number, paths: readonly string[]): string {
+export function workBegunRefusal(_number: number, paths: readonly string[]): string {
   return (
-    `session ${number} cannot declare its task list now: the working tree ` +
-    `already carries ${paths.length} change(s) (${previewPaths(paths)}). ` +
-    "The declaration comes before the work -- one made after it is a model " +
-    "deciding in hindsight what may be published. Commit or revert, then declare."
+    "You can't start a session while there are new or changed files that haven't been committed: " +
+    `${previewPaths(paths)}. Next: commit them, or undo the changes (copy anything you want to keep ` +
+    "outside the repository first)."
   );
 }
 

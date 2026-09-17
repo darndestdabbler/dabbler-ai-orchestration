@@ -10,6 +10,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.8.0] — 2026-09-17
+
+**Uncommitted changes at Start are a question, not a dead end.**
+
+### Added
+
+- **Start Session asks what to do with uncommitted changes.** Where a start
+  is refused because new or changed files have not been committed, a dialog
+  lists them and offers **Commit and Push**, **Undo the Changes** (a copy of
+  each file is kept outside the repository, in this machine's per-user
+  dabbler data folder), or Cancel, which leaves the tree as it was.
+- `dabbler session start --commit-changes` commits those files and pushes
+  them where the branch has an upstream; `--undo-changes` copies them outside
+  the repository, undoes them, and names the folder. Either then starts.
+
+### Changed
+
+- The refusal says it plainly: *"You can't start a session while there are
+  new or changed files that haven't been committed"*, and names the two flags.
+- A consult commits and pushes every file it changes before it ends, as the
+  consult brief and the managed `AGENTS.md` now say.
+
 ## [3.7.0] — 2026-09-17
 
 **Start Unattended Session is gone.**

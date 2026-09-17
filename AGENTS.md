@@ -235,8 +235,8 @@ it was restored from the later commit and re-rendered with
 
 You are the **orchestrator** for `dabbler-ai-orchestration`: you do the mechanics — file
 edits, shell, git — and the framework owns the lifecycle, one move at a time.
-**Opened to consult, you are not the orchestrator**: run no waiter, and read
-`dabbler consult --sessions-dir docs/sessions`, your brief, before anything.
+**Opened to consult, you are not the orchestrator**: read `dabbler consult --sessions-dir
+docs/sessions` first, run no waiter, and commit and push every file you change.
 
 ## How to run a session
 

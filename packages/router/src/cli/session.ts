@@ -87,6 +87,10 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --merge-origin           merge origin's branch when it shares no history with",
     "                           this one and holds more than a README (a README-only",
     "                           initial commit is merged without it)",
+    "  --commit-changes         commit the uncommitted changes a start refuses over,",
+    "                           push them where the branch has an upstream, and start",
+    "  --undo-changes           copy those changes outside the repository, undo them",
+    "                           in the tree, and start",
   ],
   decision: [
     "  --decider WHO            required: operator | orchestrator | verifier | framework",
@@ -258,11 +262,13 @@ const RETIRED_FLAGS: ReadonlyMap<string, string> = new Map([
 ]);
 
 const SWITCHES = new Set([
+  "--commit-changes",
   "--dry-run",
   "--force",
   "--mailbox",
   "--merge-origin",
   "--stop",
+  "--undo-changes",
 ]);
 
 /** The flag three verbs once required, and the sentence that says why they no longer take it. */
@@ -505,6 +511,8 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       sessionNumber,
       totalSessions,
       mergeOrigin: switches.has("--merge-origin"),
+      commitChanges: switches.has("--commit-changes"),
+      undoChanges: switches.has("--undo-changes"),
     });
   }
 

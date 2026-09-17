@@ -130,7 +130,7 @@ export { ENUMERATION_CLI_ALIASES } from "./projection.ts";
 export { preflightRefusedModel } from "./engines.ts";
 // Start Session asks the person before a start merges an origin branch that
 // shares no history with the checkout, and re-runs the start with this.
-export { MERGE_ORIGIN_FLAG } from "./session.ts";
+export { COMMIT_CHANGES_FLAG, MERGE_ORIGIN_FLAG, UNDO_CHANGES_FLAG } from "./session.ts";
 // Resume Session restarts the loop only when no heartbeat says one is driving.
 export { loopAlive } from "./drive.ts";
 // WHERE that reading comes from, so a host can watch it.

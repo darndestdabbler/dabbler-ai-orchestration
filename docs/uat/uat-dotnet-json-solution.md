@@ -460,11 +460,16 @@ its tests.
 **If you skip this, the next step refuses,** and says so plainly:
 
 ```
-start: refused -- session 1 cannot declare its task list now: the working tree already
-         carries 3 change(s) (dabbler.yaml, docs/sessions/session-plan.md, items.json).
-         The declaration comes before the work -- one made after it is a model deciding in
-         hindsight what may be published. Commit or revert, then declare.
+start: refused -- You can't start a session while there are new or changed files that
+         haven't been committed: dabbler.yaml, docs/sessions/session-plan.md, items.json.
+         Next: commit them, or undo the changes (copy anything you want to keep outside
+         the repository first).
+start: next -- run the same start with --commit-changes to commit and push them, or with
+         --undo-changes to undo them (a copy of each file is kept outside the repository).
 ```
+
+Start Session asks the same question in a dialog: **Commit and Push** or
+**Undo the Changes**.
 
 The `-u` is not optional either: it sets the upstream that every later push
 uses.

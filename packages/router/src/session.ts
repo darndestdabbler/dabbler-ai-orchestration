@@ -38,6 +38,7 @@ import {
   resolveOrchestratorIdentity,
 } from "./identity.ts";
 import { GEMINI_RETIRED, engineAliases, installedEngines } from "./engines.ts";
+import { currentCatalogPath } from "./catalog.ts";
 import {
   TRANSPORT_API,
   TRANSPORT_COPILOT_CLI,
@@ -618,6 +619,10 @@ export interface StartOptions {
   readonly refresh?: () => Promise<string[]>;
   /** Merge an origin branch that shares no history with this one, as the person answered. */
   readonly mergeOrigin?: boolean;
+  /** Commit and push the uncommitted changes a start would refuse over, as the person answered. */
+  readonly commitChanges?: boolean;
+  /** Undo them, keeping a copy of each file outside the repository, as the person answered. */
+  readonly undoChanges?: boolean;
 }
 
 /** The first line of a git error, for a one-line message. */
@@ -627,6 +632,56 @@ function firstLine(text: string): string {
 
 /** The switch that lets a start merge an origin branch sharing no history with this one. */
 export const MERGE_ORIGIN_FLAG = "--merge-origin";
+
+/** The switches a person answers uncommitted changes at a start with: keep them, or undo them. */
+export const COMMIT_CHANGES_FLAG = "--commit-changes";
+export const UNDO_CHANGES_FLAG = "--undo-changes";
+
+/** What a start refused over uncommitted changes says next, naming both ways through. */
+const UNCOMMITTED_CHANGES_NEXT =
+  `start: next -- run the same start with ${COMMIT_CHANGES_FLAG} to commit and push them, or with ` +
+  `${UNDO_CHANGES_FLAG} to undo them (a copy of each file is kept outside the repository).`;
+
+/**
+ * Commit the changes a start refused over, as a person chose, and push them
+ * where the branch tracks an upstream. Answers the refusal, or null.
+ */
+function commitChangesBeforeStart(repoRoot: string, number: number, paths: readonly string[]): string | null {
+  const added = runGit(repoRoot, ["add", "--", ...paths]);
+  if (added.code !== 0) return `git add failed: ${firstLine(added.stderr)}`;
+  const committed = runGit(repoRoot, ["commit", "-m", `Commit changes made before session ${number} started`]);
+  if (committed.code !== 0) return `git commit failed: ${firstLine(committed.stderr || committed.stdout)}`;
+  const upstream = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
+  if (upstream.code !== 0) return null;
+  const pushed = runGit(repoRoot, ["push"]);
+  return pushed.code === 0 ? null : `the changes were committed, but git push failed: ${firstLine(pushed.stderr)}`;
+}
+
+/**
+ * Undo the changes a start refused over, as a person chose: each file is
+ * copied first to a folder beside this machine's catalog, then a file HEAD
+ * has is restored and one it does not is removed. Answers the folder.
+ */
+function undoChangesBeforeStart(repoRoot: string, paths: readonly string[]): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const folder = join(dirname(currentCatalogPath()), "undone-changes", `${basename(repoRoot)}-${stamp}`);
+  for (const path of paths) {
+    const source = join(repoRoot, ...path.split("/"));
+    if (!isFile(source)) continue;
+    const copy = join(folder, ...path.split("/"));
+    mkdirSync(dirname(copy), { recursive: true });
+    copyFileSync(source, copy);
+  }
+  for (const path of paths) {
+    if (runGit(repoRoot, ["cat-file", "-e", `HEAD:${path}`]).code === 0) {
+      runGit(repoRoot, ["checkout", "HEAD", "--", path]);
+    } else {
+      runGit(repoRoot, ["rm", "--cached", "-q", "--ignore-unmatch", "--", path]);
+      rmSync(join(repoRoot, ...path.split("/")), { force: true });
+    }
+  }
+  return folder;
+}
 
 /**
  * A registration brings its checkout level with origin first, when there is
@@ -1094,6 +1149,10 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     writeErr(`start: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
+  if (options.commitChanges === true && options.undoChanges === true) {
+    writeErr(`start: refused -- ${COMMIT_CHANGES_FLAG} and ${UNDO_CHANGES_FLAG} cannot both be given; choose one.\n`);
+    return EXIT_USAGE;
+  }
   // Identity is resolved further down, AFTER the record has been read and
   // an omitted field has been filled from it. It used to be the first thing
   // this function did, on the ordering rule that the cheapest refusal comes
@@ -1253,8 +1312,22 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
         return EXIT_USAGE;
       }
       if (begun.paths.length > 0) {
-        writeErr(`start: refused -- ${workBegunRefusal(requested, begun.paths)}\n`);
-        return EXIT_USAGE;
+        const repoRoot = repoRootFromSessionsDir(sessionsDir);
+        if (options.commitChanges === true) {
+          const refused = commitChangesBeforeStart(repoRoot, requested, begun.paths);
+          if (refused !== null) {
+            writeErr(`start: refused -- ${refused}\n`);
+            return EXIT_USAGE;
+          }
+          writeOut(`start: committed ${begun.paths.length} file(s) made before session ${sessionDisplayNumber(requested)}.\n`);
+        } else if (options.undoChanges === true) {
+          const folder = undoChangesBeforeStart(repoRoot, begun.paths);
+          writeOut(`start: undid ${begun.paths.length} change(s); a copy of each file is in ${folder}\n`);
+        } else {
+          writeErr(`start: refused -- ${workBegunRefusal(requested, begun.paths)}\n`);
+          writeErr(`${UNCOMMITTED_CHANGES_NEXT}\n`);
+          return EXIT_USAGE;
+        }
       }
       // The origin is asked first, with no prompt and a bound: a pull from
       // an origin that does not answer would wait on a credential nobody

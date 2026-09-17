@@ -3943,7 +3943,7 @@
     {
       "number": 199,
       "title": "A refused dispute goes back to the AI, and Resume is there when the loop is not",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-17T08:56:20.086000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -3952,7 +3952,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.5.0",
-      "completedAt": null,
+      "completedAt": "2026-09-17T09:07:46.200000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,

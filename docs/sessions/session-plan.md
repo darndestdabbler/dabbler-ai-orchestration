@@ -11505,3 +11505,94 @@ sentence, and registers nothing. One that the menu entry is contributed on
 both node kinds.
 
 **Releasable.** Yes, a minor.
+
+### Session 193 of 193: Friction only where a session would not succeed
+
+Scope: whole repository
+
+**Why.** The operator, 2026-09-17: *"Only introduce friction when the session
+would not succeed. Don't tell the developer you can't proceed because they
+don't have X when X isn't really needed."* A trace of every check that can
+refuse `session start` or halt a running session found both kinds of error.
+
+Refusals over things the session does not use:
+- `configuredCredentialRefusal` (`discovery.ts`) runs `providerKeyStop` over
+  every enabled provider. A dangling credential reference on a provider no
+  role of this session calls still refuses the start. Session 191 made this
+  stricter, since a set variable no longer excuses it.
+- `session.ts` refuses a chosen machine vehicle (`explainTransport`) that
+  cannot be reached. Authoring runs through the engine's own CLI, and the
+  reviewers resolve their own vehicle, so the machine value decides nothing
+  for this session unless it is also the reviewing one.
+
+And silence over things it does use:
+- The reviewing vehicle is held to reachability only when a person chose it
+  (`configuredVehicleRefusal`). On the built-in default -- `api` with no key
+  anywhere -- the session starts, the authoring work runs, and the session
+  stops at verification with `no-verdict` and a log tail.
+- A reviewing role on the vehicle can have no cross-provider candidate: the
+  only keyed provider is the author's own, or the seat lists no model outside
+  it. Nothing says so until the round.
+- A seat with no catalog stops the round as `provider-unreachable`, and its
+  exits suggest `--reviewer-model`, when the repair is the free refresh.
+
+The operator's ruling on where the line is: **an authoring vehicle or a
+reviewing vehicle that cannot be reached is resolved before the session
+starts**, because telling a person mid-session that the verifier cannot be
+reached and leaving them to find an alternative is the worse moment.
+Everything unrelated to the session produces nothing at all. The catalog is
+already refreshed at the first `session start` of each day (`refreshDue`), so
+a removed model is caught by the same reading.
+
+**What -- one assessment at start, of what this session uses.** `session
+start` assesses the session it is about to register, after the daily refresh
+and before anything is written:
+- **Authoring:** the engine's CLI is on this machine (`installedEngines`), and
+  a chosen authoring model is one its list accepts (`configuredModelRefusal`,
+  unchanged).
+- **Reviewing:** the reviewing vehicle as resolved -- chosen or built-in
+  default alike -- yields at least one candidate for the Primary Reviewer
+  that is not the author's provider, and a chosen reviewer model is among
+  them. This is asked through the selection the round itself uses
+  (`apiLadder` and the seat's equivalent in `route.ts`, with the author's
+  provider excluded), never a second copy of that rule. The Auxiliary
+  Reviewer is not held to it: it is reached only on a dispute, and the round
+  already has a forward exit there.
+- **The refusal** names what cannot be reached, which layer chose it (or that
+  it is the built-in default), and each way forward as a command -- for `api`,
+  `dabbler auth set <provider>` or the provider's variable, and `dabbler
+  configure --reviewer-transport <vehicle>` for a vehicle this machine has;
+  for a seat, the free refresh or a login.
+
+Removed from start: the machine-vehicle refusal, and the refusal over
+credential references. A reference that names nothing on a provider the
+reviewing vehicle would call is not a stop: that provider is simply not a
+candidate. It is named in the reviewing refusal where it leaves no candidate,
+and printed as a warning where it does not. A reference on a provider nothing
+in this session calls produces no output. A key pasted where a variable's
+name or a credential's name belongs is printed as a warning naming the file,
+and never refuses. Session 191's order stands: a reference that names
+nothing resolves to no key, and never falls to the variable.
+
+**What -- the round's own words.** Where the reviewing vehicle stops being
+reachable after the start, the verification stop says so in the same
+sentences as the start's refusal. A seat with no catalog names the free
+refresh, not `--reviewer-model`. An `api` round with no keyed candidate names
+the key and the vehicle, not a log tail.
+
+**Non-goals.** A new gate of any kind: this session removes refusals and
+moves one earlier. Holding the Auxiliary Reviewer to reachability at start.
+Refreshing the catalog more often than daily. Anything about which account a
+key bills beyond what session 191 settled. The extension's own Start checks,
+which already concern only the engine and model being launched.
+
+**Tests.** One that a start on the default `api` reviewing vehicle with no key
+is refused, naming both ways forward. One that a start whose only keyed
+provider is the author's own is refused. One that a dangling credential
+reference on a provider no role calls starts cleanly, with nothing printed.
+One that an unreachable machine vehicle the reviewing vehicle does not use
+starts cleanly. One that a seat round with no catalog names the refresh.
+The existing tests asserting the removed refusals are changed rather than
+joined.
+
+**Releasable.** Yes, a minor, because which starts are refused changes.

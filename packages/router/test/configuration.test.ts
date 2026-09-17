@@ -582,8 +582,8 @@ describe("which credential a solution uses", () => {
       assert.match(explained.stdout, /openai key: the credential 'client-a'/);
       assert.match(explained.stdout, /settings\.json/);
       assert.match(explained.stdout, /DOES NOT HOLD IT/);
-      // The environment is the layer above it, and a provider running on one
-      // says so rather than being told to change anything.
+      // A provider that names no credential is supplied by its variable, the
+      // floor beneath both references, and says so.
       assert.match(explained.stdout, /anthropic key: DABBLER_ANTHROPIC_API_KEY in this environment/);
       // Nothing in the rendering is the value or any part of one. The keys
       // this fixture sets are the single character 'k'; what must not appear

@@ -812,9 +812,9 @@ function recordNode(row: FreshnessRow): Node {
  * whether it will work here -- and all three are answerable without
  * touching the secret.
  *
- * The environment is the layer above both references, so a provider whose
- * variable is set says so and carries no stop: an operator running on
- * environment variables today is not being told to change anything.
+ * The environment is the floor beneath both references: `fromEnvironment`
+ * means the variable is what supplies the key, which is true only where no
+ * reference is named.
  */
 function credentialNodes(config: RouterConfig): Node[] {
   const providers = config["providers"];
@@ -829,7 +829,8 @@ function credentialNodes(config: RouterConfig): Node[] {
       typeof provider[CREDENTIAL_REFERENCE_KEY] === "string"
         ? (provider[CREDENTIAL_REFERENCE_KEY] as string)
         : null;
-    const fromEnvironment = variable !== "" && (process.env[variable] ?? "") !== "";
+    const fromEnvironment =
+      reference === null && variable !== "" && (process.env[variable] ?? "") !== "";
     rows.push({
       provider: name,
       displayLabel:

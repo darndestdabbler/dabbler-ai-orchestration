@@ -125,14 +125,20 @@ this person's own default reference. Both are names of credentials, both are
 safe in a commit, and a value found where a name belongs is refused rather
 than stored.
 
-Resolution, in order: the **process environment** named by the provider's
-`api_key_env`, then the **solution's reference**, then **this person's
-default**. The environment is first because that is how CI injects a key and
-because a precedence that can be explained is the only kind worth having. A
-reference naming a credential this machine does not hold is a **stop** that
-names the layer that chose it and the command that repairs it — never a fall
-through to the next layer, because falling through would change which key is
-billed without saying so.
+Resolution, in order: the **solution's reference**
+(`dabbler.credentials.<provider>` in `.vscode/settings.json`), then **this
+person's reference** (`preferences.json`), then the **process environment**
+named by the provider's `api_key_env` as the floor. The checkout outranks the
+person here as it does everywhere else, and a `DABBLER_*_API_KEY` set at user
+scope is a personal, machine-wide default: above a reference it would shadow
+every repository's committed choice of key, and so which account is billed,
+the shape `DABBLER_TRANSPORT` was retired for. CI is unaffected — a CI machine
+holds no stored credentials, and where nothing names one the variable still
+supplies the key. A reference naming a credential this machine does not hold,
+or one stored for another vendor, is a **stop** that names the layer that
+chose it and the command that repairs it, whether or not the variable is set —
+never a fall through to the next layer, because falling through would change
+which key is billed without saying so.
 
 ## Tests, and where they run
 

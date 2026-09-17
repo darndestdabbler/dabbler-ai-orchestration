@@ -8924,3 +8924,13 @@ Reproduced by searching .dabbler/ for the value of each DABBLER_*_API_KEY.
 ### D279 · 2026-09-13 · Orchestrator (claude-fable-5-1/anthropic) · A declared pack that does not name {version} is the publish's, and the module candidate takes the default pack instead of refusing it
 
 Found by session 162's walk in the csv-parser sample, session 3: the module candidate refused a root packaging block whose pack argv did not name {version}, and the publish refuses one that does, because dabbler packaging supplies no version. Both read the same declaration for a module-attributed session, so a releasable module session could pass its run of record or publish, never both. The rule that refused by name ('a declaration nobody runs is a declaration that lies') is set aside for the candidate only: the candidate is the framework's own act with its own immutable dev version, and a pack declared for a feed is not a lie about it. The publish keeps its refusal. Decided under the unattended-work directive by rules (a) and (c): a developer expects the publish declaration to describe the publish, and one line is simpler than a second declaration.
+
+## Session 191 — API Keys, grouped, and the project's choice wins
+
+### D280 · 2026-09-17 · Operator · Provider keys resolve from the named credential first, the environment variable last
+
+Resolution of a provider key becomes: the checkout's reference (`dabbler.credentials.<provider>` in `.vscode/settings.json`), then this person's reference (`preferences.json`), then the provider's environment variable as the floor. This reverses session 159's ruling, which put the process environment first "because that is how CI injects a key".
+
+Why. Everywhere else in this framework the checkout outranks the person. A `DABBLER_*_API_KEY` set at user scope is exactly a personal, machine-wide default, and with the environment first it silently shadows every repository's committed choice of credential -- and so which account is billed -- on every repository on the machine. That is the shape session 157 retired `DABBLER_TRANSPORT` for. The CI argument does not survive the new order: a CI machine holds no stored credentials, and where nothing names one the variable still supplies the key.
+
+Consequence. A reference that names a credential this machine does not hold, or one stored for another vendor, is a stop whether or not the variable is set, because falling to the variable would change the billed account without saying so. The two checks for a key pasted into a file are unchanged.

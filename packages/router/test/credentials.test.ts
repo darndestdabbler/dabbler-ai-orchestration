@@ -131,31 +131,49 @@ describe("the store this platform has", () => {
     assert.equal(existsSync(path), false);
   });
 
-  it("reads the checkout's reference over this person's, and neither over the environment", () => {
+  it("reads the checkout's reference over this person's, and either over the environment", () => {
+    const path = inTemp();
+    seed(path);
     const root = tempDir("credential-layers-");
     mkdirSync(join(root, ".vscode"), { recursive: true });
+    const resolved = (): string | null =>
+      providerSecret({
+        api_key_env: "DABBLER_TEST_159_KEY",
+        [CREDENTIAL_REFERENCE_KEY]: credentialReferenceFor("openai", root)?.name,
+      });
 
-    // Nobody has said anything: no reference, and the provider falls to its
-    // environment variable, which is what every machine does today.
-    assert.equal(credentialReferenceFor("openai", root), null);
+    process.env["DABBLER_TEST_159_KEY"] = "from-the-environment";
+    try {
+      // Nobody has said anything: no reference, and the variable is the
+      // floor that supplies the key -- which is how CI, holding no stored
+      // credentials, injects one.
+      assert.equal(credentialReferenceFor("openai", root), null);
+      assert.equal(resolved(), "from-the-environment");
 
-    setPreferencesPath(join(tempDir("credential-prefs-"), "preferences.json"));
-    writePreferences({ credentialProvider: "openai", credential: "mine" });
-    assert.equal(credentialReferenceFor("openai", root)?.name, "mine");
+      // This person names one, and the variable no longer answers.
+      setPreferencesPath(join(tempDir("credential-prefs-"), "preferences.json"));
+      writePreferences({ credentialProvider: "openai", credential: "mine" });
+      assert.equal(credentialReferenceFor("openai", root)?.name, "mine");
+      assert.notEqual(resolved(), "from-the-environment");
 
-    writeFileSync(
-      join(root, ".vscode", "settings.json"),
-      `${JSON.stringify({ "dabbler.credentials.openai": "the-solution's" }, null, 2)}\n`,
-      "utf8",
-    );
-    const decided = credentialReferenceFor("openai", root);
-    assert.equal(decided?.name, "the-solution's");
-    // The layer travels with the value, because a refusal that cannot name
-    // where a value came from is a refusal nobody can act on.
-    assert.match(String(decided?.layer), /settings\.json/);
+      // And the checkout's outranks this person's, and the variable too.
+      writeFileSync(
+        join(root, ".vscode", "settings.json"),
+        `${JSON.stringify({ "dabbler.credentials.openai": "the-solution's" }, null, 2)}\n`,
+        "utf8",
+      );
+      const decided = credentialReferenceFor("openai", root);
+      assert.equal(decided?.name, "the-solution's");
+      assert.notEqual(resolved(), "from-the-environment");
+      // The layer travels with the value, because a refusal that cannot name
+      // where a value came from is a refusal nobody can act on.
+      assert.match(String(decided?.layer), /settings\.json/);
+    } finally {
+      delete process.env["DABBLER_TEST_159_KEY"];
+    }
   });
 
-  it("puts the environment above a reference, and stops on one that names nothing", () => {
+  it("stops on a reference that names nothing, whether or not the variable is set", () => {
     const path = inTemp();
     seed(path);
     const block = {
@@ -166,21 +184,17 @@ describe("the store this platform has", () => {
 
     // A reference naming nothing is a STOP and never a fall through to the
     // next layer: which key answers decides which account is billed.
-    assert.equal(providerSecret(block), null);
-    const stop = providerKeyStop("openai", block);
-    assert.match(String(stop), /'absent'/);
-    assert.match(String(stop), /settings\.json/);
-    assert.match(String(stop), /dabbler auth set openai/);
-
-    // And the environment is first, which is how CI injects a key. With one
-    // set there is nothing left to stop over.
     process.env["DABBLER_TEST_159_KEY"] = "from-the-environment";
     try {
-      assert.equal(providerSecret(block), "from-the-environment");
-      assert.equal(providerKeyStop("openai", block), null);
+      assert.equal(providerSecret(block), null);
+      const stop = providerKeyStop("openai", block);
+      assert.match(String(stop), /'absent'/);
+      assert.match(String(stop), /settings\.json/);
+      assert.match(String(stop), /dabbler auth set openai/);
     } finally {
       delete process.env["DABBLER_TEST_159_KEY"];
     }
+    assert.match(String(providerKeyStop("openai", block)), /'absent'/);
   });
 
   it("refuses a key sitting where a name belongs, at either layer, without echoing it", () => {
@@ -299,12 +313,9 @@ describe("the store this platform has", () => {
     assert.match(readFileSync(path, "utf8"), /01000000d0/);
   });
 
-  it("lets the environment answer over a reference that is wrong, rather than stopping", () => {
-    // The precedence this framework states is the environment, then the
-    // solution's reference, then this person's default -- and a stop over a
-    // layer that is not deciding anything would refuse a machine that can
-    // plainly run. The mismatch is still refused where it decides: at
-    // `configure --credential`, and here the moment the variable is gone.
+  it("stops on a credential stored for another vendor, even with the variable set", () => {
+    // The reference decides, so a set variable excuses nothing: answering
+    // with it would change the billed account without saying so.
     const path = inTemp();
     seed(path);
     const misdirected = {
@@ -315,13 +326,11 @@ describe("the store this platform has", () => {
     };
     process.env["DABBLER_TEST_159_KEY"] = "from-the-environment";
     try {
-      assert.equal(providerSecret(misdirected), "from-the-environment");
-      assert.equal(providerKeyStop("openai", misdirected), null);
+      assert.equal(providerSecret(misdirected), null);
+      assert.match(String(providerKeyStop("openai", misdirected)), /stored for anthropic/);
     } finally {
       delete process.env["DABBLER_TEST_159_KEY"];
     }
-    // And with the variable gone it is a stop again, naming both vendors.
-    assert.match(String(providerKeyStop("openai", misdirected)), /stored for anthropic/);
   });
 
   it("forgets a removed credential rather than leaving it readable", () => {

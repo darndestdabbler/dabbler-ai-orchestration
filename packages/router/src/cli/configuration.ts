@@ -151,9 +151,9 @@ function renderOptions(configuration: Node): string {
               : `the credential '${reference}'${credential["held"] === true ? "" : ", which this machine does not hold"}`
         }`,
       );
-      lines.push(`    - ${text(credential["variable"]) ?? ""} in the environment`);
       lines.push(`    - a stored credential: ${text(credential["choose"]) ?? ""}`);
       lines.push(`      store one first with ${text(credential["store"]) ?? ""}`);
+      lines.push(`    - ${text(credential["variable"]) ?? ""} in the environment, where no credential is named`);
     }
     lines.push("");
   }
@@ -217,15 +217,10 @@ export function renderExplain(configuration: Node): string {
     const provider = text(credential["provider"]) ?? "";
     const reference = text(credential["reference"]);
     const variable = text(credential["variable"]) ?? "";
-    // The environment first, because that is the order, and because an
-    // operator running on variables today must be told nothing changed.
+    // A named credential decides; the variable supplies the key only where
+    // none is named, so `fromEnvironment` is never true beside a reference.
     if (credential["fromEnvironment"] === true) {
-      lines.push(
-        `${provider} key: ${variable} in this environment` +
-          (reference === null
-            ? " (no credential is named, and none is needed)"
-            : ` (it outranks the credential '${reference}', which stays named)`),
-      );
+      lines.push(`${provider} key: ${variable} in this environment (no credential is named)`);
       continue;
     }
     if (reference === null) {

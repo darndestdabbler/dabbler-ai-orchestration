@@ -11653,6 +11653,32 @@
       "what": "step 'malformed-config-mid-drive': its files",
       "reason": "A YAML syntax error in a configuration layer raises YAMLParseError, not ConfigError, so the loader's readYaml must name the file and raise ConfigError for the loop (and withDriver's startup refusal) to catch it",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 191,
+      "dateTime": "2026-09-17T03:54:01.738000-04:00",
+      "task": "Reverse the provider-key precedence and group the key rows. First record the operator's decision reversing session 159's ruling, with its reason: a DABBLER_*_API_KEY set at user scope is a personal, machine-wide default that silently shadows every repository's committed choice of credential and so the billed account -- the shape session 157 retired DABBLER_TRANSPORT for -- and CI is unaffected because a CI machine holds no stored credentials and the variable still supplies the key where nothing is named. Then in packages/router/src/credentials.ts, providerSecret reads the named reference first and the provider's environment variable only where no layer named a credential; providerKeyStop loses the early return that let a set variable excuse a dangling or mismatched reference, so both are stops whether or not the variable is set, while the two checks for a key pasted into a file stay exactly as they are; the dangling reference's refusal no longer says the variable outranks the reference. credentialReferenceFor keeps its two layers. In packages/router/src/projection.ts fromEnvironment becomes true only where the variable is set and no reference is named, and cli/configuration.ts's explain and options wording states the new order (the credential named first, the variable as the floor). cli/auth.ts was read and states no order, so it is left alone. In the extension, solutionTreeModel.ts's credential row hover and description state the new order, and Configuration gains one collapsed API Keys node, present only when the projection carries credentials, holding the unchanged per-provider rows, described as 'N of M available' (available: supplied by the variable or held on this machine) and taking the attention tone when any child carries a stop. The Resolution paragraph of docs/design/credential-store.md is rewritten to the new order. Tests: in packages/router/test/credentials.test.ts the existing old-order tests are changed rather than joined -- a named reference beats a set variable at both layers, the variable supplies the key where nothing is named, and a dangling or mismatched reference is a stop with the variable set; the solutionTreeModel test asserts the API Keys node holds the rows, summarises availability and takes the attention tone from a child's stop. Releasable as a minor, because the precedence change is observable: version.json and the manifests it stamps move to 3.4.0, with a CHANGELOG entry.",
+      "releasable": true
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D280",
+      "ordinal": 280,
+      "sessionNumber": 191,
+      "decidedOn": "2026-09-17",
+      "recordedAt": "2026-09-17T03:54:16.815000-04:00",
+      "decider": "operator",
+      "headline": "Provider keys resolve from the named credential first, the environment variable last",
+      "body": "Resolution of a provider key becomes: the checkout's reference (`dabbler.credentials.<provider>` in `.vscode/settings.json`), then this person's reference (`preferences.json`), then the provider's environment variable as the floor. This reverses session 159's ruling, which put the process environment first \"because that is how CI injects a key\".\n\nWhy. Everywhere else in this framework the checkout outranks the person. A `DABBLER_*_API_KEY` set at user scope is exactly a personal, machine-wide default, and with the environment first it silently shadows every repository's committed choice of credential -- and so which account is billed -- on every repository on the machine. That is the shape session 157 retired `DABBLER_TRANSPORT` for. The CI argument does not survive the new order: a CI machine holds no stored credentials, and where nothing names one the variable still supplies the key.\n\nConsequence. A reference that names a credential this machine does not hold, or one stored for another vendor, is a stop whether or not the variable is set, because falling to the variable would change the billed account without saying so. The two checks for a key pasted into a file are unchanged."
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 191,
+      "dateTime": "2026-09-17T03:56:31.700000-04:00",
+      "what": "step 'router-precedence': its files",
+      "reason": "configuration.test.ts carries a comment stating the old order beside an assertion that still holds; the comment changes with the order",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

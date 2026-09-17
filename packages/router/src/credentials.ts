@@ -533,10 +533,12 @@ export function forgetDecrypted(): void {
 // ---------------------------------------------------------------------------
 // Which key a provider uses, and which layer said so.
 //
-// **One order, stated once: the process environment, then the solution's
-// reference, then this person's default.** The environment is first because
-// that is how CI injects a key, and because the only precedence worth having
-// is one that can be explained in a sentence. Nothing below reads a value
+// **One order, stated once: the solution's reference, then this person's
+// default, then the process environment.** The checkout outranks the person
+// here as everywhere, and a variable set at user scope is a personal default
+// for every repository on the machine, so it is the floor: it supplies the
+// key where nothing is named, which is also how CI, holding no stored
+// credentials, injects one. Nothing below reads a value
 // out of a settings file or a preferences file: both hold a NAME.
 //
 // This module deliberately does not import `config.ts`. It is handed a
@@ -645,15 +647,19 @@ export function looksLikeASecret(value: string): boolean {
  * whether a provider is reachable they are the same fact. What makes the
  * dangling reference different is `providerKeyStop`, which says so in
  * words; a caller that must not proceed silently asks that too.
+ *
+ * **A named credential outranks the environment variable**, which is the
+ * floor where no layer named one. A variable set at user scope is a
+ * personal, machine-wide default, and above a reference it would decide the
+ * billed account for every repository on the machine without saying so.
  */
 export function providerSecret(providerBlock: Record<string, unknown>): string | null {
-  const variable = text(providerBlock["api_key_env"]);
-  if (variable !== "") {
-    const fromEnvironment = process.env[variable];
-    if (fromEnvironment !== undefined && fromEnvironment !== "") return fromEnvironment;
-  }
   const reference = text(providerBlock[CREDENTIAL_REFERENCE_KEY]);
-  if (reference === "") return null;
+  if (reference === "") {
+    const variable = text(providerBlock["api_key_env"]);
+    const fromEnvironment = variable === "" ? "" : (process.env[variable] ?? "");
+    return fromEnvironment === "" ? null : fromEnvironment;
+  }
   // A credential stored for another vendor is not this vendor's key, and
   // using it would send one vendor's secret to another's endpoint. The
   // mismatch is a stop rather than a fall-through; `providerKeyStop` says
@@ -709,18 +715,10 @@ export function providerKeyStop(
       `${provider}=<name>\`, and take the key out of that file.`
     );
   }
-  // **The environment outranks every reference, including a wrong one.**
-  // A machine whose variable is set can run, and a stop here would refuse
-  // it over a setting that is not deciding anything -- which contradicts
-  // the one precedence this framework states. The mismatch is still wrong
-  // and is still refused where it matters: at `configure --credential`,
-  // which will not write it, and here the moment the variable is gone.
+  // A set environment variable excuses neither stop below: the reference
+  // decides, and falling to the variable would change the billed account
+  // without saying so.
   //
-  // The two checks above are deliberately NOT under this. They are not
-  // about which layer supplies a key; they are about a file that CONTAINS
-  // one, and an environment variable does not make a committed secret less
-  // committed.
-  if (variable !== "" && (process.env[variable] ?? "") !== "") return null;
   // Stored, but for someone else. Using it would send one vendor's key to
   // another's endpoint, bill an account nobody chose, and fail as an
   // authentication error three layers from the setting that caused it.
@@ -741,7 +739,7 @@ export function providerKeyStop(
     `machine holds no credential of that name. It was named in ${layer}. ` +
     `Store it with \`dabbler auth set ${provider} --name ${reference}\`, or ` +
     `name a different one; \`dabbler auth list\` says what this machine has. ` +
-    `Setting ${variable || "the provider's environment variable"} also works ` +
-    "and outranks the reference."
+    `${variable || "The provider's environment variable"} is used only where ` +
+    "no credential is named, so setting it does not get past this."
   );
 }

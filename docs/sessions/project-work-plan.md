@@ -228,6 +228,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 188 | One loop terminal, and it goes when the session does | yes | 2026-09-16 |
 | 189 | The suite nobody declared, asked before the push | yes | 2026-09-16 |
 | 190 | The declaration a step writes is the declaration the loop reads | yes | 2026-09-16 |
+| 191 | API Keys, grouped, and the project's choice wins | yes | 2026-09-17 |
+| 192 | Consult with AI | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2613,3 +2615,13 @@ Make the long-lived driver read the repository's configuration when it acts on i
 **Amended after acceptance:**
 
 - 2026-09-16 — step 'malformed-config-mid-drive': its files: A YAML syntax error in a configuration layer raises YAMLParseError, not ConfigError, so the loader's readYaml must name the file and raise ConfigError for the loop (and withDriver's startup refusal) to catch it (claude-code (anthropic, claude-opus-5))
+
+### Session 191 — API Keys, grouped, and the project's choice wins
+
+**Releasable: yes.**
+
+Reverse the provider-key precedence and group the key rows. First record the operator's decision reversing session 159's ruling, with its reason: a DABBLER_*_API_KEY set at user scope is a personal, machine-wide default that silently shadows every repository's committed choice of credential and so the billed account -- the shape session 157 retired DABBLER_TRANSPORT for -- and CI is unaffected because a CI machine holds no stored credentials and the variable still supplies the key where nothing is named. Then in packages/router/src/credentials.ts, providerSecret reads the named reference first and the provider's environment variable only where no layer named a credential; providerKeyStop loses the early return that let a set variable excuse a dangling or mismatched reference, so both are stops whether or not the variable is set, while the two checks for a key pasted into a file stay exactly as they are; the dangling reference's refusal no longer says the variable outranks the reference. credentialReferenceFor keeps its two layers. In packages/router/src/projection.ts fromEnvironment becomes true only where the variable is set and no reference is named, and cli/configuration.ts's explain and options wording states the new order (the credential named first, the variable as the floor). cli/auth.ts was read and states no order, so it is left alone. In the extension, solutionTreeModel.ts's credential row hover and description state the new order, and Configuration gains one collapsed API Keys node, present only when the projection carries credentials, holding the unchanged per-provider rows, described as 'N of M available' (available: supplied by the variable or held on this machine) and taking the attention tone when any child carries a stop. The Resolution paragraph of docs/design/credential-store.md is rewritten to the new order. Tests: in packages/router/test/credentials.test.ts the existing old-order tests are changed rather than joined -- a named reference beats a set variable at both layers, the variable supplies the key where nothing is named, and a dangling or mismatched reference is a stop with the variable set; the solutionTreeModel test asserts the API Keys node holds the rows, summarises availability and takes the attention tone from a child's stop. Releasable as a minor, because the precedence change is observable: version.json and the manifests it stamps move to 3.4.0, with a CHANGELOG entry.
+
+**Amended after acceptance:**
+
+- 2026-09-17 — step 'router-precedence': its files: configuration.test.ts carries a comment stating the old order beside an assertion that still holds; the comment changes with the order (claude-code (anthropic, claude-opus-5))

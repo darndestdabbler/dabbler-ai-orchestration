@@ -271,9 +271,9 @@ export interface ConfigurationRecord {
 export interface ConfigurationCredential {
   provider: string;
   displayLabel?: string;
-  /** The environment variable this provider reads, which outranks everything. */
+  /** The environment variable this provider reads where no credential is named. */
   variable?: string;
-  /** True where that variable is set in the environment this router ran in. */
+  /** True where that variable supplies the key: set, and no credential named. */
   fromEnvironment?: boolean;
   /** The credential's NAME, or null where no layer named one. */
   reference?: string | null;
@@ -346,6 +346,9 @@ export type SolutionNode =
   // Beside the participants rather than under one of them: a credential
   // belongs to a PROVIDER, and whichever participant happens to be on that
   // vendor uses it, so hanging it off a role would draw one fact twice.
+  // Grouped, because keys are set about once per machine and a model is
+  // what Configuration is usually opened to change.
+  | { kind: "configKeys" }
   | { kind: "configCredential"; provider: string };
 
 export interface RowDescriptor {
@@ -689,11 +692,14 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
       if (config.primaryReviewer || config.auxiliaryReviewer) {
         own.push({ kind: "configParticipant", who: "reviewing" });
       }
-      for (const credential of config.credentials ?? []) {
-        own.push({ kind: "configCredential", provider: credential.provider });
-      }
+      if ((config.credentials ?? []).length > 0) own.push({ kind: "configKeys" });
       return own;
     }
+    case "configKeys":
+      return (configuration(p).credentials ?? []).map((credential) => ({
+        kind: "configCredential" as const,
+        provider: credential.provider,
+      }));
     case "configParticipant": {
       const config = configuration(p);
       const own: SolutionNode[] = [];
@@ -1206,14 +1212,29 @@ export function descriptorFor(
         command: ROLE_COMMANDS[node.role],
       };
     }
+    case "configKeys": {
+      const credentials = configuration(p).credentials ?? [];
+      const available = credentials.filter((row) => row.fromEnvironment || row.held).length;
+      // Collapsed, so the row that needs acting on must still be visible
+      // from here.
+      const stopped = credentials.some((row) => row.stop);
+      return {
+        id: "config:keys",
+        label: "API Keys",
+        description: `${available} of ${credentials.length} available`,
+        tooltip:
+          "Which key each provider is reached with. A credential this checkout or you named decides; the provider's environment variable supplies the key only where none is named.",
+        icon: { id: "key", ...(stopped ? { tone: "attention" as const } : {}) },
+        expandable: true,
+      };
+    }
     case "configCredential": {
       const credential = (configuration(p).credentials ?? []).find(
         (row) => row.provider === node.provider,
       );
       const label = `${credential?.displayLabel ?? node.provider} key`;
-      // What is in force, in the order the router resolves it. The
-      // environment first, because that is the order and because an
-      // operator running on variables is being told nothing changed.
+      // What is in force. `fromEnvironment` is only ever true where no
+      // credential is named, because a named one outranks the variable.
       const description = !credential
         ? "not read"
         : credential.fromEnvironment
@@ -1231,7 +1252,7 @@ export function descriptorFor(
           "Which credential this provider is reached with. The value is in this machine's own store; what travels in a setting is the NAME.",
           credential?.stop ??
             (credential?.fromEnvironment
-              ? `${credential.variable} is set in the environment, which outranks any credential named here.`
+              ? `Nothing names a credential, so ${credential.variable}, set in the environment, supplies the key. A credential named here would outrank it.`
               : credential?.reference
                 ? `'${credential.reference}' was named by ${credential.decidedBy ?? "a configured layer"}.`
                 : `Nothing names a credential, so ${credential?.variable ?? "the provider's environment variable"} is what supplies the key.`),

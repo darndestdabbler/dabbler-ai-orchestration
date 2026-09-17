@@ -10,6 +10,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.4.0] — 2026-09-17
+
+**The project's choice of key wins.** A `DABBLER_*_API_KEY` set at user
+scope is a personal, machine-wide default, and it used to outrank every
+credential a repository named -- deciding which account was billed on every
+repository on the machine without saying so.
+
+### Changed
+
+- **A named credential outranks the environment variable.** Resolution is
+  this checkout's reference (`dabbler.credentials.<provider>` in
+  `.vscode/settings.json`), then your own (`preferences.json`), then the
+  provider's environment variable, which supplies the key only where nothing
+  is named. A machine that names no credential, CI included, works exactly
+  as before.
+- **A set variable no longer excuses a wrong reference.** A reference to a
+  credential this machine does not hold, or one stored for another vendor,
+  is a stop whether or not the variable is set.
+- **The key rows sit under one API Keys node** in Configuration, collapsed,
+  described as how many of the providers have a key available, and marked
+  for attention when any of them has a problem.
+
 ## [3.3.7] — 2026-09-16
 
 **The declaration a step writes is the declaration the loop reads.** 3.3.6

@@ -1060,18 +1060,27 @@ suite("solutionTreeModel: which key a provider is reached with", () => {
     };
   }
 
-  test("draws one row per provider, saying what is in force and never a value", () => {
+  test("groups one row per provider under API Keys, saying what is in force and never a value", () => {
     const p = withCredentials();
-    const rows = childrenOf({ kind: "configuration" }, p)
-      .filter((node) => node.kind === "configCredential")
-      .map((node) => descriptorFor(node, p));
+    // One collapsed node beside the participants, so changing a model does
+    // not wade through keys.
+    const configurationChildren = childrenOf({ kind: "configuration" }, p);
+    assert.ok(!configurationChildren.some((node) => node.kind === "configCredential"));
+    const keysNode = configurationChildren.find((node) => node.kind === "configKeys");
+    assert.ok(keysNode);
+    const keys = descriptorFor(keysNode, p);
+    assert.strictEqual(keys.label, "API Keys");
+    // Available is supplied by the variable or held on this machine.
+    assert.strictEqual(keys.description, "1 of 3 available");
+    // A child's stop shows on the collapsed group.
+    assert.strictEqual(keys.icon?.tone, "attention");
+    const rows = childrenOf(keysNode, p).map((node) => descriptorFor(node, p));
     assert.deepStrictEqual(
       rows.map((row) => row.label),
       ["Anthropic key", "Google key", "OpenAI key"],
     );
-    // The environment is the layer above both references, so a provider
-    // whose variable is set says so and carries no attention tone: nobody
-    // running on environment variables is being told to change anything.
+    // Where nothing names a credential the variable supplies the key, and
+    // the row says so with no attention tone.
     assert.ok(rows[0]?.description?.includes("DABBLER_ANTHROPIC_API_KEY"));
     assert.strictEqual(rows[0]?.icon?.tone, undefined);
     assert.strictEqual(rows[1]?.description, "nothing resolves");

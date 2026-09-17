@@ -1,0 +1,34 @@
+src/**
+test/**
+test-fixtures/**
+scripts/**
+test-results/**
+playwright-report/**
+out/**
+.vscode/**
+.github/**
+node_modules/**
+esbuild.js
+tsconfig.json
+.eslintrc.json
+playwright.config.ts
+*.map
+*.bak
+**/*.ts
+!dist/**
+media/screenshot-mockup.html
+media/marketplace-work-explorer-mock.html
+media/render-mockup.mjs
+
+# Everything above this extension, which is the repository root.
+#
+# This is a workspace member, so the root `node_modules` holds a symlink
+# back to this folder under this package's own name. vsce resolves that
+# link while walking dependencies and takes the repository itself for a
+# dependency directory: without this line a plain `vsce package` lists
+# 10,158 files -- `.git` whole, `.venv` whole, and every run record under
+# `.dabbler/`, one of which carries a provider token that vsce's own
+# secret scan is the only thing that refuses. `node_modules/**` above does
+# not reach it: that filters this folder's walk, and dependency inclusion
+# is a separate path that adds paths by name.
+../../**

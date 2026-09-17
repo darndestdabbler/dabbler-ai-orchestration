@@ -366,6 +366,7 @@
         null,
         "no-verdict",
         "provider-unreachable",
+        "reviewer-unreachable",
         "dispute-refused",
         "cap-unresolved",
         "cap-disputed",

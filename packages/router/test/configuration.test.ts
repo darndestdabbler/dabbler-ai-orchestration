@@ -16,18 +16,24 @@ import { configure } from "../src/cli/configure.ts";
 import { currentCredentialsPath, setCredentialsPath } from "../src/credentials.ts";
 import { configurationNode } from "../src/projection.ts";
 import { explainAuthoringModel, loadConfig, resetProjectRootCache } from "../src/config.ts";
-import { configuredCredentialRefusal } from "../src/discovery.ts";
 import { readPreferences, writePreferences } from "../src/preferences.ts";
 import {
   SETTING_AUTHORING_MODEL,
+  SETTING_CREDENTIAL_ANTHROPIC,
   SETTING_CREDENTIAL_OPENAI,
   SETTING_RELEASE,
   SETTING_TRANSPORT,
   settingValue,
   writeSettings,
 } from "../src/settings.ts";
-import { configuredModelRefusal, start } from "../src/session.ts";
-import { gitAnswers, seed, tempDir } from "./support/answers.ts";
+import {
+  configuredModelRefusal,
+  reviewingVehicleRefusal,
+  setSessionUseReading,
+  start,
+} from "../src/session.ts";
+import { cleanRepoAnswers, gitAnswers, seed, tempDir } from "./support/answers.ts";
+import { SESSION_USE_STAND_IN } from "./support/repo.ts";
 import { capture } from "../src/output.ts";
 
 // Back to the path the suite armed at load, never to null: the arming is
@@ -672,24 +678,110 @@ describe("which credential a solution uses", () => {
     }
   });
 
-  it("stops `session start` on a reference this machine cannot answer", () => {
-    // The environment is above the reference, so the stop only appears once
-    // the variable is gone -- which is the whole point of the order: nobody
-    // running on environment variables today is affected by any of this.
-    const { root, restore } = machine();
-    const held = process.env["DABBLER_OPENAI_API_KEY"];
+  /** A `session start` in `root`, read through `reading` rather than the suite's stand-in. */
+  async function startWith(
+    root: string,
+    reading: Parameters<typeof setSessionUseReading>[0],
+  ): Promise<{ code: number; out: string; err: string }> {
+    seed(root, {
+      "docs/sessions/session-plan.md": "### Session 1 of 1: First things\n1. Register.\n2. Build it.\n",
+    });
+    resetProjectRootCache();
+    setSessionUseReading(reading);
+    const unanswer = cleanRepoAnswers(root);
     try {
-      writeSettings(root, { [SETTING_CREDENTIAL_OPENAI]: "client-a" });
-      delete process.env["DABBLER_OPENAI_API_KEY"];
-      resetProjectRootCache();
-      const stop = configuredCredentialRefusal(loadConfig(undefined, root));
-      assert.match(String(stop), /'client-a'/);
-      assert.match(String(stop), /dabbler auth set openai/);
-      assert.match(String(stop), /nothing was billed/);
+      const started = await capture(() =>
+        Promise.resolve(
+          start(join(root, "docs", "sessions"), {
+            engine: "claude-code",
+            provider: "anthropic",
+            refresh: async () => [],
+          }),
+        ),
+      );
+      return { code: started.value, out: started.stdout, err: started.stderr };
     } finally {
-      if (held === undefined) delete process.env["DABBLER_OPENAI_API_KEY"];
-      else process.env["DABBLER_OPENAI_API_KEY"] = held;
-      writeSettings(root, { [SETTING_CREDENTIAL_OPENAI]: "" });
+      unanswer();
+      setSessionUseReading(SESSION_USE_STAND_IN);
+    }
+  }
+
+  const reviewingOnly: Parameters<typeof setSessionUseReading>[0] = (config, checkout, _engine, provider) =>
+    reviewingVehicleRefusal(config, checkout, provider);
+
+  /** The `api` block the start's own refresh records for the keys a test left. */
+  function keyedFor(providers: string[], models: CatalogModel[]): void {
+    writeBlock(TRANSPORT_API, {
+      refreshed_at: "2026-09-11T00:00:00Z",
+      source: SOURCE_API,
+      scope: { providers },
+      models,
+      retired: [],
+    });
+  }
+
+  it("starts, saying nothing, over a reference that names nothing on a provider no role calls", async () => {
+    // Claude Code authors through its own CLI and the reviewer is excluded
+    // from the author's provider, so nothing in this session calls anthropic
+    // on a key: its dangling reference is not this session's concern.
+    const { root, restore } = machine();
+    try {
+      writeSettings(root, { [SETTING_CREDENTIAL_ANTHROPIC]: "client-a" });
+      keyedFor(["google", "openai"], [catalogRow("gpt-5.6-terra", "openai")]);
+      const started = await startWith(root, reviewingOnly);
+      assert.equal(started.code, 0, started.err);
+      assert.ok(!`${started.out}${started.err}`.includes("client-a"), started.err);
+    } finally {
+      writeSettings(root, { [SETTING_CREDENTIAL_ANTHROPIC]: "" });
+      restore();
+    }
+  });
+
+  it("refuses a start on the `api` reviewer with no key, naming both ways forward", async () => {
+    // Found at the round it cost a session's authoring work; found here it
+    // costs nothing.
+    const { root, restore } = machine();
+    try {
+      for (const name of KEYS) delete process.env[name];
+      keyedFor([], []);
+      const refused = await startWith(root, reviewingOnly);
+      assert.notEqual(refused.code, 0);
+      assert.match(refused.err, /Primary Reviewer cannot be reached/);
+      assert.match(refused.err, /dabbler auth set openai/);
+      assert.match(refused.err, /dabbler configure --reviewer-transport/);
+      assert.equal(existsSync(join(root, "docs", "sessions", "sessions.json")), false);
+    } finally {
+      restore();
+    }
+  });
+
+  it("refuses a start whose only keyed provider is the author's own", async () => {
+    const { root, restore } = machine();
+    try {
+      delete process.env["DABBLER_OPENAI_API_KEY"];
+      delete process.env["DABBLER_GEMINI_API_KEY"];
+      keyedFor(["anthropic"], [catalogRow("claude-opus-5", "anthropic")]);
+      const refused = await startWith(root, reviewingOnly);
+      assert.notEqual(refused.code, 0);
+      assert.match(refused.err, /outside the author's provider \(anthropic\)/);
+      assert.equal(existsSync(join(root, "docs", "sessions", "sessions.json")), false);
+    } finally {
+      restore();
+    }
+  });
+
+  it("refuses a start over a key pasted into a setting for a provider no role calls", async () => {
+    // The session would run; the key would be shared with everyone who clones.
+    const { root, restore } = machine();
+    const key = `sk-ant-${"x".repeat(40)}`;
+    try {
+      writeSettings(root, { [SETTING_CREDENTIAL_ANTHROPIC]: key });
+      const refused = await startWith(root, null);
+      assert.notEqual(refused.code, 0);
+      assert.match(refused.err, /looks like a KEY/);
+      assert.ok(!`${refused.out}${refused.err}`.includes(key), refused.err);
+    } finally {
+      writeSettings(root, { [SETTING_CREDENTIAL_ANTHROPIC]: "" });
       restore();
     }
   });

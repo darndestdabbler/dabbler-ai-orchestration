@@ -1530,6 +1530,38 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
       cancelChoice(),
     ],
   },
+  "reviewer-unreachable": {
+    what:
+      "The Primary Reviewer cannot be reached on the reviewing vehicle, so no " +
+      "round was asked for and none was written.",
+    actor: "operator",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        "Make the reviewer reachable, as the reason names, then ask for the round again",
+        "One verification round once a reviewer is reachable. The tree is not " +
+          "the problem and nothing about it needs changing first.",
+      ),
+      {
+        label: "Read the seat's model list",
+        cost: "Nothing: a seat states its models without a prompt, and no token is billed.",
+        command: "dabbler discovery refresh",
+      },
+      {
+        label: "Give a provider other than the author's a key",
+        cost:
+          "The next round is charged to that provider. The key is kept in this " +
+          "machine's store or its variable, never in a file.",
+        command: "dabbler auth set <provider>",
+      },
+      {
+        label: "Review on a vehicle this machine has",
+        cost: "Verification stays cross-provider on every vehicle; what changes is how the round is reached.",
+        command: "dabbler configure --reviewer-transport <vehicle>",
+      },
+      cancelChoice(),
+    ],
+  },
   "dispute-refused": {
     what: "The framework refused to write a dispute of the round's finding.",
     actor: "engine",

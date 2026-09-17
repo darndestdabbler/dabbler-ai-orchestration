@@ -12,7 +12,7 @@ export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engi
 /**
  * Which refusal this was, where the kind is too coarse to act on. A kind says which bound the loop met; four unlike things meet the `verification` bound, with four actors and four next moves, and a surface keyed on the kind alone renders one sentence for all of them. Optional and closed: a stop with no code is its kind, which is what every run written before this member is, and a new refusal is named here before it can be recorded.
  */
-export type DriverRunStopCode = null | "no-verdict" | "provider-unreachable" | "dispute-refused" | "cap-unresolved" | "cap-disputed" | "cap-terminal-tree-moved";
+export type DriverRunStopCode = null | "no-verdict" | "provider-unreachable" | "reviewer-unreachable" | "dispute-refused" | "cap-unresolved" | "cap-disputed" | "cap-terminal-tree-moved";
 
 /**
  * The work-plan step the loop was on when it halted, or null when it was not on one -- a verification round, the suite, the close. Two stops on different steps are not the same stop however alike their reasons read.

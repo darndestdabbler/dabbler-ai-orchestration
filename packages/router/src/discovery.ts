@@ -68,7 +68,7 @@ import {
   HttpTimeoutError,
   httpGetJson,
 } from "./transports/api.ts";
-import { providerKeyStop, providerSecret } from "./credentials.ts";
+import { pastedKeyStop, providerKeyStop, providerSecret } from "./credentials.ts";
 import { resolveResponsesDir } from "./transports/offline.ts";
 import { providerReachable } from "./selection.ts";
 import {
@@ -1068,43 +1068,31 @@ export function vehicleRefusal(
 }
 
 /**
- * The same refusal, but only for a vehicle a PERSON put in force.
+ * A key pasted into a setting where a NAME belongs, on any enabled provider.
  *
- * A machine that simply has no seat and no keys yet is a first-run machine,
- * and refusing to start a session on it would be refusing the setup that
- * fixes it. What must not pass is a vehicle somebody CHOSE -- typed at this
- * call, committed in this checkout, or set as their own default -- that
- * cannot be reached: there the operator has an expectation, and a session
- * that quietly ran on something else would make every later account of what
- * ran untrue.
+ * The one credential refusal that does not ask whether anything calls the
+ * provider: the session would run, but the file is committed and the key is
+ * shared with everyone who clones.
  */
-export function configuredVehicleRefusal(
-  config: RouterConfig,
-  reading: TransportReading,
-  chosenLayers: readonly string[],
-): string | null {
-  if (reading.decidedBy === null || !chosenLayers.includes(reading.decidedBy)) return null;
-  return vehicleRefusal(config, reading);
+export function pastedKeyRefusal(config: RouterConfig): string | null {
+  for (const [name, cfg] of Object.entries(record(config["providers"]))) {
+    if (!isRecord(cfg) || !enabledFlag(cfg)) continue;
+    const stop = pastedKeyStop(name, cfg);
+    if (stop !== null) return stop;
+  }
+  return null;
 }
 
 /**
- * A credential reference somebody configured that names nothing here.
- *
- * Only a REFERENCE is held to this. A provider with no key at all is a
- * machine that is not set up yet, and refusing to start a session on it
- * would refuse the setup that fixes it -- exactly as for a vehicle. A
- * reference is different: it is an explicit act, and the layer that carries
- * it can be named. A session that silently ran on another provider's key
- * would change which account is billed and leave every later account of
- * what ran untrue.
+ * Why each enabled provider outside `exclude` cannot use the credential
+ * named for it. Such a provider is simply not a candidate; whether that is
+ * worth a word depends on whether anything else is.
  */
-export function configuredCredentialRefusal(config: RouterConfig): string | null {
-  for (const [name, cfg] of Object.entries(record(config["providers"]))) {
-    if (!isRecord(cfg) || !enabledFlag(cfg)) continue;
-    const stop = providerKeyStop(name, cfg);
-    if (stop !== null) return `${stop} Nothing was started and nothing was billed.`;
-  }
-  return null;
+export function credentialStops(config: RouterConfig, exclude: readonly string[]): string[] {
+  return Object.entries(record(config["providers"]))
+    .filter(([name, cfg]) => isRecord(cfg) && enabledFlag(cfg) && !exclude.includes(name))
+    .map(([name, cfg]) => providerKeyStop(name, cfg as Record<string, unknown>))
+    .filter((stop): stop is string => stop !== null);
 }
 
 export function currentApiScope(config: RouterConfig): CatalogScope {

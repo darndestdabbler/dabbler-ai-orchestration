@@ -685,6 +685,51 @@ export function providerKeyStop(
   provider: string,
   providerBlock: Record<string, unknown>,
 ): string | null {
+  const pasted = pastedKeyStop(provider, providerBlock);
+  if (pasted !== null) return pasted;
+  const variable = text(providerBlock["api_key_env"]);
+  const reference = text(providerBlock[CREDENTIAL_REFERENCE_KEY]);
+  if (reference === "") return null;
+  // A set environment variable excuses neither stop below: the reference
+  // decides, and falling to the variable would change the billed account
+  // without saying so.
+  //
+  // Stored, but for someone else. Using it would send one vendor's key to
+  // another's endpoint, bill an account nobody chose, and fail as an
+  // authentication error three layers from the setting that caused it.
+  const storedFor = credentialProvider(reference);
+  if (storedFor !== null && storedFor !== provider) {
+    return (
+      `the credential '${reference}' was stored for ${storedFor}, and ${provider} ` +
+      "is configured to use it. A credential belongs to the vendor that " +
+      "issued it: using it here would send one vendor's key to another's " +
+      `endpoint. Store ${provider}'s own with \`dabbler auth set ${provider} ` +
+      `--name <name>\`, or point ${provider} at a credential stored for it.`
+    );
+  }
+  if (credentialValue(reference) !== null) return null;
+  const layer = text(providerBlock[CREDENTIAL_LAYER_KEY]) || "a configured layer";
+  return (
+    `${provider} is configured to use the credential '${reference}', and this ` +
+    `machine holds no credential of that name. It was named in ${layer}. ` +
+    `Store it with \`dabbler auth set ${provider} --name ${reference}\`, or ` +
+    `name a different one; \`dabbler auth list\` says what this machine has. ` +
+    `${variable || "The provider's environment variable"} is used only where ` +
+    "no credential is named, so setting it does not get past this."
+  );
+}
+
+/**
+ * A key pasted into a setting where a NAME belongs, or null.
+ *
+ * Refused whether or not anything calls the provider: the session would
+ * run, but the file is committed and the key is shared with everyone who
+ * clones. The value is never printed.
+ */
+export function pastedKeyStop(
+  provider: string,
+  providerBlock: Record<string, unknown>,
+): string | null {
   const variable = text(providerBlock["api_key_env"]);
   // **A key typed where the NAME of a variable belongs.** It resolves to
   // nothing -- `process.env["sk-ant-..."]` is undefined -- so without this
@@ -715,31 +760,5 @@ export function providerKeyStop(
       `${provider}=<name>\`, and take the key out of that file.`
     );
   }
-  // A set environment variable excuses neither stop below: the reference
-  // decides, and falling to the variable would change the billed account
-  // without saying so.
-  //
-  // Stored, but for someone else. Using it would send one vendor's key to
-  // another's endpoint, bill an account nobody chose, and fail as an
-  // authentication error three layers from the setting that caused it.
-  const storedFor = credentialProvider(reference);
-  if (storedFor !== null && storedFor !== provider) {
-    return (
-      `the credential '${reference}' was stored for ${storedFor}, and ${provider} ` +
-      "is configured to use it. A credential belongs to the vendor that " +
-      "issued it: using it here would send one vendor's key to another's " +
-      `endpoint. Store ${provider}'s own with \`dabbler auth set ${provider} ` +
-      `--name <name>\`, or point ${provider} at a credential stored for it.`
-    );
-  }
-  if (credentialValue(reference) !== null) return null;
-  const layer = text(providerBlock[CREDENTIAL_LAYER_KEY]) || "a configured layer";
-  return (
-    `${provider} is configured to use the credential '${reference}', and this ` +
-    `machine holds no credential of that name. It was named in ${layer}. ` +
-    `Store it with \`dabbler auth set ${provider} --name ${reference}\`, or ` +
-    `name a different one; \`dabbler auth list\` says what this machine has. ` +
-    `${variable || "The provider's environment variable"} is used only where ` +
-    "no credential is named, so setting it does not get past this."
-  );
+  return null;
 }

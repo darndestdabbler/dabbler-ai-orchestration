@@ -10,6 +10,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.5.0] — 2026-09-17
+
+**A start refuses only what would stop the session.** `session start` now
+asks one question of what this session uses, and says nothing about what it
+does not.
+
+### Changed
+
+- **No longer refused:** a machine vehicle this machine cannot reach, when
+  the reviewing vehicle is not that one; and a credential reference that
+  names nothing, on a provider this session does not call. Where the
+  reviewing vehicle would call that provider and another is still reachable,
+  it is printed as a warning.
+- **Now refused, before the session exists:** an authoring engine whose CLI
+  is not on this machine, and a reviewing vehicle -- chosen or the built-in
+  default -- with no Primary Reviewer candidate outside the author's
+  provider: no key anywhere, only the author's provider keyed, or a seat with
+  no model list. The refusal names the vehicle, what set it, and each way
+  forward: `dabbler auth set <provider>` or its variable, `dabbler discovery
+  refresh` for a seat, and `dabbler configure --reviewer-transport
+  <vehicle>`.
+- **Still refused, on any provider:** a key pasted into a setting where a
+  name belongs.
+- **The round says the same thing.** Where the reviewer stops being reachable
+  after the start, the verification stop is `reviewer-unreachable`, in the
+  start's own words and with the same repairs -- never `--reviewer-model`
+  for a seat whose model list was never read.
+
 ## [3.4.0] — 2026-09-17
 
 **The project's choice of key wins.** A `DABBLER_*_API_KEY` set at user

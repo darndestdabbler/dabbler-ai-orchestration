@@ -37,17 +37,20 @@ import {
   IdentityResolutionError,
   resolveOrchestratorIdentity,
 } from "./identity.ts";
-import { GEMINI_RETIRED, engineAliases } from "./engines.ts";
+import { GEMINI_RETIRED, engineAliases, installedEngines } from "./engines.ts";
 import {
-  CHOSEN_VEHICLE_LAYERS,
+  TRANSPORT_API,
+  TRANSPORT_COPILOT_CLI,
   explainAuthoringModel,
   explainReviewingTransport,
-  explainTransport,
   loadConfig,
+  type RouterConfig,
 } from "./config.ts";
 import {
-  configuredCredentialRefusal,
-  configuredVehicleRefusal,
+  CATALOG_REFRESH_COMMAND,
+  credentialStops,
+  pastedKeyRefusal,
+  transportPresence,
   freshnessWarnings,
   refreshStaleRecords,
 } from "./discovery.ts";
@@ -85,6 +88,9 @@ import {
   releaseOfPlan,
 } from "./driver.ts";
 import { releaseMode } from "./settings.ts";
+import { NoCandidateError, apiLadder, seatLadder } from "./route.ts";
+import { ROLE_PRIMARY_REVIEWER } from "./selection.ts";
+import { seatModels } from "./transports/copilot.ts";
 import {
   ENUMERATION_CLI_ALIASES,
   configurationNode,
@@ -972,6 +978,111 @@ export function configuredModelRefusal(
   return null;
 }
 
+/** What a session start found about the vehicles this session uses. */
+export interface SessionUse {
+  readonly refusal: string | null;
+  readonly warnings: readonly string[];
+}
+
+/**
+ * Whether the Primary Reviewer has a candidate outside the author's provider
+ * on the reviewing vehicle as resolved, asked through the round's own ladder.
+ *
+ * Chosen or built-in default alike: an unreachable reviewer found at the
+ * round leaves a person mid-session looking for an alternative. A credential
+ * reference that names nothing, on a provider the vehicle would call, is
+ * named in the refusal where it leaves no candidate and returned as a
+ * warning where it does not.
+ */
+export function reviewingVehicleRefusal(
+  config: RouterConfig,
+  checkout: string,
+  authorProvider: string,
+): SessionUse {
+  const reading = explainReviewingTransport(config, null, checkout);
+  const exclude = [authorProvider];
+  const credentials = reading.transport === TRANSPORT_API ? credentialStops(config, exclude) : [];
+  try {
+    if (reading.transport === TRANSPORT_API) {
+      apiLadder(config, ROLE_PRIMARY_REVIEWER, "session-verification", exclude);
+    } else if (reading.transport === TRANSPORT_COPILOT_CLI) {
+      seatLadder(config, seatModels() ?? [], ROLE_PRIMARY_REVIEWER, exclude);
+    }
+  } catch (error) {
+    if (!(error instanceof NoCandidateError)) throw error;
+    const chose =
+      reading.decidedBy === null ? "is the built-in default" : `was set by ${reading.decidedBy}`;
+    const others = transportPresence(config)
+      .filter((entry) => entry.present && entry.transport !== reading.transport)
+      .map((entry) => `'${entry.transport}'`);
+    const elsewhere =
+      "`dabbler configure --reviewer-transport <vehicle>` for a vehicle this machine has" +
+      (others.length > 0 ? ` (${others.join(", ")})` : "");
+    const forward =
+      reading.transport === TRANSPORT_COPILOT_CLI
+        ? [
+            `\`${CATALOG_REFRESH_COMMAND}\` to read the seat's model list, free`,
+            "`copilot login` where the seat is not signed in",
+            elsewhere,
+          ]
+        : [
+            ...Object.entries(config["providers"] ?? {})
+              .filter(([name]) => name !== authorProvider)
+              .map(([name, cfg]) => {
+                const variable = (cfg as Record<string, unknown> | null)?.["api_key_env"];
+                return (
+                  `\`dabbler auth set ${name}\`` +
+                  (typeof variable === "string" && variable !== "" ? ` or ${variable}` : "")
+                );
+              }),
+            elsewhere,
+          ];
+    return {
+      refusal:
+        `the Primary Reviewer cannot be reached on the reviewing vehicle ` +
+        `'${reading.transport}', which ${chose}, outside the author's provider ` +
+        `(${authorProvider}): ${error.message}` +
+        (credentials.length > 0 ? ` ${credentials.join(" ")}` : "") +
+        ` Ways forward: ${forward.join("; ")}.`,
+      warnings: [],
+    };
+  }
+  return { refusal: null, warnings: credentials };
+}
+
+/**
+ * What `session start` holds a session to: a key pasted into a setting on
+ * any provider, the authoring engine's CLI, and the reviewing vehicle.
+ */
+export function assessSessionUse(
+  config: RouterConfig,
+  checkout: string,
+  engine: string,
+  authorProvider: string,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): SessionUse {
+  const pasted = pastedKeyRefusal(config);
+  if (pasted !== null) return { refusal: pasted, warnings: [] };
+  const installation = installedEngines(env).engines.find((entry) => entry.engine === engine);
+  if (installation !== undefined && installation.path === null) {
+    return {
+      refusal:
+        `the engine '${engine}' runs through \`${installation.program}\`, which is ` +
+        "not on this machine's PATH, so nothing could author this session. " +
+        "Install it, or start the session with an engine this machine has.",
+      warnings: [],
+    };
+  }
+  return reviewingVehicleRefusal(config, checkout, authorProvider);
+}
+
+let sessionUseReading: typeof assessSessionUse = assessSessionUse;
+
+/** Where a suite stands in for this machine's engines, keys and seat; null restores it. */
+export function setSessionUseReading(reading: typeof assessSessionUse | null): void {
+  sessionUseReading = reading ?? assessSessionUse;
+}
+
 export async function start(sessionsDir: string, options: StartOptions): Promise<number> {
   // Named at the flag or left in a machine's preferences from before, a
   // retired engine is refused before anything is read or written.
@@ -1046,39 +1157,9 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     // never read it would otherwise refuse a seat's model the refresh is about
     // to record, and tell the operator to run the refresh by hand.
     for (const line of await (options.refresh ?? refreshDiscovery)()) writeOut(`${line}\n`);
-    // **A vehicle a PERSON put in force and this machine cannot reach is a
-    // stop, here, before the session exists and before anything is billed.**
-    //
-    // Only one somebody chose -- typed, committed in this checkout, or set
-    // as their own default. A first-run machine with no seat and no keys is
-    // not refused: refusing it would refuse the setup that fixes it. The
-    // refusal names the LAYER, because a committed setting and a personal
-    // default are fixed in different files by different people.
-    const chosenLayers = CHOSEN_VEHICLE_LAYERS;
     try {
-      const config = loadConfig(undefined, checkout);
-      const unreachable =
-        configuredVehicleRefusal(config, explainTransport(config, null, checkout), chosenLayers) ??
-        configuredVehicleRefusal(
-          config,
-          explainReviewingTransport(config, null, checkout),
-          chosenLayers,
-        );
-      if (unreachable !== null) {
-        writeErr(`start: refused -- ${unreachable}\n`);
-        return EXIT_USAGE;
-      }
-      // **And a CREDENTIAL somebody named that this machine does not hold.**
-      //
-      // A reference is an explicit act with a layer behind it, so a dangling
-      // one is a stop rather than a quiet fall back to the environment:
-      // which key answers decides which account is billed.
-      const danglingKey = configuredCredentialRefusal(config);
-      if (danglingKey !== null) {
-        writeErr(`start: refused -- ${danglingKey}\n`);
-        return EXIT_USAGE;
-      }
-      // **And a MODEL somebody chose that its role cannot actually be.**
+      loadConfig(undefined, checkout);
+      // **A MODEL somebody chose that its role cannot actually be.**
       //
       // `dabbler configuration options` filters a list; it enforces nothing,
       // and both files a choice lives in can be typed into. So the choices
@@ -1124,18 +1205,38 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     }
     // Resolved on the identity that will actually be written, which is the
     // point of doing it here rather than on the way in.
+    let authorProvider: string;
     try {
-      resolveOrchestratorIdentity(
+      authorProvider = resolveOrchestratorIdentity(
         buildOrchestratorBlock(
           identity.engine,
           identity.provider,
           identity.model,
           identity.effort,
         ),
-      );
+      ).effectiveProvider;
     } catch (error) {
       if (!(error instanceof IdentityResolutionError)) throw error;
       writeErr(`start: refused -- ${error.message}\n`);
+      return EXIT_USAGE;
+    }
+    // **What this session uses, and nothing else, before it exists.** A
+    // vehicle that cannot author or review it is found here rather than
+    // mid-session; anything the session does not call says nothing.
+    try {
+      const use = sessionUseReading(
+        loadConfig(undefined, checkout),
+        checkout,
+        identity.engine,
+        authorProvider,
+      );
+      if (use.refusal !== null) {
+        writeErr(`start: refused -- ${use.refusal} Nothing was started and nothing was billed.\n`);
+        return EXIT_USAGE;
+      }
+      for (const warning of use.warnings) writeErr(`start: warning -- ${warning}\n`);
+    } catch (error) {
+      writeErr(`start: refused -- ${error instanceof Error ? error.message : String(error)}\n`);
       return EXIT_USAGE;
     }
     // A fresh registration only: re-registering the session in flight is a

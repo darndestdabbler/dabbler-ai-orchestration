@@ -11679,6 +11679,29 @@
       "what": "step 'router-precedence': its files",
       "reason": "configuration.test.ts carries a comment stating the old order beside an assertion that still holds; the comment changes with the order",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 192,
+      "dateTime": "2026-09-17T05:03:08.316000-04:00",
+      "task": "Make `session start` refuse only what would stop this session, and make the round say the same thing where it is stopped later. `session start`, after the daily refresh and before anything is written, assesses what this session uses: the authoring engine's CLI is installed (`installedEngines`) and a chosen authoring model is accepted (`configuredModelRefusal`, unchanged); and the reviewing vehicle as resolved by `explainReviewingTransport` -- chosen or built-in default alike -- yields at least one Primary Reviewer candidate outside the author's provider, asked through the round's own selection (`apiLadder`, or `seatLadder` over the seat catalog, with the author's provider excluded) and never a second copy of it. That assessment is one exported function in session.ts whose refusal names what cannot be reached, the layer that chose it or that it is the built-in default, and each way forward as a command (`dabbler auth set <provider>` or the provider's variable and `dabbler configure --reviewer-transport <vehicle>` for `api`; the free catalog refresh or a login for a seat); a dangling credential reference on a provider the reviewing vehicle would call is named in that refusal where it leaves no candidate and printed as a warning where it does not. Removed from start: the machine-vehicle refusal (`configuredVehicleRefusal`) and the refusal over credential references (`configuredCredentialRefusal`), except that a key pasted where a variable's name or a credential's name belongs still refuses the start on any provider, naming the file and never the value -- `providerKeyStop`'s two pasted-key branches are extracted as `pastedKeyStop` in credentials.ts and reused, and session 191's order stands. In the round, where verification fails the driver asks the same assessment and, where it refuses, stops with its sentence under a stop whose moves name the refresh, the key and the reviewing vehicle rather than `--reviewer-model` or a log tail. Releasable as a minor, because which starts are refused changes: version.json and the manifests it stamps move to 3.5.0, with a CHANGELOG entry.",
+      "releasable": true
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 192,
+      "dateTime": "2026-09-17T05:06:49.931000-04:00",
+      "what": "step 'start-assessment': its files",
+      "reason": "The typecheck covers the tests and the suite named after session.ts runs after the check, so the removed refusal's test import, the start test asserting the removed vehicle refusal, and the suite's stand-in for the new start reading must change with the source in this step",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 192,
+      "dateTime": "2026-09-17T05:15:21.399000-04:00",
+      "what": "step 'round-words': its files",
+      "reason": "A stop code is a closed vocabulary held by the run schema and the type generated from it, so the new reviewer-unreachable code is named there before it can be recorded",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

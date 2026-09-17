@@ -14,9 +14,10 @@ import { describe, it } from "node:test";
 import { capture } from "../src/output.ts";
 import { platformNewlines } from "../src/journal.ts";
 import { checkPublishedWhenReleasable } from "../src/gates.ts";
-import { TRANSPORT_COPILOT_CLI, resetProjectRootCache } from "../src/config.ts";
+import { TRANSPORT_COPILOT_CLI, TRANSPORT_OFFLINE, resetProjectRootCache } from "../src/config.ts";
 import {
   SETTING_AUTHORING_MODEL,
+  SETTING_REVIEWER_TRANSPORT,
   SETTING_TRANSPORT,
   writeSettings,
 } from "../src/settings.ts";
@@ -38,6 +39,8 @@ import {
   plan,
   repairedPaths,
   restore,
+  reviewingVehicleRefusal,
+  setSessionUseReading,
   start,
   steppedOverLines,
   type SequenceFacts,
@@ -53,6 +56,7 @@ import {
   workBegunRefusal,
 } from "../src/writers.ts";
 import { cleanRepoAnswers, gitAnswers, seed, tempDir } from "./support/answers.ts";
+import { SESSION_USE_STAND_IN } from "./support/repo.ts";
 
 /** One verb's exit code and everything it wrote, so a refusal can be read. */
 async function run(
@@ -314,32 +318,27 @@ describe("what a start refuses before a session exists", () => {
     }
   });
 
-  it("stops on a vehicle THIS CHECKOUT chose and cannot reach, naming the layer", async () => {
-    // Before anything is billed and before the session is on the record.
-    // Only a vehicle somebody CHOSE: a first-run machine with no seat and no
-    // keys is not refused, because refusing it would refuse the setup that
-    // fixes it -- see the same test's second half.
+  it("starts on a machine vehicle it cannot reach when the reviewing vehicle does not use it", async () => {
+    // Authoring runs through the engine's own CLI and the reviewers resolve
+    // their own vehicle, so the machine value decides nothing for this
+    // session unless it is also the reviewing one.
     const state = stateDir();
+    setSessionUseReading((config, checkout, _engine, provider) =>
+      reviewingVehicleRefusal(config, checkout, provider),
+    );
     try {
-      writeSettings(state.repo, { [SETTING_TRANSPORT]: TRANSPORT_COPILOT_CLI });
-      resetProjectRootCache();
-      const refused = await run(() =>
-        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
-      );
-      assert.notEqual(refused.code, EXIT_OK);
-      assert.match(refused.err, /copilot-cli/);
-      assert.match(refused.err, /settings\.json/);
-      assert.equal(readRawSessionState(state.sessionsDir), null);
-
-      // And with nothing chosen, the same machine starts: the shipped
-      // default is not somebody's expectation to be held to.
-      writeSettings(state.repo, { [SETTING_TRANSPORT]: "" });
+      writeSettings(state.repo, {
+        [SETTING_TRANSPORT]: TRANSPORT_COPILOT_CLI,
+        [SETTING_REVIEWER_TRANSPORT]: TRANSPORT_OFFLINE,
+      });
       resetProjectRootCache();
       const started = await run(() =>
         start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
       );
       assert.equal(started.code, EXIT_OK, started.err);
+      assert.ok(!started.err.includes("copilot-cli"), started.err);
     } finally {
+      setSessionUseReading(SESSION_USE_STAND_IN);
       resetProjectRootCache();
       state.restore();
     }
@@ -349,8 +348,11 @@ describe("what a start refuses before a session exists", () => {
     // A machine that had never read its catalog refused a seat's model the
     // refresh would have recorded, and told the operator to run it by hand.
     const state = stateDir();
+    setSessionUseReading((config, checkout, _engine, provider) =>
+      reviewingVehicleRefusal(config, checkout, provider),
+    );
     try {
-      writeSettings(state.repo, { [SETTING_TRANSPORT]: TRANSPORT_COPILOT_CLI });
+      writeSettings(state.repo, { [SETTING_REVIEWER_TRANSPORT]: TRANSPORT_COPILOT_CLI });
       resetProjectRootCache();
       let refreshed = false;
       const refused = await run(() =>
@@ -366,6 +368,7 @@ describe("what a start refuses before a session exists", () => {
       assert.notEqual(refused.code, EXIT_OK);
       assert.equal(refreshed, true);
     } finally {
+      setSessionUseReading(SESSION_USE_STAND_IN);
       resetProjectRootCache();
       state.restore();
     }

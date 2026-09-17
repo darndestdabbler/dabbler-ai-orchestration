@@ -826,23 +826,6 @@ export const REVIEWING_SOURCE_PREFERENCES = `preferences.json ${SETTING_REVIEWER
   "dabbler.".length,
 )}`;
 
-/**
- * Every layer a PERSON puts a vehicle in force at.
- *
- * Stated once, as one list, because it is read by the gate that refuses an
- * unreachable vehicle at a session's start -- and a gate whose list was
- * missing the two reviewing layers checked a rule it did not apply, which
- * is worse than not having it. What is deliberately NOT here is the
- * shipped configuration: a machine with no seat and no keys yet is a
- * first-run machine, and refusing it would refuse the setup that fixes it.
- */
-export const CHOSEN_VEHICLE_LAYERS: readonly string[] = [
-  TRANSPORT_SOURCE_FLAG,
-  TRANSPORT_SOURCE_SETTINGS,
-  TRANSPORT_SOURCE_PREFERENCES,
-  REVIEWING_SOURCE_SETTINGS,
-  REVIEWING_SOURCE_PREFERENCES,
-];
 export const TRANSPORT_SOURCE_CONFIG = "transport.profile";
 
 /** The layers that may name an authoring model, in precedence order. */

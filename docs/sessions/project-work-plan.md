@@ -229,7 +229,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 189 | The suite nobody declared, asked before the push | yes | 2026-09-16 |
 | 190 | The declaration a step writes is the declaration the loop reads | yes | 2026-09-16 |
 | 191 | API Keys, grouped, and the project's choice wins | yes | 2026-09-17 |
-| 192 | Consult with AI | — | not declared |
+| 192 | Friction only where a session would not succeed | yes | 2026-09-17 |
+| 193 | Consult with AI | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2625,3 +2626,14 @@ Reverse the provider-key precedence and group the key rows. First record the ope
 **Amended after acceptance:**
 
 - 2026-09-17 — step 'router-precedence': its files: configuration.test.ts carries a comment stating the old order beside an assertion that still holds; the comment changes with the order (claude-code (anthropic, claude-opus-5))
+
+### Session 192 — Friction only where a session would not succeed
+
+**Releasable: yes.**
+
+Make `session start` refuse only what would stop this session, and make the round say the same thing where it is stopped later. `session start`, after the daily refresh and before anything is written, assesses what this session uses: the authoring engine's CLI is installed (`installedEngines`) and a chosen authoring model is accepted (`configuredModelRefusal`, unchanged); and the reviewing vehicle as resolved by `explainReviewingTransport` -- chosen or built-in default alike -- yields at least one Primary Reviewer candidate outside the author's provider, asked through the round's own selection (`apiLadder`, or `seatLadder` over the seat catalog, with the author's provider excluded) and never a second copy of it. That assessment is one exported function in session.ts whose refusal names what cannot be reached, the layer that chose it or that it is the built-in default, and each way forward as a command (`dabbler auth set <provider>` or the provider's variable and `dabbler configure --reviewer-transport <vehicle>` for `api`; the free catalog refresh or a login for a seat); a dangling credential reference on a provider the reviewing vehicle would call is named in that refusal where it leaves no candidate and printed as a warning where it does not. Removed from start: the machine-vehicle refusal (`configuredVehicleRefusal`) and the refusal over credential references (`configuredCredentialRefusal`), except that a key pasted where a variable's name or a credential's name belongs still refuses the start on any provider, naming the file and never the value -- `providerKeyStop`'s two pasted-key branches are extracted as `pastedKeyStop` in credentials.ts and reused, and session 191's order stands. In the round, where verification fails the driver asks the same assessment and, where it refuses, stops with its sentence under a stop whose moves name the refresh, the key and the reviewing vehicle rather than `--reviewer-model` or a log tail. Releasable as a minor, because which starts are refused changes: version.json and the manifests it stamps move to 3.5.0, with a CHANGELOG entry.
+
+**Amended after acceptance:**
+
+- 2026-09-17 — step 'start-assessment': its files: The typecheck covers the tests and the suite named after session.ts runs after the check, so the removed refusal's test import, the start test asserting the removed vehicle refusal, and the suite's stand-in for the new start reading must change with the source in this step (claude-code (anthropic, claude-opus-5))
+- 2026-09-17 — step 'round-words': its files: A stop code is a closed vocabulary held by the run schema and the type generated from it, so the new reviewer-unreachable code is named there before it can be recorded (claude-code (anthropic, claude-opus-5))

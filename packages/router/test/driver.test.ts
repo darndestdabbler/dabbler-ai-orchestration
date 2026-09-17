@@ -42,6 +42,9 @@ import {
 import type { DriverInstruction, DriverRun } from "../src/generated/index.ts";
 import { LedgerError, appendRound } from "../src/ledger.ts";
 import { gitAnswers, makeAnsweredSandbox, tempDir } from "./support/answers.ts";
+import { TRANSPORT_COPILOT_CLI, loadConfig, resetProjectRootCache } from "../src/config.ts";
+import { SETTING_REVIEWER_TRANSPORT, writeSettings } from "../src/settings.ts";
+import { reviewingVehicleRefusal } from "../src/session.ts";
 
 const STEP_INSTRUCTION = {
   schema_version: 1,
@@ -720,6 +723,7 @@ describe("a stop, as a person reads it", () => {
     const codes = [
       "no-verdict",
       "provider-unreachable",
+      "reviewer-unreachable",
       "dispute-refused",
       "cap-unresolved",
       "cap-disputed",
@@ -760,6 +764,27 @@ describe("a stop, as a person reads it", () => {
     assert.match(unreachable.choices.map((choice) => choice.command).join(" "), /dabbler configure/);
   });
 
+  it("names the free refresh, never a model to choose, when a seat round has no catalog", () => {
+    // The round stopped as a provider that could not be reached and offered
+    // `--reviewer-model`, when the repair was a refresh that costs nothing.
+    const root = tempDir("seat-no-catalog-");
+    writeSettings(root, { [SETTING_REVIEWER_TRANSPORT]: TRANSPORT_COPILOT_CLI });
+    const ungit = gitAnswers([[["rev-parse", "--show-toplevel"], { stdout: root.split("\\").join("/") }]]);
+    resetProjectRootCache();
+    try {
+      const refusal = reviewingVehicleRefusal(loadConfig(undefined, root), root, "anthropic").refusal;
+      const words = renderStop(
+        { kind: "verification", code: "reviewer-unreachable", reason: String(refusal) },
+        { session_number: 7, phase: "verify", engine: "cli" },
+      );
+      assert.match(words.text, /dabbler discovery refresh/);
+      assert.doesNotMatch(words.text, /--reviewer-model/);
+    } finally {
+      ungit();
+      resetProjectRootCache();
+    }
+  });
+
   it("prints its ways on once, in the same words wherever a stop is printed", () => {
     // The command that met the stop is the surface the person is already
     // looking at, and it printed three of the four things the framework
@@ -791,7 +816,7 @@ describe("a stop, as a person reads it", () => {
       ...RUN,
       stop: { kind: "verification", code, reason: "the dispute was refused", at: RUN.updated_at },
     });
-    for (const code of ["no-verdict", "provider-unreachable", "dispute-refused", "cap-unresolved", "cap-disputed", "cap-terminal-tree-moved", null]) {
+    for (const code of ["no-verdict", "provider-unreachable", "reviewer-unreachable", "dispute-refused", "cap-unresolved", "cap-disputed", "cap-terminal-tree-moved", null]) {
       assert.equal(validateRun(stopped(code)).stop?.code ?? null, code);
     }
     assert.throws(() => validateRun(stopped("verification-went-wrong")), LedgerError);

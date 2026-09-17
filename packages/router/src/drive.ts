@@ -147,8 +147,10 @@ import {
   start,
   acquireLockWithTimeout,
   releaseLock,
+  reviewingVehicleRefusal,
   type DeclareRefusalCause,
 } from "./session.ts";
+import { resolveSessionOrchestratorIdentity } from "./identity.ts";
 import {
   STAGE_FINAL_FULL,
   STAGE_FINAL_TARGETED,
@@ -2531,6 +2533,13 @@ class Driver {
     // it was.
     const reason = jobLogTail(this.repoRoot, this.sessionNumber, "verification");
 
+    // A reviewer that cannot be reached is said in the start's own sentence,
+    // with the repair, rather than as a log tail or a model to choose.
+    if (code !== EXIT_UNRESOLVED) {
+      const unreachable = this.reviewerUnreachable();
+      if (unreachable !== null) throw new Stop("verification", unreachable, "reviewer-unreachable");
+    }
+
     // The stale-evidence heal that stood here went with the targeted
     // selection and the gate that demanded it; `verify` no longer refuses
     // over missing targeted evidence, so there is nothing left for the
@@ -2579,6 +2588,18 @@ class Driver {
         (reason || "it wrote no reason; its log is under the run's jobs directory"),
       "no-verdict",
     );
+  }
+
+  /** The start's refusal of the reviewing vehicle, asked again now; null where it is reachable or cannot be asked. */
+  private reviewerUnreachable(): string | null {
+    try {
+      const author = resolveSessionOrchestratorIdentity(this.sessionsDir, this.sessionNumber);
+      return reviewingVehicleRefusal(this.config(), this.repoRoot, author.effectiveProvider).refusal;
+    } catch {
+      // An identity or configuration that cannot be read is the round's own
+      // refusal to report, and it already has one.
+      return null;
+    }
   }
 
   private dispositionAsk(round: number): string {

@@ -19,6 +19,7 @@ import { PREFERENCES_FILENAME, setPreferencesPath } from "../../src/preferences.
 import { CREDENTIALS_FILENAME, setCredentialsPath } from "../../src/credentials.ts";
 import { setSeatSource } from "../../src/discovery.ts";
 import { canonicalPath } from "../../src/journal.ts";
+import { setSessionUseReading, type assessSessionUse } from "../../src/session.ts";
 
 /**
  * The suite's temp root, in the name the framework will use for it.
@@ -159,6 +160,12 @@ setSeatSource(() =>
     reason: "this suite's machine has no seat",
   }),
 );
+
+// And a session start does not read this machine's engine CLIs, keys or seat
+// to decide whether a session can run: a start test is about something else
+// unless it says otherwise, and restores this stand-in when it does.
+export const SESSION_USE_STAND_IN: typeof assessSessionUse = () => ({ refusal: null, warnings: [] });
+setSessionUseReading(SESSION_USE_STAND_IN);
 
 const GIT_CONFIG =
   "[user]\n\tname = Dabbler Test\n\temail = test@example.invalid\n" +

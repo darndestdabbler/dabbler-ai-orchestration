@@ -31,6 +31,7 @@ import {
   holdsCredential,
   listCredentials,
   looksLikeASecret,
+  pastedKeyStop,
   providerKeyStop,
   providerSecret,
   removeCredential,
@@ -215,7 +216,7 @@ describe("the store this platform has", () => {
       [CREDENTIAL_REFERENCE_KEY]: SECRET,
       [CREDENTIAL_LAYER_KEY]: ".vscode/settings.json (`dabbler.credentials.openai`)",
     };
-    const stop = String(providerKeyStop("openai", pasted));
+    const stop = String(pastedKeyStop("openai", pasted));
     assert.match(stop, /looks like a KEY/);
     assert.match(stop, /dabbler auth set openai/);
     assert.ok(!stop.includes(SECRET), stop);
@@ -225,7 +226,7 @@ describe("the store this platform has", () => {
     // to nothing at all and used to read as "no key" over a file the
     // operator can plainly see the key in.
     const inVariable = { api_key_env: SECRET };
-    const variableStop = String(providerKeyStop("openai", inVariable));
+    const variableStop = String(pastedKeyStop("openai", inVariable));
     assert.match(variableStop, /the NAME of an environment variable/);
     assert.ok(!variableStop.includes(SECRET), variableStop);
   });

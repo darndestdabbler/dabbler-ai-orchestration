@@ -11646,3 +11646,104 @@ not require a model. One that *Enter a model id…* and an empty or alias-floor
 reading both fall back to the text box.
 
 **Releasable.** Yes, a patch.
+
+### Session 195 of 196: Remove Start Unattended Session
+
+Scope: whole repository
+
+**Why.** The operator never asked for Start Unattended Session. D252 was the
+Orchestrator's decision in session 61: keep `session drive` as "the unattended
+half", and session 62's plan added an extension command over it. It sits in
+the Work Explorer's context menu beside Start Session, where it reads as a
+second way to start a session and is not one anybody chose. Asked what it was
+for on 2026-09-17, the operator directed that it be removed.
+
+**What.** The extension stops offering an unattended run:
+- **The command.** `dabbler.startUnattendedSession` goes: its registration,
+  its `package.json` contribution and menu entry, its `ActionRegistry` row,
+  and `runStartUnattendedSession`.
+- **What only it used.** Stop and Send (`dabbler.stopDrive`,
+  `dabbler.sendToEngine`) with their menu entries, the `dabbler.driving`
+  context key, the `Drives` registry and `sharedDrives`, `DriveLauncher` and
+  `defaultDriveLauncher`, `driveArguments`, the "Dabbler: Engine" output
+  channel and `engineLine`, and anything else the compiler shows is left
+  unused once they are gone. `launchDriver` stays: the Start registrar spawns
+  `session start` through it.
+- **The words.** The *Start Unattended Session* section of
+  `docs/driving-a-session.md` goes, and every other sentence in the docs,
+  the README and the comments that offers it, or offers Stop and Send, is
+  removed or corrected.
+
+**Non-goals.** The router's `dabbler session drive` verb and the engine
+adapters under it stay, so a terminal or CI can still drive a session.
+Start Session, Resume Session and Consult with AI are unchanged.
+
+**Tests.** The tests of the removed commands go with them: the Start
+Unattended flow test, the `dabbler.driving` assertions in
+`actionRegistry.test.ts`, and the Stop row in `workExplorerTreeModel.test.ts`.
+No new test: a removal is proven by the compiler and the suite.
+
+**Releasable.** Yes, a minor: a command the extension offered is removed.
+
+### Session 196 of 196: Uncommitted changes at Start are a question, not a dead end
+
+Scope: whole repository
+
+**Why.** Walking 3.6.1, the operator ran Consult with AI in
+`test-dabbler-orchestration-terminals`. It inserted a session into
+`session-plan.md` and never committed the change. Start Session then failed
+with *"the working tree already carries 1 change(s)
+(docs/sessions/session-plan.md)"*, followed by a sentence about declarations
+and models deciding in hindsight. That is accurate and not plain language,
+and it left the operator to work out the git commands for themselves.
+Committing, pushing and undoing are deterministic, so they are the
+framework's to do once a person has said which one.
+
+**What -- the words.** `workBegunRefusal` in `writers.ts` says it plainly, in
+one sentence shared by `session start` and the declaration:
+*"You can't start a session while there are new or changed files that
+haven't been committed: <paths>. Next: commit them, or undo the changes
+(copy anything you want to keep outside the repository first)."* In the
+terminal the refusal names the two flags below as the commands that do
+either.
+
+**What -- the recovery.** `session start` gains two flags, used only when a
+person has chosen:
+- **`--commit-changes`** commits every new and changed file the refusal
+  named, as one plain commit saying it was made before session N started,
+  and pushes it where the branch has an upstream. Then the start goes ahead.
+  A refused push refuses the start with the push's own reason, and the
+  commit stays.
+- **`--undo-changes`** first copies every new and changed file to a folder
+  outside the repository, under this platform's per-user data directory and
+  named for the repository and the time. Then it restores the changed files
+  and removes the new ones, and the start goes ahead. The start's output
+  names the folder.
+
+Start Session in the extension handles the refusal the way it already
+handles `--merge-origin`. Where `session start` refuses over uncommitted
+changes, it asks one modal question that lists the files, with three
+answers: **Commit and Push**, **Undo the Changes** (saying a copy is kept and
+where), and Cancel. It then registers again with the chosen flag. Cancel
+leaves the tree as it was.
+
+**What -- the consult.** The consult brief (`cli/consult.ts`) and the managed
+`AGENTS.md` consult paragraph (`bootstrap/templates.ts`) say that every file a
+consult changes is committed and pushed before the consultation ends, never
+left in the tree. This repository's `AGENTS.md` is re-rendered with `dabbler
+bootstrap`.
+
+**Non-goals.** No commit or undo without a person's answer: neither flag is
+ever passed on anyone's behalf. No stash. No gate enforcing the consult's
+commit: it is guidance, like the rest of the consult's licence. What counts
+as a material change (`materialWorktreeChanges`) is unchanged, and the
+declaration inside a running session gets the new words but not the
+recovery.
+
+**Tests.** One that `--commit-changes` commits the named files and the start
+registers. One that `--undo-changes` copies each file outside the repository,
+leaves the tree clean, and the start registers. One that Start Session asks
+the question on that refusal and passes the flag for the answer chosen, and
+passes nothing on Cancel. One that the consult brief says to commit and push.
+
+**Releasable.** Yes, a minor: Start gains a way through that it did not have.

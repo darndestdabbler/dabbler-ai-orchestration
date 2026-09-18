@@ -4216,7 +4216,7 @@
     {
       "number": 212,
       "title": "Every setting the vendor refuses is dropped, not just the first",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-18T16:05:11.933000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -4225,7 +4225,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.13.6",
-      "completedAt": null,
+      "completedAt": "2026-09-18T16:12:40.060000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,

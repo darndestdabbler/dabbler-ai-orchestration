@@ -313,7 +313,17 @@
         "transport": { "type": ["string", "null"] },
         "agency": { "$ref": "#/$defs/agency" },
         "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
-        "fixPaths": { "type": "array", "items": { "type": "string" } }
+        "fixPaths": { "type": "array", "items": { "type": "string" } },
+        "minor": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The latest round's non-blocking findings outside its NITS section, counted for a surface to show beside the verdict."
+        },
+        "nits": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The latest round's non-blocking findings under its NITS section, counted for a surface to show beside the verdict."
+        }
       }
     },
     "session": {

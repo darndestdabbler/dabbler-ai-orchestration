@@ -11,6 +11,7 @@ import {
   normalizeSeverity,
   parseAdjudicationResponse,
   parseVerificationResponse,
+  sessionVerdict,
   validateSessionVerdict,
 } from "../src/verdict.ts";
 
@@ -31,6 +32,17 @@ describe("verdict parsing", () => {
     assert.equal(verdict, VERDICT_VERIFIED);
     assert.deepEqual(issues, []);
     assert.equal(parseVerificationResponse("**VERDICT: VERIFIED**\nok")[0], VERDICT_VERIFIED);
+  });
+
+  it("reads a verdict that starts a later line, and not one inside a sentence", () => {
+    const narrated = "All files on disk match the diff shown.\n\n**VERIFIED** — I checked the parser.\n\n## NITS\n- a nit";
+    const [verdict, issues] = parseVerificationResponse(narrated);
+    assert.equal(verdict, VERDICT_VERIFIED);
+    assert.equal(issues.length, 1);
+    assert.equal(parseVerificationResponse("Narration first.\nISSUES_FOUND\n\nIssue 1: broken\nSeverity: Major")[0], VERDICT_ISSUES_FOUND);
+    const [inline, synthesized] = parseVerificationResponse("I read it all, and this cannot be VERIFIED yet.");
+    assert.equal(inline, VERDICT_ISSUES_FOUND);
+    assert.equal(synthesized[0].severity, "unknown");
   });
 
   it("parses every field an issue block declares", () => {
@@ -144,6 +156,12 @@ describe("the session verdict vocabulary", () => {
     for (const token of ["manual-override-development", "VERIFIED_NOT_REALLY", "WAIVED", "", null, "verified "]) {
       assert.throws(() => validateSessionVerdict(token));
     }
+  });
+
+  it("calls a round that left nothing blocking VERIFIED, whichever word its reviewer wrote", () => {
+    assert.equal(sessionVerdict(VERDICT_ISSUES_FOUND, false), VERDICT_VERIFIED);
+    assert.equal(sessionVerdict(VERDICT_ISSUES_FOUND, true), VERDICT_ISSUES_FOUND);
+    assert.equal(sessionVerdict("REMEDIATED_AT_CAP", false), "REMEDIATED_AT_CAP");
   });
 });
 

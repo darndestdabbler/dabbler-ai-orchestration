@@ -586,6 +586,18 @@ suite("workExplorerTreeModel: session descriptor", () => {
     assert.ok(d.tooltip!.includes("not a recognized verdict"));
   });
 
+  test("tooltip shows what a verified session's reviewer noted beside the verdict", () => {
+    const d = sessionDescriptor({
+      kind: "session",
+      repository,
+      session: makeSession({
+        verificationVerdict: "VERIFIED",
+        verification: makeVerification({ terminal: "VERIFIED", clean: true, minor: 1, nits: 2 }),
+      }),
+    });
+    assert.ok(d.tooltip!.includes("Verification: VERIFIED (1 minor, 2 nits)"), d.tooltip);
+  });
+
   test("a session that closed having changed nothing says no change, and is neither severe nor unverified", () => {
     const session = makeSession({
       status: "complete",

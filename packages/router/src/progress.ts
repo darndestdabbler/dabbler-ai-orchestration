@@ -63,6 +63,7 @@ import {
   VERDICT_ISSUES_FOUND,
   VERDICT_REMEDIATED_AT_CAP,
   VERDICT_VERIFIED,
+  sessionVerdict,
 } from "./verdict.ts";
 
 export const SCHEMA_VERSION = 5;
@@ -1449,6 +1450,10 @@ export function buildVerificationView(
   const stopped = reviewed.length > 0 ? reviewed[reviewed.length - 1] : latest;
   const verdict = latest["verdict"] ?? null;
   let fixPaths: string[] = [];
+  // What the reviewer noted and nothing blocked on, counted for the surface
+  // that shows it beside the verdict.
+  let minor = 0;
+  let nits = 0;
   let terminal: string | null;
   let findings: Record<string, unknown>[];
 
@@ -1469,14 +1474,22 @@ export function buildVerificationView(
       terminal =
         cap !== null && (latest["round"] as number) >= cap ? VERDICT_ISSUES_FOUND : null;
     } else {
+      // Nothing blocked, so the session passed whichever word the reviewer
+      // wrote; `verdict` below keeps that word.
       terminal =
-        typeof verdict === "string" && SESSION_VERDICTS.has(verdict) ? verdict : null;
+        typeof verdict === "string" && SESSION_VERDICTS.has(verdict)
+          ? sessionVerdict(verdict, false)
+          : null;
     }
     findings = [];
     const rows = latest["findings"];
     for (const finding of (Array.isArray(rows) ? rows : []).filter(isRecord)) {
       const view = findingView(finding, latest["round"], FINDING_NOTED);
       if (blockingRound && view["blocking"]) view["disposition"] = FINDING_OUTSTANDING;
+      if (!view["blocking"]) {
+        if (finding["section"] === "nits") nits += 1;
+        else minor += 1;
+      }
       findings.push(view);
     }
   }
@@ -1512,6 +1525,8 @@ export function buildVerificationView(
     agency: agencyView(stopped),
     findings,
     fixPaths,
+    minor,
+    nits,
   };
 }
 

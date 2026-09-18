@@ -176,6 +176,7 @@ import {
   workBegunRefusal,
 } from "./writers.ts";
 import { writeErr, writeOut } from "./output.ts";
+import { sessionVerdict } from "./verdict.ts";
 
 /**
  * Bring a stale record up to date before the session is registered.
@@ -2472,7 +2473,10 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
     let verdict: unknown = null;
     if (repoRoot) {
       const row = latestRound(repoRoot, current);
-      if (row) verdict = row["verdict"] ?? null;
+      // The gate's decision, not the reviewer's word: the row keeps that.
+      if (row && row["verdict"] !== null && row["verdict"] !== undefined) {
+        verdict = sessionVerdict(String(row["verdict"]), row["blocking"] !== false);
+      }
     }
 
     flipStateToClosed(sessionsDir, {

@@ -93,6 +93,7 @@ import {
   normalizeSeverity,
   type Finding,
   parseVerificationResponse,
+  sessionVerdict,
   unremediatedFindings,
 } from "../verdict.ts";
 import { buildVerificationPrompt } from "../verifyjob.ts";
@@ -963,8 +964,11 @@ export async function runRound(
     return EXIT_BLOCKING;
   }
 
-  // Loop finished: stamp the session record and the change-log summary.
-  recordSessionVerification(sessionsDir, current, verdict, {
+  // Loop finished: stamp the session record and the change-log summary with
+  // the gate's decision. Nothing blocked, so the session is VERIFIED
+  // whatever word the reviewer wrote; the row above keeps that word.
+  const passed = sessionVerdict(verdict, false);
+  recordSessionVerification(sessionsDir, current, passed, {
     rounds: roundNumber,
     verifierModel: result.model_name,
     verifierProvider: result.provider,
@@ -972,7 +976,7 @@ export async function runRound(
   });
   appendChangeLogBlock(
     sessionsDir,
-    `## Session ${current} verification — ${verdict} after ` +
+    `## Session ${current} verification — ${passed} after ` +
       `${roundNumber} round(s)\n\n` +
       `- Verifier: ${result.model_name} (${result.provider}) over ` +
       `${result.transport}\n` +
@@ -982,7 +986,7 @@ export async function runRound(
       `- Raw round output: \`.dabbler/runs/s${current}/\`\n`,
   );
   writeOut(
-    `verify: round ${roundNumber} — ${verdict} ` +
+    `verify: round ${roundNumber} — ${passed} ` +
       `(verifier ${result.model_name}/${result.provider}); ` +
       `session ${current} is verified.\n` +
       (await runOfRecordLines(sessionsDir, config)) +

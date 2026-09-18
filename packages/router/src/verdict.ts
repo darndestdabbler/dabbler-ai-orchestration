@@ -1,7 +1,7 @@
 // Verifier-response parsing and blocking classification.
 //
-// The parser is structural, never prose-scanning: a verdict token at the head
-// of the response, `Issue N:` blocks with per-field tolerant parses, and a
+// The parser is structural, never prose-scanning: a verdict token at the start
+// of a line, the first such line deciding, `Issue N:` blocks with per-field tolerant parses, and a
 // `NITS` section parsed on the same terms. Nothing a verifier wrote is ever
 // discarded: a NITS finding is recorded as `minor` and tagged
 // `section: nits`, and a NITS finding that declares a blocking severity keeps
@@ -70,8 +70,12 @@ export interface Finding {
 
 // --- Parsing ------------------------------------------------------------------
 
-const VERDICT_PREFIX = /^[\s*_#>-]*VERDICT\s*[:.-]?\s*/;
-const MARKDOWN_NOISE = /^[\s*_#>-]+/;
+// A reviewer often narrates before it rules, so the token is read at the start
+// of ANY line, bare or in the marks a model wraps it in. Upper-case only: a
+// line of narration that opens "Verified that..." is not a verdict, and
+// reading it as one would fail open.
+const VERDICT_LINE =
+  /^[ \t*_#>-]*(?:(?:VERDICT|Verdict)[ \t]*[:.-]?[ \t*_]*)?(VERIFIED|ISSUES?[ \t_]*FOUND)\b/m;
 const ISSUES_HEADER =
   /^[\s*_#>-]*(?:VERDICT\s*[:.-]?\s*)?\*?\*?ISSUES?[\s_]*FOUND\*?\*?\s*[-:.]?\s*/;
 const NITS_SECTION = /^\s*#{0,6}\s*\*{0,2}NITS\b.*$/im;
@@ -102,7 +106,8 @@ const EVIDENCE_PATHS = /Evidence[\s*_-]*paths?[\s*:.\-_]*([^\n]+)/i;
 /**
  * `[verdict, issues]`: the verdict is exactly VERIFIED or ISSUES_FOUND.
  *
- * Fail-closed on both branches: a head that is not VERIFIED is ISSUES_FOUND,
+ * Fail-closed on both branches: a response whose first verdict line is not
+ * VERIFIED, or that has no verdict line at all, is ISSUES_FOUND,
  * and a VERIFIED response still surfaces any structured blocking issue block
  * it carries -- a contradictory token never hides a finding the same response
  * spelled out.
@@ -111,10 +116,7 @@ export function parseVerificationResponse(
   response: string | null | undefined,
 ): [string, Finding[]] {
   const text = response ?? "";
-  let head = text.toUpperCase().trim().replace(VERDICT_PREFIX, "");
-  head = head.replace(MARKDOWN_NOISE, "");
-
-  if (head.startsWith("VERIFIED")) {
+  if (VERDICT_LINE.exec(text)?.[1] === VERDICT_VERIFIED) {
     return [VERDICT_VERIFIED, parseAllFindings(text, true)];
   }
 
@@ -469,6 +471,17 @@ export function classifyBlocking(
     blockingIssues: [],
     nitIssues: [],
   };
+}
+
+/**
+ * What a session says after a round: the gate's decision, not the reviewer's
+ * word. A round that left nothing blocking passed the session, so an
+ * ISSUES_FOUND with only minor findings is VERIFIED here; the round's own row
+ * keeps the word the reviewer wrote. Every other word -- a blocking round's,
+ * a cap terminal's -- is returned as it is.
+ */
+export function sessionVerdict(verdict: string, blocking: boolean): string {
+  return !blocking && verdict === VERDICT_ISSUES_FOUND ? VERDICT_VERIFIED : verdict;
 }
 
 /**

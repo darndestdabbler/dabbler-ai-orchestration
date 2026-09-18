@@ -530,6 +530,21 @@ export function repositoryDescriptor(node: RepositoryNode): RowDescriptor {
   };
 }
 
+/**
+ * What a passed session's reviewer noted, beside its verdict -- ` (1 minor,
+ * 2 nits)` -- read from the counts the projection carries, and nothing when
+ * it noted nothing.
+ */
+function notedCounts(verdict: string, view: SessionVerification | null): string {
+  if (verdict !== "VERIFIED" || view === null) return "";
+  const parts: string[] = [];
+  const minor = view.minor ?? 0;
+  const nits = view.nits ?? 0;
+  if (minor > 0) parts.push(`${minor} minor`);
+  if (nits > 0) parts.push(`${nits} nit${nits === 1 ? "" : "s"}`);
+  return parts.length > 0 ? ` (${parts.join(", ")})` : "";
+}
+
 function sessionTooltip(node: SessionNode): string {
   const { session } = node;
   const lines = [
@@ -546,7 +561,7 @@ function sessionTooltip(node: SessionNode): string {
     lines.push(
       "",
       isRecognizedVerdictToken(verdict)
-        ? `Verification: ${verdict}`
+        ? `Verification: ${verdict}${notedCounts(verdict, session.verification)}`
         : `Verification: "${verdict}" is not a recognized verdict`,
     );
   }

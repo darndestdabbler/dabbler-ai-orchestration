@@ -4092,21 +4092,51 @@
       "title": "The Reviewing AI's Vehicle row sets what it shows",
       "status": "complete",
       "startedAt": "2026-09-18T04:22:11.085000-04:00",
+      "completedAt": "2026-09-18T04:32:32.984000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-opus-5",
         "identityProvenance": "direct"
       },
-      "frameworkVersion": "3.13.0",
-      "completedAt": "2026-09-18T04:32:32.984000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5.6-terra",
         "verifierProvider": "openai",
         "transport": "copilot-cli"
+      },
+      "frameworkVersion": "3.13.0"
+    },
+    {
+      "number": 207,
+      "title": "The verdict is read where the reviewer wrote it, and the label says what the gate decided",
+      "status": "in-progress",
+      "startedAt": "2026-09-18T08:54:57.724000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "direct"
+      },
+      "frameworkVersion": "3.13.1",
+      "completedAt": null,
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5.6-terra",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
       }
+    },
+    {
+      "number": 208,
+      "title": "A quiet AI is said so in minutes, and the asks say what the framework will refuse",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
     }
   ]
 }

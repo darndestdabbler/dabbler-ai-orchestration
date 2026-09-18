@@ -102,7 +102,7 @@ Severity is defined by the **expected consequence of not fixing the finding**: t
 
 ### Response Format
 
-Start with one of these verdicts:
+The first line of your response is the verdict alone — one of these words and nothing before it:
 
 - **VERIFIED** — You genuinely tried to break it and could not. The response is correct and complete; no significant issues found. State in 1–2 sentences what you actually checked and why you are confident — a bare "looks good" is a failed review.
 - **ISSUES FOUND** — The response has problems that should be addressed.

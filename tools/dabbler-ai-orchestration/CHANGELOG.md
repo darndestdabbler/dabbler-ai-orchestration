@@ -10,6 +10,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.13.2] — 2026-09-18
+
+**A session that passed says so.**
+
+### Fixed
+
+- A session whose last verification round left nothing blocking is recorded
+  `VERIFIED`, whatever word the reviewer wrote. A reviewer that wrote
+  `ISSUES_FOUND` with only minor findings used to leave the session labelled
+  `ISSUES_FOUND` — and, in a ship-by-default repository, held its release,
+  because a session publishes only what verified. Each round's own record
+  still keeps the reviewer's word.
+- The verdict is read where the reviewer wrote it: `VERIFIED` or
+  `ISSUES_FOUND` at the start of any line, bare or in bold, the first such
+  line deciding. A reviewer that narrated a paragraph before its verdict was
+  read as `ISSUES_FOUND`. A verdict word inside a sentence is still not read,
+  and a response with no verdict line still fails closed.
+- The Work Explorer's session tooltip shows what a verified session's reviewer
+  noted beside the verdict: `Verification: VERIFIED (1 minor, 2 nits)`.
+
 ## [3.13.1] — 2026-09-18
 
 **The Reviewing AI's Vehicle row sets what it shows.**

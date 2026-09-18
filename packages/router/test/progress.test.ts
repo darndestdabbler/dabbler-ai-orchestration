@@ -551,6 +551,26 @@ describe("the verification view", () => {
     assert.equal(finding["disposition"], "noted");
   });
 
+  it("reads a round that blocked on nothing as verified whatever its reviewer wrote, and counts what it noted", () => {
+    const { repo } = makeStateDirs();
+    recordRound(repo, {
+      round: 1,
+      verdict: "ISSUES_FOUND",
+      blocking: false,
+      findings: [
+        { description: "a minor", severity: "minor", blocking: false, section: "body" },
+        { description: "a nit", severity: "minor", blocking: false, section: "nits" },
+        { description: "another nit", severity: "minor", blocking: false, section: "nits" },
+      ],
+    });
+    const view = buildVerificationView(repo, 1, 3) as Record<string, unknown>;
+    assert.equal(view["terminal"], "VERIFIED");
+    assert.equal(view["clean"], true);
+    assert.equal(view["verdict"], "ISSUES_FOUND");
+    assert.equal(view["minor"], 1);
+    assert.equal(view["nits"], 2);
+  });
+
   it("calls a blocking round unresolved only once it is at the cap, and says nothing about a cap it did not get", () => {
     const { repo } = makeStateDirs();
     recordRound(repo, { round: 1, verdict: "ISSUES_FOUND", blocking: true, findings: [{ description: "a bug", severity: "major" }] });

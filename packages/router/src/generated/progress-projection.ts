@@ -197,6 +197,14 @@ export type ProgressProjectionVerification = {
   agency: ProgressProjectionAgency;
   findings: ProgressProjectionFinding[];
   fixPaths: string[];
+  /**
+   * The latest round's non-blocking findings outside its NITS section, counted for a surface to show beside the verdict.
+   */
+  minor?: number;
+  /**
+   * The latest round's non-blocking findings under its NITS section, counted for a surface to show beside the verdict.
+   */
+  nits?: number;
 };
 
 export type ProgressProjectionSession = {

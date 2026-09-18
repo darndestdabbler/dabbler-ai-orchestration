@@ -12734,3 +12734,52 @@ anybody's pom.
 
 **Releasable.** Yes, a patch: a new repository's first session lands, and a
 planning AI is left to plan.
+
+### Session 210 of 210: A model is checked against the list it was offered from
+
+Scope: whole repository
+
+**Why.** On 2026-09-18, in `../csv-parser`, the operator set the reviewing
+vehicle to `api` on purpose (`dabbler.reviewerTransport: api` in that
+checkout's `.vscode/settings.json`) and opened the Primary Reviewer model
+row. The pane offered the API's list -- correctly -- and the pick was refused:
+
+> dabbler configure: 'claude-haiku-4-5-20251001' is not a model the
+> copilot-cli transport lists. It offers 21: claude-fable-5, ...
+
+The list came from one transport and the check from another. Reproduced on
+3.13.4 with nothing but the working directory changed:
+
+- from inside the checkout, `dabbler configure --reviewer-model
+  claude-haiku-4-5-20251001` is accepted;
+- from `C:\` with `--repo-root d:\Projects\csv-parser` -- which is how the
+  extension always calls it (`inProcess.ts`, `configure`) -- the same command
+  is refused against `copilot-cli`;
+- `dabbler configuration explain --repo-root d:\Projects\csv-parser` from the
+  same place says `api (decided by dabbler.reviewerTransport)`.
+
+So `configure`'s model check (`transportFor`, through
+`explainReviewingTransport(config)` in `cli/configure.ts`) resolves the
+reviewing vehicle without the named checkout's own settings, and falls to the
+distribution's `transport.profile`. From the pane, a repository whose
+reviewing vehicle differs from the machine's can never choose a reviewer, and
+the refusal blames the model.
+
+**What -- one root for one command.** Everything `configure` reads to judge a
+choice -- the reviewing vehicle, the role's list, the authoring node -- is
+read for `--repo-root` where one is given, exactly as `configuration explain`
+and `configuration options` read it. The model offered by `options` for a
+checkout is accepted by `configure` for that checkout.
+
+**Non-goals.** No change to the four layers or their order. No change to
+where a selection is kept: it stays one per machine, and a selection one
+vehicle cannot reach stays a stop that names it (the csv-parser auxiliary,
+`gemini-3.8-flash`, is a seat name the API does not list -- recorded, not
+planned). A reviewer from the authoring vendor stays named, not refused.
+
+**Tests.**
+- `configure.test.ts`: with `--repo-root` naming a checkout whose settings put
+  the reviewing vehicle on `api`, run from another directory, a model the API
+  lists is accepted and a model only the seat lists is refused naming `api`.
+
+**Releasable.** Yes, a patch: the pane can set what it offers.

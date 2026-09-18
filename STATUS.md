@@ -2,6 +2,16 @@
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## 2026-09-18 — 205 CLOSED (3.13.0 published); 206 is next; then STOP BUILDING and soak
+>
+> **205** landed the crash layer: a loop that dies with no stop recorded is restarted by the waiter, twice per progress point, then a `crash` stop; `driver/loop.log`; every stop kind/code renders a way on. **206** (the Reviewing AI's Vehicle row writes the setting it shows) is planned and is the last session before the soak.
+>
+> **Done is defined**, by the operator: csv-parser runs start to finish on the installed extension with no click after Start, three times on each engine. Findings from the soak go on a list, not into sessions; only what stops a session or misleads the operator is fixed. No new architecture: consult round 17 (`docs/design/consults/round17-synthesis.md`) rejected the owner table and the AI mechanic.
+>
+> **Owed, deliberately not planned.** At a close the ledger nulls `currentSession` about five seconds before the loop writes the session's `done`; a waiter that reads in between prints the idle instruction instead of that `done`. Harmless since 204 -- the idle instruction names no command -- so it was planned as 207 and removed the same day. The fix, if it ever matters: `waiterEnd` waits a bounded grace for the watched session's `done`.
+>
+> **Machine facts.** The `npm link` at `%APPDATA%\npm` that ran this checkout's own `dist` is removed: 205 was driven through it on a bundle built before 203, which the ledger's `frameworkVersion: 3.10.0` gives away. `DABBLER_TRANSPORT` is unset. The OpenAI key is out of credits, so this checkout reviews through the seat (`dabbler.reviewerTransport: copilot-cli`).
+
 > ## SESSIONS 176–180 CLOSED, 2026-09-15 — the framework drives, the AI waits in the background; 3.3.0 tagged
 >
 > | session | what | state |

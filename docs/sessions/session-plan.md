@@ -12838,3 +12838,83 @@ vehicle does not list says so.
 
 **Releasable.** Yes, a patch: the pane can set what it offers, and says when
 a choice no longer fits.
+
+### Session 211 of 211: A reviewer the pane offers can review, and a pause says Resume
+
+Scope: whole repository
+
+**Why.** On 2026-09-18, in `../csv-parser` with reviews on `api`, the operator
+chose `claude-haiku-4-5-20251001` as the Primary Reviewer -- the obvious cheap
+reviewer, offered by the pane -- and session 1 stopped `verification` /
+`no-verdict` twice. Three things were wrong, and the AI reported the wrong one
+as the cause.
+
+1. **The reviewer could not review.** `router-config.yaml` gives Anthropic one
+   set of generation params for the whole provider -- `thinking: {enabled:
+   true, type: adaptive}` -- and `callAnthropic` in `transports/api.ts` sends
+   it with every call. Haiku 4.5 answers `HTTP 400 ... adaptive thinking is
+   not supported on this model`. The config's own comment says the value kept
+   is the one "valid for EVERY model that provider serves"; this one is not.
+   Probed on the operator's key with three one-word calls: Haiku with the
+   setting fails, Haiku without it answers, `claude-sonnet-5` with it answers.
+2. **The cause was buried.** The stop's reason opens with "the 'reviewer' role
+   fell past its preference order and resolved to 'claude-haiku-4-5-20251001'
+   ... it skipped" followed by about 150 models, each with its reason -- five
+   kilobytes -- and the vendor's actual refusal is the last line. The notice
+   (`selection.ts`) fired because the operator CHOSE a model the shipped order
+   does not name, which is a choice the framework honours, not a fall. The AI
+   told the operator the reviewer "is not in the configured preference order".
+3. **The way on named a command that is not there.** The pause prints "then
+   carry on: `dabbler session next`", the pull's wording, and the AI relayed
+   `dabbler session run --mailbox ...`. In a plain terminal there is no
+   `dabbler`: the extension puts its shim on PATH only in terminals it opens.
+   The operator typed the command, it failed, and Resume Session worked. Their
+   words: "rather than having the user enter a command line, it is better to
+   just select Resume Session."
+
+**The operator's ruling on the first, 2026-09-18: allow it.** A thinking
+setting is a tuning default, not a rule -- the seat path reviews with no such
+setting at all, and caught two real defects that morning -- and which model
+reviews is the operator's decision, "used and never silently substituted".
+Refusing a chosen reviewer over a default the framework added would put the
+framework's preference above the person's. A table of which model takes which
+setting is a hand-kept list nobody keeps current; the vendor's refusal is the
+authority and costs one unbilled failed call.
+
+**What -- a refused thinking setting is dropped for that call, on the record.**
+When a provider refuses a generation param for the model asked for -- the
+vendor's own words say the model does not support it -- the call is made once
+more without that param. The round's row records it (the param, the vendor's
+sentence), and the Dabbler terminal says once that the review ran without it.
+Any other 400 fails as it does today. No model table, no probing at pick time.
+
+**What -- the preference-order notice stays out of the way.** It is not said
+when the role's model is the operator's own selection. Where it is said, it
+names the first few models skipped and counts the rest. It never stands ahead
+of a failure in a stop's reason: the refusal that stopped the round is the
+reason's first sentence.
+
+**What -- a pause says Resume Session first.** What a stop tells a person, and
+what a waiter tells the AI to tell the operator, leads with "click Resume
+Session"; the command is given second, as the way on outside VS Code, and it
+is `dabbler session run --mailbox`. `dabbler session next` leaves the ways on
+wherever the mailbox loop is what drives.
+
+**Non-goals.** No change to which models a role may be given, to the
+cross-vendor rule, or to the seat path, which sends no generation params. No
+retry of anything but a param the vendor names as unsupported. No change to
+what Resume Session does.
+
+**Tests.**
+- `api.test.ts`: a provider that answers 400 naming a thinking param as
+  unsupported is called once more without it and its answer is returned;
+  a 400 of any other kind is not retried.
+- `rounds.test.ts`: the round's row records the dropped param.
+- `selection.test.ts`: the notice is absent when the model is the operator's
+  selection, and where present names a bounded number of models.
+- `drive.test.ts`: a stop's reason begins with the refusal that caused it.
+The Resume-first wording carries no test of its own: rule 4 bars asserting
+strings.
+
+**Releasable.** Yes, a patch: the cheap reviewer reviews, and a paused
+session says which button to press.

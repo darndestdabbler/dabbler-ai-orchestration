@@ -12761,25 +12761,80 @@ The list came from one transport and the check from another. Reproduced on
 So `configure`'s model check (`transportFor`, through
 `explainReviewingTransport(config)` in `cli/configure.ts`) resolves the
 reviewing vehicle without the named checkout's own settings, and falls to the
-distribution's `transport.profile`. From the pane, a repository whose
-reviewing vehicle differs from the machine's can never choose a reviewer, and
-the refusal blames the model.
+distribution's `transport.profile`.
+
+**The sweep, run before anything was changed.** This was the second defect in
+the Configuration rows in one day (206 was the first), so the operator asked
+for the click paths to be checked proactively rather than met one at a time.
+On the installed 3.13.4, over scratch checkouts, scratch preferences and a
+copy of the real catalog, every model `configuration options --repo-root`
+OFFERED for each of the three roles was CHOSEN the way the pane chooses it --
+`configure --repo-root <checkout>` from outside the checkout -- across all
+twelve combinations of engine (`claude-code`, `copilot`), machine vehicle
+(`api`, `copilot-cli`) and reviewing vehicle (unset, `api`, `copilot-cli`):
+1,980 picks.
+
+- **1,344 refused, one cause.** Wherever the reviewing vehicle resolves to
+  `api` -- by `dabbler.reviewerTransport` OR by `dabbler.transport` alone --
+  112 of 128 Primary picks and 112 of 128 Auxiliary picks are refused as "not
+  a model the copilot-cli transport lists"; the 16 that pass are ids spelled
+  alike on both lists. So the check ignores the named checkout's settings file
+  WHOLE, not only the reviewing key: from the pane, a checkout on API keys
+  cannot choose most reviewers at all.
+- **Clean:** the authoring model in all twelve combinations; both reviewing
+  roles wherever the vehicle is the seat; the vehicle rows, the authoring
+  model row and *Keep as My Default*, each of which writes to the right file
+  under `--repo-root`, is reflected by `explain` at once, and writes nothing
+  beside the caller. A Primary Reviewer chosen as the seat's
+  `claude-haiku-4.5` is carried to the API's `claude-haiku-4-5-20251001` when
+  the vehicle moves.
+- **A second defect: a selection the new vehicle cannot run is reported as
+  fine.** Choose `gpt-5.6-luna` under Copilot and switch the engine to Claude
+  Code: `explain` says "you chose it; it is what the engine's CLI is launched
+  on" while `options` correctly lists only Anthropic models, and the row goes
+  on showing it. Choose `gemini-3.8-flash` as the Auxiliary on the seat and
+  move reviews to `api`: "it is used and never silently substituted", for an
+  id the API does not list. Both are stops waiting -- at `session start`, and
+  at the first dispute -- announced by nothing.
 
 **What -- one root for one command.** Everything `configure` reads to judge a
-choice -- the reviewing vehicle, the role's list, the authoring node -- is
-read for `--repo-root` where one is given, exactly as `configuration explain`
-and `configuration options` read it. The model offered by `options` for a
-checkout is accepted by `configure` for that checkout.
+choice -- the checkout's settings, the vehicles they decide, the role's list,
+the authoring node -- is read for `--repo-root` where one is given, exactly
+as `configuration explain` and `configuration options` read it. A model
+`options` offers for a checkout is accepted by `configure` for that checkout.
+
+**What -- a selection the vehicle does not list says so.** For all three
+roles, where the model chosen is not on the list of the vehicle now in force
+and has no counterpart there, `explain`, `options` and the pane's row say
+that -- which vehicle, that it does not list the model, and that the next
+session (or, for the Auxiliary, the first dispute) will stop on it -- instead
+of "it is used". The selection is not cleared and nothing is substituted: a
+choice is kept until a person changes it, and the rule that a selection this
+call cannot reach is a stop stays exactly as it is.
 
 **Non-goals.** No change to the four layers or their order. No change to
-where a selection is kept: it stays one per machine, and a selection one
-vehicle cannot reach stays a stop that names it (the csv-parser auxiliary,
-`gemini-3.8-flash`, is a seat name the API does not list -- recorded, not
-planned). A reviewer from the authoring vendor stays named, not refused.
+where a selection is kept: one per machine. No model is substituted for one a
+vehicle cannot reach, and no selection is cleared on a vehicle change. A
+reviewer from the authoring vendor stays named, not refused.
 
-**Tests.**
-- `configure.test.ts`: with `--repo-root` naming a checkout whose settings put
-  the reviewing vehicle on `api`, run from another directory, a model the API
-  lists is accepted and a model only the seat lists is refused naming `api`.
+**Tests -- the sweep is kept, so the next one of these fails the suite.**
+- `configure.test.ts`: over a small arranged catalog with both transports,
+  for each combination of engine, machine vehicle and reviewing vehicle,
+  every model `options` offers for each role is accepted by `configure` run
+  with `--repo-root` from another directory. One test: offered is accepted.
+- `configure.test.ts`: a model only the seat lists is refused in an `api`
+  checkout, and the refusal names `api`.
+- `configuration.test.ts`: an authoring model the engine in force does not
+  list, and an Auxiliary the reviewing vehicle does not list, are each
+  reported as not listed by that vehicle.
 
-**Releasable.** Yes, a patch: the pane can set what it offers.
+**The walk, this session's acceptance.** `configuration-pane.spec.ts` drives
+only the authoring rows today. It is extended to an `api` checkout and walks
+the Reviewing Vehicle row and the Authoring, Primary and Auxiliary model rows
+in the running editor: each pick shows exactly the ids `options` offers for
+that row, choosing one the two lists spell differently is accepted and
+repaints the row, and after a vehicle change a row whose model the new
+vehicle does not list says so.
+
+**Releasable.** Yes, a patch: the pane can set what it offers, and says when
+a choice no longer fits.

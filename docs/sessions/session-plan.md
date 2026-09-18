@@ -12555,3 +12555,118 @@ untouched.
   longer asks a vehicle.
 
 **Releasable.** Yes, a patch: a control that said it worked now does.
+
+### Session 207 of 208: The verdict is read where the reviewer wrote it, and the label says what the gate decided
+
+Scope: whole repository
+
+**Why.** The 2026-09-18 soak of `../csv-parser` on Copilot (reviewer
+`claude-sonnet-5` through the seat) closed two of its first five sessions as
+`ISSUES_FOUND` when the reviewer had written **VERIFIED**. Session 4's review
+opens "All files on disk match the diff shown..." and says `**VERIFIED**` in
+its second paragraph, with two nits. Session 5's round 2 says `VERIFIED` on
+line 17, after a paragraph of narration, with two nits. `verdict.ts` reads a
+verdict token only at the head of the response and fails closed -- "an
+unrecognizable verdict is ISSUES_FOUND" -- which is the right direction and
+the wrong label. Nothing was skipped: blocking is decided by each finding's
+severity, both rounds recorded `blocking: false`, and no remediation was
+owed. The operator read `ISSUES_FOUND` and asked what had been left
+unresolved, which is what every developer will ask.
+
+A second case reaches the same label by design: a reviewer that really
+writes `ISSUES_FOUND` with only minor findings. The severity gate passes the
+session and the ledger still says `ISSUES_FOUND`, so the label contradicts
+what the framework did.
+
+**First, check one consequence.** The managed body says no session publishes
+without a VERIFIED verdict. If the publish phase reads the session's verdict
+word, a mislabelled session in a ship-by-default repository is refused its
+release although the reviewer passed it. Establish whether that is so before
+writing anything, and say which in the close.
+
+**What -- the verdict token is read at the start of any line.** The parser
+accepts `VERIFIED` or `ISSUES_FOUND` -- bare or in the emphasis marks a model
+wraps it in -- as the first thing on a line, the first such line deciding.
+Still structural: a token inside a sentence ("this cannot be VERIFIED") is
+not at the start of a line and is not read. A response with no such line
+fails closed as today. The reviewer prompt says once more, plainly, that the
+first line is the verdict alone.
+
+**What -- the session's label is the gate's decision, with counts.** A
+session whose last round left no blocking finding is `VERIFIED`, and the
+surfaces that show it carry what the reviewer noted: `VERIFIED`, `VERIFIED
+(2 nits)`, `VERIFIED (1 minor, 2 nits)`. `ISSUES_FOUND` is what a session
+says only while something blocking is open. Each round's row keeps the
+reviewer's own word, so the record still says who said what. No new verdict
+and no new vocabulary: the counts are read from the findings the round
+already records.
+
+**Non-goals.** No prose-scanning for a verdict. No change to what blocks: the
+severity rule is untouched. No change to the closed verdict vocabulary, the
+dispute path or adjudication.
+
+**Tests.**
+- `verdict.test.ts`: a response whose verdict token starts a later line is
+  read as that verdict; a token inside a sentence is not read and the
+  response fails closed.
+- A session whose last round is non-blocking closes `VERIFIED`, whichever
+  word that round's reviewer wrote, and the round's row keeps the reviewer's
+  word.
+- The projection carries the counts a surface shows beside the verdict.
+
+**Releasable.** Yes, a patch: a session that passed says so.
+
+### Session 208 of 208: A quiet AI is said so in minutes, and the asks say what the framework will refuse
+
+Scope: whole repository
+
+**Why -- half an hour of silence.** In the same soak, session 6's step was
+issued at 08:23:23. Copilot wrote its files by 08:24:04 and ran `dotnet test`
+at 08:24:12; the test host then sat blocked for 27 minutes (1.7 s of CPU) on
+a test that shells out to `dotnet run` with redirected output. The loop was
+healthy throughout -- heartbeat current, nothing to judge -- and said nothing:
+its last line was the step's issue, and the first notice it owes is at
+`stalledAfterSeconds`, 1800. The watcher in `drive.ts` already asks whether
+the tree is quiet and already records `instruction-overdue` with
+`tree_quiet`; one threshold serves an AI that is busy editing and one that
+has changed nothing for ten minutes. The operator's words: "My staff will
+think that this is a framework issue." They will be right to: the framework
+started the session, so its silence is the framework's.
+
+**What -- a quiet tree is said sooner.** While a step is outstanding and the
+tree has not moved for about five minutes, the Dabbler terminal says so once,
+in words a developer can act on -- no answer for N minutes, no file changed
+for M, the AI's CLI may be waiting on a command that hung, look at its
+terminal -- and `supervision.jsonl` records it. A tree that is moving keeps
+today's threshold: an AI that is working is not interrupted about it. The
+framework ends nothing in the AI's shell (consult round 17: no watchdog on
+the AI's CLI); it stops being silent.
+
+**What -- the asks say what the framework will refuse, and what hangs.** All
+wording, in the texts the AI already reads:
+- The skeleton session's text says the declared suite carries `expensive:
+  true` where its run is the run of record, and carries its hang limit --
+  `dotnet test --blame-hang-timeout`, Surefire's
+  `forkedProcessTimeoutInSeconds` -- so every later run inherits it. The soak
+  met one guaranteed rejection per Maven run for the first.
+- The planning text's Java handoff names `mvn package` with `{output}`, as
+  the loader requires; today the only `{output}` example is a commented .NET
+  one.
+- The step ask says every test command the AI runs has a time limit, and a
+  test never starts a build and never waits without a timeout.
+- The CSV tutorial says VS Code's Testing view lists tests once its own Java
+  or C# tooling has built the project: an empty view after six verified
+  sessions reads as "the tests do not exist".
+
+**Non-goals.** Nothing kills, restarts or types into the AI's CLI. No gate
+refuses a suite for lacking a timeout: the ask says it, and the framework's
+own checks already time out. No new setting unless the quiet threshold
+cannot be a constant.
+
+**Tests.**
+- `drive.test.ts`: a step outstanding over a quiet tree is said at the quiet
+  threshold, once; over a moving tree it is not said before the stall
+  threshold.
+The wording carries no test of its own: rule 4 bars asserting strings.
+
+**Releasable.** Yes, a patch: a stalled session says what to look at.

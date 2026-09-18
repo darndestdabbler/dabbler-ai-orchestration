@@ -11880,6 +11880,21 @@
       "dateTime": "2026-09-18T12:20:17.317000-04:00",
       "task": "Make a brand-new repository's first session land, stop the quiet notice firing on a planning AI, and ignore the Maven shade plugin's by-product. In packages/router/src/drive.ts the land's plain push moves into one small exported function: where the branch has an upstream it runs `git push` as today; where it has none and the repository has exactly one remote it runs `git push --set-upstream <remote> <branch>`; where it has none and more than one remote it stops `land` naming that command, because which remote is the trunk's is a person's to say (the no-remote stop is unchanged). The quiet-tree rule (`quietTreeProbeDue`) takes the instruction's step id and is never due for the `plan` step, which is asked to change nothing; that step keeps the stall threshold alone and every work step keeps the five-minute notice. In packages/router/src/ecosystem.ts the Maven entry of the build-output ignore list carries `dependency-reduced-pom.xml` beside `target/`, written by `ignoreBuildOutput` before a step's checks. Tests in drive.test.ts and ecosystem.test.ts prove each. Releasable as a patch: version.json moves to 3.13.4, stamped into the manifests with `npm run stamp:version`, with a CHANGELOG entry.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 210,
+      "dateTime": "2026-09-18T13:42:51.074000-04:00",
+      "task": "Make `dabbler configure` judge a model against the same checkout, vehicle and list that `configuration options` offered it from, and make a selection the vehicle now in force does not list say so. In packages/router/src/cli/configure.ts every reading configure uses to judge a choice -- the reviewing vehicle and the machine vehicle behind `transportFor` in particular -- is read for `--repo-root` (options.repoRoot) exactly as `configuration explain` and `options` read it, so a model `options` offers for a checkout is accepted for that checkout from any working directory. In packages/router/src/projection.ts the role node and the authoring node carry one new fact: where a selection exists and the list of the vehicle in force neither names it nor a counterpart of it, which vehicle does not list it; `configuration explain` and `options` (cli/configuration.ts) and the pane's model rows (solutionTreeModel.ts) say that vehicle does not list the model and that the next session -- or, for the Auxiliary, the first dispute -- will stop on it, instead of \"it is used\". The selection is neither cleared nor substituted. Tests: a new configure.test.ts keeps the sweep (every model `options` offers for each role, across engine x machine vehicle x reviewing vehicle over a small arranged catalog, is accepted by `configure --repo-root` from another directory) and proves a seat-only model is refused in an `api` checkout naming `api`; configuration.test.ts proves the not-listed report for an authoring model and an Auxiliary. The Playwright walk configuration-pane.spec.ts is extended to an `api` checkout over the Reviewing Vehicle row and the three model rows. Releasable as a patch: version.json moves to 3.13.5, stamped into the manifests with `npm run stamp:version`, with a CHANGELOG entry.",
+      "releasable": true
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 210,
+      "dateTime": "2026-09-18T13:53:26.988000-04:00",
+      "what": "step 'walk-the-reviewing-rows': its checks",
+      "reason": "The extension imports the router through packages/router/dist/index.cjs, which esbuild.js does not rebuild; without building the router first the walk drives a stale router and the new not-listed row cannot appear. The build is prepended; the other two checks are unchanged.",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

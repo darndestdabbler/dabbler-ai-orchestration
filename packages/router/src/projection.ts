@@ -673,6 +673,16 @@ export function authoringNode(
       ? "Nothing could be enumerated for this engine here, so these are the " +
         `CLI's own always-accepted aliases. ${AUTHORING_LIST_IS_A_SUGGESTION}`
       : AUTHORING_LIST_IS_A_SUGGESTION,
+    // The engine whose list does not name the model chosen for the next
+    // session, or null. Kept, never cleared: the start stops on it and says
+    // so, and this is that stop announced before anyone presses Start. A
+    // floor or an unread list cannot say what is missing from it, and a
+    // counterpart spelled the list's way is listed.
+    notListedBy:
+      model === null && declared !== null && !onFloor && reading.unavailable === null &&
+      !listed.some(([id]) => normalizeModelToken(id) === normalizeModelToken(declared))
+        ? engine
+        : null,
   };
 }
 
@@ -943,12 +953,28 @@ export function configurationNode(
     const reviewingTransport = String(reviewingVehicle["chosen"]);
     /** A reviewing role as this machine would resolve it, on the reviewing vehicle. */
     const authorProvider = typeof authoring["provider"] === "string" ? authoring["provider"] : null;
-    const reviewingNode = (role: string): Node => ({
-      ...roleNode(readingFor(reviewingTransport), role, null, authorModel, (provider) =>
+    const reviewingNode = (role: string): Node => {
+      const reading = readingFor(reviewingTransport);
+      const resolved = roleNode(reading, role, null, authorModel, (provider) =>
         vendorConflict(config, authorProvider, provider),
-      ),
-      vehicle: reviewingVehicle,
-    });
+      );
+      const selected = resolved["selected"];
+      return {
+        ...resolved,
+        vehicle: reviewingVehicle,
+        // The reviewing vehicle whose list names neither the selection nor
+        // a counterpart of it, or null. Announced, never cleared or
+        // substituted: the round stops on it, and the row says so first.
+        notListedBy:
+          typeof selected === "string" &&
+          reading.unavailable === null &&
+          !reading
+            .resolve(role, null, { applySelection: false })
+            .candidates.some(([id]) => normalizeModelToken(id) === normalizeModelToken(selected))
+            ? reviewingTransport
+            : null,
+      };
+    };
     return {
       transport: {
         effective: transport.transport,

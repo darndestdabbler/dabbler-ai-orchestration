@@ -342,11 +342,15 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   // model>` for naming a model the transport it is leaving does not list,
   // which is the one pair of flags a person switching machines would type
   // together.
+  // Read for the checkout this call NAMES, as `configuration options` reads
+  // it: the pane always calls with `--repo-root` from elsewhere, and a
+  // reading of the working directory's settings judged the pick against a
+  // vehicle the named checkout does not use.
   const transportFor = (roleOverride?: string): string =>
     roleOverride ??
     (options.transport !== undefined
-      ? explainTransport(config, options.transport).transport
-      : explainReviewingTransport(config).transport);
+      ? explainTransport(config, options.transport, options.repoRoot).transport
+      : explainReviewingTransport(config, null, options.repoRoot).transport);
   const readings = new Map<string, RoleReading>();
   const readingFor = (name: string): RoleReading => {
     const held = readings.get(name);

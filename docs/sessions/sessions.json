@@ -4155,17 +4155,38 @@
       "title": "A first push sets its upstream, and planning is not mistaken for a hang",
       "status": "complete",
       "startedAt": "2026-09-18T12:18:59.221000-04:00",
+      "completedAt": "2026-09-18T12:28:35.235000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-opus-5",
         "identityProvenance": "direct"
       },
-      "frameworkVersion": "3.13.3",
-      "completedAt": "2026-09-18T12:28:35.235000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,
+        "verifierModel": "gpt-5.6-terra",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      },
+      "frameworkVersion": "3.13.3"
+    },
+    {
+      "number": 210,
+      "title": "A model is checked against the list it was offered from",
+      "status": "in-progress",
+      "startedAt": "2026-09-18T13:40:36.914000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "direct"
+      },
+      "frameworkVersion": "3.13.4",
+      "completedAt": null,
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
         "verifierModel": "gpt-5.6-terra",
         "verifierProvider": "openai",
         "transport": "copilot-cli"

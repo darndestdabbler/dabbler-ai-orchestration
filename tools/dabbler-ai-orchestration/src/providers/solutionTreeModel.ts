@@ -194,6 +194,11 @@ export interface ConfigurationRole {
    */
   selected?: string | null;
   /**
+   * The vehicle whose list names neither this choice nor a counterpart of
+   * it, or null. The choice is kept; the row says where it will stop.
+   */
+  notListedBy?: string | null;
+  /**
    * The AUTHORING row only: true while a session in flight declared this
    * model at `session start`.
    *
@@ -1135,18 +1140,29 @@ export function descriptorFor(
     case "configRole": {
       const role = configRole(p, node.role);
       const authoring = node.role === "authoring";
+      const unlistedModel = role?.notListedBy ? (role.selected ?? role.chosen?.model ?? "") : null;
       return {
         id: `config:role:${node.role}`,
         label: ROLE_LABELS[node.role],
-        description: `${modelText(
-          role?.chosen,
-          // Only the authoring row: a reviewing role resolves its own head
-          // from the preference order, so a null chosen there really is
-          // nothing resolving rather than nobody having picked.
-          authoring ? (role?.candidates.length ?? 0) : 0,
-        )}${role?.fellThrough || role?.conflict ? " ⚠" : ""}`,
+        description:
+          unlistedModel !== null
+            ? `${unlistedModel} — not listed by ${role?.notListedBy} ⚠`
+            : `${modelText(
+                role?.chosen,
+                // Only the authoring row: a reviewing role resolves its own head
+                // from the preference order, so a null chosen there really is
+                // nothing resolving rather than nobody having picked.
+                authoring ? (role?.candidates.length ?? 0) : 0,
+              )}${role?.fellThrough || role?.conflict ? " ⚠" : ""}`,
         tooltip: [
           ROLE_HELP[node.role],
+          // Kept, never cleared or substituted: the stop is where it always
+          // was, and this row announces it before anyone presses Start.
+          unlistedModel !== null
+            ? `You chose ${unlistedModel}, which ${role?.notListedBy} does not list. ${
+                node.role === "auxiliaryReviewer" ? "The first dispute" : "The next session"
+              } will stop on it until you choose another.`
+            : "",
           // What narrows this role at the round, in the router's own words
           // rather than a second copy of them here. Only the Auxiliary
           // Reviewer carries one: what makes it a third voice is read from
@@ -1170,7 +1186,9 @@ export function descriptorFor(
           // never silently substituted, and it NARROWS -- a selection this
           // call cannot reach is a stop that names it, not a fall to the
           // next model.
-          role?.selected
+          unlistedModel !== null
+            ? ""
+            : role?.selected
             ? `You chose ${role.selected}. It is kept on this machine rather than in this repository, so it is already your own default and travels to no clone. It is what the round dispatches to, and nothing is substituted for it: if this call cannot reach it, the round stops and says so.`
             : authoring
               ? // A REPORT and a CHOICE look identical on a row that does not
@@ -1213,7 +1231,9 @@ export function descriptorFor(
           // order, where what answers is a model nobody named (which billed
           // one session 364 premium requests), and a chosen reviewer from
           // today's authoring vendor, which a Start would refuse.
-          ...(role?.fellThrough || role?.conflict ? { tone: "attention" as const } : {}),
+          ...(role?.fellThrough || role?.conflict || unlistedModel !== null
+            ? { tone: "attention" as const }
+            : {}),
         },
         expandable: false,
         contextValue: `dabblerConfigRole;${node.role}`,

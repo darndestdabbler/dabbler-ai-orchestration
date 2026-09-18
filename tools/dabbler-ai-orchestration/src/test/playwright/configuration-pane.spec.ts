@@ -19,10 +19,12 @@
 // preferences are files under this test's own temp root, named through the
 // router's own seams, so nothing here reads or writes the operator's.
 
+import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { test, expect } from "@playwright/test";
 import {
+  DABBLER_CLI,
   LaunchedVSCode,
   cleanupTmpDir,
   closeVSCode,
@@ -79,14 +81,18 @@ test.beforeAll(async () => {
   );
   // The vehicle, committed in this checkout exactly as an operator's would
   // be -- not an environment variable, which is not how a vehicle is chosen
-  // any more.
+  // any more. Reviews start on the seat so the walk can move them to `api`.
   fs.mkdirSync(path.join(workspace, ".vscode"), { recursive: true });
   fs.writeFileSync(
     path.join(workspace, ".vscode", "settings.json"),
-    JSON.stringify({ "dabbler.transport": "api" }, null, 2),
+    JSON.stringify({ "dabbler.transport": "api", "dabbler.reviewerTransport": "copilot-cli" }, null, 2),
     "utf8",
   );
   // A catalog this machine has "read", so the rows have models to offer.
+  // Both vehicles, spelling one Anthropic model differently -- the pair the
+  // pane refused in session 210. The seat block claims no account: the
+  // launch's HOME is its own, so this machine has no seat identity to
+  // compare one with.
   fs.writeFileSync(
     catalogPath,
     JSON.stringify({
@@ -103,6 +109,18 @@ test.beforeAll(async () => {
             catalogModel("claude-sonnet-5", "anthropic"),
             catalogModel("gpt-5.6-terra", "openai"),
             catalogModel("gemini-3.1-pro-preview", "google"),
+            catalogModel("claude-haiku-4-5-20251001", "anthropic"),
+          ],
+          retired: [],
+        },
+        "copilot-cli": {
+          refreshed_at: "2026-09-12T00:00:00Z",
+          source: "acp-session-new",
+          scope: {},
+          models: [
+            catalogModel("claude-haiku-4.5", "anthropic"),
+            catalogModel("gpt-5.6-sol", "openai"),
+            catalogModel("gemini-3.8-flash", "google"),
           ],
           retired: [],
         },
@@ -264,4 +282,127 @@ test("choosing a model writes it, and the row says so without a reload", async (
   await expect
     .poll(async () => (await rowTexts(pane)).join(" | "), { timeout: 15_000 })
     .toContain(chosen);
+});
+
+/**
+ * What `dabbler configuration options` offers this checkout, per participant:
+ * the vehicle ids and the model ids. Run over the same catalog, preferences
+ * and keys the editor was launched with, and a HOME of its own, so the router
+ * reads the machine the editor reads.
+ */
+function routerOffers(): Record<string, { vehicles: string[]; models: string[] }> {
+  const out = execFileSync(
+    process.execPath,
+    [DABBLER_CLI, "configuration", "options", "--repo-root", workspace],
+    {
+      encoding: "utf8",
+      timeout: 60_000,
+      env: {
+        ...process.env,
+        HOME: state,
+        USERPROFILE: state,
+        DABBLER_CATALOG_PATH: catalogPath,
+        DABBLER_PREFERENCES_PATH: preferencesPath,
+        DABBLER_ANTHROPIC_API_KEY: "walk",
+        DABBLER_OPENAI_API_KEY: "walk",
+        DABBLER_GEMINI_API_KEY: "walk",
+      },
+    },
+  );
+  const offers: Record<string, { vehicles: string[]; models: string[] }> = {};
+  let current: { vehicles: string[]; models: string[] } | null = null;
+  for (const line of out.split(/\r?\n/)) {
+    if (/^\S/.test(line)) {
+      current = { vehicles: [], models: [] };
+      offers[line.trim()] = current;
+      continue;
+    }
+    const model = /^ {4}[-*] (\S+) \(/.exec(line);
+    const vehicle = /^ {4}[-*] (\S+) — /.exec(line);
+    if (current && model) current.models.push(model[1]);
+    else if (current && vehicle) current.vehicles.push(vehicle[1]);
+  }
+  return offers;
+}
+
+/** The labels the open pick offers, and the pick closed again. */
+async function pickLabels(row: import("@playwright/test").Locator): Promise<string[]> {
+  await row.click();
+  const picker = vscode.page.locator(".quick-input-widget");
+  await picker.waitFor({ state: "visible", timeout: 15_000 });
+  // The first `.label-name` of each row is the item's label; a description
+  // or a detail line renders another one beneath it.
+  const rows = vscode.page.locator(".quick-input-list .monaco-list-row");
+  const labels: string[] = [];
+  for (let index = 0; index < (await rows.count()); index += 1) {
+    labels.push((await rows.nth(index).locator(".label-name").first().innerText()).trim());
+  }
+  await vscode.page.keyboard.press("Escape");
+  await vscode.page.waitForTimeout(300);
+  return labels.sort();
+}
+
+/** Open the row's pick, choose one label, and let the write repaint. */
+async function choose(row: import("@playwright/test").Locator, label: string): Promise<void> {
+  await row.click();
+  await vscode.page.locator(".quick-input-widget").waitFor({ state: "visible", timeout: 15_000 });
+  await vscode.page.keyboard.type(label);
+  await vscode.page.keyboard.press("Enter");
+  await vscode.page.waitForTimeout(3_000);
+}
+
+function reviewingVehicleRow(): import("@playwright/test").Locator {
+  return pane.locator(".monaco-list-row").filter({ hasText: "Vehicle" }).nth(1);
+}
+
+function roleRow(label: RegExp): import("@playwright/test").Locator {
+  return pane.locator(".monaco-list-row").filter({ hasText: label }).first();
+}
+
+/** Each pick offers exactly what the router offers for that row. */
+async function everyPickIsTheRoutersOffer(): Promise<void> {
+  const offers = routerOffers();
+  expect(await pickLabels(reviewingVehicleRow())).toEqual(
+    [...offers["Primary Reviewer"].vehicles].sort(),
+  );
+  for (const [label, row] of [
+    ["Authoring AI", authoringModelRow()],
+    ["Primary Reviewer", roleRow(/^Primary Model/)],
+    ["Auxiliary Reviewer", roleRow(/^Auxiliary Model/)],
+  ] as const) {
+    expect(offers[label].models.length, label).toBeGreaterThan(0);
+    expect(await pickLabels(row), label).toEqual([...offers[label].models].sort());
+  }
+}
+
+test("on the seat, every pick offers exactly what the router offers", async () => {
+  await everyPickIsTheRoutersOffer();
+});
+
+test("an Auxiliary chosen on the seat is said to be not listed once reviews move to api", async () => {
+  await choose(roleRow(/^Auxiliary Model/), "gemini-3.8-flash");
+  expect(fs.readFileSync(preferencesPath, "utf8")).toContain("gemini-3.8-flash");
+  await choose(reviewingVehicleRow(), "api");
+  const settings = JSON.parse(
+    fs.readFileSync(path.join(workspace, ".vscode", "settings.json"), "utf8"),
+  ) as Record<string, string>;
+  expect(settings["dabbler.reviewerTransport"]).toBe("api");
+  // Kept, and announced: the row names the vehicle that does not list it.
+  await expect
+    .poll(async () => (await rowTexts(pane)).join(" | "), { timeout: 15_000 })
+    .toContain("gemini-3.8-flash — not listed by api");
+});
+
+test("on api, every pick offers exactly what the router offers", async () => {
+  await everyPickIsTheRoutersOffer();
+});
+
+test("a Primary the two lists spell differently is accepted on api and repaints the row", async () => {
+  // The seat spells it `claude-haiku-4.5`; this pick was refused against
+  // the seat's list when the pane called from outside the checkout.
+  await choose(roleRow(/^Primary Model/), "claude-haiku-4-5-20251001");
+  expect(fs.readFileSync(preferencesPath, "utf8")).toContain("claude-haiku-4-5-20251001");
+  await expect
+    .poll(async () => (await rowTexts(pane)).join(" | "), { timeout: 15_000 })
+    .toMatch(/Primary Model[^|]*claude-haiku-4-5-20251001/);
 });

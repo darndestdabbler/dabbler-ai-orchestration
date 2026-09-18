@@ -17,6 +17,7 @@ import { currentCredentialsPath, setCredentialsPath } from "../src/credentials.t
 import { configurationNode } from "../src/projection.ts";
 import { explainAuthoringModel, loadConfig, resetProjectRootCache } from "../src/config.ts";
 import { readPreferences, writePreferences } from "../src/preferences.ts";
+import { ROLE_AUXILIARY_REVIEWER } from "../src/selection.ts";
 import {
   SETTING_AUTHORING_MODEL,
   SETTING_CREDENTIAL_ANTHROPIC,
@@ -180,6 +181,32 @@ describe("what may be chosen, and what decided what is", () => {
       assert.doesNotMatch(line, /nobody chose one/);
       assert.match(line, /you chose it/);
     } finally {
+      writeSettings(root, { [SETTING_AUTHORING_MODEL]: "" });
+      restore();
+    }
+  });
+
+  it("says a chosen model the vehicle in force does not list is not listed there, and keeps it", async () => {
+    // Chosen under one vehicle, then the vehicle moved: "it is used" was
+    // said of a model the next session or the first dispute will stop on.
+    const { root, restore } = machine();
+    try {
+      writeSettings(root, { [SETTING_AUTHORING_MODEL]: "gpt-5.6-terra" });
+      writePreferences({ role: ROLE_AUXILIARY_REVIEWER, selected: "gemini-3.8-flash" });
+      const run = await capture(() => configurationVerb(["explain", "--repo-root", root]));
+      assert.equal(run.value, 0, run.stderr);
+      const line = (label: string): string =>
+        run.stdout.split("\n").find((row) => row.startsWith(`${label} model:`)) as string;
+      assert.match(line("Authoring AI"), /'gpt-5\.6-terra', which claude-code does not list/);
+      assert.match(line("Auxiliary Reviewer"), /'gemini-3\.8-flash', which api does not list; the first dispute/);
+      assert.doesNotMatch(line("Auxiliary Reviewer"), /it is used/);
+      // A counterpart spelled the list's way is listed, not reported.
+      writeSettings(root, { [SETTING_AUTHORING_MODEL]: "claude-opus.5" });
+      const again = await capture(() => configurationVerb(["explain", "--repo-root", root]));
+      const authoring = again.stdout.split("\n").find((row) => row.startsWith("Authoring AI model:")) as string;
+      assert.doesNotMatch(authoring, /does not list/);
+    } finally {
+      writePreferences({ role: ROLE_AUXILIARY_REVIEWER, selected: "" });
       writeSettings(root, { [SETTING_AUTHORING_MODEL]: "" });
       restore();
     }

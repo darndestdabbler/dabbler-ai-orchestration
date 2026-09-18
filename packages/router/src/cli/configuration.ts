@@ -74,6 +74,19 @@ const PARTICIPANTS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 /**
+ * A selection the vehicle in force does not list, said as the stop it will
+ * be -- or null. The selection is kept: a person changes it, nothing else.
+ */
+function notListed(participant: Node, key: string): string | null {
+  const by = text(participant["notListedBy"]);
+  if (by === null) return null;
+  const model = text(participant["selected"]) ?? text(node(participant["chosen"])["model"]) ?? "";
+  const stop =
+    key === "auxiliaryReviewer" ? "the first dispute will stop on it" : "the next session will stop on it";
+  return `you chose '${model}', which ${by} does not list; ${stop} until it is changed`;
+}
+
+/**
  * What each participant could be given, with what reaching it would take.
  *
  * Availability travels WITH each choice rather than in a separate listing,
@@ -105,6 +118,8 @@ function renderOptions(configuration: Node): string {
     }
     const chosenModel = text(node(participant["chosen"])["model"]);
     lines.push(`  model: ${chosenModel ?? "nothing resolves"}`);
+    const unlisted = notListed(participant, key);
+    if (unlisted !== null) lines.push(`    ! ${unlisted}`);
     const candidates = rows(participant["candidates"]);
     if (candidates.length === 0) {
       lines.push(`    (none: ${text(participant["unavailable"]) ?? "no model qualifies here"})`);
@@ -204,14 +219,17 @@ export function renderExplain(configuration: Node): string {
     // line -- "nobody chose one" beside the model they had just chosen, and
     // "the preference order decides" about an order that does not exist.
     const authoring = key === "authoring";
-    const why = authoring
+    const unlisted = notListed(participant, key);
+    const why = unlisted !== null
+      ? ` (${unlisted})`
+      : authoring
       ? chosen === null
         ? " (nobody has chosen one, so the engine's own default runs and no --model is passed)"
         : " (you chose it; it is what the engine's CLI is launched on)"
       : selected === null
         ? " (nobody chose one, so the preference order decides)"
         : ` (you chose '${selected}'; it is used and never silently substituted)`;
-    lines.push(`${label} model: ${chosen ?? "nothing resolves"}${why}`);
+    lines.push(`${label} model: ${chosen ?? (unlisted === null ? "nothing resolves" : selected ?? "")}${why}`);
   }
   for (const credential of rows(configuration["credentials"])) {
     const provider = text(credential["provider"]) ?? "";

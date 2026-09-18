@@ -10,6 +10,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.13.5] — 2026-09-18
+
+**The Configuration pane can set what it offers, and says when a choice no longer fits.**
+
+### Fixed
+
+- Choosing a Primary or Auxiliary Reviewer model from the pane in a
+  checkout that reviews on `api` was refused as "not a model the
+  copilot-cli transport lists". `dabbler configure --repo-root` judged the
+  pick against the vehicle of the directory it was called from rather than
+  the checkout it named. It now reads the named checkout's settings, so a
+  model `dabbler configuration options` offers is one `configure` accepts.
+- A chosen model the vehicle now in force does not list (the authoring
+  model after an engine change, or a reviewer after the reviewing vehicle
+  moves) is no longer reported as "it is used". `configuration explain`,
+  `configuration options` and the pane's model row say which vehicle does
+  not list it, and that the next session (or, for the Auxiliary, the first
+  dispute) will stop on it. The choice is kept, and nothing is substituted.
+
 ## [3.13.4] — 2026-09-18
 
 **A new repository's first session lands, and a planning AI is left to plan.**

@@ -4090,7 +4090,7 @@
     {
       "number": 206,
       "title": "The Reviewing AI's Vehicle row sets what it shows",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-18T04:22:11.085000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -4099,7 +4099,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.13.0",
-      "completedAt": null,
+      "completedAt": "2026-09-18T04:32:32.984000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,

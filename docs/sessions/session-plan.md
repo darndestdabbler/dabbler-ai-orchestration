@@ -12555,3 +12555,46 @@ untouched.
   longer asks a vehicle.
 
 **Releasable.** Yes, a patch: a control that said it worked now does.
+
+### Session 207 of 207: A waiter waits for the done it is owed
+
+Scope: whole repository
+
+**Why.** At the end of session 205 the final waiter printed the idle
+instruction -- "nothing is in flight" -- instead of session 205's own `done`.
+The record shows the gap: the ledger's `completedAt` is 04:04:09.627 and the
+`done` on `instruction.json` is issued at 04:04:14.455, five seconds later.
+`phaseClose` in `drive.ts` runs `session close` as a job, and the close nulls
+`currentSession` and commits; only when the job returns does the loop call
+`issueDone()`. `sessionWait` polls `currentSession`, and a waiter that reads
+in that window calls `waiterEnd`, which reads the session's instruction --
+still the last step -- and, finding no `done`, falls back to the idle
+instruction. Session 204 built `waiterEnd` for exactly this handoff; it did
+not close the window.
+
+(The loop that ran 205 was also a stale bundle -- `frameworkVersion` 3.10.0
+on the ledger, from the `npm link` at `%APPDATA%\npm\node_modules\
+dabbler-ai-router` pointing at this checkout's own `dist`, built before 203
+and 204 landed. That is why its `done` carried no `ask`. The race above is
+in current source regardless.)
+
+**What -- a waiter whose session goes null waits for that session's `done`.**
+When `currentSession` becomes null under a waiter that was watching a
+session, `waiterEnd` polls that session's instruction for the `done` the
+loop is about to write -- bounded, `CLOSE_DONE_GRACE_MS`, on the order of
+thirty seconds -- and prints it. Only after the grace, with no `done`
+written, does it print the idle instruction. A waiter that never watched a
+session prints idle at once, as today.
+
+**Non-goals.** No change to the close's order: the close verb owns the
+ledger write and the loop owns the instruction, and moving `issueDone`
+ahead of a close that may still refuse would write a `done` for a session
+that is not done. No change to what `session next` prints for a person.
+
+**Tests** (`drive.test.ts`).
+- A waiter whose session goes null with its `done` written within the grace
+  prints that `done`.
+- A waiter whose session goes null and whose `done` never comes prints the
+  idle instruction after the grace.
+
+**Releasable.** Yes, a patch: the last thing a session says is its own.

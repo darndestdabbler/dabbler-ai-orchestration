@@ -4069,7 +4069,7 @@
     {
       "number": 205,
       "title": "A crashed loop comes back by itself",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-18T03:39:31.251000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -4078,7 +4078,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.10.0",
-      "completedAt": null,
+      "completedAt": "2026-09-18T04:04:09.627000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,

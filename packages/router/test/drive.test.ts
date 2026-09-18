@@ -51,6 +51,7 @@ import {
   namedTestCommands,
   overdueMultiple,
   owedInstruction,
+  pushLanded,
   QUIET_TREE_SECONDS,
   quietTreeProbeDue,
   reportedFiles,
@@ -69,7 +70,6 @@ import { rewindPhaseFor } from "../src/gates.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
-
 const INSTRUCTION = {
   schema_version: 1,
   seq: 4,
@@ -270,10 +270,13 @@ describe("when a step sits unanswered over a quiet tree", () => {
       );
 
     // Quiet: files written at +41 s, then nothing.
-    assert.equal(quietTreeProbeDue(issued, at(QUIET_TREE_SECONDS), null, false), false);
-    assert.equal(quietTreeProbeDue(issued, at(QUIET_TREE_SECONDS + 1), null, false), true);
+    assert.equal(quietTreeProbeDue("s", issued, at(QUIET_TREE_SECONDS), null, false), false);
+    assert.equal(quietTreeProbeDue("s", issued, at(QUIET_TREE_SECONDS + 1), null, false), true);
     assert.equal(reading(new Date(at(41)).toISOString(), 345).state, WATCHER_OUTSTANDING);
-    assert.equal(quietTreeProbeDue(issued, at(400), at(345), true), false);
+    assert.equal(quietTreeProbeDue("s", issued, at(400), at(345), true), false);
+
+    // A plan is asked to change nothing: its quiet tree is not a hang.
+    assert.equal(quietTreeProbeDue("plan", issued, at(QUIET_TREE_SECONDS + 1), null, false), false);
 
     // Moving: touched a minute ago, so the quiet rule says nothing.
     assert.equal(reading(new Date(at(1200)).toISOString(), 1260).state, "quiet");
@@ -715,6 +718,46 @@ describe("what the local gate receipt names", () => {
   // that can actually move, which is a fact about a real remote and not
   // about a script. The assertion lives in walk-git-states.test.ts, over a
   // real origin, beside the receipt's deliberate exception.
+});
+
+describe("the land's push on a branch with no upstream", () => {
+  it("sets the upstream to the one remote, and stops naming the command when there are two", () => {
+    // A new GitHub repository's first session stopped at the push, on the
+    // one line git prints to cure it.
+    const pushes: string[][] = [];
+    const scripted = (remotes: string) =>
+      gitAnswers([
+        [["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], { code: 128, stderr: "fatal: no upstream configured for branch 'master'" }],
+        [["rev-parse", "--abbrev-ref", "HEAD"], { stdout: "master" }],
+        [["remote"], { stdout: remotes }],
+        [
+          ["push"],
+          (args) => {
+            pushes.push([...args]);
+            return {};
+          },
+        ],
+      ]);
+    const one = scripted("csv-parser\n");
+    try {
+      pushLanded("/repo");
+    } finally {
+      one();
+    }
+    assert.deepEqual(pushes, [["push", "--set-upstream", "csv-parser", "master"]]);
+
+    const two = scripted("origin\nmirror\n");
+    try {
+      assert.throws(
+        () => pushLanded("/repo"),
+        (error: Error & { kind?: string }) =>
+          error.kind === "land" && error.message.includes("git push --set-upstream <remote> master"),
+      );
+    } finally {
+      two();
+    }
+    assert.equal(pushes.length, 1);
+  });
 });
 
 describe("a publish refused on an earlier phase's evidence", () => {

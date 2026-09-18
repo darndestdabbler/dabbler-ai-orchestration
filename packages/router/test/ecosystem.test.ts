@@ -178,6 +178,8 @@ describe("the build output a step's check writes", () => {
     assert.equal(ensureRootFiles(root, graph), null);
     assert.deepEqual(ignoreBuildOutput(root, graph), [".gitignore"]);
     assert.match(readFileSync(join(root, ".gitignore"), "utf8"), /^target\/$/m);
+    // `mvn package` with the shade plugin writes this beside the module's POM.
+    assert.match(readFileSync(join(root, ".gitignore"), "utf8"), /^dependency-reduced-pom\.xml$/m);
     assert.deepEqual(ignoreBuildOutput(root, graph), []);
   });
 });

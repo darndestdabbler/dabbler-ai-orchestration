@@ -10,6 +10,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.13.4] — 2026-09-18
+
+**A new repository's first session lands, and a planning AI is left to plan.**
+
+### Fixed
+
+- The land's push on a branch with no upstream sets it, where the
+  repository has exactly one remote: a new repository's first session no
+  longer stops on git's "has no upstream branch". With more than one
+  remote the stop stays, and names `git push --set-upstream <remote>
+  <branch>`, because which remote is the trunk's is yours to say.
+- The `plan` step is no longer said to be quiet after five minutes. It is
+  asked to change nothing, so an unmoving tree there is not a hang; it is
+  held to the stall threshold alone. Work steps keep the notice.
+- A Maven repository's `.gitignore` carries `dependency-reduced-pom.xml`
+  beside `target/`, so the shade plugin's by-product from a step's own
+  `mvn package` no longer refuses the step's report.
+
 ## [3.13.3] — 2026-09-18
 
 **A quiet AI is said so in minutes.**

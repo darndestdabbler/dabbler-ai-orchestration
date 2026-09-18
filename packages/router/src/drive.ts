@@ -367,7 +367,9 @@ export function overdueMultiple(
  * nothing for five minutes is usually blocked on a command that hung, and
  * the silence reads as the framework's own until something names it. A tree
  * that is moving reads quiet under the same rule, so a working AI is never
- * interrupted about it.
+ * interrupted about it. The `plan` step is asked to change nothing and
+ * writes its answer where the tree does not track it, so it is held to the
+ * stall threshold alone.
  */
 export const QUIET_TREE_SECONDS = 300;
 
@@ -376,15 +378,17 @@ export const QUIET_PROBE_INTERVAL_MS = 60_000;
 
 /**
  * Whether the quiet-tree probe is due: strictly past the quiet threshold,
- * not yet said for this instruction, and a minute since the last probe.
+ * not yet said for this instruction, a minute since the last probe, and not
+ * the `plan` step.
  */
 export function quietTreeProbeDue(
+  stepId: string | null | undefined,
   issuedAtMs: number,
   nowMs: number,
   lastProbeMs: number | null,
   said: boolean,
 ): boolean {
-  if (said || !Number.isFinite(issuedAtMs)) return false;
+  if (said || stepId === "plan" || !Number.isFinite(issuedAtMs)) return false;
   if (Math.trunc((nowMs - issuedAtMs) / 1000) <= QUIET_TREE_SECONDS) return false;
   return lastProbeMs === null || nowMs - lastProbeMs >= QUIET_PROBE_INTERVAL_MS;
 }
@@ -797,6 +801,36 @@ class Stop extends Error {
     this.code = code;
     this.brief = brief;
     this.name = "Stop";
+  }
+}
+
+/**
+ * The land's push. A branch with no upstream is a new repository's first
+ * push, and with one remote the upstream can only be that remote, so the push
+ * sets it. With several, which remote is the trunk's is a person's to say,
+ * and the stop names the command. A push that reached a remote and was
+ * refused keeps git's own words: a rejected non-fast-forward, a credential, a
+ * protected branch. That text IS the diagnosis there, and rewriting it would
+ * cost the operator the one string worth searching for.
+ */
+export function pushLanded(repoRoot: string): void {
+  let args = ["push"];
+  if (runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).code !== 0) {
+    const branch = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout;
+    const remotes = runGit(repoRoot, ["remote"]).stdout.split(/\r?\n/).filter((name) => name !== "");
+    if (remotes.length !== 1) {
+      throw new Stop(
+        "land",
+        `branch ${branch} has no upstream and this repository has ${remotes.length} remotes, so which ` +
+          `one is the trunk's is yours to say. The commit landed and nothing is lost: run ` +
+          `\`git push --set-upstream <remote> ${branch}\` with the remote it belongs on.`,
+      );
+    }
+    args = ["push", "--set-upstream", remotes[0]!, branch];
+  }
+  const pushed = runGit(repoRoot, args);
+  if (pushed.code !== 0) {
+    throw new Stop("land", `the push was refused: ${tail(pushed.stderr, 300)}`);
   }
 }
 
@@ -1503,7 +1537,7 @@ class Driver {
     let quietSaid = false;
     let quietProbedAt: number | null = null;
     const poll = setInterval(() => {
-      if (reason === null && quietTreeProbeDue(issued, Date.now(), quietProbedAt, quietSaid)) {
+      if (reason === null && quietTreeProbeDue(instruction.step_id, issued, Date.now(), quietProbedAt, quietSaid)) {
         quietProbedAt = Date.now();
         const reading = readWatcher(this.repoRoot, this.sessionNumber, QUIET_TREE_SECONDS);
         if (reading.state === WATCHER_OUTSTANDING) {
@@ -3103,14 +3137,7 @@ class Driver {
         this.setPhase("gate-wait");
         return;
       }
-      const pushed = runGit(this.repoRoot, ["push"]);
-      if (pushed.code !== 0) {
-        // A push that reached a remote and was refused keeps git's own
-        // words: a rejected non-fast-forward, a credential, a protected
-        // branch. That text IS the diagnosis there, and rewriting it would
-        // cost the operator the one string worth searching for.
-        throw new Stop("land", `the push was refused: ${tail(pushed.stderr, 300)}`);
-      }
+      pushLanded(this.repoRoot);
     }
     const local = localGateReceipt(this.repoRoot);
     if (local.receipt === null) {

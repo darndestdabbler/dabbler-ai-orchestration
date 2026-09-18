@@ -522,7 +522,22 @@ close's log), `interrupted` (you asked), `budget` (the invocation bound,
 which only `session drive` below can meet), `tree` (the working tree
 already carried changes when the declaration was made -- commit or revert
 them; `session start` asks the same question first, so this one is met only
-when the tree moved between the registration and the plan), `engine`.
+when the tree moved between the registration and the plan), `engine`,
+`crash` (below).
+
+**A loop that dies is started again, and a stop is not.** `session run
+--mailbox` copies everything it writes to `.dabbler/runs/s<N>/driver/loop.log`,
+whoever started it — the terminal the extension opens for it may never show a
+word. An error it did not mean leaves `loop-crashed` on `supervision.jsonl`
+and in the log, and **no stop** on `run.json`: nobody decided anything. The
+waiter reads that absence. Finding the heartbeat stale and no stop recorded,
+it starts the loop again itself, records `loop-restarted`, and goes on
+waiting; the AI never sees the gap. It does this at most twice for one point
+— the phase and the seq last issued — and the count starts afresh once the
+loop gets past it. A third death at the same point is recorded as a `crash`
+stop, whose ways on name the log and the restart, and the waiter prints it
+like any other. **A recorded stop is never restarted**: every other kind was
+meant, and Resume stays the way past one.
 
 `stop_history` keeps the last few stops, oldest first, if you want to see
 the shape of a run. A close or a publish that has already happened is

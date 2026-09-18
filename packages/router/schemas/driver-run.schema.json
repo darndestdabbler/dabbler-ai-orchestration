@@ -85,7 +85,7 @@
       "properties": {
         "kind": {
           "$ref": "#/$defs/stopKind",
-          "description": "Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a working tree that already carried changes when the declaration was made, which is the tree's stop and not the engine's; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; packaging refusing or failing to reach the feed; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason)."
+          "description": "Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a working tree that already carried changes when the declaration was made, which is the tree's stop and not the engine's; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; packaging refusing or failing to reach the feed; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason); the loop dying with no stop recorded, twice restarted by a waiter at one point without getting past it (`crash`, the one kind a waiter writes rather than the loop)."
         },
         "code": { "$ref": "#/$defs/stopCode" },
         "reason": { "type": "string", "minLength": 1 },
@@ -361,7 +361,8 @@
         "land",
         "publish",
         "close",
-        "interrupted"
+        "interrupted",
+        "crash"
       ]
     },
     "stopCode": {

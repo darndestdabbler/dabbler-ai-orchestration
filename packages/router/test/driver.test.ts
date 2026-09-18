@@ -6,7 +6,7 @@
 // admit -- and every clock is a function of an instruction, a run record and
 // two probes handed in. The verbs an engine types are walk-session's.
 import assert from "node:assert/strict";
-import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -705,18 +705,33 @@ describe("an adviser's proposal, as a person would type it", () => {
 });
 
 describe("a stop, as a person reads it", () => {
-  const KINDS = [
-    "budget",
-    "rejected-thrice",
-    "blocked",
-    "engine",
-    "tests",
-    "verification",
-    "land",
-    "publish",
-    "close",
-    "interrupted",
-  ];
+  // The closed unions themselves, so a kind or code added to the schema is
+  // held to the same rule the moment it can be recorded.
+  const RUN_DEFS = (
+    JSON.parse(readFileSync(new URL("../schemas/driver-run.schema.json", import.meta.url), "utf8")) as {
+      $defs: { stopKind: { enum: string[] }; stopCode: { enum: Array<string | null> } };
+    }
+  ).$defs;
+  const KINDS = RUN_DEFS.stopKind.enum;
+  const CODES = RUN_DEFS.stopCode.enum.filter((code): code is string => code !== null);
+
+  it("offers a runnable way on from every kind and every code, besides ending the session", () => {
+    // Zero deadlock tolerance as a property: no stop the loop can record
+    // leaves a person with nothing to run but the cancel.
+    for (const [kind, code] of [
+      ...KINDS.map((kind) => [kind, null] as const),
+      ...CODES.map((code) => ["verification", code] as const),
+    ]) {
+      for (const engine of ["cli", "claude-code"]) {
+        const stop = { kind, code, reason: "the widget is load-bearing", step_id: "widget" };
+        const words = renderStop(stop as never, { session_number: 7, phase: "verify", engine });
+        const onward = words.choices.filter(
+          (choice) => /^dabbler \S/.test(choice.command) && !/session cancel/.test(choice.command),
+        );
+        assert.ok(onward.length >= 1, `${code ?? kind}/${engine}: ${words.ways}`);
+      }
+    }
+  });
 
   it("says what happened, that the command ended and the session did not, who acts, and every way on with its cost and its command", () => {
     // Every kind, both modes: the four things a person needs are the same

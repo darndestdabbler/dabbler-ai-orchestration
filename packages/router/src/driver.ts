@@ -1411,6 +1411,8 @@ interface MoveParts {
   readonly phase: string;
   /** " 'widget'" when the stop was on a step, empty when it was not. */
   readonly step: string;
+  /** The session's number, as its run folder names it. */
+  readonly session: number;
 }
 
 /** Ending it, which is a way on from every stop and never the first one. */
@@ -1550,6 +1552,24 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "Satisfy the gate the close named, then carry on",
         "Whatever the gate demands; its row names it, and the close is run again.",
       ),
+      cancelChoice(),
+    ],
+  },
+  crash: {
+    what:
+      "The loop died with no stop recorded, and starting it again twice did " +
+      "not get it past this point.",
+    actor: "operator",
+    moves: (parts) => [
+      {
+        label:
+          `Read .dabbler/runs/s${parts.session}/driver/loop.log, put right what ` +
+          "it names, then start the loop again",
+        cost:
+          `Nothing but the restart: the loop re-enters '${parts.phase}' and ` +
+          "nothing already accepted is asked for again.",
+        command: "dabbler session run --mailbox",
+      },
       cancelChoice(),
     ],
   },
@@ -1854,6 +1874,7 @@ export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
     resume,
     phase: run.phase,
     step: stop.step_id ? ` '${stop.step_id}'` : "",
+    session: run.session_number,
   });
   const next = actorSentence(actor, resume);
   return {

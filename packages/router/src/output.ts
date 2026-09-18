@@ -18,6 +18,7 @@
 // a caller reads is what a command line would have shown and not a second
 // spelling of it.
 
+import { appendFileSync } from "node:fs";
 import { EOL } from "node:os";
 
 function withPlatformNewlines(text: string): string {
@@ -31,16 +32,39 @@ interface Buffers {
 
 let collecting: Buffers | null = null;
 let diverting = false;
+let teeing: string | null = null;
+
+/**
+ * Append everything written from here on to `path` as well, or stop with
+ * null. A terminal may never show what a process wrote -- the extension's
+ * loop runs detached from the console of the tab it names -- so the loop
+ * keeps its own copy. A failed append loses a line of the copy, never the
+ * write it copies.
+ */
+export function teeOutput(path: string | null): void {
+  teeing = path;
+}
+
+function tee(bytes: string): void {
+  if (teeing === null) return;
+  try {
+    appendFileSync(teeing, bytes, "utf8");
+  } catch {
+    // The copy is a convenience; the write itself already happened.
+  }
+}
 
 export function writeOut(text: string): void {
   const bytes = withPlatformNewlines(text);
-  if (diverting) writeErr(text);
-  else if (collecting) collecting.out += bytes;
+  if (diverting) return writeErr(text);
+  tee(bytes);
+  if (collecting) collecting.out += bytes;
   else process.stdout.write(bytes);
 }
 
 export function writeErr(text: string): void {
   const bytes = withPlatformNewlines(text);
+  tee(bytes);
   if (collecting) collecting.err += bytes;
   else process.stderr.write(bytes);
 }

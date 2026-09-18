@@ -10,6 +10,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.13.0] — 2026-09-18
+
+**A session survives its loop dying.**
+
+### Added
+
+- The loop keeps a log. `session run --mailbox` copies everything it
+  writes to `.dabbler/runs/s<N>/driver/loop.log`, so a loop whose terminal
+  showed nothing still says what it was doing when it ended.
+- A crash leaves evidence rather than a verdict: an error the loop did not
+  mean is written to `supervision.jsonl` as `loop-crashed`, and to the log
+  with its stack, and `run.json` carries no stop.
+- The waiter starts a crashed loop again by itself and goes on waiting,
+  so nobody has to press Resume for it. It tries twice at one point in the
+  session; a third death there is recorded as a new `crash` stop naming
+  the log and the restart command. A stop the loop recorded on purpose is
+  never restarted.
+- Every stop kind and code is tested to offer at least one command that
+  moves the session on, besides cancelling it.
+
 ## [3.12.0] — 2026-09-17
 
 **An instruction says what it means, so the loop stops where the session

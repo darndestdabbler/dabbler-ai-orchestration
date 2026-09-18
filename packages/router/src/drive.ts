@@ -32,6 +32,7 @@
 // nothing: the session stays in flight, `run.json` says why, and a re-run
 // continues from the phase it reached.
 
+import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
@@ -44,7 +45,7 @@ import {
   timeoutFor,
   execute as executeCheck,
 } from "./checks.ts";
-import { divertOut, writeErr, writeOut } from "./output.ts";
+import { divertOut, teeOutput, writeErr, writeOut } from "./output.ts";
 import {
   ConfigError,
   DEFAULT_ENGINE_OUTPUT,
@@ -3719,6 +3720,122 @@ export function noLoopMessage(
 }
 
 /**
+ * How many times a waiter starts a loop that died again at one progress
+ * point -- the phase and the seq last issued -- before it records a `crash`
+ * stop instead. Progress moves the point, so the count starts afresh there.
+ */
+export const LOOP_RESTARTS = 2;
+
+/** Starts the mailbox loop; the seam a test replaces so nothing is spawned. */
+export type LoopStarter = (sessionsDir: string) => void;
+
+/** Start `dabbler session run --mailbox` detached, owing this waiter nothing. */
+export const startLoopDetached: LoopStarter = (sessionsDir) => {
+  const argv = [...selfArgv(), "session", "run", "--mailbox", "--sessions-dir", sessionsDir];
+  const child = spawn(argv[0]!, argv.slice(1), { detached: true, stdio: "ignore", windowsHide: true });
+  child.unref();
+};
+
+/** The `loop-restarted` rows for one progress point: how many, and when the last was. */
+function restartsAt(
+  repoRoot: string,
+  sessionNumber: number,
+  phase: string,
+  seq: number,
+): { readonly count: number; readonly last: number | null } {
+  let text: string;
+  try {
+    text = readFileSync(join(dirname(loopPath(repoRoot, sessionNumber)), "supervision.jsonl"), "utf8");
+  } catch {
+    return { count: 0, last: null };
+  }
+  let count = 0;
+  let last: number | null = null;
+  for (const line of text.split("\n")) {
+    try {
+      const row = JSON.parse(line) as Record<string, unknown>;
+      if (row["event"] === "loop-restarted" && row["phase"] === phase && row["seq"] === seq) {
+        count += 1;
+        last = Date.parse(String(row["at"]));
+      }
+    } catch {
+      // A torn line is no restart.
+    }
+  }
+  return { count, last };
+}
+
+/**
+ * A waiter that finds no loop driving: start a loop that died with no stop
+ * recorded, or -- once it has been started LOOP_RESTARTS times at this point
+ * and died again -- record the `crash` stop. A recorded stop was meant, and
+ * nothing starts a loop over it. "restarted" means go on waiting; "stop"
+ * means say why no loop is driving.
+ *
+ * Two waiters can read "no loop" at once, so the reading, the start and its
+ * row are one act under the lifecycle lock, and a restart younger than
+ * LOOP_STALE_MS is a replacement still owed its grace: the later waiter waits
+ * on it rather than starting a second or spending the budget twice.
+ */
+export function reviveLoop(
+  sessionsDir: string,
+  repoRoot: string,
+  sessionNumber: number,
+  start: LoopStarter = startLoopDetached,
+  now: number = Date.now(),
+): "restarted" | "stop" {
+  let lock: string;
+  try {
+    lock = acquireLockWithTimeout(sessionsDir, `waiter-revive/${process.pid}`);
+  } catch {
+    // Another writer holds the lifecycle; whatever it is doing, waiting on
+    // loses nothing, and the next reading decides again.
+    return "restarted";
+  }
+  try {
+    let run: DriverRun | null;
+    try {
+      run = readRun(repoRoot, sessionNumber);
+    } catch {
+      run = null;
+    }
+    if (run === null || run.stop) return "stop";
+    const restarts = restartsAt(repoRoot, sessionNumber, run.phase, run.seq);
+    if (restarts.last !== null && now - restarts.last < LOOP_STALE_MS) return "restarted";
+    if (restarts.count < LOOP_RESTARTS) {
+      start(sessionsDir);
+      appendSupervision(repoRoot, sessionNumber, {
+        event: "loop-restarted",
+        attempt: restarts.count + 1,
+        phase: run.phase,
+        seq: run.seq,
+      });
+      return "restarted";
+    }
+    const log = relative(repoRoot, loopLogPath(repoRoot, sessionNumber)).split("\\").join("/");
+    const entry = {
+      kind: "crash" as const,
+      code: null,
+      reason:
+        `the loop died at phase '${run.phase}' (seq ${run.seq}) after it was started ` +
+        `again ${LOOP_RESTARTS} times; its log is ${log}`,
+      at: nowIso(),
+      step_id: null,
+    };
+    writeRun(repoRoot, sessionNumber, {
+      ...run,
+      stop: entry,
+      stop_history: [...(run.stop_history ?? []), entry].slice(-STOP_HISTORY_CAP),
+      resumed_from: null,
+      updated_at: nowIso(),
+    });
+    return "stop";
+  } finally {
+    releaseLock(lock);
+  }
+}
+
+/**
  * What a waiter says on a repository where nothing is in flight and nothing
  * ever was under this waiter.
  *
@@ -3771,19 +3888,22 @@ export function waiterEnd(repoRoot: string, watching: number | null, now: string
  * runs this in the background, so its chat stays free while it waits, and runs
  * it again after each answer. A session that closes under the waiter ends it
  * with that session's own `done`; with nothing in flight and no session ever
- * watched it says so; with no loop driving the session it says so and names
- * the command that starts one.
+ * watched it says so. With no loop driving the session, one that died with no
+ * stop is started again and the wait goes on (`reviveLoop`); a recorded stop,
+ * or a loop that keeps dying at one point, is said with the command that
+ * starts one.
  */
 export async function sessionWait(
   sessionsDir: string,
   pollMs: number = SESSION_WAIT_POLL_MS,
+  start: LoopStarter = startLoopDetached,
 ): Promise<number> {
   const repoRoot = repoRootFor(sessionsDir);
   if (repoRoot === null) {
     writeErr(`dabbler: not inside a git repository: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
-  const since = Date.now();
+  let since = Date.now();
   let watching: number | null = null;
   for (;;) {
     const current = readSessionState(sessionsDir)?.["currentSession"];
@@ -3794,16 +3914,19 @@ export async function sessionWait(
     watching = current;
     const reading = waiterReading(repoRoot, current, since);
     if (reading === "no-loop") {
-      let run: DriverRun | null;
-      try {
-        run = readRun(repoRoot, current);
-      } catch {
-        run = null;
+      if (reviveLoop(sessionsDir, repoRoot, current, start) === "stop") {
+        let run: DriverRun | null;
+        try {
+          run = readRun(repoRoot, current);
+        } catch {
+          run = null;
+        }
+        writeErr(noLoopMessage(sessionsDir, current, run));
+        return EXIT_BOUNDARY;
       }
-      writeErr(noLoopMessage(sessionsDir, current, run));
-      return EXIT_BOUNDARY;
-    }
-    if (reading !== null) {
+      // The replacement has the grace to write its first heartbeat.
+      since = Date.now();
+    } else if (reading !== null) {
       writeOut(`${JSON.stringify(reading, null, 2)}\n`);
       return EXIT_OK;
     }
@@ -3812,6 +3935,48 @@ export async function sessionWait(
 }
 
 // --- run: one command, the whole session --------------------------------------
+
+/** The loop's own copy of what it wrote, beside its heartbeat. */
+export function loopLogPath(repoRoot: string, sessionNumber: number): string {
+  return join(dirname(loopPath(repoRoot, sessionNumber)), "loop.log");
+}
+
+/**
+ * Run the mailbox loop with its output copied to `loop.log`, and leave
+ * evidence if it dies. A `Stop` never escapes the drive -- it is written to
+ * `run.json` where it is met -- so what escapes is a crash: nobody meant it,
+ * and the record says so by carrying `loop-crashed` on `supervision.jsonl`
+ * and no stop. A waiter reads that absence as a loop worth starting again.
+ */
+export async function superviseLoop<T>(
+  repoRoot: string,
+  sessionNumber: number,
+  drive: () => Promise<T>,
+): Promise<T> {
+  const log = loopLogPath(repoRoot, sessionNumber);
+  try {
+    mkdirSync(dirname(log), { recursive: true });
+    teeOutput(log);
+  } catch {
+    // No copy, and the loop runs regardless.
+  }
+  try {
+    return await drive();
+  } catch (error) {
+    if (error instanceof Stop) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    appendSupervision(repoRoot, sessionNumber, { event: "loop-crashed", message });
+    try {
+      const detail = error instanceof Error && error.stack ? error.stack : message;
+      appendFileSync(log, `${nowIso()} loop-crashed: ${detail}\n`, "utf8");
+    } catch {
+      // supervision.jsonl already carries it.
+    }
+    throw error;
+  } finally {
+    teeOutput(null);
+  }
+}
 
 export interface RunCliOptions {
   readonly maxInvocations: number | null;
@@ -3876,14 +4041,16 @@ export async function runWholeSession(
     const timer = setInterval(beat, LOOP_HEARTBEAT_MS);
     timer.unref();
     try {
-      return await driveSession(sessionsDir, {
-        engine,
-        provider: typeof orchestrator["provider"] === "string" ? orchestrator["provider"] : null,
-        model: typeof orchestrator["model"] === "string" ? orchestrator["model"] : null,
-        effort: typeof orchestrator["effort"] === "string" ? orchestrator["effort"] : null,
-        adapter,
-        maxInvocations: options.maxInvocations,
-      });
+      return await superviseLoop(repoRoot, sessionNumber, () =>
+        driveSession(sessionsDir, {
+          engine,
+          provider: typeof orchestrator["provider"] === "string" ? orchestrator["provider"] : null,
+          model: typeof orchestrator["model"] === "string" ? orchestrator["model"] : null,
+          effort: typeof orchestrator["effort"] === "string" ? orchestrator["effort"] : null,
+          adapter,
+          maxInvocations: options.maxInvocations,
+        }),
+      );
     } finally {
       clearInterval(timer);
       try {

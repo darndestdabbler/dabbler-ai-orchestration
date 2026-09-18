@@ -7,7 +7,7 @@
  */
 export type DriverRunPhase = "plan" | "work" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "gate-wait" | "publish" | "close" | "complete";
 
-export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engine" | "tree" | "tests" | "verification" | "land" | "publish" | "close" | "interrupted";
+export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engine" | "tree" | "tests" | "verification" | "land" | "publish" | "close" | "interrupted" | "crash";
 
 /**
  * Which refusal this was, where the kind is too coarse to act on. A kind says which bound the loop met; four unlike things meet the `verification` bound, with four actors and four next moves, and a surface keyed on the kind alone renders one sentence for all of them. Optional and closed: a stop with no code is its kind, which is what every run written before this member is, and a new refusal is named here before it can be recorded.
@@ -76,7 +76,7 @@ export type DriverRun = {
    */
   stop: {
     /**
-     * Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a working tree that already carried changes when the declaration was made, which is the tree's stop and not the engine's; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; packaging refusing or failing to reach the feed; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason).
+     * Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a working tree that already carried changes when the declaration was made, which is the tree's stop and not the engine's; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; packaging refusing or failing to reach the feed; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason); the loop dying with no stop recorded, twice restarted by a waiter at one point without getting past it (`crash`, the one kind a waiter writes rather than the loop).
      */
     kind: DriverRunStopKind;
     code?: DriverRunStopCode;

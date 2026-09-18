@@ -7,11 +7,12 @@
 // the loop composes around them. The loop itself, driven from next to done,
 // is walk-session.test.ts.
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
-import { instructionPath, loopPath, renderStop, reportPath } from "../src/driver.ts";
+import { instructionPath, loopPath, readRun, renderStop, reportPath, runPath, writeRun } from "../src/driver.ts";
+import { capture, writeErr, writeOut } from "../src/output.ts";
 import {
   LOOP_STALE_MS,
   MAX_REJECTIONS,
@@ -35,6 +36,8 @@ import {
   reportIsSpent,
   localGateReceipt,
   loopAlive,
+  loopLogPath,
+  superviseLoop,
   namedTestCommands,
   overdueMultiple,
   owedInstruction,
@@ -44,6 +47,7 @@ import {
   stepChangedPaths,
   unchangedStepFiles,
   noLoopMessage,
+  reviveLoop,
   waiterEnd,
   waiterReading,
   type RegistrationFacts,
@@ -123,6 +127,109 @@ describe("whether a loop is driving the session", () => {
     const idle = noLoopMessage("docs/sessions", 1, { stop: null, phase: "work", engine: "cli" });
     assert.doesNotMatch(idle, /paused/);
     assert.match(idle, /dabbler session run --mailbox --sessions-dir docs\/sessions/);
+  });
+});
+
+describe("a mailbox loop that dies", () => {
+  function supervision(root: string): Array<Record<string, unknown>> {
+    const text = readFileSync(join(root, ".dabbler", "runs", "s1", "driver", "supervision.jsonl"), "utf8");
+    return text.trim().split("\n").map((line) => JSON.parse(line) as Record<string, unknown>);
+  }
+
+  it("leaves loop-crashed on supervision.jsonl and in its log, and no stop on run.json", async () => {
+    const root = tempDir("crash-");
+    await assert.rejects(
+      superviseLoop(root, 1, async () => {
+        throw new Error("boom");
+      }),
+      /boom/,
+    );
+    assert.deepEqual(supervision(root).map((row) => [row["event"], row["message"]]), [["loop-crashed", "boom"]]);
+    assert.equal(existsSync(runPath(root, 1)), false);
+    assert.match(readFileSync(loopLogPath(root, 1), "utf8"), /loop-crashed: Error: boom/);
+  });
+
+  it("copies what the loop writes to driver/loop.log, and nothing after it ends", async () => {
+    const root = tempDir("looplog-");
+    await capture(() =>
+      superviseLoop(root, 1, async () => {
+        writeOut("to stdout\n");
+        writeErr("to stderr\n");
+      }),
+    );
+    await capture(async () => writeErr("after the loop\n"));
+    const log = readFileSync(loopLogPath(root, 1), "utf8");
+    assert.match(log, /to stdout/);
+    assert.match(log, /to stderr/);
+    assert.doesNotMatch(log, /after the loop/);
+  });
+
+  function crashedRun(stop: unknown = null): { root: string; sessionsDir: string } {
+    const root = tempDir("revive-");
+    const sessionsDir = join(root, "docs", "sessions");
+    mkdirSync(sessionsDir, { recursive: true });
+    mkdirSync(dirname(runPath(root, 1)), { recursive: true });
+    writeRun(root, 1, {
+      schema_version: 1,
+      session_number: 1,
+      engine: "cli",
+      phase: "plan",
+      seq: 1,
+      invocations: 0,
+      max_invocations: 24,
+      accepted_steps: [],
+      baseline_tree: null,
+      stop,
+      started_at: "2026-09-17T19:50:00-04:00",
+      updated_at: "2026-09-17T19:52:20-04:00",
+    });
+    return { root, sessionsDir };
+  }
+
+  it("is started again by a waiter when no stop is recorded, and the restart is on the record", () => {
+    const { root, sessionsDir } = crashedRun();
+    const started: string[] = [];
+    assert.equal(reviveLoop(sessionsDir, root, 1, (dir) => started.push(dir)), "restarted");
+    assert.deepEqual(started, [sessionsDir]);
+    const row = supervision(root).at(-1)!;
+    assert.deepEqual([row["event"], row["attempt"], row["phase"], row["seq"]], ["loop-restarted", 1, "plan", 1]);
+    assert.equal(readRun(root, 1)?.stop, null);
+  });
+
+  it("is never started over a recorded stop", () => {
+    const { root, sessionsDir } = crashedRun({ kind: "interrupted", reason: "stop", at: "2026-09-17T20:00:00-04:00" });
+    const started: string[] = [];
+    assert.equal(reviveLoop(sessionsDir, root, 1, (dir) => started.push(dir)), "stop");
+    assert.deepEqual(started, []);
+    assert.equal(readRun(root, 1)?.stop?.kind, "interrupted");
+  });
+
+  it("is started once when two waiters find it dead before the replacement's heartbeat", () => {
+    const { root, sessionsDir } = crashedRun();
+    const started: string[] = [];
+    const outcomes = [1, 2].map(() => reviveLoop(sessionsDir, root, 1, (dir) => started.push(dir)));
+    assert.deepEqual(outcomes, ["restarted", "restarted"]);
+    assert.equal(started.length, 1);
+    assert.equal(supervision(root).filter((row) => row["event"] === "loop-restarted").length, 1);
+  });
+
+  it("becomes a crash stop the third time it dies at one point, and the waiter says its ways on", () => {
+    const { root, sessionsDir } = crashedRun();
+    const started: string[] = [];
+    // Each death is read once the replacement before it has had its grace.
+    const outcomes = [1, 2, 3].map((n) =>
+      reviveLoop(sessionsDir, root, 1, (dir) => started.push(dir), Date.now() + n * LOOP_STALE_MS),
+    );
+    assert.deepEqual(outcomes, ["restarted", "restarted", "stop"]);
+    assert.equal(started.length, 2);
+    const run = readRun(root, 1)!;
+    assert.equal(run.stop?.kind, "crash");
+    assert.match(run.stop?.reason ?? "", /\.dabbler\/runs\/s1\/driver\/loop\.log/);
+    const said = noLoopMessage("docs/sessions", 1, run);
+    assert.ok(said.includes(renderStop(run.stop!, run).ways), said);
+    // A recorded crash is a stop like any other: nothing starts a loop over it.
+    assert.equal(reviveLoop(sessionsDir, root, 1, (dir) => started.push(dir)), "stop");
+    assert.equal(started.length, 2);
   });
 });
 

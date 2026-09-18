@@ -1,5 +1,5 @@
-// The direct-API transport's answer to a thinking setting the model refuses:
-// asked once more without it, and only for that refusal.
+// The direct-API transport's answer to a generation setting the model refuses:
+// asked again without it, as many times as the vendor names one it was sent.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
@@ -54,27 +54,56 @@ describe("callModel", () => {
     assert.equal(bodies.length, 2);
     assert.ok("thinking" in bodies[0]!);
     assert.ok(!("thinking" in bodies[1]!));
-    const dropped = result.metadata["dropped_param"] as { param: string; reason: string };
-    assert.equal(dropped.param, "thinking");
-    assert.ok(dropped.reason.includes(refusal));
+    const dropped = result.metadata["dropped_params"] as Array<{ param: string; reason: string }>;
+    assert.equal(dropped.length, 1);
+    assert.equal(dropped[0]!.param, "thinking");
+    assert.ok(dropped[0]!.reason.includes(refusal));
   });
 
-  it("drops only the param the vendor named, once, and spends no retry on it", async () => {
-    const google = (makeConfig()["providers"] as Record<string, ProviderConfig>)["google"] as ProviderConfig;
-    const bodies = answerWith([400, { error: { status: "INVALID_ARGUMENT", message: "thinking_budget is not supported for this model" } }]);
-    await assert.rejects(
-      () =>
-        callModel("google", "gemini-2.5-flash", "s", "u", 100, google, {
-          thinking: { enabled: true },
-          thinking_budget: 5,
-        }),
-      /HTTP 400/,
+  it("drops every param the vendor refuses, one per refusal, and records each", async () => {
+    const effort = "This model does not support the effort parameter.";
+    const thinking = "adaptive thinking is not supported on this model";
+    const bodies = answerWith(
+      [400, { error: { type: "invalid_request_error", message: effort } }],
+      [400, { error: { type: "invalid_request_error", message: thinking } }],
+      [200, ANTHROPIC_OK],
     );
+    const result = await callModel("anthropic", "a-haiku", "s", "u", 100, anthropic(), {
+      effort: "medium",
+      thinking: { enabled: true, type: "adaptive" },
+    });
+    assert.equal(result.content, "hello");
+    assert.equal(bodies.length, 3);
+    assert.ok("output_config" in bodies[0]! && "thinking" in bodies[0]!);
+    assert.ok(!("output_config" in bodies[2]!) && !("thinking" in bodies[2]!));
+    const dropped = result.metadata["dropped_params"] as Array<{ param: string; reason: string }>;
+    assert.deepEqual(
+      dropped.map((entry) => entry.param),
+      ["effort", "thinking"],
+    );
+    assert.ok(dropped[0]!.reason.includes(effort));
+    assert.ok(dropped[1]!.reason.includes(thinking));
+  });
+
+  it("drops the longest carried param the vendor named, not a shorter one inside it", async () => {
+    const google = (makeConfig()["providers"] as Record<string, ProviderConfig>)["google"] as ProviderConfig;
+    const bodies = answerWith(
+      [400, { error: { status: "INVALID_ARGUMENT", message: "thinking_budget is not supported for this model" } }],
+      [200, { candidates: [{ content: { parts: [{ text: "hello" }] }, finishReason: "STOP" }], usageMetadata: {} }],
+    );
+    const result = await callModel("google", "gemini-2.5-flash", "s", "u", 100, google, {
+      thinking: { enabled: true },
+      thinking_budget: 5,
+    });
     const budgets = bodies.map(
       (body) => ((body["generationConfig"] as Record<string, unknown>)["thinkingConfig"] as Record<string, unknown> | undefined)?.["thinkingBudget"],
     );
-    // The first call, then the ordinary two attempts without the named param.
-    assert.deepEqual(budgets, [5, undefined, undefined]);
+    assert.deepEqual(budgets, [5, undefined]);
+    const dropped = result.metadata["dropped_params"] as Array<{ param: string }>;
+    assert.deepEqual(
+      dropped.map((entry) => entry.param),
+      ["thinking_budget"],
+    );
   });
 
   it("does not drop a param over any other 400", async () => {

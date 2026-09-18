@@ -10,7 +10,7 @@ import {
   NO_ROUND_CAP_DISPUTED,
   NO_ROUND_TERMINAL,
   blockingFindings,
-  droppedParam,
+  droppedParams,
   noRoundReason,
   reportedInputTokens,
   runOfRecordLines,
@@ -67,18 +67,21 @@ describe("what a round says it cost", () => {
     assert.equal(row["tool_calls"], 26);
   });
 
-  it("records a generation param the vendor refused and the call ran without", () => {
+  it("records every generation param the vendor refused and the call ran without", () => {
     const repo = tempDir();
-    const reason = "invalid_request_error: adaptive thinking is not supported on this model";
+    const dropped = [
+      { param: "effort", reason: "This model does not support the effort parameter." },
+      { param: "thinking", reason: "adaptive thinking is not supported on this model" },
+    ];
     appendRound(repo, 9, {
       ...base,
       verifier_model: "claude-haiku-4-5",
       verifier_provider: "anthropic",
-      dropped_param: droppedParam({ dropped_param: { param: "thinking", reason } }),
+      dropped_params: droppedParams({ dropped_params: dropped }),
     });
     const [row] = readRounds(repo, 9);
-    assert.deepEqual(row["dropped_param"], { param: "thinking", reason });
-    assert.equal(droppedParam({}), null);
+    assert.deepEqual(row["dropped_params"], dropped);
+    assert.deepEqual(droppedParams({}), []);
   });
 
   it("still reads a round from before it counted, and does not call its silence zero", () => {

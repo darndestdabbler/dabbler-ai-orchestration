@@ -10,6 +10,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.13.7] — 2026-09-18
+
+**Every setting the vendor refuses is dropped, not just the first.**
+
+### Fixed
+
+- Claude Haiku 4.5 reviewing on `api` still stopped verification: it
+  refuses both the effort and the thinking setting the framework sends
+  by default, one per call, and 3.13.6 dropped only the first. Now each
+  refusal that names a setting the call carried drops that setting and
+  calls again, until the vendor accepts or nothing is left to drop. The
+  round's record lists every setting dropped with the vendor's reason,
+  and the Dabbler terminal says each once. A refusal that names no
+  setting the call carried fails as before.
+
 ## [3.13.6] — 2026-09-18
 
 **A reviewer the pane offers can review, and a pause says Resume Session.**

@@ -214,16 +214,19 @@ export function turnCount(value: unknown): number | null {
 }
 
 /**
- * The generation param the transport dropped because the vendor refused it
- * for this model, with the vendor's sentence, or null when none was.
+ * The generation params the transport dropped because the vendor refused
+ * them for this model, each with the vendor's sentence, in the order dropped.
  */
-export function droppedParam(
+export function droppedParams(
   metadata: Record<string, unknown>,
-): { readonly param: string; readonly reason: string } | null {
-  const dropped = metadata["dropped_param"];
-  if (typeof dropped !== "object" || dropped === null) return null;
-  const { param, reason } = dropped as Record<string, unknown>;
-  return typeof param === "string" ? { param, reason: String(reason ?? "") } : null;
+): Array<{ readonly param: string; readonly reason: string }> {
+  const dropped = metadata["dropped_params"];
+  if (!Array.isArray(dropped)) return [];
+  return dropped.flatMap((entry: unknown) => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const { param, reason } = entry as Record<string, unknown>;
+    return typeof param === "string" ? [{ param, reason: String(reason ?? "") }] : [];
+  });
 }
 
 /**
@@ -937,8 +940,8 @@ export async function runRound(
     tool_calls: turnCount(result.metadata["tool_calls"]),
   };
   // A review that ran without a setting the vendor refused says so on its row.
-  const dropped = droppedParam(result.metadata);
-  if (dropped !== null) row["dropped_param"] = dropped;
+  const dropped = droppedParams(result.metadata);
+  if (dropped.length > 0) row["dropped_params"] = dropped;
   if (roundNumber >= 2) {
     // previous_tree stays the tree the prior round actually completed at.
     // When that object is gone and a re-anchor supplied the diff base, the

@@ -249,6 +249,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 209 | A first push sets its upstream, and planning is not mistaken for a hang | yes | 2026-09-18 |
 | 210 | A model is checked against the list it was offered from | yes | 2026-09-18 |
 | 211 | A reviewer the pane offers can review, and a pause says Resume | yes | 2026-09-18 |
+| 212 | Every setting the vendor refuses is dropped, not just the first | yes | 2026-09-18 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2798,3 +2799,9 @@ Let a reviewer the pane offers actually review, keep the preference-order notice
 **Amended after acceptance:**
 
 - 2026-09-18 — step 'notice-out-of-the-way': its files: selection.ts is tested in roleSelection.test.ts; selection.test.ts tests checks.ts (claude-code (anthropic, claude-opus-5))
+
+### Session 212 — Every setting the vendor refuses is dropped, not just the first
+
+**Releasable: yes.**
+
+Make the direct-API transport drop every generation param the vendor refuses, not just the first thinking one. In packages/router/src/transports/api.ts, `refusedThinkingParam` becomes a rule over any param the call carries: a 400 whose words say something is not supported and name a generation param the call carried (underscores ignored, the longest such key preferred, so `thinking_budget` wins over `thinking`) drops that param and calls again without spending a retry; each refusal drops one more, bounded by the number of params the call carried, so Anthropic's `effort` and `thinking` refused one per call end with a plain call. A 400 naming no param the call carried is handled exactly as today. The result's metadata carries `dropped_params`, a list of {param, reason} in the order dropped, and each drop writes its one stderr line as today. packages/router/src/verify/rounds.ts's `droppedParam` becomes `droppedParams`, returning that list, and the round's row records it as `dropped_params` when it is non-empty. Tests: api.test.ts gains a provider that refuses `effort` and then `thinking` in two successive 400s and is called a third time with neither, its answer returned with both on the record; the existing 'any other 400' test confirms a 400 naming no param is not retried without params, and the Google test is updated to the new rule; rounds.test.ts's row test follows the rename. Releasable as a patch: version.json moves to 3.13.7, stamped into the manifests with `npm run stamp:version`, with a CHANGELOG entry.

@@ -198,26 +198,24 @@ export function httpGetJson(
   return request(url, { headers: { ...headers } }, timeoutSeconds);
 }
 
-/** The generation params that ask a model to think, one per vendor shape. */
-const THINKING_PARAMS = ["thinking", "thinking_level", "thinking_budget"] as const;
-
 /**
- * The thinking param a 400 refused, or null.
+ * The generation param a 400 refused, or null.
  *
  * The vendor's words are the authority on which model takes which setting:
  * a table of them is a hand-kept list nobody keeps current, and the refusal
- * costs one unbilled failed call. Only a 400 whose words say thinking is not
- * supported qualifies; every other 400 is a real failure.
+ * costs one unbilled failed call. Only a 400 whose words say something is
+ * not supported AND name a param the call still carries qualifies; every
+ * other 400 is a real failure. Where several carried keys are named the
+ * longest wins, so `thinking_budget` is dropped rather than `thinking`.
  */
-function refusedThinkingParam(error: unknown, params: Json): string | null {
+function refusedParam(error: unknown, params: Json): string | null {
   if (!(error instanceof HttpStatusError) || error.status !== 400) return null;
-  if (!/thinking/i.test(error.words) || !/not supported|unsupported|does not support/i.test(error.words)) {
-    return null;
-  }
-  // The param the vendor named, where its words name one; else the one sent.
-  const flat = error.words.toLowerCase().replace(/_/g, "");
-  const sent = THINKING_PARAMS.filter((key) => key in params);
-  return sent.find((key) => key !== "thinking" && flat.includes(key.replace(/_/g, ""))) ?? sent[0] ?? null;
+  if (!/not supported|unsupported|does not support/i.test(error.words)) return null;
+  // Separators dropped on both sides: `reasoning_effort` is `reasoning.effort` in OpenAI's words.
+  const flat = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const words = flat(error.words);
+  const named = Object.keys(params).filter((key) => words.includes(flat(key)));
+  return named.sort((a, b) => b.length - a.length)[0] ?? null;
 }
 
 /**
@@ -245,7 +243,7 @@ export async function callModel(
   const backoffBase = Number(retry["backoff_base_seconds"]);
   let lastError: unknown = null;
   let params = generationParams ?? {};
-  let dropped: { param: string; reason: string } | null = null;
+  const dropped: Array<{ param: string; reason: string }> = [];
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
@@ -269,17 +267,18 @@ export async function callModel(
             "changes the price. Both ids are recorded in the metrics row.\n",
         );
       }
-      return dropped === null ? result : { ...result, metadata: { ...result.metadata, dropped_param: dropped } };
+      return dropped.length === 0 ? result : { ...result, metadata: { ...result.metadata, dropped_params: dropped } };
     } catch (error) {
-      // A thinking setting is a tuning default and the model is the
-      // operator's choice: the model the vendor says cannot take it is
-      // asked once more without it -- once, and without spending a retry --
-      // and the result says what was dropped.
-      const refused: string | null = dropped === null ? refusedThinkingParam(error, params) : null;
+      // A generation setting is a tuning default and the model is the
+      // operator's choice: the model the vendor says cannot take one is
+      // asked again without it, without spending a retry, and the result
+      // says what was dropped. Each drop removes a key, so a vendor that
+      // refuses every one ends with a plain call.
+      const refused = refusedParam(error, params);
       if (refused !== null) {
         const reason = (error as HttpStatusError).words;
         params = Object.fromEntries(Object.entries(params).filter(([key]) => key !== refused));
-        dropped = { param: refused, reason };
+        dropped.push({ param: refused, reason });
         writeErr(
           `[dabbler] NOTE: ${providerName} refused '${refused}' for '${modelId}' ` +
             `(${reason}); the call runs without it.\n`,

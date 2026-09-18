@@ -4197,17 +4197,38 @@
       "title": "A reviewer the pane offers can review, and a pause says Resume",
       "status": "complete",
       "startedAt": "2026-09-18T14:42:50.198000-04:00",
+      "completedAt": "2026-09-18T15:04:27.398000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-opus-5",
         "identityProvenance": "direct"
       },
-      "frameworkVersion": "3.13.4",
-      "completedAt": "2026-09-18T15:04:27.398000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,
+        "verifierModel": "gpt-5.6-terra",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      },
+      "frameworkVersion": "3.13.4"
+    },
+    {
+      "number": 212,
+      "title": "Every setting the vendor refuses is dropped, not just the first",
+      "status": "in-progress",
+      "startedAt": "2026-09-18T16:05:11.933000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "direct"
+      },
+      "frameworkVersion": "3.13.6",
+      "completedAt": null,
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
         "verifierModel": "gpt-5.6-terra",
         "verifierProvider": "openai",
         "transport": "copilot-cli"

@@ -4174,7 +4174,7 @@
     {
       "number": 210,
       "title": "A model is checked against the list it was offered from",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-18T13:40:36.914000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -4183,7 +4183,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.13.4",
-      "completedAt": null,
+      "completedAt": "2026-09-18T14:02:54.281000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,

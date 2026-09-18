@@ -12420,3 +12420,138 @@ contain a word is the source-text assertion rule 4 sends to ESLint, and
 files on disk.
 
 **Releasable.** Yes, a minor: the mailbox loop stops where it is meant to.
+
+### Session 205 of 206: A crashed loop comes back by itself
+
+Scope: whole repository
+
+**Why.** On 2026-09-17 the `../csv-parser` tutorial's session 002 accepted
+the AI's work plan at 19:52:20 and its loop died before declaring the task:
+phase still `plan`, no stop on `run.json`, heartbeat stale. The waiter read
+the situation correctly -- "no loop is driving session 002" -- and the AI
+told the operator, who had to click Resume. Resume worked (proved on a copy:
+the accepted plan was reused and step 1 issued). **Why the loop died cannot
+be known.** Its terminal tab was blank: the extension runs the loop as the
+editor's own executable told to behave as Node, and that process is never
+attached to the tab's console (session 188 measured the same, as the `Code`
+label). Measured 2026-09-18: the same executable writes stdout and stderr
+to a redirected file normally and exits 1 with the error text on an uncaught
+throw -- only the terminal loses it. And an error that is not a `Stop` is
+rethrown out of the drive's own catch (`drive.ts`) to the CLI entry, which
+prints one line and exits 1 without writing a word to the record.
+
+The operator's direction, and consult round 17's answer
+(`docs/design/consults/round17-synthesis.md`, Sol through the seat and
+Gemini): "whenever a human has to click Resume, the framework should be able
+to detect this and just resume itself." Both advisors said to build the crash
+layer and nothing else -- no owner table (the closed kind/code union already
+is one), no AI mechanic (an AI troubleshooting a deterministic crash tends to
+blame its own code and mutate the tree), no watchdog on the AI's CLI, no
+timers. Sol caught the one contradiction in the draft: an uncaught error
+written as a stop while "a recorded stop is never restarted" would make the
+two rules disagree. So a crash leaves *evidence*, and the stop comes only
+when restarting has failed.
+
+**What -- the loop keeps a log.** `session run --mailbox` tees everything it
+writes to stdout and stderr into `.dabbler/runs/s<N>/driver/loop.log`, from
+the loop itself, whoever started it. The terminal keeps what it gets.
+
+**What -- a crash leaves evidence, not a verdict.** An error that is not a
+`Stop` appends `loop-crashed` with its message to `supervision.jsonl` and to
+the log before the process exits 1. `run.json` is not touched: no stop was
+meant, and the record says so by carrying none.
+
+**What -- the waiter restarts a crashed loop.** A waiter that finds the
+heartbeat stale and `run.json` carrying no stop starts `dabbler session run
+--mailbox` detached, records `loop-restarted` with the attempt, the phase and
+the outstanding seq, and goes on waiting: the AI never sees the gap. The
+bound is two restarts for one progress point -- phase plus outstanding
+instruction seq -- and resets when progress lands. At the bound the waiter
+writes a stop of the new kind `crash` (added to the closed union in
+`driver-run.schema.json`) whose ways on name the log and the restart command,
+and prints it the way it prints any stop. **A recorded stop is never
+restarted**: budget, tree, interrupted, cancel, rejected-thrice were meant.
+Restarting is safe because every phase already checks what exists before
+acting (round 15); the heartbeat's pid, `Driver.save()`'s fence under the
+lifecycle lock, and Resume yielding to a live heartbeat are what keep two
+loops from driving at once, and the walk proves it rather than a new lease.
+
+**What -- every stop has a way on, and a test says so.** One test asserts
+that every stop kind and code renders at least one executable way on through
+`renderStop`. It is the forward-exit rule -- zero deadlock tolerance -- as a
+property, and it is what the owner table was really for.
+
+**Non-goals.** No owner table and no test of owners. No mechanic, no lease,
+no second AI conversation: recorded in the synthesis, revisited after ten
+real sessions if `supervision.jsonl` shows stops that reached a person and
+needed no decision from one. Nothing watches or restarts the AI's CLI --
+Resume stays for that, and for a stop that was meant. No escalation timer:
+the trigger is state. No wrapper script around the loop. No change to what
+Resume does. The `Code` label stays a non-goal, as session 188 left it.
+
+**Tests** (`drive.test.ts`, the file named after the loop and the waiter).
+- An error that is not a `Stop` leaves `loop-crashed` on `supervision.jsonl`
+  and no stop on `run.json`.
+- The loop's output reaches `driver/loop.log`.
+- A waiter on a stale heartbeat with no stop recorded starts a loop and
+  records `loop-restarted`.
+- A waiter on a stale heartbeat with a stop recorded starts nothing.
+- A third crash at one progress point becomes a `crash` stop, and the waiter
+  prints its ways on.
+- Every stop kind and code renders an executable way on.
+
+**The walk**, Sol's experiment: in a scratch copy, kill the loop at the
+incident's exact boundary -- plan accepted, task not yet declared -- and pass
+only if the waiter starts exactly one replacement, the plan is reused, the
+first step is issued exactly once, and a third kill at the same point becomes
+a recorded `crash` stop; then end a loop through a normal recorded stop and
+show it is not restarted. Recorded in `docs/uat/`.
+
+**Releasable.** Yes, a minor: a session survives its loop dying.
+
+### Session 206 of 206: The Reviewing AI's Vehicle row sets what it shows
+
+Scope: whole repository
+
+**Why.** On 2026-09-18 the operator, out of OpenAI credits, picked
+`copilot-cli` on the *Reviewing AI › Vehicle* row of the Configuration pane
+in this repository. The toast said the write succeeded. The row went on
+saying `api ⚠`. Reproduced from the CLI: the row is bound to
+`dabblerSolution.setTransport` (`solutionTreeModel.ts`, the `configVehicle`
+case), which writes the MACHINE's vehicle, `dabbler.transport` -- already
+`copilot-cli` here, so the write changed nothing and reported truthfully.
+What the row *shows* is the Primary Reviewer's vehicle, decided in this
+checkout by `dabbler.reviewerTransport = api`, which outranks the machine's;
+the ⚠ marks the layers it shadows. The row's tooltip explains this only when
+the deciding layer is `roles.reviewer.transport` (`roleOwn`), not when it is
+the editor setting. The comment beside `configVehicle` says the auxiliary's
+row was once "a control that appeared to work and changed nothing"; the
+reviewing row is that control today whenever `dabbler.reviewerTransport` is
+set. `dabbler configure --reviewer-transport copilot-cli` did in one line
+what the pane could not.
+
+**What -- the row writes the vehicle it displays.** The *Reviewing AI ›
+Vehicle* row writes `dabbler.reviewerTransport`: it is labelled the reviewing
+vehicle, it shows the reviewing vehicle, and it sets the reviewing vehicle.
+The machine's vehicle is `dabbler configure --transport` and bootstrap's,
+and no pane row sets it. The Primary Reviewer model row stops asking "what
+carries the Primary Reviewer?" first: the vehicle row is the one control,
+and the model row lists models for whatever it decided.
+
+**What -- the ⚠ names the layer.** The tooltip names the deciding layer
+whatever it is -- the editor setting, a role's config, a `--transport` flag
+-- in `configuration explain`'s own words, so a row that is overridden says
+by what.
+
+**Non-goals.** No change to the four layers or their order; no new setting;
+no change to `dabbler configure`. The authoring Vehicle row (the engine) is
+untouched.
+
+**Tests.**
+- `solutionTreeModel.test.ts`: the reviewing Vehicle row's command is the
+  one that writes the reviewing vehicle.
+- `commandFlows.test.ts`: picking a vehicle on the reviewing row calls
+  `configure` with `reviewerTransport`, and the Primary Reviewer model row no
+  longer asks a vehicle.
+
+**Releasable.** Yes, a patch: a control that said it worked now does.

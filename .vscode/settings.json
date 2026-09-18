@@ -9,5 +9,5 @@
   // delivered. A plan holds with `hold_release` and its reason.
   "dabbler.release": "ship-by-default",
   "dabbler.authoringModel": "claude-opus-5",
-  "dabbler.reviewerTransport": "api"
+  "dabbler.reviewerTransport": "copilot-cli"
 }

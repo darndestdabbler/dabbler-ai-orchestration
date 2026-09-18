@@ -1379,6 +1379,16 @@ export interface StopRendering {
 export const PULL_ENGINE = "cli";
 
 /**
+ * The way on outside VS Code when the AI answers from its own CLI. Resume
+ * Session is said first: the extension puts `dabbler` on PATH only in the
+ * terminals it opens, so the command is the way on only where there is none.
+ */
+const PULL_RESUME = "dabbler session run --mailbox";
+
+/** How a person carries a pulled run on: the button first, the command second. */
+const RESUME_SESSION = `click Resume Session in VS Code, or outside it run \`${PULL_RESUME}\``;
+
+/**
  * What a stop IS, per situation: the sentence that opens it, who acts, and
  * the ways on.
  *
@@ -1405,7 +1415,7 @@ interface StopSituation {
 
 /** The pieces every situation's commands are spelled out of. */
 interface MoveParts {
-  /** `dabbler session next` under the pull, `dabbler session drive` under the push. */
+  /** `dabbler session run --mailbox` under the pull, `dabbler session drive` under the push. */
   readonly resume: string;
   /** The phase a resume re-enters. */
   readonly phase: string;
@@ -1788,7 +1798,7 @@ function asSentence(text: string): string {
  */
 function nextActor(run: StopContext): { readonly pull: boolean; readonly resume: string } {
   const pull = (run.engine ?? PULL_ENGINE) === PULL_ENGINE;
-  return { pull, resume: pull ? "dabbler session next" : "dabbler session drive" };
+  return { pull, resume: pull ? PULL_RESUME : "dabbler session drive" };
 }
 
 /** The situation this stop is, by its code where it has one and its kind where it does not. */
@@ -1810,19 +1820,24 @@ function actorFor(stop: StopRecord, run: StopContext): StopActor {
 }
 
 /** Who acts, as the sentence a person reads. */
-function actorSentence(actor: StopActor, resume: string): string {
-  if (actor === "operator") return "Next: you.";
-  if (actor === "engine") {
-    return (
-      "Next: the engine -- this is its to clear, and it clears it by calling " +
-      `\`${resume}\` with the answer put right. If its loop has stopped, that ` +
-      "call is yours to make."
-    );
+function actorSentence(actor: StopActor, resume: string, resumable = true): string {
+  const pull = resume === PULL_RESUME;
+  if (actor === "operator") {
+    // Resume Session leads wherever carrying on is a way on; a stop whose
+    // moves do not include it (a disputed cap is adjudicated) says only who.
+    return pull && resumable ? `Next: you -- once it is put right, ${RESUME_SESSION}.` : "Next: you.";
   }
-  return (
-    `Next: whoever calls \`${resume}\` -- the engine if its loop is still ` +
-    "running, otherwise you."
-  );
+  if (actor === "engine") {
+    return pull
+      ? "Next: the engine -- this is its to clear, by answering again with it " +
+          `put right. If its loop has stopped, ${RESUME_SESSION}.`
+      : "Next: the engine -- this is its to clear, and it clears it by calling " +
+          `\`${resume}\` with the answer put right. If its loop has stopped, that ` +
+          "call is yours to make.";
+  }
+  return pull
+    ? `Next: the engine if its loop is still running; otherwise you -- ${RESUME_SESSION}.`
+    : `Next: whoever calls \`${resume}\` -- the engine if its loop is still running, otherwise you.`;
 }
 
 /** The choices as lines a person reads, under the sentence that named them. */
@@ -1876,7 +1891,11 @@ export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
     step: stop.step_id ? ` '${stop.step_id}'` : "",
     session: run.session_number,
   });
-  const next = actorSentence(actor, resume);
+  const next = actorSentence(
+    actor,
+    resume,
+    choices.some((choice) => choice.command.startsWith(resume)),
+  );
   return {
     headline,
     happened,
@@ -1959,7 +1978,7 @@ export function renderUncollected(job: UncollectedJob, run: StopContext): string
   // job is nobody's fault and everybody's to collect, and under the pull
   // the framework cannot see which of them will.
   const next = pull
-    ? `${actorSentence("either", resume)} That call collects the result and ` +
+    ? `${actorSentence("either", resume)} That collects the result and ` +
       `carries on from '${run.phase}'.`
     : `Next: you. \`${resume}\` collects the result first and carries on from '${run.phase}'.`;
   return (

@@ -55,6 +55,7 @@ import {
   QUIET_TREE_SECONDS,
   quietTreeProbeDue,
   reportedFiles,
+  refusalFirst,
   suiteRetrySeconds,
   staleJobDisposition,
   stepChangedPaths,
@@ -242,6 +243,15 @@ describe("a mailbox loop that dies", () => {
     // A recorded crash is a stop like any other: nothing starts a loop over it.
     assert.equal(reviveLoop(sessionsDir, root, 1, (dir) => started.push(dir)), "stop");
     assert.equal(started.length, 2);
+  });
+});
+
+describe("a verification stop's reason", () => {
+  it("begins with the refusal that ended the round, ahead of any notice before it", () => {
+    const refusal = "API call failed after 2 attempts: HTTP 400: adaptive thinking is not supported on this model";
+    const tail = `dabbler: the 'reviewer' role fell past its preference order\n${refusal}`;
+    assert.ok(refusalFirst(tail).startsWith(refusal));
+    assert.equal(refusalFirst(""), "");
   });
 });
 

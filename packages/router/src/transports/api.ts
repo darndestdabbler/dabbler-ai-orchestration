@@ -47,7 +47,18 @@ function servedModelId(data: Json, key: string): string | null {
  * that is not JSON -- propagates on the first attempt. These two carry that
  * distinction so the ladder retries the same things and no others.
  */
-export class HttpStatusError extends Error {}
+export class HttpStatusError extends Error {
+  /** The HTTP status the vendor answered with. */
+  readonly status: number;
+  /** The vendor's own words for the failure, empty when it named none. */
+  readonly words: string;
+
+  constructor(message: string, status = 0, words = "") {
+    super(message);
+    this.status = status;
+    this.words = words;
+  }
+}
 export class HttpTimeoutError extends Error {}
 
 export type ProviderConfig = Record<string, unknown>;
@@ -130,6 +141,8 @@ async function readJson(response: Response, url: string): Promise<Json> {
     throw new HttpStatusError(
       `HTTP ${response.status} ${response.statusText} for url '${url}'` +
         (words === "" ? "" : `: ${words}`),
+      response.status,
+      words,
     );
   }
   const data: unknown = await response.json();
@@ -185,6 +198,28 @@ export function httpGetJson(
   return request(url, { headers: { ...headers } }, timeoutSeconds);
 }
 
+/** The generation params that ask a model to think, one per vendor shape. */
+const THINKING_PARAMS = ["thinking", "thinking_level", "thinking_budget"] as const;
+
+/**
+ * The thinking param a 400 refused, or null.
+ *
+ * The vendor's words are the authority on which model takes which setting:
+ * a table of them is a hand-kept list nobody keeps current, and the refusal
+ * costs one unbilled failed call. Only a 400 whose words say thinking is not
+ * supported qualifies; every other 400 is a real failure.
+ */
+function refusedThinkingParam(error: unknown, params: Json): string | null {
+  if (!(error instanceof HttpStatusError) || error.status !== 400) return null;
+  if (!/thinking/i.test(error.words) || !/not supported|unsupported|does not support/i.test(error.words)) {
+    return null;
+  }
+  // The param the vendor named, where its words name one; else the one sent.
+  const flat = error.words.toLowerCase().replace(/_/g, "");
+  const sent = THINKING_PARAMS.filter((key) => key in params);
+  return sent.find((key) => key !== "thinking" && flat.includes(key.replace(/_/g, ""))) ?? sent[0] ?? null;
+}
+
 /**
  * Call a provider API, with retries. `config` is the provider's block from
  * router-config.yaml (api_key_env, base_url, timeout_seconds, retry).
@@ -209,6 +244,8 @@ export async function callModel(
   const maxRetries = Number(retry["max_retries"]);
   const backoffBase = Number(retry["backoff_base_seconds"]);
   let lastError: unknown = null;
+  let params = generationParams ?? {};
+  let dropped: { param: string; reason: string } | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
@@ -218,7 +255,7 @@ export async function callModel(
         userMessage,
         maxTokens,
         config,
-        generationParams ?? {},
+        params,
       );
       if (
         result.served_model_id !== null &&
@@ -232,8 +269,24 @@ export async function callModel(
             "changes the price. Both ids are recorded in the metrics row.\n",
         );
       }
-      return result;
+      return dropped === null ? result : { ...result, metadata: { ...result.metadata, dropped_param: dropped } };
     } catch (error) {
+      // A thinking setting is a tuning default and the model is the
+      // operator's choice: the model the vendor says cannot take it is
+      // asked once more without it -- once, and without spending a retry --
+      // and the result says what was dropped.
+      const refused: string | null = dropped === null ? refusedThinkingParam(error, params) : null;
+      if (refused !== null) {
+        const reason = (error as HttpStatusError).words;
+        params = Object.fromEntries(Object.entries(params).filter(([key]) => key !== refused));
+        dropped = { param: refused, reason };
+        writeErr(
+          `[dabbler] NOTE: ${providerName} refused '${refused}' for '${modelId}' ` +
+            `(${reason}); the call runs without it.\n`,
+        );
+        attempt -= 1;
+        continue;
+      }
       if (!(error instanceof HttpStatusError || error instanceof HttpTimeoutError)) {
         throw error;
       }

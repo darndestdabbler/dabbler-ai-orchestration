@@ -794,7 +794,7 @@ describe("a stop, as a person reads it", () => {
     // way to start it again.
     assert.ok(renderStop(engineStop, pull).choices.some((choice) => /Resume Session/.test(choice.label) && /session run --mailbox/.test(choice.command)));
     assert.equal(renderStop(operatorStop, pull).actor, "operator");
-    assert.equal(renderStop(operatorStop, pull).next, "Next: you.");
+    assert.match(renderStop(operatorStop, pull).next, /^Next: you/);
     // A tree that carried work when the declaration was made is the tree's
     // stop: a person commits or reverts, and the pause says so rather than
     // "the engine could not be run".
@@ -807,7 +807,7 @@ describe("a stop, as a person reads it", () => {
     // the honest answer; under the push nothing calls back but a person,
     // and saying otherwise leaves them waiting on a loop that is not running.
     assert.equal(renderStop(eitherStop, pull).actor, "either");
-    assert.match(renderStop(eitherStop, pull).next, /whoever calls/);
+    assert.match(renderStop(eitherStop, pull).next, /if its loop is still running; otherwise you/);
     assert.equal(renderStop(eitherStop, push).actor, "operator");
     assert.equal(renderStop(eitherStop, push).next, "Next: you.");
     // An engine's stop stays the engine's whichever way the session runs:
@@ -972,7 +972,7 @@ describe("a job finished and nobody collected", () => {
     const pull = renderUncollected(found, { session_number: 91, phase: "verify", engine: "cli" });
     assert.match(pull, /^Session 091: the framework's job 'verification' finished at 2026-09-05T11:43:12.000Z \(exit 4\)/);
     assert.match(pull, /has not been collected\. Nothing is running/);
-    assert.match(pull, /Next: whoever calls `dabbler session next` -- the engine if its loop is still running, otherwise you/);
+    assert.match(pull, /`dabbler session run --mailbox`/);
     assert.match(pull, /carries on from 'verify'/);
     // Under the push the driver's own poll would have collected it, so an
     // uncollected job means the drive is gone and a person restarts it.

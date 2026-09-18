@@ -22,6 +22,7 @@ import {
   ROLE_PRIMARY_REVIEWER,
   reviewerExclusions,
   explainRole,
+  fellThroughWarning,
   modelFidelity,
   observedFidelity,
   roundObservations,
@@ -184,6 +185,30 @@ describe("resolving a role", () => {
       resolveRole(makeConfig(), ROLE_PRIMARY_REVIEWER, [["brand-new-model", "google"]] as const),
       [["brand-new-model", "google"]],
     );
+  });
+});
+
+describe("the fell-through notice", () => {
+  it("says nothing when the model is the operator's own selection", () => {
+    withSelection({ [ROLE_PRIMARY_REVIEWER]: "o-one" });
+    const config = makeConfig({ roles: { [ROLE_PRIMARY_REVIEWER]: { prefer: ["g-one"] } } });
+    const resolution = explainRole(config, ROLE_PRIMARY_REVIEWER, CANDIDATES);
+    assert.equal(resolution.fellThrough, true);
+    assert.equal(fellThroughWarning(resolution, ROLE_PRIMARY_REVIEWER), null);
+  });
+
+  it("names the first few models it skipped and counts the rest", () => {
+    const many = Array.from({ length: 10 }, (_, index) => [`g-${index}`, "google"] as const);
+    const resolution = explainRole(
+      makeConfig({ roles: { r: { prefer: ["g-0"] } } }),
+      "r",
+      [...many, ["a-one", "anthropic"] as const],
+      ["google"],
+    );
+    const warning = fellThroughWarning(resolution, "r") ?? "";
+    assert.match(warning, /'g-2'/);
+    assert.doesNotMatch(warning, /'g-3'/);
+    assert.match(warning, /and 7 more/);
   });
 });
 

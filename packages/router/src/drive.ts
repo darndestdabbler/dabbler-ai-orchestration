@@ -617,6 +617,16 @@ export function suiteRetrySeconds(
   if (last === null) return fallback;
   return Math.min(fallback, Math.max(SUITE_RETRY_FLOOR_SECONDS, Math.ceil(last * 1.25)));
 }
+/**
+ * A verify log's tail as a stop's reason: its last line -- the refusal that
+ * ended the round -- first, and what the log said before it after. A notice
+ * printed ahead of the refusal must never stand in its place.
+ */
+export function refusalFirst(tail: string): string {
+  const lines = tail.split("\n").filter((line) => line.trim() !== "");
+  const last = lines.pop();
+  return last === undefined ? "" : [last, ...lines].join("\n");
+}
 const CLOSE_RETRY_SECONDS = 15;
 // A pack and a push to a feed are a build and a network call; the suite is
 // the nearest thing to either in this file, so this takes the suite's number.
@@ -2689,7 +2699,7 @@ class Driver {
     // in the log it just wrote. Reading it is the whole of what follows --
     // a refusal the driver can answer, and a stop that says which refusal
     // it was.
-    const reason = jobLogTail(this.repoRoot, this.sessionNumber, "verification");
+    const reason = refusalFirst(jobLogTail(this.repoRoot, this.sessionNumber, "verification"));
 
     // A reviewer that cannot be reached is said in the start's own sentence,
     // with the repair, rather than as a log tail or a model to choose.

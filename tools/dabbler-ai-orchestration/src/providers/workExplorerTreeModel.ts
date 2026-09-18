@@ -1067,7 +1067,7 @@ export function attentionNodes(node: RepositoryNode): AttentionNode[] {
       // and a row that implied it could would be making that judgment.
       detail:
         (finished
-          ? `${repository.uncollected ?? "The framework's job has finished and nothing has collected its result; `dabbler session next` does."} `
+          ? `${repository.uncollected ?? "The framework's job has finished and nothing has collected its result; Resume Session does."} `
           : working
             ? "The framework is running something. "
             : "Nothing is running; the session is between calls. ") +

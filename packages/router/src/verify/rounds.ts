@@ -214,6 +214,19 @@ export function turnCount(value: unknown): number | null {
 }
 
 /**
+ * The generation param the transport dropped because the vendor refused it
+ * for this model, with the vendor's sentence, or null when none was.
+ */
+export function droppedParam(
+  metadata: Record<string, unknown>,
+): { readonly param: string; readonly reason: string } | null {
+  const dropped = metadata["dropped_param"];
+  if (typeof dropped !== "object" || dropped === null) return null;
+  const { param, reason } = dropped as Record<string, unknown>;
+  return typeof param === "string" ? { param, reason: String(reason ?? "") } : null;
+}
+
+/**
  * What to say when the model that answered is not the model that was asked
  * for, or null when there is nothing to say.
  *
@@ -923,6 +936,9 @@ export async function runRound(
     premium_requests: costNumber(result.metadata["premium_requests"]),
     tool_calls: turnCount(result.metadata["tool_calls"]),
   };
+  // A review that ran without a setting the vendor refused says so on its row.
+  const dropped = droppedParam(result.metadata);
+  if (dropped !== null) row["dropped_param"] = dropped;
   if (roundNumber >= 2) {
     // previous_tree stays the tree the prior round actually completed at.
     // When that object is gone and a re-anchor supplied the diff base, the

@@ -333,6 +333,9 @@ export function explainRole<T extends Candidate>(
   };
 }
 
+/** How many skipped models the notice names before it counts the rest. */
+const NOTICE_NAMES = 3;
+
 /**
  * What to tell the operator when a role fell past its own preference order.
  *
@@ -358,17 +361,25 @@ export function fellThroughWarning<T extends Candidate>(
   if (!resolution.fellThrough) return null;
   const chosen = resolution.candidates[0];
   if (chosen === undefined) return null;
+  // A model the operator chose is honoured, not fallen to: nothing to say.
+  if (
+    resolution.selected !== null &&
+    normalizeModelToken(String(chosen[0])) === normalizeModelToken(resolution.selected)
+  ) {
+    return null;
+  }
   const why = (row: RemovedCandidate): string =>
     row.rule === REMOVED_EXCLUDED_PROVIDER
       ? `because this call excludes ${label(row.provider)}`
-      : row.rule === REMOVED_NOT_SELECTED
-        ? "because another model was chosen for this role"
-        : "because no vendor could be placed behind it";
-  const skipped = resolution.removed.map((row) => `'${row.model}' ${why(row)}`);
+      : "because no vendor could be placed behind it";
+  const skipped = resolution.removed
+    .slice(0, NOTICE_NAMES)
+    .map((row) => `'${row.model}' ${why(row)}`);
+  const more = resolution.removed.length - skipped.length;
   const because =
     skipped.length === 0
       ? "the order names no model this machine can reach"
-      : `it skipped ${skipped.join("; ")}`;
+      : `it skipped ${skipped.join("; ")}${more > 0 ? `; and ${more} more` : ""}`;
   return (
     `the '${role}' role fell past its preference order and resolved to ` +
     `'${chosen[0]}' (${chosen[1]}), which the order does not name -- ${because}`

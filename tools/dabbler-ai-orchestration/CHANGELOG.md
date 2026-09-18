@@ -10,6 +10,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.13.6] — 2026-09-18
+
+**A reviewer the pane offers can review, and a pause says Resume Session.**
+
+### Fixed
+
+- A Primary Reviewer that does not support the thinking setting the
+  framework sends by default (Claude Haiku 4.5 on `api`) stopped every
+  verification with `no-verdict`. When the vendor answers that the model
+  does not support that setting, the call is made once more without it;
+  the round's record names the setting dropped and the vendor's reason,
+  and the Dabbler terminal says so once. Any other refusal fails as before.
+- The "fell past its preference order" notice no longer fires for a model
+  you chose yourself, names at most three skipped models and counts the
+  rest, and a verification stop's reason now opens with the refusal that
+  stopped the round rather than with that notice.
+- A paused session now tells you to click Resume Session, with
+  `dabbler session run --mailbox` as the way on outside VS Code, instead
+  of `dabbler session next`, which a plain terminal does not have.
+
 ## [3.13.5] — 2026-09-18
 
 **The Configuration pane can set what it offers, and says when a choice no longer fits.**

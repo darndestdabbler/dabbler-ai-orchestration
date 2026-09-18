@@ -424,7 +424,7 @@ describe("the task rows", () => {
     assert.equal(finished?.["state"], "in flight");
     assert.match(String(finished?.["intent"]), /'run of record: unit' finished at 2026-08-31T12:05:00.000Z \(exit 0\)/);
     assert.match(String(finished?.["intent"]), /not been collected/);
-    assert.match(String(finished?.["intent"]), /`dabbler session next`.*collects the result/s);
+    assert.match(String(finished?.["intent"]), /`dabbler session run --mailbox`.*collects the result/s);
     assert.doesNotMatch(String(finished?.["intent"]), /working/);
   });
 

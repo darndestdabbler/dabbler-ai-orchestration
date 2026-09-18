@@ -217,7 +217,7 @@ suite("the Dabbler terminal", () => {
     const said = written.filter((t) => plain(t).includes("14:30:05 uncollected"));
     assert.strictEqual(said.length, 1);
     assert.ok(plain(said[0]).includes("'verification' finished at 2026-08-31T14:05:00.000Z (exit 4)"));
-    assert.ok(plain(said[0]).includes("`dabbler session next`"));
+    assert.ok(plain(said[0]).includes("`dabbler session run --mailbox`"));
     assert.ok(!written.some((t) => plain(t).includes("14:30:05 working")));
     // Said once, not on every look.
     written.length = 0;
@@ -314,7 +314,7 @@ suite("the Dabbler terminal", () => {
     // Who acts, off the record rather than asserted in prose, and the
     // command that carries the first way on.
     assert.ok(spoken.includes("who=you"));
-    assert.ok(spoken.includes("dabbler session next --max-invocations"));
+    assert.ok(spoken.includes("dabbler session run --mailbox --max-invocations"));
     assert.ok(!spoken.includes("stopped kind"));
     assert.ok(!spoken.includes("rewritten"));
     assert.ok(!spoken.includes("engine:"));
@@ -345,7 +345,7 @@ suite("the Dabbler terminal", () => {
     const spoken = plain(written.join(""));
     assert.ok(spoken.includes("who=you"));
     assert.ok(spoken.includes("dabbler verify adjudicate"));
-    assert.ok(!spoken.includes("dabbler session next"));
+    assert.ok(!spoken.includes("dabbler session run --mailbox"));
 
     terminal.dispose();
     rmrf(root);
@@ -371,7 +371,7 @@ suite("the Dabbler terminal", () => {
     terminal.poll();
     const spoken = plain(written.join(""));
     for (const command of [
-      "dabbler session next",
+      "dabbler session run --mailbox",
       "dabbler configure --reviewer-model",
       "dabbler session cancel",
     ]) {

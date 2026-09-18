@@ -248,6 +248,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 208 | A quiet AI is said so in minutes, and the asks say what the framework will refuse | yes | 2026-09-18 |
 | 209 | A first push sets its upstream, and planning is not mistaken for a hang | yes | 2026-09-18 |
 | 210 | A model is checked against the list it was offered from | yes | 2026-09-18 |
+| 211 | A reviewer the pane offers can review, and a pause says Resume | yes | 2026-09-18 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2787,3 +2788,13 @@ Make `dabbler configure` judge a model against the same checkout, vehicle and li
 **Amended after acceptance:**
 
 - 2026-09-18 — step 'walk-the-reviewing-rows': its checks: The extension imports the router through packages/router/dist/index.cjs, which esbuild.js does not rebuild; without building the router first the walk drives a stale router and the new not-listed row cannot appear. The build is prepended; the other two checks are unchanged. (claude-code (anthropic, claude-opus-5))
+
+### Session 211 — A reviewer the pane offers can review, and a pause says Resume
+
+**Releasable: yes.**
+
+Let a reviewer the pane offers actually review, keep the preference-order notice out of the way, and make a pause say Resume Session first. In packages/router/src/transports/api.ts, `HttpStatusError` carries its status, and `callModel` retries once more without the thinking generation param (`thinking`, `thinking_level` or `thinking_budget`) when a provider answers 400 and its own words say that param is not supported for the model; the result's metadata carries the dropped param and the vendor's sentence, and one stderr line says the call ran without it. Any other 400 fails as today; there is no model table and no probing. packages/router/src/verify/rounds.ts writes that into the round's row as `dropped_param`. In packages/router/src/selection.ts `fellThroughWarning` says nothing when the chosen model is the operator's own selection, and where it speaks it names the first three models skipped and counts the rest. In packages/router/src/drive.ts the verification stop's reason opens with the refusal that stopped the round -- the verify log's last line -- ahead of whatever preceded it. In packages/router/src/driver.ts the way on under the pull and the mailbox (both record engine `cli`) leads with clicking Resume Session and gives `dabbler session run --mailbox` second as the way outside VS Code, instead of `dabbler session next`; the extension's fallback in workExplorerTreeModel.ts follows, and the tests that asserted the old wording are updated. Tests: a new api.test.ts (a 400 naming thinking as unsupported is retried without it and its answer returned; any other 400 is not retried), rounds.test.ts (the row records the dropped param), selection.test.ts (no notice for a selection; a bounded notice otherwise), drive.test.ts (the stop's reason begins with the refusal). Releasable as a patch: version.json moves to 3.13.6, stamped into the manifests with `npm run stamp:version`, with a CHANGELOG entry.
+
+**Amended after acceptance:**
+
+- 2026-09-18 — step 'notice-out-of-the-way': its files: selection.ts is tested in roleSelection.test.ts; selection.test.ts tests checks.ts (claude-code (anthropic, claude-opus-5))

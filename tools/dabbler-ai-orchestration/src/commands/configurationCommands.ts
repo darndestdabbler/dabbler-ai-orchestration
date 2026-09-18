@@ -25,7 +25,7 @@
 // offering something the ledger will not honour.
 
 import * as vscode from "vscode";
-import { VALID_TRANSPORTS, type ReleaseMode, type Router } from "dabbler-ai-router";
+import type { ReleaseMode, Router } from "dabbler-ai-router";
 
 import { resolveRouterCli } from "../router/terminalShim";
 
@@ -129,20 +129,6 @@ export function defaultConfigurationUi(): ConfigurationUi {
 }
 
 const NEXT_SESSION = "This is the default for the NEXT session; a session in flight keeps what its record says.";
-
-/**
- * What each transport costs, which is the half of the choice that matters.
- *
- * A seat bills AI CREDITS per token. Premium requests are the legacy
- * platform, and this line said so for long enough that three engines in a
- * row reasoned from it: the unit travels with the measurement or it does not
- * travel.
- */
-const TRANSPORT_MEANS: Record<string, string> = {
-  api: "the provider's own endpoint, billed in tokens",
-  "copilot-cli": "a Copilot seat, billed in AI credits per token",
-  offline: "scripted answers from disk: no network, no spend",
-};
 
 /**
  * The engines a row may offer, with what the machine found beside each.
@@ -279,7 +265,14 @@ async function write(
   refreshed();
 }
 
-export async function setTransport(
+/**
+ * The Reviewing AI's vehicle: the one the row SHOWS, which is the Primary
+ * Reviewer's. Writing the machine's `dabbler.transport` from here left the
+ * row unchanged whenever `dabbler.reviewerTransport` outranked it -- a toast
+ * that said "written" over a row that said what it said before. The
+ * machine's own vehicle is `dabbler configure --transport`, and no row sets it.
+ */
+export async function setReviewerTransport(
   router: Pick<Router, "configure">,
   target: ConfigurationTarget,
   refreshed: () => void,
@@ -287,24 +280,29 @@ export async function setTransport(
 ): Promise<void> {
   const root = ui.workspaceRoot();
   if (!root) return;
-  const transport = target.projection?.configuration?.transport;
+  const vehicle = target.projection?.configuration?.primaryReviewer?.vehicle;
+  const options = vehicle?.options ?? [];
+  if (options.length === 0) {
+    ui.showWarningMessage(
+      "Nothing on this machine can carry the Primary Reviewer, so there is no vehicle to choose.",
+    );
+    return;
+  }
   const picked = await ui.pick(
-    // The names come from the router: one home for the vocabulary, so a
-    // transport added there is offered here without anybody remembering to
-    // add it twice.
-    VALID_TRANSPORTS.map((name) => ({
-      label: name,
-      description: TRANSPORT_MEANS[name] ?? "",
+    options.map((option) => ({
+      label: option.id,
+      description: option.means,
+      detail: option.id === vehicle?.chosen ? "what carries it now" : undefined,
     })),
     {
-      title: "How is a provider reached for the next session?",
-      placeHolder: transport?.decidedBy
-        ? `${transport.effective} now, decided by ${transport.decidedBy}. ${NEXT_SESSION}`
+      title: "What carries the Reviewing AI?",
+      placeHolder: vehicle?.decidedBy
+        ? `${vehicle.chosen ?? "nothing"} now, decided by ${vehicle.decidedBy}. ${NEXT_SESSION}`
         : NEXT_SESSION,
     },
   );
   if (!picked) return;
-  await write(router, root, { transport: picked.label }, ui, refreshed);
+  await write(router, root, { reviewerTransport: picked.label }, ui, refreshed);
 }
 
 /**
@@ -574,42 +572,9 @@ export async function setRoleModel(
   }
   const primary = which === "primaryReviewer";
   const role = target.projection?.configuration?.[which];
-  // The vehicle first, and only where there is a choice to make. A machine
-  // with one reachable transport is told what carries the role rather than
-  // asked; a machine with two is asked, and nothing is picked for it. The
-  // two are separate writes deliberately: the candidate list on the row was
-  // read for the OUTGOING vehicle, so offering models from it after the
-  // vehicle moved would be offering a list the round will not use.
-  //
-  // The Primary Reviewer's only: that is the role whose own vehicle this
-  // framework has a flag for, and offering the auxiliary a choice that
-  // writes nothing would be a control that silently does nothing. The
-  // Reviewing AI's Vehicle row sets the machine's, which carries both.
-  const vehicle = primary ? role?.vehicle : undefined;
-  if (vehicle && vehicle.options.length > 1) {
-    const chosen = await ui.pick(
-      vehicle.options.map((option) => ({
-        label: option.id,
-        description: option.means,
-        detail: option.id === vehicle.chosen ? "what carries it now" : undefined,
-      })),
-      {
-        title: "What carries the Primary Reviewer?",
-        placeHolder:
-          `${vehicle.chosen ?? "nothing"} now. A review may need the other ` +
-          `transport when provider independence requires it. ${NEXT_SESSION}`,
-      },
-    );
-    if (!chosen) return;
-    if (chosen.label !== vehicle.chosen) {
-      await write(router, root, { reviewerTransport: chosen.label }, ui, refreshed);
-      ui.showInformationMessage(
-        `The Primary Reviewer is carried by ${chosen.label}. Its models are ` +
-          "read from that vehicle, so open this row again to choose one.",
-      );
-      return;
-    }
-  }
+  // No vehicle question here: the Reviewing AI's Vehicle row is the one
+  // control for that, and the models offered are the ones read for whatever
+  // it decided.
   const items = modelItems(
     role?.candidates ?? [],
     target.projection?.configuration?.authoring?.provider,

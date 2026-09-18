@@ -10,6 +10,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.13.1] — 2026-09-18
+
+**The Reviewing AI's Vehicle row sets what it shows.**
+
+### Fixed
+
+- Picking a vehicle on *Configuration › Reviewing AI › Vehicle* wrote the
+  machine's `dabbler.transport`, which this checkout's
+  `dabbler.reviewerTransport` outranks, so the row reported success and
+  went on showing the old vehicle. It now writes `dabbler.reviewerTransport`,
+  the vehicle the row displays, offering only the vehicles this machine can
+  reach. The machine's own vehicle is `dabbler configure --transport`.
+- The Primary Reviewer model row no longer asks which vehicle carries the
+  reviewer first; the Vehicle row is the one control for that.
+- The row's ⚠ tooltip names the layer that overrides each shadowed one,
+  whichever layer it is, rather than only when it was a role's own config.
+
 ## [3.13.0] — 2026-09-18
 
 **A session survives its loop dying.**

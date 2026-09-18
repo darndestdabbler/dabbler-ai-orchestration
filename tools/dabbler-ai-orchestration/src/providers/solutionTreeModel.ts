@@ -1086,7 +1086,10 @@ export function descriptorFor(
       const chosen = authoring
         ? (context.chosenEngine ?? vehicle?.chosen ?? null)
         : (vehicle?.chosen ?? null);
-      const roleOwn = !authoring && (vehicle?.decidedBy ?? "").startsWith("roles.");
+      // An overridden layer says BY WHAT, whichever layer that is: a row that
+      // only explained a role's own config left the editor setting -- the
+      // operator's case -- reading as a warning with no cause.
+      const overrider = !authoring && vehicle?.decidedBy ? ` by ${vehicle.decidedBy}` : "";
       // No engine chosen is two different facts: the router declines to
       // default when two CLIs are on PATH and waits for a person, or the
       // machine has none. The developer's machine -- claude and copilot both
@@ -1106,15 +1109,8 @@ export function descriptorFor(
           vehicleText(vehicle),
           authoring
             ? "The choice is a file beside this machine's model catalog, not an editor setting only one surface can read, so `dabbler session start` typed in a terminal offers the engine this pane does. It is the default for the NEXT session: the engine is recorded per session at `session start` and never changes one in flight."
-            : "This sets the machine's own vehicle, which carries every reviewing role that does not name one of its own.",
-          ...shadowed.map((layer) => `${layer.source} says '${layer.value}' and is overridden.`),
-          // A role's own vehicle outranks the machine's, so a click here
-          // would leave this row saying exactly what it said before. Naming
-          // the layer is the difference between a control that did nothing
-          // and one that says why.
-          roleOwn
-            ? `${vehicle?.decidedBy} decides this role's, and outranks the machine's: the model row sets the reviewer's own vehicle.`
-            : "",
+            : "This sets the reviewing vehicle, dabbler.reviewerTransport in this checkout's settings -- the one this row shows.",
+          ...shadowed.map((layer) => `${layer.source} says '${layer.value}' and is overridden${overrider}.`),
           authoring && (context.chosenEngine ?? null) === null ? (engines?.reason ?? "") : "",
         ]
           .filter((line) => line !== "")
@@ -1133,7 +1129,7 @@ export function descriptorFor(
         },
         expandable: false,
         contextValue: `dabblerConfigVehicle;${node.who}`,
-        command: authoring ? "dabblerSolution.setEngine" : "dabblerSolution.setTransport",
+        command: authoring ? "dabblerSolution.setEngine" : "dabblerSolution.setReviewerTransport",
       };
     }
     case "configRole": {

@@ -782,6 +782,36 @@ suite("solutionTreeModel: what a session is run with", () => {
     ]));
     assert.strictEqual(none.description, "none installed");
   });
+
+  test("the reviewing Vehicle row sets the reviewing vehicle, and names the layer that overrides", () => {
+    // The operator's case: the machine's vehicle was already copilot-cli, the
+    // checkout's reviewerTransport said api, and the row wrote the machine's.
+    const base = configured().configuration?.primaryReviewer as ConfigurationRole;
+    const row = descriptorFor(
+      { kind: "configVehicle", who: "reviewing" },
+      deepFreeze(
+        configured({
+          primaryReviewer: {
+            ...base,
+            vehicle: {
+              ...(base.vehicle as ConfigurationVehicle),
+              decidedBy: "dabbler.reviewerTransport",
+              layers: [
+                { source: "dabbler.reviewerTransport", value: "api" },
+                { source: "dabbler.transport", value: "copilot-cli" },
+              ],
+            },
+          },
+        }),
+      ),
+    );
+    assert.strictEqual(row.command, "dabblerSolution.setReviewerTransport");
+    assert.ok(row.description?.includes("⚠"), row.description);
+    assert.ok(
+      row.tooltip?.includes("dabbler.transport says 'copilot-cli' and is overridden by dabbler.reviewerTransport"),
+      row.tooltip,
+    );
+  });
 });
 
 suite("solutionTreeModel: what a configuration reading costs", () => {

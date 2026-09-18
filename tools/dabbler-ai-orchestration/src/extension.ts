@@ -56,7 +56,7 @@ import {
   setEngine,
   setRelease,
   setRoleModel,
-  setTransport,
+  setReviewerTransport,
 } from "./commands/configurationCommands";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 import { productionRouter } from "./router/host";
@@ -316,8 +316,8 @@ export function activate(context: vscode.ExtensionContext): void {
       );
       solutionProvider.refresh();
     }),
-    vscode.commands.registerCommand("dabblerSolution.setTransport", (node?: SolutionNode) =>
-      setTransport(
+    vscode.commands.registerCommand("dabblerSolution.setReviewerTransport", (node?: SolutionNode) =>
+      setReviewerTransport(
         productionRouter(),
         { node, projection: solutionProvider.freshProjection() },
         () => solutionProvider.refresh(),

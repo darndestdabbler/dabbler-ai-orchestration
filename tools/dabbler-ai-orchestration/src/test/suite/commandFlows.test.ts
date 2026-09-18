@@ -40,6 +40,7 @@ import {
   storeCredential,
   setAsMyDefault,
   setRelease,
+  setReviewerTransport,
   setRoleModel,
   type ConfigurationUi,
 } from "../../commands/configurationCommands";
@@ -1339,66 +1340,66 @@ suite("the Configuration section's model pick", () => {
     assert.ok(warned.some((line) => line.includes("no provider key")), warned.join(" | "));
   });
 
-  test("states a vehicle with one option and asks about one with two, picking neither on its own", async () => {
-    // A vehicle is offered wherever more than one is PRESENT, and a machine
-    // that can reach only one is told what carries the role rather than
-    // asked a question with one answer. Nothing is picked for the operator:
-    // the pick that returns undefined writes nothing at all.
-    const withVehicle = (options: Array<{ id: string; means: string }>): Projection =>
-      ({
-        solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
-        modules: [],
-        configuration: {
-          fidelityTransport: "api",
-          primaryReviewer: {
-            role: "reviewer",
-            vehicle: { kind: "transport", options, chosen: "api", withheld: [] },
-            chosen: null,
-            candidates: [model({ model: "o-one", provider: "openai" })],
-            excludes: [],
-            fellThrough: false,
+  // The operator's case: this checkout's `dabbler.reviewerTransport = api`
+  // decides the reviewing vehicle while the machine's is already copilot-cli.
+  const reviewedOver = (): Projection =>
+    ({
+      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+      modules: [],
+      configuration: {
+        fidelityTransport: "api",
+        primaryReviewer: {
+          role: "reviewer",
+          vehicle: {
+            kind: "transport",
+            options: [
+              { id: "api", means: "the provider's own endpoint" },
+              { id: "copilot-cli", means: "a Copilot seat" },
+            ],
+            chosen: "api",
+            decidedBy: "dabbler.reviewerTransport",
+            withheld: [],
           },
+          chosen: null,
+          candidates: [model({ model: "o-one", provider: "openai" })],
+          excludes: [],
+          fellThrough: false,
         },
-      }) as unknown as Projection;
-
-    // One reachable vehicle: the first question asked is about the MODEL.
-    const single = capturingUi();
-    await setRoleModel(
-      fakeRouter(0, "").router,
-      {
-        node: { kind: "configRole", role: "primaryReviewer" },
-        projection: withVehicle([{ id: "api", means: "the provider's own endpoint" }]),
       },
-      "primaryReviewer",
-      () => undefined,
-      single.ui,
-    );
-    assert.strictEqual(single.options.length, 1);
-    assert.ok(single.options[0]?.title?.includes("model"), single.options[0]?.title);
+    }) as unknown as Projection;
 
-    // Two reachable vehicles: the first question asked is about the VEHICLE,
-    // and cancelling it writes nothing.
-    const pair = capturingUi();
+  test("the Primary Reviewer model row asks no vehicle, even with two to choose from", async () => {
+    // The Reviewing AI's Vehicle row is the one control for that; a second
+    // question here was a second control for one write.
+    const { ui, options } = capturingUi();
     const { router, configureOptions } = fakeRouter(0, "");
     await setRoleModel(
       router,
-      {
-        node: { kind: "configRole", role: "primaryReviewer" },
-        projection: withVehicle([
-          { id: "api", means: "the provider's own endpoint" },
-          { id: "copilot-cli", means: "a Copilot seat" },
-        ]),
-      },
+      { node: { kind: "configRole", role: "primaryReviewer" }, projection: reviewedOver() },
       "primaryReviewer",
       () => undefined,
-      pair.ui,
+      ui,
     );
-    assert.ok(pair.options[0]?.title?.includes("carries"), pair.options[0]?.title);
-    assert.deepStrictEqual(
-      pair.offered.map((item) => item.label),
-      ["api", "copilot-cli"],
-    );
+    assert.strictEqual(options.length, 1);
+    assert.ok(options[0]?.title?.includes("model"), options[0]?.title);
     assert.strictEqual(configureOptions.length, 0);
+  });
+
+  test("setReviewerTransport writes the reviewing vehicle, the one the row shows", async () => {
+    // It wrote the machine's `transport`, which the checkout's
+    // reviewerTransport outranks: the toast said written and the row said
+    // `api` still.
+    const { ui, offered, options } = capturingUi(true);
+    const { router, configureOptions } = fakeRouter(0, "written");
+    await setReviewerTransport(
+      router,
+      { node: { kind: "configVehicle", who: "reviewing" }, projection: reviewedOver() },
+      () => undefined,
+      ui,
+    );
+    assert.deepStrictEqual(offered.map((item) => item.label), ["api", "copilot-cli"]);
+    assert.ok(options[0]?.placeHolder?.includes("dabbler.reviewerTransport"), options[0]?.placeHolder);
+    assert.deepStrictEqual(configureOptions, [{ repoRoot: "D:/ws", reviewerTransport: "api" }]);
   });
 
   test("picks the Auxiliary Reviewer from its own candidates and writes it as that role", async () => {

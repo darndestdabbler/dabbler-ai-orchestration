@@ -12670,3 +12670,67 @@ cannot be a constant.
 The wording carries no test of its own: rule 4 bars asserting strings.
 
 **Releasable.** Yes, a patch: a stalled session says what to look at.
+
+### Session 209 of 209: A first push sets its upstream, and planning is not mistaken for a hang
+
+Scope: whole repository
+
+**Why.** The third soak run of `../csv-parser` on 2026-09-18 (Claude Code on
+`claude-sonnet-5`, Maven, reviewer `gpt-5.6-luna` through the seat, framework
+3.13.3) closed seven sessions VERIFIED in about 47 minutes, with two real
+defects caught by review and fixed in round 2. Its record holds three things.
+
+1. **Session 1 stopped at the push.** `phaseLand` in `drive.ts` threw `land`:
+   "the push was refused: fatal: The current branch master has no upstream
+   branch ... `git push --set-upstream csv-parser master`". The remote was a
+   new GitHub repository that had never been pushed to. Somebody ran the
+   command git named and the session resumed thirty seconds later
+   (`lease-taken`, `progress-resumed past_stop=land`). Every brand-new
+   repository meets this on its first session, and the cure is the one line
+   git prints: mechanical git, which is the framework's.
+2. **The quiet notice cried wolf.** `instruction-quiet` fired 301 seconds into
+   session 2's `plan` step, telling the operator the AI's CLI "may be waiting
+   on a command that hung". Nothing had. A plan step is asked to change
+   nothing -- "the declaration comes before the work" -- and its answer is
+   written under `.dabbler/scratch`, which the tree does not track, so the
+   rule session 208 added (`QUIET_TREE_SECONDS`, 300) fires on any plan that
+   takes more than five minutes. Session 208's plan text specified "while a
+   step is outstanding and the tree has not moved" and did not exempt the one
+   step whose tree is not meant to move.
+3. **Session 3's one rejection was a build by-product.** The step's own
+   `mvn package` made the maven-shade-plugin write
+   `console-app/dependency-reduced-pom.xml` into the tree; the report omitted
+   it and was refused (`files-changed-omits`). The AI ignored the file and
+   went on. `ecosystem.ts` already ignores Maven's `target/` before a step's
+   checks for exactly this reason.
+
+**What -- a push with no upstream sets it.** Where the branch being landed
+has no upstream and the repository has exactly one remote, the land pushes
+with `--set-upstream` to that remote. With no remote, or with more than one
+and no upstream, the stop stays as it is and names the command: which remote
+is the trunk's is a person's to say.
+
+**What -- the quiet rule does not apply to a step asked to change nothing.**
+The `plan` step is held to the stall threshold alone. Every work step keeps
+the five-minute quiet notice.
+
+**What -- Maven's ignore list carries the shade plugin's by-product.**
+`dependency-reduced-pom.xml` joins `target/` in `ecosystem.ts`'s Maven entry,
+written by `ignoreBuildOutput` before a step's checks.
+
+**Non-goals.** No remote is created, renamed or chosen between; no change to
+what `land` does once an upstream exists. No change to the quiet threshold or
+its wording for work steps. No shade-plugin configuration is written into
+anybody's pom.
+
+**Tests.**
+- `drive.test.ts`: a land on a branch with no upstream and one remote pushes
+  and leaves the upstream set; with two remotes and no upstream it stops
+  `land` naming the command.
+- `drive.test.ts`: a `plan` step outstanding over a quiet tree past
+  `QUIET_TREE_SECONDS` records no `instruction-quiet`.
+- `ecosystem.test.ts`: a Maven repository's ignore rules carry
+  `dependency-reduced-pom.xml`.
+
+**Releasable.** Yes, a patch: a new repository's first session lands, and a
+planning AI is left to plan.

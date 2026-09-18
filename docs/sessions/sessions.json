@@ -4132,7 +4132,7 @@
     {
       "number": 208,
       "title": "A quiet AI is said so in minutes, and the asks say what the framework will refuse",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-18T09:06:40.834000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -4141,7 +4141,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.13.1",
-      "completedAt": null,
+      "completedAt": "2026-09-18T09:16:26.470000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,

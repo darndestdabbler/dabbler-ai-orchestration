@@ -362,6 +362,34 @@ export function overdueMultiple(
 }
 
 /**
+ * How long a step may sit unanswered over an unmoving tree before the loop
+ * says so. Far below the stall threshold on purpose: an AI that has changed
+ * nothing for five minutes is usually blocked on a command that hung, and
+ * the silence reads as the framework's own until something names it. A tree
+ * that is moving reads quiet under the same rule, so a working AI is never
+ * interrupted about it.
+ */
+export const QUIET_TREE_SECONDS = 300;
+
+/** The least time between two quiet-tree probes, each of which costs a git call. */
+export const QUIET_PROBE_INTERVAL_MS = 60_000;
+
+/**
+ * Whether the quiet-tree probe is due: strictly past the quiet threshold,
+ * not yet said for this instruction, and a minute since the last probe.
+ */
+export function quietTreeProbeDue(
+  issuedAtMs: number,
+  nowMs: number,
+  lastProbeMs: number | null,
+  said: boolean,
+): boolean {
+  if (said || !Number.isFinite(issuedAtMs)) return false;
+  if (Math.trunc((nowMs - issuedAtMs) / 1000) <= QUIET_TREE_SECONDS) return false;
+  return lastProbeMs === null || nowMs - lastProbeMs >= QUIET_PROBE_INTERVAL_MS;
+}
+
+/**
  * Whether a report answers the instruction it was handed at all.
  *
  * Read before the tree is: a report about something else cannot be measured
@@ -1472,7 +1500,33 @@ class Driver {
     const threshold = stalledAfterSeconds(this.repoRoot);
     const issued = Date.parse(instruction.issued_at);
     let saidMultiple = 0;
+    let quietSaid = false;
+    let quietProbedAt: number | null = null;
     const poll = setInterval(() => {
+      if (reason === null && quietTreeProbeDue(issued, Date.now(), quietProbedAt, quietSaid)) {
+        quietProbedAt = Date.now();
+        const reading = readWatcher(this.repoRoot, this.sessionNumber, QUIET_TREE_SECONDS);
+        if (reading.state === WATCHER_OUTSTANDING) {
+          quietSaid = true;
+          const outstanding = Math.trunc((Date.now() - issued) / 1000);
+          const changed =
+            reading.clock === "progress" && reading.sinceSeconds < outstanding
+              ? `no file has changed for ${Math.trunc(reading.sinceSeconds / 60)} minutes`
+              : "no file has changed since it was issued";
+          writeOut(
+            `dabbler [${clock()}] step ${instruction.step_id ?? instruction.seq} has had no answer for ` +
+              `${Math.trunc(outstanding / 60)} minutes and ${changed}. The AI's CLI may be waiting ` +
+              "on a command that hung -- look at its terminal.\n",
+          );
+          appendSupervision(this.repoRoot, this.sessionNumber, {
+            event: "instruction-quiet",
+            seq: instruction.seq,
+            step: instruction.step_id ?? null,
+            outstanding_seconds: outstanding,
+            quiet_seconds: reading.sinceSeconds,
+          });
+        }
+      }
       const multiple = reason === null ? overdueMultiple(issued, Date.now(), threshold, saidMultiple) : null;
       if (multiple !== null) {
         saidMultiple = multiple;
@@ -2052,6 +2106,8 @@ class Driver {
     return (
       spec.ask +
       this.nonGoalsLine() +
+      "\n\nEvery test command you run has a time limit, and a test never starts a build and " +
+      "never waits on a process without a timeout." +
       "\n\nWhen the step is done, report with the answer command. --files may be left out: " +
       "the framework takes the step's files from what changed. Named, it lists every file " +
       "you created, changed or deleted in this step and nothing else -- a deleted file is " +

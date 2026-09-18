@@ -300,7 +300,11 @@ export const DECOMPOSITION_PROMPT =
   "  skeleton. For .NET it writes the solution file and every project the\n" +
   "  plan names, with their references; for Maven or Gradle, the parent\n" +
   "  build and every module. Either way it declares the test suite in\n" +
-  "  `dabbler.yaml` under `testing.suites`, writes `packaging.pack` where the\n" +
+  "  `dabbler.yaml` under `testing.suites`, with `expensive: true` where its\n" +
+  "  run is the run of record and a hang limit in its command --\n" +
+  "  `dotnet test --blame-hang-timeout 5m`, or Surefire's\n" +
+  "  `forkedProcessTimeoutInSeconds` -- so every later run inherits it,\n" +
+  "  writes `packaging.pack` where the\n" +
   "  plan names *Handoff artifacts*, and adds the architecture test the plan\n" +
   "  requires -- where only the API tier may reach the database, that rule.\n" +
   "  Later sessions fill the modules in and never re-create what the\n" +
@@ -364,7 +368,10 @@ export const BOOTSTRAP_PLAN =
   "   over as, with the standard command for its form -- for .NET an IIS site\n" +
   "   package (`dotnet publish`) or a Windows Service (a Worker Service\n" +
   "   published for a service host), for Java a runnable jar or a war (`mvn\n" +
-  "   package`) or an image (Spring Boot's `build-image`), for the database a\n" +
+  "   package` writing into `{output}`, which `packaging.pack` requires --\n" +
+  "   say through a property the POM's jar or war plugin takes as its\n" +
+  "   output directory, `-Dhandoff.dir={output}`) or an image (Spring\n" +
+  "   Boot's `build-image`), for the database a\n" +
   "   SQL migration script (`dotnet ef migrations script --idempotent`); the\n" +
   "   real form is produced later, and a tutorial produces the easiest one to\n" +
   "   test; the modules, with what each is\n" +
@@ -418,7 +425,11 @@ export const BOOTSTRAP_PLAN =
   "   solution file and every project the plan names, with their\n" +
   "   references; for Maven or Gradle, the parent build and every module.\n" +
   "   Either way it declares the test suite in `dabbler.yaml` under\n" +
-  "   `testing.suites`, even before any tests exist, writes `packaging.pack`\n" +
+  "   `testing.suites`, even before any tests exist, with `expensive: true`\n" +
+  "   where its run is the run of record and a hang limit in its command --\n" +
+  "   `dotnet test --blame-hang-timeout 5m`, or Surefire's\n" +
+  "   `forkedProcessTimeoutInSeconds` -- so every later run inherits it,\n" +
+  "   writes `packaging.pack`\n" +
   "   where the plan names *Handoff artifacts*, and adds the architecture\n" +
   "   test the plan requires -- where only the API tier may reach the\n" +
   "   database, that rule. Later sessions fill the modules in and never\n" +

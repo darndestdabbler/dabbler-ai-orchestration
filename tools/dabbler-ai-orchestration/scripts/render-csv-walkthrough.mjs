@@ -245,6 +245,11 @@ still build against the change, because the solution file lists every project.
   you have project files.** The projection under
   \`.dabbler/solution/solution.json\` has not been derived. Touch a \`.csproj\`
   or the \`.slnx\`, or run the explicit refresh, and it fills in.
+- **VS Code's Testing view is empty after the sessions verified.** The view
+  lists tests only once VS Code's own C# or Java tooling has built the
+  project. Build it once, or let the language extension finish loading it,
+  and the tests appear. An empty view does not mean the tests are missing:
+  the suite the framework ran is on the session's record.
 - **The framework stopped.** Read its own account first —
   \`dabbler status\`, the \`stop\` in the session's \`run.json\` under
   \`.dabbler/runs\`, and the outstanding instruction's \`reasons\`. Never edit a record, a verdict or a gate

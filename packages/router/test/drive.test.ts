@@ -11,7 +11,17 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
-import { instructionPath, loopPath, readRun, renderStop, reportPath, runPath, writeRun } from "../src/driver.ts";
+import {
+  WATCHER_OUTSTANDING,
+  instructionPath,
+  loopPath,
+  readRun,
+  renderStop,
+  reportPath,
+  runPath,
+  watcherReading,
+  writeRun,
+} from "../src/driver.ts";
 import { capture, writeErr, writeOut } from "../src/output.ts";
 import {
   LOOP_STALE_MS,
@@ -41,6 +51,8 @@ import {
   namedTestCommands,
   overdueMultiple,
   owedInstruction,
+  QUIET_TREE_SECONDS,
+  quietTreeProbeDue,
   reportedFiles,
   suiteRetrySeconds,
   staleJobDisposition,
@@ -241,6 +253,30 @@ describe("when an outstanding instruction is recorded as overdue", () => {
     assert.equal(overdueMultiple(issued, at(1801), 1800, 0), 1);
     assert.equal(overdueMultiple(issued, at(2500), 1800, 1), null);
     assert.equal(overdueMultiple(issued, at(3601), 1800, 1), 2);
+  });
+});
+
+describe("when a step sits unanswered over a quiet tree", () => {
+  it("is said just past the quiet threshold, once, and not over a moving tree", () => {
+    const issuedAt = "2026-09-18T08:23:23Z";
+    const issued = Date.parse(issuedAt);
+    const at = (seconds: number): number => issued + seconds * 1000;
+    const step = { seq: 2, kind: "step", step_id: "s", issued_at: issuedAt } as unknown as DriverInstruction;
+    const reading = (touchedAt: string | null, seconds: number) =>
+      watcherReading(
+        { instruction: step, run: null, answeredAt: null, treeTouchedAt: () => touchedAt },
+        QUIET_TREE_SECONDS,
+        new Date(at(seconds)),
+      );
+
+    // Quiet: files written at +41 s, then nothing.
+    assert.equal(quietTreeProbeDue(issued, at(QUIET_TREE_SECONDS), null, false), false);
+    assert.equal(quietTreeProbeDue(issued, at(QUIET_TREE_SECONDS + 1), null, false), true);
+    assert.equal(reading(new Date(at(41)).toISOString(), 345).state, WATCHER_OUTSTANDING);
+    assert.equal(quietTreeProbeDue(issued, at(400), at(345), true), false);
+
+    // Moving: touched a minute ago, so the quiet rule says nothing.
+    assert.equal(reading(new Date(at(1200)).toISOString(), 1260).state, "quiet");
   });
 });
 

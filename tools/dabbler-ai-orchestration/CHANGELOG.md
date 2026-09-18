@@ -10,6 +10,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.13.3] — 2026-09-18
+
+**A quiet AI is said so in minutes.**
+
+### Fixed
+
+- A step that has had no answer for five minutes over a tree that has not
+  moved is said once in the Dabbler terminal: how long it has waited, how
+  long since a file changed, and that the AI's CLI may be waiting on a
+  command that hung. `supervision.jsonl` records it as `instruction-quiet`.
+  An AI that is still editing is not interrupted, and nothing is killed or
+  typed into its CLI.
+
+### Changed
+
+- The skeleton session's text says the declared suite carries
+  `expensive: true` and a hang limit (`dotnet test --blame-hang-timeout`,
+  Surefire's `forkedProcessTimeoutInSeconds`). The planning text's Java
+  handoff names `mvn package` writing into `{output}`. The step ask says
+  every test command has a time limit.
+- The CSV tutorial explains why VS Code's Testing view can be empty after
+  the sessions verified.
+
 ## [3.13.2] — 2026-09-18
 
 **A session that passed says so.**

@@ -12918,3 +12918,47 @@ strings.
 
 **Releasable.** Yes, a patch: the cheap reviewer reviews, and a paused
 session says which button to press.
+
+### Session 212 of 212: Every setting the vendor refuses is dropped, not just the first
+
+Scope: whole repository
+
+**Why.** Session 211 shipped in 3.13.5 and the operator ran `../csv-parser`
+again with `claude-haiku-4-5-20251001` reviewing over `api`. Session 1 stopped
+at verification again. The record (`jobs/verification.log`):
+
+> [dabbler] NOTE: anthropic refused 'thinking' for
+> 'claude-haiku-4-5-20251001' (adaptive thinking is not supported on this
+> model); the call runs without it.
+> dabbler: API call failed after 3 attempts: HTTP 400 ... This model does not
+> support the effort parameter.
+
+211's plan said "when a provider refuses a generation param for the model
+asked for ... the call is made once more without that param." What landed
+(`callModel` in `transports/api.ts`) matches only a refusal whose words
+contain `thinking` (`refusedThinkingParam`) and drops at most one param
+(`dropped === null`). Anthropic's provider block carries two --
+`effort: medium` and `thinking: adaptive` -- and Haiku 4.5 refuses both, one
+per call. The first is dropped; the second stops the round. The session's
+tests proved the one case the incident showed and not the rule the plan
+stated, and the operator met the second case the same afternoon: "Not
+working ... I am stuck."
+
+**What -- the rule as stated, for any param, as many times as the vendor
+refuses one.** A 400 whose words name a generation param the call carried --
+the vendor's sentence names it: "does not support the effort parameter",
+"adaptive thinking is not supported" -- drops that param and calls again.
+Each refusal drops one more, bounded by the number of params the call
+carries, so a vendor that refuses every one ends with a plain call and a
+vendor that refuses something else ends as today. Every dropped param is on
+the round's row and said once in the terminal, as 211 does for one.
+
+**Non-goals.** No model table. No change to the seat path. No retry of a 400
+that names no param the call carried.
+
+**Tests.**
+- `api.test.ts`: a provider that refuses two params in two successive 400s,
+  each naming one, is called a third time with neither and its answer is
+  returned with both on the record; a 400 naming no param is not retried.
+
+**Releasable.** Yes, a patch: Haiku reviews over the API.

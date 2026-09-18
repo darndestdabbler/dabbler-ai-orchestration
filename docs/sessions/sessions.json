@@ -4153,7 +4153,7 @@
     {
       "number": 209,
       "title": "A first push sets its upstream, and planning is not mistaken for a hang",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-18T12:18:59.221000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -4162,7 +4162,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.13.3",
-      "completedAt": null,
+      "completedAt": "2026-09-18T12:28:35.235000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 1,

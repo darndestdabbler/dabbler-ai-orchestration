@@ -4297,11 +4297,14 @@
     {
       "number": 216,
       "title": "A dispute ends inside the session",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "bad design.  obsolete",
+      "cancelledAt": "2026-09-20T18:10:44-04:00"
     },
     {
       "number": 217,

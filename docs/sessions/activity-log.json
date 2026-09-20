@@ -12027,6 +12027,21 @@
       "what": "step 'prove-it': its files",
       "reason": "The proof found the waiter reading measuring the wrong thing: a waiter prints the instruction it finds and exits, so 'a waiter is listening now' is false for every normal step and the sentence would cry wolf. The beacon has to stamp DELIVERY -- has a waiter read this instruction -- which is what the second beta test could not say. Fixed in its own files with its tests and the pages that describe it.",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 215,
+      "dateTime": "2026-09-20T14:45:25.764000-04:00",
+      "task": "The loop outlives its questions, and Resume goes. A stop a person owns no longer ends the loop: it is recorded and rendered as today, `waiting` names the person (214's record), and the loop stays alive and carries on by itself when what the person owes has visibly moved -- the record a way-on verb wrote, or the working tree -- re-entering the phase the stop was raised in, so each way on is the command it always was and running it is the answer, exactly as a report is. The \"carry on from where it stopped\" choice goes from every stop with it: there is no loop to start again, so the ways on are the remedies and ending the session. An AI service that cannot be reached is retried on a clock the person can see -- the next attempt on `waiting.by`, the transport's own words on the round's record -- with Retry Now (`dabbler session interrupt --retry-now`) making the loop try at once. What only a person possesses is asked at plan acceptance, before any file changes, rather than by `packageSession` between the land and the close: one function beside `NOTHING_TO_PUBLISH` asks the six refusals that can be known before the work -- a dependency resolving from source, a malformed `packaging` block, an unset `packaging.push.secret`, a pack naming `{version}` where the publish phase supplies none, a `version.json` the manifests disagree with, and the tag for the current version already on origin -- by calling the readers `packageSession` calls and reading the block it will read, which fixes `declare`'s own two defects: a `PackagingConfigError` is no longer swallowed into a releasable declaration, and a module session is no longer judged by the root block. What the plan can answer refuses the PLAN with that sentence and reaches no person; what only a person can answer is asked by the living loop with the recommended way on first, and the credential is read again at the publish, which stays the authority. Opening the editor continues a running session: the record says whether a session is meant to be running -- in flight with no stop -- Stop Session and Cancel clear it, closing a terminal clears nothing, and on activation the extension starts the loop for such a session through the crash layer's own bound. Reconnect Authoring AI replaces Resume for a dead CLI: offered on the in-flight row when the AI is disconnected -- no waiter listening, an instruction owed, past its notice -- it opens the engine with the waiter sentence as Start does and never starts a second author. Resume Session goes from the extension, the managed body and the pages; outside the editor the way back is what it has always been, `dabbler session run --mailbox`. Releases as a major, 4.0.0: the Resume Session command is removed, so a consumer's keybinding, task or script that names it stops working.",
+      "releasable": true
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 215,
+      "dateTime": "2026-09-20T15:23:08.604000-04:00",
+      "what": "step 'a-person-owed-does-not-end-the-loop': its files and checks",
+      "reason": "The step's own proof -- a person-owned stop that leaves the loop running and a way on that carries the session to its close -- is a whole session driven from one call, and whole-session drives live in walk-session.test.ts. drive.test.ts keeps the reading the waiting loop polls; driver.test.ts keeps the ways on.",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

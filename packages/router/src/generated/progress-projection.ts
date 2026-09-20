@@ -237,6 +237,39 @@ export type ProgressProjectionSession = {
    */
   module?: string;
   /**
+   * Who this session is waiting on, read from the loop's own `waiting` record on run.json and rendered here so every surface says it the same way. Present only while a session is in flight and something is waiting; absent means the loop is working, or the record could not be read. Nothing derives this a second time: the sentence in `says` is the router's, shared by `dabbler status`, the Work Explorer's session row and the Dabbler terminal.
+   */
+  waiting?: {
+    /**
+     * Exactly one at a time: the author owes an answer, a framework job is running, or a person owes something.
+     */
+    owner: "author" | "job" | "person";
+    /**
+     * What the wait is for, in the loop's own words.
+     */
+    for: string;
+    /**
+     * When this wait began.
+     */
+    since: string;
+    /**
+     * The deadline a framework job runs against, or null where the wait has none -- an author is told and never failed, and a person is never on a clock.
+     */
+    by: string | null;
+    /**
+     * When a persisted milestone last changed. Never a heartbeat: a beat says a process is alive, which is what a session waiting on nobody also says.
+     */
+    lastProgress: string;
+    /**
+     * Whether a waiter has read what the author owes an answer for: `session wait` stamps its beacon as it hands an instruction over. Present only where the owner is the author; absent means the question was not asked, never that the answer was no.
+     */
+    waiter?: boolean;
+    /**
+     * The one sentence a surface shows: 'Author owes step 4 — 2:13', 'Verification — 3:42 of 10:00', 'You: the reviewer is unreachable'.
+     */
+    says: string;
+  };
+  /**
    * Who the stop standing over this session is for, from the router's one reading of it: the engine clears it by answering again, the operator clears it, or -- under the pull, where the framework cannot see the engine -- whoever calls `next` next. Present only while a stop stands on an in-flight session; absent means nothing has stopped, or the run record could not be read (`tasksRefused` says which). A surface offers a person the engine's own command only where this does not say `engine`: two callers on one instruction is what the lease exists to catch and what a button should never invite.
    */
   stopActor?: "engine" | "operator" | "either";

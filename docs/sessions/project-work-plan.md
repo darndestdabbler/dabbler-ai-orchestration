@@ -251,9 +251,10 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 211 | A reviewer the pane offers can review, and a pause says Resume | yes | 2026-09-18 |
 | 212 | Every setting the vendor refuses is dropped, not just the first | yes | 2026-09-18 |
 | 213 | One authority for each lifecycle fact | yes | 2026-09-20 |
-| 214 | No silent wait | — | not declared |
+| 214 | No silent wait | yes | 2026-09-20 |
 | 215 | The loop outlives its questions, and Resume goes | — | not declared |
-| 216 | An impasse goes to the Auxiliary Reviewer before it goes to a person | — | not declared |
+| 216 | A dispute ends inside the session | — | not declared |
+| 217 | An impasse goes to the Auxiliary Reviewer before it goes to a person | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2825,3 +2826,17 @@ Give each lifecycle fact one authority. The typed `dabbler session declare` and 
 - 2026-09-20 — step 'next-leaves-a-live-lease-alone': its files: loopAlive moved beside loopPath in driver.ts, re-exported from drive.ts, so session.ts can ask whether a loop is driving without importing the module that imports it (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-20 — step 'prove-it-by-failure-injection': its files: the injection found a defect: an answer arriving after a cancellation was told to run session start, and with an earlier closed session on the ledger was aimed at it; report now takes the session in flight only and answers with the ended session's own done (claude-code (anthropic, claude-fable-5-1))
 - 2026-09-20 — step 'release-minor': its files: the workspace lint's boundary check, run before the release, refused a new import cycle (driver->progress): liveLoopSession moved from driver.ts to session.ts, which already reads the ledger (claude-code (anthropic, claude-fable-5-1))
+
+### Session 214 — No silent wait
+
+**Releasable: yes.**
+
+No silent wait: at every moment the framework says who it is waiting on, and no wait is unbounded, invisible or unanswerable. `run.json` gains one `waiting` member -- exactly one of the author, a framework job or a person, with what it is for, since when, by when, and the last REAL progress, which is a persisted milestone and never a heartbeat -- and `session wait` beats a beacon of its own beside the loop's heartbeat, so 'author owes dispositions, no waiter listening' is a different sentence from 'the AI is slow'. `dabbler status`, the Work Explorer session row and the Dabbler terminal all read that one record and re-derive none of it. Every framework job runs against a deadline read from that job's own history where this repository has one and a declared default where it does not; past it the job is ended, started once more, and only then is it a stop naming the job, how long, and its log. A stop the framework can cure stops nothing: the close rewinds to the phase that remakes the gates that failed, bounded by the SET of gates rather than by a timestamped sentence; a tree that moved after the run of record is tested again; a missing work plan sets the phase to `plan`; a dispute that cannot be written refuses the dispositions answer instead of stopping; and a reviewer call that failed is retried against the reviewer the operator CHOSE, with the transport's own words on the round's record, so a briefly unavailable service never reaches a person as a vendor conflict. A stop that remains reaches the person as a notification carrying its first sentence and who acts, under both modes. Nothing runs where nobody can see it: a revived loop's `loop.log` is followed in the Dabbler terminal, and Stop Session beside the session in the Work Explorer runs `session interrupt --stop`, which the mailbox honours during a job. One loop drives a session: the poll that waits on an answer reads the lease, and a loop removes the heartbeat only where the pid in it is its own. A work plan whose check names a program this machine cannot find is refused while the author can still rewrite it, rather than charged to the author three times afterwards. The managed body says what the waiter prints, including the kinds the guidance does not name today. Releases as a minor, 3.15.0: a new action and a session row that says who the session is waiting on; nothing a consumer runs today changes shape.
+
+**Amended after acceptance:**
+
+- 2026-09-20 — step 'every-job-has-a-deadline': its files: A job's own history needs a duration, and the status file the runner writes carries only the exit and the end; the runner records its start beside them, which is a field on a record that already exists rather than a new one. (claude-code (anthropic, claude-opus-5))
+- 2026-09-20 — step 'the-reviewer-the-operator-chose': its files: Putting the failure on the round's own record means a field on the round row, which is declared in rounds.schema.json and generated from it; the row is where a failure stays readable after a retry succeeds. (claude-code (anthropic, claude-opus-5))
+- 2026-09-20 — step 'one-loop-drives-a-session': its files: A loop that ends because another took the lease is a fact about a running loop, and walk-session.test.ts already drives a real mailbox wait; the sibling test belongs beside it rather than as a stub in the unit file. (claude-code (anthropic, claude-opus-5))
+- 2026-09-20 — step 'stop-session-is-a-click': its files: A stop honoured DURING a job is a fact about a running loop with a job outstanding; walk-session.test.ts drives real phases with in-process jobs, so the test belongs there rather than as a stub in the unit file. (claude-code (anthropic, claude-opus-5))
+- 2026-09-20 — step 'prove-it': its files: The proof found the waiter reading measuring the wrong thing: a waiter prints the instruction it finds and exits, so 'a waiter is listening now' is false for every normal step and the sentence would cry wolf. The beacon has to stamp DELIVERY -- has a waiter read this instruction -- which is what the second beta test could not say. Fixed in its own files with its tests and the pages that describe it. (claude-code (anthropic, claude-opus-5))

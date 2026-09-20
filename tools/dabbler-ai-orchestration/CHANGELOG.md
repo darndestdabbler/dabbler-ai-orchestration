@@ -10,6 +10,67 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.15.0] — 2026-09-20
+
+**No silent wait.** In a beta test a session waited six hours for something
+that never came, and nothing on the screen said what: the framework was
+waiting on the author, the author's waiter was not running, and two loops
+were driving one session, each logging its own overdue on its own clock.
+At every moment now, exactly one thing is true and the framework says which.
+
+### Added
+
+- **One answer to "who is this waiting on"**, on `run.json` and read by
+  `dabbler status`, the Work Explorer's session row and the Dabbler
+  terminal without any of them deriving it a second time: the author owes
+  an answer, a framework job is running against a deadline, or a person
+  owes something -- with what for, since when, by when, and the last REAL
+  progress, which is a persisted milestone and never a heartbeat. The
+  in-flight row says "Author owes step 4 — 2:13" where it used to say "in
+  flight".
+- **A waiter says it has read the instruction.** `dabbler session wait`
+  stamps a beacon as it hands one over, so "no waiter has read it" is a
+  different sentence from an AI that is merely slow to answer -- the one
+  the beta test could not say.
+- **A deadline on every framework job**, from that job's own recorded
+  durations or a declared default for its family. Past it the job is
+  ended and started once more; only a second overdue is a stop, and it
+  says which job, how long it ran, and where its log is.
+- **Stop Session**, beside the session in flight in the Work Explorer: it
+  runs `session interrupt --stop` with your reason, and the loop honours it
+  *inside* a job, so a verification round or a whole suite ends where you
+  asked rather than minutes later.
+- **A stop reaches you where you are**: one notification carrying the
+  stop's first sentence and who acts next, beside the line the Dabbler
+  terminal already prints.
+
+### Changed
+
+- **A stop the framework can cure is not a stop.** The close rewinds to the
+  phase that remakes the gates that failed, bounded by the set of gates
+  rather than by a sentence carrying a timestamp; a tree that moved after
+  the run of record is tested again; a missing work plan sends the loop
+  back to planning; and a dispute the ledger refuses refuses the
+  dispositions answer instead of halting the session.
+- **A reviewer call that failed is retried against the reviewer you
+  chose**, never with that reviewer's vendor excluded -- which is how a
+  service that was briefly unavailable used to reach a person as a vendor
+  conflict. The failure is on the round's record in the transport's own
+  words, and only a failure that repeats stops anything.
+- **One loop drives a session.** A loop that loses the lease while waiting
+  on an answer stands down and writes nothing over the loop that holds it,
+  and a beat file is removed only by the process that wrote it.
+- **A revived loop is not invisible**: the Dabbler terminal follows the
+  loop's own `loop.log`, so a loop a waiter restarted detached is read
+  there like any other.
+- **A check is a program.** A work plan whose check names something this
+  machine cannot spawn -- `Test-Path`, a shell builtin -- is refused while
+  the author can still rewrite it, rather than failing the step three times
+  afterwards.
+- The managed body names every kind the waiter prints, says a
+  dispositions rejection is answered rather than fixed, and says what a
+  waiter that prints no instruction means.
+
 ## [3.14.0] — 2026-09-20
 
 **One authority for each lifecycle fact.** A beta session was read as

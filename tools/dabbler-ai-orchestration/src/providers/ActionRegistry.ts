@@ -114,6 +114,19 @@ export const SESSION_ACTIONS: SessionAction[] = [
       session.status === "in-progress" &&
       (session.stopActor !== "engine" || !loopAlive(repository.root, session.number)),
   },
+  {
+    id: "dabblerSessionSets.stopSession",
+    label: "Stop Session",
+    group: 905,
+    // The person asking for the machine back, on the row of the session
+    // actually in flight -- there is one, and `session interrupt` writes
+    // its request for whichever loop is driving it. Offered whether or not
+    // a loop is beating: a request written with none is read by the next
+    // one, and a person who cannot find the stop button reaches for the
+    // one thing that always works, which is killing something.
+    when: (repository, session) =>
+      repository.currentSession === session.number && session.status === "in-progress",
+  },
   { id: CONSULT_WITH_AI, label: "Consult with AI", group: 904, when: () => true },
   {
     id: "dabblerSessionSets.cancel",

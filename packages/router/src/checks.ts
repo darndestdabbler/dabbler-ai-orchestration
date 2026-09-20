@@ -1630,6 +1630,72 @@ export function resolveProgram(program: string): { path: string; isBatch: boolea
   return { path: program, isBatch: batch(program) };
 }
 
+/**
+ * The one program a check may name that this machine need not have yet.
+ *
+ * The shim is on PATH wherever a session runs -- a terminal the extension
+ * opened, and under a driver it started -- but not necessarily in the shell
+ * a plan is being judged in, and a plan that could not name `dabbler` would
+ * be a plan that cannot check the framework's own verbs.
+ */
+export const ALWAYS_A_PROGRAM = "dabbler";
+
+/**
+ * Whether this machine can spawn `program`, asked exactly as the spawn will
+ * ask it: `resolveProgram`'s PATH rules on Windows, and PATH itself on
+ * POSIX, where `CreateProcess`'s extension search does not apply.
+ *
+ * A path with a separator in it is asked of the filesystem rather than of
+ * PATH, because that is what a spawn does with one.
+ */
+export function programIsRunnable(program: string): boolean {
+  if (program === ALWAYS_A_PROGRAM) return true;
+  if (program === "") return false;
+  if (/[\\/]/.test(program)) return existsSync(program);
+  if (process.platform === "win32") {
+    // `resolveProgram` hands the name straight back when it found nothing.
+    return resolveProgram(program).path !== program;
+  }
+  const directories = (process.env["PATH"] ?? "").split(":").filter((dir) => dir !== "");
+  return directories.some((dir) => existsSync(join(dir, program)));
+}
+
+/**
+ * What a work plan declares that this machine cannot run, one reason each.
+ *
+ * A check is argv the framework spawns with NO shell, so a shell builtin or
+ * a PowerShell cmdlet is not a program: `Test-Path ...` arrives as `spawn
+ * Test-Path ENOENT`, which `execute` reads as a failed check. In the second
+ * beta test that cost the author three refusals of a step whose work was
+ * done -- "file updated correctly, but check command fails in framework
+ * environment" -- because an author cannot amend a check while answering
+ * the step it belongs to. Asked of the PLAN, it is a rejection the author
+ * can still act on: the plan is theirs to rewrite until it is accepted.
+ */
+export function judgeCheckPrograms(
+  plan: {
+    readonly steps: readonly {
+      readonly id: string;
+      readonly checks?: readonly { readonly argv: readonly string[] }[];
+    }[];
+  },
+): string[] {
+  const reasons: string[] = [];
+  for (const step of plan.steps) {
+    for (const check of step.checks ?? []) {
+      const program = check.argv[0] ?? "";
+      if (programIsRunnable(program)) continue;
+      reasons.push(
+        `step '${step.id}' declares a check this machine cannot run: a check is a program ` +
+          `and its arguments, spawned with no shell, and ${pythonRepr(program)} is not a ` +
+          "program here. Name the interpreter that owns it (`powershell -NoProfile " +
+          "-Command ...`, `cmd /c ...`, `sh -c ...`), or a program this machine has.",
+      );
+    }
+  }
+  return reasons;
+}
+
 /** `cmd.exe`'s quoting for one argument of a `/c` command line. */
 export function quoteForCmd(argument: string): string {
   if (argument !== "" && !/[\s"^&|<>()%!]/.test(argument)) return argument;

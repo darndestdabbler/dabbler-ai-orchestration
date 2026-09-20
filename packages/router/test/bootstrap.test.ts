@@ -244,6 +244,24 @@ describe("the instruction files", () => {
     assert.match(agents, /never by hand/);
   });
 
+  it("names every kind the waiter prints, and what a waiter that prints none means", () => {
+    // The body said "three kinds and no fourth" while the waiter printed a
+    // fourth; it said a rejection is FIXED while a dispositions rejection
+    // says to change no file; and it said nothing about the waiter's
+    // no-loop exit, so an obedient AI re-armed it every minute over a
+    // session nothing was driving.
+    const project = tempDir("bootstrap-");
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
+    for (const kind of ["`step`", "`rejection`", "`interrupt`", "`done`"]) {
+      assert.ok(agents.includes(kind), kind);
+    }
+    assert.ok(!agents.includes("Three kinds"), "the body still says three kinds");
+    assert.match(agents, /ANSWERED rather\s+than fixed/);
+    assert.match(agents, /exits printing no instruction/);
+    assert.match(agents, /tell the operator what\s+it printed/);
+  });
+
   it("says publishing is the framework's, and says which sessions it is true of", () => {
     // The sentence claimed publishing happened inside the framework's own
     // calls while nothing in the driven lifecycle called packaging, so a

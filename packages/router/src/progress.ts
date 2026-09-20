@@ -37,6 +37,7 @@ import {
   renderStop,
   renderUncollected,
   uncollectedJob,
+  waiterSeenSince,
   type StopActor,
 } from "./driver.ts";
 import { pollJob } from "./jobs.ts";
@@ -964,6 +965,95 @@ export function standingStopActor(repoRoot: string, sessionNumber: number): Stop
 }
 
 /**
+ * A span of time as a surface shows it: `m:ss`, or `h:mm:ss` once it has
+ * run past an hour. Never a bare number of seconds -- "waiting 9120" is a
+ * fact nobody reads.
+ */
+export function clockSpan(milliseconds: number): string {
+  const total = Math.max(0, Math.trunc(milliseconds / 1000));
+  const seconds = String(total % 60).padStart(2, "0");
+  const minutes = Math.trunc(total / 60) % 60;
+  const hours = Math.trunc(total / 3600);
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}` : `${minutes}:${seconds}`;
+}
+
+/** The waiting record as `run.json` carries it. */
+type WaitingRecord = NonNullable<ReturnType<typeof readRun>>["waiting"];
+
+/**
+ * The one sentence every surface says a wait in.
+ *
+ * Rendered here, once, for the same reason a stop's words are: `dabbler
+ * status`, the Work Explorer's session row and the Dabbler terminal read
+ * the same record, and three renderings of one fact are three chances for
+ * them to disagree about who a session is waiting on.
+ */
+export function renderWaiting(waiting: NonNullable<WaitingRecord>, now: number = Date.now()): string {
+  const since = Date.parse(waiting.since);
+  const elapsed = Number.isFinite(since) ? clockSpan(now - since) : null;
+  if (waiting.owner === "person") return `You: ${waiting.for}`;
+  if (waiting.owner === "job") {
+    const by = waiting.by === null ? Number.NaN : Date.parse(waiting.by);
+    const budget = Number.isFinite(by) && Number.isFinite(since) ? clockSpan(by - since) : null;
+    const ran = elapsed === null ? "" : ` — ${elapsed}${budget === null ? "" : ` of ${budget}`}`;
+    return `${sentenceCase(waiting.for)}${ran}`;
+  }
+  // Whether the AI ever picked it up is the difference between an answer
+  // being worked on and an instruction nothing has read, which is what the
+  // second beta test could not say after six hours.
+  const unheard = waiting.waiter === false ? ", no waiter has read it" : "";
+  return `Author owes ${waiting.for}${elapsed === null ? "" : ` — ${elapsed}`}${unheard}`;
+}
+
+/** First letter up, and nothing else touched: a job's name is its own. */
+function sentenceCase(text: string): string {
+  return text.length === 0 ? text : `${text[0]?.toUpperCase() ?? ""}${text.slice(1)}`;
+}
+
+/**
+ * Who this session is waiting on, as a surface renders it, or null where
+ * nothing is waiting or the run record could not be read.
+ *
+ * An unreadable record answers null for the same reason `standingStopActor`
+ * does: what a surface does about damage is say so, and `tasksRefused`
+ * carries that.
+ */
+export function waitingView(
+  repoRoot: string,
+  sessionNumber: number,
+  now: number = Date.now(),
+): Record<string, unknown> | null {
+  let run: ReturnType<typeof readRun> = null;
+  try {
+    run = readRun(repoRoot, sessionNumber);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    return null;
+  }
+  const waiting = run?.waiting ?? null;
+  if (waiting === null) return null;
+  // Whether a waiter has read it is a READING and never a stored flag: it
+  // is taken here, against this wait's own start. A flag written when the
+  // wait began went stale the moment the AI picked the instruction up --
+  // and under the pull nothing runs between the instruction and its answer
+  // to refresh it, so a delivered instruction went on saying nobody had
+  // read it.
+  const read =
+    waiting.owner === "author"
+      ? { waiter: waiterSeenSince(repoRoot, sessionNumber, waiting.since) }
+      : {};
+  return {
+    owner: waiting.owner,
+    for: waiting.for,
+    since: waiting.since,
+    by: waiting.by,
+    lastProgress: waiting.last_progress,
+    ...read,
+    says: renderWaiting({ ...waiting, ...read }, now),
+  };
+}
+
+/**
  * The session's task rows, derived from the records the lifecycle writes.
  *
  * Every row is a phase whose end is a record some verb wrote: `session
@@ -1668,6 +1758,11 @@ export function buildProjection(
       // needs to know before it offers anybody a command.
       const actor = standingStopActor(repoRoot, number as number);
       if (actor !== null) sessionOut["stopActor"] = actor;
+      // Who the session is waiting on, from the loop's one record. Absent
+      // means nothing is waiting -- the loop is working -- which is a
+      // different thing from a surface that cannot tell.
+      const waiting = waitingView(repoRoot, number as number);
+      if (waiting !== null) sessionOut["waiting"] = waiting;
     }
     if (Number.isInteger(number)) {
       try {

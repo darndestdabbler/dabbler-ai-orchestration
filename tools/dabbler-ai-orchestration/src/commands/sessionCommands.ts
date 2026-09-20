@@ -778,6 +778,58 @@ export async function runResumeSession(
 }
 
 /**
+ * Stop Session: the person asking for the machine back, on the row of the
+ * session in flight.
+ *
+ * It is `dabbler session interrupt --stop` and nothing else -- the verb the
+ * framework already has, which writes the request the loop polls. The loop
+ * honours it inside a job as well as between phases, so a verification
+ * round or a suite ends rather than running on for a person who asked it to
+ * stop; `interrupted` lands on `run.json` with their reason, the session
+ * stays in flight, and no waiter revives a loop over a recorded stop.
+ * Resume Session is the way back.
+ */
+export async function runStopSession(
+  repository: SessionsRepository,
+  ui: SessionRunUi,
+  router: Router = productionRouter(),
+  promptReason: (prompt: string, placeHolder: string) => Thenable<string | undefined> = (
+    prompt,
+    placeHolder,
+  ) => vscode.window.showInputBox({ prompt, placeHolder, ignoreFocusOut: true }),
+): Promise<boolean> {
+  const session = repository.currentSession;
+  if (session === null) {
+    ui.showInformationMessage(`Nothing is in flight in ${repository.label}; there is nothing to stop.`);
+    return false;
+  }
+  const number = String(session).padStart(3, "0");
+  // Dismissing the box aborts, as it does everywhere else a reason is
+  // asked for: a stop nobody typed a reason into is a stop nobody meant.
+  const reason = await promptReason(
+    `Why stop session ${number}? The reason is recorded on the stop.`,
+    "e.g. I need the machine back",
+  );
+  if (reason === undefined) return false;
+  const result = await router.session.interrupt({
+    repoRoot: repository.root,
+    sessionNumber: session,
+    reason: reason.trim() === "" ? "the operator stopped the session" : reason.trim(),
+    stop: true,
+  });
+  if (!result.ok) {
+    ui.showErrorMessage(
+      `Stopping session ${number} refused — ${result.message.trim() || `exit ${result.exitCode}`}`,
+    );
+    return false;
+  }
+  ui.showInformationMessage(
+    `Session ${number} will stop: the loop records the stop and ends. Resume Session starts it again.`,
+  );
+  return true;
+}
+
+/**
  * Start is the launch, and what it launches is the person's own CLI.
  *
  * The engine is the decision -- asked as one, in a pick -- and everything
@@ -937,6 +989,11 @@ export function registerSessionCommands(
       const repository = repositoryOf(arg);
       if (!repository) return;
       await runResumeSession(repository, ui);
+    }),
+    vscode.commands.registerCommand("dabblerSessionSets.stopSession", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      await runStopSession(repository, ui, router);
     }),
     vscode.commands.registerCommand("dabbler.consultWithAi", async (arg: unknown) => {
       const repository = repositoryOf(arg);

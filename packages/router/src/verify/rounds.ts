@@ -10,8 +10,11 @@
 // The verifier is picked by `route` under a hard provider exclusion: the
 // orchestrator's effective provider (derived by `identity`, never trusted
 // from a label) is excluded, so verification is always cross-provider, on
-// either transport. One retry excludes a failed provider too; when nothing
-// survives, the close stays blocked and only the operator can resolve it.
+// either transport. A call that fails to be delivered is retried against
+// the SAME reviewer -- the one the operator chose -- and only a failure
+// that repeats ends the attempt; when no reviewer survives the authoring
+// exclusion at all, the close stays blocked and only the operator can
+// resolve it.
 //
 // What a round requires of the tree is what the round itself does: the
 // verifier's authored tests run inside it, and the complete suite remains
@@ -112,14 +115,33 @@ import { buildTaskBlock, sliceCodePoints } from "./prompts.ts";
 import { undisputedBlockingIndices } from "./disputes.ts";
 
 /**
- * Two attempts, one exclusion accumulator: a fallback can never re-cross the
- * caller's constraint. `NoCandidateError` propagates -- that is the
+ * Two attempts at the reviewer the operator CHOSE, under the caller's own
+ * exclusion and no other. `NoCandidateError` propagates -- that is the
  * operator-only "verification unavailable" state.
+ *
+ * The retry used to exclude the provider that failed, and where that
+ * provider was the chosen reviewer the exclusion left nothing: the second
+ * attempt refused with the ladder's vendor-conflict sentence -- "'x' is
+ * OpenAI's, and so is the authoring model" -- which was false, the original
+ * failure was written nowhere, and a service that was briefly unavailable
+ * reached a person as a configuration error they had to resolve. It
+ * happened in the second beta test and again while driving session 213, and
+ * running the loop again was the whole cure both times.
+ *
+ * So a call that failed to be DELIVERED is made again to the same reviewer,
+ * the failure is reported in the transport's own words on the way past, and
+ * only a failure that repeats ends the attempt.
  */
 export async function dispatchVerification(
   prompt: string,
   options: {
     excludeProviders: readonly string[];
+    /**
+     * The first failure, as the transport said it, so a caller can put it
+     * on the round's record and in front of whoever is watching. A retry
+     * that succeeds must not swallow the fact that one was needed.
+     */
+    onFailed?: ((message: string, provider: string | null) => void) | null;
     /** The model the work was authored by, so the one rule holds at dispatch. */
     authorModel?: string | null;
     /**
@@ -158,9 +180,8 @@ export async function dispatchVerification(
     } catch (error) {
       if (!(error instanceof DispatchError)) throw error;
       lastError = error;
-      const failed = error.provider;
-      if (attempt === 0 && failed && !excluded.includes(failed)) {
-        excluded.push(failed);
+      if (attempt === 0) {
+        options.onFailed?.(error.message, error.provider ?? null);
         continue;
       }
       throw error;
@@ -819,6 +840,10 @@ export async function runRound(
   );
 
   const exclude = [orchestrator.effectiveProvider];
+  // What failed on the way to this round's reviewer, in the transport's own
+  // words. It goes on the round's row, so a call that had to be made twice
+  // is readable afterwards rather than lost behind the one that worked.
+  const dispatchFailures: string[] = [];
   let result: RouteResult;
   try {
     result = await dispatchVerification(promptBody, {
@@ -828,6 +853,14 @@ export async function runRound(
       transport: options.transport ?? null,
       repoRoot,
       followUp,
+      onFailed: (message, provider) => {
+        const said = `the call to ${provider ?? "the chosen reviewer"} failed: ${message}`;
+        dispatchFailures.push(said);
+        writeErr(
+          `verify: ${said}\nRetrying the same reviewer once: a service that did not ` +
+            "answer is not a reason to review with somebody else.\n",
+        );
+      },
     });
   } catch (error) {
     if (error instanceof NoCandidateError) {
@@ -835,10 +868,14 @@ export async function runRound(
       return EXIT_UNAVAILABLE;
     }
     if (error instanceof RouterError) {
+      // Twice, to the reviewer the operator chose. What is said is what
+      // failed: nothing here suggests the choice is wrong, because a
+      // service that did not answer says nothing about the choice.
       writeErr(
-        `verify: routed verification call failed: ${error.message}\n` +
-          "Nothing was written. Retry once; if the second provider also " +
-          "fails, escalate to the operator.\n",
+        `verify: the reviewer call failed twice: ${error.message}\n` +
+          (dispatchFailures.length > 0 ? `The first attempt: ${dispatchFailures[0]}\n` : "") +
+          "Nothing was written and no round was spent. Run verification again once the " +
+          "service answers.\n",
       );
       return EXIT_CALL_FAILED;
     }
@@ -939,6 +976,10 @@ export async function runRound(
     premium_requests: costNumber(result.metadata["premium_requests"]),
     tool_calls: turnCount(result.metadata["tool_calls"]),
   };
+  // A round whose reviewer had to be called twice says so on its row, in
+  // the transport's words: the retry that worked must not erase the failure
+  // that made it necessary.
+  if (dispatchFailures.length > 0) row["dispatch_failures"] = [...dispatchFailures];
   // A review that ran without a setting the vendor refused says so on its row.
   const dropped = droppedParams(result.metadata);
   if (dropped.length > 0) row["dropped_params"] = dropped;

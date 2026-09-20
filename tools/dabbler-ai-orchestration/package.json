@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: solutions, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
-  "version": "3.14.0",
+  "version": "3.15.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -97,6 +97,11 @@
       {
         "command": "dabblerSessionSets.resumeSession",
         "title": "Resume Session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.stopSession",
+        "title": "Stop Session",
         "category": "Dabbler"
       },
       {
@@ -264,6 +269,10 @@
           "when": "false"
         },
         {
+          "command": "dabblerSessionSets.stopSession",
+          "when": "false"
+        },
+        {
           "command": "dabbler.consultWithAi",
           "when": "false"
         },
@@ -344,6 +353,11 @@
           "command": "dabblerSessionSets.resumeSession",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-resumeSession;/",
           "group": "6_session@604"
+        },
+        {
+          "command": "dabblerSessionSets.stopSession",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-stopSession;/",
+          "group": "6_session@606"
         },
         {
           "command": "dabbler.consultWithAi",
@@ -581,7 +595,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.9",
-    "dabbler-ai-router": "3.14.0",
+    "dabbler-ai-router": "3.15.0",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",

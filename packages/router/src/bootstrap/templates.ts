@@ -49,13 +49,13 @@ export const SHARED_BODY =
   "\n" +
   "You are the **orchestrator** for `{repo_name}`: you do the mechanics — file\n" +
   "edits, shell, git — and the framework owns the lifecycle, one move at a time.\n" +
-  "**Opened to consult, you are not the orchestrator**: read `dabbler consult --sessions-dir\n" +
-  "docs/sessions` first, run no waiter, and commit and push every file you change.\n" +
+  "**Opened to consult, you are not the orchestrator**: read `dabbler consult\n" +
+  "--sessions-dir docs/sessions` first, run no waiter, and commit what you change.\n" +
   "\n" +
   "## How to run a session\n" +
   "\n" +
-  "Sessions are numbered directly in this repository, under one sessions root\n" +
-  "(`docs/sessions/`), so no command takes a handle to one.\n" +
+  "Sessions are numbered under one sessions root (`docs/sessions/`), so no\n" +
+  "command takes a handle to one.\n" +
   "\n" +
   "**Start Session registers the session and starts the framework's loop**,\n" +
   "`dabbler session run --mailbox`, in a terminal of its own. The loop drives\n" +
@@ -65,92 +65,93 @@ export const SHARED_BODY =
   "\n" +
   "    dabbler session wait --sessions-dir docs/sessions\n" +
   "\n" +
-  "Run it as a background command. It prints the instruction owed an answer,\n" +
-  "as JSON, and exits; it consumes nothing, so running it again prints the\n" +
-  "same instruction until it is answered. Do what the instruction's `ask`\n" +
-  "says, run its `answer_command` — running it is the answer — and start the\n" +
-  "waiter again in the background, until it prints `done`. There is nothing\n" +
-  "to remember between instructions: the framework holds the state.\n" +
+  "Run it as a background command. It prints the instruction owed an answer, as\n" +
+  "JSON, and exits; it consumes nothing, so running it again prints the same\n" +
+  "instruction until it is answered. Do what the `ask` says, run the\n" +
+  "`answer_command` — running it is the answer — and start the waiter again,\n" +
+  "until it prints `done`. The framework holds the state between instructions.\n" +
   "\n" +
   "The operator can talk to you while the waiter runs: answer them, and leave\n" +
-  "the waiter running. When an instruction has waited past its threshold the\n" +
-  "operator is told, and may ask whether your waiter is running — check, and\n" +
-  "start it again if it is not.\n" +
+  "it running. When an instruction has waited past its threshold they are\n" +
+  "told, and may ask whether your waiter is running — check, and start it\n" +
+  "again if it is not.\n" +
   "\n" +
-  "Outside VS Code the operator types the two starts: `dabbler session start\n" +
+  "Outside VS Code the operator types both starts: `dabbler session start\n" +
   "--sessions-dir docs/sessions --engine <engine> --provider <provider>` (a\n" +
-  "Copilot seat adds `--model`), then `dabbler session run --mailbox\n" +
-  "--sessions-dir docs/sessions` in a terminal of its own.\n" +
+  "seat adds `--model`), then `dabbler session run --mailbox --sessions-dir\n" +
+  "docs/sessions` in a terminal of its own.\n" +
   "\n" +
   "## What comes back\n" +
   "\n" +
-  "Three kinds of instruction, and no fourth:\n" +
+  "Four kinds of instruction, and no fifth:\n" +
   "\n" +
   "- **`step`** — work to do. Its `ask` says what; do it, then report with\n" +
   "  the `answer_command`. `--files` may be left out, and the framework takes\n" +
   "  the step's files from what changed; named, it lists every file you\n" +
   "  changed and nothing else.\n" +
   "- **`rejection`** — the answer was refused, and `reasons` says why. Fix\n" +
-  "  it and answer again; three refusals of one step stop the session.\n" +
+  "  it and answer again; three refusals of one step stop the session. A\n" +
+  "  round's findings arrive as one too, and that one is ANSWERED rather\n" +
+  "  than fixed: its `ask` says to change no file and to dispose of each.\n" +
+  "- **`interrupt`** — the same instruction re-issued because something\n" +
+  "  reached the framework while you worked; `reasons` carries it first,\n" +
+  "  and the answer owed is the one you already owed.\n" +
   "- **`done`** — the session is over and closed. Stop.\n" +
   "\n" +
+  "**A waiter that exits printing no instruction said why on stderr**: no\n" +
+  "loop is driving, and nothing will write an instruction until somebody\n" +
+  "acts. Do not re-arm it — stop, and tell the operator what it printed.\n" +
+  "\n" +
   "Everything the framework does for itself happens between instructions:\n" +
-  "declaring the work, each step's own checks, cross-provider verification\n" +
-  "and its remediation rounds, the suites as the run of record, the commit,\n" +
-  "the push, and the close. The tests that run are each step's own checks and\n" +
-  "the tests named after what it changed, then the suites — whole, or the\n" +
-  "tests the session selects where a whole run costs too much, and whole\n" +
-  "before a release. The Primary Reviewer reviews without writing or running one.\n" +
-  "None of them is yours to run, and none of them is yours to skip ahead to\n" +
-  "— the instruction in hand is the whole of what is asked. `dabbler\n" +
-  "version` says which router this is; report it when you report a problem.\n" +
-  "A source file's tests are the file named after it (`checks.ts`,\n" +
-  "`checks.test.ts`): a new public method gets a test there, a changed one has\n" +
-  "its tests updated or confirmed, and a removed one takes its tests with it.\n" +
+  "declaring the work, each step's own checks, cross-provider verification and\n" +
+  "its remediation rounds, the suites as the run of record, the commit, the\n" +
+  "push, and the close. What runs is each step's own checks and the tests named\n" +
+  "after what it changed, then the suites — whole, or the ones the session\n" +
+  "selects where a whole run costs too much, and whole before a release; the\n" +
+  "Primary Reviewer reviews without writing or running one. None of them is\n" +
+  "yours to run or to skip ahead to — the instruction in hand is the whole of\n" +
+  "what is asked, and `dabbler version` says which router this is. A source\n" +
+  "file's tests are the file named after it (`checks.ts`, `checks.test.ts`): a\n" +
+  "new public method gets a test there, a changed one has its tests updated.\n" +
   "\n" +
   "**The framework owns the clock, the state and the sequencing.** An\n" +
   "instruction that names a command is answered by running that command —\n" +
   "never by watching `run.json` or any other record for what the framework\n" +
   "will do next. The waiter is the one thing you wait on.\n" +
   "\n" +
-  "**A session's release follows `dabbler.release`**, and the framework\n" +
-  "publishes between the push and the close for itself. On request, the\n" +
-  "default, a plan releases with `release` and one reason; ship by default,\n" +
-  "a plan holds with `hold_release` and one reason. Either is declared\n" +
-  "before the work and never decided afterwards; no session publishes\n" +
-  "without a VERIFIED verdict, and a releasable session with no packaging\n" +
-  "run on its record cannot close: the close refuses.\n" +
+  "**A session's release follows `dabbler.release`**, and the framework publishes\n" +
+  "between the push and the close for itself. On request, the default, a plan\n" +
+  "releases with `release` and one reason; ship by default, a plan\n" +
+  "holds with `hold_release` and one reason. Either is declared before the work\n" +
+  "and never afterwards; no session publishes without a VERIFIED verdict, and a\n" +
+  "releasable session with no packaging run cannot close: the close refuses.\n" +
   "\n" +
   "## When the framework stops\n" +
   "\n" +
   "- Read the framework's own account before the scrollback: `dabbler status`,\n" +
-  "  the `stop` on `.dabbler/runs/s<N>/driver/run.json` with its kind and its\n" +
-  "  class, the outstanding instruction's `reasons`, and the transcripts.\n" +
+  "  the `stop` on `.dabbler/runs/s<N>/driver/run.json` with its kind and class,\n" +
+  "  the outstanding instruction's `reasons`, and the transcripts.\n" +
   "- Where the framework is source in this tree you may fix it, and the fix\n" +
   "  rides in this session's own diff; where it is an installed package,\n" +
   "  report the step `blocked` with the diagnosis in its notes.\n" +
-  "- Never touch the record, a verdict or a gate to get past a stop. The whole\n" +
-  "  protocol is the *When the framework stops* section of dabbler's\n" +
-  "  `docs/driving-a-session.md`.\n" +
+  "- Never touch the record, a verdict or a gate to get past a stop. The\n" +
+  "  protocol is *When the framework stops* in `docs/driving-a-session.md`.\n" +
   "\n" +
   "## Hard rules\n" +
   "\n" +
   "- State files (`docs/sessions/sessions.json`) and everything under\n" +
-  "  `.dabbler/runs/`\n" +
-  "  are written by the router only — never by hand, never \"fixed up\".\n" +
+  "  `.dabbler/runs/` are written by the router only — never by hand.\n" +
   "  The router commits the state files it writes at the land and the close,\n" +
   "  and a report never names those; it names `session-plan.md` if it edits it.\n" +
-  "- Verdicts come from the **Primary Reviewer** -- *not the author* -- and\n" +
-  "  a disputed impasse from the **Auxiliary Reviewer** -- *not the author\n" +
-  "  and not the primary*, so a third voice is the role's own definition. A\n" +
-  "  verdict token the framework did not hand you does not exist.\n" +
+  "- Verdicts come from the **Primary Reviewer** -- *not the author* -- and a\n" +
+  "  disputed impasse from the **Auxiliary Reviewer** -- *not the author and\n" +
+  "  not the primary*. A verdict the framework did not hand you does not exist.\n" +
   "- API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,\n" +
-  "  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The\n" +
-  "  same rule covers a feed PAT: configuration names it and never holds it.\n" +
-  "- The router is one command, `dabbler <verb>` — nothing to install beside\n" +
-  "  the extension: it ships inside the VSIX, and a VS Code terminal has it\n" +
-  "  on `PATH`. Anywhere else, run `node \"<extension dir>/dist/dabbler.cjs\"\n" +
-  "  <verb>`. \"dabbler: command not found\" is a PATH problem, not a keys one.\n" +
+  "  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files; the\n" +
+  "  same rule covers a feed PAT, which configuration names and never holds.\n" +
+  "- The router is one command, `dabbler <verb>`: it ships inside the VSIX and\n" +
+  "  a VS Code terminal has it on `PATH`; anywhere else run `node \"<extension\n" +
+  "  dir>/dist/dabbler.cjs\" <verb>`. \"command not found\" is PATH, not keys.\n" +
   "- `session cancel --force` is a person's verb, never the engine's; so is `close --force`.\n" +
   "- A fix no session covers is a session's own work: insert a session into\n" +
   "  the session plan and make the fix there, never outside a session.\n" +
@@ -159,11 +160,10 @@ export const SHARED_BODY =
   "\n" +
   "**Write files with your editing tools, never with a shell heredoc.** On a\n" +
   "Windows host the shell is usually Git Bash, and a heredoc there eats\n" +
-  "backslashes: `\\n` arrives as a newline and `\\\\` as one backslash, so\n" +
-  "JSON escapes, regular expressions and Windows paths are silently\n" +
-  "corrupted on the way to disk. Nothing fails — the file is written, and\n" +
-  "it is wrong. The same goes for `echo` and for `printf` with a format\n" +
-  "string you did not escape twice.\n" +
+  "backslashes: `\\n` arrives as a newline and `\\\\` as one backslash, so JSON\n" +
+  "escapes, regular expressions and Windows paths are silently corrupted on the\n" +
+  "way to disk. Nothing fails — the file is written, and it is wrong. The same\n" +
+  "goes for `echo` and for `printf` with a format you did not escape twice.\n" +
   "\n" +
   "**Nothing may touch the working tree between a report and the\n" +
   "instruction that follows it.** The framework hashes the tree before and\n" +

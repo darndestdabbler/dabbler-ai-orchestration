@@ -19,6 +19,8 @@ import {
   renderStop,
   reportPath,
   runPath,
+  appendSupervision,
+  waiterSeenSince,
   watcherReading,
   writeRun,
 } from "../src/driver.ts";
@@ -67,9 +69,25 @@ import {
   reviveLoop,
   waiterEnd,
   waiterReading,
+  waitingRecord,
+  waitingForInstruction,
+  gateSetBound,
+  packagingGates,
+  recordDisputesFor,
+  jobDeadlineSeconds,
+  jobDurations,
+  jobIsADeadlineRetry,
+  judgeJobDeadline,
+  JOB_DEADLINE_SECONDS,
+  JOB_DEADLINE_DEFAULT_SECONDS,
+  JOB_DEADLINE_FLOOR_SECONDS,
+  JOB_DEADLINE_EXCEEDED,
+  beatWaiter,
+  clearBeatIfMine,
   type RegistrationFacts,
   type StepSpec,
 } from "../src/drive.ts";
+import { jobStatusPath } from "../src/jobs.ts";
 import { rewindPhaseFor } from "../src/gates.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
@@ -267,6 +285,222 @@ describe("when an outstanding instruction is recorded as overdue", () => {
     assert.equal(overdueMultiple(issued, at(1801), 1800, 0), 1);
     assert.equal(overdueMultiple(issued, at(2500), 1800, 1), null);
     assert.equal(overdueMultiple(issued, at(3601), 1800, 1), 2);
+  });
+});
+
+describe("the one answer to who a session is waiting on", () => {
+  const author = {
+    schema_version: 1,
+    seq: 4,
+    session_number: 1,
+    issued_at: "2026-09-20T12:00:00Z",
+    kind: "step",
+    step_id: "one-answer",
+    ask: "do the thing",
+  } as unknown as DriverInstruction;
+
+  it("names the author, a job and a person in turn, carrying the last real progress across all three", () => {
+    // The wait moves from one owner to the next; what the session last
+    // ACTUALLY did does not move with it. Six hours of waiting on nobody
+    // and six hours of a job that is working look identical on a clock
+    // that restarts whenever the framework writes something down.
+    const owed = waitingRecord(null, { owner: "author", for: "step one-answer", by: null, waiter: false }, null, "12:00");
+    assert.deepEqual(
+      { ...owed },
+      { owner: "author", for: "step one-answer", since: "12:00", by: null, last_progress: "12:00", waiter: false },
+    );
+    const working = waitingRecord(owed, { owner: "job", for: "verification round 2", by: "12:20" }, "12:10", "12:10");
+    assert.equal(working.last_progress, "12:10");
+    assert.equal(working.by, "12:20");
+    assert.equal("waiter" in working, false);
+    // No milestone between the job and the stop: the record still says when
+    // the session last moved, which is what makes the stop's age readable.
+    const theirs = waitingRecord(working, { owner: "person", for: "the reviewer is unreachable.", by: null }, null, "12:31");
+    assert.equal(theirs.owner, "person");
+    assert.equal(theirs.since, "12:31");
+    assert.equal(theirs.last_progress, "12:10");
+  });
+
+  it("says no waiter has read the instruction until one has, measured against this wait", () => {
+    const root = tempDir("waiting-waiter-");
+    const began = new Date().toISOString();
+    // A new wait starts unread, whatever a beacon left by the last one says.
+    beatWaiter(root, 1);
+    const owed = waitingRecord(
+      null,
+      { owner: "author", for: waitingForInstruction(author), by: null, waiter: false },
+      null,
+      began,
+    );
+    assert.equal(owed.waiter, false);
+    assert.equal(owed.for, "step one-answer");
+    // The waiter stamps the beacon as it hands the instruction over, and
+    // that stamp is later than the wait began: the AI has it.
+    beatWaiter(root, 1);
+    assert.equal(waiterSeenSince(root, 1, began), true);
+    // A stamp from before this wait answers for the last instruction, not
+    // for this one.
+    assert.equal(waiterSeenSince(root, 1, new Date(Date.now() + 60_000).toISOString()), false);
+    // A stamp is not progress: nothing a process writes to say it was here
+    // touches the clock that says the work moved.
+    assert.equal(
+      waitingRecord(owed, { owner: "author", for: owed.for, by: null, waiter: true }, null, "12:02").last_progress,
+      began,
+    );
+  });
+
+  it("names what an answer is owed for: the step, a round's dispositions, or the instruction itself", () => {
+    assert.equal(waitingForInstruction(author), "step one-answer");
+    assert.equal(
+      waitingForInstruction({ ...author, step_id: undefined, round: 2 } as unknown as DriverInstruction),
+      "dispositions of round 2",
+    );
+    assert.equal(
+      waitingForInstruction({ ...author, step_id: undefined } as unknown as DriverInstruction),
+      "instruction 4",
+    );
+  });
+});
+
+describe("whose beat a loop or a waiter may clear", () => {
+  it("removes only the beat whose pid is its own", () => {
+    // Two loops ran on one session for five hours and the first to exit
+    // deleted the other's heartbeat under it: the loop still driving read
+    // as no loop at all, and a waiter started a third.
+    const root = tempDir("beat-");
+    const path = loopPath(root, 1);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify({ pid: process.pid + 1, at: new Date().toISOString() }));
+    clearBeatIfMine(path);
+    assert.equal(existsSync(path), true);
+    writeFileSync(path, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
+    clearBeatIfMine(path);
+    assert.equal(existsSync(path), false);
+    // A beat that is already gone, or that will not parse, is nobody's to
+    // remove and no error either.
+    clearBeatIfMine(path);
+    writeFileSync(path, "half a line");
+    clearBeatIfMine(path);
+    assert.equal(existsSync(path), true);
+  });
+});
+
+describe("a stop the framework can cure", () => {
+  it("sends a close refused on test_run_fresh back to the phase that remakes it, and knows the same set twice", () => {
+    // A session that publishes nothing meets the close's gates FIRST at
+    // the close, where nothing used to go back: the same gate refused
+    // every re-run and the stop named no command anybody may run.
+    const gates = [
+      { name: "verification_clean", passed: true },
+      { name: "test_run_fresh", passed: false },
+      { name: "changelog_updated", passed: false },
+    ];
+    assert.equal(rewindPhaseFor(gates), "run-of-record");
+    // The bound is the SET of gates that failed, sorted -- never the
+    // refusal's own words, which carry the moment the evidence was
+    // measured and so never match themselves twice.
+    const bound = gateSetBound(gates);
+    assert.equal(bound, "gates: changelog_updated, test_run_fresh");
+    assert.equal(gateSetBound([...gates].reverse()), bound);
+    assert.equal(alreadyRewoundFor([], bound), false);
+    assert.equal(alreadyRewoundFor([{ reason: bound }], bound), true);
+    // A different set is a different problem, and going back for it is
+    // progress rather than the same loop.
+    assert.equal(
+      alreadyRewoundFor([{ reason: bound }], gateSetBound([{ name: "pushed_to_remote", passed: false }])),
+      false,
+    );
+  });
+
+  it("reads the gates the last packaging attempt wrote, and nothing from the ones before it", () => {
+    const rows = [
+      { gates: [{ name: "test_run_fresh", passed: false }] },
+      { gates: [{ name: "pushed_to_remote", passed: false }] },
+    ];
+    assert.equal(gateSetBound(packagingGates(rows)), "gates: pushed_to_remote");
+    assert.equal(rewindFromPackaging(rows), "land");
+    assert.deepEqual(packagingGates([]), []);
+    assert.deepEqual(packagingGates([{ outcome: "published" }]), []);
+  });
+
+  it("hands a dispute the ledger refuses back as a refusal of the answer, and records the rest", () => {
+    // It used to be a stop written AFTER the set was accepted, so every
+    // restart met it again and nobody could clear it. The author wrote the
+    // grounds and can write them again.
+    const root = tempDir("dispute-refused-");
+    const set = {
+      round: 2,
+      seq: 7,
+      dispositions: [
+        { finding_index: 0, action: "reject", reason: "not a defect", evidence_paths: [] },
+        { finding_index: 1, action: "reject", reason: "cited", evidence_paths: ["docs/big.md"] },
+        { finding_index: 2, action: "fix", reason: "real" },
+      ],
+    } as unknown as Parameters<typeof recordDisputesFor>[3];
+    const written = recordDisputesFor(join(root, "docs", "sessions"), root, 1, set, 2, (_dir, request) =>
+      request.findingIndex === 1
+        ? { exit: 2, refusal: "the evidence file is over the inline cap" }
+        : { exit: 0, refusal: "" },
+    );
+    assert.deepEqual([...written.recorded], [0]);
+    assert.equal(written.refusals.length, 1);
+    assert.match(String(written.refusals[0]), /finding 1 was refused \(exit 2\)/);
+    assert.match(String(written.refusals[0]), /over the inline cap/);
+  });
+});
+
+describe("the deadline every framework job runs against", () => {
+  it("is that job's own longest run, three times over, and the declared default where it has none", () => {
+    // History beats the declaration because the declaration is a guess.
+    assert.equal(jobDeadlineSeconds([], "verification"), JOB_DEADLINE_SECONDS["verification"]);
+    assert.equal(jobDeadlineSeconds([], "run of record: typescript"), JOB_DEADLINE_SECONDS["run of record"]);
+    assert.equal(jobDeadlineSeconds([], "something nobody declared"), JOB_DEADLINE_DEFAULT_SECONDS);
+    assert.equal(jobDeadlineSeconds([600, 200], "verification"), 1800);
+    // A job that usually takes four seconds is not hung at twelve.
+    assert.equal(jobDeadlineSeconds([4], "close"), JOB_DEADLINE_FLOOR_SECONDS);
+    // A record that could not say says nothing.
+    assert.equal(jobDeadlineSeconds([0, Number.NaN], "close"), JOB_DEADLINE_SECONDS["close"]);
+  });
+
+  it("reads what jobs of that name have actually taken, from the status files the runner leaves", () => {
+    const root = tempDir("job-history-");
+    const write = (session: number, name: string, status: Record<string, unknown>): void => {
+      const path = jobStatusPath(root, session, name);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, JSON.stringify(status));
+    };
+    assert.deepEqual(jobDurations(root, "verification"), []);
+    write(1, "verification", { exit: 0, started_at: "2026-09-20T10:00:00Z", ended_at: "2026-09-20T10:02:00Z" });
+    // A status written before the runner recorded its start says nothing.
+    write(2, "verification", { exit: 0, ended_at: "2026-09-20T11:00:00Z" });
+    write(3, "close", { exit: 0, started_at: "2026-09-20T12:00:00Z", ended_at: "2026-09-20T12:00:30Z" });
+    assert.deepEqual(jobDurations(root, "verification"), [120]);
+    assert.deepEqual(jobDurations(root, "close"), [30]);
+  });
+
+  it("leaves a job inside its deadline alone, buys one retry past it, and stops on the second", () => {
+    const at = Date.parse("2026-09-20T12:00:00Z");
+    assert.equal(judgeJobDeadline(at - 1, at, false), "wait");
+    assert.equal(judgeJobDeadline(at, at, false), "retry");
+    // The retry gets its own deadline, and meeting that one is the stop:
+    // whatever this is, it is not finishing.
+    assert.equal(judgeJobDeadline(at, at, true), "stop");
+  });
+
+  it("knows the retry it already bought from the record, by the restarted job's own start", () => {
+    const root = tempDir("job-retry-");
+    const job = { name: "verification", started_at: "2026-09-20T12:30:00Z" };
+    assert.equal(jobIsADeadlineRetry(root, 1, job), false);
+    appendSupervision(root, 1, {
+      event: JOB_DEADLINE_EXCEEDED,
+      name: "verification",
+      ran_seconds: 1800,
+      deadline_seconds: 1800,
+      restarted_at: job.started_at,
+    });
+    assert.equal(jobIsADeadlineRetry(root, 1, job), true);
+    // Round 2 runs under the same name and is owed its own retry.
+    assert.equal(jobIsADeadlineRetry(root, 1, { ...job, started_at: "2026-09-20T13:00:00Z" }), false);
   });
 });
 

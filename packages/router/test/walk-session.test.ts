@@ -27,7 +27,7 @@ import { capture } from "../src/output.ts";
 import { readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import { EXIT_OK, cancel, holdRelease, planAmend, report, start } from "../src/session.ts";
+import { EXIT_OK, cancel, holdRelease, interrupt, planAmend, report, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
 import { amendmentEntries, readTaskDeclaration } from "../src/writers.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
@@ -1074,6 +1074,118 @@ describe("a session cancelled underneath its loop", () => {
       gitOut(repo, "log", "--format=%s", headBefore + "..HEAD").trim(),
       "Cancel session 1 of sessions",
     );
+  });
+
+  it("ends the job when a person stops the session while one is running", async () => {
+    // Stop Session is a person asking for the machine back. The pull
+    // honours a stop inside `longWork`; under the mailbox it used to wait
+    // for the phase boundary -- which is the end of the very job being
+    // asked to end, and a verification round or a whole suite is minutes.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+
+    let stepped = false;
+    const author: Engine = {
+      name: "scripted-author",
+      invoke: (invocation) => {
+        const seq = invocation.instruction.seq;
+        if (invocation.instruction.step_id === "plan") {
+          const path = join(tempDir("answer-"), "answer.json");
+          writeFileSync(path, JSON.stringify(PLAN), "utf8");
+          // Written into the drive's own capture: one buffer, one verb at a time.
+          assert.equal(report(sessionsDir, { seq, answerFile: path }), EXIT_OK);
+        } else {
+          writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+          assert.equal(
+            report(sessionsDir, {
+              seq,
+              stepId: "widget",
+              status: "done",
+              files: ["src/widget.py"],
+              testsRun: null,
+              notes: "walked",
+            }),
+            EXIT_OK,
+          );
+          stepped = true;
+        }
+        invocation.emit("scripted: answered");
+        return Promise.resolve({ exitCode: 0 });
+      },
+    };
+
+    // The person, once the framework's own work has started: the step is
+    // answered, so the loop is inside a job and no instruction is owed.
+    const asking = setInterval(() => {
+      if (!stepped) return;
+      clearInterval(asking);
+      interrupt(sessionsDir, { reason: "I need the machine back", stop: true });
+    }, 25);
+
+    const driven = await capture(() =>
+      driveSession(sessionsDir, {
+        engine: "claude-code",
+        provider: "anthropic",
+        adapter: author,
+        maxInvocations: 6,
+      }),
+    );
+    clearInterval(asking);
+
+    // The stop is recorded with the person's reason, and the job the loop
+    // was waiting on is not left running behind it.
+    const run = readRun(repo, 1);
+    assert.equal(run?.stop?.kind, "interrupted", driven.stderr);
+    assert.match(String(run?.stop?.reason), /I need the machine back/);
+    assert.equal(run?.job ?? null, null);
+    // And the session stays in flight, which is what Resume comes back to.
+    assert.equal(run?.phase === "complete", false);
+  });
+
+  it("ends a mailbox loop whose lease another loop has taken, and writes nothing over it", async () => {
+    // Two loops drove one session for five hours in the second beta test:
+    // epoch 6 went on waiting on an instruction epoch 7 had replaced, each
+    // logging its own overdue on its own clock. A loop learns it lost the
+    // lease in `save()`, and a loop waiting on an answer never saves -- so
+    // the poll that watches for a cancellation reads the lease too.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+
+    const headBefore = gitOut(repo, "rev-parse", "HEAD").trim();
+    // The other loop: it takes the lease while this one waits for an answer.
+    let taken: number | null = null;
+    const other = setTimeout(() => {
+      const run = readRun(repo, 1);
+      if (run === null) return;
+      taken = (run.lease_epoch ?? 1) + 5;
+      writeRun(repo, 1, { ...run, lease_epoch: taken });
+    }, 400);
+    const started = Date.now();
+    const driven = await capture(() =>
+      driveSession(sessionsDir, {
+        engine: "claude-code",
+        provider: "anthropic",
+        adapter: mailboxEngine(() => false, 20),
+      }),
+    );
+    clearTimeout(other);
+    assert.ok(Date.now() - started < 30_000, "the loop went on waiting");
+    assert.match(driven.stderr, /this loop has stood down/);
+    assert.match(driven.stderr, /another driver holds the lease/);
+    // Nothing is written over the loop that holds it: no stop, and the
+    // epoch on disk is still the one the other loop took.
+    const after = readRun(repo, 1);
+    assert.equal(after?.stop ?? null, null);
+    assert.equal(after?.lease_epoch, taken);
+    assert.equal(gitOut(repo, "log", "--format=%s", headBefore + "..HEAD").trim(), "");
   });
 });
 

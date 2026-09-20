@@ -33,11 +33,12 @@
 // continues from the phase it reached.
 
 import { spawn } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
 import {
   checkRunGreen,
+  judgeCheckPrograms,
   loadSelectionConfig,
   makeCheck,
   selectTests,
@@ -68,6 +69,7 @@ import {
   WAITER_IS_WHAT_IS_RUN,
   loopAlive,
   loopPath,
+  waiterPath,
   clearDispositions,
   readDispositions,
   readInstruction,
@@ -110,6 +112,7 @@ import {
   codeEcosystems,
   judgeSuiteDeclaration,
   rewindPhaseFor,
+  runGates,
   sessionChangedNothing,
 } from "./gates.ts";
 import type {
@@ -119,7 +122,7 @@ import type {
   DriverRun,
   DriverWorkPlan,
 } from "./generated/index.ts";
-import { type Job, endJob, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
+import { type Job, endJob, jobLogTail, jobStatusPath, pollJob, selfArgv, startJob } from "./jobs.ts";
 import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
 import { tryWriteProjection } from "./projection.ts";
 import {
@@ -136,6 +139,7 @@ import {
 import {
   LedgerError,
   OUTCOME_PUBLISHED,
+  RUNS_DIRNAME,
   type Row,
   latestRound,
   readDisputes,
@@ -631,6 +635,157 @@ export function refusalFirst(tail: string): string {
   const last = lines.pop();
   return last === undefined ? "" : [last, ...lines].join("\n");
 }
+/**
+ * What a job of each family is given where this repository has never
+ * finished one, in seconds. A family is the job's name up to its colon:
+ * every suite of the run of record is one kind of work however many suites
+ * there are, and a deadline per suite name would be a table nobody could
+ * keep current.
+ *
+ * These are bounds on a HUNG job, not budgets: they are meant to be far
+ * past anything healthy, because the cost of a number set too low is a job
+ * killed for being slow and the cost of one set too high is a stop that
+ * arrives late. A repository with history uses its own numbers instead.
+ */
+export const JOB_DEADLINE_SECONDS: Readonly<Record<string, number>> = {
+  verification: 30 * 60,
+  "candidate gate": 60 * 60,
+  publish: 30 * 60,
+  close: 15 * 60,
+  "run of record": 90 * 60,
+  "whole run before release": 90 * 60,
+};
+/** What a job whose family is not declared above is given. */
+export const JOB_DEADLINE_DEFAULT_SECONDS = 30 * 60;
+/** How many times its own longest recorded run a job is given before it is overdue. */
+export const JOB_DEADLINE_FACTOR = 3;
+/** The shortest deadline history may produce: a fast job on a loaded machine is not a hung one. */
+export const JOB_DEADLINE_FLOOR_SECONDS = 300;
+
+/** A job's family: its name up to the colon, which is what history is kept by. */
+export function jobFamily(name: string): string {
+  const colon = name.indexOf(":");
+  return (colon === -1 ? name : name.slice(0, colon)).trim();
+}
+
+/**
+ * How long a job of this name may run before it is overdue: three times the
+ * longest it has ever taken in this repository, or -- where it has never
+ * finished one -- the declared default for its family.
+ *
+ * History wins over the declaration because the declaration is a guess and
+ * the history is a measurement; the floor is there because a job that
+ * usually takes four seconds is not hung at twelve.
+ */
+export function jobDeadlineSeconds(history: readonly number[], name: string): number {
+  const measured = history.filter((seconds) => Number.isFinite(seconds) && seconds > 0);
+  if (measured.length === 0) {
+    return JOB_DEADLINE_SECONDS[jobFamily(name)] ?? JOB_DEADLINE_DEFAULT_SECONDS;
+  }
+  return Math.max(JOB_DEADLINE_FLOOR_SECONDS, Math.ceil(Math.max(...measured) * JOB_DEADLINE_FACTOR));
+}
+
+/**
+ * Every duration this repository has recorded for a job of this name, in
+ * seconds, read from the status files the runner already writes under each
+ * session's own jobs directory. Nothing is written for the history: a job
+ * that ran left its start and its end behind, and that is the measurement.
+ */
+export function jobDurations(repoRoot: string, name: string): number[] {
+  let entries: string[];
+  try {
+    entries = readdirSync(join(repoRoot, ...RUNS_DIRNAME.split("/")));
+  } catch {
+    return [];
+  }
+  const durations: number[] = [];
+  for (const entry of entries) {
+    const session = /^s(\d+)$/.exec(entry);
+    if (session === null) continue;
+    const seconds = statusDuration(jobStatusPath(repoRoot, Number(session[1]), name));
+    if (seconds !== null) durations.push(seconds);
+  }
+  return durations;
+}
+
+/** The supervision event a deadline writes when it buys a job its one retry. */
+export const JOB_DEADLINE_EXCEEDED = "job-deadline-exceeded";
+
+/**
+ * What a poll does about the clock: leave the job alone, end it and start
+ * it once more, or stop.
+ *
+ * A job is never killed without its one retry, because the framework cannot
+ * tell a hung job from a slow one and the cheap way to ask is to run it
+ * again. A second deadline on the retry is the answer: whatever this is, it
+ * is not finishing, and a person is owed the sentence rather than another
+ * hour of a live heartbeat over nothing.
+ */
+export function judgeJobDeadline(
+  now: number,
+  deadlineAt: number,
+  retried: boolean,
+): "wait" | "retry" | "stop" {
+  if (now < deadlineAt) return "wait";
+  return retried ? "stop" : "retry";
+}
+
+/** The run's own supervision record, beside its heartbeat. */
+function supervisionPath(repoRoot: string, sessionNumber: number): string {
+  return join(dirname(loopPath(repoRoot, sessionNumber)), "supervision.jsonl");
+}
+
+/**
+ * Whether this job is the one retry a deadline already bought.
+ *
+ * Asked of the supervision record rather than of a local, because under the
+ * pull the process that restarted the job is never the process that meets
+ * the second deadline -- and asked by the restarted job's own start, not by
+ * its name, because several rounds of one session run under the same name
+ * and each is owed its own retry.
+ */
+export function jobIsADeadlineRetry(
+  repoRoot: string,
+  sessionNumber: number,
+  job: { readonly name: string; readonly started_at: string },
+): boolean {
+  let text: string;
+  try {
+    text = readFileSync(supervisionPath(repoRoot, sessionNumber), "utf8");
+  } catch {
+    return false;
+  }
+  for (const line of text.split("\n")) {
+    try {
+      const row = JSON.parse(line) as Record<string, unknown>;
+      if (
+        row["event"] === JOB_DEADLINE_EXCEEDED &&
+        row["name"] === job.name &&
+        row["restarted_at"] === job.started_at
+      ) {
+        return true;
+      }
+    } catch {
+      // A torn line is no retry.
+    }
+  }
+  return false;
+}
+
+/** How long one recorded job took, or null where the record cannot say. */
+function statusDuration(path: string): number | null {
+  let status: { started_at?: unknown; ended_at?: unknown };
+  try {
+    status = JSON.parse(readFileSync(path, "utf8")) as { started_at?: unknown; ended_at?: unknown };
+  } catch {
+    return null;
+  }
+  const started = typeof status.started_at === "string" ? Date.parse(status.started_at) : Number.NaN;
+  const ended = typeof status.ended_at === "string" ? Date.parse(status.ended_at) : Number.NaN;
+  if (!Number.isFinite(started) || !Number.isFinite(ended) || ended <= started) return null;
+  return (ended - started) / 1000;
+}
+
 const CLOSE_RETRY_SECONDS = 15;
 // A pack and a push to a feed are a build and a network call; the suite is
 // the nearest thing to either in this file, so this takes the suite's number.
@@ -679,6 +834,8 @@ const RULE = {
   planNonGoals: "plan-non-goals",
   /** The plan holds its release with no reason. */
   planHold: "plan-hold",
+  /** A check names something this machine cannot spawn. */
+  planCheckProgram: "plan-check-program",
 } as const;
 
 /** One refusal, carrying the name of the rule that refused it. */
@@ -747,11 +904,89 @@ export function namedTestCommands(
  * rewind that could not fix anything would be a loop.
  */
 export function rewindFromPackaging(rows: readonly Row[]): EvidencePhase | null {
+  return rewindPhaseFor(packagingGates(rows));
+}
+
+/** The gate rows the LAST packaging attempt wrote, or none it could read. */
+export function packagingGates(
+  rows: readonly Row[],
+): readonly { readonly name: string; readonly passed?: boolean }[] {
   const last = rows.length > 0 ? rows[rows.length - 1] : null;
-  if (last === null || last === undefined) return null;
+  if (last === null || last === undefined) return [];
   const gates = last["gates"];
-  if (!Array.isArray(gates)) return null;
-  return rewindPhaseFor(gates as { name: string; passed?: boolean }[]);
+  return Array.isArray(gates) ? (gates as { name: string; passed?: boolean }[]) : [];
+}
+
+/**
+ * What a rewind is remembered by: the SET of gates that refused, sorted and
+ * named.
+ *
+ * Never the refusal's own text. A gate's remediation carries a timestamp --
+ * the moment the evidence was measured -- so the same failure never reads
+ * the same twice, and a bound that exists to catch a loop going nowhere
+ * could never match. The set of names is the fact that has to repeat before
+ * going back again is pointless.
+ */
+export function gateSetBound(
+  gates: readonly { readonly name: string; readonly passed?: boolean }[],
+): string {
+  const failed = gates
+    .filter((gate) => gate.passed !== true)
+    .map((gate) => gate.name)
+    .sort();
+  return `gates: ${failed.join(", ")}`;
+}
+
+/** How a dispute reaches the ledger; the seam a test stands in for. */
+export type DisputeRecorder = (
+  sessionsDir: string,
+  request: Parameters<typeof recordDispute>[1],
+) => { readonly exit: number; readonly refusal: string };
+
+/**
+ * Write the disputes a disposition set implies, and say which were written
+ * and what the ledger refused.
+ *
+ * A dispute already on the record is left alone: a set judged again after a
+ * refusal must not record the same rejection twice.
+ */
+export function recordDisputesFor(
+  sessionsDir: string,
+  repoRoot: string,
+  sessionNumber: number,
+  set: DriverDisposition,
+  roundNumber: number,
+  record: DisputeRecorder = recordDispute,
+): { readonly refusals: readonly string[]; readonly recorded: readonly number[] } {
+  const already = readDisputes(repoRoot, sessionNumber);
+  const refusals: string[] = [];
+  const recorded: number[] = [];
+  for (const entry of set.dispositions) {
+    if (entry.action !== "reject") continue;
+    const stands = already.some(
+      (row) => Number(row["round"]) === roundNumber && Number(row["finding_index"]) === entry.finding_index,
+    );
+    if (stands) continue;
+    const outcome = record(sessionsDir, {
+      roundNumber,
+      findingIndex: entry.finding_index,
+      grounds: String(entry.reason),
+      evidence: [...(entry.evidence_paths ?? [])],
+    });
+    if (outcome.exit !== EXIT_OK) {
+      // In the refusing verb's own words. An exit code alone sent session
+      // 144's operator to look for a reason that was on a stream nothing
+      // kept, and the reason -- an evidence file over the inline cap -- is
+      // exactly what says how to answer it.
+      refusals.push(
+        `the dispute of finding ${entry.finding_index} was refused ` +
+          `(exit ${outcome.exit}): ${outcome.refusal}`,
+      );
+      continue;
+    }
+    recorded.push(entry.finding_index);
+  }
+  return { refusals, recorded };
 }
 
 /**
@@ -770,6 +1005,60 @@ export function alreadyRewoundFor(
 ): boolean {
   if (!rewinds) return false;
   return rewinds.some((row) => row.reason === refusal);
+}
+
+/** The one answer to "who is this session waiting on", as `run.json` carries it. */
+export type Waiting = NonNullable<DriverRun["waiting"]>;
+
+/**
+ * The waiting record, built whole from the one before it.
+ *
+ * `last_progress` is the reason this is a function rather than a literal:
+ * a new wait does not make the session's last REAL progress newer. It moves
+ * when a milestone moved it (`progressAt`) and otherwise carries the
+ * previous record's, so a loop that issues, waits, issues again and waits
+ * again still says when the work last actually advanced -- which is the
+ * only clock that distinguishes a session being worked on from one being
+ * waited on by nobody. Nothing a process does to say it is alive reaches
+ * here: a heartbeat and a waiter's beacon move neither.
+ */
+export function waitingRecord(
+  previous: Waiting | null,
+  fields: { readonly owner: Waiting["owner"]; readonly for: string; readonly by: string | null; readonly waiter?: boolean },
+  progressAt: string | null,
+  now: string,
+): Waiting {
+  return {
+    owner: fields.owner,
+    for: fields.for,
+    since: now,
+    by: fields.by,
+    last_progress: progressAt ?? previous?.last_progress ?? now,
+    ...(fields.waiter === undefined ? {} : { waiter: fields.waiter }),
+  };
+}
+
+/**
+ * What an instruction's wait is FOR, in the words a surface shows after
+ * "Author owes": the step where there is one, the round's dispositions
+ * where the answer is a disposition, and the instruction itself otherwise.
+ */
+export function waitingForInstruction(instruction: DriverInstruction): string {
+  if (instruction.step_id) return `step ${instruction.step_id}`;
+  if (typeof instruction.round === "number") {
+    return `dispositions of round ${instruction.round}`;
+  }
+  return `instruction ${instruction.seq}`;
+}
+
+/**
+ * The first sentence of a stop's reason, which is what a person is shown
+ * while the whole of it stays on the record.
+ */
+export function firstSentence(text: string): string {
+  const trimmed = text.trim();
+  const end = /[.!?](\s|$)/.exec(trimmed);
+  return end === null ? trimmed : trimmed.slice(0, end.index + 1);
 }
 
 type StopKind = NonNullable<DriverRun["stop"]>["kind"];
@@ -862,6 +1151,24 @@ export function pushLanded(repoRoot: string): void {
  * by force, from another process. Not a stop -- nothing is owed and nothing
  * resumes -- so the loop ends, quietly, with the AI told to stop.
  */
+/**
+ * Another loop took the lease while this one was waiting.
+ *
+ * A loop learns it lost the lease in `save()`, and a loop waiting on an
+ * answer never saves: in the second beta test two loops ran for five hours,
+ * epoch 6 waiting on an instruction epoch 7 had already replaced, each
+ * logging its own overdue on its own clock. This is that discovery made
+ * where the waiting happens -- and it writes NOTHING: the record belongs to
+ * the loop that holds the lease now, and a stop written from here would
+ * overwrite the state of the loop that is still working.
+ */
+class LeaseLost extends Error {
+  constructor(refusal: string) {
+    super(refusal);
+    this.name = "LeaseLost";
+  }
+}
+
 class SessionEnded extends Error {
   readonly status: "cancelled" | "closed";
   readonly why: string | null;
@@ -902,6 +1209,22 @@ class Awaiting extends Error {
     super(`awaiting the answer to instruction ${instruction.seq}`);
     this.instruction = instruction;
     this.name = "Awaiting";
+  }
+}
+
+/**
+ * The phase was sent back, and whatever was being done in it is abandoned.
+ *
+ * Thrown where a cure is found deep inside a phase -- a work plan missing
+ * from the ledger, met by three different call sites -- and caught by the
+ * loop, which simply goes round again into the phase the rewind set. It
+ * carries no reason because it is not a failure: the rewind is on the
+ * record, and the loop's next move is the cure.
+ */
+class Rewound extends Error {
+  constructor(to: string) {
+    super(`the run was sent back to '${to}'`);
+    this.name = "Rewound";
   }
 }
 
@@ -1149,6 +1472,14 @@ class Driver {
    * call issues rather than reading the same answer twice.
    */
   private answered = false;
+  /**
+   * When a persisted milestone last changed in THIS process, or null where
+   * none has. The waiting record's `last_progress` is taken from here, and
+   * from the record already on disk where this process has moved nothing --
+   * a pull call is a fresh process, and starting the clock at its own start
+   * would make every call read as progress.
+   */
+  private progressAt: string | null = null;
 
   constructor(sessionsDir: string, options: DriverOptions, repoRoot: string) {
     this.sessionsDir = sessionsDir;
@@ -1232,8 +1563,88 @@ class Driver {
     }
   }
 
+  /**
+   * A persisted milestone changed: a phase, an accepted step, a recorded
+   * round, a job started or collected. It is the only thing the waiting
+   * record calls progress, because a heartbeat is not one -- a beat says a
+   * process is alive, which is exactly what a session waiting six hours on
+   * nobody also says.
+   *
+   * It moves the record in memory and leaves the writing to the save the
+   * caller was already making: a milestone is always something else being
+   * written down.
+   */
+  private markProgress(): void {
+    this.progressAt = nowIso();
+    const waiting = this.run.waiting ?? null;
+    if (waiting !== null) {
+      this.run = { ...this.run, waiting: { ...waiting, last_progress: this.progressAt } };
+    }
+  }
+
+  /** This session's waiting record as it stands now, built by the one rule. */
+  private waiting(owner: Waiting["owner"], forWhat: string, by: string | null): Waiting {
+    return waitingRecord(
+      this.run.waiting ?? null,
+      {
+        owner,
+        for: forWhat,
+        by,
+      },
+      this.progressAt,
+      nowIso(),
+    );
+  }
+
+  /**
+   * Who the session is waiting on, written where the loop begins to wait.
+   *
+   * One member, replaced whole at every transition, so no reader can find
+   * two waits standing at once or none standing while the loop sits. It is
+   * the answer the second beta test could not give: six hours of overdue
+   * events said an instruction was unanswered and could not say whether
+   * anybody was reading it.
+   */
+  private setWaiting(owner: Waiting["owner"], forWhat: string, by: string | null = null): void {
+    this.run = { ...this.run, waiting: this.waiting(owner, forWhat, by) };
+    this.save();
+  }
+
+  /**
+   * Go back to the phase that remakes this evidence -- or stop, where going
+   * back has already been tried for the same thing and did not clear it.
+   *
+   * The one rewind, shared by every phase that meets an earlier phase's
+   * evidence: the publish, the close and the land. A stop the framework can
+   * cure is not a stop, and the cure is always the same shape -- the gates
+   * say which phase makes what failed, and the run remembers what it has
+   * already gone back for so that a rewind which fixes nothing is met once.
+   */
+  private rewindOrStop(
+    to: EvidencePhase,
+    bound: string,
+    stopKind: StopKind,
+    refusal: string,
+  ): void {
+    const rewound = this.run.rewinds ?? [];
+    if (alreadyRewoundFor(rewound, bound)) {
+      throw new Stop(
+        stopKind,
+        `the run has already been sent back to '${to}' once for this without clearing it ` +
+          `(${bound}): ${refusal}`,
+      );
+    }
+    this.log("rewound", { to, why: bound });
+    this.run = {
+      ...this.run,
+      rewinds: [...rewound, { to, reason: bound, at: nowIso() }].slice(-REWIND_HISTORY_CAP),
+    };
+    this.setPhase(to);
+  }
+
   private setPhase(phase: DriverRun["phase"]): void {
     this.run = { ...this.run, phase };
+    this.markProgress();
     this.save();
     this.log("phase", { phase });
     // The first green event, said once: the loop has moved past the phase
@@ -1522,7 +1933,16 @@ class Driver {
       ...fields,
       ...(typeof command === "function" ? { answer_command: command(seq) } : {}),
     });
-    this.run = { ...this.run, seq };
+    // Issuing an instruction is the loop beginning to wait, and the record
+    // says on whom. A `wait` instruction is the echo of a job's own wait,
+    // which is already written; a `done` is the end of waiting altogether.
+    const waiting =
+      instruction.kind === "done"
+        ? null
+        : instruction.kind === "wait"
+          ? (this.run.waiting ?? null)
+          : this.waiting("author", waitingForInstruction(instruction), null);
+    this.run = { ...this.run, seq, waiting };
     this.save();
     this.log("instruction-issued", {
       seq,
@@ -1552,6 +1972,25 @@ class Driver {
    * went on to commit and push its work. A close while the loop is itself
    * closing is the loop's own, and is collected where it always was.
    */
+  /**
+   * Whether another driver has taken the lease on this run, judged by the
+   * same rule `save()` uses and said in the same words.
+   *
+   * A record that cannot be read is not a lost lease: an unreadable file is
+   * its own problem, and reading it as "somebody else holds this" would end
+   * the one loop that is actually driving.
+   */
+  private leaseLostUnderneath(): LeaseLost | null {
+    let disk: number;
+    try {
+      disk = readRun(this.repoRoot, this.sessionNumber)?.lease_epoch ?? 1;
+    } catch {
+      return null;
+    }
+    const lease = judgeLease(this.run.lease_epoch ?? 1, disk);
+    return lease.refusal === null ? null : new LeaseLost(lease.refusal);
+  }
+
   private endedUnderneath(): SessionEnded | null {
     const rows = readSessionState(this.sessionsDir)?.["sessions"];
     const row = (Array.isArray(rows) ? rows : []).find(
@@ -1584,6 +2023,31 @@ class Driver {
         `driving it${ended.why ? ` (${ended.why})` : ""}. The loop has ended; nothing was committed or pushed for it after that.\n`,
     );
     return EXIT_OK;
+  }
+
+  /**
+   * End the loop because another one holds the lease.
+   *
+   * Nothing is written and nothing is ended: the run belongs to the loop
+   * that took it, its job is that loop's job, and a stop recorded from here
+   * would overwrite the state of the process that is still working. The
+   * supervision record says this loop stood down, because that is history
+   * rather than state and it is how two loops on one session are read
+   * afterwards.
+   */
+  private endWithoutTheLease(lost: LeaseLost): number {
+    this.log("lease-lost", { phase: this.run.phase, seq: this.run.seq, epoch: this.run.lease_epoch ?? 1 });
+    appendSupervision(this.repoRoot, this.sessionNumber, {
+      event: "loop-stood-down",
+      my_epoch: this.run.lease_epoch ?? 1,
+      phase: this.run.phase,
+      seq: this.run.seq,
+    });
+    writeErr(
+      `dabbler: this loop has stood down: ${lost.message} Nothing was written; the ` +
+        "loop that holds the lease is driving the session.\n",
+    );
+    return EXIT_BOUNDARY;
   }
 
   /** Read at every point past which the loop would act on the session's behalf. */
@@ -1640,6 +2104,7 @@ class Driver {
     let reason: string | null = null;
     let stopRequested = false;
     let ended: SessionEnded | null = null;
+    let lost: LeaseLost | null = null;
     // The watcher, on the one channel a headless run has. Under the pull the
     // terminal asks the rule itself; here the driver holds the child and
     // this poll is the only thing awake while the engine runs, so it asks
@@ -1709,6 +2174,16 @@ class Driver {
       ended = this.endedUnderneath();
       if (ended !== null) {
         reason = ended.message;
+        controller.abort(reason);
+        return;
+      }
+      // And a loop that no longer holds the lease is waiting on an answer
+      // somebody else will collect. Read beside the status, on the same
+      // poll, because this is the one place a loop can sit for hours
+      // without saving -- which is the only other place it would find out.
+      lost = this.leaseLostUnderneath();
+      if (lost !== null) {
+        reason = lost.message;
         controller.abort(reason);
         return;
       }
@@ -1786,6 +2261,12 @@ class Driver {
     // the poll no turn.
     const over = ended ?? this.endedUnderneath();
     if (over !== null) throw over;
+    // The lease only where the POLL found it moved -- that is, while this
+    // loop sat waiting on an answer another loop's instruction had
+    // replaced. An engine that returned on its own leaves the fence in
+    // `save()` to refuse the next write, which is where a stale driver is
+    // stopped and where the record says which epoch lost.
+    if (lost !== null) throw lost;
     if (outcome.error) {
       throw new Stop("engine", `the engine could not be run: ${outcome.error}`);
     }
@@ -2121,6 +2602,7 @@ class Driver {
         const planReasons = [
           ...judgeWorkPlanNonGoals(plan).map((reason) => refusal(RULE.planNonGoals, reason)),
           ...judgeWorkPlanHold(plan).map((reason) => refusal(RULE.planHold, reason)),
+          ...judgeCheckPrograms(plan).map((reason) => refusal(RULE.planCheckProgram, reason)),
         ];
         if (planReasons.length === 0) break;
         unlinkSync(planPath(this.repoRoot, this.sessionNumber));
@@ -2236,7 +2718,13 @@ class Driver {
       this.plan = readWorkPlan(this.repoRoot, this.sessionNumber);
     }
     if (this.plan === null) {
-      throw new Stop("engine", "the work plan is missing from the ledger; re-run to plan again");
+      // "Re-run to plan again" was a stop nobody could act on: nothing sets
+      // the phase to `plan`, so the re-run met the same missing plan in the
+      // same phase forever. The cure is the phase itself -- the loop asks
+      // the author for a plan, which is what a run with none needs.
+      this.log("no-work-plan", { cure: "plan" });
+      this.setPhase("plan");
+      throw new Rewound("plan");
     }
     return this.plan;
   }
@@ -2418,6 +2906,7 @@ class Driver {
             ? [...this.run.accepted_steps, spec.id]
             : this.run.accepted_steps,
         };
+        this.markProgress();
         this.setRejections(0);
         this.log("report-accepted", { seq: instruction.seq, step: spec.id, files: report?.files_changed });
         return;
@@ -2644,14 +3133,31 @@ class Driver {
         retryAfterSeconds: options.retryAfterSeconds,
       });
       this.run = { ...this.run, job };
+      this.markProgress();
       this.save();
       this.log("job-started", { name: job.name, pid: job.pid, log: job.log });
+    }
+    // What this job is given before it is overdue, and when that falls.
+    // Read once per entry into this site rather than once per poll: the
+    // history it comes from does not change while the job runs.
+    const deadlineSeconds = jobDeadlineSeconds(jobDurations(this.repoRoot, options.name), options.name);
+    let deadlineAt = Date.parse(job.started_at) + deadlineSeconds * 1000;
+    // Whether THIS job is already the one retry a deadline buys. Off the
+    // record rather than a local, because under the pull the process that
+    // retried is never the process that meets the second deadline.
+    let retried = jobIsADeadlineRetry(this.repoRoot, this.sessionNumber, job);
+    // The wait is the job's now. Written once per job and not once per call:
+    // under the pull every `next` re-enters this site on the same job, and a
+    // `since` that restarted there would read as a job that never ages.
+    if (this.run.waiting?.owner !== "job" || this.run.waiting.for !== job.name) {
+      this.setWaiting("job", job.name, new Date(deadlineAt).toISOString());
     }
     const waitingSince = Date.now();
     for (;;) {
       const state = pollJob(this.repoRoot, job);
       if (state.state === "exited") {
         this.run = { ...this.run, job: null };
+        this.markProgress();
         this.save();
         this.log("job-finished", { name: job.name, exit: state.exitCode, log: job.log });
         if (state.exitCode === null) {
@@ -2674,6 +3180,44 @@ class Driver {
           `${options.name} vanished: nothing is running under pid ${job.pid} and it ` +
             `recorded no result. Its log is ${job.log}; re-run to start it again`,
         );
+      }
+      // Past its deadline: ended, started once more, and a stop only if the
+      // second one is overdue too. A job polled for ever is a live
+      // heartbeat over nothing owed, no stop and no notice, indefinitely --
+      // and the loop cannot tell a job that is working from one that hung,
+      // so the answer is a bound and never a judgment about which it was.
+      const overdue = judgeJobDeadline(Date.now(), deadlineAt, retried);
+      if (overdue !== "wait") {
+        const ran = Math.trunc((Date.now() - Date.parse(job.started_at)) / 1000);
+        endJob(job);
+        if (overdue === "stop") {
+          this.run = { ...this.run, job: null };
+          this.save();
+          throw new Stop(
+            options.stopKind,
+            `${options.name} passed its deadline of ${deadlineSeconds}s twice -- it ran ${ran}s ` +
+              `this time -- and was ended both times; its log is ${job.log}`,
+          );
+        }
+        this.log("job-overdue", { name: job.name, ran: `${ran}s`, deadline: `${deadlineSeconds}s`, retry: "once" });
+        job = startJob(this.repoRoot, this.sessionNumber, {
+          name: options.name,
+          argv: options.argv,
+          retryAfterSeconds: options.retryAfterSeconds,
+        });
+        this.run = { ...this.run, job };
+        this.save();
+        appendSupervision(this.repoRoot, this.sessionNumber, {
+          event: JOB_DEADLINE_EXCEEDED,
+          name: options.name,
+          ran_seconds: ran,
+          deadline_seconds: deadlineSeconds,
+          restarted_at: job.started_at,
+        });
+        retried = true;
+        deadlineAt = Date.parse(job.started_at) + deadlineSeconds * 1000;
+        this.setWaiting("job", job.name, new Date(deadlineAt).toISOString());
+        continue;
       }
       // A round or a suite still running for a session that was cancelled is
       // ended with the loop, rather than run to its end for nobody.
@@ -2698,6 +3242,13 @@ class Driver {
           ),
         );
       }
+      // The push waits here for as long as the job runs -- a verification
+      // round, a whole suite -- and Stop Session is a person asking for the
+      // machine back NOW. The pull honours a stop at this same point; under
+      // the mailbox it used to wait for the phase boundary, which is the
+      // end of the very job the person was asking to end. The stop ends the
+      // job with the run, in the one place every Stop passes through.
+      this.honourPendingStop();
       await new Promise((resolve) => setTimeout(resolve, JOB_POLL_MS));
     }
   }
@@ -2921,6 +3472,10 @@ class Driver {
     // A stored answer is judged like a new one: a loop resumed after a
     // refusal would otherwise record the same refused dispute again.
     let refusals: string[] = set === null ? [] : dispositionRefusals(this.repoRoot, set);
+    // A set the ledger has already judged still owes its disputes: they are
+    // written before it is acted on, and what the ledger refuses refuses
+    // the answer.
+    if (set !== null && refusals.length === 0) refusals = this.recordDisputesOf(set, roundNumber);
     if (refusals.length > 0) set = null;
     while (set === null) {
       const instruction = await this.converse({
@@ -2943,6 +3498,9 @@ class Driver {
         );
       } else {
         refusals.push(...dispositionRefusals(this.repoRoot, answered));
+        // The disputes this set implies are written HERE, before it is
+        // accepted: one the ledger refuses refuses the answer with it.
+        if (refusals.length === 0) refusals.push(...this.recordDisputesOf(answered, roundNumber));
         if (refusals.length === 0) set = answered;
       }
       if (set !== null) break;
@@ -2962,34 +3520,26 @@ class Driver {
       reject: set.dispositions.filter((entry) => entry.action === "reject").map((entry) => entry.finding_index),
     });
 
-    const recorded = readDisputes(this.repoRoot, this.sessionNumber);
-    for (const entry of set.dispositions) {
-      if (entry.action !== "reject") continue;
-      const already = recorded.some(
-        (row) => Number(row["round"]) === roundNumber && Number(row["finding_index"]) === entry.finding_index,
-      );
-      if (already) continue;
-      const outcome = recordDispute(this.sessionsDir, {
-        roundNumber,
-        findingIndex: entry.finding_index,
-        grounds: String(entry.reason),
-        evidence: [...(entry.evidence_paths ?? [])],
-      });
-      if (outcome.exit !== EXIT_OK) {
-        // In the refusing verb's own words. An exit code alone sent
-        // session 144's operator to look for a reason that was on a
-        // stream nothing kept, and the reason -- an evidence file over
-        // the inline cap -- is exactly what says how to answer it.
-        throw new Stop(
-          "verification",
-          `the dispute of finding ${entry.finding_index} was refused ` +
-            `(exit ${outcome.exit}): ${outcome.refusal}`,
-          "dispute-refused",
-        );
-      }
-      this.log("dispute-recorded", { round: roundNumber, finding: entry.finding_index });
-    }
     this.setPhase(set.dispositions.some((entry) => entry.action === "fix") ? "fix" : "verify");
+  }
+
+  /**
+   * Write the disputes a disposition set implies, and hand back whatever
+   * the ledger refused.
+   *
+   * A rejection the ledger will not take is not the framework's to stop on.
+   * The author wrote the grounds and can write them again, so the refusal
+   * goes back as a refusal of THIS answer -- in the refusing verb's own
+   * words, which is what says how to fix it -- rather than a stop that is
+   * written after the answer was accepted and therefore returns unchanged
+   * on every restart, with nobody able to clear it.
+   */
+  private recordDisputesOf(set: DriverDisposition, roundNumber: number): string[] {
+    const written = recordDisputesFor(this.sessionsDir, this.repoRoot, this.sessionNumber, set, roundNumber);
+    for (const finding of written.recorded) {
+      this.log("dispute-recorded", { round: roundNumber, finding });
+    }
+    return [...written.refusals];
   }
 
   private async phaseFix(): Promise<void> {
@@ -3200,7 +3750,17 @@ class Driver {
     // after, and the paths that moved.
     const refusal = judgeLandReadiness(this.landFacts());
     if (refusal !== null) {
-      throw new Stop("land", `the tree is not the tree the run of record tested: ${refusal}`);
+      // The phase that remakes this evidence is not in doubt: the run of
+      // record is what tests the tree about to land, and a tree that moved
+      // after it is a suite to run again rather than a person to fetch.
+      // Bounded like every rewind -- the same refusal twice is a loop.
+      this.rewindOrStop(
+        "run-of-record",
+        `land: ${refusal}`,
+        "land",
+        `the tree is not the tree the run of record tested: ${refusal}`,
+      );
+      return;
     }
     // Read again at the last moment before each act that cannot be taken
     // back: a cancelled session's work is never added, committed or pushed.
@@ -3443,25 +4003,11 @@ class Driver {
       // back did not fix it, and going back again would not either -- so the
       // loop stops, with that refusal in the stop, where a person can see it. A refusal not in the list is a different problem, and going
       // back for it is progress by the same definition the classifier reads.
-      const rewind = rewindFromPackaging(readPackaging(this.repoRoot, this.sessionNumber));
-      const rewound = this.run.rewinds ?? [];
-      if (rewind !== null && !alreadyRewoundFor(rewound, refused)) {
-        this.log("publish-rewound", { to: rewind, why: refused.slice(0, 300) });
-        this.run = {
-          ...this.run,
-          rewinds: [...rewound, { to: rewind, reason: refused, at: nowIso() }].slice(
-            -REWIND_HISTORY_CAP,
-          ),
-        };
-        this.setPhase(rewind);
-        return;
-      }
+      const rows = readPackaging(this.repoRoot, this.sessionNumber);
+      const rewind = rewindFromPackaging(rows);
       if (rewind !== null) {
-        throw new Stop(
-          "publish",
-          `the packaging run did not publish, and the run has already been sent back to ` +
-            `'${rewind}' once for this refusal without clearing it: ${refused}`,
-        );
+        this.rewindOrStop(rewind, gateSetBound(packagingGates(rows)), "publish", refused);
+        return;
       }
 
       throw new Stop(
@@ -3546,6 +4092,19 @@ class Driver {
       // failed; carrying it makes two unlike close refusals two stops rather
       // than one impasse, and gives each its own triage.
       const refused = jobLogTail(this.repoRoot, this.sessionNumber, "close");
+      // The close refuses on evidence EARLIER phases make, exactly as the
+      // publish does -- and a session that publishes nothing (every
+      // consumer's) meets those gates here first, where nothing used to
+      // rewind. The same gates are asked, in the same words, and the phase
+      // that remakes what failed is `gates.ts`'s to name.
+      const gates = runGates(this.sessionsDir, {
+        noChange: sessionChangedNothing(this.sessionsDir),
+      });
+      const rewind = rewindPhaseFor(gates);
+      if (rewind !== null) {
+        this.rewindOrStop(rewind, gateSetBound(gates), "close", refused);
+        return;
+      }
       throw new Stop(
         "close",
         `the close refused: ${
@@ -3641,11 +4200,16 @@ class Driver {
               return EXIT_OK;
           }
         } catch (error) {
+          // A cure found inside a phase: the rewind is already on the
+          // record and the phase is already set, so the loop simply goes
+          // round into it.
+          if (error instanceof Rewound) continue;
           if (!(error instanceof ConfigError)) throw error;
           this.pendConfigurationFix(error);
         }
       }
     } catch (error) {
+      if (error instanceof LeaseLost) return this.endWithoutTheLease(error);
       if (error instanceof SessionEnded) return this.endWithItsSession(error);
       if (!(error instanceof Stop)) throw error;
       // A stop abandons the run, and a job still running under it -- the
@@ -3671,6 +4235,10 @@ class Driver {
       const history = this.run.stop_history ?? [];
       this.run = {
         ...this.run,
+        // A stop is a person's wait: whatever the loop was waiting on, it is
+        // waiting on them now, and the record says so in the stop's own
+        // first sentence rather than leaving the last wait standing.
+        waiting: this.waiting("person", firstSentence(entry.reason), null),
         stop: {
           kind: entry.kind,
           code: entry.code,
@@ -3967,7 +4535,7 @@ function restartsAt(
 ): { readonly count: number; readonly last: number | null } {
   let text: string;
   try {
-    text = readFileSync(join(dirname(loopPath(repoRoot, sessionNumber)), "supervision.jsonl"), "utf8");
+    text = readFileSync(supervisionPath(repoRoot, sessionNumber), "utf8");
   } catch {
     return { count: 0, last: null };
   }
@@ -4127,6 +4695,11 @@ export async function sessionWait(
   }
   let since = Date.now();
   let watching: number | null = null;
+  // The beacon says a waiter has been here, and the loop's waiting record
+  // carries the reading against the wait it belongs to. Stamped on a
+  // cadence while waiting and again at the hand-over below.
+  let beatAt = 0;
+  try {
   for (;;) {
     const current = readSessionState(sessionsDir)?.["currentSession"];
     if (typeof current !== "number") {
@@ -4143,6 +4716,10 @@ export async function sessionWait(
       return EXIT_OK;
     }
     watching = current;
+    if (Date.now() - beatAt >= LOOP_HEARTBEAT_MS) {
+      beatAt = Date.now();
+      beatWaiter(repoRoot, current);
+    }
     const reading = waiterReading(repoRoot, current, since);
     if (reading === "no-loop") {
       if (reviveLoop(sessionsDir, repoRoot, current, start) === "stop") {
@@ -4158,14 +4735,64 @@ export async function sessionWait(
       // The replacement has the grace to write its first heartbeat.
       since = Date.now();
     } else if (reading !== null) {
+      // Stamped as it is handed over: this is the moment the AI receives
+      // the instruction, and it is what the loop reads to tell an answer
+      // being worked on from one nothing has picked up.
+      beatWaiter(repoRoot, current);
       writeOut(`${JSON.stringify(reading, null, 2)}\n`);
       return EXIT_OK;
     }
     await new Promise((resolve) => setTimeout(resolve, pollMs));
   }
+  } finally {
+    // Nothing is removed: the beacon is evidence that a waiter READ what
+    // was owed, and a waiter that has exited does not unsay it.
+  }
 }
 
 // --- run: one command, the whole session --------------------------------------
+
+/**
+ * The beacon a waiter stamps -- while it waits, and again as it hands an
+ * instruction over -- beside the loop's own heartbeat.
+ *
+ * A missed stamp reads as nobody having read it, which is the safe way
+ * round: the answer this exists to give is "did the AI ever pick this up",
+ * and a guess on the optimistic side is the guess that cost the second
+ * beta test six hours.
+ */
+export function beatWaiter(repoRoot: string, sessionNumber: number): void {
+  try {
+    const path = waiterPath(repoRoot, sessionNumber);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, `${JSON.stringify({ pid: process.pid, at: new Date().toISOString() })}\n`, "utf8");
+  } catch {
+    // Nothing to say: an unwritten beacon is an unheard waiter.
+  }
+}
+
+/**
+ * Remove a beat file, and only where the pid in it is this process's.
+ *
+ * Two loops ran on one session for five hours in the second beta test, and
+ * the first to exit deleted the other's heartbeat under it -- so the loop
+ * still driving read as no loop at all, and a waiter started a third. A
+ * beat says WHICH process is alive, and only that process may say it
+ * stopped.
+ */
+export function clearBeatIfMine(path: string): void {
+  try {
+    const held = JSON.parse(readFileSync(path, "utf8")) as { pid?: unknown };
+    if (held.pid !== process.pid) return;
+  } catch {
+    return;
+  }
+  try {
+    unlinkSync(path);
+  } catch {
+    // Already gone.
+  }
+}
 
 /** The loop's own copy of what it wrote, beside its heartbeat. */
 export function loopLogPath(repoRoot: string, sessionNumber: number): string {
@@ -4284,11 +4911,9 @@ export async function runWholeSession(
       );
     } finally {
       clearInterval(timer);
-      try {
-        unlinkSync(heartbeat);
-      } catch {
-        // Already gone.
-      }
+      // Only this loop's own beat: a loop that lost the lease and stood
+      // down must not take the live loop's heartbeat with it.
+      clearBeatIfMine(heartbeat);
     }
   }
 

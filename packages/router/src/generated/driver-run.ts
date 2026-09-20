@@ -247,6 +247,35 @@ export type DriverRun = {
     retry_after_seconds: number;
   } | null;
   /**
+   * Who this session is waiting on, since when, under what bound, and when it last actually moved. Written by the loop wherever it begins to wait and replaced at each transition, so it is never stale and never says two things at once; read by `dabbler status`, the Work Explorer's session row and the Dabbler terminal, which derive none of it a second time. Null or absent means nothing is waiting -- the loop is working, or the session is over.
+   */
+  waiting?: {
+    /**
+     * Who this session is waiting on. Exactly one is true at a time: the author owes an answer, a framework job is running, or a person owes something. It is one member rather than three so that no surface can render two waits at once, and none can render none.
+     */
+    owner: "author" | "job" | "person";
+    /**
+     * What the wait is for, in the words a surface shows: the step an answer is owed for, the job that is running, the situation a person is asked to resolve.
+     */
+    for: string;
+    /**
+     * When this wait began.
+     */
+    since: string;
+    /**
+     * When the wait is over the bound it is held to, or null where it has none. A framework job runs against a deadline; an author is told and never failed, and a person is never on a clock at all.
+     */
+    by: string | null;
+    /**
+     * When a persisted milestone last changed -- a phase, an accepted step, a recorded round, a job started or collected. NEVER a heartbeat: a beat says a process is alive, which is the very thing a session waiting six hours on nobody also says.
+     */
+    last_progress: string;
+    /**
+     * Retired: nothing writes it. Whether a waiter has read what the author owes an answer for is a READING, taken where it is read -- `dabbler session wait` stamps a beacon as it hands an instruction over, and a stamp later than this wait's `since` is the AI having received it. Stored, it went stale: under the pull no process runs between an instruction and its answer to refresh it, so a session whose instruction had been delivered went on saying nobody had read it. Kept optional and readable so a run recorded while it was written still opens.
+     */
+    waiter?: boolean;
+  } | null;
+  /**
    * The round cap and transport this session verifies under, as the call that opened the run named them. They belong to the run rather than to a call: under the pull the call that eventually starts verification is not the one the person typed them on -- it is whichever `dabbler session next` happens to reach that phase, following an `answer_command` that names neither. A later call may name them again to change them.
    */
   verification?: {

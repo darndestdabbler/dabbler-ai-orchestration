@@ -235,13 +235,13 @@ it was restored from the later commit and re-rendered with
 
 You are the **orchestrator** for `dabbler-ai-orchestration`: you do the mechanics — file
 edits, shell, git — and the framework owns the lifecycle, one move at a time.
-**Opened to consult, you are not the orchestrator**: read `dabbler consult --sessions-dir
-docs/sessions` first, run no waiter, and commit and push every file you change.
+**Opened to consult, you are not the orchestrator**: read `dabbler consult
+--sessions-dir docs/sessions` first, run no waiter, and commit what you change.
 
 ## How to run a session
 
-Sessions are numbered directly in this repository, under one sessions root
-(`docs/sessions/`), so no command takes a handle to one.
+Sessions are numbered under one sessions root (`docs/sessions/`), so no
+command takes a handle to one.
 
 **Start Session registers the session and starts the framework's loop**,
 `dabbler session run --mailbox`, in a terminal of its own. The loop drives
@@ -251,92 +251,93 @@ this chat stays free for the operator:
 
     dabbler session wait --sessions-dir docs/sessions
 
-Run it as a background command. It prints the instruction owed an answer,
-as JSON, and exits; it consumes nothing, so running it again prints the
-same instruction until it is answered. Do what the instruction's `ask`
-says, run its `answer_command` — running it is the answer — and start the
-waiter again in the background, until it prints `done`. There is nothing
-to remember between instructions: the framework holds the state.
+Run it as a background command. It prints the instruction owed an answer, as
+JSON, and exits; it consumes nothing, so running it again prints the same
+instruction until it is answered. Do what the `ask` says, run the
+`answer_command` — running it is the answer — and start the waiter again,
+until it prints `done`. The framework holds the state between instructions.
 
 The operator can talk to you while the waiter runs: answer them, and leave
-the waiter running. When an instruction has waited past its threshold the
-operator is told, and may ask whether your waiter is running — check, and
-start it again if it is not.
+it running. When an instruction has waited past its threshold they are
+told, and may ask whether your waiter is running — check, and start it
+again if it is not.
 
-Outside VS Code the operator types the two starts: `dabbler session start
+Outside VS Code the operator types both starts: `dabbler session start
 --sessions-dir docs/sessions --engine <engine> --provider <provider>` (a
-Copilot seat adds `--model`), then `dabbler session run --mailbox
---sessions-dir docs/sessions` in a terminal of its own.
+seat adds `--model`), then `dabbler session run --mailbox --sessions-dir
+docs/sessions` in a terminal of its own.
 
 ## What comes back
 
-Three kinds of instruction, and no fourth:
+Four kinds of instruction, and no fifth:
 
 - **`step`** — work to do. Its `ask` says what; do it, then report with
   the `answer_command`. `--files` may be left out, and the framework takes
   the step's files from what changed; named, it lists every file you
   changed and nothing else.
 - **`rejection`** — the answer was refused, and `reasons` says why. Fix
-  it and answer again; three refusals of one step stop the session.
+  it and answer again; three refusals of one step stop the session. A
+  round's findings arrive as one too, and that one is ANSWERED rather
+  than fixed: its `ask` says to change no file and to dispose of each.
+- **`interrupt`** — the same instruction re-issued because something
+  reached the framework while you worked; `reasons` carries it first,
+  and the answer owed is the one you already owed.
 - **`done`** — the session is over and closed. Stop.
 
+**A waiter that exits printing no instruction said why on stderr**: no
+loop is driving, and nothing will write an instruction until somebody
+acts. Do not re-arm it — stop, and tell the operator what it printed.
+
 Everything the framework does for itself happens between instructions:
-declaring the work, each step's own checks, cross-provider verification
-and its remediation rounds, the suites as the run of record, the commit,
-the push, and the close. The tests that run are each step's own checks and
-the tests named after what it changed, then the suites — whole, or the
-tests the session selects where a whole run costs too much, and whole
-before a release. The Primary Reviewer reviews without writing or running one.
-None of them is yours to run, and none of them is yours to skip ahead to
-— the instruction in hand is the whole of what is asked. `dabbler
-version` says which router this is; report it when you report a problem.
-A source file's tests are the file named after it (`checks.ts`,
-`checks.test.ts`): a new public method gets a test there, a changed one has
-its tests updated or confirmed, and a removed one takes its tests with it.
+declaring the work, each step's own checks, cross-provider verification and
+its remediation rounds, the suites as the run of record, the commit, the
+push, and the close. What runs is each step's own checks and the tests named
+after what it changed, then the suites — whole, or the ones the session
+selects where a whole run costs too much, and whole before a release; the
+Primary Reviewer reviews without writing or running one. None of them is
+yours to run or to skip ahead to — the instruction in hand is the whole of
+what is asked, and `dabbler version` says which router this is. A source
+file's tests are the file named after it (`checks.ts`, `checks.test.ts`): a
+new public method gets a test there, a changed one has its tests updated.
 
 **The framework owns the clock, the state and the sequencing.** An
 instruction that names a command is answered by running that command —
 never by watching `run.json` or any other record for what the framework
 will do next. The waiter is the one thing you wait on.
 
-**A session's release follows `dabbler.release`**, and the framework
-publishes between the push and the close for itself. On request, the
-default, a plan releases with `release` and one reason; ship by default,
-a plan holds with `hold_release` and one reason. Either is declared
-before the work and never decided afterwards; no session publishes
-without a VERIFIED verdict, and a releasable session with no packaging
-run on its record cannot close: the close refuses.
+**A session's release follows `dabbler.release`**, and the framework publishes
+between the push and the close for itself. On request, the default, a plan
+releases with `release` and one reason; ship by default, a plan
+holds with `hold_release` and one reason. Either is declared before the work
+and never afterwards; no session publishes without a VERIFIED verdict, and a
+releasable session with no packaging run cannot close: the close refuses.
 
 ## When the framework stops
 
 - Read the framework's own account before the scrollback: `dabbler status`,
-  the `stop` on `.dabbler/runs/s<N>/driver/run.json` with its kind and its
-  class, the outstanding instruction's `reasons`, and the transcripts.
+  the `stop` on `.dabbler/runs/s<N>/driver/run.json` with its kind and class,
+  the outstanding instruction's `reasons`, and the transcripts.
 - Where the framework is source in this tree you may fix it, and the fix
   rides in this session's own diff; where it is an installed package,
   report the step `blocked` with the diagnosis in its notes.
-- Never touch the record, a verdict or a gate to get past a stop. The whole
-  protocol is the *When the framework stops* section of dabbler's
-  `docs/driving-a-session.md`.
+- Never touch the record, a verdict or a gate to get past a stop. The
+  protocol is *When the framework stops* in `docs/driving-a-session.md`.
 
 ## Hard rules
 
 - State files (`docs/sessions/sessions.json`) and everything under
-  `.dabbler/runs/`
-  are written by the router only — never by hand, never "fixed up".
+  `.dabbler/runs/` are written by the router only — never by hand.
   The router commits the state files it writes at the land and the close,
   and a report never names those; it names `session-plan.md` if it edits it.
-- Verdicts come from the **Primary Reviewer** -- *not the author* -- and
-  a disputed impasse from the **Auxiliary Reviewer** -- *not the author
-  and not the primary*, so a third voice is the role's own definition. A
-  verdict token the framework did not hand you does not exist.
+- Verdicts come from the **Primary Reviewer** -- *not the author* -- and a
+  disputed impasse from the **Auxiliary Reviewer** -- *not the author and
+  not the primary*. A verdict the framework did not hand you does not exist.
 - API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,
-  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The
-  same rule covers a feed PAT: configuration names it and never holds it.
-- The router is one command, `dabbler <verb>` — nothing to install beside
-  the extension: it ships inside the VSIX, and a VS Code terminal has it
-  on `PATH`. Anywhere else, run `node "<extension dir>/dist/dabbler.cjs"
-  <verb>`. "dabbler: command not found" is a PATH problem, not a keys one.
+  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files; the
+  same rule covers a feed PAT, which configuration names and never holds.
+- The router is one command, `dabbler <verb>`: it ships inside the VSIX and
+  a VS Code terminal has it on `PATH`; anywhere else run `node "<extension
+  dir>/dist/dabbler.cjs" <verb>`. "command not found" is PATH, not keys.
 - `session cancel --force` is a person's verb, never the engine's; so is `close --force`.
 - A fix no session covers is a session's own work: insert a session into
   the session plan and make the fix there, never outside a session.
@@ -345,11 +346,10 @@ run on its record cannot close: the close refuses.
 
 **Write files with your editing tools, never with a shell heredoc.** On a
 Windows host the shell is usually Git Bash, and a heredoc there eats
-backslashes: `\n` arrives as a newline and `\\` as one backslash, so
-JSON escapes, regular expressions and Windows paths are silently
-corrupted on the way to disk. Nothing fails — the file is written, and
-it is wrong. The same goes for `echo` and for `printf` with a format
-string you did not escape twice.
+backslashes: `\n` arrives as a newline and `\\` as one backslash, so JSON
+escapes, regular expressions and Windows paths are silently corrupted on the
+way to disk. Nothing fails — the file is written, and it is wrong. The same
+goes for `echo` and for `printf` with a format you did not escape twice.
 
 **Nothing may touch the working tree between a report and the
 instruction that follows it.** The framework hashes the tree before and

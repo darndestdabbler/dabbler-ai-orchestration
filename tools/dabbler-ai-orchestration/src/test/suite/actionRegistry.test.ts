@@ -123,6 +123,27 @@ suite("ActionRegistry: session actions", () => {
     }
   });
 
+  test("Stop Session is offered on the session in flight and on no other row", () => {
+    // The person asking for the machine back. It is `session interrupt
+    // --stop`, which names the session the record says is in flight -- so
+    // an entry on any other row would stop a session the operator did not
+    // click on.
+    const sessions = [
+      makeSession({ number: 1, status: "complete" }),
+      makeSession({ number: 2, status: "in-progress" }),
+      makeSession({ number: 3, status: "not-started" }),
+    ];
+    const running = makeRepository({ currentSession: 2, nextSession: 3, sessions });
+    const offered = (session: ReturnType<typeof makeSession>) =>
+      applicableSessionActions(running, session).map((a) => a.id);
+    assert.ok(offered(sessions[1]).includes("dabblerSessionSets.stopSession"));
+    assert.ok(!offered(sessions[0]).includes("dabblerSessionSets.stopSession"));
+    assert.ok(!offered(sessions[2]).includes("dabblerSessionSets.stopSession"));
+    // And nowhere at all once nothing is in flight.
+    const idle = makeRepository({ currentSession: null, nextSession: 3, sessions });
+    assert.ok(!applicableSessionActions(idle, sessions[1]).map((a) => a.id).includes("dabblerSessionSets.stopSession"));
+  });
+
   test("cancel and restore are mutually exclusive on one row", () => {
     const cancelled = makeSession({ number: 1, status: "cancelled" });
     const ids = applicableSessionActions(

@@ -1557,6 +1557,125 @@ suite("the watcher", () => {
     rmrf(root);
   });
 
+  test("raises a stop where the operator is, once, with its first sentence and who acts", () => {
+    // A stop the framework cannot cure waits for a person, and a person in
+    // the AI's chat or another window has no way of knowing one is waiting
+    // for them. Once per stop: the notification hangs off the same identity
+    // the `paused` line does, so a repaint of an unchanged record is quiet.
+    const warned: string[] = [];
+    const { root, driver, terminal } = drivenRepo(RUNNING, warned);
+    terminal.open();
+    warned.length = 0;
+
+    writeRun(driver, {
+      session_number: 62,
+      phase: "close",
+      job: null,
+      stop: {
+        kind: "close",
+        reason: "the close refused: test_run_fresh failed. Run the suite again and close.",
+        at: "2026-08-31T14:00:00-04:00",
+      },
+    });
+    terminal.poll();
+    assert.strictEqual(warned.length, 1);
+    assert.ok(warned[0].includes("the close refused: test_run_fresh failed."), warned[0]);
+    // The whole reason stays on the record; the notification carries its
+    // first sentence and who acts next.
+    assert.ok(!warned[0].includes("Run the suite again"), warned[0]);
+    assert.match(warned[0], /act\(s\) next/);
+
+    terminal.poll();
+    assert.strictEqual(warned.length, 1);
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("says who the session is waiting on, once, and again when the AI picks it up", () => {
+    // This terminal is where an operator watches a session run, and it
+    // could say `working` and `waiting` without saying who owed anything
+    // — over the one record that carries the answer.
+    const { root, driver, written, terminal } = drivenRepo(RUNNING);
+    terminal.open();
+    written.length = 0;
+
+    // The fixture clock is 2026-08-31 14:30:05, and this wait began 133s before it.
+    const since = new Date(2026, 7, 31, 14, 27, 52).toISOString();
+    const owed = {
+      session_number: 62,
+      phase: "work",
+      job: null,
+      stop: null,
+      waiting: { owner: "author", for: "step 4", since, by: null, last_progress: since },
+    };
+    writeRun(driver, owed);
+    terminal.poll();
+    const said = written.filter((t) => plain(t).includes("waiting-on"));
+    assert.strictEqual(said.length, 1);
+    assert.ok(plain(said[0]).includes("Author owes step 4"), plain(said[0]));
+    assert.ok(plain(said[0]).includes("no waiter has read it"), plain(said[0]));
+
+    // The clock ticking is not news, so an unchanged record is quiet.
+    written.length = 0;
+    terminal.poll();
+    assert.deepStrictEqual(written.filter((t) => plain(t).includes("waiting-on")), []);
+
+    // The waiter stamping its beacon IS news: the instruction was picked up.
+    fs.writeFileSync(
+      path.join(driver, "waiter.json"),
+      JSON.stringify({ pid: 1, at: new Date().toISOString() }),
+      "utf8",
+    );
+    terminal.poll();
+    const delivered = written.filter((t) => plain(t).includes("waiting-on"));
+    assert.strictEqual(delivered.length, 1);
+    assert.ok(!plain(delivered[0]).includes("no waiter has read it"), plain(delivered[0]));
+
+    // A framework job names its deadline; a person's wait names them.
+    written.length = 0;
+    writeRun(driver, {
+      ...owed,
+      waiting: {
+        owner: "job",
+        for: "verification",
+        since,
+        by: new Date(Date.parse(since) + 600_000).toISOString(),
+        last_progress: since,
+      },
+    });
+    terminal.poll();
+    assert.ok(written.some((t) => plain(t).includes("Verification — 2:1")), written.join("|"));
+    assert.ok(written.some((t) => plain(t).includes("of 10:00")), written.join("|"));
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("follows the loop's own log, so a loop a waiter revived is not invisible", () => {
+    // A revived loop is started detached and hidden: `loop.log` beside its
+    // heartbeat is the only place its output exists, and it goes on to
+    // commit, push and close.
+    const { root, driver, written, terminal } = drivenRepo(RUNNING);
+    terminal.open();
+    written.length = 0;
+
+    // The first look starts at the file's size: a terminal opened
+    // mid-session says what happens from now on.
+    fs.writeFileSync(path.join(driver, "loop.log"), "dabbler: an hour of history\n", "utf8");
+    terminal.poll();
+    assert.ok(written.some((t) => plain(t).includes("loop-output log=")));
+    assert.ok(!written.some((t) => t.includes("an hour of history")));
+
+    written.length = 0;
+    fs.appendFileSync(path.join(driver, "loop.log"), "dabbler: phase phase=land\n", "utf8");
+    terminal.poll();
+    assert.ok(written.some((t) => t.includes("phase phase=land")));
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
   test("is asked no more often than it can answer differently", () => {
     // Half the threshold, bounded: at the default it is a git call a
     // minute, never one per 500ms poll.

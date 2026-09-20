@@ -610,9 +610,14 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
     // distinguishes the two and it has to be on the row. A finished session
     // carries the date it closed, so "when was that done" is read at a
     // glance rather than from the tooltip.
+    //
+    // An in-flight session says who it is waiting on, in the router's own
+    // sentence off the projection: "in flight" was true of a session
+    // working and of one that waited six hours on nobody, and telling
+    // those apart is the whole of what this row is for.
     description:
       session.status === "in-progress"
-        ? "in flight"
+        ? (session.waiting?.says ?? "in flight")
         : session.status === "planned"
           ? "planned"
           : closeDateLabel(session.completedAt),

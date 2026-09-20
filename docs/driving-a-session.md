@@ -448,6 +448,42 @@ running — the usual cause, and one the AI can put right itself. Nothing is
 typed into the AI's chat on your behalf: a typed nudge would be logged as
 your words.
 
+### Who the session is waiting on, and for how long
+
+At every moment exactly one thing is true, and `run.json` says which on its
+`waiting` member: the **author** owes an answer, a framework **job** is
+running against a deadline, or a **person** owes something. It carries what
+the wait is for, since when, by when where there is a bound, and the last
+REAL progress — the moment a persisted milestone changed (a phase, an
+accepted step, a recorded round, a job started or collected), never a
+heartbeat. `dabbler status`, the Work Explorer's session row and the
+Dabbler terminal all read that one record and derive none of it a second
+time:
+
+```
+Author owes step 4 — 2:13, no waiter has read it
+Verification — 3:42 of 10:00
+You: the reviewer is unreachable.
+```
+
+**"No waiter has read it" is its own sentence.** `dabbler session wait`
+stamps a beacon beside the loop's heartbeat while it waits and again as it
+hands an instruction over, so an instruction nothing ever picked up reads
+differently from one an AI is working on. Delivery, not presence: a waiter
+prints what it finds and exits, so "is one listening right now" is false
+for every step an AI is busy answering. The second beta test spent six
+hours with nobody reading its instruction and nothing on the screen could
+say so.
+
+**Every framework job runs against a deadline**, read from how long jobs of
+that name have actually taken in this repository — three times the longest,
+with a floor — or from a declared default for its family where this
+repository has no history. Past it the job is ended and started once more,
+because the framework cannot tell a hung job from a slow one and the cheap
+way to ask is to run it again; a second deadline on the retry is a stop
+that says which job, how long it ran, and where its log is. An author past
+the threshold is told and is never failed: a person is not a job.
+
 ## Talking to the engine, and stopping the framework
 
 They are two different things. Your CLI's own Esc or Ctrl+C interrupts the
@@ -502,6 +538,13 @@ session — which is exactly where you want a "and while you're at it"
 to land. Only two things are refused: a session nothing ever drove, and
 one whose drive completed, because a message queued for a closed session
 would never be read and "Sent" would be a promise the framework broke.
+
+**Stop Session** is the same verb as a click: it sits on the in-flight
+session's row in the Work Explorer, asks for your reason, and runs
+`session interrupt --stop` with it. The loop honours it **inside a job**
+as well as between phases — a verification round or a whole suite ends
+where you asked rather than minutes later — and the recorded stop is one
+no waiter revives a loop over. Resume Session is the way back.
 
 ## When the framework stops
 

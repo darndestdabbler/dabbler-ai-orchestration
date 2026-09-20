@@ -98,7 +98,7 @@ export { readUncollectedJob, type UncollectedJobReading } from "./jobs.ts";
 // precedence is the host's -- but the middle tier is the repository's to
 // state, and a renderer that fell back to a number of its own would ignore
 // a `verification.stalled_after_seconds` somebody set on purpose.
-export { stalledAfterSeconds } from "./progress.ts";
+export { stalledAfterSeconds, renderWaiting } from "./progress.ts";
 // Re-deriving the solution projection, for the same reason again: it is
 // written by the commands that move a declaration and by nothing else, so
 // a host watching the DECLARATIONS underneath it has to be able to ask for
@@ -133,6 +133,10 @@ export { preflightRefusedModel } from "./engines.ts";
 export { COMMIT_CHANGES_FLAG, MERGE_ORIGIN_FLAG, UNDO_CHANGES_FLAG } from "./session.ts";
 // Resume Session restarts the loop only when no heartbeat says one is driving.
 export { loopAlive } from "./drive.ts";
+// Whether a waiter has read what a session is waiting on: the Dabbler
+// terminal says the wait, and the reading belongs to the router that
+// defines the beacon.
+export { waiterSeenSince } from "./driver.ts";
 // WHERE that reading comes from, so a host can watch it.
 //
 // The catalog and this operator's preferences sit side by side in one

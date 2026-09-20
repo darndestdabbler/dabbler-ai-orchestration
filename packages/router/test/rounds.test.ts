@@ -10,6 +10,7 @@ import {
   NO_ROUND_CAP_DISPUTED,
   NO_ROUND_TERMINAL,
   blockingFindings,
+  dispatchVerification,
   droppedParams,
   noRoundReason,
   reportedInputTokens,
@@ -18,7 +19,13 @@ import {
   turnCount,
   verificationUnavailable,
 } from "../src/verify/rounds.ts";
-import { CAUSE_VENDOR_CONFLICT, NoCandidateError } from "../src/route.ts";
+import {
+  CAUSE_VENDOR_CONFLICT,
+  DispatchError,
+  NoCandidateError,
+  setRouteSource,
+  type RouteResult,
+} from "../src/route.ts";
 import { gitAnswers, tempDir } from "./support/answers.ts";
 
 // A directory with no repository holds no object, so a round's tree is never
@@ -204,6 +211,74 @@ describe("what a round says about the model that answered", () => {
     // A provider substituting a model is a fact about what was bought, not a
     // verification failure: the verdict stands and the round is not refused.
     assert.match(note, /verdict stands/);
+  });
+});
+
+describe("the reviewer a call that failed is retried against", () => {
+  const answered = (provider: string): RouteResult => ({
+    content: "VERDICT: VERIFIED",
+    model_name: `${provider}-model`,
+    model_id: "x",
+    provider,
+    input_tokens: 1,
+    output_tokens: 1,
+    escalated: false,
+    escalation_history: [],
+    elapsed_seconds: 0.1,
+    transport: "offline",
+    truncated: false,
+    transport_session_id: null,
+    served_model_id: null,
+    metadata: {},
+  });
+
+  it("is the one the operator chose: the failed provider is not excluded, and the failure is said", async () => {
+    // Excluding it is how a service that was briefly unavailable reached a
+    // person as a vendor conflict -- "'gpt-5.6-terra' is OpenAI's, and so
+    // is the authoring model" -- which was false, and which only the
+    // operator could resolve.
+    const exclusions: string[][] = [];
+    const restore = setRouteSource((_content, options) => {
+      exclusions.push([...(options.excludeProviders ?? [])]);
+      if (exclusions.length === 1) {
+        return Promise.reject(new DispatchError("503 from the provider", "openai", "gpt-5.6-sol"));
+      }
+      return Promise.resolve(answered("openai"));
+    });
+    const said: string[] = [];
+    try {
+      const result = await dispatchVerification("prompt", {
+        excludeProviders: ["anthropic"],
+        sessionNumber: 1,
+        onFailed: (message, provider) => said.push(`${provider}: ${message}`),
+      });
+      assert.equal(result.provider, "openai");
+    } finally {
+      restore();
+    }
+    // The authoring vendor stays excluded on both attempts, and nothing else
+    // is added to the exclusion.
+    assert.deepEqual(exclusions, [["anthropic"], ["anthropic"]]);
+    assert.deepEqual(said, ["openai: 503 from the provider"]);
+  });
+
+  it("ends on a failure that repeats, in the transport's own words", async () => {
+    const restore = setRouteSource(() =>
+      Promise.reject(new DispatchError("503 from the provider", "openai", "gpt-5.6-sol")),
+    );
+    try {
+      await assert.rejects(
+        dispatchVerification("prompt", { excludeProviders: ["anthropic"], sessionNumber: 1 }),
+        (error: Error) => {
+          assert.match(error.message, /503 from the provider/);
+          // What failed, never that the choice was wrong.
+          assert.doesNotMatch(error.message, /is OpenAI's/);
+          return true;
+        },
+      );
+    } finally {
+      restore();
+    }
   });
 });
 

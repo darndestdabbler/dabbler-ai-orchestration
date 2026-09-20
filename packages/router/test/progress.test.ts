@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
 import { writeRun, writeWorkPlan } from "../src/driver.ts";
+import { beatWaiter } from "../src/drive.ts";
 import { appendRound, roundsPath } from "../src/ledger.ts";
 import {
   DEFAULT_STALLED_AFTER_SECONDS,
@@ -244,6 +245,66 @@ describe("the source of a projection's sessions", () => {
     );
     // A bound either of them may clear says so, and the button stays.
     assert.equal(stopped({ kind: "interrupted", reason: "you asked it to stop", at }), "either");
+  });
+
+  it("says who the session is waiting on, in one sentence, and says nothing where nothing waits", () => {
+    // "in flight" was true of a session being worked on and of the one
+    // that waited six hours on nobody. The reading is the router's, so
+    // every surface says it the same way and none re-derives it.
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    const waiting = (record: Record<string, unknown> | null) => {
+      writeRun(repo, 1, { ...RUN, engine: "cli", ...(record === null ? {} : { waiting: record }) });
+      return sessions(sessionsDir)[0]!["waiting"] as Record<string, unknown> | undefined;
+    };
+    assert.equal(waiting(null), undefined);
+
+    const since = new Date(Date.now() - 133_000).toISOString();
+    const author = waiting({
+      owner: "author",
+      for: "step 4",
+      since,
+      by: null,
+      last_progress: since,
+      // What the record carries is ignored: whether a waiter has read the
+      // instruction is a reading, taken here. A stored flag went stale --
+      // under the pull nothing runs between an instruction and its answer
+      // to refresh one, so a delivered instruction went on saying nobody
+      // had read it.
+      waiter: true,
+    });
+    assert.equal(author?.["owner"], "author");
+    assert.match(String(author?.["says"]), /^Author owes step 4 — 2:1\d, no waiter has read it$/);
+    assert.equal(author?.["waiter"], false);
+
+    // The waiter stamps its beacon as it hands the instruction over, and
+    // the next reading says so -- with no loop running to refresh anything.
+    beatWaiter(repo, 1);
+    const delivered = waiting({ owner: "author", for: "step 4", since, by: null, last_progress: since });
+    assert.equal(delivered?.["waiter"], true);
+    assert.match(String(delivered?.["says"]), /^Author owes step 4 — 2:1\d$/);
+    // The clock the surface shows is elapsed, and the last REAL progress
+    // travels with it rather than being re-derived from a heartbeat.
+    assert.equal(author?.["lastProgress"], since);
+
+    const job = waiting({
+      owner: "job",
+      for: "verification",
+      since: new Date(Date.now() - 222_000).toISOString(),
+      by: new Date(Date.now() + 378_000).toISOString(),
+      last_progress: since,
+    });
+    assert.match(String(job?.["says"]), /^Verification — 3:4\d of 10:00$/);
+    assert.equal("waiter" in (job ?? {}), false);
+
+    const person = waiting({
+      owner: "person",
+      for: "the reviewer is unreachable.",
+      since,
+      by: null,
+      last_progress: since,
+    });
+    assert.equal(person?.["says"], "You: the reviewer is unreachable.");
   });
 
   it("calls an unreadable ledger a fault rather than a fresh repository", () => {

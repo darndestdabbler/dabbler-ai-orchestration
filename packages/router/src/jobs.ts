@@ -160,6 +160,10 @@ const { createWriteStream, renameSync, writeFileSync } = require("node:fs");
 const [, , status, log, cwd, ...argv] = process.argv;
 const out = createWriteStream(log, { flags: "a" });
 const win = process.platform === "win32";
+// When this job began, written beside when it ended: a job's deadline is
+// read from how long jobs of its name have actually taken, and a record
+// that says only when something finished cannot say how long it ran.
+const startedAt = new Date().toISOString();
 
 // The long work yields to whoever is using the machine. WHAT class is the
 // parent's decision (\`jobPriority\`); this applies it before the command is
@@ -180,7 +184,7 @@ if (Number.isFinite(yielded)) {
 function finish(exit) {
   out.end(() => {
     const temp = status + ".writing";
-    writeFileSync(temp, JSON.stringify({ exit, ended_at: new Date().toISOString() }) + "\\n", "utf8");
+    writeFileSync(temp, JSON.stringify({ exit, started_at: startedAt, ended_at: new Date().toISOString() }) + "\\n", "utf8");
     renameSync(temp, status);
     process.exit(0);
   });

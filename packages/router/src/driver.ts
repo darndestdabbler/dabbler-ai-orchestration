@@ -153,6 +153,13 @@ export function loopPath(repoRoot: string, sessionNumber: number): string {
   return join(driverDir(repoRoot, sessionNumber), LOOP_FILENAME);
 }
 
+/** The beacon `session wait` refreshes while it listens for an instruction. */
+export const WAITER_FILENAME = "waiter.json";
+
+export function waiterPath(repoRoot: string, sessionNumber: number): string {
+  return join(driverDir(repoRoot, sessionNumber), WAITER_FILENAME);
+}
+
 /**
  * How old a heartbeat may be and still say a loop is driving. Well past the
  * refresh, because the loop's short synchronous git calls can delay a beat.
@@ -165,8 +172,49 @@ export const LOOP_STALE_MS = 60_000;
  * process or be a different run's.
  */
 export function loopAlive(repoRoot: string, sessionNumber: number, now: number = Date.now()): boolean {
+  return beating(loopPath(repoRoot, sessionNumber), now);
+}
+
+/**
+ * Whether a waiter has READ what this session is waiting on: `session
+ * wait`'s beacon has been stamped since the wait began.
+ *
+ * The question the second beta test could not answer. Six hours of
+ * `instruction-overdue` say an instruction went unanswered and cannot say
+ * whether anybody ever picked it up -- and "the AI is working on it" and
+ * "nothing has read it" are two different problems with two different
+ * moves.
+ *
+ * Delivery and not presence, because presence is the wrong question: a
+ * waiter prints the instruction it finds and exits, so "a waiter is
+ * listening right now" is false for every step an AI is busy answering,
+ * and a sentence that fired there would cry wolf on the ordinary case.
+ * `session wait` stamps this beacon while it waits and again as it hands an
+ * instruction over, so a stamp later than the wait's start is the AI having
+ * received it.
+ */
+export function waiterSeenSince(
+  repoRoot: string,
+  sessionNumber: number,
+  since: string | number,
+): boolean {
+  const from = typeof since === "string" ? Date.parse(since) : since;
+  if (!Number.isFinite(from)) return false;
   try {
-    const beat = JSON.parse(readFileSync(loopPath(repoRoot, sessionNumber), "utf8")) as { at?: unknown };
+    const beat = JSON.parse(readFileSync(waiterPath(repoRoot, sessionNumber), "utf8")) as {
+      at?: unknown;
+    };
+    const at = typeof beat.at === "string" ? Date.parse(beat.at) : Number.NaN;
+    return Number.isFinite(at) && at >= from;
+  } catch {
+    return false;
+  }
+}
+
+/** A beat file younger than the staleness bound. Unreadable is not beating. */
+function beating(path: string, now: number): boolean {
+  try {
+    const beat = JSON.parse(readFileSync(path, "utf8")) as { at?: unknown };
     const at = typeof beat.at === "string" ? Date.parse(beat.at) : Number.NaN;
     return Number.isFinite(at) && now - at < LOOP_STALE_MS;
   } catch {

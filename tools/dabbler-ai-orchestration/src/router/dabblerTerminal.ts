@@ -78,7 +78,9 @@ import {
   readUncollectedJob,
   readWatcher,
   renderStop,
+  renderWaiting,
   stalledAfterSeconds,
+  waiterSeenSince,
 } from "dabbler-ai-router";
 
 import { RUNS_REL } from "../utils/projection";
@@ -153,6 +155,16 @@ const TEST_RUNS_FILENAME = "test-runs.jsonl";
  * often a waiter the AI stopped running.
  */
 const SUPERVISION_FILENAME = "supervision.jsonl";
+
+/**
+ * The loop's own copy of what it wrote, beside its heartbeat.
+ *
+ * A loop started from this extension's own terminal writes there and here
+ * both; a loop a WAITER revived is detached and hidden, and this file is
+ * the only place its output exists. Following it is what keeps "nothing
+ * runs where nobody can see it" true however the loop was started.
+ */
+const LOOP_LOG_FILENAME = "loop.log";
 
 /**
  * A verdict's tone.
@@ -299,6 +311,19 @@ interface RunRecord {
     name?: string;
     log?: string;
     started_at?: string;
+  } | null;
+  /**
+   * Who the session is waiting on, as the loop wrote it. Rendered here in
+   * the router's own sentence: this terminal is the surface an operator
+   * watches while a session runs, and "working" and "waiting" could not
+   * say whether anybody owed anything.
+   */
+  readonly waiting?: {
+    owner?: "author" | "job" | "person";
+    for?: string;
+    since?: string;
+    by?: string | null;
+    last_progress?: string;
   } | null;
 }
 
@@ -983,6 +1008,14 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    * moved on is the one green line this terminal may say about it.
    */
   private paused: { identity: string; stop: { kind: string }; phase: string } | null = null;
+  /**
+   * The wait this terminal has already said, by owner, subject, start and
+   * whether a waiter had read it. Said once per wait and once more when
+   * that last part changes -- an instruction picked up is news; the clock
+   * ticking is not, and the live clock is `dabbler status`'s and the Work
+   * Explorer's to show.
+   */
+  private waitingSaid: string | null = null;
   private activity: Activity = "waiting";
   private spoken: Activity | null = null;
 
@@ -1444,6 +1477,14 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     // names it.
     this.drainJobs(path.dirname(runPath));
 
+    // The loop's own output, from the copy it keeps beside its heartbeat.
+    // A loop a waiter revived is started DETACHED and hidden -- it has no
+    // terminal of its own, and it goes on to commit, push and close where
+    // nobody can see it. Read here, it is followed exactly as a job's log
+    // is, so "nothing runs where nobody can see it" holds however the loop
+    // was started.
+    this.drainLoopLog(path.join(path.dirname(runPath), LOOP_LOG_FILENAME));
+
     // The verdict and the test outcome, from the records the machine owns
     // rather than from the job bytes they also appear in. Reading them here
     // is what lets this terminal say them in its own colours WITHOUT
@@ -1461,6 +1502,8 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       this.line("job-collected", { name: collected });
       this.jobName = null;
     }
+
+    this.sayWaiting(run);
 
     const stop = run.stop ?? null;
     const phase = run.phase ?? "";
@@ -1504,6 +1547,16 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
           // person can see what their options cost before they pick one.
           ways: words.ways,
         });
+        // And where the operator actually is, which may be the AI's chat or
+        // another window entirely. A stop the framework cannot cure waits
+        // for a person, and a person who is not looking at this terminal
+        // has no way of knowing one is waiting for them. Once per stop --
+        // it hangs off the same identity the line above is keyed on, so a
+        // repaint of an unchanged record says nothing.
+        this.warn(
+          `Dabbler: session ${this.sessionLabel(run)} is paused (${kind}) — ` +
+            `${firstSentence(stop.reason ?? "")} ${whoActs(words.actor)} act(s) next.`,
+        );
       }
     } else if (this.paused !== null && progressResumed(this.paused, { stop: null, phase })) {
       // Gone AND moved on. Gone alone is the resume clearing it, and says
@@ -1604,6 +1657,78 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     const seen = this.watchedLogSize;
     this.watchedLogSize = drained;
     return seen === null ? null : drained > seen;
+  }
+
+  /**
+   * Who the session is waiting on, in the router's one sentence.
+   *
+   * This terminal is where an operator watches a session run, and until
+   * now it could say `working` and `waiting` and not who owed anything:
+   * the record it polls twice a second carried the answer and nothing read
+   * it. The sentence is `renderWaiting`'s, shared with `dabbler status`
+   * and the Work Explorer's row, and whether a waiter has read the
+   * instruction is taken live here as it is everywhere else.
+   */
+  private sayWaiting(run: RunRecord): void {
+    const waiting = run.waiting ?? null;
+    if (!waiting || !waiting.owner || !waiting.for || !waiting.since) {
+      this.waitingSaid = null;
+      return;
+    }
+    const session = run.session_number ?? 0;
+    const read =
+      waiting.owner === "author"
+        ? { waiter: waiterSeenSince(this.repoRoot, session, waiting.since) }
+        : {};
+    const identity = `${waiting.owner}\0${waiting.for}\0${waiting.since}\0${String(read.waiter ?? "")}`;
+    if (this.waitingSaid === identity) return;
+    this.waitingSaid = identity;
+    this.line("waiting-on", {
+      says: renderWaiting(
+        {
+          owner: waiting.owner,
+          for: waiting.for,
+          since: waiting.since,
+          by: waiting.by ?? null,
+          last_progress: waiting.last_progress ?? waiting.since,
+          ...read,
+        },
+        this.now().getTime(),
+      ),
+    });
+  }
+
+  /**
+   * The loop's own output, followed exactly as a job's log is.
+   *
+   * A loop a waiter revived is started detached and hidden: it has no
+   * terminal of its own, and it goes on to commit, push and close where
+   * nobody can see it. `loop.log` is the copy it keeps beside its
+   * heartbeat, and following it puts a revived loop back on a screen.
+   *
+   * The first look starts at the file's current SIZE rather than at its
+   * beginning: a terminal opened mid-session should say what happens from
+   * now on, not recite an hour of a loop that is still running.
+   */
+  private drainLoopLog(logPath: string): void {
+    if (!this.logOffsets.has(logPath)) {
+      let size: number;
+      try {
+        size = fs.statSync(logPath).size;
+      } catch {
+        // No loop has written here yet; there is nothing to follow and
+        // nothing to announce.
+        return;
+      }
+      this.logOffsets.set(logPath, size);
+      this.logAtLineStart.set(logPath, true);
+      if (!this.announced.has(logPath)) {
+        this.announced.add(logPath);
+        this.line("loop-output", { log: relativeToRoot(this.repoRoot, logPath) });
+      }
+      return;
+    }
+    this.drainFile(logPath);
   }
 
   /**

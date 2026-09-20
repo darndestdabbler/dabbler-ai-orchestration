@@ -494,6 +494,33 @@ suite("workExplorerTreeModel: session descriptor", () => {
     assert.strictEqual(d.description, "planned");
   });
 
+  test("an in-flight row says who the session is waiting on, in the router's own sentence", () => {
+    // "in flight" was true of a session being worked on and of the one that
+    // waited six hours on nobody. The sentence is the router's: this row
+    // shows it and derives nothing from the parts.
+    const waits = (says: string, owner: "author" | "job" | "person") =>
+      sessionDescriptor({
+        kind: "session",
+        repository,
+        session: makeSession({
+          status: "in-progress",
+          iconKey: "in-progress",
+          inFlight: true,
+          waiting: {
+            owner,
+            for: "step 4",
+            since: "2026-09-20T12:00:00Z",
+            by: null,
+            lastProgress: "2026-09-20T12:00:00Z",
+            says,
+          },
+        }),
+      }).description;
+    assert.strictEqual(waits("Author owes step 4 — 2:13, no waiter listening", "author"), "Author owes step 4 — 2:13, no waiter listening");
+    assert.strictEqual(waits("Verification — 3:42 of 10:00", "job"), "Verification — 3:42 of 10:00");
+    assert.strictEqual(waits("You: the reviewer is unreachable.", "person"), "You: the reviewer is unreachable.");
+  });
+
   test("the label leads with the zero-padded number", () => {
     const d = sessionDescriptor({
       kind: "session",

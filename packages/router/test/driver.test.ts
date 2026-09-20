@@ -40,6 +40,8 @@ import {
   writeInstruction,
   writeWorkPlan,
   writeRun,
+  waiterSeenSince,
+  waiterPath,
   type WatcherInputs,
 } from "../src/driver.ts";
 import type { DriverInstruction, DriverRun } from "../src/generated/index.ts";
@@ -1070,6 +1072,33 @@ describe("the lease on a run", () => {
     // this fence's to judge -- and failing closed on it would stop a run for
     // a repair somebody made deliberately.
     assert.equal(judgeLease(4, 3).refusal, null);
+  });
+});
+
+describe("whether a waiter has read what a session is waiting on", () => {
+  const began = "2026-09-20T12:00:00.000Z";
+
+  it("is a beacon stamped since the wait began, and nothing else", () => {
+    // The question the second beta test could not answer: an instruction
+    // unanswered for six hours says nothing about whether anybody ever
+    // picked it up. No beacon and a beacon from BEFORE this wait are the
+    // same answer -- no: a stamp left by the previous instruction must
+    // never answer for this one.
+    const root = tempDir("waiter-beacon-");
+    assert.equal(waiterSeenSince(root, 1, began), false);
+    mkdirSync(dirname(waiterPath(root, 1)), { recursive: true });
+    const stamp = (at: string): void => {
+      writeFileSync(waiterPath(root, 1), JSON.stringify({ pid: 1, at }));
+    };
+    stamp("2026-09-20T11:59:59.000Z");
+    assert.equal(waiterSeenSince(root, 1, began), false);
+    stamp("2026-09-20T12:00:01.000Z");
+    assert.equal(waiterSeenSince(root, 1, began), true);
+    // Presence is NOT the question: a waiter prints what it finds and
+    // exits, so an hour later the same stamp still says the AI received it.
+    assert.equal(waiterSeenSince(root, 1, began), true);
+    // A wait that has not begun for the reader is not a wait it can answer.
+    assert.equal(waiterSeenSince(root, 1, "not a time"), false);
   });
 });
 

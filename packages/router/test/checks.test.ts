@@ -19,10 +19,12 @@ import {
   endLiveChildren,
   execute,
   fnmatchCase,
+  judgeCheckPrograms,
   loadChecks,
   makeCheck,
   matchingPrefixes,
   materialPaths,
+  programIsRunnable,
   normaliseRel,
   parsePorcelain,
   resolveProgram,
@@ -409,6 +411,48 @@ describe("finding the program a name means", () => {
     const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
     assert.equal(code, 0);
     assert.match(seen, /reached/);
+  });
+});
+
+describe("a check the machine cannot run, judged with the plan", () => {
+  const step = (id: string, ...argv: string[][]) => ({ id, checks: argv.map((one) => ({ argv: one })) });
+
+  it("refuses a check whose program is not a program here, and says what a check is", () => {
+    // `Test-Path ...` arrives as `spawn Test-Path ENOENT`, which reads as a
+    // failed check -- and it was charged to the author three times in the
+    // second beta test, for a step whose work was done. An author cannot
+    // amend a check while answering the step it belongs to; a plan they
+    // have not had accepted yet is still theirs to rewrite.
+    const reasons = judgeCheckPrograms({
+      steps: [
+        step("a", ["Test-Path", "docs/x.md"]),
+        step("b", ["node", "-e", "process.exit(0)"], ["dabbler", "status"]),
+      ],
+    });
+    assert.equal(reasons.length, 1);
+    assert.match(String(reasons[0]), /step 'a'/);
+    assert.match(String(reasons[0]), /'Test-Path' is not a program here/);
+    assert.match(String(reasons[0]), /a check is a program and its arguments/);
+    assert.match(String(reasons[0]), /powershell -NoProfile -Command/);
+  });
+
+  it("accepts `dabbler` wherever it is judged, and a step with no checks refuses nothing", () => {
+    // The shim is on PATH where a session RUNS -- not necessarily in the
+    // shell a plan is judged in -- and a plan that could not name `dabbler`
+    // could not check the framework's own verbs.
+    assert.equal(programIsRunnable("dabbler"), true);
+    assert.equal(programIsRunnable("node"), true);
+    assert.equal(programIsRunnable("definitely-not-a-program-here"), false);
+    assert.equal(programIsRunnable(""), false);
+    assert.deepEqual(judgeCheckPrograms({ steps: [{ id: "c" }] }), []);
+  });
+
+  it("asks the filesystem about a program named by path, as a spawn does", () => {
+    const root = tempDir("program-");
+    const tool = join(root, "tool");
+    writeFileSync(tool, "", "utf8");
+    assert.equal(programIsRunnable(tool.split("\\").join("/")), true);
+    assert.equal(programIsRunnable(join(root, "missing").split("\\").join("/")), false);
   });
 });
 

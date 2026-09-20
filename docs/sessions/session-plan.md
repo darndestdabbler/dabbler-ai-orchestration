@@ -12963,229 +12963,255 @@ that names no param the call carried.
 
 **Releasable.** Yes, a patch: Haiku reviews over the API.
 
-### Session 213 of 219: A session releases because someone said so, and a person can hold one that should not
+### Session 213 of 216: One authority for each lifecycle fact
 
 Scope: whole repository
 
-> **ON HOLD, 2026-09-20 -- do not start 213-219.** The operator stopped this
-> block the day it was planned: it is the hole-by-hole path, and the
-> architecture is assessed first. Consult round 18
-> (`docs/design/consults/round18-synthesis.md`) recommends withdrawing all
-> seven for three sessions -- one authority for each lifecycle fact; no silent
-> wait and no Resume; the governor. The sections stay until the operator
-> rules, because their **Why** paragraphs are the audit's findings.
+**The goals sessions 213-216 serve (operator, 2026-09-20).** A human is
+bothered in the middle of a session only at the beginning, during planning;
+when an AI service is not available; or when the human chooses to ask a
+question or correct the course -- and, where it could not be asked at the
+start, for something only a person possesses. A Resume button is ridiculous.
+The framework recovers by a limited set of actions, and an impasse it did not
+anticipate is put to a reviewing AI whose one principle is to finish the
+session unless a critical issue needs a person. Nothing is over-engineered,
+and the developer's experience is paramount: an extension that appears to
+hang, or does something that is not correct, is rejected. Consult round 18
+(`docs/design/consults/round18-synthesis.md`) set the order: authority, then
+noticing, then no Resume, then the governor -- because neither failed beta
+test would have reached a governor. A seven-session block planned the same
+morning (commit `81a2ae80`) was the hole-by-hole path and is withdrawn; what
+its audits found is carried into the **Why** paragraphs here.
 
-**The rule sessions 213-219 serve (operator, 2026-09-20).** No code path
-leaves the framework or the AI not knowing what to do next. The situations
-that need the human are few, each is said clearly, and each leads to a
-resolution that lets the session CLOSE CORRECTLY. Cancelling is not a
-resolution. This repository ships by default; a consumer's repository
-publishes nothing unless its operator says so. Both defaults have stood since
-174 and neither changes. Every change in this block removes a dead end or
-corrects a sentence; where one adds a stop, the stop replaces a later and
-worse one.
+**Why.** On the operator's work computer a beta session was read as
+releasable though the Authoring AI had labelled nothing, the AI cancelled the
+session on its own, and the session ended with uncommitted code. Each step of
+that was the framework saying one thing in two places (read 2026-09-20,
+verified):
 
-**Why.** On the operator's work computer a session was read as releasable
-though the Authoring AI had labelled nothing, the AI cancelled the session on
-its own, and the session ended with uncommitted code. A read of the code the
-same day (three audits, 2026-09-20) found the release rule stated twice:
-
-- `releaseOfPlan` (`driver.ts`) reads `dabbler.release`. The typed `dabbler
-  session declare` (`cli/session.ts`, the last block) never does: it passes
-  `releasable: holdReason === null`, its help says "absent, the session ships
-  once it is verified", and the message for the retired `--releasable` flags
-  says the same. `inProcess.ts` forwards only `--hold-release`. 174 left this
-  as found; `cli.test.ts` ("ships without one") pins it under the on-request
-  default.
-- `phasePlan` declares only when no declaration exists and the publish phase
-  and the close gate read the declaration, so on an on-request checkout one
-  typed `session declare` makes the session releasable and the plan cannot
-  say otherwise.
-- Once declared, nothing changes it. `published_when_releasable` is an
-  evidence gate, so `close --force` does not pass it; a session that cannot
-  publish (no credential, a feed that refuses, a declaration made by
-  mistake) has two exits, publish or cancel. `releasabilityOf` (`writers.ts`)
-  already holds a releasable session for two reasons -- a verdict that is not
-  VERIFIED, a red whole run -- and the publish phase, `packageSession` and the
-  close gate all read that hold and close the session as held.
+- **The release rule is stated twice.** `releaseOfPlan` (`driver.ts`) reads
+  `dabbler.release`. The typed `dabbler session declare` (`cli/session.ts`)
+  never does -- it passes `releasable: holdReason === null` -- and
+  `inProcess.ts` forwards the same. `phasePlan` declares only when no
+  declaration exists, so a declaration made first beats the plan. 174 left
+  this as found; `cli.test.ts` ("ships without one") pins it.
+- **Nothing can hold a release once declared.** `published_when_releasable`
+  is an evidence gate, so not even `close --force` passes it: a release that
+  cannot succeed leaves "publish" or "cancel". `releasabilityOf`
+  (`writers.ts`) already holds a releasable session for a verdict that is not
+  VERIFIED and for a red whole run, and the publish phase, `packageSession`
+  and the close gate all close a held session as held.
+- **Every stop offers `dabbler session cancel --reason "<why>"`**
+  (`cancelChoice`, `driver.ts`), and the verb refuses it twice: it requires a
+  session number, and `--force` for a session in flight. An AI that reads the
+  offer arrives at `cancel --force` by elimination. `callerIsEngine`
+  (`session.ts`) knows `DABBLER_DRIVEN` and `CLAUDECODE`; a Copilot or Codex
+  AI answering from its own CLI carries neither. `close --force` asks nothing
+  at all, skips `working_tree_clean`, `pushed_to_remote` and `test_run_fresh`
+  and closes every open session of the plan.
+- **The loop never re-reads the session's status.** Cancelled underneath it,
+  the mailbox poll (`engines.ts`) waits for ever with a live heartbeat while
+  the waiter says nothing is in flight; cancelled during a framework phase,
+  `phaseLand` adds, commits and pushes the cancelled session's work.
+- **Four messages name `dabbler session next`** -- `report`'s stale-seq
+  refusal, `start`'s closing "Next:" line, its identity-clash refusal and
+  `interrupt`'s held-request line (`session.ts`). Under a mailbox loop
+  `session next` registers and takes the lease; the loop's next `save()` is
+  refused, the save in its own Stop handler is refused too, and the loop dies
+  with no stop recorded and the accepted answer lost. A stale seq is
+  ordinary: an operator's Send re-issues the instruction while the AI works.
+- Reported, to be confirmed by the session: `cap-disputed` offers `verify
+  reopen`, which `reopen.ts` refuses under that terminal, and "withdraw the
+  dispute", which the ledger forbids; push-mode moves print `dabbler session
+  drive` bare, and the verb requires `--engine`.
 
 **What.**
-1. **One rule, read at both doors.** The typed and the in-process `declare`
-   decide releasability through the same function the driven plan does, under
-   the checkout's `dabbler.release`: on request, `--release "<reason>"`
-   releases and its absence holds with `ON_REQUEST_HOLD`; ship by default,
-   `--hold-release "<reason>"` holds and its absence ships. The flag the
-   setting does not read is accepted and not read, exactly as the plan's
-   other member is. The help and the retired-flag message say what the
-   setting says.
+1. **A release is decided in one place.** The typed `session declare` and its
+   in-process door go, with their help, their usage line and their tests; the
+   loop calls `declare()` as it does today and `releaseOfPlan` is the one
+   rule. The pages that narrate the lifecycle say the plan is the
+   declaration. Should the session find a caller besides the loop, the verb
+   stays and decides through `releaseOfPlan`'s rule, and the session says
+   which it found.
 2. **A person's hold.** `dabbler session hold-release --reason "<why>"`
    appends one activity-log entry, and `releasabilityOf` reads it as a third
-   hold beside the two it has. One way only: it holds and never releases,
-   because releasing afterwards is deciding in hindsight what may reach a
-   feed. Refused once a `published` row exists, and refused for an engine
-   (`callerIsEngine`). No gate and no phase changes: all three readers
-   already close a held session as held.
-3. **The `publish` stop offers it**, second, after "put right what packaging
-   refused and Resume": "Hold this release and close the session", with what
-   it costs -- nothing ships from this session, and the next releasing
-   session carries the work.
+   hold. One way only: it holds and never releases, because releasing
+   afterwards is deciding in hindsight what may reach a feed. Refused once a
+   `published` row exists. The `publish` stop offers it second, with what it
+   costs: nothing ships from this session.
+3. **No engine ends a session by force.** First step, on the record: what
+   each engine's shell carries in its environment (Claude Code, Copilot CLI,
+   Codex), measured. `callerIsEngine` reads those and one marker the
+   framework owns -- the terminal the extension opens for the AI's CLI
+   carries `DABBLER_ENGINE_TERMINAL=1`, inherited by every command the AI
+   spawns. `cancel --force`, `close --force` and `hold-release` read that one
+   function and refuse an engine in the same words: report the step blocked
+   and say why.
+4. **Every way on is a command that runs as printed.** The cancel a stop
+   offers names the session and `--force` where the session is in flight, and
+   is worded as the operator's. `session drive` carries the record's engine.
+   A move whose command refuses in that situation goes. One test keeps it so:
+   every command every situation prints, in both modes, is handed to the
+   CLI's own parser and none is refused as usage.
+5. **The loop ends when its session has.** The mailbox poll, each phase
+   boundary, and the moments before the commit and before the push read the
+   session's status; one no longer in flight ends the loop with nothing
+   added, committed or pushed, and a final `done` in the run's folder that
+   names the cancellation and its recorded reason. `waiterEnd` already
+   prints a watched session's `done`. `session cancel` says what it left
+   uncommitted, by `previewPaths`.
+6. **`session next` does not take a live loop's lease.** Under a live
+   heartbeat it refuses and names the waiter, and the four messages name the
+   waiter wherever a loop is driving.
 
-**Non-goals.** No change to either default. No verb that makes a held session
-releasable. No change to `releaseOfPlan`. The release preflight is 216.
-
-**Tests.**
-- `cli.test.ts`: a typed declare with no flag is held on an on-request
-  checkout and ships on a ship-by-default one (the pinned case is updated,
-  not added to).
-- `writers.test.ts`: a recorded operator hold holds a declared-releasable
-  session, and is refused after a published row.
-- `drive.test.ts`: a session stopped at `publish`, held, resumes and closes
-  with nothing published and the hold in the close's row.
-
-**Releasable.** Yes, a minor: a new verb, and consumers stop publishing what
-nobody asked for.
-
-### Session 214 of 219: Ending a session is a person's act, and the loop knows when one has ended
-
-Scope: whole repository
-
-**Why.** The same incident, the other half. Read 2026-09-20:
-
-- Every stop offers `dabbler session cancel --reason "<why>"`
-  (`cancelChoice`, `driver.ts`). The verb requires a session number
-  (`cli/session.ts`) and a session in flight requires `--force`
-  (`judgeCancellation`), so the command as printed is refused twice, and an
-  AI that reads it arrives at `cancel --force` by elimination.
-- `callerIsEngine` (`session.ts`) recognises `DABBLER_DRIVEN` and
-  `CLAUDECODE`. Under the pull a Copilot or Codex AI answers from its own
-  CLI and carries neither, so `session cancel --force` succeeds for it.
-  `session close --force` asks nothing at all: it skips `working_tree_clean`,
-  `pushed_to_remote` and `test_run_fresh` and closes every open session of
-  the plan -- a close with uncommitted code, by an engine, is one command.
-- Nothing in `drive.ts` reads the ledger's status after registration. The
-  mailbox poll (`mailboxEngine`, `engines.ts`) looks only for an answer file,
-  so a loop whose session was cancelled waits for ever with a live heartbeat
-  while the waiter says nothing is in flight. Cancelled during a framework
-  phase, the loop carries on: `phaseLand` adds, commits and pushes a
-  cancelled session's work and the close then refuses.
-- `resolveTargetSession` falls back to the highest COMPLETED session, so a
-  typed `declare` after a cancel is aimed at the previous, closed session.
-- `session cancel` leaves the work uncommitted by design and says nothing
-  about it; the next `session start` is where a person finds out.
-
-**What.**
-1. **An engine is recognised whichever engine it is.** First step, on the
-   record: what each engine's shell carries in its environment (Claude Code,
-   Copilot CLI, Codex), measured, not remembered. `callerIsEngine` reads
-   those, and one marker the framework owns: the terminal the extension opens
-   for the AI's CLI at Start carries `DABBLER_ENGINE_TERMINAL=1`, which every
-   command the AI spawns inherits. One function, read by `cancel`,
-   `close --force` and `hold-release`.
-2. **`close --force` is refused for an engine**, in `cancel --force`'s own
-   words: report the step blocked and say why.
-3. **The cancel a stop offers runs as printed** -- the session's number and
-   `--force` where the session is in flight -- and is offered only where the
-   stop's actor is the operator or either, worded as the operator's. It stays
-   last.
-4. **The loop ends when its session has.** The mailbox poll and each phase
-   boundary read the session's status; one that is no longer in flight ends
-   the loop before anything is added, committed or pushed, with a final
-   `done` in the run's folder saying the session was cancelled, by its
-   recorded reason, and that the AI stops. `waiterEnd` already prints a
-   watched session's `done`.
-5. **`declare` targets a session in flight and no other.** `decision` keeps
-   the fallback: a decision recorded after a close is what `--decided-on`
-   exists for.
-6. **`session cancel` says what it left**: the uncommitted paths, by
-   `previewPaths`, and that the next start offers to commit or undo them.
-
-**Non-goals.** No unwinding of a cancelled session's work. No guard on a
-cancel that is not forced. No new lock.
+**Non-goals.** No change to either release default. No verb that makes a held
+session releasable. No wait contract, no deadline and nothing about Resume
+(214, 215). No release preflight (215). No governor (216). `session next`
+is not removed: the extension's session commands, the Dabbler terminal and
+the walks run through it.
 
 **Tests.**
+- `driver.test.ts`: every move of every situation, in both modes, parses; the
+  cancel names the session, and `--force` for one in flight.
 - `session.test.ts`: `callerIsEngine` is true under each measured marker and
-  the framework's own, false with none; `close --force` is refused for an
-  engine and nothing is written.
-- `driver.test.ts`: every situation's cancel names the session number, and
-  `--force` for a session in flight.
-- `drive.test.ts`: a session cancelled while the mailbox waits ends the loop
-  with a `done` naming the cancellation; cancelled before the land, nothing
-  is committed.
+  the framework's own, false with none; `close --force` and `hold-release`
+  are refused for an engine and nothing is written; a stale-seq refusal under
+  a live loop names the waiter.
+- `writers.test.ts`: a recorded hold holds a declared-releasable session, and
+  is refused after a published row.
+- `drive.test.ts`: cancelled while the mailbox waits, the loop ends with a
+  `done` naming the cancellation; cancelled before the land, nothing is
+  committed; `session next` under a live heartbeat refuses and the loop's
+  lease stands; a session stopped at `publish`, held, closes with nothing
+  published and the hold in the close's row.
+- `cli.test.ts`: the typed declare's cases go with the verb.
 
-**Releasable.** Yes, a patch.
+**Proof, by failure injection on the built bundle** (round 18, Sol): attempt
+a forced cancel and a forced close under each engine's marker; cancel between
+two phases and immediately before the commit; run `session next` against a
+live loop. Each ends with no unauthorised commit or push, one durable
+instruction, and a sentence that names what to do.
 
-### Session 215 of 219: A refused close goes back for its evidence, whatever the session declared
+**Releasable.** Yes, a minor: one verb gone, one added, and a consumer's
+session publishes only what its plan asked for.
+
+### Session 214 of 216: No silent wait
 
 Scope: whole repository
 
-**Why.** `rewindPhaseFor` (`gates.ts`) states which phase remakes each gate's
-evidence, and exactly one caller reads it: `phasePublish`, through
-`rewindFromPackaging`, reached only for a releasable session. A session that
-publishes nothing -- every consumer session under the on-request default --
-first meets the gates in `phaseClose`, which only throws. Resume re-enters
-`close`, the same gate refuses, and the `close` stop's move, "Satisfy the
-gate the close named", names nothing either party may run: a driven
-`test_run_fresh` row deliberately states no remedy, because the framework
-owns the suite. The rewind was built for this and is wired to the wrong
-door. Beside it:
+**Why.** In the second beta test the AI's waiter kept waiting for something
+that never came, and nothing on the screen said what. The cause is not known;
+the record from that machine (`run.json`, `supervision.jsonl`,
+`driver/loop.log`) has been asked for. Round 18's answer does not depend on
+it: **"no silent wait" is the acceptance invariant**, so whichever cause it
+was becomes a named, timed, visible state. The candidates, read 2026-09-20
+(the first two are closed by 213; the rest are this session's, each to be
+confirmed by reading before it is changed):
 
-- The rewind's bound compares the refusal's TEXT (`alreadyRewoundFor`), the
-  text carries a timestamp, and `run.rewinds` is never cleared: a rewind that
-  fixed nothing reads as a new refusal and buys another verification round.
-- `phaseLand` stops when the tree is not the tree the run of record tested
-  ("Put right what git refused"). Git refused nothing; the tree moved, and
-  the phase that remakes that evidence is known.
-- A red candidate gate (`phaseGateWait`) stops, and Resume polls the same SHA
-  for another 25 minutes. The failure list it names goes nowhere.
-- `phaseSteps` with no work plan says "re-run to plan again"; nothing sets
-  the phase back to `plan`, so re-running says it again.
+- A session cancelled under a live loop; a loop killed by `session next`.
+- **A framework job has no deadline.** `longWork` (`drive.ts`) polls a
+  verification round, a suite, the publish or the close for ever; `jobs.ts`
+  has no timeout. A hung job is a live heartbeat, nothing owed, no stop and
+  no notice, indefinitely.
+- **A stop may reach nobody.** The Dabbler terminal's one `warn` is for an
+  overdue instruction, and overdue events are written only inside the poll
+  that runs during `invoke`, so a stopped or dead loop emits none. 161 gave a
+  stop toast the stop's first sentence; whether the mailbox path raises it is
+  to be established in a running editor.
+- **A stop that nobody needed.** `rewindPhaseFor` (`gates.ts`) says which
+  phase remakes each gate's evidence, and only `phasePublish` reads it. A
+  session that publishes nothing -- every consumer's -- first meets the gates
+  in `phaseClose`, which only throws; the same gate refuses every time, and
+  the stop's way on names nothing anyone may run. The rewind's bound compares
+  the refusal's text, which carries a timestamp, so a rewind that fixed
+  nothing reads as new. `phaseLand` stops on a tree that moved after the run
+  of record, though the phase that retests it is known. A missing work plan
+  says "re-run to plan again" and nothing sets the phase to `plan`. A dispute
+  `recordDispute` refuses becomes a `dispute-refused` stop that returns at
+  once on any restart, where the dispositions answer could have been refused
+  in the same words.
+- **The guidance and the waiter disagree** (`bootstrap/templates.ts`): "three
+  kinds of instruction, and no fourth", while the waiter prints `interrupt`;
+  dispositions arrive as `rejection`, read as "fix it and answer again" while
+  the ask says "change no file now"; the waiter's no-loop exit is not
+  described, so an obedient AI re-arms it every minute.
+- **A revived loop is invisible.** The waiter restarts a dead loop detached
+  and hidden (`reviveLoop`), and it goes on to commit and push where nobody
+  can see it.
 
 **What.**
-1. **One rewind, where the gates are asked.** A refused close reads its own
-   gate rows, goes back to the earliest phase `rewindPhaseFor` names and runs
-   forward from there -- the same function, the same bound, shared with the
-   publish phase rather than copied. A gate no phase remakes stops, as today.
-2. **The bound is the set of gates that failed**, not the sentence: one
-   rewind per distinct set, per progress point.
-3. **A tree that moved after the run of record goes back** to the run of
-   record, or to verification where the paths that moved are ones the
-   verified tree carried.
-4. **A red candidate gate goes to `fix`** with the gate run's failures as the
-   findings' text, and lands a new candidate. Where the failures cannot be
-   read, the stop says where they are and that a push to the candidate
-   branch is the way on.
-5. **A missing work plan sets the phase to `plan`.**
+1. **One answer to "who is this waiting on".** At every moment exactly one is
+   true -- the author owes an answer, a framework job is running against a
+   deadline, or a person owes something -- and the loop keeps it on
+   `run.json`: the owner, what for, since when, by when, and the last REAL
+   progress, which is a persisted milestone that changed and never a
+   heartbeat. `dabbler status`, the waiter, the Work Explorer's session row
+   and the Dabbler terminal all read that one record: "Author owes step 4 --
+   2:13"; "Verification round 2 -- 3:42 of 10:00"; "You: the reviewer is
+   unreachable".
+2. **Every framework job has a deadline**, from that job's own history where
+   there is one and a declared default where there is not. Past it the job
+   is ended, tried once more, and then it is a stop that says which job, how
+   long, and where its log is. An overdue author is told, in the editor, and
+   is not failed.
+3. **A stop the framework can cure is not a stop.** One rewind, where the
+   gates are asked -- the close as well as the publish -- bounded by the SET
+   of gates that failed; a tree that moved after the run of record is tested
+   again; a missing plan sets the phase to `plan`; a dispute that cannot be
+   written is a rejection of the dispositions answer, and the
+   `dispute-refused` stop goes with its situation.
+4. **A stop that remains reaches the person**: a notification carrying its
+   first sentence and who acts, under both modes.
+5. **Nothing runs where nobody can see it.** A revived loop's output is
+   followed in the Dabbler terminal from `loop.log`. **Stop Session**, beside
+   the session in the Work Explorer, runs `session interrupt --stop`; the
+   mailbox honours it during a job as `next` does; and a recorded stop is
+   what `reviveLoop` already leaves alone.
+6. **The managed body says what the waiter prints**: the kinds it prints, a
+   dispositions instruction answered and not fixed, and what a waiter that
+   exits with no instruction means -- stop, and tell the operator what it
+   printed.
 
-**Non-goals.** No new gate. No change to what any gate judges. No rewind past
-`verify`.
+**Non-goals.** Resume stays in this session (215). No job is killed without
+its one retry. No new record beside `run.json`. No governor.
 
 **Tests.**
-- `drive.test.ts`: a non-releasable session whose `test_run_fresh` refuses at
-  the close goes back to the run of record and closes; the same set of gates
-  refusing twice stops once, with both gates named; a tree moved after the
-  run of record is tested again and lands.
-- `gates.test.ts`: confirmed, not added to -- `rewindPhaseFor` already has
-  its cases.
+- `drive.test.ts`: the waiting record names the author, a job and a person in
+  turn, and its last progress does not move on a heartbeat; a job past its
+  deadline is ended, retried once and then stopped by name; a non-releasable
+  session whose `test_run_fresh` refuses at the close goes back and closes;
+  the same set of gates refusing twice stops once; a stop requested during a
+  mailbox job ends the job.
+- `dabblerTerminal.test.ts`: a stop warns once with its first sentence; a
+  revived loop's lines appear.
+- `actionRegistry.test.ts`: Stop Session is offered for a session in flight.
 
-**Releasable.** Yes, a patch: a consumer's session that met a stale gate at
-the close could not close.
+**Proof.** Hang a verification job; suppress nothing and watch the stop
+arrive; kill the loop and read the revived loop's lines in the terminal. At
+no moment does `dabbler status` fail to name an owner and a clock.
 
-### Session 216 of 219: A release is checked before the work, and what it finds comes with a recommendation
+**Releasable.** Yes, a minor: a new action, and the session row says who it
+is waiting on.
+
+### Session 215 of 216: The loop outlives its questions, and Resume goes
 
 Scope: whole repository
 
-**Why.** Operator, 2026-09-20: the framework inspects whether a release could
-be carried out, at the start of the session, and recommends a resolution to
-the human operator. Today every release problem is found by `packageSession`
-between the land and the close -- after the work is verified, committed and
-pushed -- and until 213 the session could not then close. `declare`
-(`session.ts`) already does one such check before the work: a repository
-that declares no packaging is held with `NOTHING_TO_PUBLISH`. It is the right
-seam -- plan acceptance, before any file changes, passed through by the typed
-and the driven declaration alike -- and it has two defects of its own: it
-catches `PackagingConfigError` and carries on, so a malformed block is
-declared releasable and refused after the push; and it reads the root block
-(`null`) where `packageSession` reads the session's module's.
+**Why.** Resume exists because a stop ends the loop's process: whatever a
+person then does, somebody has to start a new loop, and that somebody is the
+person. After 214 the stops that remain are the ones a person truly owns --
+and a person answering is no different from the author answering, which the
+loop already waits for, alive. The other two reasons to click Resume are a
+machine that restarted and an AI CLI that died, and one verb never repaired
+three different failures (round 18, Sol). And the questions only a person can
+answer are asked too late: every release problem is found by `packageSession`
+between the land and the close, after the work is verified, committed and
+pushed. `declare` (`session.ts`) already makes one such check before the work
+-- a repository that declares no packaging is held with `NOTHING_TO_PUBLISH`
+-- and it has two defects of its own: it catches `PackagingConfigError` and
+carries on, so a malformed block is declared releasable and refused after
+the push; and it reads the root block where `packageSession` reads the
+session's module's.
 
 What `packageSession` refuses, and whether it can be known before the work
 (read 2026-09-20):
@@ -13194,213 +13220,139 @@ What `packageSession` refuses, and whether it can be known before the work
 | --- | --- |
 | a dependency resolving from source | yes -- the remedy is `dabbler deps restore` |
 | a malformed `packaging` block | yes -- a pure parse |
-| the credential `packaging.push.secret` names is not set | yes, as of now -- `resolveSecret` reads and writes nothing |
+| the credential `packaging.push.secret` names is not set | yes, as of now |
 | a pack naming `{version}` where the publish phase supplies none | yes -- static |
 | tag release: `version.json` and the manifests disagree | yes |
-| tag release: the tag for the CURRENT version is already on origin | yes -- one read-only `git ls-remote --tags`; it means this session must bump |
+| tag release: the tag for the CURRENT version is already on origin | yes -- one read-only `git ls-remote --tags`; this session must bump |
 | the close's gates; the pack; the push | no -- they need the work |
 
-**What.** A session that would release -- by `releaseOfPlan`, at plan
-acceptance -- is asked those six questions by one function beside
-`NOTHING_TO_PUBLISH`, reading the block `packageSession` will read. There are
-three answers and no fourth:
+**What.**
+1. **The loop waits on a person alive.** A stop a person owns is recorded as
+   today and the loop goes on running, the waiting record (214) naming the
+   person. Each way on is a button on the session's row and the command it
+   always was; running it is the answer, and the loop carries on by itself,
+   as it does when a report lands. An AI service that cannot be reached is
+   retried on a visible clock, with Retry Now.
+2. **What only a person possesses is asked at plan acceptance**, before any
+   file changes. A session that would release is asked the six questions
+   above by one function beside `NOTHING_TO_PUBLISH`, calling the readers
+   `packageSession` calls and reading the block it will read. Nothing found:
+   declared as today. The plan can answer it -- the current version's tag is
+   on origin and no step names `version.json` -- and the PLAN is refused with
+   that sentence, so no person is involved. Only a person can answer it: the
+   loop asks, alive, with the RECOMMENDED way on first -- put it right with
+   the command named and carry on, recommended where the remedy is one
+   command; or `hold-release` and carry on, recommended where it is not. The
+   credential is read again at the publish, which stays the authority.
+3. **Opening the editor continues a running session.** The record says
+   whether a session is meant to be running; Stop Session and Cancel clear
+   it; closing a terminal clears nothing, because closing a terminal is not
+   an instruction to anyone. On activation the extension starts the loop for
+   a session the record says is running, through the crash layer's own bound.
+4. **Reconnect Authoring AI** replaces Resume for a dead CLI: the session row
+   says the AI is disconnected -- no waiter, an instruction owed, past its
+   notice -- and the action opens the engine with the waiter sentence, as
+   Start does.
+5. **Resume Session goes** from the extension, the managed body and the
+   pages. Outside the editor the way back is what it has always been:
+   `dabbler session run --mailbox`.
 
-1. **Nothing found.** The session is declared releasable, as today.
-2. **The plan can answer it.** A tag already on origin for the current
-   version, where no step of the plan names `version.json`, refuses the PLAN
-   with that sentence -- the engine answers again with the bump in a step,
-   and no person is involved. The plan ask says so where it already says a
-   releasing session bumps the version.
-3. **Only a person can answer it.** A `release-preflight` stop, before any
-   work, whose actor is the operator: what would refuse, in packaging's own
-   words, and two ways on, the RECOMMENDED one first -- put it right with the
-   command named (`dabbler deps restore`, `dabbler auth set <name>`, the line
-   of `dabbler.yaml` the parser refused) and Resume, recommended where the
-   remedy is one command; or `dabbler session hold-release` (213) and Resume,
-   recommended where it is not. Either way the session runs and closes.
-
-The credential is read again at the publish, which stays the authority; the
-preflight is the earliest moment a person can be told, not a promise.
-
-**Non-goals.** No feed is asked whether a version exists: that is
-ecosystem-specific code and the feed's own refusal stays the signal. No
-preflight at `session start`, which does not know the plan. No AI is asked
-anything: all six are mechanical. No second copy of any check -- the
-preflight calls the readers `packageSession` calls.
+**Non-goals.** No feed is asked whether a version exists. No preflight at
+`session start`, which does not know the plan. No AI is asked anything the
+six questions can answer mechanically. The framework does not own an engine
+CLI's lifecycle: it offers to reconnect one and never starts a second author.
 
 **Tests.**
-- `session.test.ts`: a malformed block stops before the work with the
-  parser's sentence and both ways on; a module session is judged by its
-  module's block.
-- `drive.test.ts`: a releasing plan with the current tag on origin and no
+- `drive.test.ts`: a stop a person owns leaves the loop running, and running
+  its way on carries the session to its close with no second loop started; an
+  unset credential at plan acceptance is asked with both ways on, and held,
+  the session closes; a releasing plan with the current tag on origin and no
   `version.json` step is refused with that reason and accepted once a step
-  names it; an unset credential stops as `release-preflight`, and held, the
-  session closes.
+  names it.
+- `session.test.ts`: a malformed block is asked about before the work in the
+  parser's own words; a module session is judged by its module's block.
+- `sessionCommands.test.ts`: activation starts a loop for a session recorded
+  as running and none for one that was stopped; Reconnect is offered for an
+  in-flight session with no waiter, and Resume is not offered anywhere.
 
-**Releasable.** Yes, a minor.
+**Proof.** Kill the loop, the editor and the AI CLI independently, on the
+installed extension: each comes back, or is one named action, and none is
+Resume. Replay an unset credential: it is asked in the first minute, and
+either answer ends in a closed session.
 
-### Session 217 of 219: No sentence names a command that refuses, or one that kills the loop
+**Releasable.** Yes, a major: the Resume Session command is removed.
 
-Scope: whole repository
-
-**Why.** Read 2026-09-20; each of these is a sentence the framework prints
-that sends its reader somewhere that does not work.
-
-- Four messages name `dabbler session next`: `report`'s stale-seq refusal,
-  `start`'s closing "Next:" line, `start`'s identity-clash refusal and
-  `interrupt`'s held-request line (`session.ts`). Under a mailbox loop
-  `session next` registers, bumps `lease_epoch` and takes the lease; the
-  loop's next `save()` is refused, the save in its own Stop handler is
-  refused too, and the loop dies with no stop recorded and the answer it had
-  just accepted lost. A stale seq is ordinary: an operator's Send re-issues
-  the instruction with a new seq while the AI works. The right advice --
-  run the waiter again -- is printed nowhere.
-- `cap-disputed` offers `verify reopen`, which `reopen.ts` refuses under
-  that terminal, and "withdraw the dispute", which the ledger forbids.
-- `verify reopen` ends "Run the round: dabbler verify". Run by hand, the
-  bought round is spent outside the loop and the AI never receives its
-  dispositions; `cap-unresolved` and `cap-disputed` list no resume move, so
-  the stop reads "Next: you." and stops there.
-- Push-mode moves print `dabbler session drive` bare; the verb requires
-  `--engine`.
-- A `Stop` thrown by `save()` inside the loop's own handler, or in
-  `register`, escapes: `superviseLoop` rethrows it without a `loop-crashed`
-  row, and after two silent restarts the `crash` stop points at a log that
-  names nothing.
-- The watcher-only loop ignores a stop and calls `sessionNext` every 120
-  seconds, which clears it.
-- The managed body says "Three kinds of instruction, and no fourth". The
-  waiter also prints `interrupt`; dispositions arrive as `rejection`, which
-  the body reads as "fix it and answer again" while the ask says "change no
-  file now"; and the waiter's no-loop exit (stderr, `EXIT_BOUNDARY`) is not
-  described, so an obedient AI re-arms it every minute.
-
-**What.** Each sentence says what works. Under a live loop the four messages
-name the waiter, and `session next` refuses rather than take a live loop's
-lease, naming the waiter too. `cap-disputed` loses the two moves that cannot
-be made. `verify reopen` under a driven session ends with Resume, and both
-cap situations list it. `session drive` carries the record's engine. A `Stop`
-that escapes the loop is recorded as the crash it is, with its sentence. The
-watcher-only loop ends on a stop. The managed body names the kinds the
-waiter prints, says a dispositions instruction is answered and not fixed,
-and says what a waiter that exits with no instruction means: stop, and tell
-the operator what it printed.
-
-And one test that keeps it so: every command a situation's moves print is
-handed to the CLI's own parser, and none is refused as usage.
-
-**Non-goals.** No new instruction kind. No change to what any verb does
-beyond `session next`'s refusal. No rewording of a sentence that is true.
-
-**Tests.**
-- `driver.test.ts`: every move of every situation, in both modes, parses.
-- `drive.test.ts`: `session next` under a live heartbeat refuses and the
-  loop's lease stands; a `Stop` thrown from `save()` leaves a `loop-crashed`
-  row carrying its message.
-- `session.test.ts`: a stale-seq refusal under a mailbox loop names the
-  waiter.
-
-**Releasable.** Yes, a patch.
-
-### Session 218 of 219: A dispute that is lost is fixed, and one that is refused is asked again
+### Session 216 of 216: An impasse goes to the Auxiliary Reviewer before it goes to a person
 
 Scope: whole repository
 
-**Why.** The two places verification ends with no way to a correct close
-(read 2026-09-20):
+**Why.** A framework stops because it did not anticipate a condition. No
+audit closes that class, and once Resume is gone every such stop lands on a
+person who has nothing to decide. Round 17 rejected an "AI mechanic" two days
+before this block; round 18 reopened it on the operator's proposal and
+settled its shape. Not the operator's first form -- an AI that "operates like
+the framework" -- which both advisors refused: an LLM does not run git, the
+gates or the ledger. **The reviewer decides; the framework executes.** And
+not a new role: the Auxiliary Reviewer already exists to break an impasse
+between the author and the primary, and is not the judge of the work.
 
-- **An adjudication that upholds the finding.** `verify adjudicate`
-  (`verify/disputes.ts`) writes a blocking terminal -- "no further round may
-  open", "a follow-up session's work" -- and names no way to end this
-  session. Resume stops as `cap-terminal-tree-moved`, whose headline (the
-  tree is not the tree that was verified) is false here and whose first move,
-  `verify reopen`, refuses any session carrying an adjudication row
-  (`verify/reopen.ts`). Cancel is the only exit, behind a stop that
-  describes a different situation.
-- **A dispute the framework refuses to write.** `dispositionRefusals`
-  (`drive.ts`) judges only the dispute's evidence; whatever else
-  `recordDispute` refuses is rebuilt from the stored dispositions on resume,
-  so the `dispute-refused` stop returns at once. Its moves, "file again" and
-  "dispose `fix`", are both plain Resume, and neither asks the AI anything.
+The exceptions need no new machinery either. Every process rule a person may
+buy past already has a person's verb, and each buys process and never
+evidence: `session plan amend` (a step's files or checks, a dropped
+non-goal), `verify reopen` (rounds, never a verdict), `hold-release` (213).
+Granting an exception is choosing, on the person's behalf, a way on that
+today only a person may choose.
+
+One impasse is known to have no exit at all (reported 2026-09-20, to be
+confirmed): an adjudication that UPHOLDS a finding writes a blocking
+terminal, the stop then shown describes a moved tree, and its first way on,
+`verify reopen`, refuses any session carrying an adjudication row.
 
 **What.**
-1. **A lost dispute is a finding to fix.** The Auxiliary Reviewer has ruled
-   that the finding stands, which is what disposing it `fix` would have said
-   a round earlier. The loop issues the `fix` step for the upheld findings
-   and one round reviews the fix; a round that is not clean is the cap, with
-   the cap's own exits. The adjudication row is unchanged and stays the
-   record of who ruled. A dispute the Auxiliary Reviewer finds FOR the author
-   is unchanged. This is the one design choice in the block: it replaces
-   "the follow-up session fixes it" with "this session fixes it", because the
-   first cannot close. The operator may overrule it before the session
-   starts.
-2. **One judge of a dispute.** What `recordDispute` refuses is what the
-   dispositions answer is judged by, so a dispute that cannot be written is
-   a `rejection` of that answer, in the refusal's own words, and the AI
-   answers again. Three refusals stop, as for any answer. The
-   `dispute-refused` stop goes, with its situation.
+1. **When.** A stop a person would own that is none of: a planning question,
+   an AI service that cannot be reached, something only a person possesses,
+   the person's own Stop. Before the person is asked, the loop asks the
+   Auxiliary Reviewer, over the reviewing vehicle, in one call.
+2. **What it is given**: the stop in full, the rows of the record it rests
+   on, the rule that refused in its own words, the one principle -- finish
+   the session unless a critical issue needs a person, and bypass no rule
+   that has a valid action -- and a CLOSED menu: one of the stop's ways on;
+   "instruct the author", with the text; "hold the release"; "escalate",
+   naming the irreversible consequence and why no other entry resolves it.
+3. **What happens.** The framework runs the chosen entry, records it as a
+   decision by that role with its reason, and carries on. An answer outside
+   the menu is an escalation, at once. Two decisions a session, then the
+   person. The close lists every exception granted.
+4. **What it may never choose**: a cancel, a forced close, a verdict, an
+   adjudication, anything that edits the record, or a release. As governor it
+   has no write under the test roots: a role that grants exceptions does not
+   alter the evidence it governs.
+5. **A lost dispute has a way on.** An upheld finding is a finding to fix:
+   its way on is the fix step and one round to review it, offered to the
+   governor and the person alike. The adjudication row stays the record of
+   who ruled; a dispute found for the author is unchanged.
+6. **Every governor decision is a defect report.** Each is on
+   `supervision.jsonl` with the stop it answered; that list, not an audit, is
+   what earns a deterministic fix.
 
-**Non-goals.** No change to who adjudicates or to the verdict vocabulary. No
-second adjudication. The vocabulary inversion owed from earlier stays owed.
+**Non-goals.** No second governor and no appeal. No tool access beyond what a
+review already has. No change to who adjudicates a dispute or to the verdict
+vocabulary. The vocabulary inversion owed from earlier stays owed.
 
 **Tests.**
+- `drive.test.ts`: a stop the governor may answer is answered and the session
+  closes with the exception in the close's rows; an answer outside the menu
+  reaches the person; the third impasse of a session reaches the person; an
+  unreachable reviewer reaches the person as the service it is.
 - `disputes.test.ts`: an upheld adjudication leaves the session able to open
   exactly one round, for the fix.
-- `drive.test.ts`: upheld, the loop issues a fix step, reviews it and closes;
-  a dispute with blank grounds is a rejection of the dispositions answer and
-  is accepted once it carries them.
+- `driver.test.ts`: no situation's menu offers the governor a cancel, a
+  forced close or a release.
+
+**Proof.** Replay a step whose check is wrong, a round cap over a finding the
+author has fixed, and an upheld adjudication: each closes with no person
+asked and the exception named at the close. Replay a finding that would ship
+broken work: the governor escalates, and says why.
 
 **Releasable.** Yes, a minor.
 
-### Session 219 of 219: A stop reaches the operator, and Stop stops
-
-Scope: whole repository
-
-**Why.** The sessions before this one make every stop lead somewhere. This
-one makes sure the person who has to act finds out, and that the one act
-always theirs -- stopping -- works. Read 2026-09-20, and to be established in
-a running editor before anything is changed:
-
-- Whether a stop under the mailbox loop raises a notification. 161 gave the
-  stop toast the stop's own first sentence; the Dabbler terminal's only
-  `warn` today is for an overdue instruction, and overdue events are written
-  only inside the poll that runs during `invoke`, so a stopped or dead loop
-  emits none. If the AI's waiter is not running, the AI is waiting on an
-  operator nobody told.
-- Closing the loop's terminal stops nothing: the AI's waiter restarts the
-  loop detached and hidden (`reviveLoop`), its budget renewed at every
-  progress point, and the hidden loop goes on to commit and push. The
-  sanctioned stop, `session interrupt --stop`, is honoured during a
-  framework job only under `next`; the mailbox branch of `longWork` sleeps
-  through it, while `interrupt` prints that the driver halts. The extension
-  offers no Stop.
-- `longWork` polls with no deadline. A framework job that hangs leaves a
-  live heartbeat, nothing owed, no stop and no notice, indefinitely.
-- A `blocked` report made after the loop has stopped overwrites the last
-  accepted report, prints "the driver validates it next", and reaches
-  nobody.
-
-**What.**
-1. **A stop notifies**, under both modes: its first sentence, who acts, and
-   Resume where Resume is a way on.
-2. **Stop Session**, in the Work Explorer beside Resume, runs `session
-   interrupt --stop`; the mailbox honours it during a job as `next` does, and
-   the recorded stop is what keeps the waiter from reviving the loop --
-   `reviveLoop` already leaves a recorded stop alone.
-3. **A job that outlives its expected time is said once**, as an overdue
-   instruction is, with the job's log named.
-4. **A `blocked` report with no loop driving is refused**, saying the loop
-   has stopped, what stopped it, and that the operator is the one to tell.
-
-**Non-goals.** No job is killed on a timer. No change to the revive bound.
-No new notification for anything but a stop and an overdue job.
-
-**Tests.**
-- `drive.test.ts`: a stop requested during a mailbox job ends the job and
-  records `interrupted`; a waiter does not revive over it.
-- `session.test.ts`: `blocked` with no loop driving is refused and the
-  accepted report stands.
-- `dabblerTerminal.test.ts`: a stop event warns once with its first
-  sentence; a job past its expected time warns once.
-
-**Releasable.** Yes, a minor: a new action.

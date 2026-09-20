@@ -127,6 +127,11 @@ the answer and records it. Process rules only, the line `close --force`
 already draws. Two decisions a session, then the person. The close reports
 every exception granted.
 
+*Approved by the operator, 2026-09-20, and planned as sessions 213-216: the
+second became two -- 214 is the noticing (no silent wait), 215 is the loop
+that outlives its questions (no Resume, and the release preflight as the
+first question asked at plan acceptance).*
+
 Proof, Sol's experiment, run on the installed extension: replay a
 declaration made before the plan on a publish-nothing consumer; attempt a
 forced cancel from each of the three engines; cancel between phases and

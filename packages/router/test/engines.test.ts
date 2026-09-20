@@ -20,6 +20,7 @@ import {
   claudeCodeServedModel,
   engineAliases,
   preflightRefusedModel,
+  ENGINE_PLACE_MARKER,
   commandEngine,
   enginePrompt,
   engineShape,
@@ -30,7 +31,7 @@ import {
   type EngineInvocation,
 } from "../src/engines.ts";
 import { capture } from "../src/output.ts";
-import { EXIT_USAGE } from "../src/session.ts";
+import { ENGINE_MARKERS, EXIT_USAGE, callerIsEngine } from "../src/session.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
 const NODE = process.execPath;
@@ -566,6 +567,21 @@ describe("driving a built-in engine", () => {
     } finally {
       clearFakeEnv();
     }
+  });
+
+  it("starts every engine with the marker that tells it from a person, and the router reads that marker", async () => {
+    // A vendor's own variable is a reading of one version, and Codex's has
+    // never been read at all. An engine the framework starts says what it is
+    // whatever the vendor calls its variables, inside the editor or out of it.
+    const dir = tempDir("engine-");
+    const script = join(dir, "engine.cjs");
+    writeFileSync(script, `process.stdout.write(\`marker \${process.env[${JSON.stringify(ENGINE_PLACE_MARKER)}]}\\n\`);\n`, "utf8");
+    const emitted: Emitted[] = [];
+    const outcome = await commandEngine([NODE, script, "{instruction}"]).invoke(invocation({}, emitted));
+    assert.equal(outcome.exitCode, 0);
+    assert.ok(emitted.some((entry) => entry.line === "marker 1"), JSON.stringify(emitted));
+    assert.ok(ENGINE_MARKERS.includes(ENGINE_PLACE_MARKER));
+    assert.equal(callerIsEngine({ [ENGINE_PLACE_MARKER]: "1" }), true);
   });
 
   it("ends a command engine's whole tree, the tool it was running included", async () => {

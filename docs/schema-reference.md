@@ -89,7 +89,7 @@ Machine-written, append-only. Shape:
 ```
 
 - Every entry names its `kind`. `task-declaration` is written once per
-  session by `dabbler session declare`, before the work; `decision` by
+  session by the loop, from the accepted plan and before the work; `decision` by
   `dabbler session decision`; `project-plan` by `dabbler session plan`.
 - Decision numbering is derived from this file (`ordinal = decision
   entries + 1`) and `decisions-log.md` is rendered from it, which is why
@@ -424,8 +424,8 @@ check) and answers with a `rejection` when it disagrees.
 
 **`plan.json`** (required: `schema_version`, `session_number`, `task`,
 `steps`, `recorded_at`): the driver declares the session from `task` and
-the release member before any edit — the same rule `session declare`
-enforces on a typed session. Which member is read is the checkout's
+the release member before any edit, and nothing else declares one: there is
+no typed declaration. Which member is read is the checkout's
 `dabbler.release` setting: `on-request` (the default) reads `release`, the
 one reason the session publishes now, and holds a plan without it;
 `ship-by-default` reads `hold_release`, the one reason it waits, and ships

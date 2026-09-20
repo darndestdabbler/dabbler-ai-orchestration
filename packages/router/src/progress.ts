@@ -895,7 +895,7 @@ export const STEP_STATE_IN_FLIGHT = "in flight";
 export const STEP_STATE_DONE = "done";
 export const STEP_STATE_BLOCKED = "blocked";
 
-/** The activity-log row kind `session declare` writes, once per session. */
+/** The activity-log row kind the loop writes from the accepted plan, once per session. */
 export const KIND_TASK_DECLARATION = "task-declaration";
 
 /**
@@ -967,7 +967,7 @@ export function standingStopActor(repoRoot: string, sessionNumber: number): Stop
  * The session's task rows, derived from the records the lifecycle writes.
  *
  * Every row is a phase whose end is a record some verb wrote: `session
- * start` puts `startedAt` on the ledger, `session declare` appends the
+ * start` puts `startedAt` on the ledger, the accepted plan appends the
  * declaration, `test-evidence record` files the affected tests passing and
  * later the run of record, `verify` appends rounds, and `session close`
  * flips the status. A row is done exactly when its record exists, the open

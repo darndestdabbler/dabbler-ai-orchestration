@@ -239,7 +239,6 @@ export function fakeRouter(
     router: {
       session: {
         start: text("session start"),
-        declare: text("session declare"),
         close: text("session close"),
         cancel: text("session cancel"),
         restore: text("session restore"),

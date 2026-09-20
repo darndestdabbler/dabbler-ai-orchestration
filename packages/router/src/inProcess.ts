@@ -29,6 +29,7 @@
 import { readPlan } from "./approvedPlan.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { latestRound, sessionRunDir } from "./ledger.ts";
+import { asAPersonsClick } from "./session.ts";
 import { buildProjection } from "./progress.ts";
 import { standIn } from "./workdir.ts";
 import { HANDLERS } from "./cli/registry.ts";
@@ -50,7 +51,6 @@ import {
   type RouterText,
   type SessionCancelOptions,
   type SessionCloseOptions,
-  type SessionDeclareOptions,
   type SessionDecisionOptions,
   type SessionInterruptOptions,
   type SessionRestoreOptions,
@@ -183,7 +183,8 @@ export class InProcessRouter implements Router {
     const echo = silent ? undefined : this.options.echo;
     return this.serialize(async () => {
       echo?.running(commandLineFor(verb, args));
-      const captured = await capture(() => standIn(cwd, () => handler([...args])));
+      // Every call here is a person's click, and the verbs that are a person's ask.
+      const captured = await capture(() => standIn(cwd, () => asAPersonsClick(() => handler([...args]))));
       echo?.wrote(captured.stdout + captured.stderr);
       return {
         exitCode: captured.value,
@@ -256,18 +257,6 @@ export class InProcessRouter implements Router {
       optional(args, "--effort", o.effort);
       return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
     },
-    declare: (o: SessionDeclareOptions) =>
-      this.text(
-        "session",
-        [
-          "declare",
-          "--task-file",
-          o.taskFile,
-          ...(o.holdRelease ? ["--hold-release", o.holdRelease] : []),
-          ...targetArgs(o),
-        ],
-        o.repoRoot,
-      ),
     close: (o: SessionCloseOptions) => {
       const args = ["close", ...targetArgs(o)];
       if (o.dryRun) args.push("--dry-run");

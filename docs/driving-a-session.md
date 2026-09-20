@@ -89,6 +89,12 @@ the session on, and that a `wait` never reaches the engine.
   --sessions-dir docs/sessions`. A registration the router refuses opens
   nothing, and says why.
 
+  The AI's own CLI is the third thing opened there, and outside VS Code it
+  is opened by you. Nothing needs setting for it. The verbs that are a
+  person's ask where a person is, and an AI's tool runs its commands with no
+  terminal, whichever engine it is;
+  `docs/design/engine-environment-markers.md` has the readings and the limit.
+
 - The vehicle a review goes through is decided by configuration, not typed
   on a driving call: `dabbler configure --transport <vehicle>` sets this
   checkout's, and `dabbler configuration explain` says which layer decided
@@ -561,6 +567,56 @@ If a job **vanished** — no process and no recorded result, which is what a
 machine restart leaves — that is a stop too, and deliberately: re-running
 a verification round nobody recorded would spend another round's worth of
 provider calls on a fact that was never written down.
+
+### Who ends a session, and who holds a release
+
+**Whether a session releases is decided in one place**: its accepted plan,
+read under the checkout's `dabbler.release`. There is no typed declaration
+and no second door. `on-request`, the default, publishes only a plan that
+names `release`; `ship-by-default` publishes unless the plan names
+`hold_release`.
+
+**A release that cannot or should not happen is held, by a person:**
+
+    dabbler session hold-release --reason "<why>"
+
+The session then closes as held — landed, verified, nothing published — and
+the close says so in your words. It is one way only: nothing releases a
+hold, because releasing afterwards is deciding in hindsight what may reach a
+feed, and it is refused once the session has published. The `publish` stop
+offers it as its second way on. Before it existed a release that could not
+succeed left two exits, publish or cancel.
+
+**Ending a session by force is a person's act, whichever engine asks.**
+`session cancel --force` and `session close --force` are refused to an
+engine in the same words, as `session hold-release` is: report the step
+blocked and say why. The router finds a person by what is there rather than
+by what is missing: a click in the editor, or an interactive terminal with no
+engine's marker in it. An AI's tool runs its commands with no terminal at
+all, which holds for an engine nobody has measured; the markers — each
+vendor's own, and `DABBLER_ENGINE_TERMINAL`, which the extension and the
+framework set on every engine they start — are read first and make a known
+engine an engine wherever it runs. So a person's verb typed into a script or
+a pipe is refused too, and says where a person does it.
+`docs/design/engine-environment-markers.md` has the readings and says what
+this is not. The cancel a stop prints runs as
+printed: `dabbler session cancel --force --reason "<why>"` means the session
+in flight. It says what it left uncommitted, and the next `session start`
+offers to commit that or undo it.
+
+**A cancelled session ends its loop.** The loop reads the ledger at every
+phase boundary, while it waits for an answer, while a job runs, and again
+before the commit and before the push. A session cancelled or force-closed
+from another process is not driven one phase further: nothing of its work is
+added, committed or pushed, no stop is recorded, and the AI's waiter prints a
+`done` that says the session was cancelled, by whom and why, and to stop.
+
+**Under a live loop the waiter is what is run again — never `session
+next`.** `session next` registers and takes the lease, which ends a mailbox
+loop mid-save with no stop recorded and its last accepted answer lost, so it
+refuses while a loop's heartbeat is live and says to run `dabbler session
+wait`. A report that answers an instruction already replaced is refused with
+the same advice; nothing already done is lost.
 
 ### When you ask your engine for help
 

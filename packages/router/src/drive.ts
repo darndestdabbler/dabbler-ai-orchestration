@@ -64,6 +64,9 @@ import {
   WATCHER_OUTSTANDING,
   WORK_PLAN_SCHEMA,
   instructionPath,
+  LOOP_STALE_MS,
+  WAITER_IS_WHAT_IS_RUN,
+  loopAlive,
   loopPath,
   clearDispositions,
   readDispositions,
@@ -146,6 +149,7 @@ import {
   EXIT_OK,
   EXIT_USAGE,
   declare,
+  liveLoopSession,
   extractSpecExcerpt,
   start,
   acquireLockWithTimeout,
@@ -853,6 +857,44 @@ export function pushLanded(repoRoot: string): void {
  * it carries. `run.json` holds everything the next call needs to re-enter
  * the same phase at the same place.
  */
+/**
+ * The session ended underneath the loop: a person cancelled it, or closed it
+ * by force, from another process. Not a stop -- nothing is owed and nothing
+ * resumes -- so the loop ends, quietly, with the AI told to stop.
+ */
+class SessionEnded extends Error {
+  readonly status: "cancelled" | "closed";
+  readonly why: string | null;
+
+  constructor(status: "cancelled" | "closed", why: string | null) {
+    super(`the session was ${status} while the loop was driving it`);
+    this.status = status;
+    this.why = why;
+    this.name = "SessionEnded";
+  }
+}
+
+/**
+ * Whether a session's ledger row says it ended underneath a loop in `phase`.
+ * Cancelled is over in every phase. Complete is over too -- a person forced
+ * the close -- except while the loop is itself closing, where it is the
+ * loop's own close, collected where it always was.
+ */
+export function judgeSessionEnded(
+  status: unknown,
+  cancelledReason: unknown,
+  phase: string,
+): { readonly status: "cancelled" | "closed"; readonly why: string | null } | null {
+  if (status === "cancelled") {
+    const why = typeof cancelledReason === "string" ? cancelledReason.trim() : "";
+    return { status: "cancelled", why: why === "" ? null : why };
+  }
+  if (status === "complete" && phase !== "close" && phase !== "complete") {
+    return { status: "closed", why: null };
+  }
+  return null;
+}
+
 class Awaiting extends Error {
   readonly instruction: DriverInstruction;
 
@@ -1048,6 +1090,23 @@ export function closedAsk(sessionNumber: number): string {
     "landed, verified and recorded. This is the end of the loop -- there is " +
     "nothing to answer and no waiter to start again. Stop, and tell the " +
     "operator the session is done."
+  );
+}
+
+/**
+ * What the `done` says when the session ended underneath the loop. The same
+ * instruction as a close's, because it means the same thing to the AI -- the
+ * loop is over, stop -- and different words, because the work is NOT landed
+ * and an AI told otherwise would tell the operator so.
+ */
+export function endedAsk(sessionNumber: number, status: "cancelled" | "closed", why: string | null): string {
+  return (
+    `Session ${sessionDisplayNumber(sessionNumber)} was ${status} by a person` +
+    (why ? `, who said: ${why}` : "") +
+    ". The loop has ended and nothing more will be asked: change no file, answer " +
+    "nothing, start no waiter. What the working tree carries is left exactly as " +
+    "it is. Stop, and tell the operator the session was " +
+    `${status} and what you had changed.`
   );
 }
 
@@ -1486,6 +1545,54 @@ class Driver {
   }
 
   /**
+   * The ledger's word on this session, where it is no longer the loop's to
+   * drive. A session is cancelled, or closed by force, from another process
+   * -- a person's click, a person's terminal -- and until this was read the
+   * loop waited on a session that did not exist with a live heartbeat, or
+   * went on to commit and push its work. A close while the loop is itself
+   * closing is the loop's own, and is collected where it always was.
+   */
+  private endedUnderneath(): SessionEnded | null {
+    const rows = readSessionState(this.sessionsDir)?.["sessions"];
+    const row = (Array.isArray(rows) ? rows : []).find(
+      (entry): entry is Record<string, unknown> =>
+        typeof entry === "object" && entry !== null && (entry as Record<string, unknown>)["number"] === this.sessionNumber,
+    );
+    const ended = judgeSessionEnded(row?.["status"], row?.["cancelledReason"], this.run.phase);
+    return ended === null ? null : new SessionEnded(ended.status, ended.why);
+  }
+
+  /**
+   * End the loop because its session ended. No stop is recorded -- a stop is
+   * something to come back from, and this is not -- so nothing offers a way
+   * on and no waiter revives a loop over it: the ledger has no session in
+   * flight for one to find. A job still running is ended with it, as a stop
+   * ends one. The `done` is what the AI's waiter prints, and the run's phase
+   * is left where it stood, which is where a restored session carries on.
+   */
+  private endWithItsSession(ended: SessionEnded): number {
+    const abandoned = this.run.job ?? null;
+    if (abandoned !== null) {
+      endJob(abandoned);
+      this.run = { ...this.run, job: null };
+      this.log("job-ended", { name: abandoned.name, pid: abandoned.pid, reason: ended.message });
+    }
+    this.log("session-ended", { status: ended.status, phase: this.run.phase, ...(ended.why ? { why: ended.why } : {}) });
+    this.issue({ kind: "done", ask: endedAsk(this.sessionNumber, ended.status, ended.why) });
+    writeOut(
+      `dabbler: session ${sessionDisplayNumber(this.sessionNumber)} was ${ended.status} while this loop was ` +
+        `driving it${ended.why ? ` (${ended.why})` : ""}. The loop has ended; nothing was committed or pushed for it after that.\n`,
+    );
+    return EXIT_OK;
+  }
+
+  /** Read at every point past which the loop would act on the session's behalf. */
+  private refuseIfEnded(): void {
+    const ended = this.endedUnderneath();
+    if (ended !== null) throw ended;
+  }
+
+  /**
    * One invocation of the engine on `instruction`. Returns null when the
    * engine returned on its own, and the interrupt's reason when the driver
    * ended it -- polled from the ledger while the engine runs, because the
@@ -1532,6 +1639,7 @@ class Driver {
     const controller = new AbortController();
     let reason: string | null = null;
     let stopRequested = false;
+    let ended: SessionEnded | null = null;
     // The watcher, on the one channel a headless run has. Under the pull the
     // terminal asks the rule itself; here the driver holds the child and
     // this poll is the only thing awake while the engine runs, so it asks
@@ -1596,6 +1704,14 @@ class Driver {
         });
       }
       if (reason !== null) return;
+      // A session cancelled while its instruction is outstanding ends the
+      // wait: the mailbox looks only for an answer, and none is coming.
+      ended = this.endedUnderneath();
+      if (ended !== null) {
+        reason = ended.message;
+        controller.abort(reason);
+        return;
+      }
       const request = takeInterrupt(this.repoRoot, this.sessionNumber);
       if (request === null) return;
       reason = request.reason;
@@ -1665,6 +1781,11 @@ class Driver {
       seconds,
       transcript: relative(this.repoRoot, transcript).replace(/\\/g, "/"),
     });
+    // Before anything is made of the outcome: there is no session to make it
+    // for. Read once more here, because an engine that returns at once gives
+    // the poll no turn.
+    const over = ended ?? this.endedUnderneath();
+    if (over !== null) throw over;
     if (outcome.error) {
       throw new Stop("engine", `the engine could not be run: ${outcome.error}`);
     }
@@ -2554,6 +2675,9 @@ class Driver {
             `recorded no result. Its log is ${job.log}; re-run to start it again`,
         );
       }
+      // A round or a suite still running for a session that was cancelled is
+      // ended with the loop, rather than run to its end for nobody.
+      this.refuseIfEnded();
       if (this.pull) {
         // Held open on the job rather than handed back at once: a job that
         // ends inside the bound costs the engine no sleep. A stop asked for
@@ -3078,6 +3202,9 @@ class Driver {
     if (refusal !== null) {
       throw new Stop("land", `the tree is not the tree the run of record tested: ${refusal}`);
     }
+    // Read again at the last moment before each act that cannot be taken
+    // back: a cancelled session's work is never added, committed or pushed.
+    this.refuseIfEnded();
     runGit(this.repoRoot, ["add", "-A", "--", "."]);
     // Two `-m`s: git joins them with the blank line a subject and a body
     // are separated by, and quotes nothing on the way.
@@ -3090,6 +3217,7 @@ class Driver {
         throw new Stop("land", `git commit failed: ${tail(committed.stderr || committed.stdout, 300)}`);
       }
     }
+    this.refuseIfEnded();
     if (!existsSync(join(this.repoRoot, ".dabbler", "local-only"))) {
       // Asked before the push rather than read out of its failure. git
       // answers a repository with no remote with `fatal: No configuration
@@ -3443,6 +3571,9 @@ class Driver {
         // verification round, the suite) takes effect at this boundary.
         if (this.run.phase !== "complete") this.honourPendingStop();
         try {
+          // Every phase boundary: a session cancelled or force-closed from
+          // another process is not driven one phase further.
+          this.refuseIfEnded();
           // A synthesised step whose answer is outstanding is judged before
           // the phase it was issued from does anything else.
           const pending = this.run.pending_step ?? null;
@@ -3515,6 +3646,7 @@ class Driver {
         }
       }
     } catch (error) {
+      if (error instanceof SessionEnded) return this.endWithItsSession(error);
       if (!(error instanceof Stop)) throw error;
       // A stop abandons the run, and a job still running under it -- the
       // suite, a verification round, the close -- is abandoned with it. It
@@ -3661,6 +3793,19 @@ export async function driveSession(sessionsDir: string, options: DriveOptions): 
  * that one is about an answer that is not getting better.
  */
 export async function sessionNext(sessionsDir: string, options: NextOptions): Promise<number> {
+  // A live loop holds the lease, and registering here would take it: the
+  // loop's next save is refused, the save in its own stop handler is refused
+  // too, and it dies with no stop recorded and the answer it had just accepted
+  // lost. Four of the framework's own messages used to send a reader here.
+  const driving = liveLoopSession(sessionsDir);
+  if (driving !== null) {
+    writeErr(
+      `dabbler: refused -- a loop is driving session ${sessionDisplayNumber(driving)} ` +
+        "(`dabbler session run --mailbox`), and `session next` would take its lease and end it. " +
+        `${WAITER_IS_WHAT_IS_RUN}\n`,
+    );
+    return EXIT_BOUNDARY;
+  }
   let instruction: DriverInstruction | null = null;
   const code = await divertOut(() =>
     withDriver(
@@ -3696,6 +3841,9 @@ export async function sessionNext(sessionsDir: string, options: NextOptions): Pr
 
 /** How often `session wait` looks at the session's files: a local read, no model called. */
 export const SESSION_WAIT_POLL_MS = 1000;
+
+/** How many polls a waiter gives a session that left flight to write its own `done`. */
+const DONE_GRACE_POLLS = 10;
 
 /**
  * Whether `instruction` has its answer on disk. A plan is answered by the work
@@ -3745,26 +3893,7 @@ export function owedInstruction(repoRoot: string, sessionNumber: number): Driver
 /** How often the mailbox loop refreshes its heartbeat. */
 export const LOOP_HEARTBEAT_MS = 5000;
 
-/**
- * How old a heartbeat may be and still say a loop is driving. Well past the
- * refresh, because the loop's short synchronous git calls can delay a beat.
- */
-export const LOOP_STALE_MS = 60_000;
-
-/**
- * Whether a loop is driving this session: its heartbeat is younger than
- * LOOP_STALE_MS. A terminal's name is not an answer -- one can outlive its
- * process or be a different run's.
- */
-export function loopAlive(repoRoot: string, sessionNumber: number, now: number = Date.now()): boolean {
-  try {
-    const beat = JSON.parse(readFileSync(loopPath(repoRoot, sessionNumber), "utf8")) as { at?: unknown };
-    const at = typeof beat.at === "string" ? Date.parse(beat.at) : Number.NaN;
-    return Number.isFinite(at) && now - at < LOOP_STALE_MS;
-  } catch {
-    return false;
-  }
-}
+export { LOOP_STALE_MS, loopAlive };
 
 /**
  * What a waiter that began at `since` reads now: the instruction owed, or
@@ -4001,7 +4130,16 @@ export async function sessionWait(
   for (;;) {
     const current = readSessionState(sessionsDir)?.["currentSession"];
     if (typeof current !== "number") {
-      writeOut(`${JSON.stringify(waiterEnd(repoRoot, watching, nowIso()), null, 2)}\n`);
+      // The ledger moves a moment before the loop writes the session's own
+      // `done` -- at a close, and at a cancellation it has to notice first --
+      // so a watched session is given a bounded grace to say how it ended
+      // before this reports an idle repository.
+      let end = waiterEnd(repoRoot, watching, nowIso());
+      for (let waited = 0; watching !== null && end.session_number === 0 && waited < DONE_GRACE_POLLS; waited += 1) {
+        await new Promise((resolve) => setTimeout(resolve, pollMs));
+        end = waiterEnd(repoRoot, watching, nowIso());
+      }
+      writeOut(`${JSON.stringify(end, null, 2)}\n`);
       return EXIT_OK;
     }
     watching = current;

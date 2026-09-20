@@ -10,6 +10,57 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.14.0] — 2026-09-20
+
+**One authority for each lifecycle fact.** A beta session was read as
+releasable though nobody had said so, the AI cancelled it, and it ended with
+uncommitted code. Each step of that was the framework saying one thing in two
+places.
+
+### Added
+
+- `dabbler session hold-release --reason "<why>"`: a person holds the release
+  of the session in flight, and the session closes as held -- landed,
+  verified, nothing published -- with the reason in the close's own rows.
+  One way only, and refused once the session has published. The publish
+  pause offers it as its second way on; before it, a release that could not
+  succeed left two exits, publish or cancel.
+
+### Changed
+
+- Whether a session releases is decided in one place: its accepted plan,
+  under this checkout's `dabbler.release`. The typed `dabbler session
+  declare` is gone. It shipped a session unless told to hold it, whatever the
+  setting said, and a declaration made first beat the plan.
+- No AI ends a session by force, whichever engine it is. `session cancel
+  --force`, `session close --force` and `session hold-release` run from a
+  click in the editor or from an interactive terminal, and are refused
+  everywhere else in the same words -- an AI's tool runs its commands with
+  no terminal, so this holds for an engine nobody has measured. Claude Code,
+  Copilot CLI and any engine the extension or the framework started are
+  refused by name as well. A forced close used to ask nothing at all. A
+  script that force-cancels through the command line is refused too.
+- `dabbler session cancel --force --reason "<why>"` means the session in
+  flight, so the cancel a pause prints runs as printed. It says what it left
+  uncommitted, and that the next start offers to commit or undo it.
+- `dabbler session next` refuses while a loop is driving the session. It
+  used to take the loop's lease, and the loop died with no pause recorded
+  and its last accepted answer lost.
+
+### Fixed
+
+- A session cancelled while its loop was running is no longer driven on. The
+  loop reads the ledger at every phase, while it waits, while a job runs, and
+  before the commit and the push; a cancelled session's work is never
+  committed or pushed, and the AI is told the session was cancelled, by whom
+  and why, and to stop.
+- Four messages sent their reader to `session next`; under a loop they now
+  name `dabbler session wait`. An answer that arrives after a cancellation is
+  told what the session's own last instruction said, and no longer told to
+  run `session start`.
+- A disputed verification cap no longer offers `verify reopen`, which refuses
+  there, and unattended pauses print `session drive` with its engine.
+
 ## [3.13.7] — 2026-09-18
 
 **Every setting the vendor refuses is dropped, not just the first.**

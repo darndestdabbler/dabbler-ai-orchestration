@@ -115,12 +115,6 @@ export interface SessionStartOptions extends RepositoryTarget {
   readonly effort?: string;
 }
 
-export interface SessionDeclareOptions extends RepositoryTarget {
-  readonly taskFile: string;
-  /** The one reason the session publishes nothing; absent, it ships once verified. */
-  readonly holdRelease?: string;
-}
-
 export interface SessionCloseOptions extends RepositoryTarget {
   readonly dryRun?: boolean;
   readonly force?: boolean;
@@ -168,7 +162,6 @@ export interface SessionInterruptOptions extends RepositoryTarget {
 
 export interface SessionVerbs {
   start(options: SessionStartOptions): Promise<RouterResult<RouterText>>;
-  declare(options: SessionDeclareOptions): Promise<RouterResult<RouterText>>;
   close(options: SessionCloseOptions): Promise<RouterResult<RouterText>>;
   cancel(options: SessionCancelOptions): Promise<RouterResult<RouterText>>;
   restore(options: SessionRestoreOptions): Promise<RouterResult<RouterText>>;

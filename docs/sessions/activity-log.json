@@ -11917,6 +11917,69 @@
       "dateTime": "2026-09-18T16:06:25.635000-04:00",
       "task": "Make the direct-API transport drop every generation param the vendor refuses, not just the first thinking one. In packages/router/src/transports/api.ts, `refusedThinkingParam` becomes a rule over any param the call carries: a 400 whose words say something is not supported and name a generation param the call carried (underscores ignored, the longest such key preferred, so `thinking_budget` wins over `thinking`) drops that param and calls again without spending a retry; each refusal drops one more, bounded by the number of params the call carried, so Anthropic's `effort` and `thinking` refused one per call end with a plain call. A 400 naming no param the call carried is handled exactly as today. The result's metadata carries `dropped_params`, a list of {param, reason} in the order dropped, and each drop writes its one stderr line as today. packages/router/src/verify/rounds.ts's `droppedParam` becomes `droppedParams`, returning that list, and the round's row records it as `dropped_params` when it is non-empty. Tests: api.test.ts gains a provider that refuses `effort` and then `thinking` in two successive 400s and is called a third time with neither, its answer returned with both on the record; the existing 'any other 400' test confirms a 400 naming no param is not retried without params, and the Google test is updated to the new rule; rounds.test.ts's row test follows the rename. Releasable as a patch: version.json moves to 3.13.7, stamped into the manifests with `npm run stamp:version`, with a CHANGELOG entry.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 213,
+      "dateTime": "2026-09-20T09:48:04.419000-04:00",
+      "task": "Give each lifecycle fact one authority. The typed `dabbler session declare` and its in-process door go, so whether a session releases is decided in one place, by `releaseOfPlan` under the checkout's `dabbler.release`. A person gains a one-way `dabbler session hold-release --reason`, read by `releasabilityOf` as a third hold and offered by the `publish` stop, so a release that cannot succeed still closes correctly as held. `callerIsEngine` recognises every engine -- by the markers measured in each engine's shell and by `DABBLER_ENGINE_TERMINAL=1`, which the extension sets on the terminal it opens for the AI's CLI -- and `cancel --force`, `close --force` and `hold-release` refuse an engine in the same words. Every command a stop's ways on print runs as printed, held so by one test that hands each to the CLI's own parser. The loop reads the session's status at the mailbox poll, at each phase boundary and before the commit and the push, and ends with a `done` naming the cancellation when its session is no longer in flight; `session cancel` says what it left uncommitted. `session next` refuses to take a live loop's lease, and the four messages that named it name the waiter where a loop is driving. Proved by failure injection on the built bundle. Releases as a minor, 3.14.0: one verb added and a capability gained; the removed verb was never a consumer's to run under the driven lifecycle.",
+      "releasable": true
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 213,
+      "dateTime": "2026-09-20T09:51:47.133000-04:00",
+      "what": "step 'no-engine-ends-a-session-by-force': its files",
+      "reason": "cli.test.ts's forced-cancel case cleared only the two old markers, so under a Copilot shell its person half would read as an engine; it now clears ENGINE_MARKERS",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 213,
+      "dateTime": "2026-09-20T09:58:37.609000-04:00",
+      "what": "step 'the-typed-declare-goes': its files",
+      "reason": "inProcess.test.ts and bootstrap.test.ts never named the door (bootstrap's asserts the managed body does NOT name it); progress.ts comments and the work-plan schema's description named the typed verb, and the generated type follows its schema",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 213,
+      "dateTime": "2026-09-20T10:07:31.967000-04:00",
+      "what": "step 'every-way-on-runs-as-printed': its files",
+      "reason": "drive.ts needed no change: the printed commands are all driver.ts's",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 213,
+      "dateTime": "2026-09-20T10:17:46.721000-04:00",
+      "what": "step 'the-loop-ends-when-its-session-has': its files",
+      "reason": "the mailbox adapter needed no change -- the driver's own poll around it reads the ledger -- and a loop ending with its session is a walk, so its test is walk-session's beside the pure judge in drive.test.ts",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 213,
+      "dateTime": "2026-09-20T10:23:17.951000-04:00",
+      "what": "step 'next-leaves-a-live-lease-alone': its files",
+      "reason": "loopAlive moved beside loopPath in driver.ts, re-exported from drive.ts, so session.ts can ask whether a loop is driving without importing the module that imports it",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 213,
+      "dateTime": "2026-09-20T10:31:32.703000-04:00",
+      "what": "step 'prove-it-by-failure-injection': its files",
+      "reason": "the injection found a defect: an answer arriving after a cancellation was told to run session start, and with an earlier closed session on the ledger was aimed at it; report now takes the session in flight only and answers with the ended session's own done",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 213,
+      "dateTime": "2026-09-20T10:35:19.139000-04:00",
+      "what": "step 'release-minor': its files",
+      "reason": "the workspace lint's boundary check, run before the release, refused a new import cycle (driver->progress): liveLoopSession moved from driver.ts to session.ts, which already reads the ledger",
+      "by": "claude-code (anthropic, claude-fable-5-1)"
     }
   ]
 }

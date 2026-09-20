@@ -951,6 +951,30 @@ export function decisionEntries(sessionsDir: string, sessionNumber: number): Ent
   );
 }
 
+/** The `what` a person's hold on a session's release is recorded under. */
+export const AMENDMENT_RELEASE_HELD = "the release, held";
+
+/**
+ * A person's hold on this session's release, as one amendment -- so the close
+ * reads it out with the others and every round is shown it. One way only:
+ * nothing records the release of a hold, because releasing afterwards is
+ * deciding in hindsight what may reach a feed.
+ */
+export function recordReleaseHold(
+  sessionsDir: string,
+  options: { readonly sessionNumber: number; readonly reason: string; readonly by: string },
+): Entry {
+  return recordAmendment(sessionsDir, { ...options, what: AMENDMENT_RELEASE_HELD });
+}
+
+/** Why a person held this session's release, in their words, or null. */
+export function releaseHold(sessionsDir: string, sessionNumber: number): string | null {
+  const held = amendmentEntries(sessionsDir, sessionNumber).find(
+    (entry) => entry["what"] === AMENDMENT_RELEASE_HELD,
+  );
+  return held === undefined ? null : `held by ${String(held["by"])}: ${String(held["reason"])}`;
+}
+
 /** One amendment as a line a person reads: what moved, why, and who was working. */
 export function amendmentLine(entry: Entry): string {
   return `${String(entry["what"])}: ${String(entry["reason"])} (${String(entry["by"])})`;
@@ -1021,10 +1045,11 @@ export function commitBeforeDeclaring(session: number, what: string): string {
  *
  * The declaration is made at step (a), before the work, and is never
  * decided afterwards; that is what makes a releasable session's close
- * demand a packaging run. A session ships unless held, and two things
- * hold it: the reason its own plan declared, and a verdict that is not
- * VERIFIED. Both are reported in their own words, so the close reads as
- * held rather than as shipped or as never going to.
+ * demand a packaging run. A session ships unless held, and what holds it
+ * is the reason its own plan declared, a person's `hold-release`, a verdict
+ * that is not VERIFIED, or a red whole run. Each is reported in its own
+ * words, so the close reads as held rather than as shipped or as never
+ * going to. A person's hold is read first: it is the one somebody chose.
  */
 export function releasabilityOf(
   sessionsDir: string,
@@ -1047,6 +1072,7 @@ export function releasabilityOf(
   return {
     declared,
     hold:
+      releaseHold(sessionsDir, sessionNumber) ??
       verdictHold(sessionsDir, sessionNumber) ??
       releaseTestsHold(readRecords(repoRootFromSessionsDir(sessionsDir)), sessionNumber),
   };

@@ -145,8 +145,8 @@ tree, and an already-committed tree presents an empty diff.
 There is nothing to log. The Work Explorer's task rows are the
 lifecycle's six phases — *Register*, *Declare*, *Work*, *Verify*, *Run of
 record*, *Close* — and each one is done the moment the verb that is that
-phase writes its record: `session start` the first, `session declare`
-the second, the pre-verification evidence record the third, a clean
+phase writes its record: `session start` the first, the accepted plan --
+which is the declaration -- the second, the pre-verification evidence record the third, a clean
 `verify` round the fourth, the `final-full` record the fifth, and the
 close the last. The open row is the first not done. No command moves a
 row by hand, so a row that reads "in flight" is one whose record does not

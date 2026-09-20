@@ -153,6 +153,36 @@ export function loopPath(repoRoot: string, sessionNumber: number): string {
   return join(driverDir(repoRoot, sessionNumber), LOOP_FILENAME);
 }
 
+/**
+ * How old a heartbeat may be and still say a loop is driving. Well past the
+ * refresh, because the loop's short synchronous git calls can delay a beat.
+ */
+export const LOOP_STALE_MS = 60_000;
+
+/**
+ * Whether a loop is driving this session: its heartbeat is younger than
+ * LOOP_STALE_MS. A terminal's name is not an answer -- one can outlive its
+ * process or be a different run's.
+ */
+export function loopAlive(repoRoot: string, sessionNumber: number, now: number = Date.now()): boolean {
+  try {
+    const beat = JSON.parse(readFileSync(loopPath(repoRoot, sessionNumber), "utf8")) as { at?: unknown };
+    const at = typeof beat.at === "string" ? Date.parse(beat.at) : Number.NaN;
+    return Number.isFinite(at) && now - at < LOOP_STALE_MS;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What a reader is told to run while a loop is driving. Never `session
+ * next`: it registers, takes the lease, and the loop dies with no stop
+ * recorded and the answer it had just accepted lost.
+ */
+export const WAITER_IS_WHAT_IS_RUN =
+  "Run `dabbler session wait` again and answer what it prints: under a loop the waiter is " +
+  "what the AI runs, and it takes nothing from anybody.";
+
 export function amendmentsPath(repoRoot: string, sessionNumber: number): string {
   return join(driverDir(repoRoot, sessionNumber), AMENDMENTS_FILENAME);
 }
@@ -1425,14 +1455,20 @@ interface MoveParts {
   readonly session: number;
 }
 
-/** Ending it, which is a way on from every stop and never the first one. */
+/**
+ * Ending it, which is a way on from every stop a person owns and never the
+ * first one. A stopped session is in flight, so the command carries --force
+ * -- without it the verb refuses -- and names no session, because the one in
+ * flight is the one it means. It is worded as the operator's because it is:
+ * an engine that runs it is refused.
+ */
 function cancelChoice(): StopChoice {
   return {
-    label: "Cancel the session",
+    label: "Cancel the session -- yours to run, never the engine's",
     cost:
       "The session ends with your reason on the record. What the working " +
       "tree already carries stays where it is; nothing is unwound.",
-    command: "dabbler session cancel --reason \"<why>\"",
+    command: "dabbler session cancel --force --reason \"<why>\"",
   };
 }
 
@@ -1550,6 +1586,14 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "The packaging run is made again. What it pushes is outward-facing; " +
           "nothing else moves.",
       ),
+      {
+        label: "Hold this release and close the session",
+        cost:
+          "Nothing ships from this session, and nothing releases a hold: the " +
+          "work is landed and verified, and the next releasing session carries " +
+          "it. Carry on afterwards and the session closes as held.",
+        command: "dabbler session hold-release --reason \"<why>\"",
+      },
       cancelChoice(),
     ],
   },
@@ -1702,7 +1746,8 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "dispositions again, with the refusal as a reason.",
         command: "dabbler session run --mailbox",
       },
-      cancelChoice(),
+      // No cancel: this stop is the engine's to clear, and ending a session is
+      // never the engine's.
     ],
   },
   "cap-unresolved": {
@@ -1734,13 +1779,9 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "may raise no new finding; its outcome is terminal.",
         command: "dabbler verify adjudicate",
       },
-      {
-        label: "Withdraw the dispute and fix the finding instead",
-        cost:
-          "The repair is a step, and the review it then needs is a round the " +
-          "cap will not open: buying one is the other decision.",
-        command: REOPEN_COMMAND,
-      },
+      // No second move: a dispute is never withdrawn -- the ledger keeps it --
+      // and `verify reopen` refuses a cap reached over disputes, so offering
+      // either would print a command that refuses.
       cancelChoice(),
     ],
   },
@@ -1798,7 +1839,8 @@ function asSentence(text: string): string {
  */
 function nextActor(run: StopContext): { readonly pull: boolean; readonly resume: string } {
   const pull = (run.engine ?? PULL_ENGINE) === PULL_ENGINE;
-  return { pull, resume: pull ? PULL_RESUME : "dabbler session drive" };
+  // `session drive` requires its engine, and the record has it.
+  return { pull, resume: pull ? PULL_RESUME : `dabbler session drive --engine ${String(run.engine)}` };
 }
 
 /** The situation this stop is, by its code where it has one and its kind where it does not. */

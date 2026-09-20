@@ -526,6 +526,23 @@ suite("Start opens the person's own CLI", () => {
     assert.match((bare as EngineTerminal).args[0], /dabbler session wait/);
   });
 
+  test("the terminal an AI's CLI runs in says it is one, and the loop's does not", () => {
+    // The router tells an engine from a person by what the calling shell
+    // carries. A vendor's own marker is a reading of one version, and an
+    // engine nobody measured has none, so the terminal says it for all of
+    // them -- and the framework's own loop, which no AI types into, does not.
+    const repository = makeRepository();
+    for (const choice of ENGINES) {
+      const terminal = engineTerminalFor(repository, choice, choice.modelRequired ? "gpt-5-6-luna" : "");
+      assert.notStrictEqual(typeof terminal, "string", choice.engine);
+      assert.strictEqual((terminal as EngineTerminal).env?.["DABBLER_ENGINE_TERMINAL"], "1", choice.engine);
+    }
+    assert.strictEqual(
+      loopTerminalFor(repository, "dist/dabbler.cjs").env?.["DABBLER_ENGINE_TERMINAL"],
+      undefined,
+    );
+  });
+
   test("asks before a start merges origin's unrelated work, and starts with the merge only on yes", async () => {
     const refusal =
       "start: refused -- origin/main shares no history with this checkout and holds 2 file(s) it has never had: " +

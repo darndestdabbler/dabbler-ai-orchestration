@@ -37,6 +37,8 @@ import {
   declareSessionTask,
   planStepKey,
   recordAmendment,
+  recordReleaseHold,
+  releaseHold,
   recordProjectPlan,
   registerSessionStart,
   renderDecisionsLog,
@@ -290,6 +292,19 @@ describe("recording an amendment", () => {
     assert.match(rendered, /Amended after acceptance/);
     assert.match(rendered, /step 'widget': its checks: the check named the value the plan guessed \(claude-code \(anthropic\)\)/);
     assert.throws(() => recordAmendment(sessionsDir, { sessionNumber: 1, what: "x", reason: " ", by: "y" }), SanctionedWriteError);
+  });
+
+  it("records a person's hold on the release as one, read back in their words and by that session only", () => {
+    // An amendment, so the close reads it out and every round is shown it
+    // with no reader of its own.
+    const { sessionsDir } = makeSessionsDir();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Ship the thing.", releasable: true });
+    assert.equal(releaseHold(sessionsDir, 1), null);
+    recordReleaseHold(sessionsDir, { sessionNumber: 1, reason: "the feed is not ready", by: "the operator" });
+    assert.equal(releaseHold(sessionsDir, 1), "held by the operator: the feed is not ready");
+    assert.equal(releaseHold(sessionsDir, 2), null);
+    assert.match(renderProjectWorkPlan(sessionsDir), /the release, held: the feed is not ready \(the operator\)/);
   });
 });
 

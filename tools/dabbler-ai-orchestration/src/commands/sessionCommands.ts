@@ -449,6 +449,10 @@ export function engineTerminalFor(
     // so anything after it is read as part of it.
     args: [...modelArgs, ...(cli.promptArgs !== null ? cli.promptArgs(sentence) : [])],
     typed: cli.promptArgs !== null ? null : sentence,
+    // Inherited by every command the AI spawns, so the router can tell an
+    // engine from a person whichever engine this is and whatever its vendor
+    // names its own variables. Set here and on no other terminal.
+    env: { DABBLER_ENGINE_TERMINAL: "1" },
   };
 }
 

@@ -337,7 +337,7 @@ run on its record cannot close: the close refuses.
   the extension: it ships inside the VSIX, and a VS Code terminal has it
   on `PATH`. Anywhere else, run `node "<extension dir>/dist/dabbler.cjs"
   <verb>`. "dabbler: command not found" is a PATH problem, not a keys one.
-- `session cancel --force` is a person's verb, never the engine's.
+- `session cancel --force` is a person's verb, never the engine's; so is `close --force`.
 - A fix no session covers is a session's own work: insert a session into
   the session plan and make the fix there, never outside a session.
 

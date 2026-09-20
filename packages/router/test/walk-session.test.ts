@@ -18,6 +18,7 @@ import { after, describe, it } from "node:test";
 
 import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { driveSession, sessionNext, type Engine } from "../src/drive.ts";
+import { mailboxEngine } from "../src/engines.ts";
 import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
 import { judgeSuiteDeclaration } from "../src/gates.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
@@ -26,7 +27,7 @@ import { capture } from "../src/output.ts";
 import { readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import { EXIT_OK, planAmend, report, start } from "../src/session.ts";
+import { EXIT_OK, cancel, holdRelease, planAmend, report, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
 import { amendmentEntries, readTaskDeclaration } from "../src/writers.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
@@ -538,6 +539,50 @@ describe("a run left standing at the publish of a session already published", ()
   });
 });
 
+describe("a run standing at the publish of a session a person has held", () => {
+  it("moves to the close without publishing, because the hold is what the publish phase reads", async () => {
+    // A release that could not succeed left two exits, publish or cancel.
+    // `hold-release` is the third, and it needs no phase of its own: the
+    // publish phase already passes a held session through to its close.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED], TESTING, { packaging: { release: "tag" } });
+    assert.equal(
+      (await capture(() =>
+        Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
+      )).value,
+      EXIT_OK,
+    );
+    const plan = await next(sessionsDir);
+    const releasable = {
+      ...Object.fromEntries(Object.entries(PLAN).filter(([key]) => key !== "hold_release")),
+      release: "the walk publishes",
+    };
+    assert.equal(await answerPlan(sessionsDir, plan.instruction?.seq ?? 0, releasable), EXIT_OK);
+    assert.equal((await next(sessionsDir)).instruction?.step_id, "widget");
+    assert.equal(readTaskDeclaration(sessionsDir, 1)?.["releasable"], true);
+
+    // Stopped at the publish, as a refused packaging run leaves it; then held.
+    writeRun(repo, 1, { ...readRun(repo, 1), phase: "publish", job: null });
+    const held = await capture(() =>
+      Promise.resolve(holdRelease(sessionsDir, { reason: "the feed's credential is not issued", engine: false })),
+    );
+    assert.equal(held.value, EXIT_OK, held.stderr);
+
+    const move = await next(sessionsDir);
+    assert.equal(readRun(repo, 1)?.phase, "close", move.err);
+    assert.equal(
+      existsSync(join(repo, ".dabbler", "runs", "s1", "driver", "jobs", "publish.status.json")),
+      false,
+      "a held session published",
+    );
+    await settleJobs();
+  });
+});
+
 describe("a pulled session whose framework jobs end inside the call", () => {
   it("answers with what comes after them, never a wait", async () => {
     setProviderKeys();
@@ -936,6 +981,99 @@ describe("a second driver taking the lease mid-run", () => {
     assert.ok(refused, "no stale-save-refused row was written");
     assert.equal(refused?.["my_epoch"], stolenFrom);
     assert.equal(refused?.["disk_epoch"], (stolenFrom as unknown as number) + 5);
+  });
+});
+
+describe("a session cancelled underneath its loop", () => {
+  it("ends the loop with a done that says so, records no stop, and commits nothing of the session's", async () => {
+    // A beta session of 2026-09-20: the session was cancelled from another
+    // process, the loop never read the ledger again, and it waited on a
+    // session that no longer existed -- or, cancelled during a framework
+    // phase, went on to commit and push its work. The scripted engine stands
+    // in for the person: it changes a file, then cancels through the verb.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+    const headBefore = gitOut(repo, "rev-parse", "HEAD").trim();
+
+    let cancelled = false;
+    const person: Engine = {
+      name: "cancelling-person",
+      invoke: (invocation) => {
+        if (!cancelled) {
+          cancelled = true;
+          writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+          // Written into the drive's own capture: one buffer, one verb at a time.
+          assert.equal(cancel(sessionsDir, 1, { reason: "wrong repository", force: true, engine: false }), 0);
+        }
+        invocation.emit("scripted: the session was cancelled");
+        return Promise.resolve({ exitCode: 0 });
+      },
+    };
+
+    const driven = await capture(() =>
+      driveSession(sessionsDir, { engine: "claude-code", provider: "anthropic", adapter: person, maxInvocations: 4 }),
+    );
+    assert.equal(driven.value, 0, driven.stderr);
+    // What the cancel left is said where the person who cancelled is looking.
+    assert.match(driven.stderr, /left uncommitted, exactly as it was: src\/widget\.py/);
+    assert.match(driven.stdout, /was cancelled while this loop was driving it \(wrong repository\)/);
+
+    const instruction = JSON.parse(
+      readFileSync(join(repo, ".dabbler", "runs", "s1", "driver", "instruction.json"), "utf8"),
+    ) as { kind: string; ask: string };
+    assert.equal(instruction.kind, "done");
+    assert.match(instruction.ask, /was cancelled by a person, who said: wrong repository/);
+    assert.match(instruction.ask, /start no waiter/);
+    // Not a stop: nothing offers a way on, and no waiter revives a loop over it.
+    assert.equal(readRun(repo, 1)?.stop ?? null, null);
+    // Only the cancellation's own record was committed; the work is where it was.
+    const log = gitOut(repo, "log", "--format=%s", headBefore + "..HEAD").trim();
+    assert.equal(log, "Cancel session 1 of sessions");
+    assert.match(gitOut(repo, "status", "--porcelain"), / M src\/widget\.py/);
+  });
+
+  it("ends a mailbox loop that is waiting for an answer nobody will write", async () => {
+    // The mailbox looks only for an answer file. The second beta failure's
+    // likeliest shape: the session is gone, the loop's heartbeat is live, and
+    // it waits for ever. Here the wait is the real one -- `mailboxEngine`,
+    // answered by nothing -- and what ends it is the driver's own poll
+    // reading the ledger, not an answer and not a timeout.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+    const headBefore = gitOut(repo, "rev-parse", "HEAD").trim();
+
+    const person = setTimeout(() => {
+      cancel(sessionsDir, 1, { reason: "the operator changed their mind", force: true, engine: false });
+    }, 400);
+    const started = Date.now();
+    const driven = await capture(() =>
+      driveSession(sessionsDir, {
+        engine: "claude-code",
+        provider: "anthropic",
+        adapter: mailboxEngine(() => false, 20),
+      }),
+    );
+    clearTimeout(person);
+    assert.equal(driven.value, 0, driven.stderr);
+    assert.ok(Date.now() - started < 30_000, "the loop went on waiting");
+    const instruction = JSON.parse(
+      readFileSync(join(repo, ".dabbler", "runs", "s1", "driver", "instruction.json"), "utf8"),
+    ) as { kind: string; ask: string };
+    assert.equal(instruction.kind, "done");
+    assert.match(instruction.ask, /was cancelled by a person, who said: the operator changed their mind/);
+    assert.equal(readRun(repo, 1)?.stop ?? null, null);
+    assert.equal(
+      gitOut(repo, "log", "--format=%s", headBefore + "..HEAD").trim(),
+      "Cancel session 1 of sessions",
+    );
   });
 });
 

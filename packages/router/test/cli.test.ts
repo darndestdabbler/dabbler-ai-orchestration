@@ -16,6 +16,7 @@ import { packagingVerb } from "../src/cli/packaging.ts";
 import { HANDLERS } from "../src/cli/registry.ts";
 import { authVerb } from "../src/cli/auth.ts";
 import { sessionVerb } from "../src/cli/session.ts";
+import { ENGINE_MARKERS, asAPersonsClick } from "../src/session.ts";
 import { statusVerb } from "../src/cli/status.ts";
 import { extensionAbove, versionVerb } from "../src/cli/version.ts";
 import { VERBS } from "../src/contracts/verbs.ts";
@@ -148,7 +149,6 @@ describe("dabbler session, the whole surface", () => {
     for (const name of [
       "start",
       "decision",
-      "declare",
       "plan",
       "close",
       "cancel",
@@ -227,7 +227,6 @@ describe("dabbler session, the whole surface", () => {
     // optional.
     for (const [subcommand, flag, expected] of [
       ["start", "--help", "--engine"],
-      ["declare", "-h", "--hold-release"],
       ["plan", "--help", "--max-rounds"],
     ] as const) {
       const result = await run(() => sessionVerb([subcommand, flag]));
@@ -237,31 +236,19 @@ describe("dabbler session, the whole surface", () => {
     }
   });
 
-  it("declares a hold with its reason, ships without one, and refuses the flags that are gone", async () => {
-    // A session ships unless held. The two old flags are refused with the
-    // rule rather than read as a flag expecting a value: silence would publish.
-    const held = makeAnsweredSandbox();
-    registerSessionStart(held.sessionsDir, 1, { engine: "claude-code" });
-    const heldResult = await run(() =>
-      sessionVerb(["declare", "--sessions-dir", held.sessionsDir, "--task", "Do it.", "--hold-release", "session 2 lands the consumer"]),
-    );
-    assert.equal(heldResult.code, 0, heldResult.err);
-    assert.match(heldResult.out, /releasable=no; held: session 2 lands the consumer/);
-    // Ships where the repository declares packaging; held, in its own words,
-    // where it declares none -- there is nothing to publish there.
-    const ships = makeAnsweredSandbox({ "dabbler.yaml": "schema_version: 1\npackaging:\n  release: tag\n" });
-    registerSessionStart(ships.sessionsDir, 1, { engine: "claude-code" });
-    const shipsResult = await run(() => sessionVerb(["declare", "--sessions-dir", ships.sessionsDir, "--task", "Do it."]));
-    assert.equal(shipsResult.code, 0, shipsResult.err);
-    assert.match(shipsResult.out, /releasable=yes/);
-    const bare = makeAnsweredSandbox();
-    registerSessionStart(bare.sessionsDir, 1, { engine: "claude-code" });
-    const nothing = await run(() => sessionVerb(["declare", "--sessions-dir", bare.sessionsDir, "--task", "Do it."]));
-    assert.equal(nothing.code, 0, nothing.err);
-    assert.match(nothing.out, /releasable=no; held: this repository declares no packaging/);
-    const gone = await run(() => sessionVerb(["declare", "--sessions-dir", ships.sessionsDir, "--task", "Do it.", "--not-releasable"]));
+  it("has no typed declare, and refuses the flags that are gone with the rule that replaced them", async () => {
+    // A second door decided releasability by a rule of its own: the typed
+    // verb shipped unless held, whatever the checkout's `dabbler.release` said,
+    // and a declaration made first beat the plan. The accepted plan declares.
+    const { sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const typed = await run(() => sessionVerb(["declare", "--sessions-dir", sessionsDir, "--task", "Do it."]));
+    assert.equal(typed.code, 2);
+    assert.match(typed.err, /'declare' is not a subcommand/);
+    const gone = await run(() => sessionVerb(["close", "--dry-run", "--sessions-dir", sessionsDir, "--not-releasable"]));
     assert.equal(gone.code, 2);
     assert.match(gone.err, /--not-releasable: gone/);
+    assert.match(gone.err, /hold-release/);
   });
 
   it("runs the close read-only under --dry-run", async () => {
@@ -281,30 +268,61 @@ describe("dabbler session, the whole surface", () => {
     const { sessionsDir } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     // Who is asking is read from the environment: a person's shell has
-    // neither marker, and the suite may itself be running under one.
-    const saved = { driven: process.env["DABBLER_DRIVEN"], claude: process.env["CLAUDECODE"] };
+    // no marker, and the suite may itself be running under any of them.
+    const saved = ENGINE_MARKERS.map((name) => [name, process.env[name]] as const);
     const restoreEnv = () => {
-      for (const [key, value] of [["DABBLER_DRIVEN", saved.driven], ["CLAUDECODE", saved.claude]] as const) {
+      for (const [key, value] of saved) {
         if (value === undefined) delete process.env[key];
         else process.env[key] = value;
       }
     };
     try {
+      for (const name of ENGINE_MARKERS) delete process.env[name];
       process.env["DABBLER_DRIVEN"] = "1";
-      delete process.env["CLAUDECODE"];
       const engine = await run(() =>
         sessionVerb(["cancel", "1", "--reason", "stop", "--force", "--sessions-dir", sessionsDir]),
       );
       assert.equal(engine.code, 3);
       assert.match(engine.err, /a person's verb, never the engine's/);
       delete process.env["DABBLER_DRIVEN"];
+      // A person: the extension's click here, because a test has no terminal.
       const person = await run(() =>
-        sessionVerb(["cancel", "1", "--reason", "stop", "--force", "--sessions-dir", sessionsDir]),
+        asAPersonsClick(() => sessionVerb(["cancel", "1", "--reason", "stop", "--force", "--sessions-dir", sessionsDir])),
       );
       assert.equal(person.code, 0);
       assert.match(person.out, /"status": "cancelled"/);
     } finally {
       restoreEnv();
+    }
+  });
+
+  it("refuses a forced cancel from a shell with no marker and no terminal, which is an engine nobody has measured", async () => {
+    // Verification raised it three times: an engine with no known variable,
+    // launched by hand outside the editor, read as a person because nothing
+    // said it was not one. The verbs that are a person's now ask what is
+    // THERE -- a click, or an interactive terminal -- and an AI's tool shell
+    // has neither, whatever its vendor calls its variables.
+    const { sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "codex" });
+    const saved = ENGINE_MARKERS.map((name) => [name, process.env[name]] as const);
+    try {
+      for (const name of ENGINE_MARKERS) delete process.env[name];
+      for (const argv of [
+        ["cancel", "--force", "--reason", "stop"],
+        ["close", "--force"],
+        ["hold-release", "--reason", "stop"],
+      ]) {
+        const unmeasured = await run(() => sessionVerb([...argv, "--sessions-dir", sessionsDir]));
+        assert.equal(unmeasured.code, 3, argv.join(" "));
+        assert.match(unmeasured.err, /a person's verb, never the engine's/);
+      }
+      const record = (readRawSessionState(sessionsDir)?.["sessions"] as Record<string, unknown>[])[0];
+      assert.equal(record?.["status"], "in-progress");
+    } finally {
+      for (const [key, value] of saved) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
     }
   });
 

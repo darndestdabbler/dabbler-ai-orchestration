@@ -47,7 +47,12 @@ import { LedgerError, appendRound } from "../src/ledger.ts";
 import { gitAnswers, makeAnsweredSandbox, tempDir } from "./support/answers.ts";
 import { TRANSPORT_COPILOT_CLI, loadConfig, resetProjectRootCache } from "../src/config.ts";
 import { SETTING_REVIEWER_TRANSPORT, writeSettings } from "../src/settings.ts";
-import { reviewingVehicleRefusal } from "../src/session.ts";
+import { ENGINE_MARKERS, asAPersonsClick, reviewingVehicleRefusal } from "../src/session.ts";
+import { shlexSplit } from "../src/checks.ts";
+import { HANDLERS } from "../src/cli/registry.ts";
+import { sessionVerb } from "../src/cli/session.ts";
+import { capture } from "../src/output.ts";
+import { registerSessionStart } from "../src/writers.ts";
 
 const STEP_INSTRUCTION = {
   schema_version: 1,
@@ -733,6 +738,59 @@ describe("a stop, as a person reads it", () => {
     }
   });
 
+  it("prints no command its own verb would refuse as usage, and the cancel it prints runs as printed", async () => {
+    // Every stop offered `dabbler session cancel --reason "<why>"`, and the
+    // verb refused it twice -- no session number, and no --force for a
+    // session in flight -- so an AI that read the offer reached `--force` by
+    // elimination. Push-mode moves printed `session drive` bare, which needs
+    // its engine. Held here against the CLI's own tables: the verb exists, a
+    // `session` subcommand is implemented, every flag printed is one its help
+    // names, and every flag its help marks required is printed.
+    const commands = new Set<string>();
+    for (const [kind, code] of [
+      ...KINDS.map((kind) => [kind, null] as const),
+      ...CODES.map((code) => ["verification", code] as const),
+    ]) {
+      for (const engine of ["cli", "claude-code"]) {
+        const stop = { kind, code, reason: "the widget is load-bearing", step_id: "widget" };
+        for (const choice of renderStop(stop as never, { session_number: 7, phase: "verify", engine }).choices) {
+          commands.add(choice.command);
+        }
+      }
+    }
+    for (const command of commands) {
+      const tokens = shlexSplit(command);
+      assert.equal(tokens[0], "dabbler", command);
+      assert.ok(tokens[1]! in HANDLERS, command);
+      if (tokens[1] !== "session") continue;
+      const help = await capture(() => Promise.resolve(sessionVerb([tokens[2]!, "--help"])));
+      assert.equal(help.value, 0, command);
+      const printed = tokens.slice(3).filter((token) => token.startsWith("--"));
+      for (const flag of printed) assert.ok(help.stdout.includes(flag), `${command}: ${flag}`);
+      for (const required of help.stdout.matchAll(/^ {2}(--[\w-]+)(?: \S+)? +required:/gm)) {
+        assert.ok(printed.includes(required[1]!), `${command} lacks ${required[1]}`);
+      }
+    }
+
+    const cancelCommand = [...commands].find((command) => /session cancel/.test(command))!;
+    const { sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "copilot" });
+    const saved = ENGINE_MARKERS.map((name) => [name, process.env[name]] as const);
+    try {
+      for (const name of ENGINE_MARKERS) delete process.env[name];
+      const ran = await capture(() =>
+        asAPersonsClick(() => sessionVerb([...shlexSplit(cancelCommand).slice(2), "--sessions-dir", sessionsDir])),
+      );
+      assert.equal(ran.value, 0, ran.stderr);
+      assert.match(ran.stdout, /"status": "cancelled"/);
+    } finally {
+      for (const [key, value] of saved) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
   it("says what happened, that the command ended and the session did not, who acts, and every way on with its cost and its command", () => {
     // Every kind, both modes: the four things a person needs are the same
     // four things every time. What the words never say is that the engine
@@ -977,7 +1035,8 @@ describe("a job finished and nobody collected", () => {
     // Under the push the driver's own poll would have collected it, so an
     // uncollected job means the drive is gone and a person restarts it.
     const push = renderUncollected(found, { session_number: 91, phase: "verify", engine: "claude-code" });
-    assert.match(push, /Next: you\. `dabbler session drive` collects the result first/);
+    // With its engine: `session drive` requires one, and the record has it.
+    assert.match(push, /Next: you\. `dabbler session drive --engine claude-code` collects the result first/);
     // Never a claim the engine is working on it, in either mode.
     for (const words of [pull, push]) assert.doesNotMatch(words, /working/);
   });

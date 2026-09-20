@@ -934,6 +934,15 @@ function runChild(run: ChildRun): Promise<EngineOutcome> {
   });
 }
 
+/**
+ * What every engine the framework starts carries, inherited by every command
+ * that engine spawns: the same marker the extension sets on the terminal it
+ * opens for an AI's CLI. An engine run this way -- Codex included, whose own
+ * variables nobody has measured -- is told from a person wherever it runs,
+ * inside the editor or out of it.
+ */
+export const ENGINE_PLACE_MARKER = "DABBLER_ENGINE_TERMINAL";
+
 function spawnOrFail(
   argv: readonly string[],
   invocation: EngineInvocation,
@@ -943,7 +952,11 @@ function spawnOrFail(
     return spawnProgram(argv, {
       cwd: invocation.repoRoot,
       stdio: [stdin, "pipe", "pipe"],
-      env: { ...process.env, [INSTRUCTION_ENV_VAR]: invocation.instructionPath },
+      env: {
+        ...process.env,
+        [INSTRUCTION_ENV_VAR]: invocation.instructionPath,
+        [ENGINE_PLACE_MARKER]: "1",
+      },
     });
   } catch (error) {
     return error instanceof Error ? error.message : String(error);

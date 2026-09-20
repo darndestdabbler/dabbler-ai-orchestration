@@ -1,16 +1,13 @@
 // `dabbler session <subcommand>` -- the lifecycle's command line.
 //
-// Every subcommand is real. Session 26 landed the three that WRITE the
-// record (`start`, `declare`, `decision`); session 31 landed the five
-// that judge it -- `close` and its gates, `cancel`, `restore`, `plan` and
-// the legacy `migrate`; the driver set added `report`, the engine's one
-// answer, and `drive`, the loop that asks -- so nothing here is refused for
-// not existing yet.
+// Every subcommand is real. There is no `declare`: a session's task and
+// whether it releases are its accepted plan's to say, and the loop records
+// them -- a second door decided releasability by a rule of its own.
 //
 // The argument grammar is deliberately small: argparse's whole grammar is
 // not the contract, the flags the lifecycle documents are. An unknown flag
-// is a usage error rather than a silent no-op, because a misspelled
-// `--not-releasable` that parsed as nothing would publish.
+// is a usage error rather than a silent no-op, because a misspelled flag
+// that parsed as nothing would do what nobody asked.
 
 import { shlexSplit } from "../checks.ts";
 import { WAIT_IN_CALL_MS, driveSession, runWholeSession, sessionNext, sessionWait } from "../drive.ts";
@@ -23,14 +20,15 @@ import {
 } from "../engines.ts";
 import { SessionsRootNotFoundError, resolveSessionsDir } from "../evidence.ts";
 import { chosenEngine } from "../preferences.ts";
+import { readSessionState } from "../progress.ts";
 import { DECIDERS } from "../writers.ts";
 import {
   EXIT_BOUNDARY,
   EXIT_USAGE,
   cancel,
   close,
-  declare,
   decision,
+  holdRelease,
   interrupt,
   rebaseline,
   migrate,
@@ -39,7 +37,7 @@ import {
   report,
   restore,
   start,
-  callerIsEngine,
+  personIsPresent,
 } from "../session.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -47,7 +45,6 @@ import { writeErr, writeOut } from "./output.ts";
 const SUMMARY: Record<string, string> = {
   start: "register a session start",
   decision: "append a decision to decisions-log.md",
-  declare: "declare the session's task list and releasability",
   next: "advance the session one move and print the instruction to answer",
   run: "drive the in-flight session to done in one command, identity from the record",
   wait: "wait for the instruction owed an answer, print it and exit (run it in the background)",
@@ -56,6 +53,7 @@ const SUMMARY: Record<string, string> = {
   rebaseline: "record a repair made while the run was stopped, and move the baseline",
   report: "answer the driver's outstanding instruction",
   plan: "record the plan prose in project-work-plan.md; `plan amend` changes a driven step",
+  "hold-release": "hold this session's release, for a person's reason; it closes as held",
   close: "run gates and close the session",
   cancel: "cancel one session",
   restore: "restore a cancelled session",
@@ -101,14 +99,6 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --provider PROVIDER      the provider behind that model",
     "  --decided-on DATE        for a decision recorded after the fact",
     "  --backfill-reason TEXT   why it is being recorded late; required with --decided-on",
-  ],
-  declare: [
-    "  --task TEXT              the task list; mutually exclusive with --task-file",
-    "  --task-file PATH         the task list, read from a file",
-    "  --hold-release TEXT      the one reason this session publishes nothing; absent,",
-    "                           the session ships once it is verified",
-    "  --module SLUG            the module this session works in (repeatable);",
-    "                           for a multi-module solution only",
   ],
   next: [
     "  --transport T            the verification transport, as `dabbler verify` takes it;",
@@ -203,6 +193,15 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           is on the record from `session start` and is written",
     "                           into the row; there is no flag for it",
   ],
+  "hold-release": [
+    "  --reason TEXT            required: why this session publishes nothing",
+    "",
+    "  A person's verb, for the session in flight: a release that cannot or should",
+    "  not happen is held, and the session closes as held instead of stopping at the",
+    "  publish. One way only -- nothing releases a hold -- and refused once the",
+    "  session has published. Whether a session releases at all is its accepted",
+    "  plan's to say, under this checkout's `dabbler.release`.",
+  ],
   close: [
     "  --dry-run                print the gate rows and write nothing",
     "  --force                  bypass bookkeeping gates, never evidence ones.",
@@ -261,7 +260,8 @@ const RETIRED_FLAGS: ReadonlyMap<string, string> = new Map([
     (flag) =>
       [
         flag,
-        `argument ${flag}: gone -- a session ships unless its plan holds it, and \`--hold-release "<reason>"\` is the hold`,
+        `argument ${flag}: gone -- whether a session releases is its accepted plan's to say, under this ` +
+          "checkout's `dabbler.release`; a person holds one in flight with `dabbler session hold-release`",
       ] as const,
   ),
   ["--module", "argument --module: gone -- a session works in the whole solution, and its plan's steps name every file it changes"],
@@ -468,7 +468,17 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     return close(sessionsDir, {
       dryRun: switches.has("--dry-run"),
       forced: switches.has("--force"),
+      engine: !personIsPresent(),
     });
+  }
+
+  if (subcommand === "hold-release") {
+    const reason = values.get("--reason");
+    if (reason === undefined) {
+      writeErr("dabbler session hold-release: the following arguments are required: --reason\n");
+      return EXIT_USAGE;
+    }
+    return holdRelease(sessionsDir, { reason, engine: !personIsPresent() });
   }
 
   if (subcommand === "cancel" || subcommand === "restore") {
@@ -477,21 +487,26 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(`dabbler session ${subcommand}: ${positional}\n`);
       return EXIT_USAGE;
     }
-    if (positional === null) {
+    // A cancel that names no session is the one in flight's: a stop is about
+    // one session, and the command it prints needs nothing typed into it but
+    // the reason. A restore names its session, because nothing in flight is one.
+    const inFlight = subcommand === "cancel" ? readSessionState(sessionsDir)?.["currentSession"] : null;
+    const target = positional ?? sessionNumber ?? (typeof inFlight === "number" ? inFlight : null);
+    if (target === null) {
       writeErr(
         `dabbler session ${subcommand}: the following arguments are required: session_number\n`,
       );
       return EXIT_USAGE;
     }
     if (subcommand === "restore") {
-      return restore(sessionsDir, positional, { reason: values.get("--reason") ?? "" });
+      return restore(sessionsDir, target, { reason: values.get("--reason") ?? "" });
     }
     const reason = values.get("--reason");
     if (reason === undefined) {
       writeErr("dabbler session cancel: the following arguments are required: --reason\n");
       return EXIT_USAGE;
     }
-    return cancel(sessionsDir, positional, { reason, force: switches.has("--force"), engine: callerIsEngine() });
+    return cancel(sessionsDir, target, { reason, force: switches.has("--force"), engine: !personIsPresent() });
   }
 
   if (subcommand === "migrate") {
@@ -744,32 +759,9 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     });
   }
 
-  // declare
-  const task = values.get("--task");
-  const taskFile = values.get("--task-file");
-  if (task !== undefined && taskFile !== undefined) {
-    writeErr(
-      "dabbler session declare: argument --task-file: not allowed with argument --task\n",
-    );
-    return EXIT_USAGE;
-  }
-  if (task === undefined && taskFile === undefined) {
-    writeErr("dabbler session declare: one of the arguments --task --task-file is required\n");
-    return EXIT_USAGE;
-  }
-  // A session ships unless held; the flag carries the one reason it does not.
-  const holdReason = values.get("--hold-release") ?? null;
-  if (holdReason !== null && holdReason.trim() === "") {
-    writeErr("dabbler session declare: --hold-release carries the reason the session publishes nothing\n");
-    return EXIT_USAGE;
-  }
-  return declare(sessionsDir, {
-    task: task ?? null,
-    taskFile: taskFile ?? null,
-    releasable: holdReason === null,
-    holdReason,
-    sessionNumber,
-  });
+  // Every subcommand in SUMMARY has returned by here.
+  writeErr(`dabbler session: '${subcommand}' is not a subcommand\n\n${usage()}`);
+  return EXIT_USAGE;
 }
 
 export { EXIT_BOUNDARY };

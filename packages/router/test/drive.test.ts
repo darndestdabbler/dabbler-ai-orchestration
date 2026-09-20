@@ -34,6 +34,9 @@ import {
   REGISTER_START,
   alreadyRewoundFor,
   closedAsk,
+  sessionNext,
+  endedAsk,
+  judgeSessionEnded,
   disputedFindingsBrief,
   dispositionRefusals,
   idleInstruction,
@@ -70,7 +73,8 @@ import {
 import { rewindPhaseFor } from "../src/gates.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
-import { gitAnswers, seed, tempDir } from "./support/answers.ts";
+import { gitAnswers, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
+import { registerSessionStart } from "../src/writers.ts";
 const INSTRUCTION = {
   schema_version: 1,
   seq: 4,
@@ -628,6 +632,56 @@ describe("waiterEnd", () => {
     assert.equal(idle.kind, "done");
     assert.equal(idle.session_number, 0);
     assert.doesNotMatch(String(idle.ask), /session start/);
+  });
+});
+
+describe("`session next` under a live loop", () => {
+  it("refuses, names the waiter, and leaves the loop's lease where it was", async () => {
+    // Registering takes the lease. Under a mailbox loop that ends the loop:
+    // its next save is refused, the save in its own stop handler is refused
+    // too, and it dies with no stop recorded and the accepted answer lost.
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const held = writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase: "steps", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: [], baseline_tree: null, stop: null,
+      lease_epoch: 3, started_at: "2026-09-20T10:00:00-04:00", updated_at: "2026-09-20T10:00:00-04:00",
+    });
+    writeFileSync(loopPath(repo, 1), JSON.stringify({ pid: 1, at: new Date().toISOString() }));
+
+    const asked = await capture(() => sessionNext(sessionsDir, {}));
+    assert.equal(asked.value, 3);
+    assert.match(asked.stderr, /a loop is driving session 001/);
+    assert.match(asked.stderr, /Run `dabbler session wait` again/);
+    assert.equal(asked.stdout, "");
+    assert.deepEqual(readRun(repo, 1), held);
+  });
+});
+
+describe("judgeSessionEnded", () => {
+  it("reads a cancelled session as over in every phase, a forced close as over outside the loop's own, and a session in flight as the loop's", () => {
+    // The loop never re-read the ledger: cancelled underneath it, it waited
+    // on a session that did not exist, or went on to commit its work.
+    assert.deepEqual(judgeSessionEnded("cancelled", " wrong repository ", "work"), { status: "cancelled", why: "wrong repository" });
+    assert.deepEqual(judgeSessionEnded("cancelled", undefined, "close"), { status: "cancelled", why: null });
+    assert.deepEqual(judgeSessionEnded("complete", null, "verify"), { status: "closed", why: null });
+    // The loop's own close flips the status while the loop is closing, and
+    // is collected where it always was.
+    assert.equal(judgeSessionEnded("complete", null, "close"), null);
+    assert.equal(judgeSessionEnded("complete", null, "complete"), null);
+    assert.equal(judgeSessionEnded("in-progress", null, "land"), null);
+  });
+});
+
+describe("endedAsk", () => {
+  it("says who ended it and why, that nothing landed, and hands back no command and no waiter", () => {
+    const ask = endedAsk(7, "cancelled", "wrong repository");
+    assert.match(ask, /007 was cancelled by a person, who said: wrong repository/);
+    assert.match(ask, /start no waiter/);
+    assert.match(ask, /tell the operator/);
+    assert.doesNotMatch(ask, /landed, verified/);
+    assert.doesNotMatch(ask, /dabbler session/);
+    assert.match(endedAsk(7, "closed", null), /007 was closed by a person\./);
   });
 });
 

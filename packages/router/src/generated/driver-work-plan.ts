@@ -12,7 +12,7 @@ export type DriverWorkPlan = {
   schema_version: 1;
   session_number: number;
   /**
-   * What this session will do -- the text `session declare` records.
+   * What this session will do -- the text the declaration records.
    */
   task: string;
   /**

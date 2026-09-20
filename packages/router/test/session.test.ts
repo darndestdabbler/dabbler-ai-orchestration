@@ -14,6 +14,7 @@ import { describe, it } from "node:test";
 import { capture } from "../src/output.ts";
 import { platformNewlines } from "../src/journal.ts";
 import { checkPublishedWhenReleasable } from "../src/gates.ts";
+import { appendPackaging } from "../src/ledger.ts";
 import {
   SOURCE_API,
   SOURCE_SEAT,
@@ -41,19 +42,25 @@ import {
   EXIT_BOUNDARY,
   EXIT_OK,
   EXIT_USAGE,
+  ENGINE_MARKERS,
   applyCancellation,
   applyRestoration,
+  asAPersonsClick,
   callerIsEngine,
   cancel,
   carryForward,
+  close,
   configuredModelRefusal,
   identityClash,
   judgeCancellation,
   judgeRestoration,
   judgeStartBoundary,
   declare,
+  holdRelease,
+  personIsPresent,
   plan,
   repairedPaths,
+  report,
   restore,
   reviewingVehicleRefusal,
   setSessionUseReading,
@@ -61,8 +68,9 @@ import {
   steppedOverLines,
   type SequenceFacts,
 } from "../src/session.ts";
-import { recordRepair, writeRun } from "../src/driver.ts";
+import { loopPath, recordRepair, writeInstruction, writeRun } from "../src/driver.ts";
 import {
+  amendmentEntries,
   readTaskDeclaration,
   recordAmendment,
   recordSessionVerification,
@@ -71,7 +79,7 @@ import {
   sessionIsReleasable,
   workBegunRefusal,
 } from "../src/writers.ts";
-import { cleanRepoAnswers, gitAnswers, seed, tempDir } from "./support/answers.ts";
+import { cleanRepoAnswers, gitAnswers, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
 import { SESSION_USE_STAND_IN } from "./support/repo.ts";
 
 /** One verb's exit code and everything it wrote, so a refusal can be read. */
@@ -678,17 +686,20 @@ describe("registering a session", () => {
     }
   });
 
-  it("says the next call is `session next`, and names neither the declaration nor the affected tests", async () => {
-    // Both were the typed lifecycle's recipe, printed at the one moment an
-    // engine had just read the managed body saying the framework does them.
+  it("says what drives a session next -- the loop, then the waiter -- and never `session next`, the declaration or the affected tests", async () => {
+    // The declaration and the affected tests were the typed lifecycle's
+    // recipe, printed at the one moment an engine had just read the managed
+    // body saying the framework does them. `session next` was worse: under a
+    // live loop it takes the lease and ends it.
     const state = stateDir();
     try {
       const registered = await run(() =>
         start(state.sessionsDir, { engine: "codex", provider: "openai" }),
       );
       assert.equal(registered.code, EXIT_OK);
-      assert.match(registered.out, /dabbler session next --sessions-dir/);
-      assert.doesNotMatch(registered.out, /declare|affected/);
+      assert.match(registered.out, /Next: dabbler session run --mailbox --sessions-dir/);
+      assert.match(registered.out, /`dabbler session wait`/);
+      assert.doesNotMatch(registered.out, /session next|declare|affected/);
     } finally {
       state.restore();
     }
@@ -871,8 +882,16 @@ describe("cancelling and restoring through the verb", () => {
     // The proof of 2026-09-08: the AI cancelled its own registration with
     // --force and drove another folder's session from the wrong window.
     assert.equal(callerIsEngine({}), false);
-    assert.equal(callerIsEngine({ DABBLER_DRIVEN: "1" }), true);
-    assert.equal(callerIsEngine({ CLAUDECODE: "1" }), true);
+    // Every engine, not one: the measured markers and the framework's own. A
+    // person's own COPILOT_* variable is not a marker.
+    for (const name of ENGINE_MARKERS) assert.equal(callerIsEngine({ [name]: "1" }), true, name);
+    assert.deepEqual(
+      ["CLAUDECODE", "COPILOT_CLI", "COPILOT_AGENT_SESSION_ID", "DABBLER_ENGINE_TERMINAL"].filter(
+        (name) => !ENGINE_MARKERS.includes(name),
+      ),
+      [],
+    );
+    assert.equal(callerIsEngine({ COPILOT_OTEL_FILE_EXPORTER_PATH: "C:/logs" }), false);
     const state = stateDir();
     try {
       registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
@@ -883,6 +902,67 @@ describe("cancelling and restoring through the verb", () => {
       const person = await run(() => cancel(state.sessionsDir, 1, { reason: "stop", force: true, engine: false }));
       assert.equal(person.code, EXIT_OK);
       assert.equal(sessionOf(state.sessionsDir)["status"], "cancelled");
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("refuses an engine's forced close in the same words and writes nothing", async () => {
+    // The beta of 2026-09-20 ended with uncommitted code by an engine's own
+    // hand: a forced close skips the working-tree gate and closes the plan.
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "copilot" });
+      const before = readFileSync(join(state.sessionsDir, "sessions.json"), "utf8");
+      const engine = await run(() => close(state.sessionsDir, { forced: true, engine: true }));
+      assert.equal(engine.code, EXIT_BOUNDARY);
+      assert.match(engine.err, /`session close --force` is a person's verb, never the engine's/);
+      assert.match(engine.err, /Report the step blocked/);
+      assert.equal(readFileSync(join(state.sessionsDir, "sessions.json"), "utf8"), before);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("finds a person where there is a click or an interactive terminal, and nowhere else", async () => {
+    // What is THERE, not what is absent: a list of engine markers cannot
+    // cover an engine nobody has measured, and an AI's tool shell -- whoever
+    // made it -- runs its commands with no terminal.
+    assert.equal(personIsPresent({}, true), true);
+    assert.equal(personIsPresent({}, false), false);
+    // A known engine is an engine even where its tool gives it a terminal.
+    for (const name of ENGINE_MARKERS) assert.equal(personIsPresent({ [name]: "1" }, true), false, name);
+    // A click is a person, whatever the editor's own environment carries.
+    assert.equal(await asAPersonsClick(() => personIsPresent({ CLAUDECODE: "1" }, false)), true);
+    assert.equal(personIsPresent({}, false), false);
+  });
+
+  it("refuses an engine at each of a person's three verbs in one sentence, the verb and what it does apart", async () => {
+    // One sentence, so an AI is told the same thing -- and the same thing to
+    // do instead -- wherever it reaches for a verb that is not its own.
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "codex" });
+      const refusals = [
+        await run(() => cancel(state.sessionsDir, 1, { reason: "x", force: true, engine: true })),
+        await run(() => close(state.sessionsDir, { forced: true, engine: true })),
+        await run(() => holdRelease(state.sessionsDir, { reason: "x", engine: true })),
+      ];
+      const verbs = ["cancel --force", "close --force", "hold-release"];
+      for (const [index, refusal] of refusals.entries()) {
+        assert.equal(refusal.code, EXIT_BOUNDARY, verbs[index]);
+        assert.ok(
+          refusal.err.includes(`refused -- \`session ${verbs[index]}\` is a person's verb, never the engine's: it `),
+          refusal.err,
+        );
+        assert.ok(
+          refusal.err.includes(
+            ", and that judgement is not the engine's to make. Report the step blocked and say why; a person ",
+          ),
+          refusal.err,
+        );
+      }
+      assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
     } finally {
       state.restore();
     }
@@ -1023,6 +1103,91 @@ describe("a ledger row the retired focused checkout wrote", () => {
   });
 });
 
+// --- A report that answers an instruction already replaced -----------------------
+
+describe("a report that answers an instruction already replaced", () => {
+  it("names the waiter under a live loop, and `session next` only where no loop is driving", async () => {
+    // A stale seq is ordinary under a loop: an operator's Send re-issues the
+    // instruction while the AI works. The refusal used to send its reader to
+    // `session next`, which takes the live loop's lease and ends it.
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      writeInstruction(state.repo, 1, {
+        schema_version: 1, seq: 5, kind: "step", session_number: 1,
+        issued_at: "2026-09-20T10:00:00-04:00", step_id: "widget", ask: "Make the widget real.",
+        answer_schema: "driver-report.schema.json",
+        answer_command: "dabbler session report --seq 5 --step widget ...",
+      });
+      const stale = { seq: 4, stepId: "widget", status: "done", notes: "made it real" };
+
+      const alone = await run(() => report(state.sessionsDir, stale));
+      assert.equal(alone.code, EXIT_BOUNDARY);
+      assert.match(alone.err, /outstanding instruction is 5 and this report answers 4/);
+      assert.match(alone.err, /`dabbler session next`/);
+
+      mkdirSync(join(state.repo, ".dabbler", "runs", "s1", "driver"), { recursive: true });
+      writeFileSync(loopPath(state.repo, 1), JSON.stringify({ pid: 1, at: new Date().toISOString() }));
+      const driven = await run(() => report(state.sessionsDir, stale));
+      assert.equal(driven.code, EXIT_BOUNDARY);
+      assert.match(driven.err, /Run `dabbler session wait` again and answer what it prints/);
+      assert.doesNotMatch(driven.err, /session next/);
+    } finally {
+      state.restore();
+    }
+  });
+});
+
+describe("a report that arrives after its session was cancelled", () => {
+  it("is told what the session's own done said, and is never told to start a session", async () => {
+    // Found by failure injection in session 213: an AI still working when a
+    // person cancelled answered, and was told to "Run `session start` first"
+    // -- an invitation, to a loop, to start a session nobody asked for. With
+    // an earlier session on the ledger the answer was aimed at THAT one.
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      writeInstruction(state.repo, 1, {
+        schema_version: 1, seq: 3, kind: "done", session_number: 1,
+        issued_at: "2026-09-20T10:00:00-04:00",
+        ask: "Session 001 was cancelled by a person, who said: wrong repository. Stop, and tell the operator.",
+      });
+      await run(() => cancel(state.sessionsDir, 1, { reason: "wrong repository", force: true, engine: false }));
+      const late = await run(() =>
+        report(state.sessionsDir, { seq: 2, stepId: "widget", status: "done", notes: "made it real" }),
+      );
+      assert.equal(late.code, EXIT_BOUNDARY);
+      assert.match(late.err, /no session is in flight/);
+      assert.match(late.err, /was cancelled by a person, who said: wrong repository/);
+      assert.doesNotMatch(late.err, /session start/);
+    } finally {
+      state.restore();
+    }
+  });
+});
+
+// --- What a declaration holds ------------------------------------------------------
+
+describe("what the loop's declaration records about a release", () => {
+  it("ships where packaging is declared, and holds in its own words where none is", async () => {
+    // The loop is the one caller, and it hands in what `releaseOfPlan` decided
+    // under the checkout's setting. What `declare` adds is the one fact a plan
+    // cannot know: a repository that declares no packaging has nothing to
+    // publish, whatever the plan proposed.
+    const ships = makeAnsweredSandbox({ "dabbler.yaml": "schema_version: 1\npackaging:\n  release: tag\n" });
+    registerSessionStart(ships.sessionsDir, 1, { engine: "claude-code" });
+    const shipsResult = await run(() => declare(ships.sessionsDir, { task: "Do it.", releasable: true }));
+    assert.equal(shipsResult.code, EXIT_OK, shipsResult.err);
+    assert.match(shipsResult.out, /releasable=yes/);
+
+    const bare = makeAnsweredSandbox();
+    registerSessionStart(bare.sessionsDir, 1, { engine: "claude-code" });
+    const nothing = await run(() => declare(bare.sessionsDir, { task: "Do it.", releasable: true }));
+    assert.equal(nothing.code, EXIT_OK, nothing.err);
+    assert.match(nothing.out, /releasable=no; held: this repository declares no packaging/);
+  });
+});
+
 // --- What the close says was stepped over ----------------------------------------
 
 describe("what the close says was stepped over", () => {
@@ -1111,6 +1276,55 @@ describe("a session that publishes nothing", () => {
       assert.equal(checkPublishedWhenReleasable(capped.sessionsDir)[0], false);
     } finally {
       capped.restore();
+    }
+  });
+
+  it("is held by a person's hold-release, which an engine and a published session are refused", async () => {
+    // A release that cannot succeed left a session two exits, publish or
+    // cancel. The hold is the third: VERIFIED and releasable, it closes as held.
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      const yaml = join(state.repo, "dabbler.yaml");
+      writeFileSync(yaml, readFileSync(yaml, "utf8") + "\npackaging:\n  release: tag\n");
+      await run(() => declare(state.sessionsDir, { task: "Ship it.", releasable: true }));
+      recordSessionVerification(state.sessionsDir, 1, "VERIFIED");
+      assert.equal(sessionIsReleasable(state.sessionsDir, 1), true);
+
+      const engine = await run(() => holdRelease(state.sessionsDir, { reason: "no feed yet", engine: true }));
+      assert.equal(engine.code, EXIT_BOUNDARY);
+      assert.match(engine.err, /a person's verb, never the engine's/);
+      assert.equal(sessionIsReleasable(state.sessionsDir, 1), true);
+
+      const held = await run(() => holdRelease(state.sessionsDir, { reason: "the feed's credential is not issued yet" }));
+      assert.equal(held.code, EXIT_OK, held.err);
+      assert.equal(sessionIsReleasable(state.sessionsDir, 1), false);
+      const gate = checkPublishedWhenReleasable(state.sessionsDir);
+      assert.equal(gate[0], true);
+      assert.match(gate[1], /held by the operator: the feed's credential is not issued yet/);
+      // Said once: a second hold changes nothing and is not a second entry.
+      const again = await run(() => holdRelease(state.sessionsDir, { reason: "another reason" }));
+      assert.equal(again.code, EXIT_OK);
+      assert.match(again.out, /already held by the operator: the feed's credential/);
+      assert.equal(amendmentEntries(state.sessionsDir, 1).length, 1);
+    } finally {
+      state.restore();
+    }
+
+    const published = stateDir();
+    try {
+      registerSessionStart(published.sessionsDir, 1, { engine: "claude-code" });
+      appendPackaging(published.repo, 1, {
+        recorded_at: "2026-01-01T00:00:00+00:00", session_number: 1, releasable: true,
+        outcome: "published", tree_mutated: false, feed: "internal",
+        secret_name: "FEED_PAT", steps: [], artifacts: ["widget-1.0.0.tgz"],
+      });
+      const late = await run(() => holdRelease(published.sessionsDir, { reason: "too late" }));
+      assert.equal(late.code, EXIT_BOUNDARY);
+      assert.match(late.err, /has already published/);
+      assert.deepEqual(amendmentEntries(published.sessionsDir, 1), []);
+    } finally {
+      published.restore();
     }
   });
 });

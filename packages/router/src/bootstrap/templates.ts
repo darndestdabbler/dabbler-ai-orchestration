@@ -151,7 +151,7 @@ export const SHARED_BODY =
   "  the extension: it ships inside the VSIX, and a VS Code terminal has it\n" +
   "  on `PATH`. Anywhere else, run `node \"<extension dir>/dist/dabbler.cjs\"\n" +
   "  <verb>`. \"dabbler: command not found\" is a PATH problem, not a keys one.\n" +
-  "- `session cancel --force` is a person's verb, never the engine's.\n" +
+  "- `session cancel --force` is a person's verb, never the engine's; so is `close --force`.\n" +
   "- A fix no session covers is a session's own work: insert a session into\n" +
   "  the session plan and make the fix there, never outside a session.\n" +
   "\n" +

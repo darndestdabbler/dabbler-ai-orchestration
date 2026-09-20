@@ -250,6 +250,10 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 210 | A model is checked against the list it was offered from | yes | 2026-09-18 |
 | 211 | A reviewer the pane offers can review, and a pause says Resume | yes | 2026-09-18 |
 | 212 | Every setting the vendor refuses is dropped, not just the first | yes | 2026-09-18 |
+| 213 | One authority for each lifecycle fact | yes | 2026-09-20 |
+| 214 | No silent wait | — | not declared |
+| 215 | The loop outlives its questions, and Resume goes | — | not declared |
+| 216 | An impasse goes to the Auxiliary Reviewer before it goes to a person | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2805,3 +2809,19 @@ Let a reviewer the pane offers actually review, keep the preference-order notice
 **Releasable: yes.**
 
 Make the direct-API transport drop every generation param the vendor refuses, not just the first thinking one. In packages/router/src/transports/api.ts, `refusedThinkingParam` becomes a rule over any param the call carries: a 400 whose words say something is not supported and name a generation param the call carried (underscores ignored, the longest such key preferred, so `thinking_budget` wins over `thinking`) drops that param and calls again without spending a retry; each refusal drops one more, bounded by the number of params the call carried, so Anthropic's `effort` and `thinking` refused one per call end with a plain call. A 400 naming no param the call carried is handled exactly as today. The result's metadata carries `dropped_params`, a list of {param, reason} in the order dropped, and each drop writes its one stderr line as today. packages/router/src/verify/rounds.ts's `droppedParam` becomes `droppedParams`, returning that list, and the round's row records it as `dropped_params` when it is non-empty. Tests: api.test.ts gains a provider that refuses `effort` and then `thinking` in two successive 400s and is called a third time with neither, its answer returned with both on the record; the existing 'any other 400' test confirms a 400 naming no param is not retried without params, and the Google test is updated to the new rule; rounds.test.ts's row test follows the rename. Releasable as a patch: version.json moves to 3.13.7, stamped into the manifests with `npm run stamp:version`, with a CHANGELOG entry.
+
+### Session 213 — One authority for each lifecycle fact
+
+**Releasable: yes.**
+
+Give each lifecycle fact one authority. The typed `dabbler session declare` and its in-process door go, so whether a session releases is decided in one place, by `releaseOfPlan` under the checkout's `dabbler.release`. A person gains a one-way `dabbler session hold-release --reason`, read by `releasabilityOf` as a third hold and offered by the `publish` stop, so a release that cannot succeed still closes correctly as held. `callerIsEngine` recognises every engine -- by the markers measured in each engine's shell and by `DABBLER_ENGINE_TERMINAL=1`, which the extension sets on the terminal it opens for the AI's CLI -- and `cancel --force`, `close --force` and `hold-release` refuse an engine in the same words. Every command a stop's ways on print runs as printed, held so by one test that hands each to the CLI's own parser. The loop reads the session's status at the mailbox poll, at each phase boundary and before the commit and the push, and ends with a `done` naming the cancellation when its session is no longer in flight; `session cancel` says what it left uncommitted. `session next` refuses to take a live loop's lease, and the four messages that named it name the waiter where a loop is driving. Proved by failure injection on the built bundle. Releases as a minor, 3.14.0: one verb added and a capability gained; the removed verb was never a consumer's to run under the driven lifecycle.
+
+**Amended after acceptance:**
+
+- 2026-09-20 — step 'no-engine-ends-a-session-by-force': its files: cli.test.ts's forced-cancel case cleared only the two old markers, so under a Copilot shell its person half would read as an engine; it now clears ENGINE_MARKERS (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-20 — step 'the-typed-declare-goes': its files: inProcess.test.ts and bootstrap.test.ts never named the door (bootstrap's asserts the managed body does NOT name it); progress.ts comments and the work-plan schema's description named the typed verb, and the generated type follows its schema (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-20 — step 'every-way-on-runs-as-printed': its files: drive.ts needed no change: the printed commands are all driver.ts's (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-20 — step 'the-loop-ends-when-its-session-has': its files: the mailbox adapter needed no change -- the driver's own poll around it reads the ledger -- and a loop ending with its session is a walk, so its test is walk-session's beside the pure judge in drive.test.ts (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-20 — step 'next-leaves-a-live-lease-alone': its files: loopAlive moved beside loopPath in driver.ts, re-exported from drive.ts, so session.ts can ask whether a loop is driving without importing the module that imports it (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-20 — step 'prove-it-by-failure-injection': its files: the injection found a defect: an answer arriving after a cancellation was told to run session start, and with an earlier closed session on the ledger was aimed at it; report now takes the session in flight only and answers with the ended session's own done (claude-code (anthropic, claude-fable-5-1))
+- 2026-09-20 — step 'release-minor': its files: the workspace lint's boundary check, run before the release, refused a new import cycle (driver->progress): liveLoopSession moved from driver.ts to session.ts, which already reads the ledger (claude-code (anthropic, claude-fable-5-1))

@@ -81,6 +81,8 @@ import {
   readRepairs,
   readRun,
   recordRepair,
+  WAITER_IS_WHAT_IS_RUN,
+  loopAlive,
   reportPath,
   requestInterrupt,
   shapeReport,
@@ -111,6 +113,7 @@ import { isFrameworkInstalledPath, materialPaths } from "./checks.ts";
 import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
   materialWorktreeChanges,
+  previewPaths,
   readWorktreeStatus,
   renderGateRow,
   runGates,
@@ -131,8 +134,10 @@ import {
 import {
   LedgerError,
   MACHINE_DIRNAME,
+  OUTCOME_PUBLISHED,
   RUNS_DIRNAME,
   latestRound,
+  readPackaging,
   sessionRunDir,
 } from "./ledger.ts";
 import {
@@ -172,6 +177,8 @@ import {
   amendmentEntries,
   amendmentLine,
   recordAmendment,
+  recordReleaseHold,
+  releaseHold,
   WorkBegunError,
   workBegunRefusal,
 } from "./writers.ts";
@@ -1287,10 +1294,9 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
         writeErr(
           `start: refused -- session ${sessionDisplayNumber(current)} is in ` +
             `flight and ${clash}. Its identity is on the record and the work ` +
-            "already done was done under it. Continue with the same identity " +
-            "(or with none, which is what `dabbler session next` sends once a " +
-            "session is in flight), or close this session before starting one " +
-            "under another.\n",
+            "already done was done under it. Continue with the same identity, " +
+            "or with none -- a session in flight needs none named -- or close " +
+            "this session before starting one under another.\n",
         );
         return EXIT_BOUNDARY;
       }
@@ -1435,7 +1441,14 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     // four sessions of one test repository were told to run verbs the pull
     // forbids. The declaration is the plan step's answer; the tests are the
     // framework's.
-    writeOut(`Next: dabbler session next --sessions-dir ${sessionsDir}\n`);
+    // And it names what drives a session -- the loop -- never `session next`,
+    // which under a live loop takes its lease and ends it.
+    writeOut(
+      liveLoopSession(sessionsDir) !== null
+        ? "Next: a loop is already driving this session; the AI runs `dabbler session wait`.\n"
+        : `Next: dabbler session run --mailbox --sessions-dir ${sessionsDir} -- the framework's loop, in a ` +
+            "terminal of its own; the AI then runs `dabbler session wait`.\n",
+    );
     return EXIT_OK;
   } finally {
     releaseLock(lock);
@@ -1726,17 +1739,65 @@ export interface ReportCliOptions {
  * engine chose to put in the ledger, which is what this verb exists to
  * prevent.
  */
+/** The session in flight, where a live loop is driving it; null where none is. */
+export function liveLoopSession(sessionsDir: string): number | null {
+  const current = inFlightSession(sessionsDir);
+  const repoRoot = repoRootFor(sessionsDir);
+  return current !== null && repoRoot !== null && loopAlive(repoRoot, current) ? current : null;
+}
+
+/** The session in flight, or null. */
+function inFlightSession(sessionsDir: string): number | null {
+  const raw = readRawSessionState(sessionsDir);
+  const current = (raw ? derivedView(raw) : null)?.["currentSession"];
+  return typeof current === "number" ? current : null;
+}
+
+/**
+ * What an answer is told when no session is in flight to take it.
+ *
+ * The reader is an AI that was still working when its session ended -- a
+ * person cancelled it, or it closed -- so the words are the ended session's
+ * own `done` where it left one, and they never name `session start`: a loop
+ * handed that command starts a session nobody asked for.
+ */
+function nothingToAnswer(sessionsDir: string): string {
+  const nothing = `no session is in flight under ${sessionsDir}, so there is nothing to answer.`;
+  const plain = `${nothing} Change nothing more, and tell the operator.`;
+  const repoRoot = repoRootFor(sessionsDir);
+  if (repoRoot === null) return plain;
+  const rows = readRawSessionState(sessionsDir)?.["sessions"];
+  const numbers = (Array.isArray(rows) ? rows : [])
+    .map((row) => (isRecord(row) ? row["number"] : null))
+    .filter((value): value is number => typeof value === "number")
+    .sort((left, right) => right - left);
+  for (const number of numbers) {
+    let last;
+    try {
+      last = readInstruction(repoRoot, number);
+    } catch {
+      last = null;
+    }
+    if (last === null) continue;
+    // The most recent session that ran, and only it: an older one's `done`
+    // says nothing about the session this answer was for.
+    if (last.kind === "done" && typeof last.ask === "string") return `${nothing} ${last.ask}`;
+    break;
+  }
+  return plain;
+}
+
 export function report(sessionsDir: string, options: ReportCliOptions): number {
   if (!isDirectory(sessionsDir)) {
     writeErr(`report: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
-  const target = resolveTargetSession(sessionsDir, options.sessionNumber);
+  // The session in flight and no other: a report is an engine's answer, and
+  // falling back to the last CLOSED session aimed an answer that arrived
+  // after a cancellation at a session it never belonged to.
+  const target = options.sessionNumber ?? inFlightSession(sessionsDir);
   if (target === null) {
-    writeErr(
-      `report: refused -- no session has been started under ${sessionsDir}. ` +
-        "Run `session start` first.\n",
-    );
+    writeErr(`report: refused -- ${nothingToAnswer(sessionsDir)}\n`);
     return EXIT_BOUNDARY;
   }
   const repoRoot = repoRootFromSessionsDir(sessionsDir);
@@ -1772,10 +1833,17 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
     // run and phases were skipped silently; an answer that does not name
     // the OUTSTANDING instruction is a stale attempt, and a stale attempt
     // may not advance the run -- it is recorded here as refused instead.
+    // A stale seq is ordinary under a loop -- an operator's Send re-issues the
+    // instruction while the AI works -- and what is run next depends on who
+    // is driving: the waiter under a loop, `next` only where there is none.
     writeErr(
       `report: refused -- the outstanding instruction is ${instruction.seq} ` +
         `and this report answers ${options.seq}. A stale attempt does not ` +
-        "advance the run; call `dabbler session next` and answer what it says.\n",
+        "advance the run, and nothing already done is lost. " +
+        (liveLoopSession(sessionsDir) !== null
+          ? WAITER_IS_WHAT_IS_RUN
+          : "Call `dabbler session next` and answer what it says.") +
+        "\n",
     );
     return EXIT_BOUNDARY;
   }
@@ -1975,7 +2043,7 @@ export function interrupt(sessionsDir: string, options: InterruptCliOptions): nu
         ? `interrupt: session ${number} has already stopped (${waitsBehind.kind}); the request is held, and ` +
             "stopping a stopped loop changes nothing.\n"
         : `interrupt: held for session ${number}, which stopped (${waitsBehind.kind}); nothing is running to ` +
-            "end, and the next `session next` hands it to the engine with the instruction.\n"
+            "end, and it travels with the next instruction once the session is carried on.\n"
       : stop
         ? `interrupt: stop requested for session ${number} (instruction ${run.seq}); the driver ends the ` +
             "running invocation and halts -- the session stays in flight, and `session drive` re-runs it.\n"
@@ -2386,6 +2454,8 @@ function localOnly(repoRoot: string): boolean {
 export interface CloseCliOptions {
   readonly dryRun?: boolean;
   readonly forced?: boolean;
+  /** The caller is an engine (`callerIsEngine`); a forced close is refused it. */
+  readonly engine?: boolean;
 }
 
 /**
@@ -2401,6 +2471,21 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
   if (!isDirectory(sessionsDir)) {
     writeErr(`close: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
+  }
+  // A forced close skips the working-tree, push and freshness gates and
+  // promotes every open session of the plan. A beta session of 2026-09-20
+  // ended with uncommitted code by an engine's own hand; an engine that asks
+  // is refused as it is at a forced cancel, and nothing is written. The
+  // driver's own close is never forced, so a driven close is untouched.
+  if (forced && options.engine === true) {
+    writeErr(
+      `close: ${isAPersonsVerb(
+        "close --force",
+        "closes every open session of the plan past its bookkeeping gates",
+        "a person forces a close from an interactive terminal of their own, and only to abandon a whole plan",
+      )}\n`,
+    );
+    return EXIT_BOUNDARY;
   }
   let lock: string;
   try {
@@ -2894,13 +2979,76 @@ function sessionRecord(
  * file beside it.
  */
 /**
- * Whether the caller is an engine rather than a person at a terminal: a
- * driver job says so with `DABBLER_DRIVEN`, and a Claude Code turn with
- * `CLAUDECODE`. A person's shell has neither, and the extension's
+ * What an engine's shell carries and a person's does not. `DABBLER_DRIVEN`
+ * is a driver job's and `DABBLER_ENGINE_TERMINAL` is set by the extension on
+ * the terminal it opens for the AI's CLI, so it holds for an engine nobody
+ * measured; the rest are each vendor's own, as read in
+ * `docs/design/engine-environment-markers.md`. Exact names and never a
+ * prefix: a person's environment may hold a `COPILOT_*` variable of its own.
+ */
+export const ENGINE_MARKERS: readonly string[] = [
+  "DABBLER_DRIVEN",
+  "DABBLER_ENGINE_TERMINAL",
+  "CLAUDECODE",
+  "COPILOT_CLI",
+  "COPILOT_AGENT_SESSION_ID",
+];
+
+/**
+ * Whether the caller is an engine rather than a person at a terminal. A
+ * person's shell carries none of the markers, and the extension's
  * in-process calls are a person's clicks.
  */
 export function callerIsEngine(env: NodeJS.ProcessEnv = process.env): boolean {
-  return Boolean(env["DABBLER_DRIVEN"]) || Boolean(env["CLAUDECODE"]);
+  return ENGINE_MARKERS.some((name) => Boolean(env[name]));
+}
+
+/** How many of the extension's in-process calls are running: each is a person's click. */
+let clicks = 0;
+
+/**
+ * Run `work` as a person's click. The extension's in-process calls pass
+ * through no shell and no terminal, and are a person's by construction: a
+ * button was pressed, and a modal confirmed it.
+ */
+export async function asAPersonsClick<T>(work: () => T | Promise<T>): Promise<T> {
+  clicks += 1;
+  try {
+    return await work();
+  } finally {
+    clicks -= 1;
+  }
+}
+
+/**
+ * Whether a person is where this command was run -- asked of the verbs that
+ * are a person's, and answered by what is THERE rather than by what is
+ * absent. A click is a person. Otherwise an engine's marker says an engine;
+ * and with no marker at all, a person is someone at an interactive terminal,
+ * because an AI's tool runs its commands with none (measured for Claude Code,
+ * `docs/design/engine-environment-markers.md`). A list of markers cannot
+ * cover an engine nobody has measured; this does not need to.
+ */
+export function personIsPresent(
+  env: NodeJS.ProcessEnv = process.env,
+  interactive: boolean = process.stdin.isTTY === true,
+): boolean {
+  if (clicks > 0) return true;
+  return !callerIsEngine(env) && interactive;
+}
+
+/**
+ * The refusal an engine meets at a verb that is a person's: a forced cancel,
+ * a forced close, a held release. One sentence for all of them, so the AI is
+ * told the same thing wherever it reaches for one, and told what to do
+ * instead.
+ */
+export function isAPersonsVerb(verb: string, does: string, how: string): string {
+  return (
+    `refused -- \`session ${verb}\` is a person's verb, never the engine's: it ` +
+    `${does}, and that judgement is not the engine's to make. Report the ` +
+    `step blocked and say why; ${how}.`
+  );
 }
 
 /** The framework's own files a cancellation commits, and nothing else. */
@@ -2952,10 +3100,11 @@ export function cancel(
   // person does it, and nothing is written.
   if (options.force === true && options.engine === true) {
     writeErr(
-      "cancel: refused -- `session cancel --force` is a person's verb, never the engine's: it " +
-        "ends a session in flight, and that judgement is not the engine's to make. Report the " +
-        "step blocked and say why; a person cancels from the Work Explorer (Cancel Session) or " +
-        "their own terminal.\n",
+      `cancel: ${isAPersonsVerb(
+        "cancel --force",
+        "ends a session in flight",
+        "a person cancels from the Work Explorer (Cancel Session) or an interactive terminal of their own",
+      )}\n`,
     );
     return EXIT_BOUNDARY;
   }
@@ -3000,6 +3149,17 @@ export function cancel(
       return EXIT_GATE_FAILED;
     }
     writeOut(`${dumps({ session: sessionNumber, status: STATUS_CANCELLED })}\n`);
+    // Nothing is unwound, so what the session had changed is still in the
+    // tree -- said here, where the person who cancelled is looking, rather
+    // than found at the next start's refusal.
+    const left = materialWorktreeChanges(sessionsDir);
+    if (left.error === "" && left.paths.length > 0) {
+      writeErr(
+        `cancel: left uncommitted, exactly as it was: ${previewPaths(left.paths)}. The next ` +
+          "`session start` offers to commit it (--commit-changes) or to undo it, keeping a copy " +
+          "(--undo-changes).\n",
+      );
+    }
     return EXIT_OK;
   } finally {
     releaseLock(lock);
@@ -3053,6 +3213,86 @@ export function restore(
       return EXIT_GATE_FAILED;
     }
     writeOut(`${dumps({ session: sessionNumber, status: prior })}\n`);
+    return EXIT_OK;
+  } finally {
+    releaseLock(lock);
+  }
+}
+
+// --- hold-release --------------------------------------------------------------
+
+export interface HoldReleaseCliOptions {
+  readonly reason: string;
+  /** The caller is an engine (`callerIsEngine`); holding a release is a person's. */
+  readonly engine?: boolean;
+}
+
+/**
+ * Hold the release of the session in flight, for a person's reason.
+ *
+ * What a declaration decides before the work nothing else could change, so a
+ * release that could not succeed -- no credential, a feed that refuses, a
+ * declaration made by mistake -- left a session two exits, publish or cancel.
+ * This is the third: the session closes, correctly, as held. One way only,
+ * and refused once something has been published, because what reached a feed
+ * is not held by saying so.
+ */
+export function holdRelease(sessionsDir: string, options: HoldReleaseCliOptions): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`hold-release: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  if (options.engine === true) {
+    writeErr(
+      `hold-release: ${isAPersonsVerb(
+        "hold-release",
+        "decides after the work that a session its plan declared releasable publishes nothing",
+        "a person holds a release from an interactive terminal of their own",
+      )}\n`,
+    );
+    return EXIT_BOUNDARY;
+  }
+  const reason = options.reason.trim();
+  if (reason === "") {
+    writeErr("hold-release: --reason carries why this session publishes nothing\n");
+    return EXIT_USAGE;
+  }
+  let lock: string;
+  try {
+    lock = acquireLockWithTimeout(sessionsDir, `hold-release/${process.pid}`);
+  } catch (error) {
+    if (!(error instanceof LockContentionError)) throw error;
+    writeErr(`hold-release: refused -- ${error.message}\n`);
+    return EXIT_LOCK_CONTENTION;
+  }
+  try {
+    const raw = readRawSessionState(sessionsDir);
+    const current = ((raw ? derivedView(raw) : null)?.["currentSession"] ?? null) as number | null;
+    if (current === null) {
+      writeErr(`hold-release: refused -- no session is in flight under ${sessionsDir}.\n`);
+      return EXIT_BOUNDARY;
+    }
+    const repoRoot = repoRootFor(sessionsDir);
+    if (
+      repoRoot !== null &&
+      readPackaging(repoRoot, current).some((row) => row["outcome"] === OUTCOME_PUBLISHED)
+    ) {
+      writeErr(
+        `hold-release: refused -- session ${sessionDisplayNumber(current)} has already published; ` +
+          "what reached a feed is not held by saying so.\n",
+      );
+      return EXIT_BOUNDARY;
+    }
+    const standing = releaseHold(sessionsDir, current);
+    if (standing !== null) {
+      writeOut(`hold-release: session ${sessionDisplayNumber(current)} is already ${standing}.\n`);
+      return EXIT_OK;
+    }
+    recordReleaseHold(sessionsDir, { sessionNumber: current, reason, by: "the operator" });
+    writeOut(
+      `hold-release: session ${sessionDisplayNumber(current)} publishes nothing: ${reason}. The ` +
+        "session closes as held, and the close says so.\n",
+    );
     return EXIT_OK;
   } finally {
     releaseLock(lock);

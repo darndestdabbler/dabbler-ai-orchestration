@@ -12967,6 +12967,14 @@ that names no param the call carried.
 
 Scope: whole repository
 
+> **ON HOLD, 2026-09-20 -- do not start 213-219.** The operator stopped this
+> block the day it was planned: it is the hole-by-hole path, and the
+> architecture is assessed first. Consult round 18
+> (`docs/design/consults/round18-synthesis.md`) recommends withdrawing all
+> seven for three sessions -- one authority for each lifecycle fact; no silent
+> wait and no Resume; the governor. The sections stay until the operator
+> rules, because their **Why** paragraphs are the audit's findings.
+
 **The rule sessions 213-219 serve (operator, 2026-09-20).** No code path
 leaves the framework or the AI not knowing what to do next. The situations
 that need the human are few, each is said clearly, and each leads to a

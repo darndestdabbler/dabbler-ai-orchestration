@@ -13138,6 +13138,15 @@ confirmed by reading before it is changed):
 - **A revived loop is invisible.** The waiter restarts a dead loop detached
   and hidden (`reviveLoop`), and it goes on to commit and push where nobody
   can see it.
+- **A reviewer that failed once is reported as the wrong reviewer** (met
+  driving 213, 2026-09-20). `dispatchReview` (`verify/rounds.ts`) retries
+  once with the provider that failed EXCLUDED. Where that provider is the one
+  the operator chose, the retry's refusal is the ladder's vendor-conflict
+  sentence -- "'gpt-5.6-terra' is OpenAI's, and so is the authoring model" --
+  which was false, the original failure was written nowhere, and the stop
+  said only the operator could resolve it. Running the loop again was the
+  whole cure. This is the operator's category (b), an AI service briefly not
+  available, and it reached a person as a configuration error.
 
 **What.**
 1. **One answer to "who is this waiting on".** At every moment exactly one is
@@ -13159,7 +13168,11 @@ confirmed by reading before it is changed):
    of gates that failed; a tree that moved after the run of record is tested
    again; a missing plan sets the phase to `plan`; a dispute that cannot be
    written is a rejection of the dispositions answer, and the
-   `dispute-refused` stop goes with its situation.
+   `dispute-refused` stop goes with its situation. A reviewer call that
+   failed is retried against the reviewer the operator CHOSE, never with
+   that reviewer's vendor excluded; the failure is on the round's record in
+   the transport's own words; and only a failure that repeats is a stop,
+   which says what failed and not that the choice is wrong.
 4. **A stop that remains reaches the person**: a notification carrying its
    first sentence and who acts, under both modes.
 5. **Nothing runs where nobody can see it.** A revived loop's output is

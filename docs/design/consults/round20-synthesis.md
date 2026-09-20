@@ -4,6 +4,13 @@
 `round20-fable.md` (`claude-fable-5-1` through Claude Code) and
 `round20-gemini.md` (`gemini-3.8-flash` through the Copilot seat).
 
+> **Superseded by the operator's interactive-author requirement.** This round
+> evaluated direct headless authoring before it was made explicit that
+> developers must see and converse with the same AI while it works. Its
+> constraints remain useful, but its decision does not govern implementation.
+> The replacement is the chained request/answer design in the bootstrap proof
+> and Sessions 218-219 of `docs/sessions/session-plan.md`.
+
 ## Decision
 
 Adopt the recommendation with four additions to the acceptance gate. Do not
@@ -101,4 +108,3 @@ time or spend.
    extension path and mailbox as the fallback.
 8. No schema, state, role, record, command, setting, button, environment
    marker, governor, Retry Now, Reconnect, or new UAT harness is added.
-

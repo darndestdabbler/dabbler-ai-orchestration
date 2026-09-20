@@ -12980,9 +12980,20 @@ hang, or does something that is not correct, is rejected. Consult round 18
 (`docs/design/consults/round18-synthesis.md`) set the order: authority, then
 noticing, then no Resume, then the governor -- because neither failed beta
 test would have reached a governor. Round 19 put one session before the
-governor: a dispute ends inside the session (216). A seven-session block planned the same
-morning (commit `81a2ae80`) was the hole-by-hole path and is withdrawn; what
-its audits found is carried into the **Why** paragraphs here.
+governor: a dispute ends inside the session (216). A seven-session block
+planned the same morning (commit `81a2ae80`) was the hole-by-hole path and is
+withdrawn; what its audits found is carried into the **Why** paragraphs here.
+
+**Operator revision after Session 215 stalled (2026-09-20).** Session 215 was
+cancelled. Sessions 216 and 217 below are withdrawn from the delivery path:
+216 is deferred until a real dispute demonstrates that redesign is needed,
+and 217 is dropped. The direct headless-authoring proposal in consult round
+20 is also rejected because developers must retain a visible, conversational
+AI terminal. The replacement is the bounded proof and Sessions 218-219 below:
+the interactive Authoring AI asks Dabbler for its next instruction, and each
+accepted answer returns the next instruction from the same background
+exchange. There is no waiter to re-arm, no Resume button, and no framework
+daemon waiting for the author.
 
 **Why.** On the operator's work computer a beta session was read as
 releasable though the Authoring AI had labelled nothing, the AI cancelled the
@@ -13347,6 +13358,11 @@ either answer ends in a closed session.
 
 Scope: whole repository
 
+> **WITHDRAWN -- DO NOT START.** Defer this design until a real dispute reaches
+> the dead end it addresses. The operator must cancel the not-started Session
+> 216 through the router before starting Session 218; do not edit
+> `sessions.json` or any `.dabbler` record by hand.
+
 **Why.** A disputed finding is the one impasse with no exit today. The
 Auxiliary Reviewer is asked only at the round cap -- 7 by default
 (`DEFAULT_VERIFICATION_ROUNDS`) -- though the impasse exists the moment the
@@ -13412,6 +13428,12 @@ and the session closes VERIFIED with no person asked -- once each way.
 
 Scope: whole repository
 
+> **WITHDRAWN -- DO NOT START.** Drop this generic governor. It is too broad
+> for the pre-soak repair and would add another recovery system before the
+> ordinary path is reliable. The operator must cancel the not-started Session
+> 217 through the router before starting Session 218; do not edit
+> `sessions.json` or any `.dabbler` record by hand.
+
 **Why.** A framework stops because it did not anticipate a condition. No
 audit closes that class, and once Resume is gone every such stop lands on a
 person who has nothing to decide. Round 17 rejected an "AI mechanic" two days
@@ -13472,3 +13494,325 @@ broken work: the governor escalates, and says why.
 
 **Releasable.** Yes, a minor.
 
+## Bootstrap proof before Session 218 (operator-authorized out of band)
+
+This proof is deliberately outside a Dabbler session. It tests the messaging
+path that currently cannot reliably drive its own repair. Use plain git, make
+no production change, and touch only `docs/design/messaging-poc/` plus one
+result file, `docs/design/next-instruction-poc-results.md`. Do not touch
+`sessions.json`, `.dabbler/runs/`, router source, extension source, or package
+versions.
+
+### Question the proof must answer
+
+Can one visible, interactive Claude Code or Copilot CLI conversation:
+
+1. request an instruction from a short-lived framework process;
+2. do the requested authoring work;
+3. submit its answer by starting one background command;
+4. keep talking to the human while that command compiles, tests, or calls a
+   reviewer; and
+5. receive the next actionable instruction from that same command, without
+   remembering to start another waiter or press Resume?
+
+If either engine cannot do this reliably, stop. Record the failure and do not
+start Session 218. Do not compensate with polling instructions, a second
+daemon, simulated keystrokes, a Resume command, or framework-owned headless
+authoring.
+
+### Harness construction
+
+Reuse the existing Playwright harness rather than creating another harness.
+Extend `drive-poc.cjs`, `framework.mjs`, `post.mjs`, `report.mjs`, and
+`protocol-AGENTS.md` in place. Preserve the old mailbox mode only as a
+comparison control.
+
+The exchange mode has this exact contract:
+
+- The first request starts `framework.mjs` in exchange mode. It returns one
+  JSON instruction and exits.
+- Every instruction contains one `answer_command`. That command submits the
+  answer and stays alive while the framework performs the deterministic work
+  caused by it. Its stdout is reserved for exactly one later JSON
+  instruction or `done`; progress goes to the event log and the Dabbler-style
+  terminal, not stdout.
+- The Authoring AI starts `answer_command` as its own background task. The
+  human-facing AI terminal remains usable while that task runs. The AI does
+  not run a second request command after answering.
+- There is no framework process between exchanges. Persisted state, not a
+  daemon's memory, determines the next move.
+- Each request carries an exchange id and the sequence number it answers. A
+  repeated request after a killed client either collects the already-produced
+  response or safely resumes unfinished framework work. It does not accept
+  the answer twice or repeat a completed side effect.
+- Two concurrent requests may produce one winner and one explicit refusal;
+  they must not produce two accepted answers, two reviewer calls, or two
+  commits.
+
+Use a disposable repository under the POC scratch directory. Its scenario
+has three authoring instructions and at least two framework phases:
+
+1. the author creates a small TypeScript behavior and test;
+2. the framework runs the real TypeScript build and test in the disposable
+   repository, then makes one real reviewer invocation through
+   `dabbler agent prompt`: Copilot reviews the Claude-authored run and Claude
+   Code reviews the Copilot-authored run, both with `--permissions deny`, the
+   disposable diff included in the prompt, and the disposable repository as
+   `--cwd`;
+3. the author addresses the review result;
+4. the framework reruns the build and test and returns the final instruction;
+5. the final answer returns `done`.
+
+The reviewer prompt is bounded to the disposable diff and may return either
+one prescribed finding or clean. It may not write. The proof is about the
+request/response boundary, not reviewer judgment.
+
+### Required runs and evidence
+
+Run the same scenario once in a real Claude Code terminal and once in a real
+Copilot CLI terminal. For each engine the harness must:
+
+- inject one human question while the author is working and another while
+  the answer command is waiting on framework work;
+- record that the same interactive AI answers both questions without losing
+  the outstanding framework instruction;
+- close and reopen the Dabbler-style terminal during a framework phase and
+  show that it reconstructs progress from persisted events;
+- kill one answer command after its answer is durable, rerun that exact
+  command, and show that the answer and every completed side effect occur
+  once;
+- attempt one duplicate request while another is live and show one winner,
+  one refusal, and no duplicated work;
+- reach `done` with no `session wait`, no manual Resume, no framework daemon
+  left running, and no simulated human acknowledgement.
+
+`next-instruction-poc-results.md` records command lines, engine and router
+versions, timestamps, transcript locations, child exit codes, accepted
+sequence numbers, reviewer invocation counts, build/test counts, duplicate
+request outcome, recovery outcome, and any failure. It ends with one of:
+
+- `PROVEN ON CLAUDE AND COPILOT -- SESSION 218 MAY START`
+- `NOT PROVEN -- DO NOT IMPLEMENT`
+
+Commit the harness and result together with a plain git commit and push it.
+The proof is disposable evidence, not product code.
+
+### Session 218 of 219: Replace the mailbox handoff with one chained exchange
+
+Scope: `packages/router`, `tools/dabbler-ai-orchestration`, managed
+instructions, and directly related documentation
+
+**Entry gate.** The bootstrap result must say `PROVEN ON CLAUDE AND COPILOT
+-- SESSION 218 MAY START`, and the router's records for withdrawn Sessions
+216 and 217 must be cancelled through router commands. If either condition
+is false, do not declare or start this session.
+
+**Why.** Session 215 proves the framework loop can be healthy while delivery
+stops: planning returned, work step 1 was written, and the interactive AI
+never re-armed the one-shot `session wait`. A reminder, Retry Now, reconnect
+button, longer lease, or Resume command leaves the same protocol defect in
+place. Direct `session run` removes the defect by making Dabbler own a
+headless author, but also removes the visible conversational AI experience
+the operator requires. The exchange must keep the interactive AI as the
+long-lived process and make every answer lead to the next instruction.
+
+**One protocol, not another lifecycle.**
+
+- Keep `session next` as the initial pull. Do not add a
+  `next-instruction` command, queue, socket, server, watcher, daemon, recovery
+  state, or UI button.
+- Add one explicit chaining option to the existing `session report`
+  operation. Prefer `dabbler session report ... --next`; use another spelling
+  only if a CLI parser constraint makes this impossible. In pull mode every
+  generated `answer_command` includes that option.
+- `report --next` first performs the ordinary report atomically. Only after
+  the report is accepted does it invoke the same `sessionNext` advancement
+  used by `session next`. It writes exactly one next instruction or `done` as
+  JSON to stdout. Human-readable report confirmation and framework progress
+  must not contaminate that JSON stream.
+- Do not duplicate advancement rules in `report`. Extract or call the
+  existing `sessionNext` implementation. Push mode, mailbox mode, and an
+  ordinary report without `--next` keep their current behavior during this
+  session.
+- The generated managed instruction tells the AI once: run the initial
+  `session next`; thereafter run each `answer_command` as a background task
+  and act on the JSON it returns. It never tells the AI to re-arm a waiter.
+
+**Long framework work.**
+
+- A chained exchange does not return the current synthetic `kind: "wait"`
+  after 45 seconds. It remains active while the existing driver supervises a
+  compile, test, verification, adjudication, packaging, git, release, or
+  close phase, and returns only the next actionable `step`, `rejection`,
+  `interrupt`, genuinely human-owned question, or `done`.
+- Progress and overdue notices continue to be persisted and emitted to the
+  Dabbler Terminal while the call is active. Silence on stdout is not silence
+  in the UI.
+- The framework never remains alive merely waiting for the author. Once it
+  has returned an instruction, its process exits. It is allowed to wait on a
+  child process it launched, including the Primary or Auxiliary Reviewer,
+  because that is framework work rather than author delivery.
+- Interrupt and cancellation checks run at the existing framework-job poll
+  points and immediately before add, commit, push, publish, and close. A
+  person can still talk to the interactive AI at any time and can still use
+  `session interrupt` for a correction.
+
+**Reliability without a second recovery system.**
+
+- Reuse the existing persisted phase/job records, answer idempotency, atomic
+  writes, driver lease, and stale-owner checks. Do not add a general message
+  broker.
+- A repeated initial request or repeated chained answer after a client
+  process dies must return or continue from the durable state. It must not
+  accept an answer twice, open two rounds, make two reviewer calls, rerun a
+  completed package/publish, or commit/push twice.
+- If two exchange processes race, existing lease ownership must select one
+  winner or stop the stale one before a side effect. Add only the smallest
+  serialization necessary if the existing lease cannot prove that property.
+  Do not add heartbeats for a process that does not wait for the author.
+- An unavailable authoring terminal is not a framework stop: there is no
+  framework process waiting for it. Status reports the instruction currently
+  owed and its age. An unavailable reviewer remains the existing
+  human-owned service stop.
+- A malformed answer or an answer for the wrong sequence is refused with the
+  same instruction still owed. It never advances to a success-shaped
+  fallback.
+
+**Extension behavior.**
+
+1. Start Session still opens the interactive Claude Code or Copilot CLI
+   terminal and the Dabbler Terminal. It no longer launches
+   `session run --mailbox`.
+2. The extension sends or presents only the initial `session next` command.
+   The managed instruction teaches the AI to start it and the later
+   `answer_command` values as background tasks. The extension does not inject
+   every later command and does not become a second orchestrator.
+3. The Dabbler Terminal remains an observer over persisted run events. Its
+   lifetime does not own the session. Closing and reopening it reconstructs
+   current phase, current owner, elapsed time, latest progress, and the
+   instruction owed.
+4. Remove Start Session dependencies on the mailbox loop. Keep the mailbox
+   CLI path only as an explicit compatibility fallback for this release; do
+   not expose Resume, Retry Now, or Reconnect Authoring AI.
+
+**Cancellation correction.** In the same session, undo the Session 213
+regression narrowly. `dabbler session cancel <current-number> --reason
+"<why>"` succeeds for the Authoring AI even while that session is in flight;
+it does not require `--force`. Cancellation preserves the working tree and
+records the reason. The AI may not cancel another session, and `cancel
+--force` remains a person's exceptional form rather than the AI's route.
+Do not broaden `close --force`, do not infer authority from terminal
+interactivity, and do not add another caller-classification heuristic. The
+framework rechecks status before later destructive or publishing side
+effects.
+
+**Tests -- one per behavior, not protocol permutations.**
+
+- `drive.test.ts`: an accepted pull-mode answer advances through a long
+  framework job and returns the next actionable instruction without `wait`;
+  replay after the durable answer does not duplicate the phase; a competing
+  exchange cannot duplicate a side effect.
+- `session.test.ts`: `report --next` chains only after an accepted report,
+  preserves the owed instruction after malformed input, and the author can
+  run `cancel <current-number> --reason` without force while the session is
+  in flight, recording the reason and preserving files.
+- CLI tests: chained stdout is one parseable instruction or `done`, while
+  ordinary report and explicit mailbox mode remain compatible.
+- Extension tests: Start Session opens the interactive AI and observational
+  Dabbler terminals but no mailbox loop; reopening the Dabbler Terminal
+  reconstructs persisted progress.
+- Managed-instruction tests: exactly one initial request is described and
+  later answers are background chained exchanges; no waiter or Resume
+  instruction remains on the default path.
+
+**Proof.** Build the router and extension. In a disposable repository drive
+one complete fake-engine session with a long check, one verification round,
+commit, push to a local bare remote, and close. While the long check runs,
+interrupt once and show the returned instruction reflects it. Kill one
+chained CLI process after its answer is durable, repeat the command, and show
+one accepted answer, one check completion, one commit, and one push. Parse
+every stdout response as JSON. Run the targeted router and extension tests,
+then the full repository suite once.
+
+**Non-goals.** No direct/headless author as the extension default. No
+governor, dispute redesign, Resume, Retry Now, reconnect button, mailbox
+redesign, new lifecycle state, new role, extra AI call, or change to review
+policy. Do not remove compatibility code until the installed proof passes.
+
+**Releasable.** No. Session 219 owns installed proof and release.
+
+### Session 219 of 219: Prove the installed conversation before the four soaks
+
+Scope: installed VSIX harness, acceptance evidence, release notes, and only
+production fixes required by a failed acceptance case
+
+**Why.** Unit tests cannot prove that a real installed extension, shell,
+interactive engine, background task, router process, and Dabbler Terminal
+cooperate. The operator should not discover another delivery failure during
+the four soak tests. This session packages one candidate and tests that exact
+artifact with both supported interactive engines before release. It changes
+no architecture.
+
+**Harness.** Adapt the existing installed-VSIX Playwright walk rather than
+building another runner. Use a disposable VS Code profile and disposable git
+repository with a local bare remote. Install the VSIX built once at the
+start; both engine runs and all reruns use its checksum-identical artifact.
+Keep engine prompts, timestamps, terminal output, framework events, git log,
+remote refs, and child exit codes as test artifacts outside the product tree.
+Never copy provider credentials into an artifact or log.
+
+**Run once with Claude Code and once with Copilot CLI.** Each run must:
+
+1. start from the extension and leave the real interactive AI visible;
+2. approve a bounded three-step TypeScript change;
+3. answer a human question during authoring and another while a background
+   exchange waits on a long framework job;
+4. show compile/test and reviewer progress in the Dabbler Terminal;
+5. close and reopen the Dabbler Terminal without affecting the session;
+6. interrupt once with a course correction and continue without Resume;
+7. kill one chained exchange after durable submission, repeat it, and
+   demonstrate exactly-once acceptance and side effects;
+8. exercise author cancellation in a separate disposable run and show the
+   reason is recorded, files are preserved, and no later commit, push, or
+   publish occurs;
+9. complete the main run through verification, packaging, one commit, one
+   push, and close with no `session wait`, mailbox loop, direct/headless
+   author, reconnect action, or manual acknowledgement.
+
+**Acceptance.**
+
+- Both interactive engines reach `done` without a lost instruction.
+- The human can converse with the author throughout; no framework output is
+  injected as a fake human message.
+- Every instruction after the first is returned by the answer command that
+  preceded it.
+- No framework process waits for the author, and no orphan router, engine,
+  test, or package process remains after close or cancellation.
+- The Dabbler Terminal accurately shows current phase and progress and can be
+  reconstructed from persisted records.
+- The recovery run has one accepted sequence, reviewer invocation, package,
+  commit, and push where one is expected.
+- The installed artifact passes the targeted tests and the full suite, and
+  its package contents contain no POC scratch state, transcript, credential,
+  or test repository.
+- Record elapsed wall time and AI-credit usage for each run where the
+  transport reports it. Compare them with a direct interactive implementation
+  of the same three-step change. This is measurement, not a new release gate;
+  investigate any unexplained approach toward three times either baseline.
+
+On any failure, preserve evidence, fix only the demonstrated production
+defect, rebuild a new candidate, and rerun both engine cases from clean
+profiles. Do not waive a case, hand-edit state, or add recovery UI around the
+failure.
+
+**Deliverables.** One concise acceptance report names the VSIX checksum,
+engine/router versions, commands, artifact locations, results for every case,
+wall time and reported AI credits, git/remote assertions, cancellation
+assertions, process-cleanup assertions, and the exact candidate approved for
+the operator's four soaks. Update user-facing documentation to describe the
+interactive terminal, background chained exchange, observational Dabbler
+Terminal, interruption, and cancellation in plain language.
+
+**Releasable.** Yes, a minor. Publish only after both installed engine runs
+pass against the same candidate. That published artifact is the sole artifact
+the operator uses for all four soak tests.

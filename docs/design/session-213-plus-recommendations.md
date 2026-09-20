@@ -2,6 +2,15 @@
 
 Date: 2026-09-20
 
+> **Superseded after the interactive requirement was clarified.** The direct
+> `session run` recommendation below would remove the developer's visible,
+> conversational AI terminal and is not the selected design. The governing
+> replacement is the bootstrap proof and Sessions 218-219 in
+> `docs/sessions/session-plan.md`: keep the interactive AI, make it call the
+> framework for the first instruction, and make each accepted answer return
+> the next instruction from the same background exchange. Sessions 216 and
+> 217 remain withdrawn.
+
 ## Recommendation
 
 Do not restore Session 215 and do not implement Sessions 216 or 217 before the

@@ -13099,14 +13099,44 @@ session publishes only what its plan asked for.
 
 Scope: whole repository
 
-**Why.** In the second beta test the AI's waiter kept waiting for something
-that never came, and nothing on the screen said what. The cause is not known;
-the record from that machine (`run.json`, `supervision.jsonl`,
-`driver/loop.log`) has been asked for. Round 18's answer does not depend on
-it: **"no silent wait" is the acceptance invariant**, so whichever cause it
-was becomes a named, timed, visible state. The candidates, read 2026-09-20
-(the first two are closed by 213; the rest are this session's, each to be
-confirmed by reading before it is changed):
+**Why.** In the second beta test the session waited for something that never
+came, and nothing on the screen said what. Round 18's answer did not depend
+on the cause: **"no silent wait" is the acceptance invariant**, so whichever
+cause it was becomes a named, timed, visible state.
+
+**What the record from that machine showed** (`betatest2-run.json`,
+`betatest2-supervision.json` at the repository root, read 2026-09-20; no
+`loop.log` came back). The session was csv-parser's session 3, authored by
+`claude-haiku-4.5` through the Copilot seat:
+
+- **The framework was waiting on the author, not the author on the
+  framework.** The reviewer had returned findings, the loop asked for
+  dispositions (seq 27), and nothing answered for six hours. The loop wrote
+  `instruction-overdue` twenty-four times and did nothing else. `sessionWait`
+  prints an owed instruction at once, so either no waiter was running or the
+  AI had stopped reading it -- and **nothing records whether a waiter is
+  present**, so the record cannot say which.
+- **Two loops ran at once for five hours.** Eight `session-run-started` in
+  eighty minutes; epoch 6 went on waiting on seq 27 after epoch 7 took the
+  lease and issued seq 28, each logging overdue on its own clock. A loop
+  learns it lost the lease only in `save()`, and a loop waiting on an answer
+  never saves: `invoke`'s poll asks whether the session ended or was
+  interrupted and never reads the lease. Both loops beat the one heartbeat
+  file, and the first to exit deletes it under the other. Earlier, epoch 4
+  was still inside `verify` a minute after epoch 5 had taken it.
+- **The false vendor conflict below happened there too**: "'gpt-5.6-luna' is
+  OpenAI's, and so is the authoring model" with an Anthropic author. A second
+  loop was the cure, as it was for 213.
+- **Two stops were checks the machine could not run**, charged to the author
+  three times each: `Test-Path ...` (`spawn Test-Path ENOENT` -- a check is
+  spawned as argv, and a PowerShell cmdlet is not a program) and `cmd.exe /c
+  findstr ... >nul && ...`. The author's own block said so: "file updated
+  correctly, but check command fails in framework environment". The author
+  cannot amend a check; `checks.ts` reads a spawn failure as a failed check.
+
+The candidates read 2026-09-20 before that record arrived (the first two are
+closed by 213; the rest are this session's, each to be confirmed by reading
+before it is changed):
 
 - A session cancelled under a live loop; a loop killed by `session next`.
 - **A framework job has no deadline.** `longWork` (`drive.ts`) polls a
@@ -13157,7 +13187,11 @@ confirmed by reading before it is changed):
    heartbeat. `dabbler status`, the waiter, the Work Explorer's session row
    and the Dabbler terminal all read that one record: "Author owes step 4 --
    2:13"; "Verification round 2 -- 3:42 of 10:00"; "You: the reviewer is
-   unreachable".
+   unreachable". **Where the author owes, it says whether a waiter is
+   listening**: `sessionWait` beats a file of its own beside the loop's, so
+   "Author owes dispositions -- 12:40, no waiter listening" is a different
+   sentence from one the AI is merely slow to answer. It is what the second
+   beta test could not say, and what 215's Reconnect is offered on.
 2. **Every framework job has a deadline**, from that job's own history where
    there is one and a declared default where there is not. Past it the job
    is ended, tried once more, and then it is a stop that says which job, how
@@ -13184,6 +13218,15 @@ confirmed by reading before it is changed):
    dispositions instruction answered and not fixed, and what a waiter that
    exits with no instruction means -- stop, and tell the operator what it
    printed.
+7. **One loop drives a session.** The poll that waits on an answer reads the
+   lease beside the session's status, and a loop that lost it ends there, in
+   the words `save()` already uses. A loop removes the heartbeat only where
+   the pid in it is its own.
+8. **A check the machine cannot run is refused with the plan**, not charged
+   to the author three times afterwards: a work plan whose check names a
+   program this machine cannot find is rejected in those words -- "a check
+   is a program and its arguments; `Test-Path` is not a program here" --
+   while the author can still rewrite it.
 
 **Non-goals.** Resume stays in this session (215). No job is killed without
 its one retry. No new record beside `run.json`. No governor.
@@ -13194,7 +13237,11 @@ its one retry. No new record beside `run.json`. No governor.
   deadline is ended, retried once and then stopped by name; a non-releasable
   session whose `test_run_fresh` refuses at the close goes back and closes;
   the same set of gates refusing twice stops once; a stop requested during a
-  mailbox job ends the job.
+  mailbox job ends the job; a loop waiting on an answer ends when another
+  takes the lease; the waiting record says no waiter is listening until one
+  is.
+- `checks.test.ts`: a work plan whose check names no program on this machine
+  is refused naming it.
 - `dabblerTerminal.test.ts`: a stop warns once with its first sentence; a
   revived loop's lines appear.
 - `actionRegistry.test.ts`: Stop Session is offered for a session in flight.

@@ -4258,7 +4258,7 @@
     {
       "number": 214,
       "title": "No silent wait",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-20T12:51:27.932000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -4267,7 +4267,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.14.0",
-      "completedAt": null,
+      "completedAt": "2026-09-20T14:36:05.495000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,

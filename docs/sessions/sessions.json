@@ -4237,7 +4237,7 @@
     {
       "number": 213,
       "title": "One authority for each lifecycle fact",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-20T09:45:09.657000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -4246,7 +4246,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "3.13.7",
-      "completedAt": null,
+      "completedAt": "2026-09-20T11:14:18.401000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 5,

@@ -169,6 +169,11 @@ in-flight session.
    output from the existing direct invocation path. The model and engine
    selected at Start remain recorded exactly as today.
 
+   Claude Code and Codex resume a named conversation when their CLIs supply
+   one. Copilot supplies no conversation id on this path, so each instruction
+   starts a fresh Copilot conversation. The Copilot soaks must measure the
+   resulting re-read cost and elapsed time.
+
 3. Keep `session run --mailbox` and `session wait` as an explicit command-line
    fallback. They are not the extension's default and are not used by the
    four acceptance soaks.
@@ -183,7 +188,10 @@ in-flight session.
    loop before add, commit, or push.
 
 6. Update the shipped guidance so the normal extension path says one Start
-   runs the session. Do not add a replacement button or a second delivery
+   runs the session. This includes the managed body generated from
+   `packages/router/src/bootstrap/templates.ts`; leaving its waiter instruction
+   in place would tell a directly invoked author to start an unnecessary
+   mailbox reader. Do not add a replacement button or a second delivery
    protocol.
 
 **Non-goals.**
@@ -237,6 +245,13 @@ For every soak, record:
 - stops, retries, duplicate loops, and orphaned processes;
 - final commit, push, verdict, and release/hold result.
 
+At least one soak must include a real remediation round and still close with
+headroom below the default limit of 24 author invocations. Both Copilot soaks
+must separately record the cost and elapsed-time effect of starting a fresh
+conversation for each instruction. All four packaged launches must establish
+that the framework terminal inherits the PATH, authentication, model, and
+credential environment needed by the selected CLI.
+
 The artifact is not ready for staff if any soak has:
 
 - a Resume, Reconnect, waiter, retry, or terminal-restart action by the human;
@@ -245,6 +260,7 @@ The artifact is not ready for staff if any soak has:
 - an orphaned author, reviewer, test, or publish process;
 - a commit or push after cancellation;
 - a false success, missing verdict, or dirty completion;
+- an ordinary run reaching the 24-invocation budget;
 - wall-clock time or AI spend at or above three times the direct-AI baseline
   for the same task.
 
@@ -269,4 +285,3 @@ and leave no author or framework process running.
    soak and one previously passing soak on the same engine.
 7. Defer every feature request and cleanup that is not required by those
    results.
-

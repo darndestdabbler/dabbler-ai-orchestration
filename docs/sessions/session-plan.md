@@ -12963,11 +12963,11 @@ that names no param the call carried.
 
 **Releasable.** Yes, a patch: Haiku reviews over the API.
 
-### Session 213 of 216: One authority for each lifecycle fact
+### Session 213 of 217: One authority for each lifecycle fact
 
 Scope: whole repository
 
-**The goals sessions 213-216 serve (operator, 2026-09-20).** A human is
+**The goals sessions 213-217 serve (operator, 2026-09-20).** A human is
 bothered in the middle of a session only at the beginning, during planning;
 when an AI service is not available; or when the human chooses to ask a
 question or correct the course -- and, where it could not be asked at the
@@ -12979,7 +12979,8 @@ and the developer's experience is paramount: an extension that appears to
 hang, or does something that is not correct, is rejected. Consult round 18
 (`docs/design/consults/round18-synthesis.md`) set the order: authority, then
 noticing, then no Resume, then the governor -- because neither failed beta
-test would have reached a governor. A seven-session block planned the same
+test would have reached a governor. Round 19 put one session before the
+governor: a dispute ends inside the session (216). A seven-session block planned the same
 morning (commit `81a2ae80`) was the hole-by-hole path and is withdrawn; what
 its audits found is carried into the **Why** paragraphs here.
 
@@ -13066,7 +13067,7 @@ verified):
 
 **Non-goals.** No change to either release default. No verb that makes a held
 session releasable. No wait contract, no deadline and nothing about Resume
-(214, 215). No release preflight (215). No governor (216). `session next`
+(214, 215). No release preflight (215). No governor (217). `session next`
 is not removed: the extension's session commands, the Dabbler terminal and
 the walks run through it.
 
@@ -13095,7 +13096,7 @@ instruction, and a sentence that names what to do.
 **Releasable.** Yes, a minor: one verb gone, one added, and a consumer's
 session publishes only what its plan asked for.
 
-### Session 214 of 216: No silent wait
+### Session 214 of 217: No silent wait
 
 Scope: whole repository
 
@@ -13253,7 +13254,7 @@ no moment does `dabbler status` fail to name an owner and a clock.
 **Releasable.** Yes, a minor: a new action, and the session row says who it
 is waiting on.
 
-### Session 215 of 216: The loop outlives its questions, and Resume goes
+### Session 215 of 217: The loop outlives its questions, and Resume goes
 
 Scope: whole repository
 
@@ -13342,7 +13343,72 @@ either answer ends in a closed session.
 
 **Releasable.** Yes, a major: the Resume Session command is removed.
 
-### Session 216 of 216: An impasse goes to the Auxiliary Reviewer before it goes to a person
+### Session 216 of 217: A dispute ends inside the session
+
+Scope: whole repository
+
+**Why.** A disputed finding is the one impasse with no exit today. The
+Auxiliary Reviewer is asked only at the round cap -- 7 by default
+(`DEFAULT_VERIFICATION_ROUNDS`) -- though the impasse exists the moment the
+primary UPHOLDS a finding the author disputed with evidence, so up to four
+reviewer rounds are bought to repeat an argument neither side can end. And
+when the Auxiliary upholds, `runAdjudication` (`verify/disputes.ts`) writes a
+terminal row, no round may open after it, `verify reopen` refuses a session
+carrying it, and the fix is left to a follow-up session: the session cannot
+close and a person has to sort it out.
+
+The operator's proposal (2026-09-20), which consult round 19 adopted
+(`docs/design/consults/round19-synthesis.md`): the primary says what it would
+accept instead, and the Auxiliary chooses between the two resolutions. A
+choice between resolutions ends in something the author can carry out; a
+ruling on who was right does not. **Kept as small as it can be: no new role,
+no new verb, no new words on the record, no new kind of round.**
+
+**What.**
+1. **An uphold says what would settle it.** Where the primary UPHOLDS a
+   disputed finding, the same answer states its resolution: what changes, and
+   how one can tell it is done. An uphold without one is a malformed answer,
+   handled as a malformed answer already is. No extra call, and nothing is
+   asked of an ordinary finding.
+2. **The Auxiliary is asked then, not at the cap** -- once, for all of that
+   round's upheld disputes. It is shown each finding, the author's position
+   with its evidence, and the primary's resolution, and chooses one of the
+   two for each. The record keeps the two words it has: OVERRULED is the
+   author's position standing, UPHELD is the primary's resolution to be
+   carried out. It may raise nothing new, and an answer that is neither is a
+   stop for the person, as a malformed adjudication is today.
+3. **A ruling is not a terminal.** OVERRULED: the finding is withdrawn and no
+   later round may raise it. UPHELD: the author's next instruction is to
+   carry out that resolution, and a disposition that disputes it is refused.
+   The loop then goes on as it always does, under its ordinary cap, with the
+   ruled finding shown to the primary as settled -- it may say the resolution
+   was not carried out, and nothing else about it.
+4. **A finding is ruled on once, and a session is ruled on twice.** A third
+   impasse is the person's. "One adjudication per session, ever" goes, with
+   the refusal in `verify reopen` that rested on it.
+
+**Non-goals.** No third option for the Auxiliary. No new round type and no
+PASS/FAIL review. No change to who the Auxiliary is or how it is chosen. No
+change to the cap, or to the rule that a round of only minor findings ends
+the loop. The vocabulary inversion owed from earlier stays owed.
+
+**Tests.**
+- `disputes.test.ts`: an upheld dispute is sent to the Auxiliary in the round
+  that upheld it; UPHELD leaves the session able to open its next round, and
+  OVERRULED with nothing else blocking is VERIFIED; a third adjudication is
+  refused for the person.
+- `rounds.test.ts`: an uphold with no resolution is a malformed answer; a
+  ruled finding reaches the next round as settled.
+- `drive.test.ts`: after UPHELD the author is instructed with the resolution,
+  a disposition disputing it is refused, and the session closes.
+
+**Proof.** Replay a session whose primary upholds a disputed finding at round
+2: the Auxiliary is asked at round 2, the author carries out what it chose,
+and the session closes VERIFIED with no person asked -- once each way.
+
+**Releasable.** Yes, a minor.
+
+### Session 217 of 217: An impasse goes to the Auxiliary Reviewer before it goes to a person
 
 Scope: whole repository
 
@@ -13363,11 +13429,6 @@ non-goal), `verify reopen` (rounds, never a verdict), `hold-release` (213).
 Granting an exception is choosing, on the person's behalf, a way on that
 today only a person may choose.
 
-One impasse is known to have no exit at all (reported 2026-09-20, to be
-confirmed): an adjudication that UPHOLDS a finding writes a blocking
-terminal, the stop then shown describes a moved tree, and its first way on,
-`verify reopen`, refuses any session carrying an adjudication row.
-
 **What.**
 1. **When.** A stop a person would own that is none of: a planning question,
    an AI service that cannot be reached, something only a person possesses,
@@ -13382,16 +13443,13 @@ terminal, the stop then shown describes a moved tree, and its first way on,
 3. **What happens.** The framework runs the chosen entry, records it as a
    decision by that role with its reason, and carries on. An answer outside
    the menu is an escalation, at once. Two decisions a session, then the
-   person. The close lists every exception granted.
+   person -- one budget with 216's rulings, because it is one role. The
+   close lists every exception granted.
 4. **What it may never choose**: a cancel, a forced close, a verdict, an
    adjudication, anything that edits the record, or a release. As governor it
    has no write under the test roots: a role that grants exceptions does not
    alter the evidence it governs.
-5. **A lost dispute has a way on.** An upheld finding is a finding to fix:
-   its way on is the fix step and one round to review it, offered to the
-   governor and the person alike. The adjudication row stays the record of
-   who ruled; a dispute found for the author is unchanged.
-6. **Every governor decision is a defect report.** Each is on
+5. **Every governor decision is a defect report.** Each is on
    `supervision.jsonl` with the stop it answered; that list, not an audit, is
    what earns a deterministic fix.
 
@@ -13404,13 +13462,11 @@ vocabulary. The vocabulary inversion owed from earlier stays owed.
   closes with the exception in the close's rows; an answer outside the menu
   reaches the person; the third impasse of a session reaches the person; an
   unreachable reviewer reaches the person as the service it is.
-- `disputes.test.ts`: an upheld adjudication leaves the session able to open
-  exactly one round, for the fix.
 - `driver.test.ts`: no situation's menu offers the governor a cancel, a
   forced close or a release.
 
-**Proof.** Replay a step whose check is wrong, a round cap over a finding the
-author has fixed, and an upheld adjudication: each closes with no person
+**Proof.** Replay a step whose check is wrong and a round cap over a finding
+the author has fixed: each closes with no person
 asked and the exception named at the close. Replay a finding that would ship
 broken work: the governor escalates, and says why.
 

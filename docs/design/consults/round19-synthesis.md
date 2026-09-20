@@ -87,4 +87,8 @@ becomes 217.** The dispute comes first because it is the one impasse known to
 have no exit today (`runAdjudication` writes a terminal row on an uphold and
 no round may open after it), and the governor's item 5 is then already done.
 
-*Awaiting the operator's approval.*
+*Approved by the operator, 2026-09-20 -- "keep it as simple as possible" --
+and planned as session 216, with the governor as 217. Made smaller in the
+planning: the record keeps the two words it has (OVERRULED is the author's
+position standing, UPHELD is the primary's resolution to be carried out), so
+there is no new vocabulary, no new verb and no new kind of round.*

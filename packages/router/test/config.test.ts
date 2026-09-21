@@ -24,7 +24,11 @@ import {
   loadConfigFrom,
   resetProjectRootCache,
   resolveGenerationParams,
+  explainEngine,
   explainReviewingTransport,
+  explainRoleModel,
+  keptIn,
+  layerOfSource,
   resolveTransport,
   runRoundCap,
   splitSections,
@@ -45,6 +49,8 @@ import { gitAnswers, makeConfig, seed, tempDir } from "./support/answers.ts";
 import { writePreferences } from "../src/preferences.ts";
 import {
   SETTINGS_RELPATH,
+  SETTING_ENGINE,
+  SETTING_REVIEWER_MODEL,
   SETTING_REVIEWER_TRANSPORT,
   SETTING_TRANSPORT,
   writeSettings,
@@ -754,5 +760,49 @@ describe("resolving a secret", () => {
   it("reaches a registered backend without touching its callers", () => {
     registerBackend("test-backend", (name) => `from-${name}`);
     assert.equal(resolveSecret(NAME, "test-backend"), `from-${NAME}`);
+  });
+});
+
+describe("the engine and a reviewer's model, read through the layers", () => {
+  // Two windows on two repositories: a reviewer changed in one changed in
+  // the other, because the choice lived on the machine and nowhere else.
+  it("are this checkout's where it names one, and this machine's default where it does not", () => {
+    const mine = tempDir("layers-mine-");
+    const other = tempDir("layers-other-");
+    try {
+      writePreferences({ engine: "claude-code" });
+      writePreferences({ role: "reviewer", selected: "gpt-5.6-terra" });
+      writeSettings(mine, { [SETTING_ENGINE]: "copilot", [SETTING_REVIEWER_MODEL]: "claude-haiku-4.5" });
+
+      const engine = explainEngine(null, mine);
+      assert.equal(engine.transport, "copilot");
+      assert.match(String(engine.decidedBy), /settings\.json/);
+      // The machine's default is still there, shadowed and visible.
+      assert.deepEqual(engine.layers.map((layer) => layer.value), ["copilot", "claude-code"]);
+      assert.equal(explainRoleModel("reviewer", mine).transport, "claude-haiku-4.5");
+
+      // The other repository names none of its own: the machine's default is its.
+      assert.equal(explainEngine(null, other).transport, "claude-code");
+      assert.match(String(explainEngine(null, other).decidedBy), /preferences\.json/);
+      assert.equal(explainRoleModel("reviewer", other).transport, "gpt-5.6-terra");
+
+      // A flag on the call outranks both, and writes nothing.
+      assert.equal(explainEngine("codex", mine).transport, "codex");
+      // Where each choice is KEPT, as one closed word of four. A flag on the
+      // call is not a place a choice is kept, so the layer beneath it answers.
+      assert.equal(keptIn(explainEngine("codex", mine)), "checkout");
+      assert.equal(keptIn(explainEngine("codex", other)), "machine");
+      assert.equal(keptIn(explainRoleModel("reviewer", mine)), "checkout");
+      assert.equal(keptIn(explainRoleModel("reviewer", other)), "machine");
+      assert.equal(keptIn(explainRoleModel("auxiliary-reviewer", mine)), "default");
+      assert.equal(layerOfSource("transport.profile"), "shipped");
+      // A source no reading declares is a bug, said loudly rather than read as a default.
+      assert.throws(() => layerOfSource("somewhere nobody declared"), /no reading declares/);
+      // Nobody chose an auxiliary anywhere, which is not a default.
+      assert.equal(explainRoleModel("auxiliary-reviewer", mine).decidedBy, null);
+    } finally {
+      writePreferences({ engine: "" });
+      writePreferences({ role: "reviewer", selected: "" });
+    }
   });
 });

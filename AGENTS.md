@@ -215,11 +215,23 @@ it was restored from the later commit and re-rendered with
   layer that decided each value and the ones it shadows; `dabbler
   configuration options` answers "what could I choose", with whether this
   machine can reach each one.
-- **What the operator CHOSE lives beside the model catalog**, in
-  `preferences.json` under this platform's per-user data directory: the
-  engine, and the model selected for a role. The catalog is a reading and is
-  rebuildable for nothing, so a choice stored in it is a choice the next
-  free refresh wipes. A selection is used and never silently substituted; a
+- **Every choice a person makes is the REPOSITORY's, and the machine's is
+  only its default.** The engine (`dabbler.engine`), the authoring model
+  (`dabbler.authoringModel`) and each reviewer's model
+  (`dabbler.reviewerModel`, `dabbler.auxiliaryModel`) are read through the
+  same layers a vehicle is: a flag on the call > this checkout's
+  `.vscode/settings.json` > the machine's `preferences.json`, beside the
+  model catalog under this platform's per-user data directory. `dabbler
+  configure` writes the checkout — and the machine's default too, where the
+  machine has none; `--mine` writes the machine's default and only that. A
+  choice kept only on the machine was one choice for every repository on it:
+  changed in one window it changed in all of them, and two repositories
+  whose authors are different vendors had no reviewer both could start under.
+  The checkout's file is committed, so a choice travels to the next clone,
+  and a seat that does not list it is refused at `session start`, naming the
+  file and the command that changes it. Never the catalog: it is a reading,
+  rebuildable for nothing, and a choice stored in it is one the next free
+  refresh wipes. A selection is used and never silently substituted; a
   selection this call cannot reach is a stop that names it.
 - Git Bash heredocs mangle backslashes on this host — write files with
   your editing tools, never with a heredoc.

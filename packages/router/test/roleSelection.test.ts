@@ -33,16 +33,15 @@ import {
   type Candidate,
 } from "../src/selection.ts";
 import { writePreferences } from "../src/preferences.ts";
-import { makeConfig, setProviderKeys } from "./support/answers.ts";
+import { CONFIG_CHECKOUT_KEY } from "../src/config.ts";
+import { SETTING_REVIEWER_MODEL, writeSettings } from "../src/settings.ts";
+import { makeConfig, setProviderKeys, tempDir } from "./support/answers.ts";
 
 const KEYS = ["TEST_ANTHROPIC_KEY", "TEST_GOOGLE_KEY", "TEST_OPENAI_KEY"];
 
 /**
- * What this machine chose, for one role, in the file where choices live.
- *
- * Written through the preferences module rather than into a config, which
- * is the point of this step: a selection is a fact about who is at this
- * keyboard, so it does not travel inside a repository.
+ * What this machine chose, for one role: its default, which applies wherever
+ * the checkout names no reviewer of its own. Never a config's to say.
  */
 function withSelection(selected: Readonly<Record<string, string>>): void {
   for (const [role, model] of Object.entries(selected)) {
@@ -279,6 +278,22 @@ describe("a model a person selected", () => {
   it("leaves a role nobody selected resolving by preference, under the exclusion", () => {
     const config = makeConfig();
     assert.ok(!ids(resolveRole(config, ROLE_PRIMARY_REVIEWER, CANDIDATES, ["openai"])).includes("o-one"));
+  });
+
+  it("is this checkout's choice where it names one, over the machine's default", () => {
+    // One reviewer for every repository on a machine cannot serve two whose
+    // authors are different vendors: a reviewer is never from the author's.
+    const checkout = tempDir("role-selection-");
+    // A configuration loaded FOR a checkout says which; one built from named
+    // files has none, and is answered from the machine alone.
+    const here = { ...makeConfig(), [CONFIG_CHECKOUT_KEY]: checkout };
+    withSelection({ [ROLE_PRIMARY_REVIEWER]: "o-one" });
+    assert.equal(roleDeclaration(here, ROLE_PRIMARY_REVIEWER).selected, "o-one");
+    writeSettings(checkout, { [SETTING_REVIEWER_MODEL]: "g-one" });
+    assert.equal(roleDeclaration(here, ROLE_PRIMARY_REVIEWER).selected, "g-one");
+    assert.deepEqual(ids(resolveRole(here, ROLE_PRIMARY_REVIEWER, CANDIDATES)), ["g-one"]);
+    // And a configuration OF no checkout never reads one, whatever is around it.
+    assert.equal(roleDeclaration(makeConfig(), ROLE_PRIMARY_REVIEWER).selected, "o-one");
   });
 });
 

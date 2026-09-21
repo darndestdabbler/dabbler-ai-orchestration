@@ -135,6 +135,19 @@ answer now asks, and that a `wait` never reaches the engine.
   checkout's, and `dabbler configuration explain` says which layer decided
   it.
 
+- **Every choice is this repository's, and the machine's is only its
+  default.** The engine, the authoring model and each reviewer's model are
+  read the way a vehicle is: a flag on the call, then this checkout's
+  `.vscode/settings.json`, then this machine's `preferences.json`. `dabbler
+  configure` writes the checkout, and the machine's default as well where
+  the machine has none; with `--mine` it writes the machine's default and
+  nothing else. So two repositories open in two windows keep their own
+  reviewers, and a repository opened for the first time starts from what
+  the machine already prefers. `session start` with no `--engine` uses the
+  engine those layers name. The checkout's settings file is committed: a
+  choice travels to the next clone, and where their seat does not list it
+  the start refuses, naming the file and the one command that changes it.
+
 - **The round cap is not typeable on a driving call.** It is
   `verification.settings.max_rounds` in the configuration, and `next` and
   `drive` refuse `--max-rounds` rather than accepting it. It moved in both

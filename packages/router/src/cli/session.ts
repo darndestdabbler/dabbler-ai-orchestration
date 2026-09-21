@@ -18,8 +18,8 @@ import {
   builtInEngine,
   commandEngine,
 } from "../engines.ts";
-import { SessionsRootNotFoundError, resolveSessionsDir } from "../evidence.ts";
-import { chosenEngine } from "../preferences.ts";
+import { SessionsRootNotFoundError, repoRootFromSessionsDir, resolveSessionsDir } from "../evidence.ts";
+import { explainEngine } from "../config.ts";
 import { readSessionState } from "../progress.ts";
 import { DECIDERS } from "../writers.ts";
 import {
@@ -530,18 +530,17 @@ export async function sessionVerb(argv: string[]): Promise<number> {
   }
 
   if (subcommand === "start") {
-    // The flag, and otherwise what this machine CHOSE. The choice lives in
-    // the user-level preferences beside the model catalog for exactly this
-    // reason: it used to be a VS Code setting, which a terminal cannot read
-    // -- so half a machine's configuration was invisible to the one command
-    // that needs it, and every start typed at a shell asked again. The flag
-    // still wins, because a person who typed one meant it.
-    const engine = values.get("--engine") ?? chosenEngine() ?? undefined;
+    // The flag, then this checkout's choice, then this machine's default --
+    // the layers every choice is read through, from files this router reads
+    // for itself, so a start typed at a shell sees what the editor's pane set.
+    // The flag still wins, because a person who typed one meant it.
+    const engine =
+      explainEngine(values.get("--engine") ?? null, repoRootFromSessionsDir(sessionsDir)).transport || undefined;
     if (engine === undefined) {
       writeErr(
         "dabbler session start: the following arguments are required: --engine\n" +
-          "  This machine has chosen no engine either. Set one once, and every\n" +
-          "  start here is offered it:\n" +
+          "  Neither this checkout nor this machine has chosen an engine. Set one\n" +
+          "  once, and every start here uses it:\n" +
           "    dabbler configure --engine <claude-code|copilot|codex>\n",
       );
       return EXIT_USAGE;

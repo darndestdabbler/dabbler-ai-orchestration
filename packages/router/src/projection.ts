@@ -22,10 +22,14 @@ import {
   TRANSPORT_API,
   TRANSPORT_COPILOT_CLI,
   explainAuthoringModel,
+  explainEngine,
   explainReviewingTransport,
+  explainRoleModel,
   explainTransport,
+  keptIn,
   loadConfig,
   type RouterConfig,
+  type TransportReading,
 } from "./config.ts";
 import {
   CATALOG_REFRESH_COMMAND,
@@ -41,7 +45,6 @@ import {
 import { engineAliases, installedEngines } from "./engines.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { platformNewlines } from "./journal.ts";
-import { PREFERENCES_FILENAME, chosenEngine } from "./preferences.ts";
 import { dumps } from "./pythonJson.ts";
 import { readProjectGraph, usedBy } from "./projectGraph.ts";
 import { readRawSessionState } from "./sessionState.ts";
@@ -559,7 +562,7 @@ export function authoringNode(
   // disagreeing on exactly the machine sessions 131 and 132 were about.
   // `engineVehicleNode` already reads `inFlight ?? preferred`; this is the
   // same reading, so the two leaves cannot come apart again.
-  const engine = forEngine ?? inFlight ?? chosenEngine();
+  const engine = forEngine ?? inFlight ?? (explainEngine(null, root).transport || null);
   const vendor = engine === null ? undefined : ENGINE_PROVIDERS[engine];
   // The record THIS engine's CLI is spelled by. An engine nobody has mapped
   // reads the machine's own vehicle, which is where this started and is the
@@ -611,7 +614,8 @@ export function authoringNode(
   // of the two this is, so a report is never read as a choice.
   // The four-layer order, not one file: this checkout's committed setting
   // outranks this person's own default, exactly as it does for a vehicle.
-  const configured = explainAuthoringModel(forModel, root).transport;
+  const modelChoice = explainAuthoringModel(forModel, root);
+  const configured = modelChoice.transport;
   const declared = model ?? (configured === "" ? null : configured);
   const chosen =
     declared === null
@@ -620,6 +624,11 @@ export function authoringNode(
   return {
     role: "authoring",
     engine,
+    // Where the authoring model is KEPT for the next session. What a session
+    // in flight declared is `declaredAtStart`'s to say, not this field's.
+    selectedBy: modelChoice.decidedBy,
+    decidedLayer: keptIn(modelChoice),
+    selectionLayers: modelChoice.layers.map((layer) => ({ ...layer })),
     // **The author's PROVIDER, stated once and surviving an engine that
     // declares no model.**
     //
@@ -708,6 +717,7 @@ export function authoringNode(
 export const VEHICLE_ENGINE = "engine";
 export const VEHICLE_TRANSPORT = "transport";
 
+
 /** One option a vehicle row may offer, with what reaching it means. */
 function vehicleOption(id: string, means: string): Node {
   return { id, means };
@@ -716,16 +726,16 @@ function vehicleOption(id: string, means: string): Node {
 /**
  * Why the engine is the engine, when a person chose it.
  *
- * Said once, because a pane and a terminal disagreeing about the same
- * machine is the defect the preferences file exists to end: the choice used
- * to live in a VS Code setting, where `dabbler session start` from a
- * terminal could not read it.
+ * Said once, and naming the layer that decided it, because a pane and a
+ * terminal disagreeing about the same machine is the defect this reading
+ * exists to end: both read the checkout's settings file and the machine's
+ * preferences for themselves, in that order.
  */
-function enginePreferenceReason(engine: string): string {
+function enginePreferenceReason(choice: TransportReading): string {
   return (
-    `${engine} is what this machine's ${PREFERENCES_FILENAME} chose. It is ` +
-    "read by `dabbler session start` from any terminal, which is why it is a " +
-    "file beside the catalog rather than an editor setting."
+    `${choice.transport} is what ${choice.decidedBy} chose. ` +
+    "`dabbler session start` reads it from any terminal: this checkout's choice first, " +
+    "then this machine's default."
   );
 }
 
@@ -741,7 +751,8 @@ function engineVehicleNode(root: string): Node {
   const reading = installedEngines();
   const present = reading.engines.filter((entry) => entry.path !== null);
   const inFlight = orchestratorOf(root).engine;
-  const preferred = chosenEngine();
+  const choice = explainEngine(null, root);
+  const preferred = choice.transport || null;
   return {
     kind: VEHICLE_ENGINE,
     // Only what this machine has: an engine with no CLI on PATH is a way to
@@ -757,12 +768,16 @@ function engineVehicleNode(root: string): Node {
       inFlight !== null
         ? "session start"
         : preferred !== null
-          ? PREFERENCES_FILENAME
+          ? String(choice.decidedBy)
           : "installed on PATH",
+    // Where the engine is KEPT, as one closed word. A session in flight is a
+    // record and not a place a choice is kept: `decidedBy` says it, and this
+    // still says where the next session's engine comes from.
+    decidedLayer: keptIn(choice),
     // A choice here reaches the NEXT session and never the one on the
     // record: engine identity is stamped when the session is registered.
     appliesTo: "next-session",
-    reason: preferred === null ? reading.reason : enginePreferenceReason(preferred),
+    reason: preferred === null ? reading.reason : enginePreferenceReason(choice),
   };
 }
 
@@ -798,6 +813,7 @@ function reviewingVehicleNode(config: RouterConfig, root: string): Node {
       .map((entry) => ({ id: entry.transport, means: entry.means, note: entry.note })),
     chosen: reading.transport,
     decidedBy: reading.decidedBy,
+    decidedLayer: keptIn(reading),
     appliesTo: "next-session",
     layers: reading.layers.map((layer) => ({ ...layer })),
   };
@@ -950,6 +966,7 @@ export function configurationNode(
     // Two readings put two controls in front of an operator for one value,
     // and only one of them could be set.
     const reviewingVehicle = reviewingVehicleNode(config, root);
+    const engineChoice = explainEngine(null, root);
     const reviewingTransport = String(reviewingVehicle["chosen"]);
     /** A reviewing role as this machine would resolve it, on the reviewing vehicle. */
     const authorProvider = typeof authoring["provider"] === "string" ? authoring["provider"] : null;
@@ -959,9 +976,15 @@ export function configurationNode(
         vendorConflict(config, authorProvider, provider),
       );
       const selected = resolved["selected"];
+      const selection = explainRoleModel(role, root);
       return {
         ...resolved,
         vehicle: reviewingVehicle,
+        // Whose the selection is -- this checkout's, or this machine's default
+        // -- and what it shadows, so a row can say so and decide nothing.
+        selectedBy: selection.decidedBy,
+        decidedLayer: keptIn(selection),
+        selectionLayers: selection.layers.map((layer) => ({ ...layer })),
         // The reviewing vehicle whose list names neither the selection nor
         // a counterpart of it, or null. Announced, never cleared or
         // substituted: the round stops on it, and the row says so first.
@@ -979,14 +1002,18 @@ export function configurationNode(
       transport: {
         effective: transport.transport,
         decidedBy: transport.decidedBy,
+        decidedLayer: keptIn(transport),
         layers: transport.layers.map((layer) => ({ ...layer })),
       },
       engines: {
         // The preference where there is one, the machine's default where
         // there is not. Two answers to "which engine" is how a pane and a
         // terminal come to disagree about the same machine.
-        chosen: chosenEngine() ?? engines.chosen,
-        reason: chosenEngine() === null ? engines.reason : enginePreferenceReason(chosenEngine() as string),
+        chosen: engineChoice.transport || engines.chosen,
+        reason: engineChoice.decidedBy === null ? engines.reason : enginePreferenceReason(engineChoice),
+        decidedBy: engineChoice.decidedBy,
+        decidedLayer: keptIn(engineChoice),
+        layers: engineChoice.layers.map((layer) => ({ ...layer })),
         installed: engines.engines.map((entry) => ({ ...entry })),
       },
       authoring: { ...authoring, vehicle: engineVehicleNode(root) },

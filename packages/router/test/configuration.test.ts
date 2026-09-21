@@ -20,6 +20,8 @@ import { readPreferences, writePreferences } from "../src/preferences.ts";
 import { ROLE_AUXILIARY_REVIEWER } from "../src/selection.ts";
 import {
   SETTING_AUTHORING_MODEL,
+  SETTING_ENGINE,
+  SETTING_REVIEWER_MODEL,
   SETTING_CREDENTIAL_ANTHROPIC,
   SETTING_CREDENTIAL_OPENAI,
   SETTING_RELEASE,
@@ -93,7 +95,10 @@ function machine(): { root: string; restore: () => void } {
   return {
     root,
     restore: () => {
-      writePreferences({ engine: "" });
+      // Every default, not only the engine: a choice written to a checkout
+      // seeds a machine that has none, and the next test's machine has none.
+      writePreferences({ engine: "", transport: "", reviewerTransport: "", authoringModel: "" });
+      for (const role of ["reviewer", "auxiliary-reviewer"]) writePreferences({ role, selected: "" });
       ungit();
       resetProjectRootCache();
       for (const [name, value] of held) {
@@ -558,6 +563,55 @@ describe("a choice kept as this person's rather than this checkout's", () => {
     } finally {
       writeSettings(root, { [SETTING_AUTHORING_MODEL]: "" });
       writePreferences({ authoringModel: "" });
+      restore();
+    }
+  });
+});
+
+describe("whose a choice is, as the configuration and `explain` say it", () => {
+  it("names this checkout where it chose, the machine's default it shadows, and the default alone elsewhere", () => {
+    // A person with two windows open has to be able to see which of the two
+    // they are looking at: a value alone cannot say that.
+    const { root, restore } = machine();
+    try {
+      writePreferences({ role: "reviewer", selected: "claude-opus-5" });
+      const elsewhere = node(configurationNode(root)["primaryReviewer"]);
+      assert.match(String(elsewhere["selectedBy"]), /preferences\.json/);
+
+      writeSettings(root, { [SETTING_REVIEWER_MODEL]: "gpt-5.6-terra", [SETTING_ENGINE]: "copilot" });
+      const configuration = configurationNode(root);
+      const here = node(configuration["primaryReviewer"]);
+      assert.equal(here["selected"], "gpt-5.6-terra");
+      assert.match(String(here["selectedBy"]), /settings\.json/);
+      // The engine is read the same way, and the machine's `claude-code` is shadowed.
+      assert.equal(node(configuration["engines"])["chosen"], "copilot");
+      assert.match(String(node(configuration["engines"])["decidedBy"]), /settings\.json/);
+
+      // One closed word beside each sentence, under ONE name, for EVERY
+      // choice -- `checkout`, `machine`, `shipped` or `default` and no fifth --
+      // so a surface can behave differently for this repository's choice and
+      // this machine's default without reading a sentence for a word.
+      assert.equal(elsewhere["decidedLayer"], "machine");
+      assert.equal(here["decidedLayer"], "checkout");
+      assert.equal(node(configuration["engines"])["decidedLayer"], "checkout");
+      assert.equal(node(configuration["auxiliaryReviewer"])["decidedLayer"], "default");
+      assert.equal(node(configuration["transport"])["decidedLayer"], "checkout");
+      assert.equal(node(node(configuration["primaryReviewer"])["vehicle"])["decidedLayer"], "checkout");
+      // The authoring model too: nobody's, then the machine's, then this checkout's.
+      assert.equal(node(configuration["authoring"])["decidedLayer"], "default");
+      writePreferences({ authoringModel: "claude-opus-5" });
+      assert.equal(node(configurationNode(root)["authoring"])["decidedLayer"], "machine");
+      writeSettings(root, { [SETTING_AUTHORING_MODEL]: "claude-opus-5" });
+      const authoring = node(configurationNode(root)["authoring"]);
+      assert.equal(authoring["decidedLayer"], "checkout");
+      assert.match(String(authoring["selectedBy"]), /settings\.json/);
+
+      const said = renderExplain(configuration);
+      assert.match(said, /decides: .*settings\.json.*= gpt-5\.6-terra/);
+      assert.match(said, /shadowed: .*preferences\.json.*= claude-opus-5/);
+      assert.match(said, /shadowed: .*preferences\.json.*= claude-code/);
+    } finally {
+      writeSettings(root, { [SETTING_REVIEWER_MODEL]: "", [SETTING_ENGINE]: "", [SETTING_AUTHORING_MODEL]: "" });
       restore();
     }
   });

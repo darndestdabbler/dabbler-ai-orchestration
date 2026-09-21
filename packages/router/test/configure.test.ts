@@ -19,10 +19,18 @@ import {
 } from "../src/catalog.ts";
 import { configure } from "../src/cli/configure.ts";
 import { resetProjectRootCache } from "../src/config.ts";
-import { writePreferences } from "../src/preferences.ts";
+import { readPreferences, writePreferences } from "../src/preferences.ts";
 import { configurationNode } from "../src/projection.ts";
 import { ROLE_AUXILIARY_REVIEWER, ROLE_PRIMARY_REVIEWER } from "../src/selection.ts";
-import { SETTING_REVIEWER_TRANSPORT, SETTING_TRANSPORT, writeSettings } from "../src/settings.ts";
+import {
+  SETTING_AUXILIARY_MODEL,
+  SETTING_ENGINE,
+  SETTING_REVIEWER_MODEL,
+  SETTING_REVIEWER_TRANSPORT,
+  SETTING_TRANSPORT,
+  settingValue,
+  writeSettings,
+} from "../src/settings.ts";
 import { setSeatIdentity } from "../src/transports/copilot.ts";
 import { gitAnswers, tempDir } from "./support/answers.ts";
 
@@ -99,7 +107,7 @@ function machine(): () => void {
   });
   return () => {
     clearSelections();
-    writePreferences({ engine: "" });
+    writePreferences({ engine: "", transport: "", reviewerTransport: "", authoringModel: "" });
     setSeatIdentity(null);
     ungit();
     resetProjectRootCache();
@@ -110,9 +118,11 @@ function machine(): () => void {
   };
 }
 
-function clearSelections(): void {
+/** Nobody has selected a reviewer: not this machine, and not the checkout named. */
+function clearSelections(root?: string): void {
   writePreferences({ role: ROLE_PRIMARY_REVIEWER, selected: "" });
   writePreferences({ role: ROLE_AUXILIARY_REVIEWER, selected: "" });
+  if (root !== undefined) writeSettings(root, { [SETTING_REVIEWER_MODEL]: "", [SETTING_AUXILIARY_MODEL]: "" });
 }
 
 describe("configure, called for a checkout it is not standing in", () => {
@@ -140,7 +150,7 @@ describe("configure, called for a checkout it is not standing in", () => {
               const offered = offeredIds(configuration[participant]);
               assert.ok(offered.length > 0, `${where}: ${participant} offers nothing`);
               for (const model of offered) {
-                clearSelections();
+                clearSelections(root);
                 const outcome = configure({ repoRoot: root, [flag]: model });
                 assert.equal(outcome.refusal, null, `${where}: ${participant} '${model}'`);
                 picks += 1;
@@ -164,6 +174,56 @@ describe("configure, called for a checkout it is not standing in", () => {
       const outcome = configure({ repoRoot: root, reviewerModel: "claude-haiku-4.5" });
       assert.match(String(outcome.refusal), /the api transport/);
       assert.deepEqual(outcome.changed, []);
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe("where a choice made with configure is kept", () => {
+  // Two windows on two repositories: a reviewer changed in one changed in the
+  // other, because it was kept on the machine and nowhere else.
+  it("is the checkout's own, and also the machine's default only where the machine had none", () => {
+    const restore = machine();
+    try {
+      const first = tempDir("configure-first-");
+      const second = tempDir("configure-second-");
+      for (const root of [first, second]) writeSettings(root, { [SETTING_TRANSPORT]: TRANSPORT_API });
+
+      // The first repository a person configures is how a machine gets defaults.
+      const seeded = configure({ repoRoot: first, engine: "claude-code", reviewerModel: "gpt-5.6-sol" });
+      assert.equal(seeded.refusal, null);
+      assert.equal(settingValue(first, SETTING_ENGINE), "claude-code");
+      assert.equal(settingValue(first, SETTING_REVIEWER_MODEL), "gpt-5.6-sol");
+      assert.equal(readPreferences().engine, "claude-code");
+      assert.equal(readPreferences().selected?.[ROLE_PRIMARY_REVIEWER], "gpt-5.6-sol");
+      assert.ok(seeded.changed.some((line) => /this machine's default too/.test(line)), seeded.changed.join("\n"));
+
+      // The second repository's own choice is its own: the first keeps its
+      // reviewer, and the machine keeps the default it already had.
+      const own = configure({ repoRoot: second, reviewerModel: "gemini-3.1-pro" });
+      assert.equal(own.refusal, null);
+      assert.equal(settingValue(second, SETTING_REVIEWER_MODEL), "gemini-3.1-pro");
+      assert.equal(settingValue(first, SETTING_REVIEWER_MODEL), "gpt-5.6-sol");
+      assert.equal(readPreferences().selected?.[ROLE_PRIMARY_REVIEWER], "gpt-5.6-sol");
+      assert.ok(!own.changed.some((line) => /this machine's default too/.test(line)), own.changed.join("\n"));
+    } finally {
+      restore();
+    }
+  });
+
+  it("is the machine's default and nothing else with --mine, for every choice alike", () => {
+    const restore = machine();
+    try {
+      const root = tempDir("configure-mine-");
+      writeSettings(root, { [SETTING_TRANSPORT]: TRANSPORT_API });
+      const kept = configure({ repoRoot: root, engine: "claude-code", reviewerModel: "gpt-5.6-sol", mine: true });
+      assert.equal(kept.refusal, null);
+      assert.equal(readPreferences().engine, "claude-code");
+      assert.equal(readPreferences().selected?.[ROLE_PRIMARY_REVIEWER], "gpt-5.6-sol");
+      // Nothing of it is this checkout's, so the next clone is told nothing.
+      assert.equal(settingValue(root, SETTING_ENGINE), null);
+      assert.equal(settingValue(root, SETTING_REVIEWER_MODEL), null);
     } finally {
       restore();
     }

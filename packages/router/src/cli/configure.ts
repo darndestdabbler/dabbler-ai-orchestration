@@ -5,15 +5,16 @@
 // Each is checked against the rules selection already owns before anything is
 // written.
 //
-// **Two layers, and which one a setting lands in is not arbitrary.** A
-// VEHICLE is a property of this checkout -- one repository may need the seat
-// while another runs on keys -- so `--transport` and `--reviewer-transport`
-// go to the machine-local overlay beside the project. An ENGINE and a MODEL
-// are properties of the person and their machine, so they go to
-// `preferences.json` at the user level, beside the catalog, where a terminal
-// in any repository and a pane in any window read one answer. The answer says
-// which file it wrote, every time, because a setting whose home is a guess is
-// a setting somebody will look for in the wrong place.
+// **One rule for where a choice lands.** Every choice is this CHECKOUT's,
+// written to its own `.vscode/settings.json`, and `--mine` makes it this
+// machine's default instead -- the value a checkout that names none falls
+// back to. A choice that lived only on the machine was one choice for every
+// repository on it: changed in one window it changed in all of them, and two
+// repositories whose authors are different vendors had no reviewer both
+// could start under. A machine with no default for a choice takes the first
+// one a checkout is given. The answer says which file it wrote, every time,
+// because a setting whose home is a guess is a setting somebody will look
+// for in the wrong place.
 //
 // **A vehicle belongs to a role.** `--transport` is the machine's own, used
 // where no role says otherwise; `--reviewer-transport` is the Primary
@@ -51,6 +52,7 @@ import {
   VALID_TRANSPORTS,
   explainReviewingTransport,
   explainAuthoringModel,
+  explainRoleModel,
   explainTransport,
   loadConfig,
   writeConfigurationChoice,
@@ -59,7 +61,12 @@ import {
 import { BUILT_IN_ENGINES } from "../engines.ts";
 import { repoRootFor } from "../journal.ts";
 import { configuredModelRefusal } from "../session.ts";
-import { PREFERENCES_FILENAME, selectedModel, writePreferences } from "../preferences.ts";
+import {
+  PREFERENCES_FILENAME,
+  readPreferences,
+  writePreferences,
+  type Preferences,
+} from "../preferences.ts";
 import { credentialProvider, holdsCredential, looksLikeASecret } from "../credentials.ts";
 import { vehicleRefusal } from "../discovery.ts";
 import {
@@ -104,11 +111,11 @@ function usage(): string {
     "  what the NEXT session is run with",
     "",
     "options:",
-    `  --engine E              ${BUILT_IN_ENGINES.join(" | ")}; which engine the`,
-    "                          next session is offered. It is written beside the",
-    "                          catalog at the USER level -- not into a repository",
-    "                          and not into an editor setting -- so a terminal and",
-    "                          a pane read one answer. An empty value clears it",
+    `  --engine E              ${BUILT_IN_ENGINES.join(" | ")}; which engine`,
+    "                          authors the next session here. Like every choice",
+    `                          it is written to ${SETTINGS_RELPATH} in this`,
+    "                          checkout, which a terminal and a pane both read.",
+    "                          An empty value clears it",
     `  --transport T           ${VALID_TRANSPORTS.join(" | ")}; the machine's own`,
     "                          vehicle -- how a provider is reached where no role",
     `                          says otherwise. Written to ${SETTINGS_RELPATH}`,
@@ -146,14 +153,13 @@ function usage(): string {
     "                          default a plan holds with `hold_release`. Written",
     `                          to ${SETTINGS_RELPATH} only: it is the solution's`,
     `  ${MINE_FLAG}                  keep this as YOUR default rather than this`,
-    `                          checkout's: --transport, --reviewer-transport and`,
-    "                          --authoring-model go to the user-level",
+    `                          checkout's: the choice goes to the user-level`,
     `                          ${PREFERENCES_FILENAME} instead of`,
     `                          ${SETTINGS_RELPATH}, which is committed and`,
     "                          travels to everyone who clones. The same checks",
     "                          run and the same refusals come back; only where",
-    "                          it lands changes. --engine and the two reviewing",
-    "                          models are already yours and are unaffected",
+    "                          it lands changes. It holds for every choice alike:",
+    "                          the engine and the two reviewing models as well",
     "  --repo-root PATH        the repository; derived from the cwd when absent",
     "  -h, --help              show this message",
     "",
@@ -188,7 +194,42 @@ const WORDS: Record<string, string> = {
   transport: "vehicle",
   reviewerTransport: "reviewing vehicle",
   authoringModel: "authoring model",
+  engine: "engine",
+  reviewerModel: "Primary Reviewer's model",
+  auxiliaryModel: "Auxiliary Reviewer's model",
 };
+
+/** Every choice a person makes here, by the name `configure` knows it by. */
+type ChoiceKey = "transport" | "reviewerTransport" | "authoringModel" | "engine" | "reviewerModel" | "auxiliaryModel";
+
+/** The two choices the machine keeps as a role's selection rather than as a field of its own. */
+const ROLE_OF_CHOICE: Partial<Record<ChoiceKey, string>> = {
+  reviewerModel: ROLE_PRIMARY_REVIEWER,
+  auxiliaryModel: ROLE_AUXILIARY_REVIEWER,
+};
+const CHOICE_OF_ROLE: Record<string, ChoiceKey> = {
+  [ROLE_PRIMARY_REVIEWER]: "reviewerModel",
+  [ROLE_AUXILIARY_REVIEWER]: "auxiliaryModel",
+};
+
+/** The machine's file as it stands, or nothing where it cannot be read: an unreadable file holds no default. */
+function heldPreferences(): Partial<Preferences> {
+  try {
+    return readPreferences();
+  } catch {
+    return {};
+  }
+}
+
+/** What the machine already holds for one choice, or null where it holds none. */
+function machineHolds(held: Partial<Preferences>, key: ChoiceKey): string | null {
+  const role = ROLE_OF_CHOICE[key];
+  if (role !== undefined) return held.selected?.[role] ?? null;
+  if (key === "transport") return held.transport ?? null;
+  if (key === "reviewerTransport") return held.reviewer_transport ?? null;
+  if (key === "authoringModel") return held.authoring_model ?? null;
+  return held.engine ?? null;
+}
 
 /** How many names to spell before a refusal stops being readable. */
 const NAMES_IN_A_REFUSAL = 12;
@@ -462,7 +503,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     // model is excluded with it -- every time, and the operator was told so in
     // the abstract while being allowed to do it.
     const primary =
-      named["reviewerModel"] ?? selectedModel(ROLE_PRIMARY_REVIEWER);
+      named["reviewerModel"] ?? (explainRoleModel(ROLE_PRIMARY_REVIEWER, options.repoRoot).transport || null);
     if (
       primary !== null &&
       primary !== undefined &&
@@ -615,10 +656,31 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
         `${reference}\` has been run here.`;
     }
   }
+  // **One rule for every choice.** It is this CHECKOUT's, written to its own
+  // settings file, unless `--mine` makes it this machine's default and
+  // nothing else. A choice kept only on the machine was one choice for every
+  // repository on it: changed in one window, it changed in all of them.
+  //
+  // A choice written to the checkout also becomes the machine's default WHERE
+  // THE MACHINE HAS NONE: the first repository a person configures is how a
+  // machine comes to have defaults at all, and every later one leaves them
+  // as they are.
+  const held = heldPreferences();
   const personal: Record<string, string> = {};
-  const settle = (key: "transport" | "reviewerTransport" | "authoringModel", value: string): void => {
-    if (options.mine === true) personal[key] = value;
-    else Object.assign(choice, { [key]: value });
+  const roles: Array<readonly [string, string]> = [];
+  const seeded: string[] = [];
+  const settle = (key: ChoiceKey, value: string): void => {
+    const role = ROLE_OF_CHOICE[key];
+    const keepOnMachine = (): void => {
+      if (role === undefined) personal[key] = value;
+      else roles.push([role, value]);
+    };
+    if (options.mine === true) return keepOnMachine();
+    Object.assign(choice, { [key]: value });
+    if (value !== "" && machineHolds(held, key) === null) {
+      keepOnMachine();
+      seeded.push(key);
+    }
   };
   if (options.transport !== undefined) settle("transport", options.transport);
   if (named["authoringModel"] !== undefined) settle("authoringModel", named["authoringModel"]);
@@ -626,14 +688,6 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     settle("reviewerTransport", options.reviewerTransport);
   }
   if (release !== undefined) Object.assign(choice, { release });
-  // The engine and the SELECTION go to the USER-level preferences beside the
-  // catalog, not to the repository's overlay and not to an editor setting.
-  // Both are facts about who is at this keyboard: the engine is what
-  // `dabbler session start` is given from any terminal, and which model
-  // reviews is a choice about what this machine can reach. A selection that
-  // travelled inside a checkout would tell the next clone about somebody
-  // else's seat.
-  //
   // **Every refusal comes before every write.** One call may set several
   // things, and a call that wrote the acceptable half before refusing the
   // rest would leave the operator's own preferences half-changed by a
@@ -652,39 +706,40 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
         `It is one of: ${BUILT_IN_ENGINES.join(", ")}.`,
     };
   }
-  const preferenceLines: string[] = [];
-  // The personal half of a `--mine` call, written as the one preferences
-  // write it is: one file, one read-modify-write, so a call setting two of
-  // them cannot leave the file holding half of them.
-  if (Object.keys(personal).length > 0) {
-    writePreferences(personal);
-    for (const [key, value] of Object.entries(personal)) {
-      preferenceLines.push(
-        value === ""
-          ? `${PREFERENCES_FILENAME} no longer carries your own ${WORDS[key]}`
-          : `${PREFERENCES_FILENAME} keeps '${value}' as your own ${WORDS[key]}, ` +
-            `which applies wherever a checkout names none`,
-      );
-    }
-  }
+  if (engine !== undefined) settle("engine", engine);
   // The id the catalog lists is what was checked and is what is written:
   // there is no second name for a model to be translated into on the way to
   // the file, which is the round trip `aliasFor` and `modelIdOf` existed for.
-  if (named["reviewerModel"] !== undefined) {
-    writePreferences({
-      role: ROLE_PRIMARY_REVIEWER,
-      selected: named["reviewerModel"],
-    });
+  if (named["reviewerModel"] !== undefined) settle("reviewerModel", named["reviewerModel"]);
+  if (named["auxiliaryModel"] !== undefined) settle("auxiliaryModel", named["auxiliaryModel"]);
+  const preferenceLines: string[] = [];
+  // The machine's half, written as the one preferences write it is: one
+  // file, one read-modify-write, so a call setting two of them cannot leave
+  // the file holding half of them. A role's selection is a write of its own.
+  if (Object.keys(personal).length > 0) writePreferences(personal);
+  for (const [role, selected] of roles) writePreferences({ role, selected });
+  const kept: Array<readonly [ChoiceKey, string]> = [
+    ...(Object.entries(personal) as Array<[ChoiceKey, string]>),
+    ...roles.map(([role, value]) => [CHOICE_OF_ROLE[role] as ChoiceKey, value] as const),
+  ];
+  for (const [key, value] of kept) {
+    preferenceLines.push(
+      seeded.includes(key)
+        ? `${PREFERENCES_FILENAME} named no ${WORDS[key]}, so '${value}' is this machine's default too; ` +
+          "it applies wherever a checkout names none"
+        : value === ""
+          ? `${PREFERENCES_FILENAME} no longer carries your own ${WORDS[key]}`
+          : `${PREFERENCES_FILENAME} keeps '${value}' as your own ${WORDS[key]}, ` +
+            `which applies wherever a checkout names none`,
+    );
+  }
+  if (named["reviewerModel"] !== undefined && named["reviewerModel"] !== "") {
     preferenceLines.push(
       `the Primary Reviewer is '${named["reviewerModel"]}'; it is used and ` +
         "never silently substituted",
     );
   }
-  if (named["auxiliaryModel"] !== undefined) {
-    writePreferences({
-      role: ROLE_AUXILIARY_REVIEWER,
-      selected: named["auxiliaryModel"],
-    });
+  if (named["auxiliaryModel"] !== undefined && named["auxiliaryModel"] !== "") {
     preferenceLines.push(
       `the Auxiliary Reviewer is '${named["auxiliaryModel"]}'; an ` +
         "adjudication still excludes every provider that has already " +
@@ -706,14 +761,6 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     } else {
       Object.assign(choice, { credentialProvider: provider, credential: reference });
     }
-  }
-  if (engine !== undefined) {
-    writePreferences({ engine });
-    preferenceLines.push(
-      engine === ""
-        ? `no engine is chosen; ${PREFERENCES_FILENAME} carries none`
-        : `${PREFERENCES_FILENAME} chooses '${engine}' for the next session`,
-    );
   }
   if (Object.keys(choice).length === 0 && preferenceLines.length === 0) {
     return {

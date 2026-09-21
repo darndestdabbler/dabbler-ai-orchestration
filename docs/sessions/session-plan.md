@@ -14126,8 +14126,16 @@ for every choice alike (rule 4's verb).
 **Step 3 -- `configuration explain` and the projection say whose each choice
 is.** For every choice: the layer that decided it, and what it shadows. The
 projection carries, for each participant's vehicle and model and for the
-engine, `decided_by` (`checkout` | `machine` | `shipped` | `default`), so the
-pane can say it without deciding anything itself.
+engine, WHERE THE CHOICE IS KEPT as one closed word -- `checkout` | `machine`
+| `shipped` | `default`, and no fifth -- so the pane can say it without
+deciding anything itself. The field is `decidedLayer`, under that one name on
+every node, beside the `decidedBy` sentence those nodes already carry: the
+configuration node is camelCase throughout, and this plan first wrote the
+name in snake case, which would have put `decided_by` and `decidedBy` side by
+side meaning two different things. A flag on a call and a session in flight
+are not places a choice is kept, so neither is a value: a flag's reading
+answers with the layer beneath it, and a session in flight is what
+`declaredAtStart` and the `decidedBy` sentence already report.
 
 **Step 4 -- a start with no flags uses the Configuration.** `session start`
 given no `--engine` and no `--model` takes both from the layers; given them,

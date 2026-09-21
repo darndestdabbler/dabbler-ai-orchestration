@@ -12161,6 +12161,38 @@
       "task": "Fix two things read from the operator's csv-parser walk. (1) A releasable Maven session on Windows cannot publish: `runStep` in packaging.ts starts its command with a bare spawnSync, the one argv in the router that does not go through `spawnSyncProgram`, so `mvn` (a `.cmd` shim) cannot start -- the record says `could not start: ENOENT: spawnSync mvn ENOENT` and the stop said only `pack: exit null`. runStep uses spawnSyncProgram, and a step whose exit is null is printed with its own output line so the stop says why. (2) The Dabbler Terminal cut a job's output in two: in one poll it drained the job's log under the job's divider and only then said `working`, so the next read was drawn under the divider again and the operator took the tail for the whole. `poll` says the activity before it drains the job logs. Patch-sized fixes that ride in the unpublished 3.17.0; this session publishes nothing.",
       "releasable": false,
       "holdReason": "It rides in the 3.17.0 the operator is walking as a local VSIX; nothing is tagged until they say so."
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 224,
+      "dateTime": "2026-09-21T06:28:56.991000-04:00",
+      "task": "Give every configured choice the repository's own layer, by the operator's six rules of 2026-09-21. The engine, the Primary Reviewer's model and the Auxiliary Reviewer's model are today kept only in the per-user preferences.json, so a change in one VS Code window is a change in every repository on the machine; their checkout settings (`dabbler.engine`, `dabbler.reviewerModel`, `dabbler.auxiliaryModel`) are declared in settings.ts and read or written by nothing. They join the four layers the vehicle and the authoring model already use -- a flag on the call, this checkout's .vscode/settings.json, the machine's preferences.json, what ships -- and no fifth is added. `dabbler configure` writes the checkout and also seeds the machine's default where it holds none; `--mine` writes the machine's default only. `configuration explain` and the projection say which layer decided each choice. `session start` with no `--engine` reads the engine through the same layers. This is the router's half; the extension's half is session 225. Nothing is published: it ships with 225 after the operator walks a local VSIX.",
+      "releasable": false,
+      "holdReason": "It ships with session 225 as one release, after the operator has walked a locally built VSIX and said yes."
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 224,
+      "dateTime": "2026-09-21T06:33:04.633000-04:00",
+      "what": "step 'a-layer-for-every-choice': its files",
+      "reason": "role selection is tested in roleSelection.test.ts; selection.test.ts is about test selection",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 224,
+      "dateTime": "2026-09-21T06:40:09.291000-04:00",
+      "what": "step 'configure-saves-to-the-repository': its files",
+      "reason": "configuration.test.ts's machine helper must clear every default a checkout's choice now seeds",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 224,
+      "dateTime": "2026-09-21T06:45:32.979000-04:00",
+      "what": "step 'explain-says-whose-each-choice-is': its files",
+      "reason": "a role's selection must be read from the checkout the configuration was loaded FOR, which the loaded config now records; the test sits beside the authoring model's in configuration.test.ts",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

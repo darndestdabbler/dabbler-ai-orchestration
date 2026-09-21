@@ -57,7 +57,10 @@ import {
   CREDENTIAL_SETTING_BY_PROVIDER,
   SETTINGS_RELPATH,
   SETTING_AUTHORING_MODEL,
+  SETTING_AUXILIARY_MODEL,
+  SETTING_ENGINE,
   SETTING_RELEASE,
+  SETTING_REVIEWER_MODEL,
   SETTING_REVIEWER_TRANSPORT,
   SETTING_TRANSPORT,
   type SettingKey,
@@ -453,10 +456,23 @@ export function loadConfig(path?: string, projectDir?: string): RouterConfig {
   // setting invisible in a checkout that is not a repository, which the
   // walk found on its first reading: the pane said "nothing resolves" over
   // a setting it was rendering the vehicle from two rows above.
-  return withCredentialReferences(
-    loadConfigFrom(resolveConfigSources(path, projectDir)),
-    projectDir ?? projectRoot(),
-  );
+  const checkout = projectDir ?? projectRoot();
+  const config = withCredentialReferences(loadConfigFrom(resolveConfigSources(path, projectDir)), checkout);
+  // Which checkout this configuration is OF. A choice read through the layers
+  // is read from that checkout's settings, and a caller asking about a
+  // repository it is not standing in -- the pane always is -- must not be
+  // answered from the directory it happens to run in.
+  config[CONFIG_CHECKOUT_KEY] = checkout;
+  return config;
+}
+
+/** Where a loaded configuration records the checkout it was loaded for. */
+export const CONFIG_CHECKOUT_KEY = "_checkout";
+
+/** The checkout a configuration was loaded for, or null for one loaded from named files. */
+export function checkoutOf(config: RouterConfig): string | null {
+  const checkout = config[CONFIG_CHECKOUT_KEY];
+  return typeof checkout === "string" && checkout !== "" ? checkout : null;
 }
 
 /**
@@ -1030,22 +1046,152 @@ export function explainAuthoringModel(
   root?: string | null,
 ): TransportReading {
   const checkout = root ?? projectRoot();
-  const candidates: ReadonlyArray<readonly [string, unknown]> = [
+  // A model id goes through unnormalised: the date suffix is what makes a
+  // pin a pin, and the CLI is the authority on whether it knows the id.
+  return explainChoice([
     [AUTHORING_MODEL_SOURCE_FLAG, cliFlag ?? null],
     [AUTHORING_MODEL_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_AUTHORING_MODEL] ?? null],
     [AUTHORING_MODEL_SOURCE_PREFERENCES, personalAuthoringModel()],
-  ];
+  ]);
+}
+
+/** Where a reviewing role's model, or the engine, can be named: a flag, this checkout, this machine. */
+export const REVIEWER_MODEL_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_REVIEWER_MODEL})`;
+export const AUXILIARY_MODEL_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_AUXILIARY_MODEL})`;
+export const ENGINE_SOURCE_FLAG = "--engine on this call";
+export const ENGINE_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_ENGINE})`;
+export const ENGINE_SOURCE_PREFERENCES = "preferences.json (engine)";
+
+/**
+ * Which of the layers a choice came from, as one closed word.
+ *
+ * `decidedBy` is a sentence for a person -- the file, and the key in it. A
+ * surface that has to BEHAVE differently for this repository's choice and
+ * this machine's default needs a value it can compare, and one that read the
+ * sentence for the word "settings" would be a contract nobody declared.
+ */
+export type ChoiceLayer = "checkout" | "machine" | "shipped" | "default";
+
+/**
+ * Where a choice is KEPT: the first layer that holds one, or `default`.
+ *
+ * Four values and no fifth. A flag on a call is not a place a choice is
+ * kept -- it is gone when the call returns -- so a reading that a flag
+ * decided still answers with the layer that holds the choice underneath it;
+ * a session in flight is a record and is reported as one elsewhere.
+ */
+export function keptIn(reading: TransportReading): ChoiceLayer {
+  for (const layer of reading.layers) {
+    const kept = layerOfSource(layer.source);
+    if (kept !== null) return kept;
+  }
+  return "default";
+}
+
+/** The layer a source IS, or null for a flag on the call. A source nobody declared is a bug a test finds. */
+export function layerOfSource(source: string): Exclude<ChoiceLayer, "default"> | null {
+  if (
+    source === TRANSPORT_SOURCE_FLAG ||
+    source === AUTHORING_MODEL_SOURCE_FLAG ||
+    source === ENGINE_SOURCE_FLAG
+  ) {
+    return null;
+  }
+  if (
+    source === TRANSPORT_SOURCE_SETTINGS ||
+    source === REVIEWING_SOURCE_SETTINGS ||
+    source === AUTHORING_MODEL_SOURCE_SETTINGS ||
+    source === REVIEWER_MODEL_SOURCE_SETTINGS ||
+    source === AUXILIARY_MODEL_SOURCE_SETTINGS ||
+    source === ENGINE_SOURCE_SETTINGS
+  ) {
+    return "checkout";
+  }
+  if (
+    source === TRANSPORT_SOURCE_PREFERENCES ||
+    source === REVIEWING_SOURCE_PREFERENCES ||
+    source === AUTHORING_MODEL_SOURCE_PREFERENCES ||
+    source === ENGINE_SOURCE_PREFERENCES ||
+    source === roleModelSourcePreferences("reviewer") ||
+    source === roleModelSourcePreferences("auxiliary-reviewer")
+  ) {
+    return "machine";
+  }
+  if (source === TRANSPORT_SOURCE_CONFIG || source === TRANSPORT_SOURCE_ROLE) return "shipped";
+  throw new ConfigError(`'${source}' is a layer no reading declares`);
+}
+
+/** The machine's own default for `role`'s model, as the layers name it. */
+export function roleModelSourcePreferences(role: string): string {
+  return `preferences.json (selected.${role})`;
+}
+
+/**
+ * One choice read through the layers, first named wins.
+ *
+ * Every choice a person makes is decided the same way -- a flag on this
+ * call, then this CHECKOUT, then this MACHINE's default -- because a choice
+ * that lived only on the machine was one choice for every repository on it:
+ * changed in one window, it changed in all of them, and two repositories
+ * whose authors are different vendors had no reviewer both could start under.
+ */
+function explainChoice(candidates: ReadonlyArray<readonly [string, unknown]>): TransportReading {
   const layers: TransportLayer[] = candidates
     .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
     .map(([source, value]) => ({ source, value: String(value) }));
   const decided = layers[0];
-  // A model id goes through unnormalised: the date suffix is what makes a
-  // pin a pin, and the CLI is the authority on whether it knows the id.
   return {
     transport: decided === undefined ? "" : decided.value.trim(),
     decidedBy: decided === undefined ? null : decided.source,
     layers,
   };
+}
+
+/** The checkout setting a reviewing role's model is named by, or null for a role that has none. */
+function roleModelSetting(role: string): readonly [SettingKey, string] | null {
+  if (role === "reviewer") return [SETTING_REVIEWER_MODEL, REVIEWER_MODEL_SOURCE_SETTINGS];
+  if (role === "auxiliary-reviewer") return [SETTING_AUXILIARY_MODEL, AUXILIARY_MODEL_SOURCE_SETTINGS];
+  return null;
+}
+
+/**
+ * The model selected for a reviewing role, and every layer that named one.
+ *
+ * `decidedBy` is null where nobody selected one, which is not a default: the
+ * role's preference order then decides, as it always has.
+ *
+ * `root` is the checkout asked about. Null is a configuration that HAS none
+ * -- one loaded from named files -- and is answered from the machine alone:
+ * looking for a repository around the process instead would answer for
+ * whichever one the call happened to be standing in.
+ */
+export function explainRoleModel(role: string, root: string | null): TransportReading {
+  const setting = roleModelSetting(role);
+  return explainChoice([
+    ...(setting === null || root === null
+      ? []
+      : [[setting[1], checkoutSettings(root)[setting[0]] ?? null] as const]),
+    [roleModelSourcePreferences(role), personal(() => readPreferences().selected?.[role])],
+  ]);
+}
+
+/** The engine in force, and every layer that named one. */
+export function explainEngine(cliFlag?: string | null, root?: string | null): TransportReading {
+  const checkout = root ?? projectRoot();
+  return explainChoice([
+    [ENGINE_SOURCE_FLAG, cliFlag ?? null],
+    [ENGINE_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_ENGINE] ?? null],
+    [ENGINE_SOURCE_PREFERENCES, personal(() => readPreferences().engine)],
+  ]);
+}
+
+/** One read of the machine's file, total like every other: an unreadable file is nobody's choice. */
+function personal(read: () => string | undefined): string | null {
+  try {
+    return read() ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** What this person chose on this machine, or null. Total, like every read of that file. */
@@ -1250,6 +1396,11 @@ export interface ConfigurationChoice {
   readonly reviewerTransport?: string;
   /** The model the engine's own CLI is launched on; "" clears it. */
   readonly authoringModel?: string;
+  /** The engine a session here is authored by; "" clears it. */
+  readonly engine?: string;
+  /** The model each reviewing role is given here; "" clears it. */
+  readonly reviewerModel?: string;
+  readonly auxiliaryModel?: string;
   /** The provider whose credential this solution is naming. */
   readonly credentialProvider?: string;
   /** The credential's NAME, never its value; "" clears the reference. */
@@ -1297,6 +1448,9 @@ export function writeConfigurationChoice(
   if (choice.authoringModel !== undefined) {
     values[SETTING_AUTHORING_MODEL] = choice.authoringModel.trim();
   }
+  if (choice.engine !== undefined) values[SETTING_ENGINE] = choice.engine.trim();
+  if (choice.reviewerModel !== undefined) values[SETTING_REVIEWER_MODEL] = choice.reviewerModel.trim();
+  if (choice.auxiliaryModel !== undefined) values[SETTING_AUXILIARY_MODEL] = choice.auxiliaryModel.trim();
   // A NAME, and the writer never looks at whether this machine holds one:
   // whether a credential exists here is a question about this machine, and
   // a committed setting is a statement about the solution.

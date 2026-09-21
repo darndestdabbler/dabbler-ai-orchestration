@@ -16,9 +16,8 @@
 // A provider whose key does not resolve is not a candidate anywhere:
 // selection can never land on a model the process could not call.
 
-import { truthy, type RouterConfig } from "./config.ts";
+import { checkoutOf, explainRoleModel, truthy, type RouterConfig } from "./config.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
-import { selectedModel } from "./preferences.ts";
 import { providerSecret } from "./credentials.ts";
 
 // --- The reviewing roles, named by voice ------------------------------------
@@ -143,8 +142,9 @@ function normalizeProviders(providers: unknown): Set<string> {
 // different files because they are different KINDS of statement: `prefer`
 // ships in the config as an ordering, where a stale entry costs a slightly
 // older model and never a candidate; `selected` is a person's instruction,
-// so it lives in the user-level preferences beside the catalog, where a
-// person's choices live and a free refresh cannot reach.
+// read through the same layers as every other choice a person makes -- this
+// checkout's settings, then this machine's preferences beside the catalog --
+// and never from the catalog itself, which a free refresh rewrites.
 //
 // **A selection narrows and never widens.** It used to bypass the caller's
 // provider exclusion, on the argument that a default does not overrule a
@@ -162,10 +162,13 @@ export interface RoleDeclaration {
   /**
    * The one model a person chose for this role, or null where nobody did.
    *
-   * Read from this machine's preferences and never from a repository: which
-   * model reviews is a fact about who is at this keyboard and what their
-   * machine can reach, and one that travelled inside a checkout would tell
-   * the next clone about somebody else's seat.
+   * This checkout's choice, then this machine's default. A choice kept only
+   * on the machine was one reviewer for every repository on it -- and a
+   * reviewer is never from the author's vendor, so two repositories authored
+   * by different vendors had none both could start under. The price is the
+   * authoring model's: the checkout's setting is committed, so it reaches the
+   * next clone, and a seat that does not list it is refused at the start,
+   * naming the file and the one command that changes it.
    */
   readonly selected: string | null;
 }
@@ -185,7 +188,12 @@ export function roleDeclaration(
   const roleConfig = record(record(config["roles"])[role]);
   const preferRaw = roleConfig["prefer"];
   const prefer = (Array.isArray(preferRaw) ? preferRaw : []).map((id) => String(id));
-  return { prefer, selected: selectedModel(role) };
+  // This checkout's own choice, then this machine's default: a selection kept
+  // only on the machine was one reviewer for every repository on it.
+  // Of the checkout this configuration was loaded FOR, which for a pane is
+  // never the directory the call is standing in.
+  const chosen = explainRoleModel(role, checkoutOf(config));
+  return { prefer, selected: chosen.decidedBy === null ? null : chosen.transport };
 }
 
 /**

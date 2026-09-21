@@ -207,6 +207,11 @@ export function renderExplain(configuration: Node): string {
   // and no choice has not got "none installed".
   const engine = text(engines["chosen"]) ?? (installed > 0 ? `${installed} installed, none chosen` : "none installed");
   lines.push(`engine: ${engine} — ${text(engines["reason"]) ?? ""}`);
+  rows(engines["layers"]).forEach((layer, index) => {
+    lines.push(
+      `  ${index === 0 ? "decides" : "shadowed"}: ${text(layer["source"]) ?? ""} = ${text(layer["value"]) ?? ""}`,
+    );
+  });
   for (const [key, label] of PARTICIPANTS) {
     const participant = node(configuration[key]);
     lines.push(...layerLines(`${label} vehicle`, node(participant["vehicle"])));
@@ -230,6 +235,14 @@ export function renderExplain(configuration: Node): string {
         ? " (nobody chose one, so the preference order decides)"
         : ` (you chose '${selected}'; it is used and never silently substituted)`;
     lines.push(`${label} model: ${chosen ?? (unlisted === null ? "nothing resolves" : selected ?? "")}${why}`);
+    // Whose the selection is, and what it shadows: this checkout's choice
+    // outranks this machine's default, and a row that showed only the value
+    // could not say which of the two a person is looking at.
+    rows(participant["selectionLayers"]).forEach((layer, index) => {
+      lines.push(
+        `  ${index === 0 ? "decides" : "shadowed"}: ${text(layer["source"]) ?? ""} = ${text(layer["value"]) ?? ""}`,
+      );
+    });
   }
   for (const credential of rows(configuration["credentials"])) {
     const provider = text(credential["provider"]) ?? "";

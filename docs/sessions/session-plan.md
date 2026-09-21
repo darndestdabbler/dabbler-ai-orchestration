@@ -13897,3 +13897,83 @@ person's call; see `STATUS.md`).
 and the one the operator's developers install on 2026-09-21; these three
 fixes ride in the next release rather than replacing it, unwalked, the same
 morning.
+
+### Session 221 of 221: A suite's results read as one line a project
+
+Scope: `packages/router` (`cli/testEvidence.ts`, one new `testOutput.ts`,
+their tests), the Dabbler Terminal's mark table, `version.json`, the
+changelog and the page that shows a run
+
+**Why.** The operator, 2026-09-21, reading a .NET run of record in the
+Dabbler Terminal: forty lines of restore paths, adapter advice and blame
+collector notes around one line that matters, and three test projects that
+found NO tests buried where nobody would see them. `dabbler test-evidence
+run` hands the suite's output straight through (`stdio: "inherit"`), the
+terminal replays the job's log byte for byte, and nothing reads a result. The
+operator asked for one line a test project -- a green check or a red cross,
+and the counts -- for .NET and for Maven, and no other framework.
+
+What the terminal shows for a suite this session can read:
+
+```
+02:35:00 running CsvParser.Deserializer.Tests
+02:35:05 ✔ CsvParser.Deserializer.Tests: 16 pass, 0 fail, 0 not run
+02:35:05 ⚠ CsvParser.Model.Tests: no tests found
+02:35:10 ✘ CsvParser.Persistence.Tests: 5 pass, 2 fail, 0 not run
+         SavesAPerson_ThenReadsItBack: Expected 1 but found 0
+         full output: .dabbler/runs/s5/driver/jobs/run-of-record-dotnet.raw.log
+```
+
+**Step 1 -- two readers, and nothing else.** A new `testOutput.ts`: pure
+functions from one line of a suite's output to an event (a project started;
+a project's result with passed, failed and not-run counts; a project that
+found no tests; a failing test's name and first message line), one for
+`dotnet test` and one for Maven Surefire, chosen by what the suite's command
+runs. .NET: `Test run for ...X.dll`, `Passed!|Failed!  - Failed: n, Passed:
+n, Skipped: n, Total: n ... - X.dll`, `No test is available in ...X.dll`, and
+`Failed <test> [..]` with the line after it. Maven: `--- surefire:...:test
+... @ <module> ---`, the module's own `Tests run: n, Failures: n, Errors: n,
+Skipped: n` (not each class's, which ends `-- in <class>`), and `[ERROR]
+<Class.test>:<line> <message>`; failures and errors are both "fail". Tests in
+`testOutput.test.ts` are fed trimmed REAL output: csv-parser's
+`run-of-record-dotnet.log` on this machine, and a Maven log from the Java
+walk or a fresh `mvn test` of its sample. A line neither reader knows is no
+event, never an error.
+
+**Step 2 -- the run of record prints what it read, and keeps what it was
+given.** `test-evidence run` pipes the suite's output instead of inheriting
+it. Every byte goes, unchanged and as it arrives, to a raw log beside the
+job's own; the verb prints `running <project>` when a project starts, one
+result line when it ends, and under a failed one its failing tests (a bounded
+few, then a count) and the raw log's path. Lines are printed as events arrive
+and never reordered or held: `dotnet test` runs projects in parallel, and a
+buffer would make a hung project look like silence. The suite runs with
+`DOTNET_CLI_UI_LANGUAGE=en` so another locale does not change what is read.
+A suite neither reader is for -- and a run in which a reader recognised
+nothing at all -- prints exactly what it prints today. The outcome is still
+the exit code and nothing the reader counted: a reader is a view, never
+evidence. Whatever today takes a failed run's detail from the job's log for
+the author's next instruction takes it from the raw log, so the author loses
+nothing.
+
+**Step 3 -- the terminal colours what it already draws.** In the Dabbler
+Terminal's mark table: `✘` bad beside `✖`, `⚠` a warning tone, and on a
+result line the pass count good, a non-zero fail count bad, a zero muted. One
+test in `dabblerTerminal.test.ts`. No new pane, tree row or setting.
+
+**Step 4 -- one release for this and 220.** `version.json` to 3.17.0 and
+stamped (a capability, so a minor); one changelog section covering both
+sessions -- the result lines, the truthful `session interrupt` reply, and
+220's correction of the record; the page that shows what a run looks like
+shows the new lines.
+
+**Non-goals.** No reader for any other framework, and none for
+Microsoft.Testing.Platform's summary (it falls through to today's output; say
+so in the changelog). No TRX or Surefire XML parsing, and no change to a
+suite's declared command. No count is recorded, gated on or shown anywhere
+but the terminal. No change to how a step's named tests or checks run: their
+output is captured and never reaches the terminal.
+
+**Hold.** `hold_release`: the operator walks a locally built 3.17.0 VSIX
+first, as with 220, and says whether it goes to the Marketplace; on their yes
+it is tagged with `dabbler release`, one release carrying 220 and 221.

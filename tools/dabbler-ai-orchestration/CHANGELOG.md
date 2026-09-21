@@ -10,6 +10,59 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.18.0] — 2026-09-21
+
+**Every choice is this repository's, and the machine's is only its default.**
+With two VS Code windows open on two repositories, changing the reviewer's
+model in one changed it in the other: the engine and both reviewers' models
+were kept in one file for the whole machine and nowhere else. A reviewer is
+never from the author's vendor, so two repositories whose authors are
+different vendors had no reviewer both could start under.
+
+### Changed
+
+- **A choice made in the Configuration is saved to the repository**, in its
+  `.vscode/settings.json`: the engine (`dabbler.engine`), the authoring model,
+  and each reviewer's model (`dabbler.reviewerModel`,
+  `dabbler.auxiliaryModel`) — as the vehicles and the authoring model already
+  were. Two windows no longer change each other, and a reload shows what was
+  there before, because there is nothing in the window to lose.
+- **The machine's default is what a repository falls back to.** A repository
+  opened for the first time uses it. The first choice you make anywhere
+  becomes the machine's default where the machine had none; after that a
+  repository's choice leaves the default alone.
+- **Start Session asks nothing.** It starts with the engine and model this
+  repository's Configuration shows. Where the Configuration names no engine —
+  or a Copilot seat and no model — it starts nothing, says which row needs a
+  choice, and brings the Configuration to the front: a choice made there is
+  saved, so the next Start asks nothing.
+- **Every row says whose its choice is**: `· this repository` or `· machine
+  default`, with the rest in the tooltip. `dabbler configuration explain`
+  names the layer that decided each choice and the one it shadows.
+- `dabbler configure` writes the repository for every option, and
+  `--mine` writes the machine's default only; `dabbler session start` with no
+  `--engine` reads the repository's choice, then the machine's.
+
+### Added
+
+- **Start Session with Different Models...** asks for an engine and a model
+  for one session, and writes neither down.
+
+### Renamed
+
+- **Keep as My Default is Keep as Machine Default**, and is on every row that
+  holds a choice — both Vehicle rows, the authoring Model row and both
+  reviewers' — where it was on three. It makes the row's current value the
+  machine's default and leaves this repository's choice as it is.
+
+### Worth knowing
+
+- A repository's `.vscode/settings.json` is committed, so a choice made there
+  travels to everyone who clones it — as the authoring model and the vehicles
+  always have. A teammate whose seat does not list that model is told so at
+  Start Session, with the file and the one command that changes it. Use **Keep
+  as Machine Default** for a preference that is yours alone.
+
 ## [3.17.0] — 2026-09-21
 
 **A test run reads as one line a project.** A .NET run of record filled the

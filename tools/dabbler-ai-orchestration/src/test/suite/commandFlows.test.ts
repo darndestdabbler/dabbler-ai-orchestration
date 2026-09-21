@@ -34,6 +34,7 @@ import { prerequisiteReport, type ToolProbe } from "../../commands/troubleshoot"
 import {
   refreshRecord,
   storeCredential,
+  KEEP_AS_MACHINE_DEFAULT,
   setAsMyDefault,
   setRelease,
   setReviewerTransport,
@@ -466,7 +467,7 @@ suite("Start opens the person's own CLI", () => {
     });
     try {
       const refusedBeforeRegistering = registrarOf();
-      assert.strictEqual(await runStartSession(repository, row.ui, refusedBeforeRegistering), false);
+      assert.strictEqual(await runStartSession(repository, row.ui, refusedBeforeRegistering, true), false);
       // Nothing registered, nothing opened, and the operator was told why.
       assert.deepStrictEqual(refusedBeforeRegistering.calls, []);
       assert.deepStrictEqual(row.terminals, []);
@@ -479,7 +480,7 @@ suite("Start opens the person's own CLI", () => {
       // refuse" covers no CLI, no answer and an engine with no pre-flight,
       // and none of those may stand between an operator and their work.
       const silent = driveUi({ askModel: async () => "a-model-nothing-lists" });
-      assert.strictEqual(await runStartSession(makeRepository({ root }), silent.ui, registrarOf()), true);
+      assert.strictEqual(await runStartSession(makeRepository({ root }), silent.ui, registrarOf(), true), true);
       // The engine's CLI, and no framework process beside it.
       assert.strictEqual(silent.terminals.length, 1);
     } finally {
@@ -540,13 +541,13 @@ suite("Start opens the person's own CLI", () => {
 
     const asked: string[] = [];
     const declined = driveUi({ confirm: async (message) => { asked.push(message); return false; } });
-    assert.strictEqual(await runStartSession(makeRepository(), declined.ui, register), false);
+    assert.strictEqual(await runStartSession(makeRepository(), declined.ui, register, true), false);
     assert.match(asked[0], /src\/app\.ts/);
     assert.strictEqual(register.calls.length, 1);
     assert.strictEqual(declined.terminals.length, 0);
 
     const agreed = driveUi({ confirm: async () => true });
-    assert.strictEqual(await runStartSession(makeRepository(), agreed.ui, register), true);
+    assert.strictEqual(await runStartSession(makeRepository(), agreed.ui, register, true), true);
     assert.deepStrictEqual(register.calls[2].slice(-1), ["--merge-origin"]);
     assert.strictEqual(agreed.terminals.length, 1);
   });
@@ -564,7 +565,7 @@ suite("Start opens the person's own CLI", () => {
 
     const asked: string[] = [];
     const cancelled = driveUi({ choose: async (message) => { asked.push(message); return undefined; } });
-    assert.strictEqual(await runStartSession(makeRepository(), cancelled.ui, register), false);
+    assert.strictEqual(await runStartSession(makeRepository(), cancelled.ui, register, true), false);
     assert.match(asked[0], /session-plan\.md/);
     assert.deepStrictEqual(register.calls.length, 1);
     assert.strictEqual(cancelled.terminals.length, 0);
@@ -572,7 +573,7 @@ suite("Start opens the person's own CLI", () => {
     for (const [answer, flag] of [["Commit and Push", "--commit-changes"], ["Undo the Changes", "--undo-changes"]]) {
       register.calls = [];
       const chosen = driveUi({ choose: async () => answer });
-      assert.strictEqual(await runStartSession(makeRepository(), chosen.ui, register), true);
+      assert.strictEqual(await runStartSession(makeRepository(), chosen.ui, register, true), true);
       assert.deepStrictEqual(register.calls[1].slice(-1), [flag]);
       assert.strictEqual(chosen.terminals.length, 1);
     }
@@ -630,7 +631,7 @@ suite("Start opens the person's own CLI", () => {
     // The real UI over the stub: what matters is what the EDITOR was asked
     // to open, not what a fake recorded.
     const claude = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
-    assert.strictEqual(await runStartSession(repository, claude, register), true);
+    assert.strictEqual(await runStartSession(repository, claude, register, true), true);
     // Registered first, by the framework, with the identity the pick chose:
     // neither the person nor the AI types `session start`.
     assert.deepStrictEqual(register.calls[0], [
@@ -670,7 +671,7 @@ suite("Start opens the person's own CLI", () => {
     // interactively AND submits it: nothing is typed and no Enter is owed.
     const copilot = ENGINES.find((e) => e.engine === "copilot")!;
     const seat = { ...defaultSessionRunUi(), pickEngine: async () => copilot, askModel: async () => "gpt-5-6-luna" };
-    assert.strictEqual(await runStartSession(repository, seat, register), true);
+    assert.strictEqual(await runStartSession(repository, seat, register, true), true);
     // The model is recorded at registration and reaches the CLI's argv; the
     // sentence carries none.
     assert.deepStrictEqual(register.calls[1].slice(-2), ["--model", "gpt-5-6-luna"]);
@@ -695,7 +696,7 @@ suite("Start opens the person's own CLI", () => {
   test("a registration the router refuses opens nothing, and says why in the router's words", async () => {
     const row = driveUi();
     const refused = registrarOf(2, "start: refused -- the working tree is not clean");
-    assert.strictEqual(await runStartSession(makeRepository(), row.ui, refused), false);
+    assert.strictEqual(await runStartSession(makeRepository(), row.ui, refused, true), false);
     assert.deepStrictEqual(row.terminals, []);
     assert.ok(row.errors.some((line) => line.includes("the working tree is not clean")), row.errors.join(" | "));
   });
@@ -715,7 +716,7 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(terminals[0].options.location, undefined);
 
     const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
-    assert.strictEqual(await runStartSession(repository, ui, registrarOf()), true);
+    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), true), true);
     // The CLI, then a Dabbler terminal built beside the CLI -- the unsplit
     // one is replaced, not merely shown.
     assert.strictEqual(terminals.length, 3);
@@ -733,7 +734,7 @@ suite("Start opens the person's own CLI", () => {
     terminals.length = 0;
 
     const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
-    assert.strictEqual(await runStartSession(repository, ui, registrarOf()), true);
+    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), true), true);
     assert.strictEqual(terminals.length, 2);
     assert.deepStrictEqual(terminals[0].options.location, { viewColumn: vscode.ViewColumn.One });
     assert.ok(terminals[1].options.name.startsWith("Dabbler"));
@@ -745,7 +746,7 @@ suite("Start opens the person's own CLI", () => {
     // A second Start in the same window costs no scrollback here: the
     // framework's tab is already where it belongs, so it is shown rather
     // than rebuilt -- which is the one thing the panel split cannot do.
-    assert.strictEqual(await runStartSession(repository, ui, registrarOf()), true);
+    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), true), true);
     assert.strictEqual(terminals.length, 3);
     assert.strictEqual(terminals[1].disposed, 0);
     assert.strictEqual(terminals[1].shown, 2);
@@ -756,10 +757,61 @@ suite("Start opens the person's own CLI", () => {
     const copilot = ENGINES.find((e) => e.engine === "copilot")!;
     const seat = driveUi({ pickEngine: async () => copilot, askModel: async () => "" });
     const register = registrarOf();
-    assert.strictEqual(await runStartSession(repository, seat.ui, register), false);
+    assert.strictEqual(await runStartSession(repository, seat.ui, register, true), false);
     assert.ok(seat.errors[0].includes("needs a model"));
     const dismissed = driveUi({ pickEngine: async () => undefined });
-    assert.strictEqual(await runStartSession(repository, dismissed.ui, register), false);
+    assert.strictEqual(await runStartSession(repository, dismissed.ui, register, true), false);
+    assert.deepStrictEqual(register.calls, []);
+  });
+
+  test("Start asks nothing: the engine and the model are the repository's Configuration", async () => {
+    // Both were a pick list at every Start, offering back what the
+    // Configuration already showed -- a second answer, written nowhere.
+    const copilot = ENGINES.find((e) => e.engine === "copilot")!;
+    const asked: string[] = [];
+    const configured = driveUi({
+      configured: () => ({ picked: copilot, model: "gpt-5.6-luna" }),
+      pickEngine: async () => { asked.push("engine"); return ENGINES[0]; },
+      askModel: async () => { asked.push("model"); return "haiku"; },
+    });
+    const register = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository(), configured.ui, register), true);
+    assert.deepStrictEqual(asked, []);
+    const args = register.calls[0]?.join(" ") ?? "";
+    assert.ok(args.includes("--engine copilot") && args.includes("--model gpt-5.6-luna"), args);
+
+    // The other command asks for both, for this one session.
+    const askedFor: string[] = [];
+    const different = driveUi({
+      configured: () => ({ picked: copilot, model: "gpt-5.6-luna" }),
+      pickEngine: async () => { askedFor.push("engine"); return ENGINES[0]; },
+      askModel: async () => { askedFor.push("model"); return "haiku"; },
+    });
+    const once = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository(), different.ui, once, true), true);
+    assert.deepStrictEqual(askedFor, ["engine", "model"]);
+    assert.ok((once.calls[0]?.join(" ") ?? "").includes("--engine claude-code"));
+  });
+
+  test("a Configuration that cannot start a session says what it lacks and opens it, and asks for nothing itself", async () => {
+    // A choice made in the Configuration is SAVED, so the next Start asks
+    // nothing. A pick list here would start one session and leave the
+    // repository as unconfigured as it was, to meet this message again.
+    const lacks = "This repository's Configuration names no engine to start a session with, so nothing was started.";
+    let opened = 0;
+    const asked: string[] = [];
+    const unconfigured = driveUi({
+      configured: () => lacks,
+      openConfiguration: () => { opened += 1; },
+      pickEngine: async () => { asked.push("engine"); return ENGINES[0]; },
+      askModel: async () => { asked.push("model"); return "haiku"; },
+      choose: async () => { asked.push("choose"); return undefined; },
+    });
+    const register = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository(), unconfigured.ui, register), false);
+    assert.deepStrictEqual(unconfigured.errors, [lacks]);
+    assert.strictEqual(opened, 1);
+    assert.deepStrictEqual(asked, []);
     assert.deepStrictEqual(register.calls, []);
   });
 });
@@ -1513,33 +1565,29 @@ suite("the Configuration node's refresh", () => {
     assert.strictEqual(repainted, 1);
   });
 
-  test("keeps a vehicle as this person's default, and says which file and what outranks it", async () => {
-    // A right-click that wrote the committed settings file would publish a
-    // personal preference to everyone who clones the repository, which is a
-    // control doing more than it said.
+  test("keeps any row's choice as the machine's default and nothing else, the engine and the reviewers' included", async () => {
+    // The old control covered three rows and wrote the engine WITHOUT the
+    // flag, which after every choice became the repository's is a write to
+    // this repository's committed settings from a button that says machine.
+    const role = (model: string) => ({ chosen: { model }, candidates: [], excludes: [], fellThrough: false });
     const projection = {
       solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
       modules: [],
       configuration: {
+        engines: { chosen: "copilot" },
+        authoring: { role: "authoring", ...role("gpt-5.6-luna") },
         primaryReviewer: {
           role: "reviewer",
-          vehicle: {
-            kind: "transport",
-            options: [{ id: "api", means: "the provider's own endpoint" }],
-            chosen: "api",
-            layers: [{ source: ".vscode/settings.json", value: "copilot-cli" }],
-          },
-          chosen: null,
-          candidates: [],
-          excludes: [],
-          fellThrough: false,
+          ...role("claude-haiku-4.5"),
+          vehicle: { kind: "transport", options: [], chosen: "api", layers: [] },
         },
+        auxiliaryReviewer: { role: "auxiliary-reviewer", ...role("gemini-3.8-flash") },
       },
     } as unknown as Projection;
     const asked: string[] = [];
     const ui: ConfigurationUi = {
-      confirm: (message) => {
-        asked.push(message);
+      confirm: (message, action) => {
+        asked.push(`${action}: ${message}`);
         return Promise.resolve(true);
       },
       runVerb: () => Promise.resolve(0),
@@ -1549,20 +1597,24 @@ suite("the Configuration node's refresh", () => {
       workspaceRoot: () => "D:/ws",
     };
     const { router, configureOptions } = fakeRouter(0, "written");
-    await setAsMyDefault(
-      router,
-      { node: { kind: "configVehicle", who: "reviewing" }, projection },
-      () => undefined,
-      ui,
-    );
+    const rows = [
+      { kind: "configVehicle", who: "authoring" },
+      { kind: "configVehicle", who: "reviewing" },
+      { kind: "configRole", role: "authoring" },
+      { kind: "configRole", role: "primaryReviewer" },
+      { kind: "configRole", role: "auxiliaryReviewer" },
+    ] as const;
+    for (const node of rows) await setAsMyDefault(router, { node, projection }, () => undefined, ui);
     assert.deepStrictEqual(configureOptions, [
+      { repoRoot: "D:/ws", engine: "copilot", mine: true },
       { repoRoot: "D:/ws", reviewerTransport: "api", mine: true },
+      { repoRoot: "D:/ws", authoringModel: "gpt-5.6-luna", mine: true },
+      { repoRoot: "D:/ws", reviewerModel: "claude-haiku-4.5", mine: true },
+      { repoRoot: "D:/ws", auxiliaryModel: "gemini-3.8-flash", mine: true },
     ]);
-    // Which file it is about to write, and what already outranks it: a
-    // personal default under a committed setting is a value the operator can
-    // see and the framework will not use.
-    assert.ok(asked[0]?.includes("not committed"), asked[0]);
-    assert.ok(asked[0]?.includes(".vscode/settings.json"), asked[0]);
+    // What it reaches, said before it is written: the machine, and nobody else's.
+    assert.ok(asked.every((line) => line.startsWith(`${KEEP_AS_MACHINE_DEFAULT}: `)), asked[0]);
+    assert.ok(asked[0]?.includes("not committed") && asked[0]?.includes("names no choice of its own"), asked[0]);
   });
 
   test("refuses to keep a row that has nothing on it", async () => {

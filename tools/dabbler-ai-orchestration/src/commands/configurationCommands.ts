@@ -401,18 +401,16 @@ export async function refreshRecord(
 }
 
 /**
- * Keep this row's choice as YOUR default rather than this checkout's.
+ * Keep this row's choice as the MACHINE's default.
  *
- * **Offered only where the ordinary control writes the checkout**, which is
- * the two Vehicle rows and the authoring Model row. A reviewing model's
- * selection already lives in `preferences.json` and has since it existed, so
- * a second entry beside it would be two controls performing one write -- the
- * shape this section is being repaired of. Those rows say where their choice
- * is kept instead.
+ * Every choice is this repository's, and the machine's is only the default a
+ * repository that names none falls back to. This makes the row's current
+ * value that default, and nothing else: the repository's own choice is as it
+ * was. Offered on every row that holds a choice -- both Vehicle rows, the
+ * authoring Model row and both reviewers' -- because the rule is one rule.
  *
- * The confirmation names the file about to be written and anything that
- * already outranks it, because a personal default under a committed setting
- * is a value the operator can see and the framework will not use.
+ * The confirmation says what it reaches: every repository on this machine
+ * that names no choice of its own, and nobody else's machine.
  */
 export async function setAsMyDefault(
   router: Pick<Router, "configure">,
@@ -425,60 +423,47 @@ export async function setAsMyDefault(
   const node = target.node;
   if (!node) return;
   const configuration = target.projection?.configuration;
-  const [what, value, shadow] =
-    node.kind === "configVehicle"
-      ? node.who === "authoring"
-        ? ["the engine", configuration?.engines?.chosen ?? null, null]
-        : [
-            "the reviewing vehicle",
-            configuration?.primaryReviewer?.vehicle?.chosen ?? null,
-            (configuration?.primaryReviewer?.vehicle?.layers ?? [])[0] ?? null,
-          ]
-      : node.kind === "configRole" && node.role === "authoring"
-        ? [
-            "the authoring model",
-            configuration?.authoring?.chosen?.model ?? null,
-            null,
-          ]
-        : [null, null, null];
-  if (what === null || value === null || value === "") {
+  const kept = ((): readonly [string, string | null, Record<string, string>] | null => {
+    if (node.kind === "configVehicle") {
+      return node.who === "authoring"
+        ? ["the engine", configuration?.engines?.chosen ?? null, { engine: "" }]
+        : ["the reviewing vehicle", configuration?.primaryReviewer?.vehicle?.chosen ?? null, { reviewerTransport: "" }];
+    }
+    if (node.kind !== "configRole") return null;
+    if (node.role === "authoring") {
+      return ["the authoring model", configuration?.authoring?.chosen?.model ?? null, { authoringModel: "" }];
+    }
+    return node.role === "primaryReviewer"
+      ? ["the Primary Reviewer's model", configuration?.primaryReviewer?.chosen?.model ?? null, { reviewerModel: "" }]
+      : ["the Auxiliary Reviewer's model", configuration?.auxiliaryReviewer?.chosen?.model ?? null, { auxiliaryModel: "" }];
+  })();
+  const value = kept?.[1] ?? null;
+  if (kept === null || value === null || value === "") {
     ui.showWarningMessage(
-      "There is nothing on this row to keep: choose a value first, and then " +
-        "keep it as your own default.",
+      "There is nothing on this row to keep: choose a value first, and then keep it as the machine's default.",
     );
     return;
   }
   const agreed = await ui.confirm(
     [
-      `Keep '${value}' as your own ${what}?`,
+      `Keep '${value}' as this machine's default for ${kept[0]}?`,
       "",
-      "It is written to this machine's own preferences, beside your model " +
-        "catalog, and applies in every repository that does not name one of " +
-        "its own. It is not committed and reaches nobody else.",
-      ...(shadow
-        ? [
-            "",
-            `${shadow.source} names '${shadow.value}' and outranks it here, so ` +
-              "this repository will go on using that one. Your default applies " +
-              "wherever that setting is absent.",
-          ]
-        : []),
+      "It is written to this machine's own preferences, beside your model catalog, and applies in " +
+        "every repository here that names no choice of its own -- including one you open for the " +
+        "first time. This repository's own choice is left as it is. It is not committed and reaches " +
+        "nobody else.",
     ].join("\n"),
-    "Keep as my default",
+    KEEP_AS_MACHINE_DEFAULT,
   );
   if (!agreed) return;
-  // The engine is ALREADY a personal default -- it has never been anything
-  // else -- so keeping it is a write of the same value to the same file, and
-  // the flag is harmless there. A branch that skipped it would be a second
-  // statement of where an engine lives.
-  const choice =
-    node.kind === "configVehicle"
-      ? node.who === "authoring"
-        ? { engine: value }
-        : { reviewerTransport: value, mine: true }
-      : { authoringModel: value, mine: true };
-  await write(router, root, choice, ui, refreshed);
+  // The machine's default and only that, for every row alike: without `mine`
+  // the same write is this repository's, which is what the row's own control does.
+  const [key] = Object.keys(kept[2]) as [string];
+  await write(router, root, { [key]: value, mine: true }, ui, refreshed);
 }
+
+/** The control's name, which is also the button that confirms it. */
+export const KEEP_AS_MACHINE_DEFAULT = "Keep as Machine Default";
 
 /**
  * The model the engine's own CLI is launched on.

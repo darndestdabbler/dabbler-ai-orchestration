@@ -12193,6 +12193,22 @@
       "what": "step 'explain-says-whose-each-choice-is': its files",
       "reason": "a role's selection must be read from the checkout the configuration was loaded FOR, which the loaded config now records; the test sits beside the authoring model's in configuration.test.ts",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 225,
+      "dateTime": "2026-09-21T07:13:40.153000-04:00",
+      "task": "The extension's half of the operator's six rules of 2026-09-21 for where a configured choice lives; session 224 gave the router the repository's layer for every choice. Start Session asks for no engine and no model: it starts with what the Configuration shows for this repository, and where that names no engine -- or a seat's engine and no model -- it says so and points at the Configuration. A second command, Start Session with Different Models..., asks what Start asks today and passes it on that one call, writing nothing. Keep as My Default becomes Keep as Machine Default, is offered on every row that holds a choice (both vehicles, the engine, the authoring model and both reviewers' models), and writes the machine's default only. Each of those rows says whose its choice is -- this repository's or the machine's default -- from the projection's decidedLayer. A UAT page gives the operator one numbered check per rule. version.json goes to 3.18.0 (a minor: capabilities) with one changelog section for 224 and 225. Nothing is published by this session.",
+      "releasable": false,
+      "holdReason": "The operator walks a locally built 3.18.0 VSIX first and says whether it goes to the Marketplace; on their yes it is tagged with `dabbler release`, one release carrying sessions 224 and 225."
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 225,
+      "dateTime": "2026-09-21T07:17:07.891000-04:00",
+      "what": "step 'start-asks-nothing': its files",
+      "reason": "the new command is registered beside Start in sessionCommands.ts and shares its menu's when-clause, so extension.ts and the action registry did not change",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

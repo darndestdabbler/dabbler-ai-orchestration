@@ -6,6 +6,7 @@ import { configurationNode, spawnProgram, tryWriteProjection } from "dabbler-ai-
 import {
   ConfigurationRole,
   ConfigurationVehicle,
+  DecidedLayer,
   NO_PROJECTS_YET,
   PROJECTION_RELPATH,
   PROJECTION_SOURCE_GLOBS,
@@ -17,6 +18,7 @@ import {
   externalLocation,
   repositoryPathOf,
   rootNodes,
+  whoseChoice,
 } from "../../providers/solutionTreeModel";
 import {
   repositoryTarget,
@@ -746,6 +748,52 @@ suite("solutionTreeModel: what a session is run with", () => {
     } finally {
       (globalThis as { fetch?: unknown }).fetch = fetched;
     }
+  });
+
+  test("a row says whose its choice is: this repository's, or the machine's default it falls back to", () => {
+    // Two windows on two repositories showed one reviewer, and a value alone
+    // cannot say which of the two a person is looking at. The row reads the
+    // router's word for where the choice is KEPT and decides nothing.
+    const reviewer = configured().configuration?.primaryReviewer as ConfigurationRole;
+    const as = (decidedLayer: DecidedLayer) =>
+      descriptorFor(
+        { kind: "configRole", role: "primaryReviewer" },
+        configured({ primaryReviewer: { ...reviewer, decidedLayer } }),
+      );
+    const here = as("checkout");
+    const fallback = as("machine");
+    // The same model, two different facts, and the row says which.
+    assert.ok(here.description?.includes("gpt-5.6-terra") && fallback.description?.includes("gpt-5.6-terra"));
+    assert.ok(here.description?.includes("this repository"), here.description);
+    assert.ok(fallback.description?.includes("machine default"), fallback.description);
+    assert.ok(here.tooltip?.includes("another window has its own"), here.tooltip);
+    assert.ok(fallback.tooltip?.includes("names no choice of its own"), fallback.tooltip);
+    // A choice the reviewing vehicle does not list says whose it is too: that
+    // row is telling a person to change it, and they must know where it is kept.
+    const unlisted = descriptorFor(
+      { kind: "configRole", role: "primaryReviewer" },
+      configured({
+        primaryReviewer: { ...reviewer, selected: "gpt-5.6-terra", notListedBy: "copilot-cli", decidedLayer: "machine" },
+      }),
+    );
+    assert.ok(unlisted.description?.includes("machine default"), unlisted.description);
+    assert.ok(unlisted.description?.includes("not listed by copilot-cli"), unlisted.description);
+    assert.ok(unlisted.tooltip?.includes("names no choice of its own"), unlisted.tooltip);
+    // Nobody's choice says nothing of whose it is.
+    assert.ok(!/this repository|machine default/.test(as("default").description ?? ""));
+
+    // A vehicle row reads the same word the same way.
+    const vehicle = descriptorFor(
+      { kind: "configVehicle", who: "reviewing" },
+      configured({
+        primaryReviewer: {
+          ...reviewer,
+          vehicle: { kind: "transport", options: [], chosen: "api", decidedLayer: "checkout", layers: [] },
+        },
+      }),
+    );
+    assert.ok(vehicle.description?.includes("this repository"), vehicle.description);
+    assert.strictEqual(whoseChoice("shipped"), "shipped default");
   });
 
   test("says a configuration it could not read is unreadable, rather than showing an empty one", () => {

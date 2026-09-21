@@ -67,8 +67,18 @@ Verification needs reach to at least two provider families — two of the
 three keys, or one seat that exposes two families.
 
 **5. The framework runs the session; you do the work.** Start Session
-registers the session and opens your AI's own CLI beside the Dabbler
-terminal. Your AI asks the framework for an instruction once, does what it
+asks nothing about who authors: it uses the engine and the model this
+repository's **Configuration** shows, in the Solution Explorer. Every choice
+there — the engine, its model, the reviewers' models, the vehicles — is saved
+to the repository's own `.vscode/settings.json`, so two repositories open in
+two windows keep their own, and each row says whether what it shows is `this
+repository`'s or the `machine default` a repository falls back to. **Keep as
+Machine Default** makes a row's value that default; **Start Session with
+Different Models...** asks for an engine and a model for one session and
+writes neither down.
+
+Start Session registers the session and opens your AI's own CLI beside the
+Dabbler terminal. Your AI asks the framework for an instruction once, does what it
 says, and answers with the command it names as a background command — so
 its chat stays free for you. That answer stays open while the framework
 works and prints the next instruction when it exits, until one says `done`;

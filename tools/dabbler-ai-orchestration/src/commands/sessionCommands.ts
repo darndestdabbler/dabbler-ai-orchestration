@@ -445,6 +445,15 @@ export function consultTerminalFor(
 }
 
 export interface SessionRunUi {
+  /**
+   * What this repository's Configuration starts a session with, or the
+   * sentence saying what it does not name. `configuredStart` in production;
+   * a seam because the reading is this machine's, and a suite that read it
+   * would be testing the developer's own preferences.
+   */
+  configured?: (repoRoot: string) => { picked: EngineChoice; model: string } | string;
+  /** Put the Solution Explorer, where the Configuration is, in front of the person. */
+  openConfiguration?: () => void;
   /** `purpose` titles the pick; Start's when omitted. */
   pickEngine: (purpose?: string) => Thenable<EngineChoice | undefined>;
   /**
@@ -520,6 +529,9 @@ export function defaultSessionRunUi(
   chosen: () => string | null = () => null,
 ): SessionRunUi {
   return {
+    // The view the Configuration lives in. A view's own `focus` command is the
+    // editor's, named after the view's id.
+    openConfiguration: () => void vscode.commands.executeCommand("dabblerSolutionTree.focus"),
     // The one editor-side effect here that is a PROCESS: it asks the
     // installed CLI, which is the only thing that actually knows whether it
     // will run on a model, and it bills nothing doing it.
@@ -688,21 +700,67 @@ export async function runStopSession(
 }
 
 /**
+ * What this repository's Configuration starts a session with: the engine and
+ * the model it names, or the sentence saying what it does not name.
+ *
+ * Read and never asked. The engine and the model were each a pick list at
+ * every Start, offering back what the Configuration already showed -- so a
+ * person answered twice, and the second answer was written nowhere.
+ */
+export function configuredStart(repoRoot: string): { picked: EngineChoice; model: string } | string {
+  const configuration = solutionConfiguration(repoRoot) as { engines?: { chosen?: string | null } } | null;
+  const engine = configuration?.engines?.chosen ?? null;
+  const picked = ENGINES.find((choice) => choice.engine === engine);
+  if (picked === undefined) {
+    return (
+      "This repository's Configuration names no engine to start a session with, so nothing was started. " +
+      "Choose one on the Authoring AI's Vehicle row in the Configuration, which is now in front of you: " +
+      "it is saved to this repository, and Start Session then asks nothing."
+    );
+  }
+  const model = chosenAuthoringModel(repoRoot);
+  if (picked.modelRequired && model === "") {
+    return (
+      `${picked.label} needs a model and this repository's Configuration names none, so nothing was started. ` +
+      "Choose one on the Authoring AI's Model row in the Configuration, which is now in front of you: " +
+      "it is saved to this repository, and Start Session then asks nothing."
+    );
+  }
+  return { picked, model };
+}
+
+/**
  * Start is the launch, and what it launches is the person's own CLI.
  *
- * The engine is the decision -- asked as one, in a pick -- and everything
- * after it belongs to the person: their terminal, their chat, their Esc.
- * A cancelled pick cancels the command, which is what cancelling a
- * decision should do.
+ * It asks nothing about who authors: the engine and its model are this
+ * repository's Configuration, which is where a person chooses them. `ask` is
+ * the other command -- *Start Session with Different Models* -- which asks
+ * for both, for this one session, and writes neither down. Everything after
+ * the launch belongs to the person: their terminal, their chat, their Esc.
  */
 export async function runStartSession(
   repository: SessionsRepository,
   ui: SessionRunUi,
   register: SessionRegistrar = defaultSessionRegistrar(),
+  ask = false,
 ): Promise<boolean> {
-  const picked = await ui.pickEngine();
+  const configured = ask ? null : (ui.configured ?? configuredStart)(repository.root);
+  if (typeof configured === "string") {
+    // To the Configuration and never to a pick list of Start's own: a choice
+    // made there is SAVED, so the next Start asks nothing, where one made
+    // here would be written nowhere and this message would meet the person
+    // again at every Start. The other command is the one that asks.
+    ui.showErrorMessage(configured);
+    ui.openConfiguration?.();
+    return false;
+  }
+  // A cancelled pick cancels the command, which is what cancelling a decision should do.
+  const picked = configured === null ? await ui.pickEngine("Start session with different models") : configured.picked;
   if (!picked) return false;
-  const model = await ui.askModel(repository.root, picked, chosenAuthoringModel(repository.root));
+  const model =
+    configured === null
+      ? await ui.askModel(repository.root, picked, chosenAuthoringModel(repository.root))
+      : configured.model;
   if (model === undefined) return false;
   // Two questions, and they are different questions. One asks what this
   // machine has READ for this engine; the other asks the INSTALLED CLI, which
@@ -836,6 +894,13 @@ export function registerSessionCommands(
       // opened, and the framework's own work goes to the Dabbler
       // terminal rather than here.
       await runStartSession(repository, ui);
+    }),
+    // The same start, asked: an engine and a model for this one session,
+    // written nowhere, so the repository's Configuration is as it was.
+    vscode.commands.registerCommand("dabblerSessionSets.startSessionWithDifferentModels", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      await runStartSession(repository, ui, undefined, true);
     }),
     vscode.commands.registerCommand("dabblerSessionSets.stopSession", async (arg: unknown) => {
       const repository = repositoryOf(arg);

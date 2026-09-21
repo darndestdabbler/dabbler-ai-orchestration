@@ -154,6 +154,36 @@ export interface ConfigurationModel {
  * `withheld` says why each absent one is absent, because "not offered" with
  * no reason reads as a broken pane.
  */
+/**
+ * Where a choice is kept, as the router's projection says it: this
+ * repository's settings, this machine's default, what ships, or nowhere.
+ */
+export type DecidedLayer = "checkout" | "machine" | "shipped" | "default";
+
+/**
+ * Whose a row's choice is, in the words a row says it. Read from the
+ * projection and decided nowhere here: a person with two windows open has to
+ * be able to see which of the two a value is, and a value alone cannot say.
+ */
+export function whoseChoice(layer: DecidedLayer | null | undefined): string {
+  if (layer === "checkout") return "this repository";
+  if (layer === "machine") return "machine default";
+  if (layer === "shipped") return "shipped default";
+  return "";
+}
+
+/** The same, as the sentence a tooltip carries; empty where nobody chose. */
+function whoseSentence(layer: DecidedLayer | null | undefined): string {
+  if (layer === "checkout") {
+    return "This is THIS REPOSITORY's choice, kept in its .vscode/settings.json: another repository open in another window has its own, and a change here reaches neither it nor the machine's default. The file is committed, so the choice travels to the next clone.";
+  }
+  if (layer === "machine") {
+    return "This is the MACHINE's default, which applies here because this repository names no choice of its own. Choosing one on this row makes it this repository's; Keep as Machine Default changes the default instead.";
+  }
+  if (layer === "shipped") return "Nobody chose this: it is what the distribution ships.";
+  return "";
+}
+
 export interface ConfigurationVehicle {
   /** "engine" or "transport". */
   kind: string;
@@ -161,6 +191,7 @@ export interface ConfigurationVehicle {
   withheld?: Array<{ id: string; means: string; note: string | null }>;
   chosen: string | null;
   decidedBy?: string | null;
+  decidedLayer?: DecidedLayer | null;
   /** Which session a change here reaches. Always the next one. */
   appliesTo?: string;
   reason?: string;
@@ -198,6 +229,8 @@ export interface ConfigurationRole {
    * it, or null. The choice is kept; the row says where it will stop.
    */
   notListedBy?: string | null;
+  /** Where this role's model is kept for the next session. */
+  decidedLayer?: DecidedLayer | null;
   /**
    * The AUTHORING row only: true while a session in flight declared this
    * model at `session start`.
@@ -1100,11 +1133,12 @@ export function descriptorFor(
       // machine has none. The developer's machine -- claude and copilot both
       // installed -- read "none installed" until session 162.
       const installed = (engines?.installed ?? []).filter((entry) => entry.path !== null).length;
+      const whose = whoseChoice(vehicle?.decidedLayer);
       return {
         id: `config:vehicle:${node.who}`,
         label: "Vehicle",
         description: chosen
-          ? `${chosen}${shadowed.length > 0 ? " ⚠" : ""}`
+          ? `${chosen}${whose === "" ? "" : ` · ${whose}`}${shadowed.length > 0 ? " ⚠" : ""}`
           : authoring
             ? installed > 0
               ? `${installed} installed, none chosen`
@@ -1113,8 +1147,9 @@ export function descriptorFor(
         tooltip: [
           vehicleText(vehicle),
           authoring
-            ? "The choice is a file beside this machine's model catalog, not an editor setting only one surface can read, so `dabbler session start` typed in a terminal offers the engine this pane does. It is the default for the NEXT session: the engine is recorded per session at `session start` and never changes one in flight."
+            ? "Start Session uses this engine and asks for none; `dabbler session start` typed in a terminal reads the same choice. It reaches the NEXT session: the engine is recorded per session at `session start` and never changes one in flight."
             : "This sets the reviewing vehicle, dabbler.reviewerTransport in this checkout's settings -- the one this row shows.",
+          chosen ? whoseSentence(vehicle?.decidedLayer) : "",
           ...shadowed.map((layer) => `${layer.source} says '${layer.value}' and is overridden${overrider}.`),
           authoring && (context.chosenEngine ?? null) === null ? (engines?.reason ?? "") : "",
         ]
@@ -1146,14 +1181,16 @@ export function descriptorFor(
         label: ROLE_LABELS[node.role],
         description:
           unlistedModel !== null
-            ? `${unlistedModel} — not listed by ${role?.notListedBy} ⚠`
+            ? // Whose it is matters MOST here: the row is telling a person to
+              // change a choice, and they have to know which file holds it.
+              `${unlistedModel}${whoseChoice(role?.decidedLayer) === "" ? "" : ` · ${whoseChoice(role?.decidedLayer)}`} — not listed by ${role?.notListedBy} ⚠`
             : `${modelText(
                 role?.chosen,
                 // Only the authoring row: a reviewing role resolves its own head
                 // from the preference order, so a null chosen there really is
                 // nothing resolving rather than nobody having picked.
                 authoring ? (role?.candidates.length ?? 0) : 0,
-              )}${role?.fellThrough || role?.conflict ? " ⚠" : ""}`,
+              )}${role?.chosen && whoseChoice(role?.decidedLayer) !== "" ? ` · ${whoseChoice(role?.decidedLayer)}` : ""}${role?.fellThrough || role?.conflict ? " ⚠" : ""}`,
         tooltip: [
           ROLE_HELP[node.role],
           // Kept, never cleared or substituted: the stop is where it always
@@ -1161,7 +1198,7 @@ export function descriptorFor(
           unlistedModel !== null
             ? `You chose ${unlistedModel}, which ${role?.notListedBy} does not list. ${
                 node.role === "auxiliaryReviewer" ? "The first dispute" : "The next session"
-              } will stop on it until you choose another.`
+              } will stop on it until you choose another. ${whoseSentence(role?.decidedLayer)}`.trim()
             : "",
           // What narrows this role at the round, in the router's own words
           // rather than a second copy of them here. Only the Auxiliary
@@ -1189,7 +1226,7 @@ export function descriptorFor(
           unlistedModel !== null
             ? ""
             : role?.selected
-            ? `You chose ${role.selected}. It is kept on this machine rather than in this repository, so it is already your own default and travels to no clone. It is what the round dispatches to, and nothing is substituted for it: if this call cannot reach it, the round stops and says so.`
+            ? `You chose ${role.selected}. ${whoseSentence(role.decidedLayer)} It is what the round dispatches to, and nothing is substituted for it: if this call cannot reach it, the round stops and says so.`
             : authoring
               ? // A REPORT and a CHOICE look identical on a row that does not
                 // say which it is, and only one of the two can be changed.

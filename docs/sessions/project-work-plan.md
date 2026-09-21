@@ -262,7 +262,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 222 | A running job's output is shown from its first byte | no | 2026-09-21 |
 | 223 | A Maven release can start, and a job's output is one piece | no | 2026-09-21 |
 | 224 | Every configured choice is the repository's, and the machine's is its default | no | 2026-09-21 |
-| 225 | Start asks nothing, and the Configuration is this repository's | — | not declared |
+| 225 | Start asks nothing, and the Configuration is this repository's | no | 2026-09-21 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2927,3 +2927,13 @@ Give every configured choice the repository's own layer, by the operator's six r
 - 2026-09-21 — step 'a-layer-for-every-choice': its files: role selection is tested in roleSelection.test.ts; selection.test.ts is about test selection (claude-code (anthropic, claude-opus-5))
 - 2026-09-21 — step 'configure-saves-to-the-repository': its files: configuration.test.ts's machine helper must clear every default a checkout's choice now seeds (claude-code (anthropic, claude-opus-5))
 - 2026-09-21 — step 'explain-says-whose-each-choice-is': its files: a role's selection must be read from the checkout the configuration was loaded FOR, which the loaded config now records; the test sits beside the authoring model's in configuration.test.ts (claude-code (anthropic, claude-opus-5))
+
+### Session 225 — Start asks nothing, and the Configuration is this repository's
+
+**Releasable: no — held: The operator walks a locally built 3.18.0 VSIX first and says whether it goes to the Marketplace; on their yes it is tagged with `dabbler release`, one release carrying sessions 224 and 225..**
+
+The extension's half of the operator's six rules of 2026-09-21 for where a configured choice lives; session 224 gave the router the repository's layer for every choice. Start Session asks for no engine and no model: it starts with what the Configuration shows for this repository, and where that names no engine -- or a seat's engine and no model -- it says so and points at the Configuration. A second command, Start Session with Different Models..., asks what Start asks today and passes it on that one call, writing nothing. Keep as My Default becomes Keep as Machine Default, is offered on every row that holds a choice (both vehicles, the engine, the authoring model and both reviewers' models), and writes the machine's default only. Each of those rows says whose its choice is -- this repository's or the machine's default -- from the projection's decidedLayer. A UAT page gives the operator one numbered check per rule. version.json goes to 3.18.0 (a minor: capabilities) with one changelog section for 224 and 225. Nothing is published by this session.
+
+**Amended after acceptance:**
+
+- 2026-09-21 — step 'start-asks-nothing': its files: the new command is registered beside Start in sessionCommands.ts and shares its menu's when-clause, so extension.ts and the action registry did not change (claude-code (anthropic, claude-opus-5))

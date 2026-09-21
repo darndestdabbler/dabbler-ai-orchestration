@@ -55,8 +55,23 @@ session between an instruction and its answer. So there is nothing to
 re-arm and nothing to resume: an engine that answers has asked, and
 `dabbler status` says which instruction is owed and for how long.
 
+**The Dabbler Terminal only watches.** It reads the record and the jobs'
+logs and owns nothing: closing it changes nothing about the session, and
+reopening it shows the phase, who owes what and for how long, and what the
+framework is running. Every framework line in it reads one way, `20:02:12
+event key=value`, whether the terminal said it or replayed it from a job's
+log, so a step or a phase looks the same whoever reported it.
+
 **A repeated answer takes nothing twice.** A chained command whose process
 died — a closed terminal, a killed task — is run again exactly as it was.
+The engine tells by what the output ends with: a JSON instruction is acted
+on; a line saying `refused`, or a stop with its `Next:` and its ways on, is
+read and obeyed, and a stop is never repeated; anything else — progress
+lines and then nothing — was cut off, and the command is started again at
+once, because the framework does not finish a session by itself. (The rule
+used to turn on whether anything had been printed at all. Walked on the
+installed extension, an engine read a killed command's progress lines,
+decided the framework would finish the job alone, and ended its turn.)
 If its report was already taken, the framework carries on from the phase
 and the job the record names, and no check, round, commit or push runs
 twice; if the next instruction had already been issued, that instruction is

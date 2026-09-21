@@ -51,8 +51,27 @@ There is one implementation, in TypeScript, and it runs two ways:
 See [docs/quick-start.md](docs/quick-start.md) for the full walkthrough of
 the typed lifecycle, and [docs/driving-a-session.md](docs/driving-a-session.md)
 for the driven one — what happens when you press **Start Session** in the
-Work Explorer and the framework runs the session itself, calling the engine
-once per step.
+Work Explorer.
+
+### What you see when a session runs
+
+- **Your AI's own terminal.** Start Session opens Claude Code or the Copilot
+  CLI interactively, in your repository, and you can talk to it at any time.
+  It asks the framework for an instruction once, does what it says, and
+  answers with a command it starts in the background. That command stays open
+  while the framework checks, tests, reviews, commits and pushes, and hands
+  the AI its next instruction when it finishes — so the chat is never tied up,
+  and no framework process sits waiting for the AI.
+- **The Dabbler terminal**, beside it, only watches: the phase, who owes what
+  and for how long, and each job's output as it runs. Closing it changes
+  nothing about the session, and reopening it shows where the session is.
+- **To say something to a running session**, tell the AI, or use `dabbler
+  session interrupt --reason "..."` (Stop Session adds `--stop`): the AI gets
+  it with its next instruction, and a stop ends the framework's work where it
+  is. To carry on afterwards, ask the AI to run `dabbler session next`.
+- **To end one**, cancel it. The AI may cancel the session it is working —
+  its number and a reason, nothing more — and your working tree is left as it
+  was. Cancelling any other session, and `--force`, are yours alone.
 
 Two UAT walkthroughs build a small multi-module solution end to end, from an
 empty folder to a running program, with every expected output captured from

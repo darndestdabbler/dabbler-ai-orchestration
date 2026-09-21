@@ -3066,11 +3066,15 @@ export function personIsPresent(
  * told the same thing wherever it reaches for one, and told what to do
  * instead.
  */
-export function isAPersonsVerb(verb: string, does: string, how: string): string {
+export function isAPersonsVerb(
+  verb: string,
+  does: string,
+  how: string,
+  instead = "Report the step blocked and say why",
+): string {
   return (
     `refused -- \`session ${verb}\` is a person's verb, never the engine's: it ` +
-    `${does}, and that judgement is not the engine's to make. Report the ` +
-    `step blocked and say why; ${how}.`
+    `${does}, and that judgement is not the engine's to make. ${instead}; ${how}.`
   );
 }
 
@@ -3127,6 +3131,9 @@ export function cancel(
         "cancel --force",
         "ends a session in flight",
         "a person cancels from the Work Explorer (Cancel Session) or an interactive terminal of their own",
+        // The engine has a form of its own, and an engine told only to report
+        // `blocked` paused a session its operator had asked it to cancel.
+        'The session you are working is yours to cancel without it: `dabbler session cancel <its number> --reason "<why>"`',
       )}\n`,
     );
     return EXIT_BOUNDARY;

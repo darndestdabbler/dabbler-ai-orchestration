@@ -256,7 +256,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 216 | A dispute ends inside the session | — | not declared |
 | 217 | An impasse goes to the Auxiliary Reviewer before it goes to a person | — | not declared |
 | 218 | Replace the mailbox handoff with one chained exchange | no | 2026-09-20 |
-| 219 | Prove the installed conversation before the four soaks | — | not declared |
+| 219 | Prove the installed conversation before the four soaks | yes | 2026-09-20 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2866,3 +2866,13 @@ Replace the mailbox handoff with one chained exchange, on the pull the router al
 - 2026-09-20 — step 'start-opens-no-loop': its files: With Resume Session gone, the router's own stop sentences, the start verb's closing line, the consult brief and the undelivered-instruction sentence would send a person to a button that does not exist or a loop nothing starts: they say dabbler session next now, and a printed instruction is stamped delivered so a pulled session is not read as unread. (claude-code (anthropic, claude-opus-5))
 - 2026-09-20 — step 'start-opens-no-loop': its checks: The step changes router sentences and their tests, so its checks run those router tests and the router typecheck beside the extension's. (claude-code (anthropic, claude-opus-5))
 - 2026-09-20 — step 'proof-chained-exchange': its files: The proof's first run found that a chained answer repeated after the close was told the idle done, whose ask names session start; it is told the ended session's own done instead, with the walk test that holds it. (claude-code (anthropic, claude-opus-5))
+
+### Session 219 — Prove the installed conversation before the four soaks
+
+**Releasable: yes.**
+
+Prove the installed conversation before the operator's four soaks, and release what passes as 3.16.0 -- a minor, because the chained exchange of session 218 is a new capability an installed extension now uses by default. Everything that must be inside the candidate is done first: the version and its changelog entry, the Dabbler Terminal drawing a replayed router line the same way it draws its own (no line begins `dabbler [`, and a step or a phase looks the same whoever wrote it), and the user-facing pages saying in plain language what a person sees -- the interactive AI terminal, the background chained exchange, the observational Dabbler Terminal, interruption and cancellation. Then the existing installed-VSIX Playwright walk is adapted, not replaced, to the chained exchange: it stages its own disposable TypeScript repository with a local bare remote and a pack-only handoff, installs the VSIX into a disposable VS Code profile, starts the session from the Work Explorer with the real interactive engine visible, asks one question while the author works and one while a background exchange waits on a long framework job, closes and reopens the Dabbler Terminal, interrupts once with a course correction, kills one chained exchange after its answer is durable and watches the engine repeat it, reads the record for exactly-once acceptance and side effects, checks that no router, engine, test or package process is left, and in a separate disposable run has the author cancel its own session and checks the reason, the preserved files and the absence of any later commit, push or publish. One candidate VSIX is built once; its checksum is recorded; the Claude Code run, the Copilot CLI run, both cancellation runs and a direct-implementation baseline for wall time and AI credits all use that file. A failed case keeps its evidence, gets only the demonstrated production fix, a new candidate, and both engine cases again from clean profiles. One acceptance report records all of it and names the exact candidate approved for the soaks. The release is this repository's tag-driven one, made by the framework only after the verdict.
+
+**Amended after acceptance:**
+
+- 2026-09-20 — step 'installed-acceptance': its files: The acceptance rejected a build and two walked candidates, and each rejection's production fix rides here with its test: the package's ignore list, the managed instruction's rule for an answer command that was cut off, and the forced-cancel refusal's advice to an engine. The walk itself was corrected where it, not the product, was at fault. (claude-code (anthropic, claude-opus-5))

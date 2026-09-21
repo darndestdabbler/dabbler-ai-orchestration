@@ -917,6 +917,10 @@ describe("cancelling and restoring through the verb", () => {
       const engine = await run(() => cancel(state.sessionsDir, 1, { reason: "wrong window", force: true, engine: true }));
       assert.equal(engine.code, EXIT_BOUNDARY);
       assert.match(engine.err, /a person's verb, never the engine's/);
+      // And it says the engine's own way: walked on the installed extension, an
+      // engine told only to report `blocked` paused a session it had been asked to cancel.
+      assert.match(engine.err, /yours to cancel without it: `dabbler session cancel <its number> --reason/);
+      assert.doesNotMatch(engine.err, /Report the step blocked/);
       assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
       const person = await run(() => cancel(state.sessionsDir, 1, { reason: "stop", force: true, engine: false }));
       assert.equal(person.code, EXIT_OK);
@@ -974,9 +978,12 @@ describe("cancelling and restoring through the verb", () => {
           refusal.err.includes(`refused -- \`session ${verbs[index]}\` is a person's verb, never the engine's: it `),
           refusal.err,
         );
+        assert.ok(refusal.err.includes(", and that judgement is not the engine's to make. "), refusal.err);
+        // What to do instead is the one part that differs: an engine has a
+        // cancel of its own, and no close or hold of its own.
         assert.ok(
           refusal.err.includes(
-            ", and that judgement is not the engine's to make. Report the step blocked and say why; a person ",
+            index === 0 ? "yours to cancel without it: `dabbler session cancel <its number>" : "Report the step blocked and say why; a person ",
           ),
           refusal.err,
         );

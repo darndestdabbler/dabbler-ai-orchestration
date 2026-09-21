@@ -143,12 +143,26 @@ function runBuiltCommand() {
   process.stdout.write(`built ${command}: ${result.stdout}`);
 }
 
+/**
+ * A build starts from an empty folder, because the package is whatever is in
+ * it. Nothing here ever deleted a file, so a checkout's `dist` kept every
+ * schema a later session removed and whatever a router run from it wrote
+ * beside the bundle -- a lock, a metrics log. CI checks out into an empty tree
+ * and never had them: walked before 3.16.0, a package built here held five
+ * files the published one did not, and a candidate that differs from what
+ * ships is a candidate nobody has walked.
+ */
+function emptyOutDir() {
+  fs.rmSync(outDir, { recursive: true, force: true });
+}
+
 if (watch) {
   copyRouterRuntime();
   Promise.all(builds.map((options) => esbuild.context(options)))
     .then((contexts) => Promise.all(contexts.map((ctx) => ctx.watch())))
     .then(() => console.log("Watching for changes..."));
 } else {
+  emptyOutDir();
   Promise.all(builds.map((options) => esbuild.build(options)))
     .then(copyRouterRuntime)
     .then(runBuiltCommand)

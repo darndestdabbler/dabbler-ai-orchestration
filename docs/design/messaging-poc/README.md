@@ -19,7 +19,7 @@ linted or tested with the repository.
 | drive-poc.cjs | The driver: resets the scratch folder, launches VS Code with a fresh profile, starts the CLI in a terminal, answers its folder-trust prompt, types the opening, starts the framework, types the operator's questions (`--human "<seconds>:<text>\|..."`), kills the waiter on cue (`--kill <seconds>,...`), and saves the logs, screenshots and terminal text. |
 | report.mjs | The analyzer: one run's findings and timeline from the harness logs and the engine's own log (the Claude project transcript, or Copilot's session events and usage store). |
 | *exchange mode* | The same five files carry the next-instruction proof (`docs/design/next-instruction-poc-results.md`); the mailbox mode above stays as its comparison control. See "The exchange mode" below. |
-| walk-vsix.cjs | The walk of the product rather than the protocol: installs a built VSIX into a fresh VS Code profile, runs Start Session from the repository's Work Explorer row, answers the engine and model picks and every prompt the CLI puts up, types the operator's questions while the AI waits and while it works, and follows the framework's records until the session completes. Every action goes to `walk.jsonl` with who took it and whether a rule could have. |
+| walk-vsix.cjs | The walk of the product rather than the protocol: stages a disposable repository, installs a built VSIX into a fresh VS Code profile, runs Start Session from the repository's Work Explorer row, and plays the operator -- and once, the saboteur -- through a whole session of the chained exchange, a cancellation, or a no-framework baseline. See "Walking the VSIX". |
 
 ## Running it
 
@@ -110,37 +110,75 @@ machine-wide.
 
 ## Walking the VSIX
 
-`walk-vsix.cjs` needs a repository the extension can start a session in:
-bootstrapped, with a session planned, committed and pushed to a remote. It
-writes its evidence to a folder beside the repository, `<repo>-results/<run>`,
-so nothing it writes moves the repository's tree, and it keeps each run's VS
-Code profile in `<repo>-vscode/<run>`, which it deletes before that run
-launches: every run starts on a fresh profile of its own, so no earlier run's
-terminals are restored into it.
+`walk-vsix.cjs` walks the installed extension through one session of the
+chained exchange. It stages its own disposable repository, so it needs only a
+built VSIX and a scratch folder -- one it made itself, or one that does not
+exist yet; it refuses to wipe any other:
 
 ```
-node walk-vsix.cjs --engine claude --vsix <extension>/dabbler-ai-orchestration-<version>.vsix \
-  --repo C:/temp/<scratch repo> --run claude-walk --model sonnet \
-  --human "turn:What are you working on? One sentence.|wait:Are you still waiting? One sentence."
+node docs/design/messaging-poc/walk-vsix.cjs --engine claude --model sonnet \
+  --vsix tools/dabbler-ai-orchestration/dabbler-ai-orchestration-<version>.vsix \
+  --scratch C:/temp/<scratch folder> --run claude-main --scenario main
 ```
 
-Copilot needs `--model`. The `DABBLER_` keys in the environment reach the
-window, so the reviewers can be reached; `HOME` is the real one, so the CLIs
-find their logins. Which actions a person had to take is `walk.jsonl` filtered
-to `"actor":"operator"`; which commands the AI ran is the engine's own log,
-which the walk copies beside `walk.jsonl` when it ends or stops on an error,
-under a name carrying the attempt's start time. A rerun under the same `--run`
-keeps the previous log as `walk-attempt<N>.jsonl` rather than adding to it, and
-the previous engine log under its own name.
+Everything of a run lives under `<scratch>/<run>`: the repository and its bare
+remote, a fresh VS Code profile, extensions folder and AppData, and `results`
+-- `walk.jsonl` (every action, who took it, and whether a rule could have),
+`summary.json`, the engine's own transcript, the AI terminal's text, the
+Dabbler Terminal's text before it was closed, after it was reopened and at
+the end, screenshots, the run's records, the ledger, the git log and the
+remote's refs. Nothing is written into a product tree, and no environment or
+credential is copied into any of it: the `DABBLER_` keys reach the window as
+they reach a person's, and `HOME` is the real one so the CLIs find their logins.
 
-Copilot's screen cannot be read, so an Enter the walk presses on it is logged
-as answering either Copilot's folder-trust prompt or the sentence Start typed,
-with a screenshot taken just before it. Tell them apart from the records: an
-Enter that submitted the sentence is followed within a second by a
-`user.message` in Copilot's session events, and one that answered the trust
-prompt is followed by nothing. Or answer the trust prompt once for the scratch
-folder before the walk, and there is only one kind.
+The repository is a small TypeScript package with a real build and test (the
+checkout's own compiler and node types, so it installs nothing), `dabbler
+bootstrap` run through the VSIX's OWN bundled router, a three-step releasable
+session, a declared suite that takes 40 seconds so the run of record is a long
+framework job, and a pack-only `packaging` block, so the session packages and
+tags and pushes its artifact nowhere.
 
+| `--scenario` | what the walk does |
+| --- | --- |
+| `main` | Starts the session from the Work Explorer row and types only what a person would: the engine and model picks, a CLI's trust and tool prompts, a question while the author works, a question while an answer command waits on verification, and one `session interrupt` course correction. Off the framework's own records it closes and reopens the Dabbler Terminal during a framework job, and kills the live chained `session report --next` once the run of record is running -- then watches for the engine to run the exact command again -- and follows the session to its close. |
+| `cancel` | Asks the AI, in its chat, to cancel the session it is working with a stated reason, then reads the ledger, the working tree, the git log, the remote, the tags and the packaging record, and reads them again a minute later. |
+| `direct` | No framework and no extension: the same engine is given the same three-step change in one prompt, for the wall-time and cost baseline. |
+
+**A walk fails closed.** It judges its own run against the scenario's
+acceptance cases -- closed VERIFIED from one `session next` and chained
+background answers, both questions heard and answered, the correction on the
+next instruction, the Dabbler Terminal rebuilt with every line one way, the
+killed command repeated as the same command, everything once, the package
+clean, nothing left running; or, for a cancellation, the reason recorded, the
+files kept and nothing landed -- writes each case with its evidence into
+`summary.json`, and exits non-zero unless every one holds. A run that hit its
+deadline leaves the same files a passing one does, and is not evidence.
+
+"Nothing left running" is only as good as the look behind it, so that look
+fails closed too. Every error inside the listing is made a terminating one and
+a non-zero exit, and the ONE listing that says what is left must itself
+contain the walk's own process: a listing that ran and saw nothing at all is a
+listing that failed, however it exited. `--self-test-processes` puts that
+listing through every way it can fail — a lister that is not installed, one
+that answers something else, a process provider that writes an error and
+carries on, and one that returns nothing — and requires each to be a failed
+inspection and none to be an empty list. The reads a cancellation is judged by
+fail the same way: git's failure is thrown, never read as "nothing there", and
+a packaging record that is there and cannot be read is an error.
+
+`--compare <a.vsix> <b.vsix>` says whether two packages hold the same files
+with the same bytes. Two builds of one tree never share a checksum -- a zip
+carries its own timestamps -- so this is how the package a release pipeline
+built is tied to the one that was walked.
+
+Copilot needs `--model`. Run one walk at a time: they share the clipboard. What
+a run cost is read from the engine's own record -- Copilot's usage store in AI
+credits, Claude Code's transcript in tokens. Every run ends by listing the
+processes that still name it after the editor has closed.
+
+Copilot's screen cannot be read, so an Enter the walk presses before Copilot's
+first user message is logged as answering either its folder-trust prompt or
+nothing, with a screenshot taken just before it.
 ## What to know first
 
 - **Copilot drops a prompt given with `-i`** in this terminal. The driver starts

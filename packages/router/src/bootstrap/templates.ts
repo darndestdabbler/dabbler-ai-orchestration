@@ -68,9 +68,7 @@ export const SHARED_BODY =
   "framework checks, tests, reviews, commits and pushes, which can take many\n" +
   "minutes, and what it prints when it exits is your next instruction: act on\n" +
   "that one the same way, until one says `done`. Never poll it, and never start\n" +
-  "anything else to wait with. One that ends having printed nothing at all was\n" +
-  "killed: start that exact command again — an answer is taken once, and a\n" +
-  "repeat prints what is owed.\n" +
+  "anything else to wait with.\n" +
   "\n" +
   "The operator can talk to you while it runs: answer them, and leave it\n" +
   "running. `dabbler status` says which instruction is owed, and for how long.\n" +
@@ -97,9 +95,12 @@ export const SHARED_BODY =
   "  and the answer owed is the one you already owed.\n" +
   "- **`done`** — the session is over and closed. Stop.\n" +
   "\n" +
-  "**An answer command that prints no instruction and says why on stderr** was\n" +
-  "refused or met a stop, and repeating it moves nothing. Read what it said: a\n" +
-  "refusal you can fix is answered again; a stop is *When the framework stops*.\n" +
+  "**When an answer command exits, read what it printed.** A JSON instruction:\n" +
+  "act on it. A line saying `refused`, or a stop (`Next:` and its ways on): do\n" +
+  "what it says, and never repeat a stop. Anything else — it ended on progress\n" +
+  "lines, or printed nothing — and it was cut off: start that exact command\n" +
+  "again at once. An answer is taken once, the repeat carries on from where the\n" +
+  "framework is, and the framework does not finish a session by itself.\n" +
   "\n" +
   "Everything the framework does for itself happens between instructions:\n" +
   "declaring the work, each step's own checks, cross-provider verification and\n" +
@@ -151,7 +152,7 @@ export const SHARED_BODY =
   "- The router is one command, `dabbler <verb>`: it ships inside the VSIX and\n" +
   "  a VS Code terminal has it on `PATH`; anywhere else run `node \"<extension\n" +
   "  dir>/dist/dabbler.cjs\" <verb>`. \"command not found\" is PATH, not keys.\n" +
-  "- `session cancel --force` is a person's verb, never the engine's; so is `close --force`.\n" +
+  "- `cancel --force` and `close --force` are a person's, never yours. The session you are working is yours to cancel: `dabbler session cancel <its number> --reason \"<why>\"`.\n" +
   "- A fix no session covers is a session's own work: insert a session into\n" +
   "  the session plan and make the fix there, never outside a session.\n" +
   "\n" +

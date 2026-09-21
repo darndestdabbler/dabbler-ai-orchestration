@@ -78,6 +78,18 @@ cross-provider round and its remediation, the complete test suite as the
 run of record, the commit, the push and the close are all the framework's
 — not a checklist anyone has to remember.
 
+While it runs you have two terminals and two verbs. **Your AI's terminal**
+is an ordinary interactive chat: talk to it whenever you like.
+**The Dabbler terminal** only watches — the phase, who owes what and for how
+long, each job's output — so closing it changes nothing and reopening it
+shows where the session is. **Stop Session** (or `dabbler session interrupt --reason
+"..."` from a terminal) reaches the framework where it is working, and a
+plain message reaches the AI with its next instruction; to carry on after a
+stop, ask your AI to run `dabbler session next`. **Cancel Session** ends one
+with your reason on the record and your files left as they were. Your AI may
+cancel the session it is working, by its number with a reason; cancelling
+any other session, and `--force`, stay yours.
+
 **6. Seven gates at the close, each one earned.** `session close` runs
 verification clean, working tree clean, pushed to remote, test run fresh,
 pins current, published when releasable, and verdict vocabulary — and only then flips the state

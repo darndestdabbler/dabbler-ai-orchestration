@@ -10,6 +10,72 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.16.0] — 2026-09-20
+
+**Every answer asks for what comes next.** A session stalled with nothing
+wrong in the framework: its loop was healthy, the next instruction was
+written, and the AI — which had answered — never started its waiter again, so
+nothing delivered it. Reminders and a Resume button leave that gap where it
+is. It is closed instead: the AI's answer is itself the request for the next
+instruction, so an AI that answers has nothing left to remember.
+
+### Changed
+
+- **Start Session opens your AI's own terminal and the Dabbler Terminal, and
+  no framework loop.** The AI asks for one instruction with `dabbler session
+  next`, does what it says, and starts the command the instruction names as a
+  background command. That command — `dabbler session report ... --next` —
+  takes the answer, stays open while the framework checks, tests, reviews,
+  commits and pushes, and prints the next instruction when it exits. Your
+  AI's chat stays free the whole time, and no framework process sits waiting
+  for it.
+- **A repeated answer takes nothing twice.** If the background command dies —
+  a closed terminal, a killed task — the AI runs the same command again. The
+  answer is accepted once, the framework carries on from the job its record
+  names, and no check, review round, commit or push runs a second time.
+- **The author may cancel the session it is working**, with `dabbler session
+  cancel <its number> --reason "<why>"` and no `--force`. The reason is
+  recorded and your working tree is left as it was. Any other session's
+  number is refused to an AI, and `--force` stays a person's.
+- **The Dabbler Terminal says every framework line one way**: `20:02:12
+  event key=value`, whether the terminal wrote the line or replayed it from a
+  job's log. Lines that began `dabbler [20:02:12]` are drawn the same as the
+  rest, so a step or a phase looks the same whoever reported it.
+- **The Dabbler Terminal only watches.** Closing it changes nothing about the
+  session, and reopening it shows the phase, who owes what and for how long,
+  from the record.
+
+### Removed
+
+- **Resume Session.** There is no loop for it to start again. A stopped
+  session is carried on by asking your AI, in its chat, to run `dabbler
+  session next`, which picks up in the phase the stop was in; every stop's
+  own message says so.
+
+### Fixed
+
+Found by walking this release, installed, with both engines before it shipped
+(`docs/uat/uat-installed-conversation.md`):
+
+- **An AI whose answer command is cut off starts it again.** The instruction
+  said to repeat a command that had "printed nothing at all", and a killed one
+  has printed the framework's progress: one engine read that, decided the
+  framework would finish alone, and ended its turn over a session nothing
+  would move again. The rule now turns on what the output ends with.
+- **An AI refused `session cancel --force` is told its own way to cancel**,
+  where it used to be told to report the step blocked — which paused a
+  session its operator had asked it to cancel.
+- **A package built on a developer's machine is the package CI builds.** The
+  build starts from an empty `dist`, so it no longer carries schemas a later
+  release removed, or the lock and the `router-metrics.jsonl` a router run on
+  that machine left beside the bundle. Published builds never did.
+
+### Kept, as a fallback
+
+- `dabbler session run --mailbox`, with the AI running `dabbler session
+  wait`, still works when a person starts it by hand in a terminal. It stays
+  until this release has been through its soak.
+
 ## [3.15.0] — 2026-09-20
 
 **No silent wait.** In a beta test a session waited six hours for something

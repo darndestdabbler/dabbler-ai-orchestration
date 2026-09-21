@@ -258,9 +258,17 @@ describe("the instruction files", () => {
     }
     assert.ok(!agents.includes("Three kinds"), "the body still says three kinds");
     assert.match(agents, /ANSWERED rather\s+than fixed/);
-    assert.match(agents, /prints no instruction and says why on stderr/);
-    assert.match(agents, /repeating it moves nothing/);
-    assert.match(agents, /printed nothing at all was\s+killed: start that exact command again/);
+    // The rule turns on what the output ENDS with. It used to turn on whether
+    // anything was printed at all, and a killed answer command has printed the
+    // report's confirmation and the framework's progress: walked on the
+    // installed extension, a seat read that, decided the framework would
+    // finish the job by itself, and ended its turn over a session nothing
+    // would ever move again.
+    assert.match(agents, /ended on progress\s+lines, or printed nothing/);
+    assert.match(agents, /start that exact command\s+again at once/);
+    assert.match(agents, /the framework does not finish a session by itself/);
+    // A stop is a person's, and a repeat would carry on past it.
+    assert.match(agents, /never repeat a stop/);
   });
 
   it("asks for an instruction once, answers in the background, and leaves no waiter to re-arm", () => {

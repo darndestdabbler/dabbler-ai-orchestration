@@ -276,6 +276,54 @@ suite("the Dabbler terminal", () => {
     rmrf(root);
   });
 
+  test("draws a replayed router line the way it draws its own, and leaves every other line of a log as it was", () => {
+    // One scrollback held `20:02:12 phase ...` beside `dabbler [20:02:12]
+    // phase ...`: the same fact drawn two ways, depending on whether this
+    // terminal said it or replayed it from a job's log.
+    const { root, driver, terminal, written } = drivenRepo(RUNNING);
+    terminal.open();
+    written.length = 0;
+    fs.writeFileSync(
+      path.join(driver, "jobs", "close.log"),
+      "dabbler [20:02:12] phase from=land to=close\n" +
+        "dabbler [20:02:13] step widget has had no answer for 31 min\n" +
+        "close: session 062 closed\n" +
+        "✔ the gates pass\n",
+      "utf8",
+    );
+    terminal.poll();
+    const said = written.map(plain).join("");
+    assert.match(said, /^20:02:12 phase from=land to=close\r?$/m);
+    assert.match(said, /^20:02:13 step widget has had no answer for 31 min\r?$/m);
+    assert.doesNotMatch(said, /dabbler \[/);
+    // Everything that is not the router's own line is another writer's.
+    assert.match(said, /^close: session 062 closed\r?$/m);
+    assert.match(said, /^✔ the gates pass\r?$/m);
+    // The file on disk is nobody's to rewrite: it still says who was speaking.
+    assert.match(fs.readFileSync(path.join(driver, "jobs", "close.log"), "utf8"), /^dabbler \[20:02:12\] phase/);
+
+    // A read can land in the middle of a router line. Its opening is held
+    // until its end is written, and then it is one line in the terminal's form.
+    written.length = 0;
+    fs.appendFileSync(path.join(driver, "jobs", "close.log"), "dabbler [20:02:14] phase from=close ", "utf8");
+    terminal.poll();
+    assert.doesNotMatch(written.map(plain).join(""), /20:02:14|dabbler \[/);
+    fs.appendFileSync(path.join(driver, "jobs", "close.log"), "to=complete\n", "utf8");
+    terminal.poll();
+    const joined = written.map(plain).join("");
+    assert.match(joined, /^20:02:14 phase from=close to=complete\r?$/m);
+    assert.doesNotMatch(joined, /dabbler \[/);
+    // Anybody else's unfinished line is shown at once, as it always was --
+    // one that merely opens like the router's prefix included.
+    written.length = 0;
+    fs.appendFileSync(path.join(driver, "jobs", "close.log"), "pushing\nd", "utf8");
+    terminal.poll();
+    assert.match(written.map(plain).join(""), /pushing\r?\nd$/);
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
   test("re-reads the theme when it changes rather than painting the old palette", () => {
     useTheme(vscode.ColorThemeKind.Dark);
     const { root, driver, terminal, written } = drivenRepo(RUNNING);

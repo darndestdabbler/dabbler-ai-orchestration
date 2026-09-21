@@ -140,6 +140,16 @@ session interrupt --reason "..."` talks to a running session, and `dabbler
 session cancel` is the way out. Everything else — instructions and reports —
 is the machinery's conversation with the engine, not yours; you never type it.
 
+In VS Code the Dabbler terminal sits beside your AI's and only watches: the
+phase, who owes what and for how long, and each job's output. Closing it
+changes nothing about the session, and reopening it shows where the session
+is. An interruption reaches the AI with its next instruction; one sent with
+`--stop` (Stop Session) ends the framework's work where it is, and asking
+the AI to run `dabbler session next` carries on. The AI may cancel the
+session it is working — `dabbler session cancel <its number> --reason
+"<why>"` — and leaves your working tree as it was; cancelling any other
+session, and `--force`, are yours.
+
 ## 3. Work the steps
 
 Follow the spec's step list for the current session: make the edits and

@@ -254,9 +254,7 @@ command**, so this chat stays free for the operator. It stays open while the
 framework checks, tests, reviews, commits and pushes, which can take many
 minutes, and what it prints when it exits is your next instruction: act on
 that one the same way, until one says `done`. Never poll it, and never start
-anything else to wait with. One that ends having printed nothing at all was
-killed: start that exact command again — an answer is taken once, and a
-repeat prints what is owed.
+anything else to wait with.
 
 The operator can talk to you while it runs: answer them, and leave it
 running. `dabbler status` says which instruction is owed, and for how long.
@@ -283,9 +281,12 @@ Four kinds of instruction, and no fifth:
   and the answer owed is the one you already owed.
 - **`done`** — the session is over and closed. Stop.
 
-**An answer command that prints no instruction and says why on stderr** was
-refused or met a stop, and repeating it moves nothing. Read what it said: a
-refusal you can fix is answered again; a stop is *When the framework stops*.
+**When an answer command exits, read what it printed.** A JSON instruction:
+act on it. A line saying `refused`, or a stop (`Next:` and its ways on): do
+what it says, and never repeat a stop. Anything else — it ended on progress
+lines, or printed nothing — and it was cut off: start that exact command
+again at once. An answer is taken once, the repeat carries on from where the
+framework is, and the framework does not finish a session by itself.
 
 Everything the framework does for itself happens between instructions:
 declaring the work, each step's own checks, cross-provider verification and
@@ -337,7 +338,7 @@ releasable session with no packaging run cannot close: the close refuses.
 - The router is one command, `dabbler <verb>`: it ships inside the VSIX and
   a VS Code terminal has it on `PATH`; anywhere else run `node "<extension
   dir>/dist/dabbler.cjs" <verb>`. "command not found" is PATH, not keys.
-- `session cancel --force` is a person's verb, never the engine's; so is `close --force`.
+- `cancel --force` and `close --force` are a person's, never yours. The session you are working is yours to cancel: `dabbler session cancel <its number> --reason "<why>"`.
 - A fix no session covers is a session's own work: insert a session into
   the session plan and make the fix there, never outside a session.
 

@@ -12090,6 +12090,21 @@
       "what": "step 'proof-chained-exchange': its files",
       "reason": "The proof's first run found that a chained answer repeated after the close was told the idle done, whose ask names session start; it is told the ended session's own done instead, with the walk test that holds it.",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 219,
+      "dateTime": "2026-09-20T20:22:47.088000-04:00",
+      "task": "Prove the installed conversation before the operator's four soaks, and release what passes as 3.16.0 -- a minor, because the chained exchange of session 218 is a new capability an installed extension now uses by default. Everything that must be inside the candidate is done first: the version and its changelog entry, the Dabbler Terminal drawing a replayed router line the same way it draws its own (no line begins `dabbler [`, and a step or a phase looks the same whoever wrote it), and the user-facing pages saying in plain language what a person sees -- the interactive AI terminal, the background chained exchange, the observational Dabbler Terminal, interruption and cancellation. Then the existing installed-VSIX Playwright walk is adapted, not replaced, to the chained exchange: it stages its own disposable TypeScript repository with a local bare remote and a pack-only handoff, installs the VSIX into a disposable VS Code profile, starts the session from the Work Explorer with the real interactive engine visible, asks one question while the author works and one while a background exchange waits on a long framework job, closes and reopens the Dabbler Terminal, interrupts once with a course correction, kills one chained exchange after its answer is durable and watches the engine repeat it, reads the record for exactly-once acceptance and side effects, checks that no router, engine, test or package process is left, and in a separate disposable run has the author cancel its own session and checks the reason, the preserved files and the absence of any later commit, push or publish. One candidate VSIX is built once; its checksum is recorded; the Claude Code run, the Copilot CLI run, both cancellation runs and a direct-implementation baseline for wall time and AI credits all use that file. A failed case keeps its evidence, gets only the demonstrated production fix, a new candidate, and both engine cases again from clean profiles. One acceptance report records all of it and names the exact candidate approved for the soaks. The release is this repository's tag-driven one, made by the framework only after the verdict.",
+      "releasable": true
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 219,
+      "dateTime": "2026-09-20T22:42:27.709000-04:00",
+      "what": "step 'installed-acceptance': its files",
+      "reason": "The acceptance rejected a build and two walked candidates, and each rejection's production fix rides here with its test: the package's ignore list, the managed instruction's rule for an answer command that was cut off, and the forced-cancel refusal's advice to an engine. The walk itself was corrected where it, not the product, was at fault.",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

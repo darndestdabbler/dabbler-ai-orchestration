@@ -15,7 +15,14 @@ playwright.config.ts
 *.map
 *.bak
 **/*.ts
-!dist/**
+# The bundle and what it reads, by kind -- and not `!dist/**`. vsce keeps a
+# file that matches ANY negation whatever else excludes it, so a blanket one
+# also packs what a router run on THIS machine wrote beside its bundle: its
+# metrics log lands next to the configuration it loaded, which in a checkout
+# is `dist/`. That is a record of this machine's own calls, and a package
+# carries none.
+!dist/**/*.{cjs,js,json,map,md,yaml,lock}
+dist/**/*.jsonl
 media/screenshot-mockup.html
 media/marketplace-work-explorer-mock.html
 media/render-mockup.mjs

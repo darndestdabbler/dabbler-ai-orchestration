@@ -763,12 +763,66 @@ function paintMark(line: string, kind: ThemeKind): string {
  * ended in the middle of: its first glyph is then not in the first column,
  * whatever it looks like here.
  */
-export function forTerminal(bytes: string, kind: ThemeKind, atLineStart = true): string {
-  return bytes
-    .replace(/\r?\n/g, "\r\n")
-    .split("\r\n")
-    .map((line, at) => (at === 0 && !atLineStart ? line : paintMark(line, kind)))
+export function forTerminal(
+  bytes: string,
+  kind: ThemeKind,
+  atLineStart = true,
+  draw?: (line: RouterLine) => string,
+): string {
+  const lines = bytes.replace(/\r?\n/g, "\r\n").split("\r\n");
+  return lines
+    .map((line, at) => {
+      if (at === 0 && !atLineStart) return line;
+      // Only a line this chunk ends: a fragment is continued by the next drain.
+      const whole = at < lines.length - 1;
+      const routers = draw !== undefined && whole ? routerLine(line) : null;
+      return routers === null ? paintMark(line, kind) : draw!(routers).replace(/\r\n$/, "");
+    })
     .join("\r\n");
+}
+
+/** One line the router wrote about itself: the clock it printed, the event, and its `key=value` fields. */
+export interface RouterLine {
+  readonly clock: string;
+  readonly event: string;
+  readonly fields: Record<string, string>;
+}
+
+/** The router's own line, as its driver prints one: who is speaking, the clock, then the event. */
+const ROUTER_LINE = /^dabbler \[(\d{2}:\d{2}:\d{2})\] (.+)$/;
+/** How such a line opens, which is all that can be known of one before its end is written. */
+const ROUTER_PREFIX = "dabbler [";
+
+/**
+ * A replayed line read as the router's own, or null where it is anybody
+ * else's.
+ *
+ * The prefix says who is speaking, which a log file on disk needs and this
+ * terminal does not: its voice rule already says it, and its own lines open
+ * with the bare clock. So the router's line is drawn the way those are, and a
+ * step or a phase looks the same whoever reported it. The fields are read for
+ * their tones only -- every character after the clock reaches the screen --
+ * and a line that is prose after its clock is one event with no fields.
+ */
+export function routerLine(line: string): RouterLine | null {
+  const match = ROUTER_LINE.exec(line);
+  if (match === null) return null;
+  const clock = match[1] as string;
+  const said = match[2] as string;
+  const space = said.indexOf(" ");
+  const rest = space === -1 ? "" : said.slice(space + 1);
+  const keys = [...rest.matchAll(/(?:^| )([A-Za-z_][\w-]*)=/g)];
+  if (rest !== "" && keys[0]?.index !== 0) return { clock, event: said, fields: {} };
+  const fields: Record<string, string> = {};
+  keys.forEach((key, at) => {
+    const from = (key.index ?? 0) + key[0].length;
+    const to = at + 1 < keys.length ? (keys[at + 1]?.index ?? rest.length) : rest.length;
+    const name = key[1] as string;
+    // A key said twice keeps both: the second is carried in the first's value.
+    if (name in fields) fields[name] = `${fields[name]} ${name}=${rest.slice(from, to)}`;
+    else fields[name] = rest.slice(from, to);
+  });
+  return { clock, event: space === -1 ? said : said.slice(0, space), fields };
 }
 
 /**
@@ -1064,6 +1118,8 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    * whatever has arrived, and what has arrived is not always whole lines.
    */
   private readonly logAtLineStart = new Map<string, boolean>();
+  /** Per log: the opening of a router line read before its end was written. */
+  private readonly heldRouterLine = new Map<string, string>();
 
   /** Log paths the record already announced, so nothing is announced twice. */
   private readonly announced = new Set<string>();
@@ -1276,7 +1332,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       if (entry.kind === "line") {
         this.emit(this.render(entry.at, entry.event, entry.fields), entry.voice);
       } else if (entry.kind === "raw") {
-        this.emit(forTerminal(entry.bytes, this.theme), entry.label);
+        this.emit(this.replayed(entry.bytes, true), entry.label);
       } else {
         this.emitBanner(entry.label, entry.voice);
       }
@@ -1924,14 +1980,39 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       return;
     }
     if (appended === "") return;
-    const label = numbered(jobLabel(logPath), this.bannered);
-    this.remember({ kind: "raw", label, bytes: appended });
     // Whether this chunk opens a line, so a mark is only painted where it
     // really is in the first column: a drain that ended mid-line leaves the
     // next one continuing it, whatever its first glyph looks like.
     const opensLine = this.logAtLineStart.get(logPath) ?? true;
-    this.logAtLineStart.set(logPath, appended.endsWith("\n"));
-    this.say(forTerminal(appended, this.theme, opensLine), label);
+    // The start of a router line whose end has not been written yet is held
+    // back until it has: a read can land in the middle of one, and half of it
+    // drawn as it arrived is a `dabbler [` line on the screen after all.
+    // Nothing else is held -- a runner's own unfinished line shows at once,
+    // even one that opens with a letter or two of the router's prefix. The
+    // price is a read that lands inside those nine characters, which shows
+    // that one line as it was written; the router writes whole lines, so a
+    // read lands there only when a larger write is cut exactly so.
+    const held = this.heldRouterLine.get(logPath) ?? "";
+    let text = held + appended;
+    const cut = text.lastIndexOf("\n") + 1;
+    const tail = text.slice(cut);
+    const tailOpensLine = cut > 0 || opensLine || held !== "";
+    if (tailOpensLine && tail.startsWith(ROUTER_PREFIX)) {
+      this.heldRouterLine.set(logPath, tail);
+      text = text.slice(0, cut);
+    } else {
+      this.heldRouterLine.delete(logPath);
+    }
+    if (text === "") return;
+    const label = numbered(jobLabel(logPath), this.bannered);
+    this.remember({ kind: "raw", label, bytes: text });
+    this.logAtLineStart.set(logPath, text.endsWith("\n"));
+    this.say(this.replayed(text, opensLine || held !== ""), label);
+  }
+
+  /** A log's bytes for this screen: marks painted, and the router's own lines drawn as this terminal's are. */
+  private replayed(bytes: string, opensLine: boolean): string {
+    return forTerminal(bytes, this.theme, opensLine, (line) => this.render(line.clock, line.event, line.fields));
   }
 
   private sessionLabel(run: RunRecord): string {
@@ -1971,10 +2052,12 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    * The clock stands alone at the left edge: it is the outline's marker,
    * and a word before it was one more thing to read past on every line.
    */
-  private render(at: Date, event: string, fields: Record<string, string>): string {
-    const clock = [at.getHours(), at.getMinutes(), at.getSeconds()]
-      .map((part) => String(part).padStart(2, "0"))
-      .join(":");
+  private render(at: Date | string, event: string, fields: Record<string, string>): string {
+    // A replayed router line carries the clock it was written at, already said.
+    const clock =
+      typeof at === "string"
+        ? at
+        : [at.getHours(), at.getMinutes(), at.getSeconds()].map((part) => String(part).padStart(2, "0")).join(":");
     const tone = lineTone(event, fields);
     const spans: Span[] = [
       { text: clock, tone: "muted", bold: false },

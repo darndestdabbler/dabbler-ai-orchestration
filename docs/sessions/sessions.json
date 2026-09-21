@@ -4489,9 +4489,9 @@
     {
       "number": 226,
       "title": "Different models means the reviewers too",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-21T08:05:04.174000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-21T08:35:29.696000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

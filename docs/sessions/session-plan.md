@@ -14075,3 +14075,56 @@ environment allowlist, or what is published.
 
 **Hold.** `hold_release`: it rides in the 3.17.0 the operator is walking;
 nothing is tagged until they say so.
+
+### Session 224 of 224: A reviewer chosen in one repository stays in it
+
+Scope: `packages/router` (`settings.ts`, `config.ts`, `selection.ts`,
+`cli/configure.ts`, `cli/configuration.ts`, `projection.ts`), the
+Configuration pane, and the pages that describe the layers
+
+**NOT STARTED, AND NOT TO START until the operator answers the question
+below.** It is a design choice with a team consequence, and it is theirs.
+
+**Why.** The operator, 2026-09-21, with two VS Code windows open on two
+repositories: changing the Primary Reviewer's model in one changed it in the
+other. It is not the pane: three choices are kept in the one per-user
+`preferences.json` and have no per-repository layer at all -- the engine, the
+Primary Reviewer's model and the Auxiliary Reviewer's -- while the vehicle,
+the reviewing vehicle and the authoring model are this checkout's
+(`.vscode/settings.json`) unless `--mine`. That is the design session 157
+recorded. What it costs: a reviewer is never from the author's vendor, so a
+person with a Claude-authored repository and a Copilot/GPT-authored one open
+together has no single reviewer both can start under, and each Start in the
+other repository is refused until they flip the machine's choice back. The
+AI developing THIS repository met it the same night and ran under a
+session-scoped preferences file to avoid disturbing the operator's walk.
+
+**The question (the operator's).** Where does a repository's own reviewer
+choice live? (a) In `.vscode/settings.json` beside `dabbler.authoringModel`,
+`--mine` for the personal default: one rule for every model choice, and the
+four layers unchanged -- but the file is COMMITTED, so the choice travels to
+every teammate, and a committed setting is enforced at Start, where a
+teammate whose seat does not list that model is refused. (b) Per repository
+AND per person: `preferences.json` keyed by repository, nothing committed --
+no teammate is ever refused by somebody else's pick, at the price of a fifth
+place a choice can be, which session 157 exists to forbid. Recommendation:
+(a), because the authoring model already lives there under exactly the same
+risk and the refusal at Start names the file and the one command that fixes
+it; and the pane says, on every row, whether the choice is this repository's
+or this machine's -- which is the half of this the operator was actually
+surprised by, and is worth doing whichever way the question goes.
+
+**Steps, once answered (for (a)).** (1) `dabbler.reviewerModel` and
+`dabbler.auxiliaryModel` are read by `selection.ts` ahead of the machine's
+choice, through the one layer function the authoring model uses. (2)
+`configure --reviewer-model` / `--auxiliary-model` write this checkout's
+settings unless `--mine`, as `--authoring-model` does. (3) `configuration
+explain` names the layer that decided each reviewer and the one it shadows.
+(4) The Configuration pane says on each row whose the choice is, and a change
+made in one window is not shown in another repository's. (5) The engine stays
+the machine's where Start asks for it every time -- a default and not a
+decision; confirm that it does before leaving it. One test per behaviour, in the file named after what changed.
+
+**Non-goals.** No new layer beyond the four for (a); no change to which
+models a role may be; no migration of anybody's existing `preferences.json`
+choice, which stays the machine's default.

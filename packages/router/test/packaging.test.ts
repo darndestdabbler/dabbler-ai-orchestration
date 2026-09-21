@@ -32,12 +32,13 @@ import {
   record,
   redact,
   runAsRecord,
+  runStep,
   taggedCommit,
   type PackagingRun,
 } from "../src/packaging.ts";
 import { renderRun } from "../src/cli/packaging.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
-import { EARLIER_COMMIT, makeAnsweredSandbox, makeConfig } from "./support/answers.ts";
+import { EARLIER_COMMIT, makeAnsweredSandbox, makeConfig, tempDir } from "./support/answers.ts";
 
 // Writes one file into whatever directory the framework hands it, named by
 // the arguments after it.
@@ -799,5 +800,54 @@ describe("the heading a packaging run prints", () => {
     assert.match(real, new RegExp(`^packaging: ${OUTCOME_PUBLISHED}`));
     assert.doesNotMatch(real, /dry run/);
     assert.match(renderRun(run, true), /^packaging: dry run/);
+  });
+
+  it("says why a step that cannot start did not run, rather than that its exit was null", () => {
+    // csv-parser's session 4: three packaging runs said `pack: exit null`, the
+    // AI ran the same Maven command by hand, saw it work, and cancelled.
+    const cannotStart = runStep("pack", ["no-such-packager-anywhere", "package"], ["no-such-packager-anywhere", "package"], {
+      cwd: tempDir("pack-"),
+      timeoutSeconds: 30,
+    });
+    assert.equal(cannotStart.exitCode, null);
+    const run: PackagingRun = {
+      outcome: OUTCOME_FAILED,
+      sessionNumber: 4,
+      releasable: true,
+      refusal: "",
+      feed: "",
+      secretName: "",
+      treeDigest: null,
+      postTreeDigest: null,
+      treeMutated: false,
+      artifacts: [],
+      gates: [],
+      steps: [cannotStart],
+      recordedAt: "2026-09-21T03:31:20.000-04:00",
+      ready: false,
+      declared: true,
+      notes: [],
+    };
+    const said = renderRun(run, false);
+    assert.match(said, /pack: could not start/);
+    assert.doesNotMatch(said, /exit null/);
+  });
+});
+
+describe("a declared command", () => {
+  it("runs when its program is a batch shim, as `mvn` and `npm` are on Windows", () => {
+    // A `.cmd` cannot be started by a bare spawn: it is `cmd.exe`'s to run.
+    // `dotnet` is an executable, so a .NET release never met this and every
+    // releasing Maven session on Windows did.
+    const dir = tempDir("pack-");
+    const windows = process.platform === "win32";
+    const shim = join(dir, windows ? "packager.cmd" : "packager");
+    writeFileSync(shim, windows ? "@echo packed %1\r\n@exit /b 3\r\n" : "#!/bin/sh\necho packed $1\nexit 3\n", {
+      encoding: "utf8",
+      mode: 0o755,
+    });
+    const ran = runStep("pack", [shim, "console-app"], [shim, "console-app"], { cwd: dir, timeoutSeconds: 60 });
+    assert.equal(ran.exitCode, 3, ran.output);
+    assert.match(ran.output, /packed console-app/);
   });
 });

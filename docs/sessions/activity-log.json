@@ -12153,6 +12153,14 @@
       "task": "The Dabbler Terminal's first look at a run marks every job log already on disk as read up to its current size -- an earlier job is named, not replayed -- and does so to the RUNNING job's log too, so a terminal opened, reopened or reloaded while a job runs drops what the job had written so far; the operator saw seven lines of a 9 KB Maven log, the first starting mid-word. In `sayEarlier`, the log of the job the run record is carrying starts at its first byte; every other log keeps today's rule. One test, failing today, holds it. A patch-sized fix that rides in the unpublished 3.17.0; this session publishes nothing.",
       "releasable": false,
       "holdReason": "It rides in the 3.17.0 the operator is walking as a local VSIX; nothing is tagged until they say so."
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 223,
+      "dateTime": "2026-09-21T04:03:33.787000-04:00",
+      "task": "Fix two things read from the operator's csv-parser walk. (1) A releasable Maven session on Windows cannot publish: `runStep` in packaging.ts starts its command with a bare spawnSync, the one argv in the router that does not go through `spawnSyncProgram`, so `mvn` (a `.cmd` shim) cannot start -- the record says `could not start: ENOENT: spawnSync mvn ENOENT` and the stop said only `pack: exit null`. runStep uses spawnSyncProgram, and a step whose exit is null is printed with its own output line so the stop says why. (2) The Dabbler Terminal cut a job's output in two: in one poll it drained the job's log under the job's divider and only then said `working`, so the next read was drawn under the divider again and the operator took the tail for the whole. `poll` says the activity before it drains the job logs. Patch-sized fixes that ride in the unpublished 3.17.0; this session publishes nothing.",
+      "releasable": false,
+      "holdReason": "It rides in the 3.17.0 the operator is walking as a local VSIX; nothing is tagged until they say so."
     }
   ]
 }

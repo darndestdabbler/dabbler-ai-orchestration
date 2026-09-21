@@ -192,7 +192,11 @@ export function renderRun(run: PackagingRun, dryRun: boolean): string {
   if (run.refusal) lines.push(`  ${run.refusal}`);
   for (const note of run.notes) lines.push(`  ${note}`);
   for (const step of run.steps) {
-    const code = step.timedOut ? "timed out" : `exit ${step.exitCode}`;
+    // A step with no exit code never ran to an end, and "exit null" is not a
+    // reason: what it left in its output -- that the program could not be
+    // started, and why -- is the one line that says what to fix.
+    const unstarted = step.exitCode === null && !step.timedOut ? step.output.trim().split(/\r?\n/)[0] : "";
+    const code = step.timedOut ? "timed out" : unstarted ? unstarted.replace(/^\[|\]$/g, "") : `exit ${step.exitCode}`;
     lines.push(`  ${step.step}: ${code} — ${step.command}`);
   }
   if (run.treeMutated) {

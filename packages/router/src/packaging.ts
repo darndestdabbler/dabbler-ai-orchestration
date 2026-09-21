@@ -13,13 +13,12 @@
 // recorded command is the declared command, which is the thing anyone
 // reading it wants.
 
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 
-import { childEnv, isSetBookkeeping } from "./checks.ts";
+import { childEnv, isSetBookkeeping, spawnSyncProgram } from "./checks.ts";
 import { type RouterConfig, loadConfig } from "./config.ts";
 import { GATE_PUBLISHED_WHEN_RELEASABLE, type GateResult, runGates } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
@@ -700,13 +699,13 @@ export function runStep(
   let timedOut = false;
   let output = "";
   try {
-    const [program, ...rest] = spawnArgv;
-    const completed = spawnSync(program as string, rest, {
+    // Through the one door every argv goes through: on Windows `mvn`, `npm`
+    // and `gradle` are `.cmd` shims, and a bare spawn cannot start one.
+    const completed = spawnSyncProgram(spawnArgv, {
       cwd: options.cwd,
       env: childEnv(scratch),
       timeout: Math.round(options.timeoutSeconds * 1000),
       encoding: "utf8",
-      windowsHide: true,
     });
     // Python merges the child's stderr into its stdout pipe. Node keeps two,
     // so they are concatenated in the order that merge would have produced

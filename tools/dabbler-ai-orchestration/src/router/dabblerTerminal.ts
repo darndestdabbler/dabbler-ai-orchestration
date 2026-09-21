@@ -1572,6 +1572,13 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       this.line("job-started", { name: this.jobName, log: job.log ?? "?" });
     }
 
+    // Said BEFORE the job's log is drained: `working` is the framework's
+    // line, and said after the first read it sat between two halves of the
+    // job's output, each under a divider of its own -- so the half at the
+    // bottom of the screen read as the whole. Only a job beginning: one
+    // ending is said after its last bytes, as it always was.
+    this.sayActivity(run, "working");
+
     // Drained BEFORE the job is reported collected, so a job's last bytes
     // are spoken before the line that says it finished -- and drained from
     // the directory, so they are spoken whether or not the record still
@@ -1666,20 +1673,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       this.paused = null;
     }
 
-    // The indicator, said rather than merely held: a person watching this
-    // terminal is asking "is anything happening", and a getter no surface
-    // renders does not answer them. A job that has exited uncollected is
-    // not "working" -- the spinner claimed it was for three hours once --
-    // and the line that says so carries the router's words for it.
-    const finished = stop || !job ? null : uncollectedWords(this.repoRoot, run);
-    this.activity = stop || !job ? "waiting" : finished === null ? "working" : "uncollected";
-    if (this.activity !== this.spoken) {
-      this.spoken = this.activity;
-      this.line(
-        this.activity,
-        finished === null ? {} : { name: job?.name ?? "job", reason: finished },
-      );
-    }
+    this.sayActivity(run);
     // The indicator follows the activity immediately rather than at the
     // next animation tick: a framework that has just stopped should not
     // still appear to be spinning, however briefly.
@@ -1687,6 +1681,25 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     else this.erase();
 
     this.watch(run);
+  }
+
+  /**
+   * The indicator, said rather than merely held: a person watching this
+   * terminal is asking "is anything happening", and a getter no surface
+   * renders does not answer them. A job that has exited uncollected is not
+   * "working" -- the spinner claimed it was for three hours once -- and the
+   * line that says so carries the router's words for it.
+   */
+  private sayActivity(run: RunRecord, only?: Activity): void {
+    const job = run.job ?? null;
+    const stop = run.stop ?? null;
+    const finished = stop || !job ? null : uncollectedWords(this.repoRoot, run);
+    const activity: Activity = stop || !job ? "waiting" : finished === null ? "working" : "uncollected";
+    if (only !== undefined && activity !== only) return;
+    this.activity = activity;
+    if (this.activity === this.spoken) return;
+    this.spoken = this.activity;
+    this.line(this.activity, finished === null ? {} : { name: job?.name ?? "job", reason: finished });
   }
 
   /**

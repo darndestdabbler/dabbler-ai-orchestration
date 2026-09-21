@@ -260,6 +260,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 220 | What 219 left owed | no | 2026-09-21 |
 | 221 | A suite's results read as one line a project | no | 2026-09-21 |
 | 222 | A running job's output is shown from its first byte | no | 2026-09-21 |
+| 223 | A Maven release can start, and a job's output is one piece | no | 2026-09-21 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2906,3 +2907,9 @@ Make a suite's run of record read as one line a test project for `dotnet test` a
 **Releasable: no — held: It rides in the 3.17.0 the operator is walking as a local VSIX; nothing is tagged until they say so..**
 
 The Dabbler Terminal's first look at a run marks every job log already on disk as read up to its current size -- an earlier job is named, not replayed -- and does so to the RUNNING job's log too, so a terminal opened, reopened or reloaded while a job runs drops what the job had written so far; the operator saw seven lines of a 9 KB Maven log, the first starting mid-word. In `sayEarlier`, the log of the job the run record is carrying starts at its first byte; every other log keeps today's rule. One test, failing today, holds it. A patch-sized fix that rides in the unpublished 3.17.0; this session publishes nothing.
+
+### Session 223 — A Maven release can start, and a job's output is one piece
+
+**Releasable: no — held: It rides in the 3.17.0 the operator is walking as a local VSIX; nothing is tagged until they say so..**
+
+Fix two things read from the operator's csv-parser walk. (1) A releasable Maven session on Windows cannot publish: `runStep` in packaging.ts starts its command with a bare spawnSync, the one argv in the router that does not go through `spawnSyncProgram`, so `mvn` (a `.cmd` shim) cannot start -- the record says `could not start: ENOENT: spawnSync mvn ENOENT` and the stop said only `pack: exit null`. runStep uses spawnSyncProgram, and a step whose exit is null is printed with its own output line so the stop says why. (2) The Dabbler Terminal cut a job's output in two: in one poll it drained the job's log under the job's divider and only then said `working`, so the next read was drawn under the divider again and the operator took the tail for the whole. `poll` says the activity before it drains the job logs. Patch-sized fixes that ride in the unpublished 3.17.0; this session publishes nothing.

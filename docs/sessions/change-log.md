@@ -1709,3 +1709,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: 16 read(s), 0 search(es), 0 listing(s); 3 read(s) were transformed; 1 read(s) of the transport's own handoff file, not counted
 - Raw round output: `.dabbler/runs/s222/`
+
+## Session 223 verification — VERIFIED after 1 round(s)
+
+- Verifier: gpt-5.6-terra (openai) over copilot-cli
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: 34 read(s), 0 search(es), 0 listing(s); 11 not confined to scope; 1 read(s) of the transport's own handoff file, not counted
+- Raw round output: `.dabbler/runs/s223/`

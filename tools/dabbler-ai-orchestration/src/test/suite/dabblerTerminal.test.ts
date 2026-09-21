@@ -1153,6 +1153,40 @@ suite("the first look, and the rule between voices", () => {
     rmrf(root);
   });
 
+  test("shows a job's output in one piece, under one divider of its name", () => {
+    // The operator took a Maven run's output to be seven lines. It was all
+    // there: the first read was drawn under the job's divider, then `working`
+    // was said under the framework's, and the rest came under the job's
+    // divider a second time -- the tail, at the bottom of the screen.
+    const { root, driver, terminal, written } = drivenRepo({ session_number: 62, phase: "land", stop: null, job: null });
+    const jobs = path.join(driver, "jobs");
+    terminal.open();
+    terminal.poll();
+    written.length = 0;
+
+    fs.writeFileSync(path.join(jobs, "run-of-record-maven.log"), "[INFO] Scanning for projects...\n", "utf8");
+    writeRun(driver, {
+      session_number: 62,
+      phase: "run-of-record",
+      stop: null,
+      job: { name: "run of record: maven", log: ".dabbler/runs/s62/driver/jobs/run-of-record-maven.log" },
+    });
+    terminal.poll();
+    fs.appendFileSync(path.join(jobs, "run-of-record-maven.log"), "[INFO] BUILD SUCCESS\n", "utf8");
+    terminal.poll();
+
+    const said = plain(written.join(""));
+    assert.strictEqual(said.split("─ run-of-record-maven ─").length - 1, 1, said);
+    // Nothing of the framework's comes between the job's two reads: no rule, no line of its own.
+    const between = said.slice(said.indexOf("Scanning for projects"), said.indexOf("BUILD SUCCESS"));
+    assert.ok(said.includes("BUILD SUCCESS") && !between.includes("─") && !/\d\d:\d\d:\d\d/.test(between), said);
+    // `working` is still said, before the output it introduces.
+    assert.ok(said.indexOf(" working") >= 0 && said.indexOf(" working") < said.indexOf("Scanning for projects"), said);
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
   test("shows a running job's output from its first byte when it is opened while the job runs", () => {
     // Opened, reopened or reloaded mid-job: the operator saw seven lines of a
     // 9 KB Maven log, the first starting in the middle of a word. An earlier

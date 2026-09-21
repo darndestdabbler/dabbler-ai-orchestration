@@ -14213,3 +14213,78 @@ rules, or to anything a session does after it starts.
 **Hold.** `hold_release`: the operator walks a locally built 3.18.0 VSIX
 first and says whether it goes to the Marketplace; on their yes it is tagged
 with `dabbler release`, one release carrying 224 and 225.
+
+### Session 226 of 226: Different models means the reviewers too
+
+Scope: `packages/router` -- `cli/session.ts`, `session.ts` (what a start
+records and checks), `config.ts` and `selection.ts` (the one reading),
+`route.ts` (where a round loads its configuration) -- the extension's
+`commands/sessionCommands.ts`, their tests, the walk page and the changelog
+
+**Why.** The operator, walking 3.18.0 on 2026-09-21, in csv-parser's session
+2: *Start Session with Different Models...*, Claude chosen as the author,
+and the start refused -- csv-parser's own Primary Reviewer is Claude Haiku,
+and a reviewer is never from the author's vendor. The refusal is right. The
+command is what is wrong: the operator's rule 3 asked for a start that lets
+a person "select different vehicles and models" for one session, and session
+225 built one that asks for the engine and the AUTHORING model and nothing
+else. So the one choice that most often has to change with the author --
+the reviewer -- cannot be made for one session at all, and the only way on
+is to change the repository's saved reviewer, which is what "for this one
+session" exists to avoid.
+
+**Both reviewers, not one** (the operator, the same morning: *do we also
+need to allow selecting the Auxiliary Model?*). Yes. With three vendors the
+author takes one, the Primary Reviewer another, and the Auxiliary -- never
+the author's and never the primary's -- is whichever is left. A one-session
+author and primary therefore routinely land on the repository's saved
+auxiliary's vendor, nothing says so at the start, and the session stops at
+its first dispute: a dead end built by the command that was meant to avoid
+one.
+
+**Step 1 -- a session carries the reviewers it was started with.** `dabbler
+session start --reviewer-model <id> --auxiliary-model <id>` records each
+model named on the session's own ledger row, beside the engine and the
+authoring model it already records. It writes no setting and no preference.
+A start without a flag records none for that role.
+
+**Step 2 -- one reading, with the session's choice first.** Each reviewing
+role's model is read as: the session's own, then this checkout's, then
+the machine's default -- through `explainRoleModel`, so the start's check,
+`configuration explain` for a session in flight and the round all read one
+thing. The round's configuration (`route.ts`, which already knows the
+session and the repository) carries the session's choice the way a loaded
+configuration carries its checkout. `decidedLayer` is unchanged: a session
+is a record and not a place a choice is kept, so it answers with the layer
+beneath, as a flag on a call does.
+
+**Step 3 -- the start's check honours it.** The reviewer check at `session
+start` judges the reviewer THIS start names where it names one: a Claude
+author with `--reviewer-model gpt-5.6-sol` starts in a repository whose
+saved reviewer is Claude's, and one whose named reviewer is also the
+author's vendor is refused in the same words as today. A named auxiliary
+from the author's vendor or the named primary's is refused at the start, in
+the words `configure` already uses for that pair, rather than met at a
+dispute.
+
+**Step 4 -- *Start Session with Different Models...* asks for them.** After
+the engine and the authoring model it asks for the Primary Reviewer's model
+and then the Auxiliary Reviewer's, each offering what the repository's
+reviewing vehicle lists that the picks before it allow -- a primary not of
+the author's vendor, an auxiliary of neither's -- with the repository's own
+choice first where it is one of them, so an unchanged choice is one Enter.
+It passes all four on that one call and writes nothing. Start Session itself still asks nothing.
+
+**Step 5 -- the pages.** The walk page's check 5 walks this case -- an
+author from the saved reviewer's vendor -- and the 3.18.0 changelog section
+says what the command asks.
+
+One test per behaviour, in the file named after what changed.
+
+**Non-goals.** No one-session reviewing VEHICLE: it is the repository's. No
+claim that a start can know every provider a dispute will exclude -- a round
+that fell to another provider is judged at the dispute, as today. No change to the cross-vendor
+rule or to its words. No new layer in the list a choice is KEPT in.
+
+**Hold.** `hold_release`: it rides in the 3.18.0 the operator is walking;
+nothing is tagged until they say so.

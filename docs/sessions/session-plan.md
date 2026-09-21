@@ -14076,55 +14076,129 @@ environment allowlist, or what is published.
 **Hold.** `hold_release`: it rides in the 3.17.0 the operator is walking;
 nothing is tagged until they say so.
 
-### Session 224 of 224: A reviewer chosen in one repository stays in it
+### Session 224 of 225: Every configured choice is the repository's, and the machine's is its default
 
-Scope: `packages/router` (`settings.ts`, `config.ts`, `selection.ts`,
-`cli/configure.ts`, `cli/configuration.ts`, `projection.ts`), the
-Configuration pane, and the pages that describe the layers
-
-**NOT STARTED, AND NOT TO START until the operator answers the question
-below.** It is a design choice with a team consequence, and it is theirs.
+Scope: `packages/router` -- `settings.ts`, `config.ts`, `preferences.ts`,
+`selection.ts`, `session.ts` (what a start reads), `cli/configure.ts`,
+`cli/configuration.ts`, `projection.ts` -- and the pages that state the layers
 
 **Why.** The operator, 2026-09-21, with two VS Code windows open on two
 repositories: changing the Primary Reviewer's model in one changed it in the
-other. It is not the pane: three choices are kept in the one per-user
-`preferences.json` and have no per-repository layer at all -- the engine, the
+other. It is not the pane. Three choices are kept only in the one per-user
+`preferences.json` and have no repository layer at all -- the engine, the
 Primary Reviewer's model and the Auxiliary Reviewer's -- while the vehicle,
-the reviewing vehicle and the authoring model are this checkout's
-(`.vscode/settings.json`) unless `--mine`. That is the design session 157
-recorded. What it costs: a reviewer is never from the author's vendor, so a
-person with a Claude-authored repository and a Copilot/GPT-authored one open
-together has no single reviewer both can start under, and each Start in the
-other repository is refused until they flip the machine's choice back. The
-AI developing THIS repository met it the same night and ran under a
-session-scoped preferences file to avoid disturbing the operator's walk.
+the reviewing vehicle and the authoring model are this checkout's unless
+`--mine`. A reviewer is never from the author's vendor, so a person with a
+Claude-authored repository and a Copilot-authored one open together has no
+single reviewer both can start under, and every change in one window is a
+change in the other.
 
-**The question (the operator's).** Where does a repository's own reviewer
-choice live? (a) In `.vscode/settings.json` beside `dabbler.authoringModel`,
-`--mine` for the personal default: one rule for every model choice, and the
-four layers unchanged -- but the file is COMMITTED, so the choice travels to
-every teammate, and a committed setting is enforced at Start, where a
-teammate whose seat does not list that model is refused. (b) Per repository
-AND per person: `preferences.json` keyed by repository, nothing committed --
-no teammate is ever refused by somebody else's pick, at the price of a fifth
-place a choice can be, which session 157 exists to forbid. Recommendation:
-(a), because the authoring model already lives there under exactly the same
-risk and the refusal at Start names the file and the one command that fixes
-it; and the pane says, on every row, whether the choice is this repository's
-or this machine's -- which is the half of this the operator was actually
-surprised by, and is worth doing whichever way the question goes.
+**The operator's six rules (2026-09-21), which are the specification for this
+session and the next.** (1) A repository opened for the first time uses the
+machine's defaults, where there are any. (2) A change made in the
+Configuration is saved to the REPOSITORY; it also becomes the machine's
+default where the machine has none. (3) Start Session asks for no vehicle and
+no model: it uses the Configuration. A separate *Start Session with Different
+Models* asks, for that one session. (4) *Keep as my default* is *Keep as
+Machine Default* and makes the current selection the machine's default. (5) A
+reload or a restart shows the Configuration as it was. (6) Two windows open
+at once do not change each other's Configuration.
 
-**Steps, once answered (for (a)).** (1) `dabbler.reviewerModel` and
-`dabbler.auxiliaryModel` are read by `selection.ts` ahead of the machine's
-choice, through the one layer function the authoring model uses. (2)
-`configure --reviewer-model` / `--auxiliary-model` write this checkout's
-settings unless `--mine`, as `--authoring-model` does. (3) `configuration
-explain` names the layer that decided each reviewer and the one it shadows.
-(4) The Configuration pane says on each row whose the choice is, and a change
-made in one window is not shown in another repository's. (5) The engine stays
-the machine's where Start asks for it every time -- a default and not a
-decision; confirm that it does before leaving it. One test per behaviour, in the file named after what changed.
+This session is the router's half: where each choice lives and how it is
+read. Session 225 is the extension's half.
 
-**Non-goals.** No new layer beyond the four for (a); no change to which
-models a role may be; no migration of anybody's existing `preferences.json`
-choice, which stays the machine's default.
+**Step 1 -- one rule for every choice.** The engine, the Primary Reviewer's
+model and the Auxiliary Reviewer's model each get this checkout's setting
+(`dabbler.engine`, `dabbler.reviewerModel`, `dabbler.auxiliaryModel`), read
+through the one layer function the vehicle and the authoring model already
+use: CLI flag > this checkout's `.vscode/settings.json` > the machine's
+`preferences.json` > what the distribution ships > the default. Four layers
+and no fifth: nothing new is added to the list, three more choices join it.
+`selection.ts` and the start read a role's model and the engine through it.
+
+**Step 2 -- `configure` saves to the repository, and seeds a machine that has
+no default.** Every `configure` option writes this checkout's settings. Where
+the machine's `preferences.json` holds no value for that choice, the same
+value is written there too, and the verb says so in one line; where it holds
+one, it is left alone. `--mine` writes the machine's default and only that,
+for every choice alike (rule 4's verb).
+
+**Step 3 -- `configuration explain` and the projection say whose each choice
+is.** For every choice: the layer that decided it, and what it shadows. The
+projection carries, for each participant's vehicle and model and for the
+engine, `decided_by` (`checkout` | `machine` | `shipped` | `default`), so the
+pane can say it without deciding anything itself.
+
+**Step 4 -- a start with no flags uses the Configuration.** `session start`
+given no `--engine` and no `--model` takes both from the layers; given them,
+they are this call's and nothing is written. A start that can resolve no
+engine refuses, naming `dabbler configure --engine`.
+
+**Step 5 -- the pages.** `AGENTS.md`'s Environment section (through the
+managed template where it is the template's), `docs/driving-a-session.md` and
+the extension README state the one rule. No statement of it survives that
+says a reviewer's model or the engine is the machine's alone.
+
+One test per behaviour, in the file named after what changed. A committed
+setting stays enforced at Start: a reviewer a teammate's seat does not list
+is refused there, naming the file and the one command that changes it --
+that is today's rule for the authoring model, and the operator's rule 2
+accepts it for the others.
+
+**Non-goals.** No fifth layer and no per-repository section inside
+`preferences.json`. No migration: an existing machine choice stays the
+machine's default, which is exactly what rule 1 asks of it. No extension
+change (session 225).
+
+**Hold.** `hold_release`: it ships with session 225 as one release, after
+the operator has walked a local VSIX.
+
+### Session 225 of 225: Start asks nothing, and the Configuration is this repository's
+
+Scope: `tools/dabbler-ai-orchestration` -- `commands/sessionCommands.ts`,
+`commands/configurationCommands.ts`, the Configuration pane's tree, the
+manifest's commands and menus, their tests -- the README, `version.json` and
+the changelog
+
+**Entry gate.** Session 224 closed VERIFIED.
+
+**Step 1 -- Start Session asks nothing.** It registers with no engine and no
+model on the call, so the router takes them from the Configuration (224 step
+4). Where no engine resolves, it opens the Configuration's engine row rather
+than a pick list of its own. Every other question Start asks today --
+uncommitted changes, an unrelated origin -- is unchanged.
+
+**Step 2 -- *Start Session with Different Models...*.** A second command, on
+the same row's menu, that asks what Start asks today -- the engine, the
+model -- and passes them on that one call. It writes nothing.
+
+**Step 3 -- *Keep as Machine Default*.** The control is renamed and does one
+thing for every row: writes the row's current selection as the machine's
+default (`configure --mine`). Its confirmation says which repositories it
+reaches: every one that names no choice of its own.
+
+**Step 4 -- each row says whose the choice is, and a window shows its own
+repository's.** A row reads `decided_by` from the projection: *this
+repository* or *machine default*. A change to the machine's file re-projects
+the pane -- and changes what a row SHOWS only where the repository names no
+choice of its own, which after a first change in this repository is never.
+One test with two repositories under one machine file: a change made through
+the first is not shown by the second once the second has a choice of its
+own, and IS its default while it has none (rules 1 and 6).
+
+**Step 5 -- walked, as a person.** In a scratch profile with two scratch
+repositories: change a reviewer in one window and read the other; reload and
+read the Configuration again (rule 5); Start Session and see no pick list;
+*Start Session with Different Models* and see it; *Keep as Machine Default*
+and open a third, fresh repository to see it (rule 1). Evidence outside the
+tree; one page under `docs/uat/`.
+
+**Step 6 -- the release.** `version.json` to 3.18.0 (a capability, so a
+minor), stamped; one changelog section for 224 and 225.
+
+**Non-goals.** No change to which models a role may be, to the reviewer
+rules, or to anything a session does after it starts.
+
+**Hold.** `hold_release`: the operator walks a locally built 3.18.0 VSIX
+first and says whether it goes to the Marketplace; on their yes it is tagged
+with `dabbler release`, one release carrying 224 and 225.

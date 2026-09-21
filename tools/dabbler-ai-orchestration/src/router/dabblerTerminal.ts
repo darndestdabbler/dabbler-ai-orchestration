@@ -151,8 +151,8 @@ const TEST_RUNS_FILENAME = "test-runs.jsonl";
 /**
  * What the framework's own loop noticed while it waited, under the run's
  * driver dir. The row read here is `instruction-overdue`: an instruction the
- * AI has not answered past the threshold, which under the mailbox is most
- * often a waiter the AI stopped running.
+ * AI has not answered past the threshold. Only the older mailbox loop writes
+ * it; elsewhere the waiting line says what is owed and for how long.
  */
 const SUPERVISION_FILENAME = "supervision.jsonl";
 
@@ -1848,15 +1848,10 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       const seq = String(row["seq"]);
       const step = typeof row["step"] === "string" ? row["step"] : "?";
       const seconds = Number(row["outstanding_seconds"] ?? 0);
-      this.line("instruction-overdue", {
-        step,
-        seq,
-        outstanding: `${seconds}s`,
-        waiter: "may not be running",
-      });
+      this.line("instruction-overdue", { step, seq, outstanding: `${seconds}s` });
       this.warn(
-        `Dabbler: step ${step} (instruction ${seq}) has waited ${Math.floor(seconds / 60)} min with no answer. ` +
-          "The AI's waiter may not be running -- ask the AI in its chat whether `dabbler session wait` is still running.",
+        `Dabbler: step ${step} (instruction ${seq}) has been owed an answer for ${Math.floor(seconds / 60)} min. ` +
+          "Nothing of the framework's waits on it -- ask the AI in its chat what it is doing with it.",
       );
     }
   }

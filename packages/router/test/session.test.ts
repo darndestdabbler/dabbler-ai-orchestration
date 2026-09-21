@@ -68,7 +68,7 @@ import {
   steppedOverLines,
   type SequenceFacts,
 } from "../src/session.ts";
-import { loopPath, recordRepair, writeInstruction, writeRun } from "../src/driver.ts";
+import { loopPath, readInstruction, readReport, recordRepair, writeInstruction, writeRun } from "../src/driver.ts";
 import {
   amendmentEntries,
   readTaskDeclaration,
@@ -697,9 +697,9 @@ describe("registering a session", () => {
         start(state.sessionsDir, { engine: "codex", provider: "openai" }),
       );
       assert.equal(registered.code, EXIT_OK);
-      assert.match(registered.out, /Next: dabbler session run --mailbox --sessions-dir/);
-      assert.match(registered.out, /`dabbler session wait`/);
-      assert.doesNotMatch(registered.out, /session next|declare|affected/);
+      assert.match(registered.out, /Next: the AI runs `dabbler session next --sessions-dir/);
+      assert.match(registered.out, /`answer_command`.*background/);
+      assert.doesNotMatch(registered.out, /session wait|run --mailbox|declare|affected/);
     } finally {
       state.restore();
     }
@@ -799,16 +799,35 @@ describe("registering a session", () => {
 
 describe("what a cancellation is allowed to say", () => {
   it("refuses one already cancelled", () => {
-    const ruling = judgeCancellation({ status: "cancelled" }, 1, true);
+    const ruling = judgeCancellation({ status: "cancelled" }, 1);
     assert.match(String(ruling.refusal), /already cancelled/);
   });
 
-  it("refuses one in flight without --force", () => {
-    assert.match(
-      String(judgeCancellation({ status: "in-progress" }, 1, false).refusal),
-      /is in flight/,
-    );
-    assert.equal(judgeCancellation({ status: "in-progress" }, 1, true).refusal, null);
+  it("lets the author cancel the session in flight by number, with a reason and no --force, and leaves the tree alone", async () => {
+    // Session 213 made every in-flight cancel a forced one, and a forced one a
+    // person's: an author whose session should not go on had no verb for it.
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      const unfinished = join(state.repo, "half-written.txt");
+      writeFileSync(unfinished, "work in progress\n", "utf8");
+
+      // Another session's number -- the mistake an engine makes -- is refused,
+      // and that session's record is as it was. A person may still cancel it.
+      const other = await run(() => cancel(state.sessionsDir, 2, { reason: "wrong number", engine: true }));
+      assert.equal(other.code, EXIT_BOUNDARY);
+      assert.match(other.err, /session 002 is not the session in flight \(001 is\)/);
+      assert.equal(sessionOf(state.sessionsDir, 1)["status"], "not-started");
+      assert.equal(sessionOf(state.sessionsDir, 1)["cancelledReason"], undefined);
+
+      const result = await run(() => cancel(state.sessionsDir, 1, { reason: "the plan names a file that does not exist", engine: true }));
+      assert.equal(result.code, EXIT_OK, result.err);
+      assert.equal(sessionOf(state.sessionsDir)["status"], "cancelled");
+      assert.equal(sessionOf(state.sessionsDir)["cancelledReason"], "the plan names a file that does not exist");
+      assert.equal(readFileSync(unfinished, "utf8"), "work in progress\n");
+    } finally {
+      state.restore();
+    }
   });
 
   it("keeps the status it had, so a restore has something to go back to", () => {
@@ -1132,6 +1151,39 @@ describe("a report that answers an instruction already replaced", () => {
       assert.equal(driven.code, EXIT_BOUNDARY);
       assert.match(driven.err, /Run `dabbler session wait` again and answer what it prints/);
       assert.doesNotMatch(driven.err, /session next/);
+    } finally {
+      state.restore();
+    }
+  });
+});
+
+describe("a chained report (`--next`) that is not the answer owed", () => {
+  it("takes nothing for an instruction already behind and lets the caller ask, and still refuses one that was never issued", async () => {
+    // A chained command repeated after its process died names an instruction
+    // the run is past. Refusing it left the AI with no instruction at all.
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      writeInstruction(state.repo, 1, {
+        schema_version: 1, seq: 5, kind: "step", session_number: 1,
+        issued_at: "2026-09-20T10:00:00-04:00", step_id: "widget", ask: "Make the widget real.",
+        answer_schema: "driver-report.schema.json",
+        answer_command: "dabbler session report --seq 5 --next --step widget ...",
+      });
+      const answer = { stepId: "widget", status: "done", notes: "made it real", chained: true };
+
+      const repeated = await run(() => report(state.sessionsDir, { ...answer, seq: 4 }));
+      assert.equal(repeated.code, EXIT_OK, repeated.err);
+      assert.match(repeated.err, /nothing is accepted twice/);
+      assert.equal(readReport(state.repo, 1), null);
+
+      // Malformed, or ahead of anything issued: refused, and 5 is still owed.
+      const ahead = await run(() => report(state.sessionsDir, { ...answer, seq: 6 }));
+      assert.equal(ahead.code, EXIT_BOUNDARY);
+      const malformed = await run(() => report(state.sessionsDir, { ...answer, seq: 5, status: "finished" }));
+      assert.notEqual(malformed.code, EXIT_OK);
+      assert.equal(readReport(state.repo, 1), null);
+      assert.equal(readInstruction(state.repo, 1)?.seq, 5);
     } finally {
       state.restore();
     }

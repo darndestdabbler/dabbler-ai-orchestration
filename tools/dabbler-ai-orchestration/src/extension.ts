@@ -5,7 +5,6 @@ import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import {
   ENGINES,
-  closeLoopOnSessionEnd,
   defaultSessionRunUi,
   registerSessionCommands,
 } from "./commands/sessionCommands";
@@ -101,7 +100,6 @@ export function activate(context: vscode.ExtensionContext): void {
     // that knows; the transition rule is the terminal's.
     for (const repository of repositories) {
       revealOnSessionStart(repository.root, repository.currentSession);
-      closeLoopOnSessionEnd(repository);
     }
   });
 
@@ -421,7 +419,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerWorkExplorerTreeCommands(context),
   );
   safeRegister("openFileCommands", () => registerOpenFileCommands(context));
-  // Start, Resume and Consult open the engine's own CLI; Close runs the gates.
+  // Start and Consult open the engine's own CLI; Close runs the gates.
   safeRegister("sessionCommands", () => {
     registerSessionCommands(
       context,

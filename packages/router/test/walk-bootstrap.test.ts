@@ -98,7 +98,7 @@ describe("a project on its first day", () => {
       assert.ok(readFileSync(join(repo, name), "utf8").includes(MANAGED_START), name);
     }
     const agents = readFileSync(join(repo, "AGENTS.md"), "utf8");
-    assert.match(agents, /dabbler session wait/);
+    assert.match(agents, /dabbler session next/);
     assert.match(readFileSync(join(repo, "CLAUDE.md"), "utf8"), /@AGENTS\.md/);
     // And the operator's own file is exactly as they left it.
     assert.equal(

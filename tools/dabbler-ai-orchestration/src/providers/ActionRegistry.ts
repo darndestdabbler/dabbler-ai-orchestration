@@ -8,10 +8,7 @@
 // what can be done to that session. Widening one `when` to cover both
 // would make every entry's signature lie about what it reads.
 
-import {
-  loopAlive,
-  type ProgressProjectionSession as SessionRecord,
-} from "dabbler-ai-router";
+import type { ProgressProjectionSession as SessionRecord } from "dabbler-ai-router";
 import type { SessionsRepository } from "../utils/fileSystem";
 
 export interface RepositoryAction {
@@ -96,34 +93,16 @@ export const SESSION_ACTIONS: SessionAction[] = [
     when: isTheNextRow,
   },
   {
-    id: "dabblerSessionSets.resumeSession",
-    label: "Resume Session",
-    group: 903,
-    // The AI's terminal back, for the session in flight in this workspace:
-    // the proof of 2026-09-08 lost the engine's editor tab and had no way
-    // to bring it back. Only on the in-flight row, because `session run`
-    // drives the session the record says is in flight and no other.
-    //
-    // And not while the standing stop is the ENGINE's to clear AND a loop
-    // is beating: a live loop hands that stop back to the engine, and a
-    // click would make a second driver on it. A stop ends the mailbox loop
-    // and its heartbeat, though, and with no loop nothing drives -- so there
-    // the action is offered, and it restarts the loop.
-    when: (repository, session) =>
-      repository.currentSession === session.number &&
-      session.status === "in-progress" &&
-      (session.stopActor !== "engine" || !loopAlive(repository.root, session.number)),
-  },
-  {
     id: "dabblerSessionSets.stopSession",
     label: "Stop Session",
     group: 905,
     // The person asking for the machine back, on the row of the session
     // actually in flight -- there is one, and `session interrupt` writes
-    // its request for whichever loop is driving it. Offered whether or not
-    // a loop is beating: a request written with none is read by the next
-    // one, and a person who cannot find the stop button reaches for the
-    // one thing that always works, which is killing something.
+    // its request for the framework to read. Offered whether or not the
+    // framework is working at that moment: a request written while it is not
+    // is read when the AI's next answer arrives, and a person who cannot find
+    // the stop button reaches for the one thing that always works, which is
+    // killing something.
     when: (repository, session) =>
       repository.currentSession === session.number && session.status === "in-progress",
   },

@@ -95,11 +95,6 @@
         "category": "Dabbler"
       },
       {
-        "command": "dabblerSessionSets.resumeSession",
-        "title": "Resume Session",
-        "category": "Dabbler"
-      },
-      {
         "command": "dabblerSessionSets.stopSession",
         "title": "Stop Session",
         "category": "Dabbler"
@@ -265,10 +260,6 @@
           "when": "false"
         },
         {
-          "command": "dabblerSessionSets.resumeSession",
-          "when": "false"
-        },
-        {
           "command": "dabblerSessionSets.stopSession",
           "when": "false"
         },
@@ -348,11 +339,6 @@
           "command": "dabblerSessionSets.closeSession",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-closeSession;/",
           "group": "6_session@602"
-        },
-        {
-          "command": "dabblerSessionSets.resumeSession",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-resumeSession;/",
-          "group": "6_session@604"
         },
         {
           "command": "dabblerSessionSets.stopSession",

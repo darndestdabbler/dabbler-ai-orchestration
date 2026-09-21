@@ -50,36 +50,35 @@ export const SHARED_BODY =
   "You are the **orchestrator** for `{repo_name}`: you do the mechanics — file\n" +
   "edits, shell, git — and the framework owns the lifecycle, one move at a time.\n" +
   "**Opened to consult, you are not the orchestrator**: read `dabbler consult\n" +
-  "--sessions-dir docs/sessions` first, run no waiter, and commit what you change.\n" +
+  "--sessions-dir docs/sessions` first, ask for no instruction, and commit what you change.\n" +
   "\n" +
   "## How to run a session\n" +
   "\n" +
   "Sessions are numbered under one sessions root (`docs/sessions/`), so no\n" +
   "command takes a handle to one.\n" +
   "\n" +
-  "**Start Session registers the session and starts the framework's loop**,\n" +
-  "`dabbler session run --mailbox`, in a terminal of its own. The loop drives\n" +
-  "the session: it judges each answer, advances the session, and writes the\n" +
-  "next instruction for you. Your part is one loop, kept in the background so\n" +
-  "this chat stays free for the operator:\n" +
+  "**Start Session registers the session and opens your CLI.** You ask the\n" +
+  "framework for an instruction once:\n" +
   "\n" +
-  "    dabbler session wait --sessions-dir docs/sessions\n" +
+  "    dabbler session next --sessions-dir docs/sessions\n" +
   "\n" +
-  "Run it as a background command. It prints the instruction owed an answer, as\n" +
-  "JSON, and exits; it consumes nothing, so running it again prints the same\n" +
-  "instruction until it is answered. Do what the `ask` says, run the\n" +
-  "`answer_command` — running it is the answer — and start the waiter again,\n" +
-  "until it prints `done`. The framework holds the state between instructions.\n" +
+  "It prints one instruction, as JSON, and exits. Do what its `ask` says, then\n" +
+  "start its `answer_command` — running it is the answer — **as a background\n" +
+  "command**, so this chat stays free for the operator. It stays open while the\n" +
+  "framework checks, tests, reviews, commits and pushes, which can take many\n" +
+  "minutes, and what it prints when it exits is your next instruction: act on\n" +
+  "that one the same way, until one says `done`. Never poll it, and never start\n" +
+  "anything else to wait with. One that ends having printed nothing at all was\n" +
+  "killed: start that exact command again — an answer is taken once, and a\n" +
+  "repeat prints what is owed.\n" +
   "\n" +
-  "The operator can talk to you while the waiter runs: answer them, and leave\n" +
-  "it running. When an instruction has waited past its threshold they are\n" +
-  "told, and may ask whether your waiter is running — check, and start it\n" +
-  "again if it is not.\n" +
+  "The operator can talk to you while it runs: answer them, and leave it\n" +
+  "running. `dabbler status` says which instruction is owed, and for how long.\n" +
   "\n" +
-  "Outside VS Code the operator types both starts: `dabbler session start\n" +
+  "Outside VS Code the operator types the start: `dabbler session start\n" +
   "--sessions-dir docs/sessions --engine <engine> --provider <provider>` (a\n" +
-  "seat adds `--model`), then `dabbler session run --mailbox --sessions-dir\n" +
-  "docs/sessions` in a terminal of its own.\n" +
+  "seat adds `--model`). `dabbler session run --mailbox` is the older loop, a\n" +
+  "fallback a person starts by hand; what it refuses says what to run under it.\n" +
   "\n" +
   "## What comes back\n" +
   "\n" +
@@ -98,9 +97,9 @@ export const SHARED_BODY =
   "  and the answer owed is the one you already owed.\n" +
   "- **`done`** — the session is over and closed. Stop.\n" +
   "\n" +
-  "**A waiter that exits printing no instruction said why on stderr**: no\n" +
-  "loop is driving, and nothing will write an instruction until somebody\n" +
-  "acts. Do not re-arm it — stop, and tell the operator what it printed.\n" +
+  "**An answer command that prints no instruction and says why on stderr** was\n" +
+  "refused or met a stop, and repeating it moves nothing. Read what it said: a\n" +
+  "refusal you can fix is answered again; a stop is *When the framework stops*.\n" +
   "\n" +
   "Everything the framework does for itself happens between instructions:\n" +
   "declaring the work, each step's own checks, cross-provider verification and\n" +
@@ -117,7 +116,7 @@ export const SHARED_BODY =
   "**The framework owns the clock, the state and the sequencing.** An\n" +
   "instruction that names a command is answered by running that command —\n" +
   "never by watching `run.json` or any other record for what the framework\n" +
-  "will do next. The waiter is the one thing you wait on.\n" +
+  "will do next. The answer command you started is the one thing you wait on.\n" +
   "\n" +
   "**A session's release follows `dabbler.release`**, and the framework publishes\n" +
   "between the push and the close for itself. On request, the default, a plan\n" +

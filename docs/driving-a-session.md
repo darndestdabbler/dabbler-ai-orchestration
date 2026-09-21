@@ -24,48 +24,70 @@ its own checks), verify with a different provider, run the whole suite,
 commit and push, close. Following that list in prose is what an engine is
 worst at — it wanders, and a less capable engine wanders further.
 
-So the framework owns the list, and drives it. **Start Session** registers
-the session and starts the framework's loop in a terminal of its own:
+So the framework owns the list, and every answer moves it on. **Start
+Session** registers the session and opens the engine's own CLI, and the
+engine asks for an instruction once:
 
 ```
-dabbler session run --mailbox --sessions-dir docs/sessions
+dabbler session next --sessions-dir docs/sessions
 ```
 
-The loop judges whatever answer is outstanding, advances the session, runs
-every check, review and job itself, and writes the next instruction. The
-engine answers from its own chat, with one command kept in the background:
+It prints one instruction, as JSON, and exits. The engine does what the
+instruction says and starts the command it names — its `answer_command`,
+which carries `--next` — as a background command:
 
 ```
-dabbler session wait --sessions-dir docs/sessions
+dabbler session report --sessions-dir docs/sessions --seq 4 --next --step widget --status done --notes "..."
 ```
 
-It prints the instruction owed an answer and exits, consuming nothing. The
-engine does what the instruction says, runs the command it names, and
-starts the waiter again — until it prints `done`. Nobody calls anything to
-move the session on: that is the loop's.
+That one command is the answer and the request for what follows it. It
+takes the report exactly as a plain `session report` does, and then stays
+open while the framework does everything the answer caused — the step's
+checks, the named tests, verification and its rounds, the suites, the
+commit, the push, the close — and prints the next instruction when there is
+one for somebody to act on. It never prints a `wait`. Its own confirmation
+and the framework's progress go to stderr and to the Dabbler Terminal, so
+stdout is one instruction or `done` and nothing else.
 
-**A waiter holds the session it is watching.** When the close lands under
-one, the waiter prints that session's own `done` — the one the close
-wrote, with its `ask` — and not a fresh reading of an empty repository. A
-waiter that never saw a session says nothing is in flight and to tell the
-operator, and it names no command: a waiter is a loop, and a loop handed
-`dabbler session start` starts a session nobody asked for. `session next`
-and the terminal still name it, because a person reads those.
+**No framework process waits for the engine.** Once an instruction is
+printed the process exits; the record under `.dabbler/runs/` holds the
+session between an instruction and its answer. So there is nothing to
+re-arm and nothing to resume: an engine that answers has asked, and
+`dabbler status` says which instruction is owed and for how long.
+
+**A repeated answer takes nothing twice.** A chained command whose process
+died — a closed terminal, a killed task — is run again exactly as it was.
+If its report was already taken, the framework carries on from the phase
+and the job the record names, and no check, round, commit or push runs
+twice; if the next instruction had already been issued, that instruction is
+what it prints. Two of them alive at once are settled by the run's lease:
+the one that lost it stands down before the commit, the push or the close.
 
 **The engine stays in its own CLI.** Nothing spawns Claude Code or a
 Copilot seat; you are already talking to one, in the terminal you like,
 with your own context, your own scrollback and your own interrupt key —
-and because the waiter runs in the background, the chat stays yours to
-type into while the session runs. The whole instruction an engine needs is
-the sentence Start gives it: *run `dabbler session wait --sessions-dir
-docs/sessions` as a background command; each time it prints an
-instruction, do what its `ask` says and answer with its `answer_command`,
-then run the waiter in the background again; stop when it prints `done`.*
+and because the answer command runs in the background, the chat stays
+yours to type into while the framework works. The whole instruction an
+engine needs is the sentence Start gives it: *run `dabbler session next
+--sessions-dir docs/sessions`; do what the instruction's `ask` says and
+start its `answer_command` as a background command; what that prints when
+it exits is the next instruction; stop at `done`.*
+
+**The older loop is a fallback, started by hand.** `dabbler session run
+--mailbox --sessions-dir docs/sessions` in a terminal of its own drives
+the session as a long-lived process, and the engine keeps `dabbler session
+wait --sessions-dir docs/sessions` running in the background and starts it
+again after every answer. It stays until the chained exchange has been
+proved on an installed extension, and every passage below that speaks of
+*the loop*, *the waiter* or its heartbeat describes that fallback. Under a
+live loop `session next` refuses, naming the waiter. There is no Resume
+Session: a stopped session is carried on by asking the AI, in its chat, to
+run `dabbler session next`, which re-enters the phase the stop was in.
 
 The walks quoted below were printed under the earlier pull, where the
-engine called `session next` itself. The instructions, the reports and the
-framework's lines are the same under the loop; what differs is who moves
-the session on, and that a `wait` never reaches the engine.
+engine called `session next` after each answer. The instructions, the
+reports and the framework's lines are the same; what differs is that the
+answer now asks, and that a `wait` never reaches the engine.
 
 ## Before the first call
 
@@ -85,11 +107,9 @@ the session on, and that a `wait` never reaches the engine.
       --engine claude-code --provider anthropic
   ```
 
-  and the loop is started beside it with `dabbler session run --mailbox
-  --sessions-dir docs/sessions`. A registration the router refuses opens
-  nothing, and says why.
+  A registration the router refuses opens nothing, and says why.
 
-  The AI's own CLI is the third thing opened there, and outside VS Code it
+  The AI's own CLI is the other thing opened there, and outside VS Code it
   is opened by you. Nothing needs setting for it. The verbs that are a
   person's ask where a person is, and an AI's tool runs its commands with no
   terminal, whichever engine it is;
@@ -192,7 +212,7 @@ one running the engine.
 
 | `kind` | what it means | what you do |
 | --- | --- | --- |
-| `step` | work to do — the plan, or one step of it | do it, run `answer_command`, start the waiter again |
+| `step` | work to do — the plan, or one step of it | do it, and start `answer_command` in the background: what it prints is the next instruction |
 | `rejection` | your last answer was refused; `reasons` says why | put them right, answer again with **this** seq |
 | `done` | the session is closed | stop |
 
@@ -297,7 +317,7 @@ to say what went wrong.
 
 Answer it with the new seq. **Three refusals of one step stop the
 session** (`rejected-thrice`) — the last reasons are on the run state.
-Resuming it — **Resume Session**, which starts the loop again — does not
+Carrying on — asking the AI to run `dabbler session next` — does not
 simply judge the failed answer a fourth time: that answer is left behind,
 the count starts over, and the step is asked afresh under a new seq. A person deciding to carry
 on is the intervention the bound exists to force. If a step genuinely
@@ -541,10 +561,11 @@ would never be read and "Sent" would be a promise the framework broke.
 
 **Stop Session** is the same verb as a click: it sits on the in-flight
 session's row in the Work Explorer, asks for your reason, and runs
-`session interrupt --stop` with it. The loop honours it **inside a job**
-as well as between phases — a verification round or a whole suite ends
-where you asked rather than minutes later — and the recorded stop is one
-no waiter revives a loop over. Resume Session is the way back.
+`session interrupt --stop` with it. It is honoured **inside a job** as well
+as between phases — a verification round or a whole suite ends where you
+asked rather than minutes later — and while the AI is working a step it is
+read when the AI's answer arrives. The way back is `dabbler session next`,
+run by the AI when you ask it to.
 
 ## When the framework stops
 
@@ -586,7 +607,7 @@ waiting; the AI never sees the gap. It does this at most twice for one point
 loop gets past it. A third death at the same point is recorded as a `crash`
 stop, whose ways on name the log and the restart, and the waiter prints it
 like any other. **A recorded stop is never restarted**: every other kind was
-meant, and Resume stays the way past one.
+meant, and the way past one is the stop's own.
 
 `stop_history` keeps the last few stops, oldest first, if you want to see
 the shape of a run. A close or a publish that has already happened is
@@ -646,6 +667,15 @@ this is not. The cancel a stop prints runs as
 printed: `dabbler session cancel --force --reason "<why>"` means the session
 in flight. It says what it left uncommitted, and the next `session start`
 offers to commit that or undo it.
+
+**The author may cancel the session it is working, and no other**, and needs
+no force for it: `dabbler session cancel <its number> --reason "<why>"`. Any
+other number is refused to an engine, and that session's record is left as it
+was: cancelling another session is a person's. The reason goes
+on the record, the working tree is left exactly as it was, and the framework
+reads the ledger again before every commit, push, publish and close, so
+nothing of a cancelled session is landed afterwards. `--force` stays the
+person's form, refused to an engine.
 
 **A cancelled session ends its loop.** The loop reads the ledger at every
 phase boundary, while it waits for an answer, while a job runs, and again

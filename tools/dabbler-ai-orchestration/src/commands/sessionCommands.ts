@@ -1,13 +1,14 @@
-// Start, Resume, Consult, Close -- the engine stays in the person's own CLI.
+// Start, Stop, Consult, Close -- the engine stays in the person's own CLI.
 //
-// Start registers the session, starts the framework's loop (`session run
-// --mailbox`), and opens a terminal running the engine's own CLI,
-// interactively, at the repository root, with the one sentence a session
-// needs: keep `dabbler session wait` running in the background and answer
-// what it prints. The framework drives; nothing deterministic is left for the
-// person or the AI to type, and nothing is pasted anywhere: they keep their
-// own spinner, their own scrollback, their own chat and their own interrupt
-// key, which is what the staff already trust.
+// Start registers the session and opens a terminal running the engine's own
+// CLI, interactively, at the repository root, with the one sentence a session
+// needs: ask for an instruction once with `dabbler session next`, and start
+// each `answer_command` in the background, because what that prints is the
+// next instruction. No framework process is started and none waits for the
+// AI: every answer moves the session on, so nothing deterministic is left for
+// the person or the AI to type, and nothing is pasted anywhere: they keep
+// their own spinner, their own scrollback, their own chat and their own
+// interrupt key, which is what the staff already trust.
 //
 // Beside it is the *Dabbler* terminal: what the framework is doing while
 // they type. Two terminals is the arrangement, not one -- Start shows
@@ -20,14 +21,12 @@
 // The driver is a child process rather than an in-process call, and the
 // reason is stated once in `router/driveProcess.ts`.
 
-import * as path from "path";
 import * as vscode from "vscode";
 import {
   COMMIT_CHANGES_FLAG,
   ENUMERATION_CLI_ALIASES,
   MERGE_ORIGIN_FLAG,
   UNDO_CHANGES_FLAG,
-  loopAlive,
   preflightRefusedModel,
   type Router,
 } from "dabbler-ai-router";
@@ -169,18 +168,19 @@ export interface EngineTerminal {
 /**
  * The whole instruction an engine needs, as the guide states it.
  *
- * Start has already registered the session and started the framework's loop,
- * so the sentence carries no identity and asks for no `start` or `next`: both
- * are deterministic and both are the framework's. The waiter runs in the
- * background so the chat stays free for the person. The sessions root is
- * repository-relative because the terminal opens at the repository root.
+ * Start has already registered the session, so the sentence carries no
+ * identity and asks for no `start`. It asks for one `next`, and never for
+ * another: each `answer_command` chains, so an AI that answers has asked.
+ * The answer runs in the background so the chat stays free for the person.
+ * The sessions root is repository-relative because the terminal opens at the
+ * repository root.
  */
 export function openingSentence(): string {
   const dir = SESSIONS_REL.replace(/\\/g, "/");
   return (
-    `Run \`dabbler session wait --sessions-dir ${dir}\` as a background command, so this chat stays free. ` +
-    "Each time it prints an instruction, do what its `ask` says and answer with its `answer_command`, " +
-    "then run the waiter in the background again. Stop when it prints `done`."
+    `Run \`dabbler session next --sessions-dir ${dir}\` once. Do what the instruction's \`ask\` says, then start ` +
+    "its `answer_command` as a background command, so this chat stays free: what it prints when it exits is " +
+    "your next instruction. Stop when one says `done`."
   );
 }
 
@@ -216,51 +216,6 @@ export function startArguments(choice: EngineChoice, model: string): string[] {
   ];
   if (model.trim() !== "") args.push("--model", model.trim());
   return args;
-}
-
-/**
- * The terminal the framework's loop runs in: it drives the session and waits
- * on the AI's answers. Named for the repository, so one repository's loop is
- * never taken for another's.
- */
-export function loopTerminalFor(repository: SessionsRepository, cli: string): EngineTerminal {
-  return {
-    name: `Framework loop — ${repository.label}`,
-    cwd: repository.root,
-    program: process.execPath,
-    args: [cli, "session", "run", "--mailbox", "--sessions-dir", SESSIONS_REL.replace(/\\/g, "/")],
-    typed: null,
-    // The program is the editor's own executable: without this it starts a second editor, not the loop.
-    env: { ELECTRON_RUN_AS_NODE: "1" },
-  };
-}
-
-/**
- * Dispose every open loop terminal of this repository.
- *
- * Closing the tab does not end the loop -- the editor's own binary outlives
- * its tab -- so this removes only what the operator sees. The loop exits by
- * itself when its session closes, and Resume's heartbeat check keeps a second
- * one from starting beside a loop still running.
- */
-export function closeLoopTerminals(repository: SessionsRepository): void {
-  const spec = loopTerminalFor(repository, "");
-  for (const terminal of vscode.window.terminals ?? []) {
-    // The name it was created with: the tab's own is `Code`, taken from the
-    // executable, because the editor never sees this shell reach process-ready.
-    const options = terminal.creationOptions as vscode.TerminalOptions;
-    if (options.name === spec.name && launchedAs(options, spec)) terminal.dispose();
-  }
-}
-
-/** The last in-flight session per repository, so an end is a change and not a state. */
-const loopSessionSeen = new Map<string, number | null>();
-
-/** The session completing takes its loop terminal with it. */
-export function closeLoopOnSessionEnd(repository: SessionsRepository): void {
-  const before = loopSessionSeen.get(repository.root);
-  loopSessionSeen.set(repository.root, repository.currentSession);
-  if (typeof before === "number" && repository.currentSession === null) closeLoopTerminals(repository);
 }
 
 /**
@@ -489,30 +444,6 @@ export function consultTerminalFor(
   );
 }
 
-/** Whether a terminal was created running `spec`'s program at `spec`'s root. */
-function launchedAs(options: vscode.TerminalOptions, spec: EngineTerminal): boolean {
-  const cwd = typeof options.cwd === "string" ? options.cwd : options.cwd?.fsPath;
-  if (options.shellPath !== spec.program || cwd === undefined) return false;
-  const [left, right] = [path.resolve(cwd), path.resolve(spec.cwd)];
-  return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
-}
-
-/**
- * Whether an open terminal is the CLI `spec` would open: the same engine name,
- * program and repository root. A name alone is not enough -- two repositories
- * open the same engine under the same label -- and the options a terminal was
- * created with are what say where it was launched.
- */
-export function isEngineTerminalOf(
-  terminal: {
-    readonly name: string;
-    readonly creationOptions: Readonly<vscode.TerminalOptions | vscode.ExtensionTerminalOptions>;
-  },
-  spec: EngineTerminal,
-): boolean {
-  return terminal.name === spec.name && launchedAs(terminal.creationOptions as vscode.TerminalOptions, spec);
-}
-
 export interface SessionRunUi {
   /** `purpose` titles the pick; Start's when omitted. */
   pickEngine: (purpose?: string) => Thenable<EngineChoice | undefined>;
@@ -536,8 +467,6 @@ export interface SessionRunUi {
   showInformationMessage: (message: string) => unknown;
   /** Open the person's own CLI, interactively, and show it. */
   openTerminal: (terminal: EngineTerminal) => unknown;
-  /** Open the framework's loop in the panel, without the focus, replacing this repository's last one. */
-  openLoopTerminal: (repository: SessionsRepository, terminal: EngineTerminal) => unknown;
   /**
    * Ask the installed CLI whether it knows this model. Answers the model it
    * refused, or null for "it did not refuse" -- which covers no CLI, no
@@ -550,8 +479,6 @@ export interface SessionRunUi {
    * never do -- it would pass here and mean nothing anywhere else.
    */
   engineKnowsModel: (choice: EngineChoice, model: string) => Thenable<string | null>;
-  /** Close every open terminal that is the CLI `spec` would open, in its repository. */
-  closeEngineTerminals: (spec: EngineTerminal) => void;
   /**
    * Show the framework's own terminal for this repository, split off the
    * one just opened.
@@ -696,26 +623,6 @@ export function defaultSessionRunUi(
       if (spec.typed !== null) terminal.sendText(spec.typed, false);
       return terminal;
     },
-    openLoopTerminal: (repository, spec) => {
-      // The panel whatever `dabbler.terminalLocation` says, and without the
-      // caret: the editor area is the CLI's and the Dabbler terminal's.
-      closeLoopTerminals(repository);
-      const terminal = vscode.window.createTerminal({
-        name: spec.name,
-        cwd: spec.cwd,
-        shellPath: spec.program,
-        shellArgs: [...spec.args],
-        ...(spec.env ? { env: { ...spec.env } } : {}),
-        location: vscode.TerminalLocation.Panel,
-      });
-      terminal.show(true);
-      return terminal;
-    },
-    closeEngineTerminals: (spec) => {
-      for (const terminal of vscode.window.terminals ?? []) {
-        if (isEngineTerminalOf(terminal, spec)) terminal.dispose();
-      }
-    },
     showFrameworkTerminal: (repoRoot, beside) =>
       ensureDabblerTerminal(repoRoot, beside as vscode.Terminal | undefined),
     withProgress: <T,>(title: string, work: () => Promise<T>): Promise<T> =>
@@ -729,65 +636,15 @@ export function defaultSessionRunUi(
 }
 
 /**
- * Resume Session: a session in flight left with a loop driving it and an AI
- * waiting on it.
- *
- * The loop is restarted unless its heartbeat says one is driving: a terminal
- * still open under the loop's name can be a process that has exited. The AI
- * is not trusted by name either -- a CLI whose background waiter was
- * interrupted sits at its prompt waiting on nothing -- so the recorded
- * engine's terminal is replaced by a fresh one carrying the waiter sentence.
- * The framework holds the session's state, so nothing the old chat knew is
- * needed. With no recorded engine the operator is told the sentence.
- */
-export async function runResumeSession(
-  repository: SessionsRepository,
-  ui: SessionRunUi,
-  cli: string | null = resolveRouterCli(),
-  alive: (repoRoot: string, sessionNumber: number) => boolean = loopAlive,
-): Promise<boolean> {
-  const session = repository.currentSession;
-  if (session === null) {
-    ui.showInformationMessage(`Nothing is in flight in ${repository.label}; Start Session is the way in.`);
-    return false;
-  }
-  if (cli === null) {
-    ui.showErrorMessage("The bundled `dabbler` command was not found beside the extension; nothing was resumed.");
-    return false;
-  }
-  const restarted = !alive(repository.root, session);
-  const loop = restarted ? ui.openLoopTerminal(repository, loopTerminalFor(repository, cli)) : undefined;
-  const number = String(session).padStart(3, "0");
-  const recorded = ENGINES.find((entry) => entry.engine === repository.orchestrator?.engine);
-  const terminal = recorded ? engineTerminalFor(repository, recorded, repository.orchestrator?.model ?? "") : null;
-  if (recorded === undefined || terminal === null || typeof terminal === "string") {
-    ui.showFrameworkTerminal(repository.root, loop);
-    ui.showInformationMessage(
-      `Session ${number}'s loop is running. Open your AI's CLI in ${repository.label} and give it: ${openingSentence()}`,
-    );
-    return true;
-  }
-  ui.closeEngineTerminals(terminal);
-  const opened = ui.openTerminal(terminal);
-  ui.showFrameworkTerminal(repository.root, opened);
-  ui.showInformationMessage(
-    `Session ${number} resumed: ${restarted ? "its loop was restarted" : "its loop was still running"}, ` +
-      `and ${recorded.label} was reopened waiting on it.`,
-  );
-  return true;
-}
-
-/**
  * Stop Session: the person asking for the machine back, on the row of the
  * session in flight.
  *
  * It is `dabbler session interrupt --stop` and nothing else -- the verb the
- * framework already has, which writes the request the loop polls. The loop
- * honours it inside a job as well as between phases, so a verification
- * round or a suite ends rather than running on for a person who asked it to
- * stop; `interrupted` lands on `run.json` with their reason, the session
- * stays in flight, and no waiter revives a loop over a recorded stop.
- * Resume Session is the way back.
+ * framework already has, which writes the request the framework reads. It is
+ * honoured inside a job as well as between phases, so a verification round or
+ * a suite ends rather than running on for a person who asked it to stop;
+ * `interrupted` lands on `run.json` with their reason and the session stays
+ * in flight. The way back is said to the AI: `dabbler session next`.
  */
 export async function runStopSession(
   repository: SessionsRepository,
@@ -824,7 +681,8 @@ export async function runStopSession(
     return false;
   }
   ui.showInformationMessage(
-    `Session ${number} will stop: the loop records the stop and ends. Resume Session starts it again.`,
+    `Session ${number} will stop: the framework records the stop the next time it moves, and gives the AI no ` +
+      "further instruction. To carry on, ask your AI to run `dabbler session next`.",
   );
   return true;
 }
@@ -841,7 +699,6 @@ export async function runStartSession(
   repository: SessionsRepository,
   ui: SessionRunUi,
   register: SessionRegistrar = defaultSessionRegistrar(),
-  cli: string | null = resolveRouterCli(),
 ): Promise<boolean> {
   const picked = await ui.pickEngine();
   if (!picked) return false;
@@ -860,10 +717,6 @@ export async function runStartSession(
   const terminal = engineTerminalFor(repository, picked, model);
   if (typeof terminal === "string") {
     ui.showErrorMessage(terminal);
-    return false;
-  }
-  if (cli === null) {
-    ui.showErrorMessage("The bundled `dabbler` command was not found beside the extension; nothing was started.");
     return false;
   }
   // Registering is the framework's, not the AI's: the identity is on the
@@ -897,9 +750,8 @@ export async function runStartSession(
     ui.showErrorMessage(`The session was not registered, so nothing was opened.${said === "" ? "" : ` ${said}`}`);
     return false;
   }
-  // The keys go to the framework: its loop drives the session and waits for
-  // each answer the AI gives from its own CLI.
-  ui.openLoopTerminal(repository, loopTerminalFor(repository, cli));
+  // No framework process is started here: the AI's one request, and then each
+  // of its answers, is what moves the session on.
   const opened = ui.openTerminal(terminal);
   // The framework's own terminal, beside the CLI. Both, or the person is
   // watching their engine work with no sight of what the framework is
@@ -984,11 +836,6 @@ export function registerSessionCommands(
       // opened, and the framework's own work goes to the Dabbler
       // terminal rather than here.
       await runStartSession(repository, ui);
-    }),
-    vscode.commands.registerCommand("dabblerSessionSets.resumeSession", async (arg: unknown) => {
-      const repository = repositoryOf(arg);
-      if (!repository) return;
-      await runResumeSession(repository, ui);
     }),
     vscode.commands.registerCommand("dabblerSessionSets.stopSession", async (arg: unknown) => {
       const repository = repositoryOf(arg);

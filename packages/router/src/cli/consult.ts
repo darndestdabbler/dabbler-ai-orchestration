@@ -57,12 +57,11 @@ function describeSession(session: Row): string[] {
   const stop = standingStop(session);
   if (stop === null) return lines;
   const actor = String(session["stopActor"] ?? "operator");
-  // Resume is withheld where the stop is the engine's: a person's click there
-  // would be a second driver on a live loop.
+  // Carrying on is said, to the AI, by the person: there is no button for it.
   const resume =
     actor === "engine"
-      ? "Resume Session is not offered while this stop is the engine's"
-      : "Resume Session in Work Explorer to bring the AI back";
+      ? "the AI working the session clears this stop by answering again"
+      : "ask the AI working the session to run `dabbler session next` to carry on";
   lines.push(
     `- It is stopped. ${stop}`,
     `- Stopped for: ${actor}.`,

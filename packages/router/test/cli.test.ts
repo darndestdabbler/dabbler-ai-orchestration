@@ -475,6 +475,52 @@ describe("the verb registry", () => {
   });
 });
 
+describe("dabbler session report --next", () => {
+  it("prints one parseable instruction on stdout where the plain report prints its own confirmation", async () => {
+    // The engine reads a chained answer's stdout as its next instruction, so
+    // the report's human sentence cannot be on it; without --next it is where
+    // it always was, for the loop and the people who read it.
+    const plan = join(tempDir("plan-"), "plan.json");
+    writeFileSync(
+      plan,
+      JSON.stringify({
+        task: "Make the widget real.",
+        hold_release: "nothing to ship yet",
+        non_goals: ["Anything the step does not name."],
+        steps: [{ id: "widget", ask: "Make the widget real.", files: ["src/widget.py"], checks: [{ argv: [process.execPath, "-e", "0"] }] }],
+      }),
+      "utf8",
+    );
+    // One sandbox at a time: each answers for git while it is the newest.
+    const begin = async (): Promise<{ sessionsDir: string; seq: number; answer_command: string }> => {
+      const { sessionsDir } = makeAnsweredSandbox();
+      const started = await run(() =>
+        sessionVerb(["start", "--sessions-dir", sessionsDir, "--engine", "claude-code", "--provider", "anthropic"]),
+      );
+      assert.equal(started.code, 0, started.err);
+      const asked = await run(() => sessionVerb(["next", "--sessions-dir", sessionsDir]));
+      return { sessionsDir, ...(JSON.parse(asked.out) as { seq: number; answer_command: string }) };
+    };
+
+    const chained = await begin();
+    assert.match(chained.answer_command, / --next /);
+    const answered = await run(() =>
+      sessionVerb(["report", "--sessions-dir", chained.sessionsDir, "--seq", String(chained.seq), "--next", "--answer-file", plan]),
+    );
+    assert.equal(answered.code, 0, answered.err);
+    const following = JSON.parse(answered.out) as { kind: string; step_id: string; seq: number };
+    assert.deepEqual([following.kind, following.step_id], ["step", "widget"]);
+    assert.match(answered.err, /work plan/);
+
+    const plain = await begin();
+    const ordinary = await run(() =>
+      sessionVerb(["report", "--sessions-dir", plain.sessionsDir, "--seq", String(plain.seq), "--answer-file", plan]),
+    );
+    assert.equal(ordinary.code, 0, ordinary.err);
+    assert.match(ordinary.out, /^report: session 001 seq \d+ answered; work plan/);
+  });
+});
+
 describe("dabbler session run", () => {
   it("refuses when no session is in flight, naming the registration it needs", async () => {
     const { sessionsDir } = makeAnsweredSandbox();

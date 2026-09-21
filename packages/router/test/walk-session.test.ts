@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
 import { CONFIG_ENV_VAR } from "../src/config.ts";
-import { driveSession, sessionNext, type Engine } from "../src/drive.ts";
+import { driveSession, reportAndNext, sessionNext, type Engine } from "../src/drive.ts";
 import { mailboxEngine } from "../src/engines.ts";
 import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
 import { judgeSuiteDeclaration } from "../src/gates.ts";
@@ -611,6 +611,130 @@ describe("a pulled session whose framework jobs end inside the call", () => {
       const collected = await capture(() => sessionNext(sessionsDir, { waitInCallMs: 120_000 }));
       const instruction = JSON.parse(collected.stdout) as DriverInstruction;
       assert.equal(instruction.kind, "done", collected.stderr);
+    } finally {
+      restoreJobs = useInProcessJobs();
+    }
+  });
+});
+
+describe("a session whose answers chain (`report --next`)", () => {
+  /** One chained answer, and the one instruction it printed on stdout. */
+  async function chained(
+    sessionsDir: string,
+    options: Parameters<typeof reportAndNext>[1],
+  ): Promise<{ code: number; instruction: DriverInstruction | null; out: string; err: string }> {
+    const collected = await capture(() => reportAndNext(sessionsDir, options));
+    const out = collected.stdout.trim();
+    return {
+      code: collected.value,
+      out,
+      err: collected.stderr,
+      // Parsed whole: stdout is the instruction and nothing beside it.
+      instruction: out === "" ? null : (JSON.parse(out) as DriverInstruction),
+    };
+  }
+
+  async function begun(): Promise<{ repo: string; sessionsDir: string; plan: DriverInstruction; planFile: string }> {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+    assert.equal(
+      (await capture(() =>
+        Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
+      )).value,
+      EXIT_OK,
+    );
+    const plan = (await next(sessionsDir)).instruction as DriverInstruction;
+    const planFile = join(tempDir("answer-"), "answer.json");
+    writeFileSync(planFile, JSON.stringify(PLAN), "utf8");
+    return { repo, sessionsDir, plan, planFile };
+  }
+
+  const lands = (repo: string): number =>
+    gitOut(repo, "log", "--format=%s").split("\n").filter((subject) => /^Session 1\b/.test(subject)).length;
+
+  it("goes from an accepted answer through the framework's jobs to the next instruction, never a wait, and answers nothing twice", async () => {
+    const { repo, sessionsDir, plan, planFile } = await begun();
+    assert.match(String(plan.answer_command), / --next /, "a pulled instruction's answer asks for what follows it");
+
+    // A report that is refused chains nothing, and the instruction is still owed.
+    const wrong = await chained(sessionsDir, { seq: plan.seq + 5, answerFile: planFile });
+    assert.notEqual(wrong.code, EXIT_OK);
+    assert.equal(wrong.out, "");
+    assert.equal(readInstruction(repo, 1)?.seq, plan.seq);
+    assert.equal(readWorkPlan(repo, 1), null);
+
+    const step = await chained(sessionsDir, { seq: plan.seq, answerFile: planFile });
+    assert.equal(step.instruction?.step_id, "widget", step.err);
+
+    // The process that printed that died before anyone read it, and the same
+    // command is run again: the plan is not taken twice, and what is owed is
+    // the instruction already issued, under the seq it was issued with.
+    const again = await chained(sessionsDir, { seq: plan.seq, answerFile: planFile });
+    assert.equal(again.code, EXIT_OK, again.err);
+    assert.equal(again.instruction?.seq, step.instruction?.seq);
+    assert.equal(again.instruction?.step_id, "widget");
+
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+    const answer = { seq: step.instruction?.seq ?? 0, stepId: "widget", status: "done", files: ["src/widget.py"], notes: "walked" };
+    // The answer is durable and its process dies before it asks for anything.
+    assert.equal((await answerStep(sessionsDir, answer.seq, "widget", ["src/widget.py"])).code, EXIT_OK);
+
+    // Real children: the checks, verification, both suites, the land, the
+    // push and the close all run inside the one repeated call.
+    restoreJobs();
+    try {
+      const done = await chained(sessionsDir, answer);
+      assert.equal(done.instruction?.kind, "done", done.err);
+      assert.equal(readRun(repo, 1)?.accepted_steps.length, 1);
+      assert.equal(readRounds(repo, 1).length, 1);
+      assert.equal(lands(repo), 1);
+
+      // Repeated once more, after the close: told that session's own `done`
+      // again -- never the idle one, which names `session start` -- and
+      // nothing moves.
+      const after = await chained(sessionsDir, answer);
+      assert.equal(after.code, EXIT_OK, after.err);
+      assert.deepEqual([after.instruction?.kind, after.instruction?.session_number], ["done", 1]);
+      assert.doesNotMatch(String(after.instruction?.ask), /session start/);
+      assert.equal(lands(repo), 1);
+    } finally {
+      restoreJobs = useInProcessJobs();
+    }
+  });
+
+  it("stands a chained call down before the land once another has taken the lease", async () => {
+    const { repo, sessionsDir, plan, planFile } = await begun();
+    const step = await chained(sessionsDir, { seq: plan.seq, answerFile: planFile });
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+    const answer = { seq: step.instruction?.seq ?? 0, stepId: "widget", status: "done", files: ["src/widget.py"], notes: "walked" };
+
+    restoreJobs();
+    try {
+      const first = chained(sessionsDir, answer);
+      // A second exchange registers while the first waits on a job, which is
+      // what taking the lease is.
+      const deadline = Date.now() + 60_000;
+      while ((readRun(repo, 1)?.job ?? null) === null && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      const held = readRun(repo, 1);
+      assert.notEqual(held?.job ?? null, null, "the first call never reached a job");
+      writeRun(repo, 1, { ...held!, lease_epoch: (held!.lease_epoch ?? 1) + 1 });
+
+      const stood = await first;
+      assert.notEqual(stood.code, EXIT_OK);
+      assert.equal(stood.out, "");
+      assert.match(stood.err, /stood down/);
+      assert.equal(lands(repo), 0);
+
+      // The exchange that holds the lease re-enters the same job and finishes.
+      const done = await chained(sessionsDir, answer);
+      assert.equal(done.instruction?.kind, "done", done.err);
+      assert.equal(lands(repo), 1);
     } finally {
       restoreJobs = useInProcessJobs();
     }

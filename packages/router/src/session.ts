@@ -93,6 +93,7 @@ import {
   appendSupervision,
   releaseOfPlan,
 } from "./driver.ts";
+import type { DriverInstruction } from "./generated/index.ts";
 import { releaseMode } from "./settings.ts";
 import {
   CAUSE_NOT_LISTED,
@@ -1441,13 +1442,14 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     // four sessions of one test repository were told to run verbs the pull
     // forbids. The declaration is the plan step's answer; the tests are the
     // framework's.
-    // And it names what drives a session -- the loop -- never `session next`,
-    // which under a live loop takes its lease and ends it.
+    // And it names what moves a session: the AI's one request, after which
+    // every answer asks for what follows it. Under a live loop that request
+    // would take the loop's lease and end it, so there it is the waiter.
     writeOut(
       liveLoopSession(sessionsDir) !== null
         ? "Next: a loop is already driving this session; the AI runs `dabbler session wait`.\n"
-        : `Next: dabbler session run --mailbox --sessions-dir ${sessionsDir} -- the framework's loop, in a ` +
-            "terminal of its own; the AI then runs `dabbler session wait`.\n",
+        : `Next: the AI runs \`dabbler session next --sessions-dir ${sessionsDir}\` once, and starts each ` +
+            "`answer_command` it is given as a background command.\n",
     );
     return EXIT_OK;
   } finally {
@@ -1720,6 +1722,8 @@ export interface ReportCliOptions {
   /** A plan or a disposition: the JSON the engine wrote, validated and copied in. */
   readonly answerFile?: string | null;
   readonly sessionNumber?: number | null;
+  /** `--next`: the caller goes on to ask for what follows, so a repeated answer is not a dead end. */
+  readonly chained?: boolean;
 }
 
 /**
@@ -1763,9 +1767,19 @@ function inFlightSession(sessionsDir: string): number | null {
  */
 function nothingToAnswer(sessionsDir: string): string {
   const nothing = `no session is in flight under ${sessionsDir}, so there is nothing to answer.`;
-  const plain = `${nothing} Change nothing more, and tell the operator.`;
+  const done = lastSessionDone(sessionsDir);
+  return done === null ? `${nothing} Change nothing more, and tell the operator.` : `${nothing} ${String(done.ask)}`;
+}
+
+/**
+ * The `done` the most recent session that ran left behind, or null.
+ *
+ * That session and only it: an older one's `done` says nothing about the
+ * session an answer arriving now was for.
+ */
+export function lastSessionDone(sessionsDir: string): DriverInstruction | null {
   const repoRoot = repoRootFor(sessionsDir);
-  if (repoRoot === null) return plain;
+  if (repoRoot === null) return null;
   const rows = readRawSessionState(sessionsDir)?.["sessions"];
   const numbers = (Array.isArray(rows) ? rows : [])
     .map((row) => (isRecord(row) ? row["number"] : null))
@@ -1779,12 +1793,9 @@ function nothingToAnswer(sessionsDir: string): string {
       last = null;
     }
     if (last === null) continue;
-    // The most recent session that ran, and only it: an older one's `done`
-    // says nothing about the session this answer was for.
-    if (last.kind === "done" && typeof last.ask === "string") return `${nothing} ${last.ask}`;
-    break;
+    return last.kind === "done" && typeof last.ask === "string" ? last : null;
   }
-  return plain;
+  return null;
 }
 
 export function report(sessionsDir: string, options: ReportCliOptions): number {
@@ -1797,8 +1808,10 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
   // after a cancellation at a session it never belonged to.
   const target = options.sessionNumber ?? inFlightSession(sessionsDir);
   if (target === null) {
-    writeErr(`report: refused -- ${nothingToAnswer(sessionsDir)}\n`);
-    return EXIT_BOUNDARY;
+    // Chained, the caller's next read says the same thing as an instruction:
+    // the last answer of a session repeated after its close is told `done`.
+    writeErr(`report: ${options.chained === true ? "" : "refused -- "}${nothingToAnswer(sessionsDir)}\n`);
+    return options.chained === true ? EXIT_OK : EXIT_BOUNDARY;
   }
   const repoRoot = repoRootFromSessionsDir(sessionsDir);
   let instruction;
@@ -1822,6 +1835,22 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
         "expects nothing.\n",
     );
     return EXIT_BOUNDARY;
+  }
+  if (options.chained === true && options.seq < instruction.seq) {
+    // A chained answer repeated after its process died, or one overtaken by an
+    // interruption: the instruction it names is behind the one outstanding.
+    // Nothing is written -- an answer is taken once -- and the caller asks for
+    // what is owed now, which is what the process that died never printed.
+    appendSupervision(repoRoot, target, {
+      event: "chained-answer-repeated",
+      got_seq: options.seq,
+      outstanding_seq: instruction.seq,
+    });
+    writeErr(
+      `report: instruction ${options.seq} is behind the outstanding one, ${instruction.seq}; ` +
+        "nothing is accepted twice, and the instruction owed follows.\n",
+    );
+    return EXIT_OK;
   }
   if (options.seq !== instruction.seq) {
     appendSupervision(repoRoot, target, {
@@ -2881,27 +2910,21 @@ const ALLOWED: BoundaryRuling = { refusal: null, exitCode: EXIT_OK };
 /**
  * Whether this session may be cancelled, decided from its own record.
  *
- * A session already cancelled is settled, and one in flight is work
- * somebody is doing: cancelling it without saying so is how a run
- * disappears from under the person running it.
+ * A session already cancelled is settled. One in flight may be cancelled by
+ * whoever is working it, with the reason the verb requires: the cancellation
+ * unwinds nothing, so the tree is left as it was, and the loop reads the
+ * ledger before every act it cannot take back. Requiring `--force` here --
+ * a person's verb -- left the author of a session that should not go on
+ * with no way to end it, and the beta test's AI ended one by other means.
  */
 export function judgeCancellation(
   record: Record<string, unknown>,
   sessionNumber: number,
-  force: boolean,
 ): BoundaryRuling {
   const prior = canonicalizeStatus(record["status"]);
   if (prior === STATUS_CANCELLED) {
     return {
       refusal: `session ${sessionDisplayNumber(sessionNumber)} is already cancelled`,
-      exitCode: EXIT_BOUNDARY,
-    };
-  }
-  if (prior === STATUS_IN_PROGRESS && !force) {
-    return {
-      refusal:
-        `refused -- session ${sessionDisplayNumber(sessionNumber)} is in flight. ` +
-        "Close it first, or pass --force.",
       exitCode: EXIT_BOUNDARY,
     };
   }
@@ -3130,7 +3153,20 @@ export function cancel(
       );
       return EXIT_USAGE;
     }
-    const ruling = judgeCancellation(record, sessionNumber, options.force === true);
+    // An engine ends the session it is working, and no other: a number it got
+    // wrong would otherwise cancel planned or finished work it was never given.
+    // Whose session a person cancels is theirs to say, as it always was.
+    const working = derivedView(raw)?.["currentSession"];
+    if (options.engine === true && working !== sessionNumber) {
+      writeErr(
+        `cancel: refused -- session ${sessionDisplayNumber(sessionNumber)} is not the session in flight` +
+          (typeof working === "number" ? ` (${sessionDisplayNumber(working)} is)` : "") +
+          ", and an engine cancels only the session it is working. Cancelling another is a person's: the " +
+          "Work Explorer (Cancel Session), or an interactive terminal of their own.\n",
+      );
+      return EXIT_BOUNDARY;
+    }
+    const ruling = judgeCancellation(record, sessionNumber);
     if (ruling.refusal !== null) {
       writeErr(`cancel: ${ruling.refusal}\n`);
       return ruling.exitCode;

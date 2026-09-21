@@ -23,14 +23,10 @@ import {
   type EngineTerminal,
   type SessionRegistrar,
   type SessionRunUi,
-  closeLoopOnSessionEnd,
   defaultSessionRunUi,
   engineTerminalFor,
-  isEngineTerminalOf,
-  loopTerminalFor,
   repositoryOf,
   runConsultWithAi,
-  runResumeSession,
   runStartSession,
 } from "../../commands/sessionCommands";
 import { ROUTER_VERSION } from "dabbler-ai-router";
@@ -374,7 +370,7 @@ suite("set up new project", () => {
   });
 });
 
-// --- Start, Resume and Consult open the engine's own CLI ------------------
+// --- Start and Consult open the engine's own CLI --------------------------
 
 function driveUi(overrides: Partial<SessionRunUi> = {}): {
   ui: SessionRunUi;
@@ -391,7 +387,6 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     // let this reach the real `claude` would spawn the developer's own CLI
     // on every flow test -- passing here and meaning nothing anywhere else.
     engineKnowsModel: async () => null,
-    closeEngineTerminals: () => undefined,
     pickEngine: async () => ENGINES[0],
     askModel: async () => "haiku",
     confirm: async () => false,
@@ -400,10 +395,6 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     showErrorMessage: (m: string) => errors.push(m),
     showInformationMessage: (m: string) => infos.push(m),
     openTerminal: (terminal) => {
-      terminals.push(terminal);
-      return undefined;
-    },
-    openLoopTerminal: (_repository, terminal) => {
       terminals.push(terminal);
       return undefined;
     },
@@ -424,8 +415,6 @@ function registrarOf(code: number | null = 0, output = ""): SessionRegistrar & {
   register.calls = calls;
   return register;
 }
-
-const CLI = "D:\\ext\\dabbler.cjs";
 
 /** What the stub records of one `window.createTerminal` call. */
 interface FakeTerminal {
@@ -477,7 +466,7 @@ suite("Start opens the person's own CLI", () => {
     });
     try {
       const refusedBeforeRegistering = registrarOf();
-      assert.strictEqual(await runStartSession(repository, row.ui, refusedBeforeRegistering, CLI), false);
+      assert.strictEqual(await runStartSession(repository, row.ui, refusedBeforeRegistering), false);
       // Nothing registered, nothing opened, and the operator was told why.
       assert.deepStrictEqual(refusedBeforeRegistering.calls, []);
       assert.deepStrictEqual(row.terminals, []);
@@ -490,9 +479,9 @@ suite("Start opens the person's own CLI", () => {
       // refuse" covers no CLI, no answer and an engine with no pre-flight,
       // and none of those may stand between an operator and their work.
       const silent = driveUi({ askModel: async () => "a-model-nothing-lists" });
-      assert.strictEqual(await runStartSession(makeRepository({ root }), silent.ui, registrarOf(), CLI), true);
-      // The framework's loop and the engine's CLI.
-      assert.strictEqual(silent.terminals.length, 2);
+      assert.strictEqual(await runStartSession(makeRepository({ root }), silent.ui, registrarOf()), true);
+      // The engine's CLI, and no framework process beside it.
+      assert.strictEqual(silent.terminals.length, 1);
     } finally {
       rmrf(root);
     }
@@ -514,7 +503,7 @@ suite("Start opens the person's own CLI", () => {
     // is read as part of the prompt.
     assert.deepStrictEqual(claudeArgs.slice(0, 2), ["--model", "claude-opus-5"]);
     assert.strictEqual(claudeArgs.length, 3);
-    assert.match(claudeArgs[2], /dabbler session wait/);
+    assert.match(claudeArgs[2], /dabbler session next/);
 
     const seat = engineTerminalFor(repository, copilot, "gpt-5-6-luna");
     assert.deepStrictEqual((seat as EngineTerminal).args.slice(0, 3), ["--model", "gpt-5-6-luna", "-i"]);
@@ -523,24 +512,20 @@ suite("Start opens the person's own CLI", () => {
     // is a launch that fails in front of the person.
     const bare = engineTerminalFor(repository, ENGINES[0], "");
     assert.strictEqual((bare as EngineTerminal).args.length, 1);
-    assert.match((bare as EngineTerminal).args[0], /dabbler session wait/);
+    assert.match((bare as EngineTerminal).args[0], /dabbler session next/);
   });
 
   test("the terminal an AI's CLI runs in says it is one, and the loop's does not", () => {
     // The router tells an engine from a person by what the calling shell
     // carries. A vendor's own marker is a reading of one version, and an
     // engine nobody measured has none, so the terminal says it for all of
-    // them -- and the framework's own loop, which no AI types into, does not.
+    // them.
     const repository = makeRepository();
     for (const choice of ENGINES) {
       const terminal = engineTerminalFor(repository, choice, choice.modelRequired ? "gpt-5-6-luna" : "");
       assert.notStrictEqual(typeof terminal, "string", choice.engine);
       assert.strictEqual((terminal as EngineTerminal).env?.["DABBLER_ENGINE_TERMINAL"], "1", choice.engine);
     }
-    assert.strictEqual(
-      loopTerminalFor(repository, "dist/dabbler.cjs").env?.["DABBLER_ENGINE_TERMINAL"],
-      undefined,
-    );
   });
 
   test("asks before a start merges origin's unrelated work, and starts with the merge only on yes", async () => {
@@ -555,15 +540,15 @@ suite("Start opens the person's own CLI", () => {
 
     const asked: string[] = [];
     const declined = driveUi({ confirm: async (message) => { asked.push(message); return false; } });
-    assert.strictEqual(await runStartSession(makeRepository(), declined.ui, register, CLI), false);
+    assert.strictEqual(await runStartSession(makeRepository(), declined.ui, register), false);
     assert.match(asked[0], /src\/app\.ts/);
     assert.strictEqual(register.calls.length, 1);
     assert.strictEqual(declined.terminals.length, 0);
 
     const agreed = driveUi({ confirm: async () => true });
-    assert.strictEqual(await runStartSession(makeRepository(), agreed.ui, register, CLI), true);
+    assert.strictEqual(await runStartSession(makeRepository(), agreed.ui, register), true);
     assert.deepStrictEqual(register.calls[2].slice(-1), ["--merge-origin"]);
-    assert.strictEqual(agreed.terminals.length, 2);
+    assert.strictEqual(agreed.terminals.length, 1);
   });
 
   test("asks what to do with uncommitted changes, and starts with the flag for the answer chosen", async () => {
@@ -579,7 +564,7 @@ suite("Start opens the person's own CLI", () => {
 
     const asked: string[] = [];
     const cancelled = driveUi({ choose: async (message) => { asked.push(message); return undefined; } });
-    assert.strictEqual(await runStartSession(makeRepository(), cancelled.ui, register, CLI), false);
+    assert.strictEqual(await runStartSession(makeRepository(), cancelled.ui, register), false);
     assert.match(asked[0], /session-plan\.md/);
     assert.deepStrictEqual(register.calls.length, 1);
     assert.strictEqual(cancelled.terminals.length, 0);
@@ -587,9 +572,9 @@ suite("Start opens the person's own CLI", () => {
     for (const [answer, flag] of [["Commit and Push", "--commit-changes"], ["Undo the Changes", "--undo-changes"]]) {
       register.calls = [];
       const chosen = driveUi({ choose: async () => answer });
-      assert.strictEqual(await runStartSession(makeRepository(), chosen.ui, register, CLI), true);
+      assert.strictEqual(await runStartSession(makeRepository(), chosen.ui, register), true);
       assert.deepStrictEqual(register.calls[1].slice(-1), [flag]);
-      assert.strictEqual(chosen.terminals.length, 2);
+      assert.strictEqual(chosen.terminals.length, 1);
     }
   });
 
@@ -609,7 +594,7 @@ suite("Start opens the person's own CLI", () => {
     assert.match(cli.name, /^Consult/);
     assert.deepStrictEqual(cli.args.slice(0, 3), ["--model", "gpt-5-6-luna", "-i"]);
     assert.match(cli.args[3], /dabbler consult --sessions-dir docs\/sessions --session 7/);
-    assert.doesNotMatch(cli.args[3], /session wait/);
+    assert.doesNotMatch(cli.args[3], /session (wait|next)/);
 
     // A model the installed CLI refuses is refused here as at Start: nothing opens.
     const refused = driveUi({ engineKnowsModel: async (_choice, model) => model });
@@ -645,21 +630,18 @@ suite("Start opens the person's own CLI", () => {
     // The real UI over the stub: what matters is what the EDITOR was asked
     // to open, not what a fake recorded.
     const claude = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
-    assert.strictEqual(await runStartSession(repository, claude, register, CLI), true);
+    assert.strictEqual(await runStartSession(repository, claude, register), true);
     // Registered first, by the framework, with the identity the pick chose:
     // neither the person nor the AI types `session start`.
     assert.deepStrictEqual(register.calls[0], [
       "session", "start", "--sessions-dir", "docs/sessions", "--engine", "claude-code", "--provider", "anthropic",
     ]);
-    // Three terminals: the framework's loop, the engine's CLI, and the
-    // framework's own view beside the CLI.
-    assert.strictEqual(terminals.length, 3);
-    assert.deepStrictEqual(terminals[0].options.shellArgs, [
-      CLI, "session", "run", "--mailbox", "--sessions-dir", "docs/sessions",
-    ]);
-    // The program is the editor's executable, which runs as node only when told to.
-    assert.strictEqual(terminals[0].options.env?.ELECTRON_RUN_AS_NODE, "1");
-    const cli = terminals[1];
+    // Two terminals and no third: the engine's CLI, and the framework's own
+    // view beside it. No framework process is started -- nothing runs
+    // `session run --mailbox`, and nothing waits for the AI.
+    assert.strictEqual(terminals.length, 2);
+    assert.ok(!terminals.some((terminal) => terminal.options.shellArgs?.includes("--mailbox")));
+    const cli = terminals[0];
     assert.strictEqual(cli.options.shellPath, "claude");
     assert.strictEqual(cli.options.cwd, repository.root);
     assert.strictEqual(cli.shown, 1);
@@ -669,14 +651,16 @@ suite("Start opens the person's own CLI", () => {
     // called `panel` putting the pair in editor tabs.
     assert.strictEqual(cli.options.location, vscode.TerminalLocation.Panel);
     // Claude Code takes a positional prompt for an interactive session, so
-    // the sentence is argv and nothing is typed. It asks the AI to wait in
-    // the background and answer; it registers nothing and advances nothing.
-    assert.match(cli.options.shellArgs[0], /dabbler session wait --sessions-dir docs\/sessions/);
-    assert.doesNotMatch(cli.options.shellArgs[0], /session (start|next)|--engine|--provider|--model/);
+    // the sentence is argv and nothing is typed. It asks the AI for one
+    // instruction and to answer in the background; it registers nothing, and
+    // names no waiter to keep running.
+    assert.match(cli.options.shellArgs[0], /dabbler session next --sessions-dir docs\/sessions/);
+    assert.match(cli.options.shellArgs[0], /`answer_command` as a background command/);
+    assert.doesNotMatch(cli.options.shellArgs[0], /session (start|wait)|--mailbox|--engine|--provider|--model/);
     assert.deepStrictEqual(cli.sent, []);
 
     // The Dabbler terminal, split off the CLI and shown.
-    const dabbler = terminals[2];
+    const dabbler = terminals[1];
     assert.ok(dabbler.options.name.startsWith("Dabbler"));
     assert.ok(dabbler.options.pty);
     assert.strictEqual(dabbler.options.location?.parentTerminal, cli);
@@ -686,23 +670,23 @@ suite("Start opens the person's own CLI", () => {
     // interactively AND submits it: nothing is typed and no Enter is owed.
     const copilot = ENGINES.find((e) => e.engine === "copilot")!;
     const seat = { ...defaultSessionRunUi(), pickEngine: async () => copilot, askModel: async () => "gpt-5-6-luna" };
-    assert.strictEqual(await runStartSession(repository, seat, register, CLI), true);
+    assert.strictEqual(await runStartSession(repository, seat, register), true);
     // The model is recorded at registration and reaches the CLI's argv; the
     // sentence carries none.
     assert.deepStrictEqual(register.calls[1].slice(-2), ["--model", "gpt-5-6-luna"]);
-    assert.strictEqual(terminals.length, 6);
-    assert.strictEqual(terminals[4].options.shellPath, "copilot");
-    assert.deepStrictEqual(terminals[4].options.shellArgs.slice(0, 3), ["--model", "gpt-5-6-luna", "-i"]);
-    assert.match(terminals[4].options.shellArgs[3], /dabbler session wait/);
-    assert.deepStrictEqual(terminals[4].sent, []);
+    assert.strictEqual(terminals.length, 4);
+    assert.strictEqual(terminals[2].options.shellPath, "copilot");
+    assert.deepStrictEqual(terminals[2].options.shellArgs.slice(0, 3), ["--model", "gpt-5-6-luna", "-i"]);
+    assert.match(terminals[2].options.shellArgs[3], /dabbler session next/);
+    assert.deepStrictEqual(terminals[2].sent, []);
 
     // A second session in the same window opens a second CLI, and the
     // terminal beside the FIRST one is not the arrangement Start promised
     // for this one. A location cannot be changed after creation, so the
     // Dabbler terminal is built again beside the CLI that was just opened.
-    assert.ok(terminals[5].options.name.startsWith("Dabbler"));
-    assert.strictEqual(terminals[5].options.location?.parentTerminal, terminals[4]);
-    assert.strictEqual(terminals[5].shown, 1);
+    assert.ok(terminals[3].options.name.startsWith("Dabbler"));
+    assert.strictEqual(terminals[3].options.location?.parentTerminal, terminals[2]);
+    assert.strictEqual(terminals[3].shown, 1);
     // And the one it replaced is gone rather than left behind.
     assert.strictEqual(dabbler.disposed, 1);
     assert.strictEqual(dabbler.shown, 1);
@@ -711,7 +695,7 @@ suite("Start opens the person's own CLI", () => {
   test("a registration the router refuses opens nothing, and says why in the router's words", async () => {
     const row = driveUi();
     const refused = registrarOf(2, "start: refused -- the working tree is not clean");
-    assert.strictEqual(await runStartSession(makeRepository(), row.ui, refused, CLI), false);
+    assert.strictEqual(await runStartSession(makeRepository(), row.ui, refused), false);
     assert.deepStrictEqual(row.terminals, []);
     assert.ok(row.errors.some((line) => line.includes("the working tree is not clean")), row.errors.join(" | "));
   });
@@ -731,12 +715,12 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(terminals[0].options.location, undefined);
 
     const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
-    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), CLI), true);
-    // The loop, the CLI, then a Dabbler terminal built beside the CLI -- the
-    // unsplit one is replaced, not merely shown.
-    assert.strictEqual(terminals.length, 4);
-    assert.strictEqual(terminals[3].options.location?.parentTerminal, terminals[2]);
-    assert.strictEqual(terminals[3].shown, 1);
+    assert.strictEqual(await runStartSession(repository, ui, registrarOf()), true);
+    // The CLI, then a Dabbler terminal built beside the CLI -- the unsplit
+    // one is replaced, not merely shown.
+    assert.strictEqual(terminals.length, 3);
+    assert.strictEqual(terminals[2].options.location?.parentTerminal, terminals[1]);
+    assert.strictEqual(terminals[2].shown, 1);
     assert.strictEqual(terminals[0].shown, 0);
   });
 
@@ -749,85 +733,22 @@ suite("Start opens the person's own CLI", () => {
     terminals.length = 0;
 
     const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
-    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), CLI), true);
-    assert.strictEqual(terminals.length, 3);
-    assert.deepStrictEqual(terminals[1].options.location, { viewColumn: vscode.ViewColumn.One });
-    assert.ok(terminals[2].options.name.startsWith("Dabbler"));
-    assert.deepStrictEqual(terminals[2].options.location, {
+    assert.strictEqual(await runStartSession(repository, ui, registrarOf()), true);
+    assert.strictEqual(terminals.length, 2);
+    assert.deepStrictEqual(terminals[0].options.location, { viewColumn: vscode.ViewColumn.One });
+    assert.ok(terminals[1].options.name.startsWith("Dabbler"));
+    assert.deepStrictEqual(terminals[1].options.location, {
       viewColumn: vscode.ViewColumn.Beside,
     });
-    assert.strictEqual(terminals[2].shown, 1);
+    assert.strictEqual(terminals[1].shown, 1);
 
     // A second Start in the same window costs no scrollback here: the
     // framework's tab is already where it belongs, so it is shown rather
     // than rebuilt -- which is the one thing the panel split cannot do.
-    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), CLI), true);
-    assert.strictEqual(terminals.length, 5);
-    assert.strictEqual(terminals[2].disposed, 0);
-    assert.strictEqual(terminals[2].shown, 2);
-  });
-
-  test("opens the framework's loop in the panel without taking focus, whatever the pair's location", async () => {
-    const repository = makeRepository({ root: path.join("D:", "loop-panel") });
-    const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
-    terminals.length = 0;
-
-    const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
-    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), CLI), true);
-    const loop = terminals[0];
-    assert.deepStrictEqual(loop.options.shellArgs.slice(1, 4), ["session", "run", "--mailbox"]);
-    assert.strictEqual(loop.options.location, vscode.TerminalLocation.Panel);
-    assert.strictEqual(loop.preserveFocus, true);
-  });
-
-  test("a second Start replaces the repository's loop terminal and leaves the CLI and Dabbler terminals open", async () => {
-    const repository = makeRepository({ root: path.join("D:", "loop-replaced") });
-    const other = makeRepository({ root: path.join("D:", "elsewhere", "loop-replaced") });
-    const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
-    terminals.length = 0;
-
-    const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
-    assert.strictEqual(await runStartSession(other, ui, registrarOf(), CLI), true);
-    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), CLI), true);
-    const [otherLoop, firstLoop, cli, dabbler] = [terminals[0], terminals[3], terminals[4], terminals[5]];
-    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), CLI), true);
-    assert.strictEqual(firstLoop.disposed, 1);
-    assert.strictEqual(terminals[6].disposed, 0);
-    assert.strictEqual(otherLoop.disposed, 0);
-    assert.strictEqual(cli.disposed, 0);
-    assert.strictEqual(dabbler.disposed, 0);
-  });
-
-  test("the session completing disposes its loop terminal", async () => {
-    const repository = makeRepository({ root: path.join("D:", "loop-completes"), currentSession: 2 });
-    const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
-    terminals.length = 0;
-    closeLoopOnSessionEnd(repository);
-
-    defaultSessionRunUi().openLoopTerminal(repository, loopTerminalFor(repository, CLI));
-    // A scan that still reads the session in flight leaves it open.
-    closeLoopOnSessionEnd(repository);
-    assert.strictEqual(terminals[0].disposed, 0);
-    closeLoopOnSessionEnd({ ...repository, currentSession: null });
-    assert.strictEqual(terminals[0].disposed, 1);
-  });
-
-  test("closing the loop terminal by hand leaves Resume refusing to start a second loop beside a live one", async () => {
-    const repository = makeRepository({
-      root: path.join("D:", "loop-closed-by-hand"),
-      currentSession: 2,
-      nextSession: 2,
-      sessions: [makeSession({ number: 2, status: "in-progress" })],
-    });
-    const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
-    terminals.length = 0;
-    const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
-    assert.strictEqual(await runStartSession(repository, ui, registrarOf(), CLI), true);
-    terminals[0].dispose();
-
-    // The heartbeat says the loop is still driving, so no loop is opened.
-    assert.strictEqual(await runResumeSession(repository, ui, CLI, () => true), true);
-    assert.ok(!terminals.slice(3).some((terminal) => terminal.options.shellArgs?.includes("--mailbox")));
+    assert.strictEqual(await runStartSession(repository, ui, registrarOf()), true);
+    assert.strictEqual(terminals.length, 3);
+    assert.strictEqual(terminals[1].disposed, 0);
+    assert.strictEqual(terminals[1].shown, 2);
   });
 
   test("a seat without a model opens nothing, and a dismissed pick opens nothing", async () => {
@@ -835,10 +756,10 @@ suite("Start opens the person's own CLI", () => {
     const copilot = ENGINES.find((e) => e.engine === "copilot")!;
     const seat = driveUi({ pickEngine: async () => copilot, askModel: async () => "" });
     const register = registrarOf();
-    assert.strictEqual(await runStartSession(repository, seat.ui, register, CLI), false);
+    assert.strictEqual(await runStartSession(repository, seat.ui, register), false);
     assert.ok(seat.errors[0].includes("needs a model"));
     const dismissed = driveUi({ pickEngine: async () => undefined });
-    assert.strictEqual(await runStartSession(repository, dismissed.ui, register, CLI), false);
+    assert.strictEqual(await runStartSession(repository, dismissed.ui, register), false);
     assert.deepStrictEqual(register.calls, []);
   });
 });
@@ -1044,71 +965,6 @@ suite("placing a repository the Explorer cannot reach", () => {
     } finally {
       restore();
     }
-  });
-});
-
-suite("Resume Session", () => {
-  test("Resume Session restarts the loop only when no heartbeat says one is driving, and reopens the recorded engine waiting on it", async () => {
-    const repository = makeRepository({
-      root: "D:\\ws\\csv-pipeline",
-      currentSession: 2,
-      nextSession: 2,
-      sessions: [makeSession({ number: 2, status: "in-progress" })],
-      orchestrator: { engine: "copilot", provider: "openai", model: "gpt-5-6-luna" },
-    });
-    const cli = "D:\\ext\\dabbler.cjs";
-    const loopArgs = ["session", "run", "--mailbox", "--sessions-dir", "docs/sessions"];
-
-    // A live loop is left alone; the open CLI, whose waiter may be gone, is
-    // replaced by one carrying the sentence.
-    const closed: EngineTerminal[] = [];
-    const live = driveUi({ closeEngineTerminals: (spec) => { closed.push(spec); } });
-    assert.strictEqual(await runResumeSession(repository, live.ui, cli, () => true), true);
-    // What is closed is exactly the CLI being reopened, in this repository.
-    assert.deepStrictEqual(closed, [live.terminals[0]]);
-    assert.strictEqual(live.terminals.length, 1);
-    assert.strictEqual(live.terminals[0].program, "copilot");
-    assert.deepStrictEqual(live.terminals[0].args.slice(0, 3), ["--model", "gpt-5-6-luna", "-i"]);
-    assert.match(live.terminals[0].args[3], /dabbler session wait/);
-
-    // No heartbeat: the loop is restarted, whatever terminals are open.
-    const dead = driveUi();
-    assert.strictEqual(await runResumeSession(repository, dead.ui, cli, () => false), true);
-    assert.deepStrictEqual(dead.terminals[0].args.slice(1), loopArgs);
-    assert.strictEqual(dead.terminals[0].cwd, repository.root);
-    assert.strictEqual(dead.terminals[1].program, "copilot");
-
-    // No recorded engine: the loop, and the sentence in a message.
-    const unknown = driveUi();
-    assert.strictEqual(await runResumeSession({ ...repository, orchestrator: null }, unknown.ui, cli, () => false), true);
-    assert.strictEqual(unknown.terminals.length, 1);
-    assert.match(unknown.infos[0], /dabbler session wait/);
-
-    const idle = driveUi();
-    assert.strictEqual(await runResumeSession({ ...repository, currentSession: null }, idle.ui, cli, () => false), false);
-    assert.strictEqual(idle.terminals.length, 0);
-  });
-
-  test("Resume closes only its own repository's CLI, beside another repository of the same name", () => {
-    const copilot = ENGINES.find((e) => e.engine === "copilot")!;
-    const mine = engineTerminalFor(makeRepository({ root: "D:\\ws\\a\\app" }), copilot, "gpt-5-6-luna") as EngineTerminal;
-    const theirs = engineTerminalFor(makeRepository({ root: "D:\\ws\\b\\app" }), copilot, "gpt-5-6-luna") as EngineTerminal;
-    // Same label, same engine: the name alone cannot tell them apart.
-    assert.strictEqual(mine.name, theirs.name);
-    const open = (spec: EngineTerminal, cwd: string | vscode.Uri = spec.cwd, shellPath = spec.program) => ({
-      name: spec.name,
-      creationOptions: { shellPath, cwd },
-    });
-    const window = [
-      open(mine),
-      open(theirs),
-      open(mine, { fsPath: mine.cwd } as unknown as vscode.Uri),
-      open(mine, mine.cwd, "pwsh"),
-    ];
-    // Disposing what matches leaves the other repository's CLI and a shell
-    // that merely shares the name.
-    const left = window.filter((terminal) => !isEngineTerminalOf(terminal, mine));
-    assert.deepStrictEqual(left, [window[1], window[3]]);
   });
 });
 

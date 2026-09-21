@@ -255,6 +255,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 215 | The loop outlives its questions, and Resume goes | yes | 2026-09-20 |
 | 216 | A dispute ends inside the session | — | not declared |
 | 217 | An impasse goes to the Auxiliary Reviewer before it goes to a person | — | not declared |
+| 218 | Replace the mailbox handoff with one chained exchange | no | 2026-09-20 |
+| 219 | Prove the installed conversation before the four soaks | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2850,3 +2852,17 @@ The loop outlives its questions, and Resume goes. A stop a person owns no longer
 **Amended after acceptance:**
 
 - 2026-09-20 — step 'a-person-owed-does-not-end-the-loop': its files and checks: The step's own proof -- a person-owned stop that leaves the loop running and a way on that carries the session to its close -- is a whole session driven from one call, and whole-session drives live in walk-session.test.ts. drive.test.ts keeps the reading the waiting loop polls; driver.test.ts keeps the ways on. (claude-code (anthropic, claude-opus-5))
+
+### Session 218 — Replace the mailbox handoff with one chained exchange
+
+**Releasable: no — held: Session 219 owns the installed proof and the release: this session's chained exchange has not yet met an installed VSIX with a real interactive engine, and the session plan says it publishes nothing..**
+
+Replace the mailbox handoff with one chained exchange, on the pull the router already has. `dabbler session report` gains `--next`: it performs the ordinary report exactly as today and, only once that report is accepted, calls the same `sessionNext` advancement `session next` calls, holding the call open across whatever the framework does next -- checks, named tests, verification, the run of record, the land, the push, the close -- so it never returns the synthetic `wait`, and prints exactly one instruction or `done` as JSON on stdout with the report's own confirmation and all progress on stderr. Under the pull every generated `answer_command` carries `--next`; push mode, mailbox mode and a report without `--next` behave as they do now. A chained answer repeated after its process died returns or continues from the record: the answer is accepted once and no phase, round, commit or push runs twice, and two exchanges racing are settled by the driver lease before a side effect. `session cancel <the session in flight> --reason` succeeds without `--force`, records the reason and leaves the tree alone; `cancel --force` stays a person's. The managed instruction and the pages that teach the loop describe one initial `session next` and background `answer_command`s, with no waiter to re-arm. In the extension Start Session opens the interactive AI and the Dabbler Terminal and no mailbox loop, its opening sentence asks for the initial `session next`, Resume Session is no longer offered, and the Dabbler Terminal stays an observer that rebuilds phase, owner, elapsed time, latest progress and the instruction owed from the record when it is reopened. A proof drives one whole fake-engine session through the built router in a disposable repository with a local bare remote, interrupts it during a long check, kills one chained process after its answer is durable and repeats it, and records what happened.
+
+**Amended after acceptance:**
+
+- 2026-09-20 — step 'report-next-chains': its files: The whole-session behaviours (through a long job with no wait, a repeated answer, a lost lease) need real child jobs, and the harness that drives a pulled session with them is walk-session.test.ts; drive.test.ts gains nothing. (claude-code (anthropic, claude-opus-5))
+- 2026-09-20 — step 'report-next-chains': its checks: The step's tests live in walk-session.test.ts, so its check runs that file too. (claude-code (anthropic, claude-opus-5))
+- 2026-09-20 — step 'start-opens-no-loop': its files: With Resume Session gone, the router's own stop sentences, the start verb's closing line, the consult brief and the undelivered-instruction sentence would send a person to a button that does not exist or a loop nothing starts: they say dabbler session next now, and a printed instruction is stamped delivered so a pulled session is not read as unread. (claude-code (anthropic, claude-opus-5))
+- 2026-09-20 — step 'start-opens-no-loop': its checks: The step changes router sentences and their tests, so its checks run those router tests and the router typecheck beside the extension's. (claude-code (anthropic, claude-opus-5))
+- 2026-09-20 — step 'proof-chained-exchange': its files: The proof's first run found that a chained answer repeated after the close was told the idle done, whose ask names session start; it is told the ended session's own done instead, with the walk test that holds it. (claude-code (anthropic, claude-opus-5))

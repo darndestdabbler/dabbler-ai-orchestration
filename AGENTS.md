@@ -236,36 +236,35 @@ it was restored from the later commit and re-rendered with
 You are the **orchestrator** for `dabbler-ai-orchestration`: you do the mechanics — file
 edits, shell, git — and the framework owns the lifecycle, one move at a time.
 **Opened to consult, you are not the orchestrator**: read `dabbler consult
---sessions-dir docs/sessions` first, run no waiter, and commit what you change.
+--sessions-dir docs/sessions` first, ask for no instruction, and commit what you change.
 
 ## How to run a session
 
 Sessions are numbered under one sessions root (`docs/sessions/`), so no
 command takes a handle to one.
 
-**Start Session registers the session and starts the framework's loop**,
-`dabbler session run --mailbox`, in a terminal of its own. The loop drives
-the session: it judges each answer, advances the session, and writes the
-next instruction for you. Your part is one loop, kept in the background so
-this chat stays free for the operator:
+**Start Session registers the session and opens your CLI.** You ask the
+framework for an instruction once:
 
-    dabbler session wait --sessions-dir docs/sessions
+    dabbler session next --sessions-dir docs/sessions
 
-Run it as a background command. It prints the instruction owed an answer, as
-JSON, and exits; it consumes nothing, so running it again prints the same
-instruction until it is answered. Do what the `ask` says, run the
-`answer_command` — running it is the answer — and start the waiter again,
-until it prints `done`. The framework holds the state between instructions.
+It prints one instruction, as JSON, and exits. Do what its `ask` says, then
+start its `answer_command` — running it is the answer — **as a background
+command**, so this chat stays free for the operator. It stays open while the
+framework checks, tests, reviews, commits and pushes, which can take many
+minutes, and what it prints when it exits is your next instruction: act on
+that one the same way, until one says `done`. Never poll it, and never start
+anything else to wait with. One that ends having printed nothing at all was
+killed: start that exact command again — an answer is taken once, and a
+repeat prints what is owed.
 
-The operator can talk to you while the waiter runs: answer them, and leave
-it running. When an instruction has waited past its threshold they are
-told, and may ask whether your waiter is running — check, and start it
-again if it is not.
+The operator can talk to you while it runs: answer them, and leave it
+running. `dabbler status` says which instruction is owed, and for how long.
 
-Outside VS Code the operator types both starts: `dabbler session start
+Outside VS Code the operator types the start: `dabbler session start
 --sessions-dir docs/sessions --engine <engine> --provider <provider>` (a
-seat adds `--model`), then `dabbler session run --mailbox --sessions-dir
-docs/sessions` in a terminal of its own.
+seat adds `--model`). `dabbler session run --mailbox` is the older loop, a
+fallback a person starts by hand; what it refuses says what to run under it.
 
 ## What comes back
 
@@ -284,9 +283,9 @@ Four kinds of instruction, and no fifth:
   and the answer owed is the one you already owed.
 - **`done`** — the session is over and closed. Stop.
 
-**A waiter that exits printing no instruction said why on stderr**: no
-loop is driving, and nothing will write an instruction until somebody
-acts. Do not re-arm it — stop, and tell the operator what it printed.
+**An answer command that prints no instruction and says why on stderr** was
+refused or met a stop, and repeating it moves nothing. Read what it said: a
+refusal you can fix is answered again; a stop is *When the framework stops*.
 
 Everything the framework does for itself happens between instructions:
 declaring the work, each step's own checks, cross-provider verification and
@@ -303,7 +302,7 @@ new public method gets a test there, a changed one has its tests updated.
 **The framework owns the clock, the state and the sequencing.** An
 instruction that names a command is answered by running that command —
 never by watching `run.json` or any other record for what the framework
-will do next. The waiter is the one thing you wait on.
+will do next. The answer command you started is the one thing you wait on.
 
 **A session's release follows `dabbler.release`**, and the framework publishes
 between the push and the close for itself. On request, the default, a plan

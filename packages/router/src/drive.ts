@@ -155,11 +155,14 @@ import {
   declare,
   liveLoopSession,
   extractSpecExcerpt,
+  lastSessionDone,
+  report,
   start,
   acquireLockWithTimeout,
   releaseLock,
   reviewingVehicleRefusal,
   type DeclareRefusalCause,
+  type ReportCliOptions,
 } from "./session.ts";
 import { resolveSessionOrchestratorIdentity } from "./identity.ts";
 import {
@@ -1887,10 +1890,16 @@ class Driver {
 
   // --- the conversation ------------------------------------------------------
 
-  /** The answer command, rendered for the seq an instruction is issued under. */
+  /**
+   * The answer command, rendered for the seq an instruction is issued under.
+   *
+   * Under the pull it chains: nobody drives between the engine's calls, so
+   * the answer is also the request for what follows, and an engine that
+   * answers has nothing left to remember. A loop reads the answer itself.
+   */
   private answerCommand(kind: "step" | "file", stepId?: string): (seq: number) => string {
     return (seq) => {
-      const head = `dabbler session report --sessions-dir ${this.sessionsDir} --seq ${seq}`;
+      const head = `dabbler session report --sessions-dir ${this.sessionsDir} --seq ${seq}${this.pull ? " --next" : ""}`;
       if (kind === "file") return `${head} --answer-file <path to the JSON you wrote>`;
       return (
         `${head} --step ${stepId} --status done ` +
@@ -2050,10 +2059,19 @@ class Driver {
     return EXIT_BOUNDARY;
   }
 
-  /** Read at every point past which the loop would act on the session's behalf. */
+  /**
+   * Read at every point past which the loop would act on the session's behalf.
+   *
+   * The lease is read with the ledger: two chained answers can be alive at
+   * once -- a repeated command beside the one it repeats -- and the one that
+   * no longer holds the lease stands down here, before the add, the commit,
+   * the push or the close, rather than at its next save after one.
+   */
   private refuseIfEnded(): void {
     const ended = this.endedUnderneath();
     if (ended !== null) throw ended;
+    const lost = this.leaseLostUnderneath();
+    if (lost !== null) throw lost;
   }
 
   /**
@@ -4401,8 +4419,42 @@ export async function sessionNext(sessionsDir: string, options: NextOptions): Pr
       },
     ),
   );
-  if (instruction !== null) writeOut(`${JSON.stringify(instruction, null, 2)}\n`);
+  if (instruction !== null) {
+    writeOut(`${JSON.stringify(instruction, null, 2)}\n`);
+    // Printed to the engine that asked is delivered: the same stamp a waiter
+    // makes as it hands one over, so an instruction this call printed is not
+    // read afterwards as one nothing has received.
+    const delivered = (instruction as DriverInstruction).session_number;
+    const repoRoot = repoRootFor(sessionsDir);
+    if (delivered > 0 && repoRoot !== null) beatWaiter(repoRoot, delivered);
+  }
   return code;
+}
+
+/**
+ * `session report --next`: the answer, and then whatever follows it.
+ *
+ * The report is the ordinary one, with its confirmation on stderr, and
+ * nothing advances unless it was taken. What follows is `sessionNext` itself
+ * with no bound on the wait inside the call: the engine started this as a
+ * background command and is free meanwhile, so the call stays open across
+ * every job the framework runs and hands back an instruction somebody can
+ * act on, never the `wait` a bounded call returns. No process is left behind
+ * it: once the instruction is printed this one exits, and a command repeated
+ * after its process died re-enters the same phases from the record.
+ */
+export async function reportAndNext(sessionsDir: string, options: ReportCliOptions): Promise<number> {
+  const reported = await divertOut(async () => report(sessionsDir, { ...options, chained: true }));
+  if (reported !== EXIT_OK) return reported;
+  if (typeof readSessionState(sessionsDir)?.["currentSession"] !== "number") {
+    // The last answer of a session, repeated after it ended: told that
+    // session's own `done` again. The idle instruction names `session start`,
+    // and a reader that follows instructions would begin the next session.
+    const ended = lastSessionDone(sessionsDir) ?? waiterIdleInstruction(nowIso());
+    writeOut(`${JSON.stringify(ended, null, 2)}\n`);
+    return EXIT_OK;
+  }
+  return sessionNext(sessionsDir, { waitInCallMs: Number.POSITIVE_INFINITY });
 }
 
 // --- wait: the AI's side of the mailbox ------------------------------------------
@@ -4497,13 +4549,13 @@ export function noLoopMessage(
   const restart = `dabbler session run --mailbox --sessions-dir ${sessionsDir}`;
   const stop = run?.stop ?? null;
   if (stop === null) {
-    return `${opening}Tell the operator; Resume Session starts it, or in a terminal of its own: ${restart}\n`;
+    return `${opening}Tell the operator; in a terminal of its own: ${restart}\n`;
   }
   const words = renderStop(stop, { session_number: sessionNumber, phase: run!.phase, engine: run!.engine });
   return (
     `${opening}${words.headline}. ${words.happened}\n` +
     "Tell the operator. The ways on:\n" +
-    `  - Resume Session in VS Code, or in a terminal of its own: ${restart}\n` +
+    `  - In a terminal of its own: ${restart}\n` +
     `    The loop starts again from phase '${run!.phase}'.` +
     `${words.ways}\n`
   );

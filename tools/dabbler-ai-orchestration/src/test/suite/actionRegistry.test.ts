@@ -154,11 +154,10 @@ suite("ActionRegistry: session actions", () => {
     assert.ok(!ids.includes("dabblerSessionSets.cancel"));
   });
 
-  test("Resume Session is withheld at the engine's stop only while its loop beats", () => {
-    // A live loop hands the engine's stop back to the engine, and a click
-    // would be a second driver on it. A stop ends the loop, though, and
-    // with no heartbeat nothing drives: session 198 stopped with no button.
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "resume-"));
+  test("a session in flight offers Stop and Cancel and no Resume, whoever its stop is for", () => {
+    // Nothing waits for the AI, so there is no loop for a button to start
+    // again: carrying on is said to the AI, in its chat.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "no-resume-"));
     const offered = (stopActor?: "engine" | "operator" | "either") =>
       applicableSessionActions(
         makeRepository({
@@ -169,17 +168,10 @@ suite("ActionRegistry: session actions", () => {
         makeSession({ number: 2, status: "in-progress", ...(stopActor ? { stopActor } : {}) }),
       ).map((a) => a.id);
 
-    assert.ok(offered("engine").includes("dabblerSessionSets.resumeSession"));
-    const driver = path.join(root, ".dabbler", "runs", "s2", "driver");
-    fs.mkdirSync(driver, { recursive: true });
-    fs.writeFileSync(path.join(driver, "loop.json"), JSON.stringify({ at: new Date().toISOString() }));
-    assert.ok(!offered("engine").includes("dabblerSessionSets.resumeSession"));
-    // Where the stop is genuinely theirs, or nothing has stopped at all,
-    // the action is exactly where it was: this withholds a button in one
-    // state rather than removing an affordance.
-    assert.ok(offered("operator").includes("dabblerSessionSets.resumeSession"));
-    assert.ok(offered("either").includes("dabblerSessionSets.resumeSession"));
-    assert.ok(offered().includes("dabblerSessionSets.resumeSession"));
+    for (const actor of ["engine", "operator", "either", undefined] as const) {
+      assert.ok(!offered(actor).some((id) => /resume/i.test(id)), String(actor));
+      assert.ok(offered(actor).includes("dabblerSessionSets.stopSession"), String(actor));
+    }
     // And nothing else moves: cancelling a session is the person's verb
     // whatever the loop is doing.
     assert.ok(offered("engine").includes("dabblerSessionSets.cancel"));

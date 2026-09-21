@@ -52,16 +52,16 @@ describe("consultBrief", () => {
     assert.match(brief, /dabbler verify reopen/);
     assert.match(brief, /dabbler session plan amend/);
     assert.match(brief, /`dabbler session cancel --force` is the person's verb only/);
-    // A stop that is the operator's offers Resume.
+    // A stop that is the operator's says how a person carries it on: through the AI.
     writeRun(repo, 1, { ...RUN, stop: { kind: "verification", code: "cap-disputed", reason: "one dispute stands", at: "2026-08-31T12:30:00-04:00" } });
     const operators = consultBrief(sessionsDir, 1);
     assert.match(operators, /Stopped for: operator\./);
-    assert.match(operators, /Resume Session in Work Explorer to bring the AI back/);
-    // A stop that is the engine's to clear offers no Resume, as the menu does not.
+    assert.match(operators, /ask the AI working the session to run `dabbler session next`/);
+    // A stop that is the engine's to clear is cleared by its next answer.
     writeRun(repo, 1, { ...RUN, stop: { kind: "verification", code: "dispute-refused", reason: "over the inline cap", at: "2026-08-31T12:30:00-04:00" } });
     const engines = consultBrief(sessionsDir, 1);
-    assert.match(engines, /Resume Session is not offered/);
-    assert.doesNotMatch(engines, /Resume Session in Work Explorer/);
+    assert.match(engines, /clears this stop by answering again/);
+    assert.doesNotMatch(engines, /Resume Session|ask the AI working the session to run/);
   });
 
   it("permits plan edits only while no session is in progress", () => {

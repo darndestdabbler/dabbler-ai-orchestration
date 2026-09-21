@@ -199,19 +199,16 @@ describe("the in-process router", () => {
       engine: "claude-code",
       provider: "anthropic",
     });
-    // A session in flight cannot be cancelled without --force, and the verb
-    // says so; the router reports the verb's sentence, not one of its own.
-    const result = await router.session.cancel({
-      repoRoot: repo,
-      sessionsDir,
-      sessionNumber: 1,
-      reason: "changed my mind",
-    });
+    // A session already cancelled cannot be cancelled again, and the verb says
+    // so; the router reports the verb's sentence, not one of its own.
+    const cancelling = { repoRoot: repo, sessionsDir, sessionNumber: 1, reason: "changed my mind" };
+    assert.equal((await router.session.cancel(cancelling)).ok, true);
+    const result = await router.session.cancel(cancelling);
     assert.equal(result.ok, false);
     if (result.ok) return;
     assert.equal(result.outcome, "refused");
     assert.equal(result.exitCode, 3);
-    assert.match(result.message, /in flight|--force/);
+    assert.match(result.message, /already cancelled/);
   });
 
   it("bootstraps a project, which is the whole of first-run now", async () => {

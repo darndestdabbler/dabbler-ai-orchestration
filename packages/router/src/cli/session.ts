@@ -10,7 +10,7 @@
 // that parsed as nothing would do what nobody asked.
 
 import { shlexSplit } from "../checks.ts";
-import { WAIT_IN_CALL_MS, driveSession, runWholeSession, sessionNext, sessionWait } from "../drive.ts";
+import { WAIT_IN_CALL_MS, driveSession, reportAndNext, runWholeSession, sessionNext, sessionWait } from "../drive.ts";
 import {
   ENGINE_OUTPUT_MODES,
   type Engine,
@@ -111,12 +111,15 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  `done`.",
     "",
     "  Stdout carries one thing: the instruction, as driver-instruction JSON. Do what",
-    "  its `ask` says, run its `answer_command`, then call this again -- until it says",
-    "  `done`. A `wait` means the framework is running something long: leave it",
-    "  `retry_after_seconds`, read its `log` if you like, and call this again.",
+    "  its `ask` says and start its `answer_command` as a background command: it",
+    "  carries `--next`, so it stays open while the framework works and what it prints",
+    "  is the next instruction -- until one says `done`. This is called once. Called",
+    "  again while the framework runs something long it answers `wait`: leave it",
+    "  `retry_after_seconds`, read its `log` if you like, and call it again.",
   ],
   run: [
-    "  --mailbox                the AI answers from its own CLI: a background",
+    "  --mailbox                the older loop, kept as a fallback a person starts by",
+    "                           hand. The AI answers from its own CLI: a background",
     "                           `dabbler session wait` prints each instruction, and this",
     "                           loop waits for its report and runs everything between",
     "  --show-engine MODE       stream | quiet, for a registered built-in engine",
@@ -159,6 +162,10 @@ const OPTIONS: Record<string, readonly string[]> = {
   ],
   report: [
     "  --seq N                  required: the seq of the instruction being answered",
+    "  --next                   then stay open while the framework works, and print the",
+    "                           next instruction as JSON on stdout: run it as a background",
+    "                           command. Repeated after its process died, it answers",
+    "                           nothing twice and prints what is owed",
     "  a step report, when the instruction asked for one:",
     "  --step ID                the step id the instruction named",
     "  --status STATUS          done | blocked",
@@ -211,7 +218,8 @@ const OPTIONS: Record<string, readonly string[]> = {
   ],
   cancel: [
     "  --reason TEXT            required: why the session is being cancelled",
-    "  --force                  cancel a session that is in flight",
+    "  --force                  a person's form, refused to an engine; the session in",
+    "                           flight is cancelled by its number and a reason without it",
   ],
   restore: ["  --reason TEXT            required: why it is coming back"],
   migrate: ["  --from PATH              required: the legacy session-set directory"],
@@ -273,6 +281,7 @@ const SWITCHES = new Set([
   "--force",
   "--mailbox",
   "--merge-origin",
+  "--next",
   "--stop",
   "--undo-changes",
 ]);
@@ -688,6 +697,8 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(`dabbler session report: ${seq}\n`);
       return EXIT_USAGE;
     }
+    // Chained, the answer is also the request for what follows it.
+    const answer = switches.has("--next") ? reportAndNext : report;
     if (answerFile !== undefined) {
       const stepFlags = ["--step", "--status", "--files", "--notes", "--tests"].filter((flag) =>
         values.has(flag),
@@ -698,9 +709,9 @@ export async function sessionVerb(argv: string[]): Promise<number> {
         );
         return EXIT_USAGE;
       }
-      return report(sessionsDir, { seq: seq!, answerFile, sessionNumber });
+      return answer(sessionsDir, { seq: seq!, answerFile, sessionNumber });
     }
-    return report(sessionsDir, {
+    return answer(sessionsDir, {
       seq: seq!,
       stepId: values.get("--step")!,
       status: values.get("--status")!,

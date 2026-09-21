@@ -60,6 +60,19 @@ function drivenRepo(run: Record<string, unknown>, warned: string[] = []): {
   return { root, driver, written, terminal };
 }
 
+/** A second terminal over a repository one was already opened on: the tab closed, and opened again. */
+function reopened(root: string): { written: string[]; terminal: DabblerTerminal } {
+  const written: string[] = [];
+  const terminal = new DabblerTerminal({
+    repoRoot: root,
+    now: () => new Date(2026, 7, 31, 14, 30, 5),
+    pollMs: 60_000,
+    warn: () => undefined,
+  });
+  terminal.onDidWrite((text: string) => written.push(text));
+  return { written, terminal };
+}
+
 /**
  * Every phase this framework writes, from the schema that declares them.
  *
@@ -217,7 +230,7 @@ suite("the Dabbler terminal", () => {
     const said = written.filter((t) => plain(t).includes("14:30:05 uncollected"));
     assert.strictEqual(said.length, 1);
     assert.ok(plain(said[0]).includes("'verification' finished at 2026-08-31T14:05:00.000Z (exit 4)"));
-    assert.ok(plain(said[0]).includes("`dabbler session run --mailbox`"));
+    assert.ok(plain(said[0]).includes("`dabbler session next`"));
     assert.ok(!written.some((t) => plain(t).includes("14:30:05 working")));
     // Said once, not on every look.
     written.length = 0;
@@ -314,7 +327,7 @@ suite("the Dabbler terminal", () => {
     // Who acts, off the record rather than asserted in prose, and the
     // command that carries the first way on.
     assert.ok(spoken.includes("who=you"));
-    assert.ok(spoken.includes("dabbler session run --mailbox --max-invocations"));
+    assert.ok(spoken.includes("dabbler session run --max-invocations"));
     assert.ok(!spoken.includes("stopped kind"));
     assert.ok(!spoken.includes("rewritten"));
     assert.ok(!spoken.includes("engine:"));
@@ -345,7 +358,7 @@ suite("the Dabbler terminal", () => {
     const spoken = plain(written.join(""));
     assert.ok(spoken.includes("who=you"));
     assert.ok(spoken.includes("dabbler verify adjudicate"));
-    assert.ok(!spoken.includes("dabbler session run --mailbox"));
+    assert.ok(!spoken.includes("dabbler session next"));
 
     terminal.dispose();
     rmrf(root);
@@ -371,7 +384,7 @@ suite("the Dabbler terminal", () => {
     terminal.poll();
     const spoken = plain(written.join(""));
     for (const command of [
-      "dabbler session run --mailbox",
+      "dabbler session next",
       "dabbler configure --reviewer-model",
       "dabbler session cancel",
     ]) {
@@ -1538,9 +1551,9 @@ suite("the watcher", () => {
     terminal.poll();
     const said = written.filter((t) => plain(t).includes("instruction-overdue"));
     assert.strictEqual(said.length, 1);
-    assert.ok(plain(said[0]).includes("step=widget seq=4 outstanding=1860s waiter=may not be running"));
+    assert.ok(plain(said[0]).includes("step=widget seq=4 outstanding=1860s"));
     assert.strictEqual(warned.length, 1);
-    assert.match(warned[0], /step widget .*31 min.*session wait/);
+    assert.match(warned[0], /step widget .*owed an answer for 31 min.*ask the AI in its chat/);
 
     written.length = 0;
     terminal.poll();
@@ -1592,6 +1605,37 @@ suite("the watcher", () => {
     rmrf(root);
   });
 
+  test("closed and opened again, rebuilds where the session is from the record and owns nothing of it", () => {
+    // Nothing of the framework's runs between an instruction and its answer,
+    // so this terminal is the only thing on screen that knows the session:
+    // it has to be able to go away and come back without the session noticing.
+    const since = new Date(2026, 7, 31, 14, 27, 52).toISOString();
+    const owed = {
+      session_number: 62,
+      phase: "work",
+      job: null,
+      stop: null,
+      waiting: { owner: "author", for: "step 4", since, by: null, last_progress: since },
+    };
+    const first = drivenRepo(owed);
+    first.terminal.open();
+    first.terminal.poll();
+    const before = fs.readFileSync(path.join(first.driver, "run.json"), "utf8");
+    first.terminal.dispose();
+    // Closing it wrote nothing and ended nothing.
+    assert.strictEqual(fs.readFileSync(path.join(first.driver, "run.json"), "utf8"), before);
+
+    const again = reopened(first.root);
+    again.terminal.open();
+    again.terminal.poll();
+    const said = again.written.map(plain).join("\n");
+    // The phase, who owes what and for how long, all from the record.
+    assert.match(said, /work/);
+    assert.match(said, /Author owes step 4 — 2:1\d/);
+    again.terminal.dispose();
+    rmrf(first.root);
+  });
+
   test("says who the session is waiting on, once, and again when the AI picks it up", () => {
     // This terminal is where an operator watches a session run, and it
     // could say `working` and `waiting` without saying who owed anything
@@ -1614,7 +1658,7 @@ suite("the watcher", () => {
     const said = written.filter((t) => plain(t).includes("waiting-on"));
     assert.strictEqual(said.length, 1);
     assert.ok(plain(said[0]).includes("Author owes step 4"), plain(said[0]));
-    assert.ok(plain(said[0]).includes("no waiter has read it"), plain(said[0]));
+    assert.ok(plain(said[0]).includes("nothing has read it"), plain(said[0]));
 
     // The clock ticking is not news, so an unchanged record is quiet.
     written.length = 0;
@@ -1630,7 +1674,7 @@ suite("the watcher", () => {
     terminal.poll();
     const delivered = written.filter((t) => plain(t).includes("waiting-on"));
     assert.strictEqual(delivered.length, 1);
-    assert.ok(!plain(delivered[0]).includes("no waiter has read it"), plain(delivered[0]));
+    assert.ok(!plain(delivered[0]).includes("nothing has read it"), plain(delivered[0]));
 
     // A framework job names its deadline; a person's wait names them.
     written.length = 0;

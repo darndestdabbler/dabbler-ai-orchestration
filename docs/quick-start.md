@@ -118,23 +118,27 @@ ahead.
 
 ## 2b. Run it — the whole session, one command
 
-In VS Code, **Start Session** does 2 and 2b together. From a terminal:
+In VS Code, **Start Session** does 2 and opens your AI's CLI with the one
+sentence it needs. From a terminal, tell your AI to run:
 
 ```
-dabbler session run --mailbox
+dabbler session next --sessions-dir docs/sessions
 ```
 
-The framework's loop drives the session: it writes each instruction, sleeps
-out its own long work, and judges each answer as it arrives. Your AI, in
-its own chat, keeps `dabbler session wait` running in the background, does
-what each printed instruction says, answers with its `answer_command`, and
-runs the waiter again until it prints `done` — so the chat stays free for
-you the whole time. Without `--mailbox`, `session run` invokes the
-registered engine per instruction itself. Your whole vocabulary is
-**start, run, interact, cancel**: `dabbler session interrupt --reason
-"..."` talks to a running session, and `dabbler session cancel` is the way
-out. Everything else — instructions, reports, the waiter — is the
-machinery's conversation with the engine, not yours; you never type it.
+That prints the first instruction. From there every answer asks for what
+follows it: the AI does what an instruction says and starts its
+`answer_command` — a `dabbler session report ... --next` — as a background
+command, which stays open while the framework checks, tests, reviews,
+commits and pushes, and prints the next instruction when it exits, until
+one says `done`. The chat stays free for you the whole time, and no
+framework process sits waiting for the AI. `dabbler session run` without
+`--mailbox` invokes the registered engine per instruction itself, headless;
+with `--mailbox` it is the older long-lived loop, kept as a fallback you
+start by hand, under which the AI keeps `dabbler session wait` running
+instead. Your whole vocabulary is **start, interact, cancel**: `dabbler
+session interrupt --reason "..."` talks to a running session, and `dabbler
+session cancel` is the way out. Everything else — instructions and reports —
+is the machinery's conversation with the engine, not yours; you never type it.
 
 ## 3. Work the steps
 

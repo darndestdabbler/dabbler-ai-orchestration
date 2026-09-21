@@ -198,10 +198,10 @@ describe("the instruction files", () => {
     writeInstructionFiles(project, "acme-app");
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
     assert.match(agents, /`acme-app`/);
-    assert.match(agents, /dabbler session wait/);
+    assert.match(agents, /dabbler session next/);
     const claude = readFileSync(join(project, "CLAUDE.md"), "utf8");
     assert.match(claude, /@AGENTS\.md/);
-    assert.ok(!claude.includes("dabbler session wait"));
+    assert.ok(!claude.includes("dabbler session next"));
   });
 
   it("takes the retired Gemini fence out, deleting a file that held nothing else", () => {
@@ -228,7 +228,7 @@ describe("the instruction files", () => {
     const project = tempDir("bootstrap-");
     writeInstructionFiles(project, "acme-app");
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
-    assert.match(agents, /dabbler session wait/);
+    assert.match(agents, /dabbler session next/);
     for (const verb of [
       "session declare",
       "dabbler affected",
@@ -244,12 +244,12 @@ describe("the instruction files", () => {
     assert.match(agents, /never by hand/);
   });
 
-  it("names every kind the waiter prints, and what a waiter that prints none means", () => {
-    // The body said "three kinds and no fourth" while the waiter printed a
-    // fourth; it said a rejection is FIXED while a dispositions rejection
-    // says to change no file; and it said nothing about the waiter's
-    // no-loop exit, so an obedient AI re-armed it every minute over a
-    // session nothing was driving.
+  it("names every kind an answer prints, and what an answer command that prints none means", () => {
+    // The body said "three kinds and no fourth" while a fourth was printed;
+    // it said a rejection is FIXED while a dispositions rejection says to
+    // change no file; and it said nothing about a command that prints no
+    // instruction, so an obedient AI ran it again every minute over a session
+    // nothing was moving. Killed is the one case a repeat cures.
     const project = tempDir("bootstrap-");
     writeInstructionFiles(project, "acme-app");
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
@@ -258,8 +258,24 @@ describe("the instruction files", () => {
     }
     assert.ok(!agents.includes("Three kinds"), "the body still says three kinds");
     assert.match(agents, /ANSWERED rather\s+than fixed/);
-    assert.match(agents, /exits printing no instruction/);
-    assert.match(agents, /tell the operator what\s+it printed/);
+    assert.match(agents, /prints no instruction and says why on stderr/);
+    assert.match(agents, /repeating it moves nothing/);
+    assert.match(agents, /printed nothing at all was\s+killed: start that exact command again/);
+  });
+
+  it("asks for an instruction once, answers in the background, and leaves no waiter to re-arm", () => {
+    // The interactive AI never re-armed a one-shot waiter after its first
+    // answer, and the loop waited on it for hours. An answer that is also the
+    // request for what follows leaves nothing to remember.
+    const project = tempDir("bootstrap-");
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
+    assert.equal(agents.match(/dabbler session next/g)?.length, 1);
+    assert.match(agents, /`answer_command`[^.]*as a background\s+command/);
+    assert.match(agents, /what it prints when it exits is your next instruction/);
+    assert.doesNotMatch(agents, /session wait|waiter|Resume/);
+    // The older loop is named once, as what it is.
+    assert.match(agents, /`dabbler session run --mailbox` is the older loop, a\s+fallback a person starts by hand/);
   });
 
   it("says publishing is the framework's, and says which sessions it is true of", () => {
@@ -302,7 +318,7 @@ describe("the instruction files", () => {
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8").toLowerCase();
     assert.match(agents, /owns the clock/);
     assert.match(agents, /never by watching `run\.json`/);
-    assert.match(agents, /the waiter is the one thing you wait on/);
+    assert.match(agents, /the answer command you started is the one thing you wait on/);
   });
 
   it("gives each engine its own tail", () => {

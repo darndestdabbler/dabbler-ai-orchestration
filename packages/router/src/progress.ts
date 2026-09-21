@@ -1001,7 +1001,7 @@ export function renderWaiting(waiting: NonNullable<WaitingRecord>, now: number =
   // Whether the AI ever picked it up is the difference between an answer
   // being worked on and an instruction nothing has read, which is what the
   // second beta test could not say after six hours.
-  const unheard = waiting.waiter === false ? ", no waiter has read it" : "";
+  const unheard = waiting.waiter === false ? ", nothing has read it" : "";
   return `Author owes ${waiting.for}${elapsed === null ? "" : ` — ${elapsed}`}${unheard}`;
 }
 

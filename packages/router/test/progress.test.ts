@@ -274,7 +274,7 @@ describe("the source of a projection's sessions", () => {
       waiter: true,
     });
     assert.equal(author?.["owner"], "author");
-    assert.match(String(author?.["says"]), /^Author owes step 4 — 2:1\d, no waiter has read it$/);
+    assert.match(String(author?.["says"]), /^Author owes step 4 — 2:1\d, nothing has read it$/);
     assert.equal(author?.["waiter"], false);
 
     // The waiter stamps its beacon as it hands the instruction over, and
@@ -485,7 +485,7 @@ describe("the task rows", () => {
     assert.equal(finished?.["state"], "in flight");
     assert.match(String(finished?.["intent"]), /'run of record: unit' finished at 2026-08-31T12:05:00.000Z \(exit 0\)/);
     assert.match(String(finished?.["intent"]), /not been collected/);
-    assert.match(String(finished?.["intent"]), /`dabbler session run --mailbox`.*collects the result/s);
+    assert.match(String(finished?.["intent"]), /`dabbler session next`.*collects the result/s);
     assert.doesNotMatch(String(finished?.["intent"]), /working/);
   });
 

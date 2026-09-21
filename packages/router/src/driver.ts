@@ -1457,14 +1457,15 @@ export interface StopRendering {
 export const PULL_ENGINE = "cli";
 
 /**
- * The way on outside VS Code when the AI answers from its own CLI. Resume
- * Session is said first: the extension puts `dabbler` on PATH only in the
- * terminals it opens, so the command is the way on only where there is none.
+ * The way on when the AI answers from its own CLI: the pull it began with.
+ * It re-enters the phase the stop was in, and what it prints is the AI's next
+ * instruction -- so it is the AI that runs it, in the chat the person is
+ * already talking to. Nothing waits for it and there is no button for it.
  */
-const PULL_RESUME = "dabbler session run --mailbox";
+const PULL_RESUME = "dabbler session next";
 
-/** How a person carries a pulled run on: the button first, the command second. */
-const RESUME_SESSION = `click Resume Session in VS Code, or outside it run \`${PULL_RESUME}\``;
+/** How a person carries a pulled run on: by saying so, to the AI. */
+const RESUME_SESSION = `ask your AI to run \`${PULL_RESUME}\` in its chat`;
 
 /**
  * What a stop IS, per situation: the sentence that opens it, who acts, and
@@ -1493,7 +1494,7 @@ interface StopSituation {
 
 /** The pieces every situation's commands are spelled out of. */
 interface MoveParts {
-  /** `dabbler session run --mailbox` under the pull, `dabbler session drive` under the push. */
+  /** `dabbler session next` under the pull, `dabbler session drive` under the push. */
   readonly resume: string;
   /** The phase a resume re-enters. */
   readonly phase: string;
@@ -1505,10 +1506,10 @@ interface MoveParts {
 
 /**
  * Ending it, which is a way on from every stop a person owns and never the
- * first one. A stopped session is in flight, so the command carries --force
- * -- without it the verb refuses -- and names no session, because the one in
- * flight is the one it means. It is worded as the operator's because it is:
- * an engine that runs it is refused.
+ * first one. It names no session, because the one in flight is the one it
+ * means, and it carries --force because a stop is the person's to answer:
+ * that form is refused to an engine, which has its own -- the session's
+ * number and a reason -- for a session it is working and should not go on.
  */
 function cancelChoice(): StopChoice {
   return {
@@ -1543,7 +1544,8 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "A decision to spend more: the invocations you name, and the " +
           "provider calls the phases still to run make. Nothing already " +
           "accepted is asked for again.",
-        command: `${parts.resume} --max-invocations <larger>`,
+        // The bound is on a run that invokes its engine, and `session next` invokes nobody.
+        command: `${parts.resume === PULL_RESUME ? "dabbler session run" : parts.resume} --max-invocations <larger>`,
       },
       cancelChoice(),
     ],
@@ -1788,11 +1790,11 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "verification round when that step is done.",
       ),
       {
-        label: "Where the loop has ended, Resume Session to start it again",
+        label: "Where nothing is driving it, have the AI ask again",
         cost:
-          "Nothing but the restart: the loop asks the engine for the " +
+          "Nothing but the call: the framework asks the engine for the " +
           "dispositions again, with the refusal as a reason.",
-        command: "dabbler session run --mailbox",
+        command: PULL_RESUME,
       },
       // No cancel: this stop is the engine's to clear, and ending a session is
       // never the engine's.
@@ -1913,20 +1915,20 @@ function actorFor(stop: StopRecord, run: StopContext): StopActor {
 function actorSentence(actor: StopActor, resume: string, resumable = true): string {
   const pull = resume === PULL_RESUME;
   if (actor === "operator") {
-    // Resume Session leads wherever carrying on is a way on; a stop whose
-    // moves do not include it (a disputed cap is adjudicated) says only who.
+    // Carrying on leads wherever it is a way on; a stop whose moves do not
+    // include it (a disputed cap is adjudicated) says only who.
     return pull && resumable ? `Next: you -- once it is put right, ${RESUME_SESSION}.` : "Next: you.";
   }
   if (actor === "engine") {
     return pull
       ? "Next: the engine -- this is its to clear, by answering again with it " +
-          `put right. If its loop has stopped, ${RESUME_SESSION}.`
+          `put right. If it has gone quiet, ${RESUME_SESSION}.`
       : "Next: the engine -- this is its to clear, and it clears it by calling " +
           `\`${resume}\` with the answer put right. If its loop has stopped, that ` +
           "call is yours to make.";
   }
   return pull
-    ? `Next: the engine if its loop is still running; otherwise you -- ${RESUME_SESSION}.`
+    ? `Next: the engine if it is still answering; otherwise you -- ${RESUME_SESSION}.`
     : `Next: whoever calls \`${resume}\` -- the engine if its loop is still running, otherwise you.`;
 }
 

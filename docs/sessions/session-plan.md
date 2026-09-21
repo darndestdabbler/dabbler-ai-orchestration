@@ -13790,6 +13790,24 @@ Never copy provider credentials into an artifact or log.
   test, or package process remains after close or cancellation.
 - The Dabbler Terminal accurately shows current phase and progress and can be
   reconstructed from persisted records.
+- **The Dabbler Terminal says every framework line one way** (operator,
+  2026-09-20, watching session 218). Its own lines read `20:02:12 event
+  key=value`; the router's lines it replays from a job's log -- and from the
+  fallback loop's `loop.log` -- arrive as the router printed them, `dabbler
+  [20:02:12] event key=value`, so one scrollback holds both and a step or a
+  phase is drawn two ways depending on who said it. The cause is one place:
+  `drainFile` in `dabblerTerminal.ts` hands replayed bytes to `forTerminal`,
+  which paints marks and reformats nothing. The fix is there and nowhere
+  else: a replayed line that is the router's own (`dabbler [hh:mm:ss] event
+  ...`) is drawn through the same `render` the terminal's own lines use --
+  the bare clock, the event in its tone, `key=` muted -- so a step and a phase
+  look the same whoever wrote them; every other byte of a log is left as it
+  is. The router's output and the log files on disk do not change: a person
+  reading `close.log` or a CLI's stderr still sees who is speaking. One test
+  in `dabblerTerminal.test.ts`: a job log holding a router line and a plain
+  line is replayed with the first in the terminal's form and the second
+  untouched. The installed walk's terminal capture is read for it: no line
+  of it begins `dabbler [`.
 - The recovery run has one accepted sequence, reviewer invocation, package,
   commit, and push where one is expected.
 - The installed artifact passes the targeted tests and the full suite, and

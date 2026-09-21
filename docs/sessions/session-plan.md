@@ -14346,3 +14346,50 @@ reachable.
 
 **Hold.** `hold_release`: it rides in the 3.18.0 the operator is walking;
 nothing is tagged until they say so.
+
+### Session 228 of 228: A machine's default model belongs to its default engine
+
+Scope: `packages/router` -- `cli/configure.ts`'s seeding, `session.ts`'s
+start refusal, their tests, the walk page and the changelog
+
+**Why.** The operator, 2026-09-21: *my machine default for Authoring AI is
+claude code, but my machine default for model is gpt-5.6-luna.* Session 224
+seeds each choice onto a machine that holds none of it, one choice at a time.
+This machine already held an engine, Claude Code, and held no authoring
+model; the first model configured afterwards was a Copilot repository's, so
+it became the default beside an engine that cannot run it. A repository
+opened for the first time falls back to the pair. Measured against the
+3.18.0 build: the pane's row announces it and `session start` refuses it
+before anything is billed -- and the refusal says the model *was chosen in
+this checkout's `.vscode/settings.json`*, a file that repository does not
+have. The operator's bar: a conflict is caught and said before a session
+runs. It is caught; it is said wrongly, and the framework made the conflict
+itself.
+
+**Step 1 -- the refusal names where the model was chosen.** The authoring
+model's refusal at `session start` reads the layer from the reading it
+already judges by (`selectedBy`), as the two reviewers' refusals do: this
+call, this checkout's settings, or the machine's default. For the machine's
+default it names both ways on: `dabbler configure --authoring-model <id>`
+gives this repository its own, and `--mine` changes the default.
+
+**Step 2 -- a model is seeded only beside its own engine.** `configure`
+makes a checkout's authoring model the machine's default, where the machine
+has none, only if the machine's default engine -- as this call leaves it --
+is the engine this repository runs. Otherwise the checkout is written, the
+machine is left alone, and the output says why in one line. `--mine` is a
+person's own act and is not second-guessed: the row and the start say what
+it made.
+
+**Step 3 -- the pages.** The walk page's first check and the 3.18.0
+changelog section say what a first repository seeds.
+
+One test per behaviour, in the file named after what changed.
+
+**Non-goals.** No repair of a `preferences.json` that already holds a
+mismatched pair: it is a person's file, and *Keep as Machine Default* on the
+model row of a repository that runs the default engine replaces it in one
+click. No change to what an unset row shows. No refusal of `--mine`.
+
+**Hold.** `hold_release`: it rides in the 3.18.0 the operator is walking;
+nothing is tagged until they say so.

@@ -12145,6 +12145,14 @@
       "what": "step 'terminal-draws-results': its files",
       "reason": "the terminal reads the event names from the router's own export rather than spelling them twice",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 222,
+      "dateTime": "2026-09-21T03:46:55.265000-04:00",
+      "task": "The Dabbler Terminal's first look at a run marks every job log already on disk as read up to its current size -- an earlier job is named, not replayed -- and does so to the RUNNING job's log too, so a terminal opened, reopened or reloaded while a job runs drops what the job had written so far; the operator saw seven lines of a 9 KB Maven log, the first starting mid-word. In `sayEarlier`, the log of the job the run record is carrying starts at its first byte; every other log keeps today's rule. One test, failing today, holds it. A patch-sized fix that rides in the unpublished 3.17.0; this session publishes nothing.",
+      "releasable": false,
+      "holdReason": "It rides in the 3.17.0 the operator is walking as a local VSIX; nothing is tagged until they say so."
     }
   ]
 }

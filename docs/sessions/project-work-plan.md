@@ -259,6 +259,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 219 | Prove the installed conversation before the four soaks | yes | 2026-09-20 |
 | 220 | What 219 left owed | no | 2026-09-21 |
 | 221 | A suite's results read as one line a project | no | 2026-09-21 |
+| 222 | A running job's output is shown from its first byte | no | 2026-09-21 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2899,3 +2900,9 @@ Make a suite's run of record read as one line a test project for `dotnet test` a
 
 - 2026-09-21 — step 'suite-output-readers': its files: a new module is declared in the boundary file, which the lint check holds (claude-code (anthropic, claude-opus-5))
 - 2026-09-21 — step 'terminal-draws-results': its files: the terminal reads the event names from the router's own export rather than spelling them twice (claude-code (anthropic, claude-opus-5))
+
+### Session 222 — A running job's output is shown from its first byte
+
+**Releasable: no — held: It rides in the 3.17.0 the operator is walking as a local VSIX; nothing is tagged until they say so..**
+
+The Dabbler Terminal's first look at a run marks every job log already on disk as read up to its current size -- an earlier job is named, not replayed -- and does so to the RUNNING job's log too, so a terminal opened, reopened or reloaded while a job runs drops what the job had written so far; the operator saw seven lines of a 9 KB Maven log, the first starting mid-word. In `sayEarlier`, the log of the job the run record is carrying starts at its first byte; every other log keeps today's rule. One test, failing today, holds it. A patch-sized fix that rides in the unpublished 3.17.0; this session publishes nothing.

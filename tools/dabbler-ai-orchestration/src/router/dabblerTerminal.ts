@@ -1873,7 +1873,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    * with its exit if the job's status file says one, and NOT replayed. Its
    * size is where reading starts, so only bytes a job writes from now on
    * pass through. The job the record is carrying is left to `job-started`,
-   * which says it in the present tense.
+   * which says it in the present tense, and its log is read from the start.
    *
    * Each line carries the record's own clock rather than the moment this
    * terminal happened to open: a verdict recorded at 21:06 is said at 21:06.
@@ -1909,7 +1909,10 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       } catch {
         continue;
       }
-      this.logOffsets.set(full, size);
+      // The job the record is carrying is the present, not history: what it
+      // has written so far is shown from its first byte, or a terminal opened
+      // while it runs starts in the middle of its output -- of a word, even.
+      this.logOffsets.set(full, full === current ? 0 : size);
       this.announced.add(full);
       const base = jobLabel(full);
       if (full === current) continue;

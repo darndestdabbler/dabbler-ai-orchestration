@@ -1153,6 +1153,41 @@ suite("the first look, and the rule between voices", () => {
     rmrf(root);
   });
 
+  test("shows a running job's output from its first byte when it is opened while the job runs", () => {
+    // Opened, reopened or reloaded mid-job: the operator saw seven lines of a
+    // 9 KB Maven log, the first starting in the middle of a word. An earlier
+    // job is history and is named; the job the record carries is the present.
+    const { root, driver, terminal, written } = drivenRepo({
+      session_number: 62,
+      phase: "run-of-record",
+      stop: null,
+      job: { name: "run of record: maven", log: ".dabbler/runs/s62/driver/jobs/run-of-record-maven.log" },
+    });
+    const jobs = path.join(driver, "jobs");
+    fs.writeFileSync(path.join(jobs, "verification.log"), "verify: round 1 -- VERIFIED\n", "utf8");
+    fs.writeFileSync(path.join(jobs, "verification.status.json"), JSON.stringify({ exit: 0 }), "utf8");
+    fs.writeFileSync(
+      path.join(jobs, "run-of-record-maven.log"),
+      "running maven: mvn -B verify\n[INFO] Scanning for projects...\n",
+      "utf8",
+    );
+    terminal.open();
+    terminal.poll();
+    fs.appendFileSync(path.join(jobs, "run-of-record-maven.log"), "[WARNING] Plugin validation issues were detected\n", "utf8");
+    terminal.poll();
+
+    const said = plain(written.join(""));
+    // What the job wrote before the terminal looked, and what it wrote after.
+    assert.match(said, /running maven: mvn -B verify\r?\n\[INFO\] Scanning for projects\.\.\./);
+    assert.match(said, /^\[WARNING\] Plugin validation issues were detected\r?$/m);
+    // The finished job before it is still named, and still not replayed.
+    assert.match(said, /earlier-job name=verification/);
+    assert.ok(!said.includes("verify: round 1 -- VERIFIED"), said);
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
   test("opens a session under its own banner, again when the next one starts, and at the width in hand", async () => {
     useTheme(vscode.ColorThemeKind.Dark);
     const root = makeTempDir("dabbler-banner-");

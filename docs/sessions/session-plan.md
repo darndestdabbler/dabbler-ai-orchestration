@@ -14021,3 +14021,57 @@ history cap, or to the router.
 
 **Hold.** `hold_release`: it rides in the 3.17.0 the operator is walking;
 nothing is tagged until they say so.
+
+### Session 223 of 223: A Maven release can start, and a job's output is one piece
+
+Scope: `packages/router/src/packaging.ts`, the Dabbler Terminal's `poll`, and
+their tests
+
+**Why.** Two things from the operator's csv-parser walk of 2026-09-21, both
+read from its record.
+
+*Session 4 was cancelled by its AI after its work had landed.* It was
+releasable; verification, the run of record, the commit and the push all
+passed; then the packaging run failed three times with `pack: exit null`, and
+the AI, which had run the same Maven command by hand and seen it work,
+cancelled. The record holds the cause and the stop did not say it: `[could
+not start: ENOENT: spawnSync mvn ENOENT]`. `runStep` in `packaging.ts` starts
+its command with a bare `spawnSync`, the one argv in the router that does not
+go through `spawnSyncProgram` -- which exists because on Windows `mvn`,
+`npm` and `gradle` are `.cmd` shims that no bare spawn can start. `dotnet` is
+an executable, so a .NET release never met it. Every releasing Maven session
+on Windows ends this way.
+
+*The operator took the Maven run's output to be seven lines.* It was all
+there, in two pieces. In one poll the terminal says `job-started`, drains the
+job's log under the job's divider, and only then says `working` -- a
+framework line, under the framework's divider -- so the next read of the same
+log is drawn under the job's divider AGAIN, and what a person sees at the
+bottom of the screen is that second divider with the tail of the output
+beneath it, starting wherever the first read ended: in the middle of a word.
+(Session 222 fixed a different, real way to lose a running job's output; it
+was not this one.)
+
+**Step 1 -- packaging starts its command the way every other argv is
+started.** `runStep` uses `spawnSyncProgram`, keeping its environment
+allowlist, timeout and output handling. One test in `packaging.test.ts`: a
+pack whose program is a batch shim on Windows (a `.cmd` written by the test;
+a shell script elsewhere) runs and records its exit code, where today it
+cannot start.
+
+**Step 2 -- a stop says why a packaging step could not run.** Where a
+step's exit is null the failure line carries the step's own output line
+(`could not start: ENOENT ...`, `timed out after ...`) rather than only
+`exit null`. One test beside step 1's.
+
+**Step 3 -- the terminal says `working` before it drains the job's log.**
+In `poll`, the activity line is said before `drainJobs`, so a job's output
+follows its own divider in one piece. One test in `dabblerTerminal.test.ts`:
+a job that writes between two polls is shown under ONE divider of its name.
+
+**Non-goals.** No change to who may cancel a session or to what a cancelled
+session with landed work is called; no change to the packaging gates, the
+environment allowlist, or what is published.
+
+**Hold.** `hold_release`: it rides in the 3.17.0 the operator is walking;
+nothing is tagged until they say so.

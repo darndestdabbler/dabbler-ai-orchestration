@@ -13834,3 +13834,61 @@ Terminal, interruption, and cancellation in plain language.
 **Releasable.** Yes, a minor. Publish only after both installed engine runs
 pass against the same candidate. That published artifact is the sole artifact
 the operator uses for all four soak tests.
+
+### Session 220 of 220: What 219 left owed
+
+Scope: `packages/router` (`jobs.ts`, `session.ts`, their tests) and
+`docs/design/messaging-poc/walk-vsix.cjs`
+
+**Why.** Session 219 closed with three things recorded and not fixed, and the
+operator asked (2026-09-21) that they be fixed in one short session rather
+than carried into more soaks. None of them stops a session; 3.16.0 is
+published, was walked as published on both engines, and is what the
+operator's developers install. This session changes no architecture and adds
+no surface.
+
+**Step 1 -- a job does not hold its caller's output.** Claude Code is told a
+background command has ended only when everything holding that command's
+output has exited. A framework job is a separate process and holds it, so an
+answer command killed under a suite is noticed when the suite ends -- 12 to
+41 s in the walks, the length of the suite in general. Measure first: one
+test in `jobs.test.ts` starts a process with piped output, has it start a
+detached job that outlives it through `spawnDetachedJob`, lets the process
+exit, and requires the pipe to reach its end within two seconds, not when the
+job ends. It fails today on Windows. Make it pass by the smallest means the
+measurement proves, in `spawnDetachedJob` and nowhere else; a job is still
+found by its status file, and nothing reads a job's pid that did not before.
+If no means within Node makes it pass on this host, report the step blocked
+with the measurement: no launcher service, no native module, no new process
+that outlives a session.
+
+**Step 2 -- `session interrupt` says what will happen to the message.**
+Under the chained exchange nothing ends an invocation: a message travels with
+the next instruction. The reply still says *the driver ends the running
+invocation and re-invokes the engine*, and once every step has been answered
+it says so about a message that may never be read, because the next
+instruction may be `done`. The reply says the truth in both cases: with a
+step still owed, that the message arrives with the next instruction; with
+every step answered, that it arrives only if the review raises an instruction
+and is otherwise never read, and that the AI's own chat is where to say it
+now. The fallback loop's wording stays for the fallback loop. One test per
+reply in `session.test.ts`; no exact-sentence assertions.
+
+**Step 3 -- the walk takes "which instruction" from the interrupt's own
+reply.** `walk-vsix.cjs` judged the course correction against the last
+instruction its poll had seen, and one run on the published package was void
+for it: the interrupt was filed against instruction 3, instruction 4 carried
+it, and the walk expected 3 to. It reads the number the framework's reply
+names and holds the instruction after that one to the case. The harness is
+not built, linted or tested with the repository; the void run's
+`walk.jsonl` is the specimen, and the judgment is a function that can be run
+against it.
+
+**Non-goals.** No walk of a new candidate, no soak, no change to the managed
+instruction body, no re-checkout of this machine's CRLF working files (a
+person's call; see `STATUS.md`).
+
+**Hold.** `hold_release`: 3.16.0 is the package that was walked as published
+and the one the operator's developers install on 2026-09-21; these three
+fixes ride in the next release rather than replacing it, unwalked, the same
+morning.

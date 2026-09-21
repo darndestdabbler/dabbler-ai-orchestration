@@ -4510,9 +4510,9 @@
     {
       "number": 227,
       "title": "Different models means the reviewing vehicle too",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-21T09:34:57.070000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-21T10:08:44.457000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

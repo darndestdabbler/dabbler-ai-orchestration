@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    // The router is a TypeScript source package: it declares `src/index.ts`
+    // as its types, so a consumer type-checks against the source and links
+    // against the bundle, and no generated declaration can go stale between
+    // them. The price is that this package's compiler options have to be
+    // able to READ that source — `import.meta` needs an ES module target,
+    // and `node:sqlite` needs the Node types the router is written against.
+    // Before the cutover the extension imported only types from the router's
+    // contract, which reach neither; now it imports the implementation.
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    // `noEmit`, because nothing consumes a tsc emit: `dist/extension.js`
+    // is esbuild's, the unit suite runs the sources through ts-node and
+    // Playwright runs its specs directly. It is also what
+    // `allowImportingTsExtensions` requires, and that is what lets this
+    // package read `dabbler-ai-router`'s types from its TypeScript
+    // source — the router is run by Node's own type stripping, so its
+    // imports carry the `.ts` extension ESM requires.
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  // The unit suite is mocha over `ts-node/register`, which is CommonJS: the
+  // stub it loads is a `.js` require hook and the specs are required, not
+  // imported. So ts-node compiles with CommonJS while `tsc --noEmit` checks
+  // with ESNext. That is not two configurations of one thing — it is the
+  // emit the test runner needs, stated where the runner reads it.
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs",
+      "moduleResolution": "node"
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", ".vscode-test"]
+}

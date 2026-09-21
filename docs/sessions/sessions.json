@@ -4363,9 +4363,9 @@
     {
       "number": 220,
       "title": "What 219 left owed",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-21T01:40:17.800000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-21T01:56:24.280000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

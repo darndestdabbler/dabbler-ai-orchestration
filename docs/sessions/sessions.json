@@ -4426,9 +4426,9 @@
     {
       "number": 223,
       "title": "A Maven release can start, and a job's output is one piece",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-21T04:03:29.299000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-21T04:11:37.130000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -44,6 +44,13 @@ Expect:
 - `dabbler configuration explain`, run in A, prints
   `decides: .vscode\settings.json (dabbler.reviewerModel) = <the model>`.
 
+What a first repository seeds: a choice made here also becomes the machine's
+default **where the machine had none**. One exception: an authoring model
+becomes the default only if the machine's default engine is the engine this
+repository runs — a Copilot repository's model is never made the default of a
+machine whose default engine is Claude Code. `dabbler configure`, typed in a
+terminal, says which happened.
+
 ## Check 2 — the other window is not changed (rule 6)
 
 **You —** look at B's *Primary Reviewer* Model row. Do not click anything.

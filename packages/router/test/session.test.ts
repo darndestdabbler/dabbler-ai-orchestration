@@ -677,6 +677,40 @@ describe("why a start cannot reach its reviewer, and only the ways forward that 
     }
   });
 
+  it("names where a refused authoring model was chosen: the machine's default, this checkout, or this call", () => {
+    // The operator's machine held Claude Code as its default engine and a
+    // Copilot model as its default model. A repository naming neither was
+    // refused -- and sent to its own settings file, which it does not have.
+    const { root, restore } = checkout(TRANSPORT_API, ["DABBLER_ANTHROPIC_API_KEY", "DABBLER_OPENAI_API_KEY"]);
+    try {
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic", "openai"] },
+        models: [row("claude-opus-5", "anthropic"), row("gpt-5.6-terra", "openai")],
+        retired: [],
+      });
+      writePreferences({ authoringModel: "gpt-5.6-luna" });
+      const machine = String(configuredModelRefusal(root, "gpt-5.6-luna", "claude-code"));
+      assert.match(machine, /preferences\.json/);
+      assert.match(machine, /--mine/);
+      assert.doesNotMatch(machine, /settings\.json/);
+      // The same model in this checkout's own file is this checkout's.
+      mkdirSync(join(root, ".vscode"), { recursive: true });
+      writeFileSync(join(root, ".vscode", "settings.json"), JSON.stringify({ "dabbler.authoringModel": "gpt-5.6-sol" }));
+      const here = String(configuredModelRefusal(root, "gpt-5.6-sol", "claude-code"));
+      assert.match(here, /settings\.json/);
+      assert.doesNotMatch(here, /preferences\.json/);
+      // One no saved layer holds was typed on this call.
+      const typed = String(configuredModelRefusal(root, "gpt-5.6-typed", "claude-code"));
+      assert.match(typed, /--model/);
+      assert.doesNotMatch(typed, /settings\.json|preferences\.json/);
+    } finally {
+      writePreferences({ authoringModel: "" });
+      restore();
+    }
+  });
+
   it("judges a start on the reviewing vehicle IT names, whose list is where its reviewers were chosen from", () => {
     // The reviewers a session is started with are picked from a vehicle's
     // list. Judged on the repository's saved vehicle instead, a reviewer only

@@ -41,6 +41,7 @@ import { GEMINI_RETIRED, engineAliases, installedEngines } from "./engines.ts";
 import { currentCatalogPath } from "./catalog.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
 import {
+  AUTHORING_MODEL_SOURCE_PREFERENCES,
   TRANSPORT_API,
   TRANSPORT_COPILOT_CLI,
   REVIEWING_TRANSPORT_KEY,
@@ -1081,16 +1082,30 @@ export function configuredModelRefusal(
   // catalog that moved after the session began.
   // A name the engine's CLI always accepts is never held to the catalog's
   // list: `sonnet` is not an enumerated id, and `claude` takes it anyway.
+  //
+  // Where it was chosen is the saved layer that holds this very model, and
+  // this call where none does. Said as "this checkout's settings, or on this
+  // call" for all three, it sent a person whose repository names no model to
+  // a file that repository does not have.
+  const saved = explainAuthoringModel(null, checkout);
+  const savedHere = saved.transport !== "" && saved.transport === (authoringModel ?? "").trim();
+  const [chosenIn, changedBy] = !savedHere
+    ? ["`--model` on this call", "naming another with `--model <id>`"]
+    : saved.decidedBy === AUTHORING_MODEL_SOURCE_PREFERENCES
+      ? [
+          "`preferences.json` (`authoring_model`), this machine's default, which applies here because this " +
+            "repository names none",
+          "`dabbler configure --authoring-model <id>` for this repository alone, or the same with `--mine` for " +
+            "the default itself,",
+        ]
+      : [
+          "this checkout's `.vscode/settings.json` (`dabbler.authoringModel`)",
+          "`dabbler configure --authoring-model <id>`",
+        ];
   const authoringRefusal =
     authoring?.["declaredAtStart"] === true || engineAliases(engine).includes(authoringModel ?? "")
       ? null
-      : held(
-          authoring,
-          authoringModel,
-          "The authoring model",
-          "this checkout's `.vscode/settings.json` (`dabbler.authoringModel`), or on this call",
-          "`dabbler configure --authoring-model <id>`",
-        );
+      : held(authoring, authoringModel, "The authoring model", chosenIn, changedBy);
   if (authoringRefusal !== null) return authoringRefusal;
   // Each reviewing role against ITS OWN list, on the shared reviewing
   // vehicle. `selected` is what a person chose and is the only thing held to

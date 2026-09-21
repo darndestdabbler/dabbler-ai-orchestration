@@ -30,7 +30,12 @@ different vendors had no reviewer both could start under.
 - **The machine's default is what a repository falls back to.** A repository
   opened for the first time uses it. The first choice you make anywhere
   becomes the machine's default where the machine had none; after that a
-  repository's choice leaves the default alone.
+  repository's choice leaves the default alone. An authoring model becomes
+  the default only beside the engine that runs it: a Copilot repository's
+  model is not made the default of a machine whose default engine is Claude
+  Code. Where a default cannot run — a model the engine in force does not
+  list — the row says so, and Start refuses before anything is billed, naming
+  the machine's default as where it was chosen.
 - **Start Session asks nothing.** It starts with the engine and model this
   repository's Configuration shows. Where the Configuration names no engine —
   or a Copilot seat and no model — it starts nothing, says which row needs a

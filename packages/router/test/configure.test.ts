@@ -24,6 +24,7 @@ import { configurationNode } from "../src/projection.ts";
 import { ROLE_AUXILIARY_REVIEWER, ROLE_PRIMARY_REVIEWER } from "../src/selection.ts";
 import {
   SETTING_AUXILIARY_MODEL,
+  SETTING_AUTHORING_MODEL,
   SETTING_ENGINE,
   SETTING_REVIEWER_MODEL,
   SETTING_REVIEWER_TRANSPORT,
@@ -207,6 +208,31 @@ describe("where a choice made with configure is kept", () => {
       assert.equal(settingValue(first, SETTING_REVIEWER_MODEL), "gpt-5.6-sol");
       assert.equal(readPreferences().selected?.[ROLE_PRIMARY_REVIEWER], "gpt-5.6-sol");
       assert.ok(!own.changed.some((line) => /this machine's default too/.test(line)), own.changed.join("\n"));
+    } finally {
+      restore();
+    }
+  });
+
+  it("makes an authoring model the machine's default only beside the engine that runs it", () => {
+    // The operator's machine: Claude Code as its default engine, and then a
+    // Copilot repository's model seeded beside it as its default model.
+    const restore = machine();
+    try {
+      const copilot = tempDir("configure-other-engine-");
+      const claude = tempDir("configure-same-engine-");
+      writePreferences({ engine: "claude-code" });
+      writeSettings(copilot, { [SETTING_TRANSPORT]: TRANSPORT_SEAT, [SETTING_ENGINE]: "copilot" });
+      writeSettings(claude, { [SETTING_TRANSPORT]: TRANSPORT_API });
+
+      const other = configure({ repoRoot: copilot, authoringModel: "gpt-5.6-sol" });
+      assert.equal(other.refusal, null);
+      assert.equal(settingValue(copilot, SETTING_AUTHORING_MODEL), "gpt-5.6-sol");
+      assert.equal(readPreferences().authoring_model, undefined);
+      assert.ok(other.changed.some((line) => /only beside the engine/.test(line)), other.changed.join("\n"));
+
+      const same = configure({ repoRoot: claude, authoringModel: "claude-opus-5" });
+      assert.equal(same.refusal, null);
+      assert.equal(readPreferences().authoring_model, "claude-opus-5");
     } finally {
       restore();
     }

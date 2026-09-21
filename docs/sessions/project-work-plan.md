@@ -265,6 +265,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 225 | Start asks nothing, and the Configuration is this repository's | no | 2026-09-21 |
 | 226 | Different models means the reviewers too | no | 2026-09-21 |
 | 227 | Different models means the reviewing vehicle too | no | 2026-09-21 |
+| 228 | A machine's default model belongs to its default engine | no | 2026-09-21 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2957,3 +2958,13 @@ Start Session with Different Models... asks for the engine and the authoring mod
 **Releasable: no — held: It rides in the 3.18.0 the operator is walking as a local VSIX; nothing is tagged until they say so..**
 
 Start Session with Different Models... asks for the engine, its model and both reviewers and not for the reviewing vehicle, which session 226 wrote down as a non-goal on the author's own call; the operator asked why. Their rule 3 said vehicles and models, the reviewing vehicle is the second vehicle, and it is not separable from 226: the reviewer lists the command offers are what the reviewing vehicle lists, so a session that should be reviewed over the seat rather than the direct API is offered the wrong models. `dabbler session start --reviewer-transport <vehicle>` records the vehicle on the session's own ledger row and writes no setting; `explainReviewingTransport` reads it from the configuration it is given, above every saved layer and beneath an actual flag on the call; the start's check, a round's dispatch and a round's grant each read a configuration stamped from the session's row; and the command asks for it after the authoring model and BEFORE the reviewers, whose lists are then that vehicle's. Start Session itself still asks nothing. It rides in the unpublished 3.18.0; nothing is published by this session.
+
+### Session 228 — A machine's default model belongs to its default engine
+
+**Releasable: no — held: It rides in the 3.18.0 the operator is walking as a local VSIX; nothing is tagged until they say so..**
+
+The operator found their machine's default engine is Claude Code while its default authoring model is gpt-5.6-luna. Session 224 seeds each choice onto a machine that holds none of it, one at a time, so a Copilot repository's model became the default beside an engine that cannot run it, and a repository opened for the first time falls back to the pair. Measured on the 3.18.0 build: the pane's row announces it and `session start` refuses it before anything is billed, but the refusal says the model was chosen in this checkout's `.vscode/settings.json`, a file that repository does not have. The refusal names the layer the reading already carries (`selectedBy`), and `configure` seeds a checkout's authoring model as the machine's default only where the machine's default engine, as the call leaves it, is the engine this repository runs. It rides in the unpublished 3.18.0; nothing is published by this session.
+
+**Amended after acceptance:**
+
+- 2026-09-21 — step 'the-pages': its files: The changelog is the extension's, tools/dabbler-ai-orchestration/CHANGELOG.md; the plan named a path that does not exist (claude-code (anthropic, claude-opus-5))

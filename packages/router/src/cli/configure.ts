@@ -52,6 +52,7 @@ import {
   VALID_TRANSPORTS,
   explainReviewingTransport,
   explainAuthoringModel,
+  explainEngine,
   explainRoleModel,
   explainTransport,
   loadConfig,
@@ -669,6 +670,17 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   const personal: Record<string, string> = {};
   const roles: Array<readonly [string, string]> = [];
   const seeded: string[] = [];
+  // **A model is a default only beside the engine that runs it.** Seeded one
+  // choice at a time, a machine whose default engine was Claude Code took a
+  // Copilot repository"s model as its default model, and every repository
+  // opened afterwards fell back to a pair no session could start on.
+  let unseededModel: string | null = null;
+  const besideItsEngine = (): boolean => {
+    const stated = options.engine?.trim() ?? "";
+    const machine = machineHolds(held, "engine") ?? (stated === "" ? null : stated);
+    const here = stated === "" ? explainEngine(null, options.repoRoot).transport : stated;
+    return machine !== null && machine === here;
+  };
   const settle = (key: ChoiceKey, value: string): void => {
     const role = ROLE_OF_CHOICE[key];
     const keepOnMachine = (): void => {
@@ -677,13 +689,15 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     };
     if (options.mine === true) return keepOnMachine();
     Object.assign(choice, { [key]: value });
-    if (value !== "" && machineHolds(held, key) === null) {
-      keepOnMachine();
-      seeded.push(key);
+    if (value === "" || machineHolds(held, key) !== null) return;
+    if (key === "authoringModel" && !besideItsEngine()) {
+      unseededModel = value;
+      return;
     }
+    keepOnMachine();
+    seeded.push(key);
   };
   if (options.transport !== undefined) settle("transport", options.transport);
-  if (named["authoringModel"] !== undefined) settle("authoringModel", named["authoringModel"]);
   if (options.reviewerTransport !== undefined) {
     settle("reviewerTransport", options.reviewerTransport);
   }
@@ -707,6 +721,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     };
   }
   if (engine !== undefined) settle("engine", engine);
+  if (named["authoringModel"] !== undefined) settle("authoringModel", named["authoringModel"]);
   // The id the catalog lists is what was checked and is what is written:
   // there is no second name for a model to be translated into on the way to
   // the file, which is the round trip `aliasFor` and `modelIdOf` existed for.
@@ -731,6 +746,12 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
           ? `${PREFERENCES_FILENAME} no longer carries your own ${WORDS[key]}`
           : `${PREFERENCES_FILENAME} keeps '${value}' as your own ${WORDS[key]}, ` +
             `which applies wherever a checkout names none`,
+    );
+  }
+  if (unseededModel !== null) {
+    preferenceLines.push(
+      `${PREFERENCES_FILENAME} names no ${WORDS["authoringModel"]} and still names none: '${unseededModel}' is a default only beside the ` +
+        "engine that runs it, and this machine's default engine is not this repository's. `--mine` makes it one anyway",
     );
   }
   if (named["reviewerModel"] !== undefined && named["reviewerModel"] !== "") {

@@ -166,6 +166,14 @@ inspection and none to be an empty list. The reads a cancellation is judged by
 fail the same way: git's failure is thrown, never read as "nothing there", and
 a packaging record that is there and cannot be read is an error.
 
+"The correction arrived on the next instruction" counts "next" from the
+instruction the framework's own reply to `session interrupt` names, never
+from the last one the walk's poll had seen: an engine that answers a step in
+seconds puts a new instruction between the two, and one run on a published
+package was void for it. `--self-test-interrupt` puts the judgment to that
+run's rows, to a run where nothing carried the message, and to a reply that
+names no instruction, and exits non-zero unless only the first is accepted.
+
 `--compare <a.vsix> <b.vsix>` says whether two packages hold the same files
 with the same bytes. Two builds of one tree never share a checksum -- a zip
 carries its own timestamps -- so this is how the package a release pipeline

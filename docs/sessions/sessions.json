@@ -4344,17 +4344,38 @@
       "title": "Prove the installed conversation before the four soaks",
       "status": "complete",
       "startedAt": "2026-09-20T20:20:33.726000-04:00",
+      "completedAt": "2026-09-21T00:56:44.023000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-opus-5",
         "identityProvenance": "direct"
       },
-      "frameworkVersion": "3.15.0",
-      "completedAt": "2026-09-21T00:56:44.023000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 6,
+        "verifierModel": "gpt-5.6-terra",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      },
+      "frameworkVersion": "3.15.0"
+    },
+    {
+      "number": 220,
+      "title": "What 219 left owed",
+      "status": "in-progress",
+      "startedAt": "2026-09-21T01:40:17.800000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "3.16.0",
+      "verification": {
+        "rounds": 1,
         "verifierModel": "gpt-5.6-terra",
         "verifierProvider": "openai",
         "transport": "copilot-cli"

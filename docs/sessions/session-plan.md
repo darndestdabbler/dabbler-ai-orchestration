@@ -13849,18 +13849,23 @@ no surface.
 
 **Step 1 -- a job does not hold its caller's output.** Claude Code is told a
 background command has ended only when everything holding that command's
-output has exited. A framework job is a separate process and holds it, so an
-answer command killed under a suite is noticed when the suite ends -- 12 to
-41 s in the walks, the length of the suite in general. Measure first: one
-test in `jobs.test.ts` starts a process with piped output, has it start a
-detached job that outlives it through `spawnDetachedJob`, lets the process
-exit, and requires the pipe to reach its end within two seconds, not when the
-job ends. It fails today on Windows. Make it pass by the smallest means the
-measurement proves, in `spawnDetachedJob` and nowhere else; a job is still
-found by its status file, and nothing reads a job's pid that did not before.
-If no means within Node makes it pass on this host, report the step blocked
-with the measurement: no launcher service, no native module, no new process
-that outlives a session.
+output has exited. Session 219 recorded that a framework job is one of the
+holders, so an answer command killed under a suite is noticed when the suite
+ends -- 12 to 41 s in the walks. **Measured before any change, that is not
+so.** On this Windows host, from Node directly and through Git Bash, a
+detached job started as `spawnDetachedJob` starts it let the pipe reach its
+end when its caller exited (1.5 s and 1.7 s), not when the 6-second job did.
+What does hold a pipe is a process left alive in the killed command's own
+chain: a shell killed alone left its child holding the output for that
+child's whole life. So `spawnDetachedJob` is not changed. One test in
+`walk-jobs.test.ts`, where the real detached jobs are walked, pins the
+property the chained exchange depends on: a process with piped output starts
+a job that outlives it and exits, and the pipe reaches its end within two
+seconds of that exit while the job still runs. The test fails against an
+inheriting spawn. The record is corrected where it said otherwise -- the
+acceptance report and `STATUS.md` -- and says what is left: why Claude Code
+repeated a killed command only as the suite ended is unproven, and no case
+failed for it.
 
 **Step 2 -- `session interrupt` says what will happen to the message.**
 Under the chained exchange nothing ends an invocation: a message travels with

@@ -15,10 +15,12 @@
 // child inherits -- and none of that is true of a function call. A stubbed
 // spawn would test the stub.
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { constants, getPriority, setPriority } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { pathToFileURL } from "node:url";
 
 import { JOB_PRIORITY_VAR, endJob, pollJob, startJob } from "../src/jobs.ts";
 import { tempDir } from "./support/answers.ts";
@@ -220,6 +222,60 @@ describe("one job, from start to collection", () => {
     // rest.
     assert.match(logged, /driven=1/);
     assert.ok(existsSync(join(repoRoot, job.status)));
+  });
+});
+
+describe("what a job shares with the process that started it", () => {
+  it("does not hold its caller's output open", async () => {
+    // An answer command's output is how an engine learns the command ended,
+    // and an engine is told only when every holder of that output is gone. A
+    // job outlives the command that started it by design, so it must not be
+    // one of them -- or a command killed under a suite is noticed when the
+    // suite ends.
+    const repoRoot = tempDir("jobs-");
+    const gate = join(repoRoot, "gate");
+    const caller = spawn(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        "const { startJob } = await import(process.argv[1]);" +
+          "const job = startJob(process.argv[2], 64, { name: 'the complete suite', retryAfterSeconds: 30," +
+          " argv: [process.execPath, '-e'," +
+          " \"const fs=require('node:fs');const wait=()=>(fs.existsSync(process.argv[1])?process.exit(0):setTimeout(wait,25));wait();\"," +
+          " process.argv[3]] });" +
+          "process.stdout.write(JSON.stringify(job));",
+        pathToFileURL(join(import.meta.dirname, "..", "src", "jobs.ts")).href,
+        repoRoot,
+        gate,
+      ],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+    let printed = "";
+    caller.stdout.on("data", (chunk: Buffer) => (printed += chunk.toString("utf8")));
+    // Both clocks are armed before either can fire: `close` is the child's
+    // exit AND the end of every stream it was given.
+    const exited = new Promise<number>((resolve) => caller.once("exit", () => resolve(Date.now())));
+    const closed = new Promise<number>((resolve, reject) => {
+      const giveUp = setTimeout(() => reject(new Error("the caller's output never reached its end")), 20_000);
+      caller.once("close", () => {
+        clearTimeout(giveUp);
+        resolve(Date.now());
+      });
+    });
+    // The gate opens however this ends: a job that DID hold the output would
+    // otherwise hold this test's own runner open with it.
+    let job: Parameters<typeof pollJob>[1] | null = null;
+    try {
+      const [exitedAt, closedAt] = await Promise.all([exited, closed]);
+      job = JSON.parse(printed) as Parameters<typeof pollJob>[1];
+      // The job is still running, so it was not the job's end that closed the output.
+      assert.deepEqual(pollJob(repoRoot, job), { state: "running" });
+      assert.ok(closedAt - exitedAt < 2_000, `the output stayed open ${closedAt - exitedAt} ms after its owner exited`);
+    } finally {
+      writeFileSync(gate, "", "utf8");
+      if (job !== null) await settle(repoRoot, job);
+    }
   });
 });
 

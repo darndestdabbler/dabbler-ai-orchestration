@@ -536,8 +536,12 @@ that is working from a script rather than reading your terminal:
 
 ```
 dabbler session interrupt --sessions-dir docs/sessions --reason "the release notes want the version bumped too"
-interrupt: requested for session 001 (instruction 3); the driver ends the running invocation and re-invokes the engine with the reason.
+interrupt: held for session 001 (instruction 3); nothing is ended, and it arrives first among the reasons of the next instruction.
 ```
+
+Sent once every step has been answered, it says that instead: the message
+arrives only if the review raises another instruction, and the AI's own chat
+is where to say it now.
 
 ```
 dabbler [11:31:29] interrupt-deferred reason=the release notes want the version bumped too why=no invocation was running; it travels with the next instruction

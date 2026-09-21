@@ -317,6 +317,21 @@ twenty-minute suite would go unnoticed for twenty minutes. The fix is small
 and is the router's — a job should not hold its parent's streams — and it was
 not made here: no case failed for it, and the soaks are where its cost in
 practice will show.
+
+**Corrected by session 220: the cause given above was not measured, and the
+measurement does not bear it out.** The timings stand — Claude Code repeated
+the killed command only as the suite ended. The explanation does not. On this
+host, from Node directly and through Git Bash, a detached job started exactly
+as the router starts one let its caller's output reach its end when the
+caller exited (1.5 s and 1.7 s) while the job ran on for six; a test in
+`walk-jobs.test.ts` now holds the router to that and fails against an
+inheriting spawn. What does hold an output open is a process left alive in
+the killed command's own chain — a shell killed alone left its child holding
+the pipe for the child's whole life. Whether that is what happened under
+Claude Code, whose command runs beneath a shell the walk did not kill, or
+whether Claude Code surfaces a finished background command only at some later
+moment of its own, is unproven. There is no router fix to make, and none was
+made.
 **What the harness got wrong, so nobody re-learns it.** Seven runs were void,
 or void in one reading, for the harness's own faults, and are kept beside
 the rest:

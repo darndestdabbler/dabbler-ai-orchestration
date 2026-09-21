@@ -115,6 +115,23 @@ if (process.argv.includes("--self-test-processes")) {
   process.exit(ok ? 0 : 1);
 }
 
+// --self-test-interrupt: the course-correction judgment, put to the run it once misjudged and to one
+// where the message never arrived.
+if (process.argv.includes("--self-test-interrupt")) {
+  const reason = "In your next step, begin src/greet.ts with the comment `// greetings are one line each`.";
+  const replied = "interrupt: requested for session 001 (instruction 3); the driver ends the running invocation and re-invokes the engine with the reason.";
+  const steps = (carrier) => [1, 2, 3, 4, 5].map((seq) => ({ seq, kind: seq === 5 ? "done" : "step", reasons: seq === carrier ? [`sent: ${reason}`] : null }));
+  const results = [
+    // `published-claude-main`: sent a second after instruction 3 was written, while the poll still held 2.
+    { name: "filed against 3 while the poll had seen 2, carried by 4", expect: true, ...courseCorrection({ reason, afterSeq: 2, said: replied }, steps(4)) },
+    { name: "filed against 3, carried by nothing", expect: false, ...courseCorrection({ reason, afterSeq: 2, said: replied }, steps(0)) },
+    { name: "a reply that names no instruction", expect: false, ...courseCorrection({ reason, afterSeq: 2, said: "interrupt: refused" }, steps(4)) },
+  ];
+  const ok = results.every((result) => result.reflected === result.expect);
+  process.stdout.write(`${JSON.stringify({ ok, results }, null, 2)}\n`);
+  process.exit(ok ? 0 : 1);
+}
+
 if (!arg("--scratch", "")) throw new Error("--scratch <folder> is required: the walk stages its repository under it");
 if (scenario !== "direct" && !fs.existsSync(VSIX)) throw new Error(`--vsix: no such file: ${VSIX}`);
 
@@ -511,6 +528,23 @@ function chainedExchanges() {
   return (glance("dabbler\\.cjs.*session\\s+report.*--next") ?? []).filter((p) => mine(p.command) && /^(code|node)(\.exe)?$/i.test(p.name));
 }
 
+/**
+ * Whether a course correction arrived on the next instruction. "Next" is counted from the instruction
+ * the FRAMEWORK says the interrupt was filed against -- its reply names it -- and never from the last
+ * one this walk's poll had seen: an engine that answers a step in seconds puts a new instruction
+ * between the two. A reply that names none judges nothing.
+ */
+function courseCorrection(interrupt, instructions) {
+  const named = /\(instruction (\d+)\)/.exec(interrupt.said ?? "");
+  const filedAgainst = named ? Number(named[1]) : null;
+  const next = filedAgainst === null ? null : instructions.find((seen) => seen.seq > filedAgainst) ?? null;
+  return {
+    filedAgainst,
+    nextInstruction: next ? { seq: next.seq, kind: next.kind, reasons: next.reasons } : null,
+    reflected: Boolean(next?.reasons?.some((reason) => reason.includes(interrupt.reason.slice(0, 30)))),
+  };
+}
+
 function driverDir() {
   const runs = path.join(REPO, ".dabbler", "runs");
   const numbers = (fs.existsSync(runs) ? fs.readdirSync(runs) : []).map((name) => /^s(\d+)$/.exec(name)).filter(Boolean).map((match) => Number(match[1]));
@@ -864,7 +898,7 @@ function summarize(outcome, startedAt) {
     const answer = heard ? rows.find((row) => row.kind === "ai-text" && Date.parse(row.at) >= Date.parse(heard.at)) : null;
     return { ...said, recordedByTheEngine: Boolean(heard), answer: answer ? answer.what.replace(/\s+/g, " ").slice(0, 240) : null };
   });
-  const afterInterrupt = state.interrupt ? state.instructions.find((seen) => seen.seq > state.interrupt.afterSeq) : null;
+  const corrected = state.interrupt ? courseCorrection(state.interrupt, state.instructions) : null;
   const dabblerAfter = fs.existsSync(path.join(OUT, "dabbler-after-reopen.txt")) ? fs.readFileSync(path.join(OUT, "dabbler-after-reopen.txt"), "utf8") : "";
   const dabblerEnd = fs.existsSync(path.join(OUT, "dabbler-end.txt")) ? fs.readFileSync(path.join(OUT, "dabbler-end.txt"), "utf8") : "";
   const actions = jsonl(WALK_LOG);
@@ -891,7 +925,7 @@ function summarize(outcome, startedAt) {
       all: shell.map((row) => `${row.kind === "ai-background" ? "[bg] " : ""}${row.what.replace(/\s+/g, " ").slice(0, 160)}`),
     },
     questions,
-    interrupt: state.interrupt ? { ...state.interrupt, nextInstruction: afterInterrupt ? { seq: afterInterrupt.seq, kind: afterInterrupt.kind, reasons: afterInterrupt.reasons } : null, reflected: Boolean(afterInterrupt?.reasons?.some((reason) => reason.includes(state.interrupt.reason.slice(0, 30)))) } : null,
+    interrupt: state.interrupt ? { ...state.interrupt, ...corrected } : null,
     // Rebuilt: the reopened terminal holds the session's banner, a phase line and who is waited on, from the record.
     reopen: state.reopen ? { ...state.reopen, rebuilt: /SESSION \d+/.test(dabblerAfter) && /\bphase\b/.test(dabblerAfter) && /waiting-on/.test(dabblerAfter) } : null,
     dabblerTerminal: {

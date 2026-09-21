@@ -2010,6 +2010,9 @@ export interface InterruptCliOptions {
   readonly stop?: boolean;
 }
 
+/** The phases in which a step's instruction is still to come, so a message has one to travel with. */
+const STEP_PHASES: ReadonlySet<string> = new Set(["plan", "work", "steps"]);
+
 /**
  * End the engine's running invocation under a driven session. The one path
  * for every interrupter -- a person at the keyboard, the extension's Stop,
@@ -2022,6 +2025,9 @@ export interface InterruptCliOptions {
  * Refused when nothing is being driven: no run, a run that completed, or
  * one that stopped -- an interrupt then has nothing to end, and a request
  * left lying would end the first invocation of the next re-run instead.
+ *
+ * Under the chained exchange no process holds the author, so nothing is
+ * ended: the request waits for the next instruction, and the reply says so.
  */
 export function interrupt(sessionsDir: string, options: InterruptCliOptions): number {
   if (!isDirectory(sessionsDir)) {
@@ -2065,9 +2071,20 @@ export function interrupt(sessionsDir: string, options: InterruptCliOptions): nu
   // wants to leave for the resume, and session 62 had no way to give it:
   // the engine was told to stop and nobody could tell it anything else.
   const waitsBehind = run.stop;
+  // Only a loop holds an engine it can end. Under the chained exchange the
+  // author is a person's own CLI, and a message has one way to it: the next
+  // instruction -- which, once every step is answered, may never come.
+  const chained = !stop && !waitsBehind && liveLoopSession(sessionsDir) !== target;
   requestInterrupt(repoRoot, target, reason, nowIso(), stop);
   writeOut(
-    waitsBehind
+    chained
+      ? STEP_PHASES.has(run.phase)
+        ? `interrupt: held for session ${number} (instruction ${run.seq}); nothing is ended, and it arrives ` +
+          "first among the reasons of the next instruction.\n"
+        : `interrupt: held for session ${number} (instruction ${run.seq}), but every step has been answered: ` +
+          "it arrives only if the review raises another instruction, and is otherwise never read. To be " +
+          "heard now, say it in the AI's own chat.\n"
+      : waitsBehind
       ? stop
         ? `interrupt: session ${number} has already stopped (${waitsBehind.kind}); the request is held, and ` +
             "stopping a stopped loop changes nothing.\n"

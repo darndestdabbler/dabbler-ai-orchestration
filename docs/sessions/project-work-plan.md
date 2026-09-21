@@ -257,6 +257,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 217 | An impasse goes to the Auxiliary Reviewer before it goes to a person | — | not declared |
 | 218 | Replace the mailbox handoff with one chained exchange | no | 2026-09-20 |
 | 219 | Prove the installed conversation before the four soaks | yes | 2026-09-20 |
+| 220 | What 219 left owed | no | 2026-09-21 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2876,3 +2877,13 @@ Prove the installed conversation before the operator's four soaks, and release w
 **Amended after acceptance:**
 
 - 2026-09-20 — step 'installed-acceptance': its files: The acceptance rejected a build and two walked candidates, and each rejection's production fix rides here with its test: the package's ignore list, the managed instruction's rule for an answer command that was cut off, and the forced-cancel refusal's advice to an engine. The walk itself was corrected where it, not the product, was at fault. (claude-code (anthropic, claude-opus-5))
+
+### Session 220 — What 219 left owed
+
+**Releasable: no — held: 3.16.0 is the package that was walked as published and the one the operator's developers install on 2026-09-21; these fixes wait for the next release rather than replacing it, unwalked, the same morning..**
+
+Settle the three things session 219 recorded as owed. (1) 219 said a framework job holds its caller's output, so Claude Code learns late that a killed answer command died. Measured on this Windows host before any change, twice -- from Node directly and through Git Bash -- a detached job started as `spawnDetachedJob` starts it does NOT hold the pipe: the pipe reached its end when the caller exited (1.5 s and 1.7 s), not when the 6-second job did; what does hold it is a surviving process in the killed command's own chain. So `spawnDetachedJob` is left as it is, one test pins the property the chained exchange depends on, and the plan section, the acceptance report and STATUS.md are corrected to say what was measured and that the late notice's cause is unproven. (2) `session interrupt` says what will happen to the message under the chained exchange: it arrives with the next instruction while a step is owed, and once every step is answered it arrives only if the review raises an instruction. (3) The installed walk takes the instruction an interrupt was filed against from the framework's own reply rather than from its last poll. No release: patch-sized fixes that ride in the next one.
+
+**Amended after acceptance:**
+
+- 2026-09-21 — step 'interrupt-says-what-happens': its files: the driving guide quotes the reply this step changes (claude-code (anthropic, claude-opus-5))

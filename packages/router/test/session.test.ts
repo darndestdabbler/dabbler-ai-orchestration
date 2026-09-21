@@ -57,6 +57,7 @@ import {
   judgeStartBoundary,
   declare,
   holdRelease,
+  interrupt,
   personIsPresent,
   plan,
   repairedPaths,
@@ -1295,6 +1296,60 @@ describe("what the close says was stepped over", () => {
     } finally {
       state.restore();
     }
+  });
+});
+
+// --- What becomes of a message sent with `session interrupt` ----------------------
+
+describe("what `session interrupt` says becomes of a message", () => {
+  /** A driven session at `phase`, and what the verb said about a message sent to it. */
+  async function said(phase: "work" | "verify", loopDriving = false): Promise<string> {
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      writeRun(state.repo, 1, {
+        schema_version: 1,
+        session_number: 1,
+        engine: "claude-code",
+        phase,
+        seq: 3,
+        invocations: 0,
+        max_invocations: 24,
+        accepted_steps: [] as string[],
+        baseline_tree: null,
+        stop: null,
+        started_at: "2026-09-13T09:00:00-04:00",
+        updated_at: "2026-09-13T10:00:00-04:00",
+      });
+      if (loopDriving) {
+        mkdirSync(join(state.repo, ".dabbler", "runs", "s1", "driver"), { recursive: true });
+        writeFileSync(loopPath(state.repo, 1), JSON.stringify({ pid: 1, at: new Date().toISOString() }));
+      }
+      const result = await run(() => interrupt(state.sessionsDir, { reason: "begin with a comment" }));
+      assert.equal(result.code, EXIT_OK, result.err);
+      // Whatever it says, it names the instruction the message was filed against.
+      assert.match(result.out, /instruction 3/);
+      return result.out;
+    } finally {
+      state.restore();
+    }
+  }
+
+  it("with a step still owed, that it arrives with the next instruction and ends nothing", async () => {
+    const out = await said("work");
+    assert.match(out, /next instruction/);
+    assert.doesNotMatch(out, /re-invokes|never read/);
+  });
+
+  it("with every step answered, that it may never be read and where to say it instead", async () => {
+    const out = await said("verify");
+    assert.match(out, /never read/);
+    assert.match(out, /chat/);
+    assert.doesNotMatch(out, /re-invokes/);
+  });
+
+  it("under the fallback loop, that the loop ends the invocation and re-invokes the engine", async () => {
+    assert.match(await said("work", true), /re-invokes/);
   });
 });
 

@@ -13961,7 +13961,20 @@ Terminal's mark table: `✘` bad beside `✖`, `⚠` a warning tone, and on a
 result line the pass count good, a non-zero fail count bad, a zero muted. One
 test in `dabblerTerminal.test.ts`. No new pane, tree row or setting.
 
-**Step 4 -- one release for this and 220.** `version.json` to 3.17.0 and
+**Step 4 -- Start reads a chosen model the way everything else does.** Found
+starting this session, 2026-09-21: the operator had picked
+`claude-haiku-4-5-20251001` as the Primary Reviewer on a machine whose
+reviewing vehicle is the Copilot seat, which lists the same model as
+`claude-haiku-4.5`. The pane took it, `configuration explain` resolved it to
+the seat's name and said it would be used, the router dispatches to it -- and
+`session start` refused it, because `held` in `session.ts` asks
+`candidates.includes(chosen)` by exact string where every other reader
+compares `normalizeModelToken`. One comparison, made the one the others make;
+the refusal stays for a model no spelling of which is on the list. One test
+in `session.test.ts`: a vendor's dated id for a model the seat lists under
+its own name starts; a model the seat does not list is still refused.
+
+**Step 5 -- one release for this and 220.** `version.json` to 3.17.0 and
 stamped (a capability, so a minor); one changelog section covering both
 sessions -- the result lines, the truthful `session interrupt` reply, and
 220's correction of the record; the page that shows what a run looks like

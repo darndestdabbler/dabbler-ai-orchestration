@@ -14194,12 +14194,15 @@ One test with two repositories under one machine file: a change made through
 the first is not shown by the second once the second has a choice of its
 own, and IS its default while it has none (rules 1 and 6).
 
-**Step 5 -- walked, as a person.** In a scratch profile with two scratch
-repositories: change a reviewer in one window and read the other; reload and
-read the Configuration again (rule 5); Start Session and see no pick list;
-*Start Session with Different Models* and see it; *Keep as Machine Default*
-and open a third, fresh repository to see it (rule 1). Evidence outside the
-tree; one page under `docs/uat/`.
+**Step 5 -- walked by the operator, from a page that says how.** The operator
+walks a locally built VSIX before any release, as they did for 3.17.0 and
+said they would again (2026-09-21), so this session writes the walk and does
+not drive it: one page under `docs/uat/`, copy-pasteable, one numbered check
+per rule -- change a reviewer in one window and read the other (6); reload
+and read the Configuration again (5); Start Session and see no pick list,
+then *Start Session with Different Models* and see it (3); *Keep as Machine
+Default* and open a fresh repository to see it there (4, 1); change a choice
+and read `.vscode/settings.json` (2).
 
 **Step 6 -- the release.** `version.json` to 3.18.0 (a capability, so a
 minor), stamped; one changelog section for 224 and 225.

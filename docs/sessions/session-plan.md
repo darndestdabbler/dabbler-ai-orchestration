@@ -13990,3 +13990,34 @@ output is captured and never reaches the terminal.
 **Hold.** `hold_release`: the operator walks a locally built 3.17.0 VSIX
 first, as with 220, and says whether it goes to the Marketplace; on their yes
 it is tagged with `dabbler release`, one release carrying 220 and 221.
+
+### Session 222 of 222: A running job's output is shown from its first byte
+
+Scope: `tools/dabbler-ai-orchestration/src/router/dabblerTerminal.ts` and its
+test
+
+**Why.** The operator, 2026-09-21, walking a Maven sample: under `4 ─
+run-of-record-maven` the Dabbler Terminal showed seven lines of a 9 KB log,
+and the first began in the middle of a word (`n validation issues were
+detected`). The terminal had started reading that log partway through it. One
+place gives a job's log a starting point other than its first byte:
+`sayEarlier`, at the terminal's first look at a run, sets every log already
+on disk to its current size -- named as an earlier job, not replayed -- and
+does it to the RUNNING job's log as well, before the loop skips that job. So
+a terminal opened, reopened or reloaded while a job runs drops whatever the
+job had written so far, which for Maven -- most of its output in its first
+second -- is nearly all of it. An earlier job is history; the job the record
+is carrying is the present, and `job-started` says it in the present tense.
+
+**The one step.** In `sayEarlier` the log of the job the run record is
+carrying starts at its first byte; every other log keeps today's rule. One
+test in `dabblerTerminal.test.ts`: a terminal opened while a job is running
+and its log already holds lines shows those lines, under the job's name, and
+an earlier finished job's log is still named and not replayed. It fails
+today.
+
+**Non-goals.** No change to what an earlier job is or how it is said, to the
+history cap, or to the router.
+
+**Hold.** `hold_release`: it rides in the 3.17.0 the operator is walking;
+nothing is tagged until they say so.

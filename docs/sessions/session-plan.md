@@ -14288,3 +14288,61 @@ rule or to its words. No new layer in the list a choice is KEPT in.
 
 **Hold.** `hold_release`: it rides in the 3.18.0 the operator is walking;
 nothing is tagged until they say so.
+
+### Session 227 of 227: Different models means the reviewing vehicle too
+
+Scope: `packages/router` -- the ledger row and `session start`, `config.ts`'s
+reviewing-vehicle reading, the places a session's round and start read it
+(`session.ts`, `route.ts`, `verify/rounds.ts`), `projection.ts` -- the
+extension's `commands/sessionCommands.ts`, their tests, the walk page and
+the changelog
+
+**Why.** The operator, 2026-09-21, an hour after 226: *why am I not prompted
+for the Reviewing Vehicle when I select Start Session with Different
+Models?* Because session 226 wrote it down as a non-goal -- "it is the
+repository's" -- which was the author's call and not the operator's. Rule 3
+asked for a start that lets a person "select different VEHICLES and models":
+the authoring vehicle is the engine, which the command asks for, and the
+reviewing vehicle is the other one. It is also not separable from what 226
+built: the two reviewer lists the command offers are what the reviewing
+vehicle LISTS, so a session that should be reviewed over the seat rather
+than the direct API -- an API key out of credit is the operator's own case
+-- is offered the wrong models, and cannot say so.
+
+**Step 1 -- a session carries the reviewing vehicle it was started with.**
+`dabbler session start --reviewer-transport <vehicle>` records it on the
+session's own ledger row (`reviewerTransport`), beside the reviewers 226
+records, and writes no setting. The schema and its generated type gain the
+member.
+
+**Step 2 -- one reading, with the session's vehicle above every saved
+layer.** `explainReviewingTransport` reads the session's vehicle from the
+configuration it is given, as 226's reading takes a session's reviewers, in
+the position a `--transport` flag holds and beneath an actual flag: a flag is
+what a person typed on THIS call. The start's check, a round's dispatch
+(`route.ts`) and a round's grant (`verify/rounds.ts`) each read a
+configuration stamped from the session's row, so all three agree. It is a
+record and not a place a choice is kept: `decidedLayer` answers with the
+layer beneath, as it does for a flag. A vehicle this machine cannot reach is
+refused at the start in the start's existing words.
+
+**Step 3 -- the command asks for it, before the reviewers it decides.**
+After the engine and the authoring model it asks for the reviewing vehicle --
+the vehicles this machine reaches, the repository's own first -- and the two
+reviewer questions then offer what THAT vehicle lists. The reading the
+command asks the router for takes the vehicle as it takes the engine and the
+authoring model. It passes `--reviewer-transport` on that one call and
+writes nothing. Start Session itself asks nothing.
+
+**Step 4 -- the pages.** The walk's check 5 and the 3.18.0 changelog section
+say the command asks five things, in the order each decides the next.
+
+One test per behaviour, in the file named after what changed.
+
+**Non-goals.** No one-session MACHINE vehicle (`dabbler.transport`): it is
+how a provider is reached where no role says otherwise, and no role a session
+names reads it. No change to which vehicles exist or to how one is judged
+reachable.
+
+**Hold.** `hold_release`: it rides in the 3.18.0 the operator is walking;
+nothing is tagged until they say so.

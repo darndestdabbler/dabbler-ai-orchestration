@@ -44,6 +44,39 @@ different checksums and identical contents in every entry: a VSIX is a zip,
 and a zip carries its own timestamps, which is the whole of the reason no
 local file can share a checksum with the one CI publishes.
 
+**Outcome, added after publication (2026-09-21): the comparison did not hold,
+the expectation above was wrong, and the published package was walked
+itself.** CI published `vsix-v3.16.0` (run `35562713225`), SHA-256
+`7a02d7aba1240696485a659ebb44c31d99d72a6274a3b6f09b071e5128028fb0`.
+`--compare` answered `"same": false`, 28 of 67 entries. The two code bundles
+are byte-identical. Twenty-six text assets — the schemas, the prompt
+templates, the source maps, the license, the SVGs — are identical once line
+endings are set aside. The packager's two manifests differ as two versions of
+`vsce` write them. `.gitattributes` does pin line endings, in the index; it
+does not reach back into a working tree checked out before it existed, and
+152 files in the tree the candidate was built from still hold CRs. The one
+file this report tested happened not to be one of them.
+
+By rule 3 the comparison designated nothing, so the four cases were walked on
+the published file, by the same harness, failing closed:
+
+| run | engine | result | Start to end | author's cost |
+| --- | --- | --- | --- | --- |
+| `published-claude-main-2` | Claude Code | accepted, 14 of 14, closed VERIFIED | 359 s | 28 model calls, 7,453 output tokens |
+| `published-copilot-main` | Copilot CLI | accepted, 14 of 14, closed VERIFIED | 389 s | 29 model calls, 2.70 AI credits |
+| `published-claude-cancel` | Claude Code | accepted, 7 of 7 | 258 s | 16 model calls |
+| `published-copilot-cancel` | Copilot CLI | accepted, 7 of 7 | 250 s | 14 model calls, 1.53 AI credits |
+
+Each installed `7a02d7ab…` and left nothing running. The times are the whole
+walk, staging and install included, so they are not the table below's
+Start-to-close. A first Claude run, `published-claude-main`, is void and kept:
+thirteen cases held, and the fourteenth was the walk's bookkeeping — it sent
+the course correction one second after instruction 3 was written while still
+holding 2 as the last it had seen, and judged 3 to be "next". The framework
+filed the interrupt against 3 and instruction 4 carried it first among its
+reasons, which is the behaviour the case asks for. **The published 3.16.0 is
+the package for the four soaks.**
+
 Five candidates were walked and this is the fifth. A first build was rejected
 by its own contents before any walk; two walked candidates were rejected by a
 case; a third passed every case and was set aside because the changelog it

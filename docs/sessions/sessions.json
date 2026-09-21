@@ -4384,9 +4384,9 @@
     {
       "number": 221,
       "title": "A suite's results read as one line a project",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-21T03:17:00.820000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-21T03:41:33.298000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

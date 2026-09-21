@@ -4447,9 +4447,9 @@
     {
       "number": 224,
       "title": "Every configured choice is the repository's, and the machine's is its default",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-21T06:28:51.374000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-21T07:10:53.469000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

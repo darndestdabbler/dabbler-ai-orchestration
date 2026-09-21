@@ -264,6 +264,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 224 | Every configured choice is the repository's, and the machine's is its default | no | 2026-09-21 |
 | 225 | Start asks nothing, and the Configuration is this repository's | no | 2026-09-21 |
 | 226 | Different models means the reviewers too | no | 2026-09-21 |
+| 227 | Different models means the reviewing vehicle too | no | 2026-09-21 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2950,3 +2951,9 @@ Start Session with Different Models... asks for the engine and the authoring mod
 - 2026-09-21 — step 'a-session-carries-its-reviewers': its files: the verb's parser already takes any flag with a value, so the behaviour is the writer's and is tested there; the verb-to-row path is held by step 2's start test (claude-code (anthropic, claude-opus-5))
 - 2026-09-21 — step 'one-reading-session-first': its files: the round reads a session's named reviewers off its ledger row through a reader in sessionState.ts, which is tested where such a row is written (claude-code (anthropic, claude-opus-5))
 - 2026-09-21 — step 'different-models-asks-for-the-reviewers': its files: the reading for the author about to be launched takes the authoring model as well as the engine, which host.ts's signature had to admit (claude-code (anthropic, claude-opus-5))
+
+### Session 227 — Different models means the reviewing vehicle too
+
+**Releasable: no — held: It rides in the 3.18.0 the operator is walking as a local VSIX; nothing is tagged until they say so..**
+
+Start Session with Different Models... asks for the engine, its model and both reviewers and not for the reviewing vehicle, which session 226 wrote down as a non-goal on the author's own call; the operator asked why. Their rule 3 said vehicles and models, the reviewing vehicle is the second vehicle, and it is not separable from 226: the reviewer lists the command offers are what the reviewing vehicle lists, so a session that should be reviewed over the seat rather than the direct API is offered the wrong models. `dabbler session start --reviewer-transport <vehicle>` records the vehicle on the session's own ledger row and writes no setting; `explainReviewingTransport` reads it from the configuration it is given, above every saved layer and beneath an actual flag on the call; the start's check, a round's dispatch and a round's grant each read a configuration stamped from the session's row; and the command asks for it after the authoring model and BEFORE the reviewers, whose lists are then that vehicle's. Start Session itself still asks nothing. It rides in the unpublished 3.18.0; nothing is published by this session.

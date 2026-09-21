@@ -46,8 +46,10 @@ different vendors had no reviewer both could start under.
 ### Added
 
 - **Start Session with Different Models...** asks for the engine, its model,
-  the Primary Reviewer and the Auxiliary Reviewer, for one session, and writes
-  none of them down. A reviewer is never from the author's vendor, and the
+  the reviewing vehicle, the Primary Reviewer and the Auxiliary Reviewer, for
+  one session, and writes none of them down. The reviewing vehicle comes
+  before the reviewers because it decides their lists: the seat's models are
+  not the direct API's. A reviewer is never from the author's vendor, and the
   Auxiliary never from the Primary's either, so each list offers only what
   the picks before it allow — a session authored by Claude in a repository
   that reviews with Claude is one pick away, and the repository's own choices
@@ -55,8 +57,8 @@ different vendors had no reviewer both could start under.
   nothing may review the chosen author it says so and starts nothing, and on
   a machine that reaches two vendors and no third — where no session can have
   an Auxiliary at all — it says what that means for a dispute and lets you
-  decide. From a terminal: `dabbler session start --reviewer-model <id>
-  --auxiliary-model <id>`.
+  decide. From a terminal: `dabbler session start --reviewer-transport
+  <vehicle> --reviewer-model <id> --auxiliary-model <id>`.
 
 ### Renamed
 

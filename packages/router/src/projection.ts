@@ -27,7 +27,10 @@ import {
   explainRoleModel,
   explainTransport,
   keptIn,
+  sessionReviewerOf,
   loadConfig,
+  withSessionReviewers,
+  withSessionVehicle,
   type RouterConfig,
   type TransportReading,
 } from "./config.ts";
@@ -920,6 +923,23 @@ export interface ConfigurationReadingOptions {
    * reviewer's own model on that call went through.
    */
   readonly authoringModel?: string | null;
+  /**
+   * The reviewing vehicle of the session ABOUT to start, where one is named.
+   *
+   * The reviewing roles are read over their vehicle's list, so a start that
+   * is choosing a vehicle for one session has to be able to ask what THAT
+   * vehicle would offer before anything is registered -- the same reason the
+   * two members above exist. It reads as the session's own: above what is
+   * kept, and written nowhere.
+   */
+  readonly reviewerTransport?: string | null;
+  /**
+   * The reviewers that session names, by role, read the same way: as the
+   * session's own, above what is kept. A start that names a reviewer is
+   * judged on THAT reviewer, and a reading that showed the repository's saved
+   * one instead would refuse a start for a choice the session does not use.
+   */
+  readonly reviewers?: Readonly<Record<string, string | null | undefined>>;
 }
 
 export function configurationNode(
@@ -928,7 +948,10 @@ export function configurationNode(
 ): Node {
   let config: RouterConfig;
   try {
-    config = loadConfig(undefined, root);
+    config = withSessionVehicle(
+      withSessionReviewers(loadConfig(undefined, root), options.reviewers ?? {}),
+      options.reviewerTransport,
+    );
   } catch (error) {
     return { unavailable: error instanceof Error ? error.message : String(error) };
   }
@@ -976,7 +999,7 @@ export function configurationNode(
         vendorConflict(config, authorProvider, provider),
       );
       const selected = resolved["selected"];
-      const selection = explainRoleModel(role, root);
+      const selection = explainRoleModel(role, root, sessionReviewerOf(config, role));
       return {
         ...resolved,
         vehicle: reviewingVehicle,

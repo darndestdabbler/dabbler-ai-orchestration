@@ -25,7 +25,7 @@ import {
   parseStepTexts,
   splitSlugMarker,
 } from "../src/session.ts";
-import { namedReviewers } from "../src/sessionState.ts";
+import { namedReviewers, namedReviewingVehicle } from "../src/sessionState.ts";
 import { VERSION } from "../src/version.ts";
 import {
   KIND_AMENDMENT,
@@ -265,6 +265,7 @@ describe("registering a session start", () => {
     const { repo, sessionsDir } = makeSessionsDir();
     const named = registerSessionStart(sessionsDir, 1, {
       engine: "claude-code",
+      reviewerTransport: "copilot-cli",
       reviewerModel: "gpt-5.6-sol",
       auxiliaryModel: " gemini-3.8-flash ",
     })["sessions"] as Record<string, unknown>[];
@@ -276,11 +277,16 @@ describe("registering a session start", () => {
     assert.deepEqual(namedReviewers(repo, 1), { reviewer: "gpt-5.6-sol", "auxiliary-reviewer": "gemini-3.8-flash" });
     assert.deepEqual(namedReviewers(repo, 2), {});
     assert.deepEqual(namedReviewers(null, 1), {});
+    // The vehicle they are reached through is the session's own in the same way.
+    assert.equal(named[0]["reviewerTransport"], "copilot-cli");
+    assert.equal(namedReviewingVehicle(repo, 1), "copilot-cli");
+    assert.equal(namedReviewingVehicle(repo, 2), null);
 
     // Started again with none named: the ordinary start, reviewed by the repository's own.
     const again = registerSessionStart(sessionsDir, 1, { engine: "claude-code" })["sessions"] as Record<string, unknown>[];
     assert.equal("reviewerModel" in again[0], false);
     assert.equal("auxiliaryModel" in again[0], false);
+    assert.equal("reviewerTransport" in again[0], false);
 
     // A later session's registration leaves an earlier session's reviewers on its row.
     registerSessionStart(sessionsDir, 1, { engine: "claude-code", reviewerModel: "gpt-5.6-sol" });

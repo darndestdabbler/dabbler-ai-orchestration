@@ -217,6 +217,7 @@ export function startArguments(choice: EngineChoice, model: string, reviewers: S
   if (model.trim() !== "") args.push("--model", model.trim());
   // For THIS session and written nowhere: the router records them on the
   // session's own row, and the repository's Configuration is as it was.
+  if (reviewers.vehicle) args.push("--reviewer-transport", reviewers.vehicle);
   if (reviewers.reviewer) args.push("--reviewer-model", reviewers.reviewer);
   if (reviewers.auxiliary) args.push("--auxiliary-model", reviewers.auxiliary);
   return args;
@@ -313,6 +314,8 @@ function listedModels(authoring: ConfigurationRole | undefined): ConfigurationMo
 
 /** The reviewers one session is started with; a role left out is the repository's own, as at any start. */
 export interface SessionReviewers {
+  /** The vehicle both reviewers are reached through, which is the list they were picked from. */
+  readonly vehicle?: string;
   readonly reviewer?: string;
   readonly auxiliary?: string;
 }
@@ -355,16 +358,31 @@ export async function askReviewers(
   model: string,
   ui: SessionRunUi,
 ): Promise<SessionReviewers | undefined> {
-  const configuration = (ui.configurationFor ?? solutionConfiguration)(root, {
-    engine: choice.engine,
-    authoringModel: model.trim() === "" ? null : model.trim(),
-  }) as {
+  type Reading = {
     authoring?: { provider?: string | null };
     primaryReviewer?: ConfigurationRole;
     auxiliaryReviewer?: ConfigurationRole;
   } | null;
+  const about = { engine: choice.engine, authoringModel: model.trim() === "" ? null : model.trim() };
+  const read = (reviewerTransport?: string): Reading =>
+    (ui.configurationFor ?? solutionConfiguration)(root, { ...about, ...(reviewerTransport ? { reviewerTransport } : {}) }) as Reading;
+  const named: { vehicle?: string; reviewer?: string; auxiliary?: string } = {};
+
+  // **The vehicle first, because it decides the two lists that follow.** The
+  // reviewers are what the reviewing vehicle LISTS: the seat's models are not
+  // the direct API's, so a session to be reviewed over the other vehicle has
+  // to say so before it is offered a reviewer.
+  const own = read();
+  const vehicleRow = own?.primaryReviewer?.vehicle;
+  const reachable = vehicleRow?.options ?? [];
+  if (reachable.length > 0) {
+    const first = reachable.filter((option) => option.id === vehicleRow?.chosen);
+    const vehicle = await ui.askReviewingVehicle([...first, ...reachable.filter((option) => !first.includes(option))]);
+    if (vehicle === undefined) return undefined;
+    named.vehicle = vehicle;
+  }
+  const configuration = named.vehicle !== undefined && named.vehicle !== vehicleRow?.chosen ? read(named.vehicle) : own;
   const author = configuration?.authoring?.provider ?? choice.provider;
-  const named: { reviewer?: string; auxiliary?: string } = {};
 
   const listed = listedModels(configuration?.primaryReviewer);
   // Nothing read at all is not "nothing may review": the router's start check says which.
@@ -552,7 +570,15 @@ export interface SessionRunUi {
    * with. `solutionConfiguration` in production; a seam for the reason
    * `configured` is one -- the reading is this machine's catalog.
    */
-  configurationFor?: (root: string, options: { engine?: string | null; authoringModel?: string | null }) => unknown;
+  configurationFor?: (
+    root: string,
+    options: { engine?: string | null; authoringModel?: string | null; reviewerTransport?: string | null },
+  ) => unknown;
+  /**
+   * The reviewing vehicle for this session: what this machine reaches, the
+   * repository's own first. Undefined is a dismissed pick.
+   */
+  askReviewingVehicle: (vehicles: ReadonlyArray<{ id: string; means: string }>) => Thenable<string | undefined>;
   /**
    * One reviewing role's model for this session: `models` is what the picks
    * before it allow, the repository's own first. Undefined is a dismissed pick.
@@ -638,6 +664,21 @@ export function defaultSessionRunUi(
     // The view the Configuration lives in. A view's own `focus` command is the
     // editor's, named after the view's id.
     openConfiguration: () => void vscode.commands.executeCommand("dabblerSolutionTree.focus"),
+    askReviewingVehicle: async (vehicles) => {
+      const picked = await vscode.window.showQuickPick(
+        vehicles.map((vehicle, at) => ({
+          label: vehicle.id,
+          description: vehicle.means,
+          detail: at === 0 ? "this repository's own" : undefined,
+        })),
+        {
+          title: "Start session with different models — reviewing vehicle",
+          placeHolder: "What both reviewers are reached through, for this session only. It decides which models the next two lists offer.",
+          ignoreFocusOut: true,
+        },
+      );
+      return picked?.label;
+    },
     askReviewer: async (role, models, authorProvider) => {
       const picked = await vscode.window.showQuickPick(modelItems(models, authorProvider, models[0]?.model ?? null), {
         title: `Start session with different models — ${role}`,

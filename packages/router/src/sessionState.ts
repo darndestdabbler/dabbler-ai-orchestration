@@ -52,6 +52,17 @@ export function readRawSessionState(
  * that is not a session's. Keyed by role as selection names them, so the
  * reading that consumes it needs no second spelling.
  */
+/** The reviewing vehicle ONE session was started with, off its own row, or null where its start named none. */
+export function namedReviewingVehicle(repoRoot: string | null, sessionNumber: number | null): string | null {
+  if (repoRoot === null || sessionNumber === null) return null;
+  const sessions = readRawSessionState(sessionsDirFor(repoRoot))?.["sessions"];
+  const row = (Array.isArray(sessions) ? sessions : []).find(
+    (entry) => isRecord(entry) && entry["number"] === sessionNumber,
+  );
+  const vehicle = isRecord(row) ? row["reviewerTransport"] : null;
+  return typeof vehicle === "string" && vehicle.trim() !== "" ? vehicle.trim() : null;
+}
+
 export function namedReviewers(
   repoRoot: string | null,
   sessionNumber: number | null,

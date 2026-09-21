@@ -41,6 +41,10 @@ export type SessionsSessionRecord = {
    */
   frameworkVersion?: string;
   /**
+   * The reviewing vehicle THIS session was started with, where its start named one. A session's own, as reviewerModel is: read ahead of the checkout's setting and the machine's default for this session alone, and written to neither. It decides which list the two reviewers are drawn from, which is why it is recorded beside them.
+   */
+  reviewerTransport?: string;
+  /**
    * The Primary Reviewer's model THIS session was started with, where its start named one. A session's own and nobody else's: it is read ahead of the checkout's setting and the machine's default for this session alone, and it writes neither. Absent where the start named none, which is every ordinary Start Session.
    */
   reviewerModel?: string;

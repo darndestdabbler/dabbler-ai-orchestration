@@ -352,6 +352,48 @@ describe("what a session would be run with", () => {
     }
   });
 
+  it("reads the reviewers over the vehicle a start is about to name, and the repository's own where it names none", () => {
+    // A start that chooses a reviewing vehicle for one session has to be able
+    // to ask what THAT vehicle lists before anything is registered: the two
+    // reviewers it then names are chosen from that list and no other.
+    const root = tempDir("configuration-");
+    const restore = onApi(root);
+    const ungit = inRepository(root);
+    try {
+      setSeatIdentity(SEAT);
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic", "google", "openai"] },
+        models: [catalogModelRow("claude-opus-5", "anthropic"), catalogModelRow("gemini-3.1-pro-preview", "google")],
+        retired: [],
+      });
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models: [catalogModelRow("claude-haiku-4.5", "anthropic"), catalogModelRow("gpt-5.6-sol", "openai")],
+        retired: [],
+      });
+      const offered = (options: { reviewerTransport?: string }) =>
+        (configurationNode(root, options)["primaryReviewer"] as Role).candidates.map((row) => row.model);
+      assert.ok(offered({}).includes("gemini-3.1-pro-preview") && !offered({}).includes("gpt-5.6-sol"));
+      const onTheSeat = offered({ reviewerTransport: "copilot-cli" });
+      assert.ok(onTheSeat.includes("gpt-5.6-sol") && !onTheSeat.includes("gemini-3.1-pro-preview"), String(onTheSeat));
+      // The row says which vehicle that is, and nothing was written for it.
+      const vehicle = (configurationNode(root, { reviewerTransport: "copilot-cli" })["primaryReviewer"] as {
+        vehicle: { chosen: string; decidedLayer: string };
+      }).vehicle;
+      assert.equal(vehicle.chosen, "copilot-cli");
+      assert.equal(vehicle.decidedLayer, "checkout");
+    } finally {
+      setSeatIdentity(null);
+      withoutOverlay(root);
+      ungit();
+      restore();
+    }
+  });
+
   it("refuses the authoring model itself, and marks its provider-mate rather than hiding it", () => {
     // Review is cross-vendor (D281), but the author is chosen at each Start:
     // a second model from the author's vendor stays offered and choosable,

@@ -50,6 +50,7 @@ import {
   loadConfig,
   sessionReviewerOf,
   withSessionReviewers,
+  withSessionVehicle,
   type RouterConfig,
 } from "./config.ts";
 import {
@@ -645,6 +646,8 @@ export interface StartOptions {
    */
   readonly reviewerModel?: string | null;
   readonly auxiliaryModel?: string | null;
+  /** The vehicle this session's reviewers are reached through, kept the same way. */
+  readonly reviewerTransport?: string | null;
   readonly sessionNumber?: number | null;
   readonly totalSessions?: number | null;
   /** The free catalog refresh a start runs first; a test speaks through it. */
@@ -985,9 +988,21 @@ export function configuredModelRefusal(
    * instead refused a good model on a machine whose seat had never been read.
    */
   engine: string | null = null,
+  /**
+   * What THIS start names for its reviewers and their vehicle, where it names
+   * any. They are what the session will be reviewed by, so they are what is
+   * judged: held to the repository's saved reviewer instead, a start that
+   * named a good one was refused for a choice it does not use.
+   */
+  named: {
+    readonly reviewerTransport?: string | null;
+    readonly reviewers?: Readonly<Record<string, string | null | undefined>>;
+  } = {},
 ): string | null {
   const configuration = configurationNode(checkout, {
     engine,
+    reviewerTransport: named.reviewerTransport ?? null,
+    reviewers: named.reviewers ?? {},
     // The model THIS CALL names, so the reviewing roles are measured against
     // the author of the session about to begin rather than against whatever
     // the checkout had configured. Without it, naming the Primary Reviewer's
@@ -1090,12 +1105,18 @@ export function configuredModelRefusal(
   ] as const) {
     const role = roleOf(key);
     const selected = role?.["selected"];
+    // Where it WAS chosen, in the reading's own words: this start, this
+    // checkout's settings, or the machine's default. It said the machine's
+    // for all three, and sent a person to a file that did not hold it.
+    const chosenIn = typeof role?.["selectedBy"] === "string" ? (role["selectedBy"] as string) : "a configured layer";
     const refusal = held(
       role,
       typeof selected === "string" ? selected : null,
       what,
-      "this machine's own `preferences.json`",
-      `\`dabbler configure ${flag} <id>\``,
+      chosenIn,
+      chosenIn.startsWith("this session's start")
+        ? `naming another with \`${flag} <id>\` on this start`
+        : `\`dabbler configure ${flag} <id>\``,
     );
     if (refusal !== null) return refusal;
   }
@@ -1291,6 +1312,26 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       model: options.model ?? (explainAuthoringModel(null, checkout).transport || null),
       effort: options.effort ?? null,
     };
+    // **The reviewers and the vehicle this session is reviewed by: what this
+    // call names, and for a session already in flight, what its START named.**
+    // Re-registering the session in flight is the ordinary way a pull
+    // continues, and it names none of them -- so an omitted one is "not
+    // stated", exactly as an omitted identity field is below, and means the
+    // same to the checks and to the write. Read as "none", a continuation was
+    // judged on the repository's saved reviewer the session never used, and
+    // then had its own erased from its row.
+    const inFlight =
+      current !== null && requested === current && normalized !== null ? sessionRecord(normalized, current) : null;
+    const carried = (key: string, stated: string | null | undefined): string | null => {
+      if (typeof stated === "string" && stated.trim() !== "") return stated.trim();
+      const recorded = inFlight?.[key];
+      return typeof recorded === "string" && recorded.trim() !== "" ? recorded : null;
+    };
+    const reviewedBy = {
+      reviewerTransport: carried("reviewerTransport", options.reviewerTransport),
+      reviewerModel: carried("reviewerModel", options.reviewerModel),
+      auxiliaryModel: carried("auxiliaryModel", options.auxiliaryModel),
+    };
     // Free, and before anything below reads the catalog: a machine that has
     // never read it would otherwise refuse a seat's model the refresh is about
     // to record, and tell the operator to run the refresh by hand.
@@ -1304,7 +1345,13 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       // are read once more here, at the boundary before anything is billed,
       // through the same reading every surface uses -- a second copy of any
       // of these rules is the thing this block of sessions exists to delete.
-      const impossible = configuredModelRefusal(checkout, identity.model, identity.engine);
+      const impossible = configuredModelRefusal(checkout, identity.model, identity.engine, {
+        reviewerTransport: reviewedBy.reviewerTransport,
+        reviewers: {
+          [ROLE_PRIMARY_REVIEWER]: reviewedBy.reviewerModel,
+          [ROLE_AUXILIARY_REVIEWER]: reviewedBy.auxiliaryModel,
+        },
+      });
       if (impossible !== null) {
         writeErr(`start: refused -- ${impossible}\n`);
         return EXIT_USAGE;
@@ -1364,10 +1411,13 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       const use = sessionUseReading(
         // With the reviewers THIS start names, so the check judges the session
         // that would run and not the repository's saved choice.
-        withSessionReviewers(loadConfig(undefined, checkout), {
-          [ROLE_PRIMARY_REVIEWER]: options.reviewerModel,
-          [ROLE_AUXILIARY_REVIEWER]: options.auxiliaryModel,
-        }),
+        withSessionVehicle(
+          withSessionReviewers(loadConfig(undefined, checkout), {
+            [ROLE_PRIMARY_REVIEWER]: reviewedBy.reviewerModel,
+            [ROLE_AUXILIARY_REVIEWER]: reviewedBy.auxiliaryModel,
+          }),
+          reviewedBy.reviewerTransport,
+        ),
         checkout,
         identity.engine,
         authorProvider,
@@ -1443,8 +1493,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       model: identity.model,
       effort: identity.effort,
       totalSessions: options.totalSessions,
-      reviewerModel: options.reviewerModel ?? null,
-      auxiliaryModel: options.auxiliaryModel ?? null,
+      ...reviewedBy,
     });
     writeOut(
       `start: session ${sessionDisplayNumber(requested)} of ${basename(sessionsDir)} registered (${options.engine}).\n`,

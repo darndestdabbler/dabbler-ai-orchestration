@@ -49,9 +49,11 @@ import {
 import {
   loadConfig,
   explainReviewingTransport,
+  withSessionVehicle,
   verificationRoundCap,
   type RouterConfig,
 } from "../config.ts";
+import { namedReviewingVehicle } from "../sessionState.ts";
 import {
   changedPathsBetween,
   repoRootFor,
@@ -659,7 +661,10 @@ export async function runRound(
     return EXIT_STATE;
   }
 
-  const config = loadConfig();
+  // With the reviewing vehicle THIS session was started with, where it named
+  // one: the grant below is a property of the vehicle the round is dispatched
+  // on, and the dispatch reads the same record.
+  const config = withSessionVehicle(loadConfig(), namedReviewingVehicle(repoRoot, current));
   const cap = effectiveCap(repoRoot, current, options.maxRounds || verificationRoundCap(config));
   const priorRounds = readRounds(repoRoot, current);
   if (priorRounds.some((row) => row["type"] === "adjudication")) {

@@ -34,6 +34,7 @@ import {
   splitSections,
   truthy,
   verificationRoundCap,
+  withSessionVehicle,
   type ConfigSources,
   type RouterConfig,
 } from "../src/config.ts";
@@ -808,6 +809,17 @@ describe("the engine and a reviewer's model, read through the layers", () => {
         "gpt-5.6-terra",
       ]);
       assert.equal(keptIn(forOneSession), "checkout");
+      // The reviewing VEHICLE a session was started with sits in the same
+      // place: above this checkout's and this machine's, beneath a flag typed
+      // on the call, and never itself where the choice is kept.
+      writeSettings(mine, { [SETTING_REVIEWER_TRANSPORT]: "api" });
+      const stamped = withSessionVehicle(loadConfigFrom(sources()), "copilot-cli");
+      const forThisSession = explainReviewingTransport(stamped, null, mine);
+      assert.equal(forThisSession.transport, "copilot-cli");
+      assert.match(String(forThisSession.decidedBy), /this session's start/);
+      assert.equal(keptIn(forThisSession), "checkout");
+      assert.equal(explainReviewingTransport(stamped, "offline", mine).transport, "offline");
+      assert.equal(explainReviewingTransport(loadConfigFrom(sources()), null, mine).transport, "api");
       // A source no reading declares is a bug, said loudly rather than read as a default.
       assert.throws(() => layerOfSource("somewhere nobody declared"), /no reading declares/);
       // Nobody chose an auxiliary anywhere, which is not a default.

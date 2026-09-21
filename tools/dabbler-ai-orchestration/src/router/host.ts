@@ -145,7 +145,7 @@ export function solutionConfiguration(
    * whatever the ledger or the preference names, which is the wrong engine
    * whenever an operator is starting a session on the other one.
    */
-  options: { engine?: string | null; authoringModel?: string | null } = {},
+  options: { engine?: string | null; authoringModel?: string | null; reviewerTransport?: string | null } = {},
 ): unknown {
   try {
     return configurationNode(repoRoot, options);

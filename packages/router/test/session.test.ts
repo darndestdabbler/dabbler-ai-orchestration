@@ -28,14 +28,17 @@ import {
   TRANSPORT_OFFLINE,
   loadConfig,
   withSessionReviewers,
+  withSessionVehicle,
   resetProjectRootCache,
 } from "../src/config.ts";
 import { writePreferences } from "../src/preferences.ts";
 import { setSeatIdentity } from "../src/transports/copilot.ts";
 import {
   SETTING_AUTHORING_MODEL,
+  SETTING_REVIEWER_MODEL,
   SETTING_REVIEWER_TRANSPORT,
   SETTING_TRANSPORT,
+  settingValue,
   writeSettings,
 } from "../src/settings.ts";
 import { readRawSessionState } from "../src/progress.ts";
@@ -426,6 +429,89 @@ describe("what a start refuses before a session exists", () => {
     }
   });
 
+  it("starts with the vehicle and reviewer the START names, where the repository's saved reviewer could not review this author", async () => {
+    // Through `start` itself, every check in its order. The saved reviewer is
+    // the worst case -- the authoring model itself, on the direct API -- and
+    // the start names the seat and a reviewer only the seat lists.
+    const state = stateDir();
+    // Exactly these two keys and no third: a catalog block is believed only
+    // for the key set it was read with, and a suite that left the developer's
+    // own third key in place would judge nothing and pass.
+    const every = ["DABBLER_ANTHROPIC_API_KEY", "DABBLER_OPENAI_API_KEY", "DABBLER_GEMINI_API_KEY"];
+    const held = every.map((name) => [name, process.env[name]] as const);
+    for (const name of every) delete process.env[name];
+    for (const name of every.slice(0, 2)) process.env[name] = "k";
+    const seat = { host: "https://github.com", login: "someone" };
+    const model = (id: string, provider: string): CatalogModel => ({
+      id,
+      provider,
+      provider_source: "vendor-endpoint",
+      display_name: id,
+      enabled: true,
+      price_category: null,
+      cost: null,
+      listed_at: "2026-09-11T00:00:00Z",
+    });
+    setSessionUseReading((config, checkout, _engine, provider) => reviewingVehicleRefusal(config, checkout, provider));
+    try {
+      setSeatIdentity(seat);
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic", "openai"] },
+        models: [model("claude-opus-5", "anthropic"), model("gpt-5.6-sol", "openai")],
+        retired: [],
+      });
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: seat.host, seat_login: seat.login },
+        models: [model("gpt-5.6-luna", "openai")],
+        retired: [],
+      });
+      writeSettings(state.repo, {
+        [SETTING_REVIEWER_TRANSPORT]: TRANSPORT_API,
+        [SETTING_REVIEWER_MODEL]: "claude-opus-5",
+      });
+      resetProjectRootCache();
+      const author = { engine: "claude-code", provider: "anthropic", model: "claude-opus-5", refresh: async () => [] };
+
+      // As the repository is saved, this author cannot be reviewed: refused.
+      const refused = await run(() => start(state.sessionsDir, author));
+      assert.notEqual(refused.code, EXIT_OK);
+
+      // With the vehicle and the reviewer the start names, it registers, and
+      // the session's row carries them -- the repository's settings untouched.
+      const started = await run(() =>
+        start(state.sessionsDir, { ...author, reviewerTransport: TRANSPORT_COPILOT_CLI, reviewerModel: "gpt-5.6-luna" }),
+      );
+      assert.equal(started.code, EXIT_OK, started.err);
+      const row = sessionOf(state.sessionsDir);
+      assert.equal(row["reviewerTransport"], TRANSPORT_COPILOT_CLI);
+      assert.equal(row["reviewerModel"], "gpt-5.6-luna");
+      assert.equal(settingValue(state.repo, SETTING_REVIEWER_MODEL), "claude-opus-5");
+
+      // **A continuation names none of them, and that is "not stated".**
+      // Re-registering the session in flight is how a pull carries on: it is
+      // judged on what the session's START named, not on the repository's
+      // saved reviewer it never used, and its row keeps what it carried.
+      const continued = await run(() => start(state.sessionsDir, author));
+      assert.equal(continued.code, EXIT_OK, continued.err);
+      const after = sessionOf(state.sessionsDir);
+      assert.equal(after["reviewerTransport"], TRANSPORT_COPILOT_CLI);
+      assert.equal(after["reviewerModel"], "gpt-5.6-luna");
+    } finally {
+      setSeatIdentity(null);
+      setSessionUseReading(SESSION_USE_STAND_IN);
+      resetProjectRootCache();
+      for (const [name, value] of held) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+      state.restore();
+    }
+  });
+
   it("reads the catalog before any check that can refuse", async () => {
     // A machine that had never read its catalog refused a seat's model the
     // refresh would have recorded, and told the operator to run it by hand.
@@ -587,6 +673,38 @@ describe("why a start cannot reach its reviewer, and only the ways forward that 
         /vehicle does not list it/,
       );
     } finally {
+      restore();
+    }
+  });
+
+  it("judges a start on the reviewing vehicle IT names, whose list is where its reviewers were chosen from", () => {
+    // The reviewers a session is started with are picked from a vehicle's
+    // list. Judged on the repository's saved vehicle instead, a reviewer only
+    // the seat lists is "not listed" -- refused for being chosen correctly.
+    const { root, restore } = checkout(TRANSPORT_API, ["DABBLER_ANTHROPIC_API_KEY", "DABBLER_OPENAI_API_KEY"]);
+    try {
+      setSeatIdentity(SEAT);
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic", "openai"] },
+        models: [row("claude-haiku-4.5", "anthropic"), row("gpt-5.6-sol", "openai")],
+        retired: [],
+      });
+      writeBlock(TRANSPORT_SEAT, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_SEAT,
+        scope: { seat_host: SEAT.host, seat_login: SEAT.login },
+        models: [row("gpt-5.6-luna", "openai")],
+        retired: [],
+      });
+      const named = withSessionReviewers(loadConfig(undefined, root), { reviewer: "gpt-5.6-luna" });
+      // On the repository's own vehicle, the direct API, nothing lists it.
+      assert.match(String(reviewingVehicleRefusal(named, root, "anthropic").refusal), /reviewing vehicle 'api'/);
+      // On the vehicle the start names, the seat, it is the seat's own model.
+      assert.equal(reviewingVehicleRefusal(withSessionVehicle(named, TRANSPORT_COPILOT_CLI), root, "anthropic").refusal, null);
+    } finally {
+      setSeatIdentity(null);
       restore();
     }
   });

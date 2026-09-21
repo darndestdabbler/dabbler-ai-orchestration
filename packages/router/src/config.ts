@@ -1097,7 +1097,8 @@ export function layerOfSource(source: string): Exclude<ChoiceLayer, "default"> |
     source === AUTHORING_MODEL_SOURCE_FLAG ||
     source === ENGINE_SOURCE_FLAG ||
     source === REVIEWER_MODEL_SOURCE_SESSION ||
-    source === AUXILIARY_MODEL_SOURCE_SESSION
+    source === AUXILIARY_MODEL_SOURCE_SESSION ||
+    source === REVIEWING_SOURCE_SESSION
   ) {
     return null;
   }
@@ -1158,6 +1159,31 @@ function roleModelSetting(role: string): readonly [SettingKey, string, string] |
     return [SETTING_AUXILIARY_MODEL, AUXILIARY_MODEL_SOURCE_SETTINGS, AUXILIARY_MODEL_SOURCE_SESSION];
   }
   return null;
+}
+
+/** What the reviewing vehicle ONE SESSION was started with is called in a reading. */
+export const REVIEWING_SOURCE_SESSION = "this session's start (--reviewer-transport)";
+
+/** Where a configuration carries that vehicle. */
+export const CONFIG_SESSION_VEHICLE_KEY = "_session_reviewing_vehicle";
+
+/**
+ * This configuration, for a session started with a reviewing vehicle of its
+ * own; the configuration itself where it named none. It rides here for the
+ * reason a session's reviewers do: the start's check, a round's dispatch and
+ * a round's grant all take a configuration, and one reading then serves all
+ * three without any of them being told.
+ */
+export function withSessionVehicle(config: RouterConfig, vehicle: string | null | undefined): RouterConfig {
+  return typeof vehicle === "string" && vehicle.trim() !== ""
+    ? { ...config, [CONFIG_SESSION_VEHICLE_KEY]: vehicle.trim() }
+    : config;
+}
+
+/** The reviewing vehicle this configuration's session was started with, or null. */
+export function sessionVehicleOf(config: RouterConfig): string | null {
+  const vehicle = config[CONFIG_SESSION_VEHICLE_KEY];
+  return typeof vehicle === "string" && vehicle !== "" ? vehicle : null;
 }
 
 /** Where a configuration carries the reviewers ONE SESSION was started with. */
@@ -1397,12 +1423,18 @@ export function explainReviewingTransport(
     .filter(([, value]) => value !== null)
     .map(([source, value]) => ({ source, value: value as string }));
   const global = explainTransport(config, cliFlag, root);
-  if (own.length === 0) return global;
+  // What THIS session was started with, above everything kept anywhere: it
+  // is the vehicle the session's reviewers were chosen FROM, so a round that
+  // fell back to the checkout's would look for them on a list that may not
+  // hold them.
+  const session = sessionVehicleOf(config);
+  const sessions: TransportLayer[] = session === null ? [] : [{ source: REVIEWING_SOURCE_SESSION, value: session }];
+  if (own.length === 0 && sessions.length === 0) return global;
   // The flag is still above every one of them: a reviewing vehicle is a
-  // configured default, not an override of what the operator typed at this
-  // call.
+  // configured default, and a session's is a record of what was chosen at
+  // its start -- neither overrides what the operator typed at this call.
   const above = global.layers.filter((layer) => layer.source === TRANSPORT_SOURCE_FLAG);
-  const layers = [...above, ...own, ...global.layers.filter((layer) => !above.includes(layer))];
+  const layers = [...above, ...sessions, ...own, ...global.layers.filter((layer) => !above.includes(layer))];
   const decided = layers[0] as TransportLayer;
   const normalized = decided.value.trim().toLowerCase();
   if (!(VALID_TRANSPORTS as readonly string[]).includes(normalized)) {

@@ -32,9 +32,10 @@ import {
   resolveGenerationParams,
   truthy,
   withSessionReviewers,
+  withSessionVehicle,
   type RouterConfig,
 } from "./config.ts";
-import { namedReviewers } from "./sessionState.ts";
+import { namedReviewers, namedReviewingVehicle } from "./sessionState.ts";
 import { CATALOG_REFRESH_COMMAND, apiBlock, apiSelectableModels } from "./discovery.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
 import { recordCall, type CallRecord } from "./metrics.ts";
@@ -1075,9 +1076,12 @@ async function routeLive(
   // The reviewers THIS session was started with, where it named any: read
   // off its own ledger row and carried on the configuration, so the one
   // reading of a role's model finds them and nothing here has to be told.
-  const config = withSessionReviewers(
-    configFor(options.repoRoot ?? null),
-    namedReviewers(options.repoRoot ?? null, options.sessionNumber ?? null),
+  const config = withSessionVehicle(
+    withSessionReviewers(
+      configFor(options.repoRoot ?? null),
+      namedReviewers(options.repoRoot ?? null, options.sessionNumber ?? null),
+    ),
+    namedReviewingVehicle(options.repoRoot ?? null, options.sessionNumber ?? null),
   );
   // **The ROLE's vehicle, not the machine's.** Every role is dispatched
   // through something, and it is not always the same something: this module

@@ -391,6 +391,7 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     engineKnowsModel: async () => null,
     pickEngine: async () => ENGINES[0],
     askModel: async () => "haiku",
+    askReviewingVehicle: async (vehicles) => vehicles[0]?.id,
     askReviewer: async (_role, models) => models[0]?.model,
     confirm: async () => false,
     choose: async () => undefined,
@@ -793,6 +794,79 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(await runStartSession(makeRepository(), different.ui, once, true), true);
     assert.deepStrictEqual(askedFor, ["engine", "model"]);
     assert.ok((once.calls[0]?.join(" ") ?? "").includes("--engine claude-code"));
+  });
+
+  test("Different Models asks for the reviewing vehicle first, because it decides the reviewers' lists", async () => {
+    // The operator asked why the command did not ask. The reviewers are what
+    // the reviewing vehicle LISTS, so a session reviewed over the seat is
+    // offered the wrong models unless the vehicle is asked before them.
+    const role = (vehicle: string, models: Array<[string, string]>) => ({
+      selected: null,
+      chosen: null,
+      excludes: [],
+      fellThrough: false,
+      vehicle: {
+        kind: "transport",
+        chosen: "api",
+        options: [
+          { id: "copilot-cli", means: "the Copilot seat" },
+          { id: "api", means: "the provider's own endpoint" },
+        ],
+      },
+      candidates: models.map(([model, provider]) => ({ model, provider, vehicle })),
+    });
+    const lists: Record<string, Array<[string, string]>> = {
+      api: [["gpt-5.6-sol", "openai"], ["gemini-3.8-flash", "google"]],
+      "copilot-cli": [["gpt-5.6-luna", "openai"], ["gemini-3.6-flash", "google"]],
+    };
+    const readings: Array<string | undefined> = [];
+    const asked: string[] = [];
+    const different = driveUi({
+      configurationFor: (_root, options) => {
+        readings.push(options.reviewerTransport ?? undefined);
+        const vehicle = options.reviewerTransport ?? "api";
+        return {
+          authoring: { provider: "anthropic" },
+          primaryReviewer: role(vehicle, lists[vehicle] ?? []),
+          auxiliaryReviewer: role(vehicle, lists[vehicle] ?? []),
+        };
+      },
+      askModel: async () => "",
+      askReviewingVehicle: async (vehicles) => {
+        asked.push(`vehicle: ${vehicles.map((vehicle) => vehicle.id).join(",")}`);
+        return "copilot-cli";
+      },
+      askReviewer: async (which, models) => {
+        asked.push(`${which}: ${models.map((row) => row.model).join(",")}`);
+        return models[0]?.model;
+      },
+    });
+    const register = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository(), different.ui, register, true), true);
+    // The repository's own vehicle first; then the SEAT's models, not the API's.
+    assert.deepStrictEqual(asked, [
+      "vehicle: api,copilot-cli",
+      "Primary Reviewer: gpt-5.6-luna,gemini-3.6-flash",
+      "Auxiliary Reviewer: gemini-3.6-flash",
+    ]);
+    assert.deepStrictEqual(readings, [undefined, "copilot-cli"]);
+    const args = register.calls[0]?.join(" ") ?? "";
+    assert.ok(
+      args.includes("--reviewer-transport copilot-cli") &&
+        args.includes("--reviewer-model gpt-5.6-luna") &&
+        args.includes("--auxiliary-model gemini-3.6-flash"),
+      args,
+    );
+
+    // A dismissed vehicle cancels the start.
+    const dismissed = driveUi({
+      configurationFor: () => ({ primaryReviewer: role("api", lists["api"] ?? []) }),
+      askModel: async () => "",
+      askReviewingVehicle: async () => undefined,
+    });
+    const none = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository(), dismissed.ui, none, true), false);
+    assert.deepStrictEqual(none.calls, []);
   });
 
   test("Different Models asks for the reviewers too, each narrowed by the picks before it, and writes nothing", async () => {

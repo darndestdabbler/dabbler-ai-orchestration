@@ -95,8 +95,12 @@ work.
 
 **You —** run **Start Session with Different Models...** on the same row.
 
-Expect four questions, in this order: the engine, its model, the *Primary
-Reviewer*, the *Auxiliary Reviewer*. Press Escape at the first one: nothing
+Expect five questions, in the order each decides the next: the engine, its
+model, the *reviewing vehicle*, the *Primary Reviewer*, the *Auxiliary
+Reviewer*. The vehicle comes before the two reviewers because their lists
+are what that vehicle lists: pick the seat and you are offered the seat's
+models, pick the direct API and you are offered the API's. A's own vehicle
+is first in its list. Press Escape at the first one: nothing
 starts and nothing is written — `git -C <path to A> status --short` shows no
 change from it.
 
@@ -110,8 +114,8 @@ Claude model, pick Claude Code. Expect:
   from the vendor of the primary you just picked, and shows A's own
   auxiliary first where it may still serve;
 - the session starts. Afterwards A's Configuration and
-  `.vscode/settings.json` are exactly as they were — the three choices were
-  this session's only, and `dabbler configuration explain` in A still shows
+  `.vscode/settings.json` are exactly as they were — the choices were this
+  session's only, and `dabbler configuration explain` in A still shows
   A's saved reviewer.
 
 Close the AI's terminal and cancel the session it registered, as above.

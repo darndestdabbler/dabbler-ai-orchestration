@@ -12241,6 +12241,14 @@
       "what": "step 'different-models-asks-for-the-reviewers': its files",
       "reason": "the reading for the author about to be launched takes the authoring model as well as the engine, which host.ts's signature had to admit",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 227,
+      "dateTime": "2026-09-21T09:35:01.519000-04:00",
+      "task": "Start Session with Different Models... asks for the engine, its model and both reviewers and not for the reviewing vehicle, which session 226 wrote down as a non-goal on the author's own call; the operator asked why. Their rule 3 said vehicles and models, the reviewing vehicle is the second vehicle, and it is not separable from 226: the reviewer lists the command offers are what the reviewing vehicle lists, so a session that should be reviewed over the seat rather than the direct API is offered the wrong models. `dabbler session start --reviewer-transport <vehicle>` records the vehicle on the session's own ledger row and writes no setting; `explainReviewingTransport` reads it from the configuration it is given, above every saved layer and beneath an actual flag on the call; the start's check, a round's dispatch and a round's grant each read a configuration stamped from the session's row; and the command asks for it after the authoring model and BEFORE the reviewers, whose lists are then that vehicle's. Start Session itself still asks nothing. It rides in the unpublished 3.18.0; nothing is published by this session.",
+      "releasable": false,
+      "holdReason": "It rides in the 3.18.0 the operator is walking as a local VSIX; nothing is tagged until they say so."
     }
   ]
 }

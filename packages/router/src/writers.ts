@@ -307,6 +307,7 @@ function buildSessionsArray(
       "frameworkVersion",
       // The reviewers a session was started with are that session's own:
       // a rebuild for a LATER registration must leave an earlier row's.
+      "reviewerTransport",
       "reviewerModel",
       "auxiliaryModel",
       // The declaration's modules, written once by the declaring writer.
@@ -369,6 +370,8 @@ export interface RegisterOptions {
    */
   readonly reviewerModel?: string | null;
   readonly auxiliaryModel?: string | null;
+  /** The vehicle those reviewers are reached through, for this session alone. */
+  readonly reviewerTransport?: string | null;
 }
 
 /**
@@ -473,6 +476,7 @@ export function stateAfterStart(
     // one: a session started again without them is reviewed by the
     // repository's own reviewers, as every ordinary start is.
     for (const [key, named] of [
+      ["reviewerTransport", options.reviewerTransport],
       ["reviewerModel", options.reviewerModel],
       ["auxiliaryModel", options.auxiliaryModel],
     ] as const) {

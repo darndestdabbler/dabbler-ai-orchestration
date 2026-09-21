@@ -4405,9 +4405,9 @@
     {
       "number": 222,
       "title": "A running job's output is shown from its first byte",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-21T03:46:50.280000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-21T03:53:50.434000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

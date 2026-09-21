@@ -276,6 +276,39 @@ suite("the Dabbler terminal", () => {
     rmrf(root);
   });
 
+  test("draws a suite's results as a mark, the project and its counts, for a .NET project and a Maven module alike", () => {
+    // What the run of record writes into its job's log for a suite it can
+    // read: the router's own events, which this terminal draws for a person.
+    const { root, driver, terminal, written } = drivenRepo(RUNNING);
+    terminal.open();
+    written.length = 0;
+    fs.writeFileSync(
+      path.join(driver, "jobs", "run-of-record-maven.log"),
+      "dabbler [02:35:00] project-running project=person-model\n" +
+        "dabbler [02:35:05] project-passed project=person-model pass=3 fail=0 not_run=0\n" +
+        "dabbler [02:35:05] project-no-tests project=csv-deserializer\n" +
+        "dabbler [02:35:09] test-failed test=Spec.B.Tests.PersistenceTests.SavesAPerson message=Assert.Equal() Failure: Values differ\n" +
+        "dabbler [02:35:10] project-failed project=Spec.B.Tests pass=5 fail=2 not_run=1\n",
+      "utf8",
+    );
+    terminal.poll();
+    const said = written.map(plain).join("");
+    assert.match(said, /^02:35:00 running person-model\r?$/m);
+    assert.match(said, /^02:35:05 ✔ person-model: 3 pass, 0 fail, 0 not run\r?$/m);
+    assert.match(said, /^02:35:05 ⚠ csv-deserializer: no tests found\r?$/m);
+    assert.match(said, /^02:35:09 {3}Spec\.B\.Tests\.PersistenceTests\.SavesAPerson: Assert\.Equal\(\) Failure: Values differ\r?$/m);
+    assert.match(said, /^02:35:10 ✘ Spec\.B\.Tests: 5 pass, 2 fail, 1 not run\r?$/m);
+    assert.doesNotMatch(said, /project-passed|pass=|dabbler \[/);
+    // The counts that say something carry a colour; a zero does not compete with them.
+    const painted = written.join("");
+    assert.ok(painted.includes(paint("3 pass", "good", "dark")), "a pass count is green");
+    assert.ok(painted.includes(paint("2 fail", "bad", "dark", true)), "a fail count is red");
+    assert.ok(painted.includes(paint("0 fail", "muted", "dark")), "a zero is muted");
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
   test("draws a replayed router line the way it draws its own, and leaves every other line of a log as it was", () => {
     // One scrollback held `20:02:12 phase ...` beside `dabbler [20:02:12]
     // phase ...`: the same fact drawn two ways, depending on whether this

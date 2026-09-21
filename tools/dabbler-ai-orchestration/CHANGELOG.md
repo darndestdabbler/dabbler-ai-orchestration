@@ -10,6 +10,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.17.0] — 2026-09-21
+
+**A test run reads as one line a project.** A .NET run of record filled the
+Dabbler Terminal with forty lines of restore paths and adapter advice around
+the one line that mattered — and buried three test projects that had found no
+tests at all. For `dotnet test` and for Maven, the terminal now shows what
+happened and keeps everything else one file away.
+
+### Added
+
+- **One line a test project, for `dotnet test` and Maven Surefire.** While a
+  suite runs the Dabbler Terminal says `running <project>`, then a green `✔`
+  or a red `✘` with the project's name and its counts — passes green, failures
+  red, tests that did not run amber, zeros muted. Under a failed project it
+  names the failing tests with the first line of each message (the first ten,
+  then a count). Lines appear as the suite prints them and are never held to
+  be put in order, so projects that run side by side report side by side.
+- **A project that found no tests says so, under a warning of its own** —
+  `⚠ <project>: no tests found` — instead of reading as one more pass.
+- **The suite's own output is kept whole** in `.dabbler/test-output/`, and the
+  terminal names the file. Nothing is summarised away: if the run failed and
+  no failing project was read — a build that never reached its tests — or if
+  nothing was recognised at all, the suite's output is shown whole, as before.
+- Any other test runner is shown exactly as it was. So is Microsoft.Testing.
+  Platform's summary line, which is a different format and is not read yet.
+  The counts are a view: a session's outcome is still the suite's exit code
+  and nothing else.
+
+### Fixed
+
+- **Start Session no longer refuses a reviewer model that every other screen
+  accepted.** A model picked by its vendor's dated name
+  (`claude-haiku-4-5-20251001`) on a machine whose list spells it another way
+  (`claude-haiku-4.5`) was taken by the Configuration pane, confirmed by
+  `dabbler configuration explain`, and then refused at Start. Start reads the
+  name the way the others do. A model that is not on the list under any
+  spelling is still refused.
+- **`dabbler session interrupt` says what will happen to your message.** It
+  used to say the framework would end the AI's work and re-invoke it, which
+  is not what happens now that the AI runs in its own terminal. It says the
+  message arrives with the AI's next instruction — and, once every step has
+  been answered, that it may never be read, and to tell the AI in its chat
+  instead.
+
+### Internal
+
+- A framework job does not hold the output of the command that started it;
+  a test now holds it to that. (3.16.0's notes suspected it did. Measured, it
+  does not.)
+
 ## [3.16.0] — 2026-09-20
 
 **Every answer asks for what comes next.** A session stalled with nothing

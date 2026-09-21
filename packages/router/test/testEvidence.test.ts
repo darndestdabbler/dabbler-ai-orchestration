@@ -3,7 +3,7 @@
 // The enumeration of a surface (git) and the record's digest against a
 // real tree are walked in walk-record.test.ts.
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -22,7 +22,9 @@ import {
   type SuiteSpec,
   type TestRunRecord,
 } from "../src/testEvidence.ts";
+import { TEST_OUTPUT_REL, spawnSuite } from "../src/cli/testEvidence.ts";
 import { judgeFreshness } from "../src/gates.ts";
+import { capture } from "../src/output.ts";
 import { gitAnswers, tempDir } from "./support/answers.ts";
 
 const UNIT: SuiteSpec = { name: "unit", command: "npm test", covers: ["src/"], expensive: true, runsWhole: false };
@@ -332,5 +334,57 @@ describe("the run record", () => {
     assert.equal(row.policy, "");
     assert.equal(row.durationSeconds, 2);
     assert.ok(RecordError.name);
+  });
+});
+
+describe("what a suite's run says while it runs", () => {
+  /** A suite that prints `lines` and exits `code`, reached by a command that names `dotnet test`. */
+  function fakeSuite(root: string, lines: readonly string[], code: number): string {
+    const script = join(root, "suite.cjs");
+    writeFileSync(
+      script,
+      `for (const line of ${JSON.stringify(lines)}) console.log(line);\nprocess.exit(${code});\n`,
+      "utf8",
+    );
+    return `node "${script}"`;
+  }
+
+  // `dotnet test`'s own lines, from the operator's machine (see testOutput.test.ts).
+  const RAN = [
+    "  Determining projects to restore...",
+    String.raw`Test run for D:\Projects\csv-parser\tests\CsvParser.Model.Tests\bin\Debug\net10.0\CsvParser.Model.Tests.dll (.NETCoreApp,Version=v10.0)`,
+    String.raw`Test run for D:\Projects\csv-parser\tests\CsvParser.ConsoleApp.Tests\bin\Debug\net10.0\CsvParser.ConsoleApp.Tests.dll (.NETCoreApp,Version=v10.0)`,
+    String.raw`No test is available in D:\Projects\csv-parser\tests\CsvParser.Model.Tests\bin\Debug\net10.0\CsvParser.Model.Tests.dll. Make sure that test discoverer & executors are registered and platform & framework version settings are appropriate and try again.`,
+    "Passed!  - Failed:     0, Passed:     5, Skipped:     0, Total:     5, Duration: 30 ms - CsvParser.ConsoleApp.Tests.dll (net10.0)",
+  ];
+
+  it("is one line a project for a suite it can read, with the suite's own output kept whole beside it", async () => {
+    const root = tempDir("suite-says-");
+    const collected = await capture(() => spawnSuite(`${fakeSuite(root, RAN, 0)} dotnet test`, root, "dotnet-final-full"));
+    assert.equal(collected.value, 0);
+    assert.match(collected.stdout, /project-running project=CsvParser\.ConsoleApp\.Tests/);
+    assert.match(collected.stdout, /project-no-tests project=CsvParser\.Model\.Tests/);
+    assert.match(collected.stdout, /project-passed project=CsvParser\.ConsoleApp\.Tests pass=5 fail=0 not_run=0/);
+    // What the runner said around its results stays out of the terminal and in the log it names.
+    assert.doesNotMatch(collected.stdout, /Determining projects|test discoverer/);
+    const named = /suite-output log=(\S+)/.exec(collected.stdout)?.[1] ?? "";
+    assert.deepEqual(readFileSync(join(root, named), "utf8").split(/\r?\n/).filter(Boolean), RAN);
+  });
+
+  it("is the suite's own output, whole, when the run failed and no project it read did", async () => {
+    // A build that never reached its tests: the lines that explain it are the ones no reader knows.
+    const broke = ["  Determining projects to restore...", "Program.cs(4,1): error CS1002: ; expected"];
+    const root = tempDir("suite-says-");
+    const collected = await capture(() => spawnSuite(`${fakeSuite(root, broke, 1)} dotnet test`, root, "dotnet-final-full"));
+    assert.equal(collected.value, 1);
+    assert.match(collected.stdout, /error CS1002/);
+  });
+
+  it("keeps a suite it cannot read exactly as it was: the terminal is the suite's, and no log is kept", async () => {
+    const root = tempDir("suite-says-");
+    const collected = await capture(() => spawnSuite(fakeSuite(root, [], 3), root, "unit-final-full"));
+    assert.equal(collected.value, 3);
+    assert.equal(collected.stdout, "");
+    assert.equal(existsSync(join(root, TEST_OUTPUT_REL)), false);
   });
 });

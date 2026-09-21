@@ -7,8 +7,11 @@
 // against the selector here rather than trusted, because the command IS the
 // evidence.
 
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import { nowIso } from "../journal.ts";
+import { readerFor, said } from "../testOutput.ts";
 import { loadConfig } from "../config.ts";
 import { readRun } from "../driver.ts";
 import { SessionsRootNotFoundError, repoRootFor, resolveSessionsDir } from "../evidence.ts";
@@ -404,11 +407,7 @@ async function runSuite(argv: readonly string[]): Promise<number> {
   // ends with this process; its own group on POSIX and hidden on Windows.
   // Asynchronous rather than a blocking spawnSync because a process blocked
   // in one cannot observe the signal that would let it end its child.
-  const status = await new Promise<number | null>((resolve) => {
-    const child = spawnCommand(command, { cwd: root, stdio: "inherit" });
-    child.on("error", () => resolve(null));
-    child.on("close", (code) => resolve(code));
-  });
+  const status = await spawnSuite(command, root, `${suiteName}-${stage}`);
   const durationSeconds = Math.max(1, Math.round((Date.now() - started) / 1000));
   const outcome = status === 0 ? OUTCOME_PASSED : OUTCOME_FAILED;
 
@@ -442,6 +441,96 @@ async function runSuite(argv: readonly string[]): Promise<number> {
     return EXIT_USAGE;
   }
   return outcome === OUTCOME_PASSED ? EXIT_OK : 1;
+}
+
+/** How many failing tests are named before the rest are only counted. */
+const FAILURES_NAMED = 10;
+
+/** Where a read suite's own output is kept whole, relative to the repository. */
+export const TEST_OUTPUT_REL = ".dabbler/test-output";
+
+/**
+ * Run the suite's command and say what it said; the exit code is returned
+ * and is the only thing that decides the outcome.
+ *
+ * A suite no reader is for keeps the terminal, exactly as before. One a
+ * reader is for is piped: every byte goes unchanged to a raw log as it
+ * arrives, and what reaches the terminal is one line an event, said the
+ * moment its line is read and never held to be put in order -- projects run
+ * side by side, and a held line would make a hung project look like
+ * silence.
+ *
+ * **The reader is a view, and a view that saw nothing shows everything.**
+ * A run in which it recognised no project -- another output format, a build
+ * that never reached its tests -- and a run that failed with no failing
+ * project read both print the suite's own output whole, because the lines
+ * that explain them are exactly the ones a reader does not know.
+ */
+export async function spawnSuite(command: string, root: string, label: string): Promise<number | null> {
+  const reader = readerFor(command);
+  if (reader === null) {
+    return new Promise<number | null>((resolve) => {
+      const child = spawnCommand(command, { cwd: root, stdio: "inherit" });
+      child.on("error", () => resolve(null));
+      child.on("close", (code) => resolve(code));
+    });
+  }
+  const rawRel = `${TEST_OUTPUT_REL}/${label.replace(/[^\w.-]+/g, "_")}.log`;
+  const rawPath = join(root, rawRel);
+  mkdirSync(dirname(rawPath), { recursive: true });
+  writeFileSync(rawPath, "");
+
+  let projects = 0;
+  let failedProjects = 0;
+  let failures = 0;
+  const say = (line: string): void => {
+    for (const event of reader(line)) {
+      if (event.kind === "result" || event.kind === "none") projects += 1;
+      if (event.kind === "result" && event.failed > 0) failedProjects += 1;
+      if (event.kind === "failure" && (failures += 1) > FAILURES_NAMED) continue;
+      const { event: name, fields } = said(event);
+      sayEvent(name, fields);
+    }
+  };
+  // One pending line a stream: a chunk ends where the pipe cut it, not where a line does.
+  const lines = (): ((chunk: Buffer | null) => void) => {
+    let pending = "";
+    return (chunk) => {
+      if (chunk !== null) appendFileSync(rawPath, chunk);
+      const text = pending + (chunk === null ? "\n" : chunk.toString("utf8"));
+      const parts = text.split(/\r?\n/);
+      pending = chunk === null ? "" : (parts.pop() ?? "");
+      for (const line of parts) if (line !== "") say(line);
+    };
+  };
+  const status = await new Promise<number | null>((resolve) => {
+    const child = spawnCommand(command, {
+      cwd: root,
+      stdio: ["ignore", "pipe", "pipe"],
+      // Another locale's words are lines no reader knows.
+      env: { ...process.env, DOTNET_CLI_UI_LANGUAGE: "en" },
+    });
+    for (const stream of [child.stdout, child.stderr]) {
+      const take = lines();
+      stream?.on("data", take);
+      stream?.on("end", () => take(null));
+    }
+    child.on("error", () => resolve(null));
+    child.on("close", (code) => resolve(code));
+  });
+
+  if (failures > FAILURES_NAMED) sayEvent("tests-failed-unnamed", { count: failures - FAILURES_NAMED });
+  if (projects === 0 || (status !== 0 && failedProjects === 0)) writeOut(readFileSync(rawPath, "utf8"));
+  sayEvent("suite-output", { log: rawRel });
+  return status;
+}
+
+/** One line in the router's own voice, which the Dabbler Terminal draws as it draws the driver's. */
+function sayEvent(event: string, fields: Readonly<Record<string, string | number>>): void {
+  const extra = Object.entries(fields)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ");
+  writeOut(`dabbler [${nowIso("seconds").slice(11, 19)}] ${event}${extra ? ` ${extra}` : ""}\n`);
 }
 
 function runUsage(): string {

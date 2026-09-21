@@ -73,6 +73,11 @@ import * as path from "path";
 import * as vscode from "vscode";
 
 import {
+  TESTS_FAILED,
+  TESTS_NONE,
+  TESTS_PASSED,
+  TESTS_RUNNING,
+  TEST_FAILURE,
   WATCHER_QUIET,
   progressResumed,
   readUncollectedJob,
@@ -254,6 +259,46 @@ export function fieldTone(event: string, key: string, value: string): Tone {
   // prose painted whole is a wall.
   if (event === "paused" && key === "kind") return "warn";
   return "plain";
+}
+
+/**
+ * A suite's result events, drawn as a person reads a test run: a mark, the
+ * project, and its counts -- or null for every other event, which is drawn
+ * as `event key=value`.
+ *
+ * These are the router's own DECLARED events (`testOutput.ts`), read by name
+ * and by field, never a runner's prose recognised by its wording. A count is
+ * toned only when it is not zero, so the eye lands on what happened: passes
+ * green, failures red, tests that did not run amber, and a project that
+ * found no tests under a warning of its own rather than beside the greens.
+ */
+export function suiteResultSpans(event: string, fields: Record<string, string>): Span[] | null {
+  const plain = (text: string): Span => ({ text, tone: "plain", bold: false });
+  const project = fields["project"] ?? "";
+  if (event === TESTS_RUNNING) return [{ text: "running", tone: "muted", bold: false }, plain(` ${project}`)];
+  if (event === TESTS_NONE) {
+    return [{ text: "⚠", tone: "warn", bold: true }, plain(` ${project}: `), { text: "no tests found", tone: "warn", bold: false }];
+  }
+  if (event === TEST_FAILURE) {
+    const message = fields["message"] ?? "";
+    return [plain("  "), { text: fields["test"] ?? "", tone: "bad", bold: false }, plain(message === "" ? "" : `: ${message}`)];
+  }
+  if (event !== TESTS_PASSED && event !== TESTS_FAILED) return null;
+  const count = (key: string, word: string, tone: Tone): Span => {
+    const value = fields[key] ?? "0";
+    const counted = value !== "0";
+    return { text: `${value} ${word}`, tone: counted ? tone : "muted", bold: counted && tone === "bad" };
+  };
+  const passed = event === TESTS_PASSED;
+  return [
+    { text: passed ? "✔" : "✘", tone: passed ? "good" : "bad", bold: true },
+    plain(` ${project}: `),
+    count("pass", "pass", "good"),
+    plain(", "),
+    count("fail", "fail", "bad"),
+    plain(", "),
+    count("not_run", "not run", "warn"),
+  ];
 }
 
 /**
@@ -2058,6 +2103,14 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       typeof at === "string"
         ? at
         : [at.getHours(), at.getMinutes(), at.getSeconds()].map((part) => String(part).padStart(2, "0")).join(":");
+    const result = suiteResultSpans(event, fields);
+    if (result !== null) {
+      return renderSpans(
+        [{ text: clock, tone: "muted", bold: false }, { text: " ", tone: "plain", bold: false }, ...result],
+        this.columns,
+        this.theme,
+      );
+    }
     const tone = lineTone(event, fields);
     const spans: Span[] = [
       { text: clock, tone: "muted", bold: false },

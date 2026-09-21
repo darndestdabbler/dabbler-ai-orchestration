@@ -12121,6 +12121,30 @@
       "what": "step 'interrupt-says-what-happens': its files",
       "reason": "the driving guide quotes the reply this step changes",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 221,
+      "dateTime": "2026-09-21T03:18:53.036000-04:00",
+      "task": "Make a suite's run of record read as one line a test project for `dotnet test` and Maven Surefire, and no other framework. A new `testOutput.ts` holds two pure readers from a line of a suite's output to an event (project started; project result with passed, failed and not-run counts; project that found no tests; a failing test and its first message line), tested against trimmed real output. `dabbler test-evidence run` pipes the suite's output instead of inheriting it, writes every byte unchanged to a raw log, and prints the router's own event lines as events arrive -- never reordered, never buffered -- with the failing tests and the raw log's path under a failed project; a suite neither reader is for, or a run in which a reader recognised nothing, prints what it prints today, and the outcome stays the exit code. The Dabbler Terminal draws those events with a green check, a red cross or a warning mark and tones the counts. Separately, `session start` compares a chosen model to its role's list by the normalized token every other reader uses, so a vendor's dated id for a model the seat lists under its own name starts. version.json goes to 3.17.0 (a minor: a capability) with one changelog section covering this session and 220. Nothing is published by this session.",
+      "releasable": false,
+      "holdReason": "The operator walks a locally built 3.17.0 VSIX first and says whether it goes to the Marketplace; on their yes it is tagged with `dabbler release`, one release carrying sessions 220 and 221."
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 221,
+      "dateTime": "2026-09-21T03:25:08.435000-04:00",
+      "what": "step 'suite-output-readers': its files",
+      "reason": "a new module is declared in the boundary file, which the lint check holds",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 221,
+      "dateTime": "2026-09-21T03:34:26.024000-04:00",
+      "what": "step 'terminal-draws-results': its files",
+      "reason": "the terminal reads the event names from the router's own export rather than spelling them twice",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

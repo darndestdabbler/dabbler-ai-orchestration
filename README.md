@@ -65,6 +65,11 @@ Work Explorer.
 - **The Dabbler terminal**, beside it, only watches: the phase, who owes what
   and for how long, and each job's output as it runs. Closing it changes
   nothing about the session, and reopening it shows where the session is.
+  A `dotnet test` or Maven run reads as one line a test project —
+  `✔ CsvParser.Deserializer.Tests: 16 pass, 0 fail, 0 not run`, a red `✘`
+  with the failing tests named beneath it, `⚠ … no tests found` for a project
+  that ran nothing — and the suite's full output is kept in
+  `.dabbler/test-output/`.
 - **To say something to a running session**, tell the AI, or use `dabbler
   session interrupt --reason "..."` (Stop Session adds `--stop`): the AI gets
   it with its next instruction, and a stop ends the framework's work where it

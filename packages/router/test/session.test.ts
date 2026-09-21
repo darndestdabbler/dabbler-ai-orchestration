@@ -589,6 +589,29 @@ describe("why a start cannot reach its reviewer, and only the ways forward that 
       restore();
     }
   });
+
+  it("reads a chosen reviewer by the model it names, whichever spelling of it the list uses", () => {
+    // The operator picked a vendor's dated id on a machine whose list spells
+    // the same model its own way. The pane, `configuration explain` and the
+    // dispatch all took it; the start alone compared the strings.
+    const { root, restore } = checkout(TRANSPORT_API, ["DABBLER_ANTHROPIC_API_KEY", "DABBLER_OPENAI_API_KEY"]);
+    try {
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic", "openai"] },
+        models: [row("claude-haiku-4.5", "anthropic"), row("gpt-5.6-terra", "openai")],
+        retired: [],
+      });
+      writePreferences({ role: "reviewer", selected: "claude-haiku-4-5-20251001" });
+      assert.equal(configuredModelRefusal(root, "gpt-5.6-terra", "codex"), null);
+      // A model no spelling of which is listed is still refused.
+      writePreferences({ role: "reviewer", selected: "claude-haiku-9-20251001" });
+      assert.match(String(configuredModelRefusal(root, "gpt-5.6-terra", "codex")), /does not list it/);
+    } finally {
+      restore();
+    }
+  });
 });
 
 describe("registering a session", () => {

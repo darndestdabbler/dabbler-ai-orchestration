@@ -258,6 +258,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 218 | Replace the mailbox handoff with one chained exchange | no | 2026-09-20 |
 | 219 | Prove the installed conversation before the four soaks | yes | 2026-09-20 |
 | 220 | What 219 left owed | no | 2026-09-21 |
+| 221 | A suite's results read as one line a project | no | 2026-09-21 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2887,3 +2888,14 @@ Settle the three things session 219 recorded as owed. (1) 219 said a framework j
 **Amended after acceptance:**
 
 - 2026-09-21 — step 'interrupt-says-what-happens': its files: the driving guide quotes the reply this step changes (claude-code (anthropic, claude-opus-5))
+
+### Session 221 — A suite's results read as one line a project
+
+**Releasable: no — held: The operator walks a locally built 3.17.0 VSIX first and says whether it goes to the Marketplace; on their yes it is tagged with `dabbler release`, one release carrying sessions 220 and 221..**
+
+Make a suite's run of record read as one line a test project for `dotnet test` and Maven Surefire, and no other framework. A new `testOutput.ts` holds two pure readers from a line of a suite's output to an event (project started; project result with passed, failed and not-run counts; project that found no tests; a failing test and its first message line), tested against trimmed real output. `dabbler test-evidence run` pipes the suite's output instead of inheriting it, writes every byte unchanged to a raw log, and prints the router's own event lines as events arrive -- never reordered, never buffered -- with the failing tests and the raw log's path under a failed project; a suite neither reader is for, or a run in which a reader recognised nothing, prints what it prints today, and the outcome stays the exit code. The Dabbler Terminal draws those events with a green check, a red cross or a warning mark and tones the counts. Separately, `session start` compares a chosen model to its role's list by the normalized token every other reader uses, so a vendor's dated id for a model the seat lists under its own name starts. version.json goes to 3.17.0 (a minor: a capability) with one changelog section covering this session and 220. Nothing is published by this session.
+
+**Amended after acceptance:**
+
+- 2026-09-21 — step 'suite-output-readers': its files: a new module is declared in the boundary file, which the lint check holds (claude-code (anthropic, claude-opus-5))
+- 2026-09-21 — step 'terminal-draws-results': its files: the terminal reads the event names from the router's own export rather than spelling them twice (claude-code (anthropic, claude-opus-5))

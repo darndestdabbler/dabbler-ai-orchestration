@@ -80,6 +80,7 @@
       "comment": "The testing/fixing loop: evidence, selection of what a change owes, the fix loop, the authored-tests phase, the controls.",
       "members": [
         "testEvidence",
+        "testOutput",
         "affected",
         "facts"
       ]

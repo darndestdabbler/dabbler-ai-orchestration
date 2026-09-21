@@ -1037,7 +1037,12 @@ export function configuredModelRefusal(
     if (chosen === null || chosen.trim() === "" || role === null) return null;
     if (role["enumeration"] === ENUMERATION_CLI_ALIASES) return null;
     const candidates = modelsOf(role);
-    if (candidates.length === 0 || candidates.includes(chosen)) return null;
+    // By the normalized token, as the pane, `configuration explain` and the
+    // dispatch all read it: a vendor's dated id and a seat's own name for the
+    // same model are one model, and a start that alone held them apart
+    // refused a choice every other surface had accepted.
+    const token = normalizeModelToken(chosen);
+    if (candidates.length === 0 || candidates.some((listed) => normalizeModelToken(listed) === token)) return null;
     return (
       `${what} is set to '${chosen}', which is not one it can be: ${notACandidate(role, chosen)}. ` +
       `${offeredNames(candidates)} It was chosen in ${where}; ${fix} changes ` +

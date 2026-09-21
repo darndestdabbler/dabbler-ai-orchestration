@@ -137,6 +137,9 @@ export { loopAlive } from "./drive.ts";
 // terminal says the wait, and the reading belongs to the router that
 // defines the beacon.
 export { waiterSeenSince } from "./driver.ts";
+// The events a read suite is said in, so the Dabbler terminal draws them by
+// name rather than by a spelling of its own.
+export { TESTS_FAILED, TESTS_NONE, TESTS_PASSED, TESTS_RUNNING, TEST_FAILURE } from "./testOutput.ts";
 // WHERE that reading comes from, so a host can watch it.
 //
 // The catalog and this operator's preferences sit side by side in one

@@ -27,6 +27,7 @@ import {
   TRANSPORT_COPILOT_CLI,
   TRANSPORT_OFFLINE,
   loadConfig,
+  withSessionReviewers,
   resetProjectRootCache,
 } from "../src/config.ts";
 import { writePreferences } from "../src/preferences.ts";
@@ -586,6 +587,69 @@ describe("why a start cannot reach its reviewer, and only the ways forward that 
         /vehicle does not list it/,
       );
     } finally {
+      restore();
+    }
+  });
+
+  it("judges the reviewers THIS start names, the auxiliary included, over the repository's saved ones", () => {
+    // The operator started one session with a Claude author in a repository
+    // whose saved Primary Reviewer is Claude's, and was refused with no way
+    // to name another for that session. And a one-session author and primary
+    // routinely land on the saved auxiliary's vendor, which nothing said
+    // until the first dispute.
+    const { root, restore } = checkout(TRANSPORT_API, [
+      "DABBLER_ANTHROPIC_API_KEY",
+      "DABBLER_OPENAI_API_KEY",
+      "DABBLER_GEMINI_API_KEY",
+    ]);
+    try {
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic", "google", "openai"] },
+        models: [
+          row("claude-haiku-4.5", "anthropic"),
+          row("gpt-5.6-terra", "openai"),
+          row("gpt-5.6-sol", "openai"),
+          row("gemini-3.8-flash", "google"),
+        ],
+        retired: [],
+      });
+      writePreferences({ role: "reviewer", selected: "claude-haiku-4.5" });
+      const config = loadConfig(undefined, root);
+      const refusalFor = (named: Record<string, string>): string | null =>
+        reviewingVehicleRefusal(withSessionReviewers(config, named), root, "anthropic").refusal;
+
+      // The saved reviewer is the author's vendor: refused, as it always was.
+      assert.match(String(refusalFor({})), /never from the author's vendor/);
+      // A primary named for this session is the one judged.
+      assert.equal(refusalFor({ reviewer: "gpt-5.6-terra" }), null);
+      assert.match(String(refusalFor({ reviewer: "claude-haiku-4.5" })), /never from the author's vendor/);
+      // A named auxiliary is judged at the start: a third vendor passes, the
+      // named primary's and the author's are refused AS the auxiliary.
+      assert.equal(refusalFor({ reviewer: "gpt-5.6-terra", "auxiliary-reviewer": "gemini-3.8-flash" }), null);
+      for (const taken of ["gpt-5.6-sol", "claude-haiku-4.5"]) {
+        const refused = String(refusalFor({ reviewer: "gpt-5.6-terra", "auxiliary-reviewer": taken }));
+        assert.match(refused, /^the Auxiliary Reviewer cannot be reached/, refused);
+        assert.match(refused, /third voice/, refused);
+      }
+
+      // **An auxiliary NOBODY named is not judged at a start, whatever is
+      // saved.** A machine that reaches two vendors has no third voice for any
+      // session, and every ordinary start there registers: the auxiliary is
+      // resolved, and refused, at a dispute. So a start that names a primary
+      // and no auxiliary registers too -- with the repository's saved
+      // auxiliary on the author's vendor, and again on the named primary's.
+      for (const saved of ["claude-haiku-4.5", "gpt-5.6-sol"]) {
+        writePreferences({ role: "auxiliary-reviewer", selected: saved });
+        const unnamed = withSessionReviewers(loadConfig(undefined, root), { reviewer: "gpt-5.6-terra" });
+        assert.equal(reviewingVehicleRefusal(unnamed, root, "anthropic").refusal, null, saved);
+        // The same saved auxiliary, NAMED for the session, is what is refused.
+        assert.match(String(refusalFor({ reviewer: "gpt-5.6-terra", "auxiliary-reviewer": saved })), /third voice/);
+      }
+    } finally {
+      writePreferences({ role: "reviewer", selected: "" });
+      writePreferences({ role: "auxiliary-reviewer", selected: "" });
       restore();
     }
   });

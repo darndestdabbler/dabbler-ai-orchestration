@@ -41,6 +41,14 @@ export type SessionsSessionRecord = {
    */
   frameworkVersion?: string;
   /**
+   * The Primary Reviewer's model THIS session was started with, where its start named one. A session's own and nobody else's: it is read ahead of the checkout's setting and the machine's default for this session alone, and it writes neither. Absent where the start named none, which is every ordinary Start Session.
+   */
+  reviewerModel?: string;
+  /**
+   * The Auxiliary Reviewer's model this session was started with, where its start named one. Read and kept exactly as reviewerModel is. It is here because a one-session author and primary routinely land on the saved auxiliary's vendor, and an auxiliary is never from either.
+   */
+  auxiliaryModel?: string;
+  /**
    * The module(s) the accepted work plan named, by slug, written by the declaring writer for a multi-module solution only. Absent on every session of a single-module repository and on every row written before the vocabulary existed: nothing module-shaped is persisted for that shape.
    */
   modules?: string[];

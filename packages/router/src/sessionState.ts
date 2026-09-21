@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { STATE_FILENAME } from "./evidence.ts";
+import { STATE_FILENAME, sessionsDirFor } from "./evidence.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -42,4 +42,33 @@ export function readRawSessionState(
     throw error;
   }
   return isRecord(raw) ? raw : null;
+}
+
+/**
+ * The reviewers ONE session was started with, by role, read off its own row.
+ *
+ * Empty for a session whose start named none -- every ordinary start -- and
+ * for a caller that names no repository or no session, which is a dispatch
+ * that is not a session's. Keyed by role as selection names them, so the
+ * reading that consumes it needs no second spelling.
+ */
+export function namedReviewers(
+  repoRoot: string | null,
+  sessionNumber: number | null,
+): Record<string, string> {
+  if (repoRoot === null || sessionNumber === null) return {};
+  const sessions = readRawSessionState(sessionsDirFor(repoRoot))?.["sessions"];
+  const row = (Array.isArray(sessions) ? sessions : []).find(
+    (entry) => isRecord(entry) && entry["number"] === sessionNumber,
+  );
+  if (!isRecord(row)) return {};
+  const named: Record<string, string> = {};
+  for (const [role, key] of [
+    ["reviewer", "reviewerModel"],
+    ["auxiliary-reviewer", "auxiliaryModel"],
+  ] as const) {
+    const model = row[key];
+    if (typeof model === "string" && model.trim() !== "") named[role] = model.trim();
+  }
+  return named;
 }

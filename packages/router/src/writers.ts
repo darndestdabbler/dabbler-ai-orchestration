@@ -305,6 +305,10 @@ function buildSessionsArray(
       // session with the version running today, which would make every
       // row claim the framework that last touched the file.
       "frameworkVersion",
+      // The reviewers a session was started with are that session's own:
+      // a rebuild for a LATER registration must leave an earlier row's.
+      "reviewerModel",
+      "auxiliaryModel",
       // The declaration's modules, written once by the declaring writer.
       "modules",
     ]) {
@@ -358,6 +362,13 @@ export interface RegisterOptions {
   readonly model?: string | null;
   readonly effort?: string | null;
   readonly totalSessions?: number | null;
+  /**
+   * The reviewers THIS session was started with, where its start named them.
+   * The session's own: they are recorded on its row and written nowhere else,
+   * so the repository's choice and the machine's default are as they were.
+   */
+  readonly reviewerModel?: string | null;
+  readonly auxiliaryModel?: string | null;
 }
 
 /**
@@ -458,6 +469,16 @@ export function stateAfterStart(
       options.effort,
     );
     record["verificationVerdict"] = null;
+    // What this start named and nothing a restarted row carried from the last
+    // one: a session started again without them is reviewed by the
+    // repository's own reviewers, as every ordinary start is.
+    for (const [key, named] of [
+      ["reviewerModel", options.reviewerModel],
+      ["auxiliaryModel", options.auxiliaryModel],
+    ] as const) {
+      if (typeof named === "string" && named.trim() !== "") record[key] = named.trim();
+      else delete record[key];
+    }
     // Stamped at the start, where the session's identity is settled, and
     // never afterwards: it says which framework REGISTERED this session,
     // which is a fact about the row and not about the reader.

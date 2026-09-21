@@ -95,9 +95,33 @@ work.
 
 **You —** run **Start Session with Different Models...** on the same row.
 
-Expect: the engine list, then the model list, as Start used to show them.
-Press Escape at the first one: nothing starts and nothing is written —
-`git -C <path to A> status --short` shows no change from it.
+Expect four questions, in this order: the engine, its model, the *Primary
+Reviewer*, the *Auxiliary Reviewer*. Press Escape at the first one: nothing
+starts and nothing is written — `git -C <path to A> status --short` shows no
+change from it.
+
+Then walk the case this command exists for. Run it again and pick an engine
+**from the same vendor as A's saved Primary Reviewer** — if A reviews with a
+Claude model, pick Claude Code. Expect:
+
+- the *Primary Reviewer* list does **not** offer A's saved reviewer, or any
+  model of that vendor: a reviewer is never from the author's vendor;
+- the *Auxiliary Reviewer* list offers nothing from the author's vendor or
+  from the vendor of the primary you just picked, and shows A's own
+  auxiliary first where it may still serve;
+- the session starts. Afterwards A's Configuration and
+  `.vscode/settings.json` are exactly as they were — the three choices were
+  this session's only, and `dabbler configuration explain` in A still shows
+  A's saved reviewer.
+
+Close the AI's terminal and cancel the session it registered, as above.
+
+On a machine that reaches only two vendors there is no third for the
+Auxiliary once the author and the primary have taken one each. The command
+says so instead of asking — that the session can run and be verified, and
+that a disputed finding would stop it for you — and starts only if you choose
+*Start Without an Auxiliary*. That is the same position every session on such
+a machine is already in; the difference is that you are told.
 
 If A's Configuration names no engine — or a Copilot seat and no model — Start
 starts nothing: it says which row is missing a choice and brings the Solution

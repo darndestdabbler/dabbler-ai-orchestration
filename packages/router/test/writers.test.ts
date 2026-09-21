@@ -25,6 +25,7 @@ import {
   parseStepTexts,
   splitSlugMarker,
 } from "../src/session.ts";
+import { namedReviewers } from "../src/sessionState.ts";
 import { VERSION } from "../src/version.ts";
 import {
   KIND_AMENDMENT,
@@ -255,6 +256,41 @@ describe("registering a session start", () => {
     const rebuilt = registerSessionStart(sessionsDir, 2, { engine: "claude-code" })["sessions"] as Record<string, unknown>[];
     assert.equal(rebuilt[0]["frameworkVersion"], "1.1.0");
     assert.equal(rebuilt[1]["frameworkVersion"], VERSION);
+  });
+
+  it("records the reviewers a start named on that session's row, keeps an earlier session's, and clears them on a restart without them", () => {
+    // A reviewer chosen for one session is that session's own: on its row and
+    // written nowhere else, so the repository's choice and the machine's
+    // default are as they were.
+    const { repo, sessionsDir } = makeSessionsDir();
+    const named = registerSessionStart(sessionsDir, 1, {
+      engine: "claude-code",
+      reviewerModel: "gpt-5.6-sol",
+      auxiliaryModel: " gemini-3.8-flash ",
+    })["sessions"] as Record<string, unknown>[];
+    assert.equal(named[0]["reviewerModel"], "gpt-5.6-sol");
+    assert.equal(named[0]["auxiliaryModel"], "gemini-3.8-flash");
+    assert.equal("reviewerModel" in named[1], false);
+    // And a round reads them back by role, for THAT session and no other:
+    // it is how a dispatch finds them without being told.
+    assert.deepEqual(namedReviewers(repo, 1), { reviewer: "gpt-5.6-sol", "auxiliary-reviewer": "gemini-3.8-flash" });
+    assert.deepEqual(namedReviewers(repo, 2), {});
+    assert.deepEqual(namedReviewers(null, 1), {});
+
+    // Started again with none named: the ordinary start, reviewed by the repository's own.
+    const again = registerSessionStart(sessionsDir, 1, { engine: "claude-code" })["sessions"] as Record<string, unknown>[];
+    assert.equal("reviewerModel" in again[0], false);
+    assert.equal("auxiliaryModel" in again[0], false);
+
+    // A later session's registration leaves an earlier session's reviewers on its row.
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code", reviewerModel: "gpt-5.6-sol" });
+    const path = join(sessionsDir, "sessions.json");
+    const state = JSON.parse(readFileSync(path, "utf8"));
+    state.sessions[0].status = "complete";
+    writeFileSync(path, JSON.stringify(state), "utf8");
+    const later = registerSessionStart(sessionsDir, 2, { engine: "claude-code" })["sessions"] as Record<string, unknown>[];
+    assert.equal(later[0]["reviewerModel"], "gpt-5.6-sol");
+    assert.equal("reviewerModel" in later[1], false);
   });
 
   it("drops a stale verification summary when a session is restarted", () => {

@@ -263,6 +263,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 223 | A Maven release can start, and a job's output is one piece | no | 2026-09-21 |
 | 224 | Every configured choice is the repository's, and the machine's is its default | no | 2026-09-21 |
 | 225 | Start asks nothing, and the Configuration is this repository's | no | 2026-09-21 |
+| 226 | Different models means the reviewers too | no | 2026-09-21 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2937,3 +2938,15 @@ The extension's half of the operator's six rules of 2026-09-21 for where a confi
 **Amended after acceptance:**
 
 - 2026-09-21 — step 'start-asks-nothing': its files: the new command is registered beside Start in sessionCommands.ts and shares its menu's when-clause, so extension.ts and the action registry did not change (claude-code (anthropic, claude-opus-5))
+
+### Session 226 — Different models means the reviewers too
+
+**Releasable: no — held: It rides in the 3.18.0 the operator is walking as a local VSIX; nothing is tagged until they say so..**
+
+Start Session with Different Models... asks for the engine and the authoring model and nothing else, so the choices that most often have to change with the author -- the two reviewers, neither ever from the author's vendor and the Auxiliary never from the Primary's -- cannot be made for one session. The operator met it in csv-parser, where a Claude author was refused because that repository's saved Primary Reviewer is Claude's, and asked the same morning whether the Auxiliary must be selectable too: yes, because a one-session author and primary routinely land on the saved auxiliary's vendor, nothing says so at the start, and the session stops at its first dispute. `dabbler session start --reviewer-model <id> --auxiliary-model <id>` records each on the session's own ledger row and writes no setting; each reviewing role's model is then read as the session's own, then this checkout's, then the machine's default, through the one reading the start's check and the round both use; the start judges the reviewers it names; and the command asks for both after the engine and the authoring model, each list narrowed by the picks before it. Start Session itself still asks nothing. It rides in the unpublished 3.18.0; nothing is published by this session.
+
+**Amended after acceptance:**
+
+- 2026-09-21 — step 'a-session-carries-its-reviewers': its files: the verb's parser already takes any flag with a value, so the behaviour is the writer's and is tested there; the verb-to-row path is held by step 2's start test (claude-code (anthropic, claude-opus-5))
+- 2026-09-21 — step 'one-reading-session-first': its files: the round reads a session's named reviewers off its ledger row through a reader in sessionState.ts, which is tested where such a row is written (claude-code (anthropic, claude-opus-5))
+- 2026-09-21 — step 'different-models-asks-for-the-reviewers': its files: the reading for the author about to be launched takes the authoring model as well as the engine, which host.ts's signature had to admit (claude-code (anthropic, claude-opus-5))

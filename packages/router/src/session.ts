@@ -48,6 +48,8 @@ import {
   explainAuthoringModel,
   explainReviewingTransport,
   loadConfig,
+  sessionReviewerOf,
+  withSessionReviewers,
   type RouterConfig,
 } from "./config.ts";
 import {
@@ -104,7 +106,7 @@ import {
   prose,
   seatLadder,
 } from "./route.ts";
-import { ROLE_PRIMARY_REVIEWER } from "./selection.ts";
+import { ROLE_AUXILIARY_REVIEWER, ROLE_PRIMARY_REVIEWER } from "./selection.ts";
 import { seatModels } from "./transports/copilot.ts";
 import {
   ENUMERATION_CLI_ALIASES,
@@ -636,6 +638,13 @@ export interface StartOptions {
   readonly provider?: string | null;
   readonly model?: string | null;
   readonly effort?: string | null;
+  /**
+   * The reviewers for THIS session, where the start names them. Recorded on
+   * the session's row and written nowhere else: the repository's own choice
+   * and the machine's default are as they were.
+   */
+  readonly reviewerModel?: string | null;
+  readonly auxiliaryModel?: string | null;
   readonly sessionNumber?: number | null;
   readonly totalSessions?: number | null;
   /** The free catalog refresh a start runs first; a test speaks through it. */
@@ -1117,12 +1126,26 @@ export function reviewingVehicleRefusal(
   const reading = explainReviewingTransport(config, null, checkout);
   const exclude = [authorProvider];
   const credentials = reading.transport === TRANSPORT_API ? credentialStops(config, exclude) : [];
+  /** The role's ladder on the reviewing vehicle, or nothing on a vehicle that has none to climb. */
+  const ladder = (role: string, without: readonly string[]): ReadonlyArray<{ provider: string }> =>
+    reading.transport === TRANSPORT_API
+      ? apiLadder(config, role, "session-verification", without)
+      : reading.transport === TRANSPORT_COPILOT_CLI
+        ? // Null is a seat never read, which the ladder tells from a seat that lists nothing.
+          seatLadder(config, seatModels(), role, without)
+        : [];
+  let judging = "the Primary Reviewer";
   try {
-    if (reading.transport === TRANSPORT_API) {
-      apiLadder(config, ROLE_PRIMARY_REVIEWER, "session-verification", exclude);
-    } else if (reading.transport === TRANSPORT_COPILOT_CLI) {
-      // Null is a seat never read, which the ladder tells from a seat that lists nothing.
-      seatLadder(config, seatModels(), ROLE_PRIMARY_REVIEWER, exclude);
+    const primary = ladder(ROLE_PRIMARY_REVIEWER, exclude);
+    // **An auxiliary THIS start named is judged here, not at a dispute.** It
+    // is never the author's vendor and never the primary's, and a session
+    // started with an author and a primary of its own routinely lands on the
+    // saved auxiliary's vendor -- so the one who named it is told now, while
+    // they can still name another. One nobody named is judged at the dispute,
+    // as it always was: a start cannot know what a round will fall to.
+    if (sessionReviewerOf(config, ROLE_AUXILIARY_REVIEWER) !== null) {
+      judging = "the Auxiliary Reviewer";
+      ladder(ROLE_AUXILIARY_REVIEWER, [...exclude, ...(primary[0] ? [primary[0].provider] : [])]);
     }
   } catch (error) {
     if (!(error instanceof NoCandidateError)) throw error;
@@ -1150,9 +1173,9 @@ export function reviewingVehicleRefusal(
           : [];
     return {
       refusal:
-        `the Primary Reviewer cannot be reached on the reviewing vehicle ` +
+        `${judging} cannot be reached on the reviewing vehicle ` +
         `'${reading.transport}', which ${chose}, outside the author's provider ` +
-        `(${authorProvider}): ${error.message}` +
+        `(${authorProvider})${judging === "the Auxiliary Reviewer" ? " and the Primary Reviewer's" : ""}: ${error.message}` +
         (credentials.length > 0 ? ` ${credentials.join(" ")}` : "") +
         (forward.length > 0 ? ` Also: ${forward.join("; ")}.` : ""),
       warnings: [],
@@ -1339,7 +1362,12 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     // mid-session; anything the session does not call says nothing.
     try {
       const use = sessionUseReading(
-        loadConfig(undefined, checkout),
+        // With the reviewers THIS start names, so the check judges the session
+        // that would run and not the repository's saved choice.
+        withSessionReviewers(loadConfig(undefined, checkout), {
+          [ROLE_PRIMARY_REVIEWER]: options.reviewerModel,
+          [ROLE_AUXILIARY_REVIEWER]: options.auxiliaryModel,
+        }),
         checkout,
         identity.engine,
         authorProvider,
@@ -1415,6 +1443,8 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       model: identity.model,
       effort: identity.effort,
       totalSessions: options.totalSessions,
+      reviewerModel: options.reviewerModel ?? null,
+      auxiliaryModel: options.auxiliaryModel ?? null,
     });
     writeOut(
       `start: session ${sessionDisplayNumber(requested)} of ${basename(sessionsDir)} registered (${options.engine}).\n`,

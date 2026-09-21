@@ -74,8 +74,9 @@ to the repository's own `.vscode/settings.json`, so two repositories open in
 two windows keep their own, and each row says whether what it shows is `this
 repository`'s or the `machine default` a repository falls back to. **Keep as
 Machine Default** makes a row's value that default; **Start Session with
-Different Models...** asks for an engine and a model for one session and
-writes neither down.
+Different Models...** asks for the engine, its model and both reviewers for
+one session — each list narrowed to what the picks before it allow, since a
+reviewer is never from the author's vendor — and writes none of them down.
 
 Start Session registers the session and opens your AI's own CLI beside the
 Dabbler terminal. Your AI asks the framework for an instruction once, does what it

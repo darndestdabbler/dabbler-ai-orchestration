@@ -20,6 +20,7 @@ import {
 } from "../../commands/bootstrapProject";
 import {
   ENGINES,
+  START_WITHOUT_AUXILIARY,
   type EngineTerminal,
   type SessionRegistrar,
   type SessionRunUi,
@@ -390,6 +391,7 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     engineKnowsModel: async () => null,
     pickEngine: async () => ENGINES[0],
     askModel: async () => "haiku",
+    askReviewer: async (_role, models) => models[0]?.model,
     confirm: async () => false,
     choose: async () => undefined,
     report: () => undefined,
@@ -791,6 +793,116 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(await runStartSession(makeRepository(), different.ui, once, true), true);
     assert.deepStrictEqual(askedFor, ["engine", "model"]);
     assert.ok((once.calls[0]?.join(" ") ?? "").includes("--engine claude-code"));
+  });
+
+  test("Different Models asks for the reviewers too, each narrowed by the picks before it, and writes nothing", async () => {
+    // The operator started one session with a Claude author in a repository
+    // whose saved reviewer is Claude's, and had no way to name another for
+    // that session. And an auxiliary is never the author's vendor or the
+    // primary's, so a one-session author and primary usually need one too.
+    const offered: Record<string, string[]> = {};
+    const answers: Record<string, string> = { "Primary Reviewer": "gpt-5.6-sol", "Auxiliary Reviewer": "gemini-3.8-flash" };
+    // As the router reads it for a Claude author: the repository's own
+    // reviewer is Claude's, which it marks as a conflict with this author.
+    const role = (selected: string) => ({
+      selected,
+      chosen: null,
+      excludes: [],
+      fellThrough: false,
+      candidates: [
+        { model: "claude-haiku-4.5", provider: "anthropic", conflict: "not usable while authoring is Anthropic" },
+        { model: "gpt-5.6-sol", provider: "openai" },
+        { model: "gpt-5.6-terra", provider: "openai" },
+        { model: "gemini-3.8-flash", provider: "google" },
+      ],
+    });
+    const configurationFor = () => ({
+      authoring: { provider: "anthropic" },
+      primaryReviewer: role("claude-haiku-4.5"),
+      auxiliaryReviewer: role("gemini-3.8-flash"),
+    });
+    const different = driveUi({
+      configurationFor,
+      askModel: async () => "",
+      askReviewer: async (role, models) => {
+        offered[role] = models.map((row) => `${row.model}/${row.provider}`);
+        return answers[role];
+      },
+    });
+    const register = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository(), different.ui, register, true), true);
+    const args = register.calls[0]?.join(" ") ?? "";
+    assert.ok(args.includes("--reviewer-model gpt-5.6-sol") && args.includes("--auxiliary-model gemini-3.8-flash"), args);
+    // The primary's list leaves out the author's vendor -- the repository's own
+    // reviewer, here -- on the router's word, not on a rule restated in the editor.
+    assert.deepStrictEqual(offered["Primary Reviewer"], ["gpt-5.6-sol/openai", "gpt-5.6-terra/openai", "gemini-3.8-flash/google"]);
+    // The auxiliary's list is what the PRIMARY'S pick left: nothing of OpenAI's,
+    // and the repository's own auxiliary first, since it may still serve.
+    assert.deepStrictEqual(offered["Auxiliary Reviewer"], ["gemini-3.8-flash/google"]);
+    assert.ok((offered["Auxiliary Reviewer"] ?? []).every((row) => !row.endsWith("/openai")), String(offered["Auxiliary Reviewer"]));
+
+    // Ordinary Start asks for neither and names neither.
+    const ordinary = driveUi({
+      configured: () => ({ picked: ENGINES[0], model: "" }),
+      askReviewer: async () => { throw new Error("Start Session asks nothing"); },
+    });
+    const plain = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository(), ordinary.ui, plain), true);
+    assert.ok(!(plain.calls[0]?.join(" ") ?? "").includes("-model"), plain.calls[0]?.join(" "));
+
+    // A dismissed reviewer cancels the start: nothing is registered.
+    const dismissed = driveUi({ configurationFor, askModel: async () => "", askReviewer: async () => undefined });
+    const none = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository(), dismissed.ui, none, true), false);
+    assert.deepStrictEqual(none.calls, []);
+  });
+
+  test("says so when no reviewer can be named, and never starts a session it was silent about", async () => {
+    // A machine that reaches two vendors and no third is the documented
+    // minimum: the author takes one, the primary the other, and NO auxiliary
+    // exists for any session there. Skipping the question silently started
+    // the very session this command exists to prevent -- one that stops at
+    // its first dispute, with nobody told.
+    const rows = (...pairs: Array<[string, string, string?]>) =>
+      pairs.map(([model, provider, conflict]) => ({ model, provider, ...(conflict ? { conflict } : {}) }));
+    const reading = (candidates: ReturnType<typeof rows>) => () => ({
+      authoring: { provider: "anthropic" },
+      primaryReviewer: { selected: null, chosen: null, excludes: [], fellThrough: false, candidates },
+      auxiliaryReviewer: { selected: null, chosen: null, excludes: [], fellThrough: false, candidates },
+    });
+    const twoVendors = reading(rows(["claude-haiku-4.5", "anthropic", "not usable while authoring is Anthropic"], ["gpt-5.6-sol", "openai"]));
+
+    // No third vendor: said, with what it means, and the person decides.
+    const asked: string[][] = [];
+    const declined = driveUi({
+      configurationFor: twoVendors,
+      askModel: async () => "",
+      choose: async (message, actions) => { asked.push([message, ...actions]); return undefined; },
+    });
+    const none = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository(), declined.ui, none, true), false);
+    assert.deepStrictEqual(none.calls, []);
+    assert.strictEqual(asked.length, 1);
+    assert.ok(asked[0]?.[0]?.includes("No Auxiliary Reviewer can be named"), asked[0]?.[0]);
+    assert.ok(asked[0]?.[0]?.includes("stops for you"), asked[0]?.[0]);
+    assert.deepStrictEqual(asked[0]?.slice(1), [START_WITHOUT_AUXILIARY]);
+
+    // Taken knowingly, it starts with the primary named and no auxiliary.
+    const accepted = driveUi({ configurationFor: twoVendors, askModel: async () => "", choose: async () => START_WITHOUT_AUXILIARY });
+    const started = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository(), accepted.ui, started, true), true);
+    const args = started.calls[0]?.join(" ") ?? "";
+    assert.ok(args.includes("--reviewer-model gpt-5.6-sol") && !args.includes("--auxiliary-model"), args);
+
+    // Nothing may review this author at all: said, and nothing is started.
+    const oneVendor = driveUi({
+      configurationFor: reading(rows(["claude-haiku-4.5", "anthropic", "not usable while authoring is Anthropic"])),
+      askModel: async () => "",
+    });
+    const refused = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository(), oneVendor.ui, refused, true), false);
+    assert.deepStrictEqual(refused.calls, []);
+    assert.ok(oneVendor.errors[0]?.includes("never from the author's vendor"), oneVendor.errors[0]);
   });
 
   test("a Configuration that cannot start a session says what it lacks and opens it, and asks for nothing itself", async () => {

@@ -796,6 +796,18 @@ describe("the engine and a reviewer's model, read through the layers", () => {
       assert.equal(keptIn(explainRoleModel("reviewer", other)), "machine");
       assert.equal(keptIn(explainRoleModel("auxiliary-reviewer", mine)), "default");
       assert.equal(layerOfSource("transport.profile"), "shipped");
+      // A reviewer ONE SESSION was started with is read ahead of everything
+      // kept anywhere -- and is not itself a place a choice is kept, so where
+      // the choice is KEPT still answers with the layer beneath it.
+      const forOneSession = explainRoleModel("reviewer", mine, "gemini-3.8-flash");
+      assert.equal(forOneSession.transport, "gemini-3.8-flash");
+      assert.match(String(forOneSession.decidedBy), /this session's start/);
+      assert.deepEqual(forOneSession.layers.map((layer) => layer.value), [
+        "gemini-3.8-flash",
+        "claude-haiku-4.5",
+        "gpt-5.6-terra",
+      ]);
+      assert.equal(keptIn(forOneSession), "checkout");
       // A source no reading declares is a bug, said loudly rather than read as a default.
       assert.throws(() => layerOfSource("somewhere nobody declared"), /no reading declares/);
       // Nobody chose an auxiliary anywhere, which is not a default.

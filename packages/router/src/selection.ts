@@ -16,7 +16,7 @@
 // A provider whose key does not resolve is not a candidate anywhere:
 // selection can never land on a model the process could not call.
 
-import { checkoutOf, explainRoleModel, truthy, type RouterConfig } from "./config.ts";
+import { checkoutOf, explainRoleModel, sessionReviewerOf, truthy, type RouterConfig } from "./config.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
 import { providerSecret } from "./credentials.ts";
 
@@ -192,7 +192,7 @@ export function roleDeclaration(
   // only on the machine was one reviewer for every repository on it.
   // Of the checkout this configuration was loaded FOR, which for a pane is
   // never the directory the call is standing in.
-  const chosen = explainRoleModel(role, checkoutOf(config));
+  const chosen = explainRoleModel(role, checkoutOf(config), sessionReviewerOf(config, role));
   return { prefer, selected: chosen.decidedBy === null ? null : chosen.transport };
 }
 

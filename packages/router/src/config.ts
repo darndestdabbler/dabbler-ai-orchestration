@@ -1058,6 +1058,8 @@ export function explainAuthoringModel(
 /** Where a reviewing role's model, or the engine, can be named: a flag, this checkout, this machine. */
 export const REVIEWER_MODEL_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_REVIEWER_MODEL})`;
 export const AUXILIARY_MODEL_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_AUXILIARY_MODEL})`;
+export const REVIEWER_MODEL_SOURCE_SESSION = "this session's start (--reviewer-model)";
+export const AUXILIARY_MODEL_SOURCE_SESSION = "this session's start (--auxiliary-model)";
 export const ENGINE_SOURCE_FLAG = "--engine on this call";
 export const ENGINE_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_ENGINE})`;
 export const ENGINE_SOURCE_PREFERENCES = "preferences.json (engine)";
@@ -1093,7 +1095,9 @@ export function layerOfSource(source: string): Exclude<ChoiceLayer, "default"> |
   if (
     source === TRANSPORT_SOURCE_FLAG ||
     source === AUTHORING_MODEL_SOURCE_FLAG ||
-    source === ENGINE_SOURCE_FLAG
+    source === ENGINE_SOURCE_FLAG ||
+    source === REVIEWER_MODEL_SOURCE_SESSION ||
+    source === AUXILIARY_MODEL_SOURCE_SESSION
   ) {
     return null;
   }
@@ -1147,11 +1151,43 @@ function explainChoice(candidates: ReadonlyArray<readonly [string, unknown]>): T
   };
 }
 
-/** The checkout setting a reviewing role's model is named by, or null for a role that has none. */
-function roleModelSetting(role: string): readonly [SettingKey, string] | null {
-  if (role === "reviewer") return [SETTING_REVIEWER_MODEL, REVIEWER_MODEL_SOURCE_SETTINGS];
-  if (role === "auxiliary-reviewer") return [SETTING_AUXILIARY_MODEL, AUXILIARY_MODEL_SOURCE_SETTINGS];
+/** The checkout setting a reviewing role's model is named by, and what a session's own choice of it is called; null for a role that has neither. */
+function roleModelSetting(role: string): readonly [SettingKey, string, string] | null {
+  if (role === "reviewer") return [SETTING_REVIEWER_MODEL, REVIEWER_MODEL_SOURCE_SETTINGS, REVIEWER_MODEL_SOURCE_SESSION];
+  if (role === "auxiliary-reviewer") {
+    return [SETTING_AUXILIARY_MODEL, AUXILIARY_MODEL_SOURCE_SETTINGS, AUXILIARY_MODEL_SOURCE_SESSION];
+  }
   return null;
+}
+
+/** Where a configuration carries the reviewers ONE SESSION was started with. */
+export const CONFIG_SESSION_REVIEWERS_KEY = "_session_reviewers";
+
+/**
+ * This configuration, for a session that was started with reviewers of its
+ * own. A copy: the configuration it came from is somebody else's too.
+ *
+ * A reviewer chosen for one session is read ahead of the checkout's and the
+ * machine's -- for that session -- and is written to neither. It rides on the
+ * configuration, as the checkout does, so the start's check and the round
+ * read it through the one reading rather than each being told.
+ */
+export function withSessionReviewers(
+  config: RouterConfig,
+  named: Readonly<Record<string, string | null | undefined>>,
+): RouterConfig {
+  const kept: Record<string, string> = {};
+  for (const [role, model] of Object.entries(named)) {
+    if (typeof model === "string" && model.trim() !== "") kept[role] = model.trim();
+  }
+  return Object.keys(kept).length === 0 ? config : { ...config, [CONFIG_SESSION_REVIEWERS_KEY]: kept };
+}
+
+/** The model this configuration's session was started with for `role`, or null. */
+export function sessionReviewerOf(config: RouterConfig, role: string): string | null {
+  const named = config[CONFIG_SESSION_REVIEWERS_KEY];
+  const model = typeof named === "object" && named !== null ? (named as Record<string, unknown>)[role] : null;
+  return typeof model === "string" && model !== "" ? model : null;
 }
 
 /**
@@ -1165,9 +1201,15 @@ function roleModelSetting(role: string): readonly [SettingKey, string] | null {
  * looking for a repository around the process instead would answer for
  * whichever one the call happened to be standing in.
  */
-export function explainRoleModel(role: string, root: string | null): TransportReading {
+export function explainRoleModel(
+  role: string,
+  root: string | null,
+  session: string | null = null,
+): TransportReading {
   const setting = roleModelSetting(role);
   return explainChoice([
+    // What THIS session was started with, ahead of everything kept anywhere.
+    ...(setting === null ? [] : [[setting[2], session] as const]),
     ...(setting === null || root === null
       ? []
       : [[setting[1], checkoutSettings(root)[setting[0]] ?? null] as const]),

@@ -33,7 +33,7 @@ import {
   type Candidate,
 } from "../src/selection.ts";
 import { writePreferences } from "../src/preferences.ts";
-import { CONFIG_CHECKOUT_KEY } from "../src/config.ts";
+import { CONFIG_CHECKOUT_KEY, withSessionReviewers } from "../src/config.ts";
 import { SETTING_REVIEWER_MODEL, writeSettings } from "../src/settings.ts";
 import { makeConfig, setProviderKeys, tempDir } from "./support/answers.ts";
 
@@ -294,6 +294,13 @@ describe("a model a person selected", () => {
     assert.deepEqual(ids(resolveRole(here, ROLE_PRIMARY_REVIEWER, CANDIDATES)), ["g-one"]);
     // And a configuration OF no checkout never reads one, whatever is around it.
     assert.equal(roleDeclaration(makeConfig(), ROLE_PRIMARY_REVIEWER).selected, "o-one");
+    // The reviewer ONE SESSION was started with outranks both, for that
+    // session's configuration alone: the checkout's is as it was.
+    const oneSession = withSessionReviewers(here, { [ROLE_PRIMARY_REVIEWER]: "a-one" });
+    assert.equal(roleDeclaration(oneSession, ROLE_PRIMARY_REVIEWER).selected, "a-one");
+    assert.equal(roleDeclaration(here, ROLE_PRIMARY_REVIEWER).selected, "g-one");
+    // A start that named none is the configuration it was given.
+    assert.equal(withSessionReviewers(here, { [ROLE_PRIMARY_REVIEWER]: null }), here);
   });
 });
 

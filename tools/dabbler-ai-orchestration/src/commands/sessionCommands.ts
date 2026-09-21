@@ -203,7 +203,7 @@ export function defaultSessionRegistrar(cli: string | null = resolveRouterCli())
 }
 
 /** The `session start` arguments for a choice: the identity, recorded by the framework rather than typed by anyone. */
-export function startArguments(choice: EngineChoice, model: string): string[] {
+export function startArguments(choice: EngineChoice, model: string, reviewers: SessionReviewers = {}): string[] {
   const args = [
     "session",
     "start",
@@ -215,6 +215,10 @@ export function startArguments(choice: EngineChoice, model: string): string[] {
     choice.provider,
   ];
   if (model.trim() !== "") args.push("--model", model.trim());
+  // For THIS session and written nowhere: the router records them on the
+  // session's own row, and the repository's Configuration is as it was.
+  if (reviewers.reviewer) args.push("--reviewer-model", reviewers.reviewer);
+  if (reviewers.auxiliary) args.push("--auxiliary-model", reviewers.auxiliary);
   return args;
 }
 
@@ -305,6 +309,97 @@ function chosenPrimaryReviewer(root: string, engine: string): ConfigurationModel
 /** The ids a reading lists, blanks dropped. */
 function listedModels(authoring: ConfigurationRole | undefined): ConfigurationModel[] {
   return (authoring?.candidates ?? []).filter((row) => String(row.model ?? "") !== "");
+}
+
+/** The reviewers one session is started with; a role left out is the repository's own, as at any start. */
+export interface SessionReviewers {
+  readonly reviewer?: string;
+  readonly auxiliary?: string;
+}
+
+/** A role's models that `allowed` admits, the repository's own choice first so an unchanged one is one Enter. */
+function reviewerChoices(
+  role: ConfigurationRole | undefined,
+  allowed: (row: ConfigurationModel) => boolean,
+): ConfigurationModel[] {
+  const rows = listedModels(role).filter(allowed);
+  const own = role?.selected ?? role?.chosen?.model ?? null;
+  return [...rows.filter((row) => row.model === own), ...rows.filter((row) => row.model !== own)];
+}
+
+/** The one way on where no Auxiliary Reviewer can be named for the author and primary picked. */
+export const START_WITHOUT_AUXILIARY = "Start Without an Auxiliary";
+
+/**
+ * The two reviewers for a session started with different models, asked in
+ * the order each narrows the next: a Primary Reviewer the chosen author may
+ * be reviewed by, then an Auxiliary that is neither's vendor.
+ *
+ * The author's vendor is the ROUTER's to say -- a seat authors with whichever
+ * vendor's model was picked -- and whether a reviewer conflicts with it is
+ * the router's word on the row (`conflict`). What is compared here is two
+ * providers the reading already carries: the auxiliary's and the primary's.
+ *
+ * Undefined is no start: a dismissed pick, or a role nothing can be named
+ * for. **Neither case is ever silent.** With no Primary Reviewer the chosen
+ * author may be reviewed by, nothing could review the session, so it says so
+ * and starts nothing. With no Auxiliary left -- every machine that reaches
+ * two vendors and no third, where the author takes one and the primary the
+ * other -- the session CAN run and only a dispute would stop, so it says
+ * exactly that and the person decides. A machine whose lists could not be
+ * read at all names nobody, and the router's own check speaks at the start.
+ */
+export async function askReviewers(
+  root: string,
+  choice: EngineChoice,
+  model: string,
+  ui: SessionRunUi,
+): Promise<SessionReviewers | undefined> {
+  const configuration = (ui.configurationFor ?? solutionConfiguration)(root, {
+    engine: choice.engine,
+    authoringModel: model.trim() === "" ? null : model.trim(),
+  }) as {
+    authoring?: { provider?: string | null };
+    primaryReviewer?: ConfigurationRole;
+    auxiliaryReviewer?: ConfigurationRole;
+  } | null;
+  const author = configuration?.authoring?.provider ?? choice.provider;
+  const named: { reviewer?: string; auxiliary?: string } = {};
+
+  const listed = listedModels(configuration?.primaryReviewer);
+  // Nothing read at all is not "nothing may review": the router's start check says which.
+  if (listed.length === 0) return named;
+  const primaries = reviewerChoices(configuration?.primaryReviewer, (row) => !row.conflict);
+  if (primaries.length === 0) {
+    ui.showErrorMessage(
+      `Nothing this machine reaches may review a session authored by ${author ?? choice.label}: every model the ` +
+        "reviewing vehicle lists is that vendor's, and a reviewer is never from the author's vendor. Nothing " +
+        "was started. Choose another author, or give this machine a second vendor's key or seat.",
+    );
+    return undefined;
+  }
+  const reviewer = await ui.askReviewer("Primary Reviewer", primaries, author);
+  if (reviewer === undefined) return undefined;
+  named.reviewer = reviewer;
+
+  const primaryProvider = primaries.find((row) => row.model === reviewer)?.provider ?? null;
+  const auxiliaries = reviewerChoices(
+    configuration?.auxiliaryReviewer,
+    (row) => !row.conflict && row.provider !== primaryProvider,
+  );
+  if (auxiliaries.length === 0) {
+    const chose = await ui.choose(
+      `No Auxiliary Reviewer can be named for this session: it is never from the author's vendor (${author}) or the ` +
+        `Primary Reviewer's (${primaryProvider}), and this machine reaches no third. The session can run and be ` +
+        "verified. If a finding is disputed, there is no third voice to settle it and the session stops for you.",
+      [START_WITHOUT_AUXILIARY],
+    );
+    return chose === START_WITHOUT_AUXILIARY ? named : undefined;
+  }
+  const auxiliary = await ui.askReviewer("Auxiliary Reviewer", auxiliaries, author);
+  if (auxiliary === undefined) return undefined;
+  named.auxiliary = auxiliary;
+  return named;
 }
 
 export function engineModelRefusal(
@@ -452,6 +547,17 @@ export interface SessionRunUi {
    * would be testing the developer's own preferences.
    */
   configured?: (repoRoot: string) => { picked: EngineChoice; model: string } | string;
+  /**
+   * The router's reading of what a session with this author would be run
+   * with. `solutionConfiguration` in production; a seam for the reason
+   * `configured` is one -- the reading is this machine's catalog.
+   */
+  configurationFor?: (root: string, options: { engine?: string | null; authoringModel?: string | null }) => unknown;
+  /**
+   * One reviewing role's model for this session: `models` is what the picks
+   * before it allow, the repository's own first. Undefined is a dismissed pick.
+   */
+  askReviewer: (role: string, models: readonly ConfigurationModel[], authorProvider: string | null) => Thenable<string | undefined>;
   /** Put the Solution Explorer, where the Configuration is, in front of the person. */
   openConfiguration?: () => void;
   /** `purpose` titles the pick; Start's when omitted. */
@@ -532,6 +638,14 @@ export function defaultSessionRunUi(
     // The view the Configuration lives in. A view's own `focus` command is the
     // editor's, named after the view's id.
     openConfiguration: () => void vscode.commands.executeCommand("dabblerSolutionTree.focus"),
+    askReviewer: async (role, models, authorProvider) => {
+      const picked = await vscode.window.showQuickPick(modelItems(models, authorProvider, models[0]?.model ?? null), {
+        title: `Start session with different models — ${role}`,
+        placeHolder: `The ${role} for this session only. The first is this repository's own choice where it may review this author.`,
+        ignoreFocusOut: true,
+      });
+      return picked?.label;
+    },
     // The one editor-side effect here that is a PROCESS: it asks the
     // installed CLI, which is the only thing that actually knows whether it
     // will run on a model, and it bills nothing doing it.
@@ -762,6 +876,11 @@ export async function runStartSession(
       ? await ui.askModel(repository.root, picked, chosenAuthoringModel(repository.root))
       : configured.model;
   if (model === undefined) return false;
+  // Different models means the reviewers too: a reviewer is never from the
+  // author's vendor, so a session with another author usually needs another
+  // reviewer -- and then, as often, another third voice.
+  const reviewers = configured === null ? await askReviewers(repository.root, picked, model, ui) : {};
+  if (reviewers === undefined) return false;
   // Two questions, and they are different questions. One asks what this
   // machine has READ for this engine; the other asks the INSTALLED CLI, which
   // is the only thing that actually knows and says so when it refuses.
@@ -779,7 +898,7 @@ export async function runStartSession(
   }
   // Registering is the framework's, not the AI's: the identity is on the
   // record before anything opens, and a refusal opens nothing.
-  const args = startArguments(picked, model);
+  const args = startArguments(picked, model, reviewers);
   let registered = await register(repository.root, args);
   // Uncommitted changes: committing them or undoing them is the framework's
   // to do, once the person has said which.

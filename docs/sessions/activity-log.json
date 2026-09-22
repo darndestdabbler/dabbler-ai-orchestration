@@ -12265,6 +12265,14 @@
       "what": "step 'the-pages': its files",
       "reason": "The changelog is the extension's, tools/dabbler-ai-orchestration/CHANGELOG.md; the plan named a path that does not exist",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 229,
+      "dateTime": "2026-09-22T05:44:00.892000-04:00",
+      "task": "Give every wall a door, and one door for all of them: `dabbler session propose --reason \"<why>\" <what>`, where <what> is only a change the framework can apply -- a plan amendment (a step's files or checks, a dropped non-goal, the round cap; now also allowed against an accepted step, which re-opens it and what depends on it) or `--hold-release`. Free text alone is refused with the shapes it accepts, and a second proposal of the same thing is refused naming the first. A proposal is recorded in the activity log with who proposed it and why, and applies nothing on its own. The Primary Reviewer rules on it once, as a one-question round: endorse, or return ONE concrete finding, which the author disposes of like any finding. An endorsed plan amendment is applied and recorded as endorsed by the reviewer; a hold, or anything not endorsed, becomes a stop of kind `proposal` whose menu is Approve / Reject / Cancel, and in VS Code that stop -- and no other -- opens a modal with the reason, the reviewer's verdict, the exact change and three buttons. Approval (a person's verb) applies exactly what was proposed and records who and when. The close gate's words and the close stop's menu name `propose` instead of \"never here\"; the close summary and `dabbler metrics` count proposals (endorsed, approved, rejected); the managed body tells the engine that a proposal is its last resort and the way past any refusal it cannot act on. A walk page covers the H2 and the held-release scenarios on the Java sample. The session holds its release, so no version is bumped; session 230 releases.",
+      "releasable": false,
+      "holdReason": "The operator walks the local VSIX, built and --force-installed from this checkout, before this ships; session 230 releases it."
     }
   ]
 }

@@ -270,7 +270,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 230 | What the walk found, and the release | — | not declared |
 | 231 | The Mechanic | no | 2026-09-22 |
 | 232 | A release is a session of its own | no | 2026-09-22 |
-| 233 | Release 3.19.0 (release: 3.19.0) | — | not declared |
+| 233 | Release 3.19.0 (release: 3.19.0) | yes | 2026-09-22 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2991,3 +2991,9 @@ Make the Mechanic first-class, almost entirely as instruction: `dabbler consult 
 **Releasable: no — held: This repository's releases now happen in a release session, and session 233 is the first one: it ships 3.19.0..**
 
 Make a release a session of its own, so ordinary sessions never publish. A person at a VS Code terminal counts as a person: personIsPresent drops the interactive-stdin criterion. A session heading may carry `(release: <version>)`, parsed next to the slug marker, and a session is releasable if and only if it is a release session. The `dabbler.release` setting and its two modes, releaseOfPlan, ON_REQUEST_HOLD, the plan ask's release member and `dabbler configure --release` are deleted. A new plan that names `release` or `hold_release` is refused with the sentence that a release is a session of its own; an older plan's members are read and ignored. `session start` on a release session opens no AI and runs its preflight: packaging must be declared, no session since the last published packaging run may have closed with a verdict other than VERIFIED, and version.json or a tag release must name the release's version. After that the driver declares the session and goes straight to publish. It runs the whole expensive suites, passes the version as the pack's `{version}`, then pushes, tags, records and closes. A failed pack or push is a stop whose ways on are cancel, a fix session and a new release session. Ordinary sessions skip the publish phase, and published_when_releasable is no longer passed by a no-change session. The Solution Explorer's release item and the setting's contribution go. Start Session on a release session opens no engine CLI and runs in the Dabbler terminal alone. The bootstrap templates and the managed body stop writing `packaging.pack` early and tell the AI to plan packaging and releases as sessions of their own. The docs describe this. version.json goes to 3.19.0, a minor bump because this adds a new kind of session, and is stamped, with a changelog section.
+
+### Session 233 — Release 3.19.0 (release: 3.19.0)
+
+**Releasable: yes.**
+
+Release 3.19.0: the framework packs and publishes what is on the trunk.

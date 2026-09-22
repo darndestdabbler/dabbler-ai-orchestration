@@ -4622,22 +4622,27 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "3.18.0",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5.6-terra",
         "verifierProvider": "openai",
         "transport": "copilot-cli"
-      }
+      },
+      "frameworkVersion": "3.18.0"
     },
     {
       "number": 233,
       "title": "Release 3.19.0 (release: 3.19.0)",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "status": "complete",
+      "startedAt": "2026-09-22T11:02:35.144000-04:00",
+      "completedAt": "2026-09-22T11:05:01.153000-04:00",
+      "orchestrator": {
+        "engine": "framework",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null,
+      "frameworkVersion": "3.19.0",
+      "noChange": true
     }
   ]
 }

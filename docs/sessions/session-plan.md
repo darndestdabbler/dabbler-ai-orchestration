@@ -14748,3 +14748,42 @@ release session, and session 233 is the first one -- it ships 3.19.0.
 
 The first release session: the framework publishes session 232's work as
 3.19.0 and nothing else.
+
+### Session 234 of 235: A release runs only the tests nothing has proved
+
+Scope: `packages/router` -- `drive.ts` (`wholeRunsBeforeRelease`), and
+`testEvidence.ts` where the reading belongs, their tests -- the changelog,
+`version.json` and the stamped manifests
+
+**Why.** The operator, 2026-09-22, after session 233: a release session
+changes no code, yet it runs every expensive suite whole again. Session 232
+made it so: the old rule owed a whole run only for a suite whose run of
+record was targeted, and moving it into the release session widened it to
+every suite, every time. Each session since the last release already ended
+with a run of record against its own verified tree, and this repository's
+are almost always whole -- so session 233 re-ran both suites and proved
+nothing new.
+
+**Step 1 -- a suite runs whole before a release only when nothing has
+proved it.** Before the pack, a release session runs a suite whole only
+where no passing whole run of it stands against the tree being released:
+a session since the last published release ran it targeted, or the tree
+has moved since its last passing whole run. Read from the test-run record
+and the freshness reading the `test_run_fresh` gate already makes, never
+a second rule of its own. A suite so proved is not run, and the log says
+which run proved it. A red whole run still stops the release, with the
+same ways on. One test per behaviour in the file named after what changed:
+a release whose suites were proved whole runs none, and one whose suite
+ran targeted runs that suite whole.
+
+**Step 2 -- the version.** `version.json` goes to 3.19.1 (a patch: no new
+capability), stamped with `npm run stamp:version`, and the changelog gets
+the 3.19.1 section.
+
+**Non-goals.** No change to what an ordinary session's run of record runs.
+No change to the preflight's three questions. No change to the publish or
+the close. No Mechanic.
+
+### Session 235 of 235: Release 3.19.1 (release: 3.19.1)
+
+The framework publishes session 234's work as 3.19.1 and nothing else.

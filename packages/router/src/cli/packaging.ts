@@ -32,7 +32,10 @@ const EXIT_USAGE = 2;
 function usage(): string {
   return [
     "usage: dabbler packaging [-h] [--sessions-dir SESSIONS_DIR] [--dry-run]",
-    "                         [--show-record] [--json]",
+    "                         [--show-record] [--json] [--version VERSION]",
+    "",
+    "`--version` is the release's version, substituted for `{version}` in the",
+    "pack; the publish phase of a release session passes its heading's.",
     "",
     "Step (f): pack the session's work and push it to the declared feed.",
     "Only a session that declared itself releasable at step (a) may publish,",
@@ -48,18 +51,19 @@ function usage(): string {
   ].join("\n");
 }
 
-const VALUE_FLAGS = new Set(["--sessions-dir"]);
+const VALUE_FLAGS = new Set(["--sessions-dir", "--version"]);
 const BARE_FLAGS = new Set(["--dry-run", "--show-record", "--json"]);
 
 interface Parsed {
   readonly sessionsDir?: string;
+  readonly version?: string;
   readonly dryRun: boolean;
   readonly showRecord: boolean;
   readonly json: boolean;
 }
 
 function parseArgs(argv: readonly string[]): Parsed | string {
-  let sessionsDir: string | undefined;
+  const values = new Map<string, string>();
   let dryRun = false;
   let showRecord = false;
   let json = false;
@@ -76,15 +80,15 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     }
     if (!VALUE_FLAGS.has(name)) return `unrecognized arguments: ${token}`;
     if (equals !== -1) {
-      sessionsDir = token.slice(equals + 1);
+      values.set(name, token.slice(equals + 1));
       continue;
     }
     const next = argv[index + 1];
     if (next === undefined) return `argument ${name}: expected one argument`;
-    sessionsDir = next;
+    values.set(name, next);
     index += 1;
   }
-  return { sessionsDir, dryRun, showRecord, json };
+  return { sessionsDir: values.get("--sessions-dir"), version: values.get("--version"), dryRun, showRecord, json };
 }
 
 /**
@@ -261,7 +265,7 @@ export async function packagingVerb(argv: string[]): Promise<number> {
 
   let run: PackagingRun;
   try {
-    run = packageSession(sessionsDir, { dryRun: parsed.dryRun });
+    run = packageSession(sessionsDir, { dryRun: parsed.dryRun, version: parsed.version ?? null });
   } catch (error) {
     if (error instanceof PackagingError || error instanceof PackagingConfigError) {
       writeErr(`packaging: ${error.message}\n`);

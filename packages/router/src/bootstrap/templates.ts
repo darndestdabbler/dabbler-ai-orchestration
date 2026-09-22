@@ -119,12 +119,12 @@ export const SHARED_BODY =
   "never by watching `run.json` or any other record for what the framework\n" +
   "will do next. The answer command you started is the one thing you wait on.\n" +
   "\n" +
-  "**A session's release follows `dabbler.release`**, and the framework publishes\n" +
-  "between the push and the close for itself. On request, the default, a plan\n" +
-  "releases with `release` and one reason; ship by default, a plan\n" +
-  "holds with `hold_release` and one reason. Either is declared before the work\n" +
-  "and never afterwards; no session publishes without a VERIFIED verdict, and a\n" +
-  "releasable session with no packaging run cannot close: the close refuses.\n" +
+  "**A release is a session of its own**, headed `(release: <version>)`: the\n" +
+  "framework packs and publishes what is on the trunk; no other session\n" +
+  "publishes. Propose each release's version (patch, minor or major) when you\n" +
+  "write or amend the plan, for the person to approve with it. Never add a\n" +
+  "`packaging:` block to `dabbler.yaml` until the next session is the packaging\n" +
+  "session, which does nothing else; the close refuses an unpublished release.\n" +
   "\n" +
   "## When the framework stops\n" +
   "\n" +
@@ -304,11 +304,18 @@ export const DECOMPOSITION_PROMPT =
   "  run is the run of record and a hang limit in its command --\n" +
   "  `dotnet test --blame-hang-timeout 5m`, or Surefire's\n" +
   "  `forkedProcessTimeoutInSeconds` -- so every later run inherits it,\n" +
-  "  writes `packaging.pack` where the\n" +
-  "  plan names *Handoff artifacts*, and adds the architecture test the plan\n" +
-  "  requires -- where only the API tier may reach the database, that rule.\n" +
-  "  Later sessions fill the modules in and never re-create what the\n" +
-  "  skeleton made.\n" +
+  "  and adds the architecture test the plan requires -- where only the API\n" +
+  "  tier may reach the database, that rule. Later sessions fill the modules\n" +
+  "  in and never re-create what the skeleton made.\n" +
+  "- **Packaging and releases are sessions of their own:** where the plan\n" +
+  "  names *Handoff artifacts*, plan one packaging session -- early, with\n" +
+  "  project files only, or later -- that writes the `packaging:` block in\n" +
+  "  `dabbler.yaml` and does nothing else; no other session writes it. A\n" +
+  "  release is a session with no steps, headed `### Session <N>: Release\n" +
+  "  <version> (release: <version>)`: the framework packs and publishes what\n" +
+  "  is on the trunk, with no AI work, no tests of its own and no review.\n" +
+  "  Propose its version -- patch, minor or major by what the sessions it\n" +
+  "  releases change -- and the person approves it with the plan.\n" +
   "- **Numbering:** continue from the highest session number the plan already\n" +
   "  declares. Numbers are never reused and never renumbered, including for\n" +
   "  cancelled sessions.\n" +
@@ -429,11 +436,17 @@ export const BOOTSTRAP_PLAN =
   "   where its run is the run of record and a hang limit in its command --\n" +
   "   `dotnet test --blame-hang-timeout 5m`, or Surefire's\n" +
   "   `forkedProcessTimeoutInSeconds` -- so every later run inherits it,\n" +
-  "   writes `packaging.pack`\n" +
-  "   where the plan names *Handoff artifacts*, and adds the architecture\n" +
-  "   test the plan requires -- where only the API tier may reach the\n" +
-  "   database, that rule. Later sessions fill the modules in and never\n" +
-  "   re-create what the skeleton made.\n" +
+  "   and adds the architecture test the plan requires -- where only the\n" +
+  "   API tier may reach the database, that rule. Later sessions fill the\n" +
+  "   modules in and never re-create what the skeleton made.\n" +
+  "\n" +
+  "   Packaging and releases are sessions of their own. Where the plan\n" +
+  "   names *Handoff artifacts*, plan one packaging session -- early, with\n" +
+  "   project files only, or later -- that writes the `packaging:` block in\n" +
+  "   `dabbler.yaml` and does nothing else. A release is a session with no\n" +
+  "   steps, headed `### Session <N>: Release <version> (release:\n" +
+  "   <version>)`; propose its version -- patch, minor or major by what the\n" +
+  "   sessions it releases change -- for the person to approve with the plan.\n" +
   "4. Cross-provider verification.\n" +
   "5. Full test suite, recorded as the run of record.\n" +
   "6. Close-out.\n" +

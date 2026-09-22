@@ -44,7 +44,6 @@ import {
   sessionRunDir,
 } from "./ledger.ts";
 import { loadSchemaFile, schemaFailure, tolerantSchemaFailure } from "./schema/validate.ts";
-import { RELEASE_SHIP_BY_DEFAULT, type ReleaseMode } from "./settings.ts";
 
 export const DRIVER_DIRNAME = "driver";
 export const DRIVER_SCHEMA_VERSION = 1;
@@ -406,49 +405,19 @@ export function judgeWorkPlanNonGoals(plan: DriverWorkPlan): string[] {
 }
 
 /**
- * A hold, where the plan declares one, carries its reason. The schema's
- * `minLength` counts whitespace, and a blank hold would be recorded as a
- * held session with nothing to say for itself -- refused here instead,
- * beside the other judgments a schema cannot make.
+ * An ordinary session never publishes, so a plan answered now says nothing
+ * about releasing. `release` and `hold_release` are refused here, at
+ * acceptance; a plan recorded before this rule still carries them and is
+ * read as recorded, with both ignored.
  */
-export function judgeWorkPlanHold(plan: DriverWorkPlan): string[] {
-  const reasons: string[] = [];
-  if (plan.hold_release !== undefined && plan.hold_release.trim() === "") {
-    reasons.push(
-      "the plan's `hold_release` is blank: a hold carries the one reason the session publishes " +
-        "nothing, or is left out so the session ships",
-    );
-  }
-  if (plan.release !== undefined && plan.release.trim() === "") {
-    reasons.push(
-      "the plan's `release` is blank: a release carries the one reason the session publishes " +
-        "now, or is left out so the session publishes nothing",
-    );
-  }
-  return reasons;
-}
-
-/** The hold a session carries where its solution releases on request and its plan asks for none. */
-export const ON_REQUEST_HOLD =
-  "this solution releases on request (`dabbler.release`), and the plan names no `release`";
-
-/**
- * Whether a plan's session publishes, under the checkout's release setting.
- *
- * The setting decides which member is read: on request, `release` releases
- * and its absence holds; ship by default, `hold_release` holds and its
- * absence releases. A plan carrying the other member is accepted, and a
- * `hold_release` on an on-request plan lends the hold its words.
- */
-export function releaseOfPlan(
-  plan: DriverWorkPlan,
-  mode: ReleaseMode,
-): { readonly releasable: boolean; readonly holdReason: string | null } {
-  if (mode === RELEASE_SHIP_BY_DEFAULT) {
-    return { releasable: plan.hold_release === undefined, holdReason: plan.hold_release ?? null };
-  }
-  if (plan.release !== undefined) return { releasable: true, holdReason: null };
-  return { releasable: false, holdReason: plan.hold_release ?? ON_REQUEST_HOLD };
+export function judgeWorkPlanRelease(plan: DriverWorkPlan): string[] {
+  const named = (["release", "hold_release"] as const).filter((key) => plan[key] !== undefined);
+  if (named.length === 0) return [];
+  return [
+    `the plan names ${named.map((key) => `\`${key}\``).join(" and ")}: an ordinary session never ` +
+      "publishes, and a release is a session of its own, headed `(release: <version>)` in the " +
+      "session plan. Leave the member out",
+  ];
 }
 
 /**
@@ -1639,9 +1608,9 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
       {
         label: "Hold this release and close the session",
         cost:
-          "Nothing ships from this session, and nothing releases a hold: the " +
-          "work is landed and verified, and the next releasing session carries " +
-          "it. Carry on afterwards and the session closes as held.",
+          "Nothing ships from this release session, and nothing releases a hold: " +
+          "the work stays on the trunk, and a later release session ships it. " +
+          "Carry on afterwards and the session closes as held.",
         command: "dabbler session hold-release --reason \"<why>\"",
       },
       cancelChoice(),

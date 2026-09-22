@@ -73,7 +73,6 @@ import { vehicleRefusal } from "../discovery.ts";
 import {
   CREDENTIAL_SETTING_BY_PROVIDER,
   MINE_FLAG,
-  RELEASE_MODES,
   SETTINGS_RELPATH,
 } from "../settings.ts";
 import { workingDirectory } from "../workdir.ts";
@@ -106,7 +105,7 @@ function usage(): string {
     "usage: dabbler configure [-h] [--engine E] [--transport T]",
     "                         [--reviewer-transport T] [--authoring-model M]",
     "                         [--reviewer-model M] [--auxiliary-model M]",
-    "                         [--credential PROVIDER=NAME] [--release R]",
+    "                         [--credential PROVIDER=NAME]",
     `                         [${MINE_FLAG}] [--repo-root PATH]`,
     "",
     "  what the NEXT session is run with",
@@ -148,11 +147,6 @@ function usage(): string {
     "                          provider P. A NAME and never a key: the value is",
     "                          in this machine's own store, put there by `dabbler",
     "                          auth set`. An empty name clears the reference",
-    `  --release R             ${RELEASE_MODES.join(" | ")}; when this solution's`,
-    "                          sessions publish. On request (the default) a plan",
-    "                          releases with `release` and its reason; ship by",
-    "                          default a plan holds with `hold_release`. Written",
-    `                          to ${SETTINGS_RELPATH} only: it is the solution's`,
     `  ${MINE_FLAG}                  keep this as YOUR default rather than this`,
     `                          checkout's: the choice goes to the user-level`,
     `                          ${PREFERENCES_FILENAME} instead of`,
@@ -283,8 +277,6 @@ export interface ConfigureOptions {
    * the provider back to its environment variable.
    */
   readonly credential?: string;
-  /** When this solution's sessions publish: `on-request` or `ship-by-default`. */
-  readonly release?: string;
 }
 
 export interface ConfigureOutcome {
@@ -338,23 +330,6 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
         `'${options.reviewerTransport}' is not a vehicle this framework has. ` +
         `It is one of: ${VALID_TRANSPORTS.join(", ")}.`,
     };
-  }
-  const release = options.release?.trim();
-  if (release !== undefined) {
-    if (!(RELEASE_MODES as readonly string[]).includes(release)) {
-      return {
-        ...empty,
-        refusal: `'${release}' is not a release setting. It is one of: ${RELEASE_MODES.join(", ")}.`,
-      };
-    }
-    if (options.mine === true) {
-      return {
-        ...empty,
-        refusal:
-          `when a session publishes is the solution's to say, so --release is written to ` +
-          `${SETTINGS_RELPATH} and never kept as one person's default. Run it without ${MINE_FLAG}.`,
-      };
-    }
   }
   // **A vehicle this machine cannot reach is a stop, at the moment it is
   // chosen.** Writing it and discovering it at the round would spend a
@@ -701,7 +676,6 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   if (options.reviewerTransport !== undefined) {
     settle("reviewerTransport", options.reviewerTransport);
   }
-  if (release !== undefined) Object.assign(choice, { release });
   // **Every refusal comes before every write.** One call may set several
   // things, and a call that wrote the acceptable half before refusing the
   // rest would leave the operator's own preferences half-changed by a
@@ -786,7 +760,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   if (Object.keys(choice).length === 0 && preferenceLines.length === 0) {
     return {
       ...empty,
-      refusal: "nothing to set: name an engine, a vehicle, a model, a credential or a release setting.",
+      refusal: "nothing to set: name an engine, a vehicle, a model or a credential.",
     };
   }
   const written =
@@ -826,7 +800,6 @@ export async function configureVerb(argv: string[]): Promise<number> {
     "--reviewer-model",
     "--auxiliary-model",
     "--credential",
-    "--release",
     "--repo-root",
   ];
   // A choice can be this CHECKOUT's or this PERSON's, and the difference is
@@ -877,7 +850,6 @@ export async function configureVerb(argv: string[]): Promise<number> {
     ...(values.has("--credential")
       ? { credential: values.get("--credential") as string }
       : {}),
-    ...(values.has("--release") ? { release: values.get("--release") as string } : {}),
     ...(mine ? { mine: true } : {}),
   };
   let outcome: ConfigureOutcome;

@@ -317,12 +317,12 @@ instruction that names a command is answered by running that command —
 never by watching `run.json` or any other record for what the framework
 will do next. The answer command you started is the one thing you wait on.
 
-**A session's release follows `dabbler.release`**, and the framework publishes
-between the push and the close for itself. On request, the default, a plan
-releases with `release` and one reason; ship by default, a plan
-holds with `hold_release` and one reason. Either is declared before the work
-and never afterwards; no session publishes without a VERIFIED verdict, and a
-releasable session with no packaging run cannot close: the close refuses.
+**A release is a session of its own**, headed `(release: <version>)`: the
+framework packs and publishes what is on the trunk; no other session
+publishes. Propose each release's version (patch, minor or major) when you
+write or amend the plan, for the person to approve with it. Never add a
+`packaging:` block to `dabbler.yaml` until the next session is the packaging
+session, which does nothing else; the close refuses an unpublished release.
 
 ## When the framework stops
 

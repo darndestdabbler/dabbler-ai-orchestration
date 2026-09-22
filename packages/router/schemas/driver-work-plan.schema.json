@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "driver/plan.json (the engine's answer to \"plan this session\")",
-  "description": "The work plan a driven session runs, under .dabbler/runs/s<N>/driver/plan.json: what the session will do, whether a hold keeps it from publishing, and the ordered steps -- each with an id, the files it expects to touch, and at least one check that proves it. The driver declares the session from `task` and `hold_release`, then issues the steps one at a time and measures each report against its step. A check is argv, never a shell string, and the driver runs it rather than reading it: code and tests are compiled and run, never interpreted. Validated before it is written; a file that fails validation on read is refused.",
+  "description": "The work plan a driven session runs, under .dabbler/runs/s<N>/driver/plan.json: what the session will do and the ordered steps -- each with an id, the files it expects to touch, and at least one check that proves it. The driver declares the session from `task`, then issues the steps one at a time and measures each report against its step. A check is argv, never a shell string, and the driver runs it rather than reading it: code and tests are compiled and run, never interpreted. Validated before it is written; a file that fails validation on read is refused.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "session_number", "task", "steps", "recorded_at"],
@@ -18,17 +18,17 @@
     },
     "releasable": {
       "type": "boolean",
-      "description": "An older plan's member, read as it was recorded and never written now: a plan says `release`, `hold_release` or neither, and the checkout's `dabbler.release` setting decides which one it is read by."
+      "description": "An older plan's member, read as it was recorded and ignored: an ordinary session never publishes, and a release is a session of its own, headed `(release: <version>)` in the session plan."
     },
     "release": {
       "type": "string",
       "minLength": 1,
-      "description": "The one reason this session publishes now, read where the checkout's `dabbler.release` is `on-request` (the default): absent, the session publishes nothing. Where the setting is `ship-by-default` it is accepted and not read. Declared here, before the work, and never decided afterwards."
+      "description": "An older plan's member, read as it was recorded and ignored. A plan answered now that names it is refused at acceptance: an ordinary session never publishes, and a release is a session of its own, headed `(release: <version>)` in the session plan."
     },
     "hold_release": {
       "type": "string",
       "minLength": 1,
-      "description": "The one reason this session publishes nothing, read where the checkout's `dabbler.release` is `ship-by-default`: the later session, sibling module or first release's go-live the work waits on. Absent there, the session ships. Where the setting is `on-request` a session without `release` is held, and this reason is the hold's words. Declared here, before the work, and never decided afterwards."
+      "description": "An older plan's member, read as it was recorded and ignored. A plan answered now that names it is refused at acceptance: an ordinary session never publishes, so there is nothing to hold; a person stops a release session's publish with `dabbler session hold-release`."
     },
     "non_goals": {
       "type": "array",

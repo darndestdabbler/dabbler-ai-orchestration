@@ -316,6 +316,20 @@ describe("the driver", () => {
     assert.deepEqual(rows.map((row) => row.name), ["verdict_vocabulary"]);
   });
 
+  it("passes a session that changed nothing on its verification and suite, never on its publish", () => {
+    // A release session changes nothing by design; what it exists for is the
+    // packaging run, so that gate is still asked.
+    const rows = runGates(SESSIONS, {
+      noChange: true,
+      gates: [["verification_clean", fail], ["test_run_fresh", fail], ["published_when_releasable", fail]],
+    });
+    assert.deepEqual(rows.map((row) => [row.name, row.passed]), [
+      ["verification_clean", true],
+      ["test_run_fresh", true],
+      ["published_when_releasable", false],
+    ]);
+  });
+
   it("marks an inapplicable row as such and not as a pass", () => {
     const skip = (): readonly [boolean, string, boolean] => [true, "nothing measured", true];
     const [row] = runGates(SESSIONS, { gates: [["test_run_fresh", skip]] });

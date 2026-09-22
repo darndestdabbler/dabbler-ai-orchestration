@@ -16,15 +16,15 @@ export type DriverWorkPlan = {
    */
   task: string;
   /**
-   * An older plan's member, read as it was recorded and never written now: a plan says `release`, `hold_release` or neither, and the checkout's `dabbler.release` setting decides which one it is read by.
+   * An older plan's member, read as it was recorded and ignored: an ordinary session never publishes, and a release is a session of its own, headed `(release: <version>)` in the session plan.
    */
   releasable?: boolean;
   /**
-   * The one reason this session publishes now, read where the checkout's `dabbler.release` is `on-request` (the default): absent, the session publishes nothing. Where the setting is `ship-by-default` it is accepted and not read. Declared here, before the work, and never decided afterwards.
+   * An older plan's member, read as it was recorded and ignored. A plan answered now that names it is refused at acceptance: an ordinary session never publishes, and a release is a session of its own, headed `(release: <version>)` in the session plan.
    */
   release?: string;
   /**
-   * The one reason this session publishes nothing, read where the checkout's `dabbler.release` is `ship-by-default`: the later session, sibling module or first release's go-live the work waits on. Absent there, the session ships. Where the setting is `on-request` a session without `release` is held, and this reason is the hold's words. Declared here, before the work, and never decided afterwards.
+   * An older plan's member, read as it was recorded and ignored. A plan answered now that names it is refused at acceptance: an ordinary session never publishes, so there is nothing to hold; a person stops a release session's publish with `dabbler session hold-release`.
    */
   hold_release?: string;
   /**

@@ -60,17 +60,6 @@ export const SETTING_REVIEWER_MODEL = "dabbler.reviewerModel";
 export const SETTING_AUXILIARY_MODEL = "dabbler.auxiliaryModel";
 
 /**
- * When a session of this solution publishes. A solution's choice and never a
- * person's, so it lives only in this file. Not a `dabbler.yaml` key:
- * `release:` there already names HOW a repository releases.
- */
-export const SETTING_RELEASE = "dabbler.release";
-export const RELEASE_ON_REQUEST = "on-request";
-export const RELEASE_SHIP_BY_DEFAULT = "ship-by-default";
-export const RELEASE_MODES = [RELEASE_ON_REQUEST, RELEASE_SHIP_BY_DEFAULT] as const;
-export type ReleaseMode = (typeof RELEASE_MODES)[number];
-
-/**
  * Which credential this solution uses for a provider -- a NAME, never a key.
  *
  * One key per provider, spelled out rather than derived, because this table
@@ -96,7 +85,6 @@ export const SETTING_KEYS = [
   SETTING_AUTHORING_MODEL,
   SETTING_REVIEWER_MODEL,
   SETTING_AUXILIARY_MODEL,
-  SETTING_RELEASE,
   SETTING_CREDENTIAL_ANTHROPIC,
   SETTING_CREDENTIAL_OPENAI,
   SETTING_CREDENTIAL_GOOGLE,
@@ -173,17 +161,6 @@ export function readSettings(root: string): SettingsReading {
 /** One setting's value in this checkout, or null where the file is silent. */
 export function settingValue(root: string, key: SettingKey): string | null {
   return readSettings(root).values[key] ?? null;
-}
-
-/**
- * When this checkout's sessions publish. Ship by default only where the file
- * says exactly that: a value this framework does not know publishes nothing
- * rather than everything.
- */
-export function releaseMode(root: string): ReleaseMode {
-  return settingValue(root, SETTING_RELEASE) === RELEASE_SHIP_BY_DEFAULT
-    ? RELEASE_SHIP_BY_DEFAULT
-    : RELEASE_ON_REQUEST;
 }
 
 /** What a write changed, in the words a person reads. */

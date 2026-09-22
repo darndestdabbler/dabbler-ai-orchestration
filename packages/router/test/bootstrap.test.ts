@@ -294,9 +294,10 @@ describe("the instruction files", () => {
     const project = tempDir("bootstrap-");
     writeInstructionFiles(project, "acme-app");
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
-    assert.match(agents, /release follows `dabbler\.release`/);
-    assert.match(agents, /releases with `release`/);
-    assert.match(agents, /holds with `hold_release`/);
+    assert.match(agents, /A release is a session of its own\*\*, headed `\(release: <version>\)`/);
+    assert.match(agents, /no other session\s+publishes/);
+    assert.match(agents, /Never add a\s+`packaging:` block to `dabbler\.yaml` until the next session is the packaging\s+session/);
+    assert.doesNotMatch(agents, /dabbler\.release|hold_release/);
     assert.match(agents.toLowerCase(), /the close refuses/);
   });
 
@@ -513,14 +514,17 @@ describe("the scaffolded setup sessions", () => {
       assert.match(session, /creates, edits or\s+deletes no code, project, build file, test/);
     }
     // The skeleton is an instruction for the first numbered session, carrying
-    // the projects, the suite and the pack.
+    // the projects and the suite. The pack is a packaging session's, and a
+    // release a session of its own.
     const skeleton = parseStepTexts(second.slice(second.indexOf("\n1. "))).find((step) =>
       /first numbered session is the skeleton/.test(step),
     );
     assert.ok(skeleton, second);
     assert.match(skeleton, /solution file/);
     assert.match(skeleton, /`testing\.suites`/);
-    assert.match(skeleton, /`packaging\.pack`/);
+    assert.doesNotMatch(skeleton, /`packaging\.pack`/);
+    assert.match(second, /packaging session[^]*`packaging:` block/);
+    assert.match(second, /\(release:\s+<version>\)/);
     assert.doesNotMatch(second, /\*\*Creates:\*\*[^\n]*projects/);
   });
 

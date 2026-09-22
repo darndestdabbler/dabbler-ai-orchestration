@@ -78,7 +78,7 @@ import {
   readWatcher,
   readWorkPlan,
   isWorkPhase,
-  judgeWorkPlanHold,
+  judgeWorkPlanRelease,
   judgeWorkPlanNonGoals,
   planPath,
   takeInterrupt,
@@ -88,9 +88,7 @@ import {
   appendSupervision,
   progressResumed,
   renderStop,
-  releaseOfPlan,
 } from "./driver.ts";
-import { RELEASE_SHIP_BY_DEFAULT, releaseMode } from "./settings.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
 import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
@@ -155,6 +153,7 @@ import {
   declare,
   liveLoopSession,
   extractSpecExcerpt,
+  releaseSessionVersion,
   lastSessionDone,
   report,
   start,
@@ -171,7 +170,7 @@ import {
   closedSessionSeconds,
   evaluateFreshness,
   runsWholeAtClose,
-  wholeRunsOwedBeforeRelease,
+  OUTCOME_PASSED,
   loadSuitesChecked,
   readRecords,
   suiteRequiredForClose,
@@ -836,7 +835,7 @@ const RULE = {
   /** The plan names nothing it will not do. */
   planNonGoals: "plan-non-goals",
   /** The plan holds its release with no reason. */
-  planHold: "plan-hold",
+  planRelease: "plan-release",
   /** A check names something this machine cannot spawn. */
   planCheckProgram: "plan-check-program",
 } as const;
@@ -888,36 +887,6 @@ export function namedTestCommands(
       command: targetedCommand(suite.command, result.forSuite(suite.name), suite),
     }))
     .filter((entry) => entry.command !== "");
-}
-
-
-/**
- * Where a refused publish sends the run back to, read off the record rather
- * than out of the refusal's prose.
- *
- * `packageSession` runs the close's gates as its own preconditions and
- * writes their rows into the refused packaging row, so the answer is
- * structured and the driver never parses a sentence. Only the LAST row is
- * read: a session may be refused, fixed and refused again, and what is to
- * be remade is what failed this time.
- *
- * Null where the refusal is not about an earlier phase's evidence -- a
- * missing credential, a feed that would not take the artifact, a tag that
- * names the wrong commit -- because no phase remakes any of those, and a
- * rewind that could not fix anything would be a loop.
- */
-export function rewindFromPackaging(rows: readonly Row[]): EvidencePhase | null {
-  return rewindPhaseFor(packagingGates(rows));
-}
-
-/** The gate rows the LAST packaging attempt wrote, or none it could read. */
-export function packagingGates(
-  rows: readonly Row[],
-): readonly { readonly name: string; readonly passed?: boolean }[] {
-  const last = rows.length > 0 ? rows[rows.length - 1] : null;
-  if (last === null || last === undefined) return [];
-  const gates = last["gates"];
-  return Array.isArray(gates) ? (gates as { name: string; passed?: boolean }[]) : [];
 }
 
 /**
@@ -2511,27 +2480,6 @@ class Driver {
     );
   }
 
-  /** The one plan member this checkout's `dabbler.release` reads, as the plan ask names it. */
-  private releaseMemberAsk(): string {
-    const bump =
-      "A releasing session bumps the version in the manifest as part of its work -- patch unless the " +
-      "change adds a capability (minor) or breaks a consumer (major) -- and its task paragraph says which\n";
-    if (releaseMode(this.repoRoot) === RELEASE_SHIP_BY_DEFAULT) {
-      return (
-        "  hold_release  optional: the ONE reason this session publishes nothing -- the later session, " +
-        "sibling module or first release's go-live the work waits on. This solution ships by default: once " +
-        "new or fixed functionality can be delivered, it is delivered, so hold only for the first release " +
-        "or a stated dependency, and say which. " +
-        bump
-      );
-    }
-    return (
-      "  release     optional: the ONE reason this session publishes now. This solution releases on " +
-      "request, so a plan without it publishes nothing: name it when the work is ready to be delivered. " +
-      bump
-    );
-  }
-
   private planAsk(): string {
     let excerpt = "";
     try {
@@ -2559,7 +2507,6 @@ class Driver {
       "(for example .dabbler/scratch/plan.json), then run the answer command. The file " +
       "carries exactly these members and no other:\n" +
       "  task        one paragraph: what this session will do -- it becomes the declaration\n" +
-      this.releaseMemberAsk() +
       "  non_goals   a list of at least one: what this session will NOT do -- the exclusions its section of the session plan states, or the nearest concrete boundary of the task where it states none. An engine that cannot name one has not understood the scope; the reviewer holds the work to the list\n" +
       '  steps       an ordered list; each step is {"id": "<lowercase-slug>", "ask": "<what ' +
       'to do, in words>", "files": ["<every repository-relative file the step creates or ' +
@@ -2599,7 +2546,38 @@ class Driver {
     );
   }
 
+  /**
+   * A release session asks nothing: it is declared from its heading and goes
+   * straight to the publish. There is no AI work, no review and no test of
+   * its own to run first.
+   */
+  private declareRelease(version: string): void {
+    if (readTaskDeclaration(this.sessionsDir, this.sessionNumber) === null) {
+      let refused = "";
+      const code = declare(this.sessionsDir, {
+        task: `Release ${version}: the framework packs and publishes what is on the trunk.`,
+        releasable: true,
+        sessionNumber: this.sessionNumber,
+        onRefusal: (message) => {
+          refused = message;
+        },
+      });
+      if (code !== EXIT_OK) throw new Stop("publish", `the release could not be declared: ${refused || "its reason is above"}`);
+    }
+    // Where the tree stood when the release began: it changes nothing, and the
+    // close reads that from here.
+    const head = runGit(this.repoRoot, ["rev-parse", "HEAD"]);
+    this.run = { ...this.run, plan_head: head.code === 0 ? head.stdout.trim() : null };
+    this.log("release-declared", { version });
+    this.setPhase("publish");
+  }
+
   private async phasePlan(): Promise<void> {
+    const releasing = releaseSessionVersion(this.sessionsDir, this.sessionNumber);
+    if (releasing !== null) {
+      this.declareRelease(releasing);
+      return;
+    }
     let plan = readWorkPlan(this.repoRoot, this.sessionNumber);
     let reasons: string[] = [];
     while (plan === null) {
@@ -2619,7 +2597,7 @@ class Driver {
         // the file is removed so the next answer is judged afresh.
         const planReasons = [
           ...judgeWorkPlanNonGoals(plan).map((reason) => refusal(RULE.planNonGoals, reason)),
-          ...judgeWorkPlanHold(plan).map((reason) => refusal(RULE.planHold, reason)),
+          ...judgeWorkPlanRelease(plan).map((reason) => refusal(RULE.planRelease, reason)),
           ...judgeCheckPrograms(plan).map((reason) => refusal(RULE.planCheckProgram, reason)),
         ];
         if (planReasons.length === 0) break;
@@ -2646,10 +2624,8 @@ class Driver {
     }
     this.plan = plan;
     this.setRejections(0);
-    const release = releaseOfPlan(plan, releaseMode(this.repoRoot));
     this.log("plan-accepted", {
       steps: plan.steps.map((step) => step.id),
-      hold: release.holdReason,
       non_goals: (plan.non_goals ?? []).length,
     });
     this.placePlannedRepositories(plan);
@@ -2660,8 +2636,7 @@ class Driver {
       const refused: { message: string; cause: DeclareRefusalCause } = { message: "", cause: "other" };
       const code = declare(this.sessionsDir, {
         task: plan.task,
-        releasable: release.releasable,
-        holdReason: release.holdReason,
+        releasable: false,
         sessionNumber: this.sessionNumber,
         onRefusal: (message, cause) => {
           refused.message = message;
@@ -3944,8 +3919,8 @@ class Driver {
    * this phase closes, and `published_when_releasable` is what stops it
    * reopening quietly the next time this phase does not run.
    *
-   * A session that is not releasable passes straight through, silently:
-   * there is nothing to say about a step that does not apply.
+   * Only a release session publishes. An ordinary session, and a release a
+   * person has held, pass straight through to the close.
    *
    * What the pack writes lands in `.dabbler/runs/s<N>/package/`, which is
    * inside the ignored run directory -- so the artifact cannot dirty the
@@ -3954,22 +3929,14 @@ class Driver {
    * this is the phase that would break if it ever changed.
    */
   private async phasePublish(): Promise<void> {
-    // A session that would ship runs whole, first, every suite whose run of
-    // record was targeted. A red whole run holds the release rather than
-    // stopping the session, and the check below then reads the hold.
-    if (sessionIsReleasable(this.sessionsDir, this.sessionNumber)) await this.wholeRunsBeforeRelease();
     // The DECLARATION, which is what `packageSession` and the close gate
-    // both read. The plan carries a `releasable` too and the engine writes
-    // it, and `phasePlan` turns it into a declaration only when there is
-    // not one already -- so an operator who declared the session before it
-    // was driven can disagree with the plan, and the two disagreeing is
-    // worse in both directions: reading the plan here publishes what was
-    // declared not-releasable, or skips a publish the close then demands a
-    // packaging row for. The plan may PROPOSE it; the declaration decides.
-    if (!sessionIsReleasable(this.sessionsDir, this.sessionNumber)) {
+    // both read: a release session is declared releasable from its heading,
+    // and a person's hold is on the declaration too.
+    const version = releaseSessionVersion(this.sessionsDir, this.sessionNumber);
+    if (version === null || !sessionIsReleasable(this.sessionsDir, this.sessionNumber)) {
       const releasability = releasabilityOf(this.sessionsDir, this.sessionNumber);
       this.log("publish-skipped", {
-        reason: releasability.hold ?? "not declared releasable",
+        reason: releasability.hold ?? "an ordinary session never publishes",
       });
       this.setPhase("close");
       return;
@@ -3985,9 +3952,10 @@ class Driver {
         return;
       }
     }
+    await this.wholeRunsBeforeRelease(version);
     const code = await this.longWork({
       name: "publish",
-      argv: [...selfArgv(), "packaging", "--sessions-dir", this.sessionsDir],
+      argv: [...selfArgv(), "packaging", "--sessions-dir", this.sessionsDir, "--version", version],
       retryAfterSeconds: PUBLISH_RETRY_SECONDS,
       stopKind: "publish",
     });
@@ -4004,6 +3972,12 @@ class Driver {
       // The cost of the literal was not the wording: six distinct refusals
       // read as one, and the rewind below keys on the refusal too.
       const refused = jobLogTail(this.repoRoot, this.sessionNumber, "publish");
+      // A release session changed nothing and has no earlier phase to go
+      // back to: what refused it is fixed in a session of its own.
+      const waysOn =
+        ` A version is spent only by a push that succeeded. Cancel this release session ` +
+        `(\`dabbler session cancel ${sessionDisplayNumber(this.sessionNumber)} --reason "<why>"\`), then plan a ` +
+        "session that fixes this and a new release session after it.";
 
       // Refused on an earlier phase's evidence: go back and make it, rather
       // than stopping and handing the operator the five verbs the managed
@@ -4021,20 +3995,13 @@ class Driver {
       // back did not fix it, and going back again would not either -- so the
       // loop stops, with that refusal in the stop, where a person can see it. A refusal not in the list is a different problem, and going
       // back for it is progress by the same definition the classifier reads.
-      const rows = readPackaging(this.repoRoot, this.sessionNumber);
-      const rewind = rewindFromPackaging(rows);
-      if (rewind !== null) {
-        this.rewindOrStop(rewind, gateSetBound(packagingGates(rows)), "publish", refused);
-        return;
-      }
-
       throw new Stop(
         "publish",
         `the packaging run did not publish: ${
           refused ||
           "it wrote no reason; its log is under the run's jobs directory and " +
             "the attempt is in the session's packaging record"
-        }`,
+        }.${waysOn}`,
       );
     }
     this.log("published", { session: sessionDisplayNumber(this.sessionNumber) });
@@ -4042,41 +4009,43 @@ class Driver {
   }
 
   /**
-   * The whole of every suite whose run of record this session was targeted,
-   * before anything is packaged. A red run stops nothing: `releasabilityOf`
-   * reads it as a hold naming the suite, the publish passes through, and
-   * the session closes with the failure on its record. CI's full run after
-   * the push is not this; it is unchanged.
+   * Every expensive suite, whole, before anything is packaged, once per
+   * release session: a suite with a whole run on this session's record is
+   * not run again. A red one stops the release. CI's full run after the push
+   * is not this; it is unchanged.
    */
-  private async wholeRunsBeforeRelease(): Promise<void> {
-    const declared = this.expensiveSuites();
-    for (const name of wholeRunsOwedBeforeRelease(readRecords(this.repoRoot), this.sessionNumber)) {
-      const suite = declared.find((entry) => entry.name === name);
-      if (suite === undefined) continue;
-      this.log("whole-run-before-release", { suite: name, command: suite.command });
-      const code = await this.longWork({
-        name: `whole run before release: ${name}`,
-        argv: [
-          ...selfArgv(),
-          "test-evidence",
-          "run",
-          "--sessions-dir",
-          this.sessionsDir,
-          "--suite",
-          name,
-          "--stage",
-          STAGE_FINAL_FULL,
-        ],
-        retryAfterSeconds: suiteRetrySeconds(readRecords(this.repoRoot), name),
-        stopKind: "tests",
-      });
-      if (code === 1) {
-        this.log("tests-failed", { command: suite.command, holds: "the release" });
-        continue;
+  private async wholeRunsBeforeRelease(version: string): Promise<void> {
+    for (const suite of this.expensiveSuites()) {
+      const name = suite.name;
+      const whole = () =>
+        readRecords(this.repoRoot)
+          .filter((row) => row.sessionNumber === this.sessionNumber && row.suite === name && row.stage === STAGE_FINAL_FULL)
+          .at(-1);
+      if (whole() === undefined) await this.wholeRunBeforeRelease(name, suite.command);
+      const outcome = whole()?.outcome;
+      if (outcome !== OUTCOME_PASSED) {
+        throw new Stop(
+          "tests",
+          `the whole ${name} run before the release of ${version} ${outcome === undefined ? "was not recorded" : "failed"}, ` +
+            "and a release publishes only what its whole suites pass. Cancel this release session " +
+            `(\`dabbler session cancel ${sessionDisplayNumber(this.sessionNumber)} --reason "<why>"\`), then plan a ` +
+            "session that fixes it and a new release session after it.",
+        );
       }
-      if (code !== EXIT_OK) {
-        throw new Stop("tests", `the whole run of ${name} before the release could not be recorded (exit ${code})`);
-      }
+    }
+  }
+
+  /** One suite, whole, recorded as the release session's run; a red run (exit 1) is on the record for the caller to read. */
+  private async wholeRunBeforeRelease(name: string, command: string): Promise<void> {
+    this.log("whole-run-before-release", { suite: name, command });
+    const code = await this.longWork({
+      name: `whole run before release: ${name}`,
+      argv: [...selfArgv(), "test-evidence", "run", "--sessions-dir", this.sessionsDir, "--suite", name, "--stage", STAGE_FINAL_FULL],
+      retryAfterSeconds: suiteRetrySeconds(readRecords(this.repoRoot), name),
+      stopKind: "tests",
+    });
+    if (code !== EXIT_OK && code !== 1) {
+      throw new Stop("tests", `the whole run of ${name} before the release could not be recorded (exit ${code})`);
     }
   }
 

@@ -37,7 +37,6 @@ import {
   storeCredential,
   KEEP_AS_MACHINE_DEFAULT,
   setAsMyDefault,
-  setRelease,
   setReviewerTransport,
   setRoleModel,
   type ConfigurationUi,
@@ -60,6 +59,8 @@ import {
   unusableRouter,
   writeFileTree,
 } from "./helpers";
+import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 
 function cancelUi(overrides: Partial<CancelLifecycleUi> = {}): {
@@ -1002,6 +1003,29 @@ suite("Start opens the person's own CLI", () => {
   });
 });
 
+suite("Start Session on a release session", () => {
+  test("opens no engine CLI, asks nothing, and starts it with no engine", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-start-"));
+    fs.mkdirSync(path.join(root, "docs", "sessions"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, "docs", "sessions", "session-plan.md"),
+      "### Session 1 of 1: Release 1.0.0 (release: 1.0.0)\n",
+      "utf8",
+    );
+    let framework = 0;
+    const drove = driveUi({
+      configured: () => { throw new Error("a release asks for no engine"); },
+      pickEngine: async () => { throw new Error("a release asks for no engine"); },
+      showFrameworkTerminal: () => { framework += 1; },
+    });
+    const register = registrarOf();
+    assert.strictEqual(await runStartSession(makeRepository({ root }), drove.ui, register), true);
+    assert.deepStrictEqual(register.calls, [["session", "start", "--sessions-dir", "docs/sessions"]]);
+    assert.deepStrictEqual(drove.terminals, []);
+    assert.strictEqual(framework, 1);
+  });
+});
+
 suite("tree command argument narrowing", () => {
   test("the two narrowings fail closed on foreign arguments", () => {
     const repository = makeRepository();
@@ -1582,28 +1606,6 @@ suite("the Configuration section's model pick", () => {
     assert.deepStrictEqual(configureOptions, [
       { repoRoot: "D:/ws", auxiliaryModel: "gemini-3.1-pro-preview" },
     ]);
-  });
-});
-
-suite("the solution row's release commands", () => {
-  test("write the setting through configure, and repaint", async () => {
-    const ui: ConfigurationUi = {
-      confirm: () => Promise.resolve(true),
-      runVerb: () => Promise.resolve(0),
-      pick: () => Promise.resolve(undefined),
-      showInformationMessage: () => undefined,
-      showWarningMessage: () => undefined,
-      workspaceRoot: () => "D:/ws",
-    };
-    const { router, configureOptions } = fakeRouter(0, "written");
-    let repainted = 0;
-    await setRelease(router, "ship-by-default", () => (repainted += 1), ui);
-    await setRelease(router, "on-request", () => (repainted += 1), ui);
-    assert.deepStrictEqual(configureOptions, [
-      { repoRoot: "D:/ws", release: "ship-by-default" },
-      { repoRoot: "D:/ws", release: "on-request" },
-    ]);
-    assert.strictEqual(repainted, 2);
   });
 });
 

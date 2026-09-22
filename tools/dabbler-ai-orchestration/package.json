@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: solutions, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
-  "version": "3.18.0",
+  "version": "3.19.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -195,16 +195,6 @@
         "icon": "$(person)"
       },
       {
-        "command": "dabblerSolution.shipByDefault",
-        "title": "Ship by Default",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSolution.releaseOnRequest",
-        "title": "Release on Request",
-        "category": "Dabbler"
-      },
-      {
         "command": "dabblerSolution.refreshRecord",
         "title": "Update the Catalog",
         "category": "Dabbler",
@@ -294,14 +284,6 @@
         },
         {
           "command": "dabblerSolution.setAsMyDefault",
-          "when": "false"
-        },
-        {
-          "command": "dabblerSolution.shipByDefault",
-          "when": "false"
-        },
-        {
-          "command": "dabblerSolution.releaseOnRequest",
           "when": "false"
         },
         {
@@ -408,16 +390,6 @@
         {
           "command": "dabblerSolution.storeCredential",
           "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfigCredential;/",
-          "group": "1_set@1"
-        },
-        {
-          "command": "dabblerSolution.shipByDefault",
-          "when": "view == dabblerSolutionTree && viewItem == dabblerSolution;on-request",
-          "group": "1_set@1"
-        },
-        {
-          "command": "dabblerSolution.releaseOnRequest",
-          "when": "view == dabblerSolutionTree && viewItem == dabblerSolution;ship-by-default",
           "group": "1_set@1"
         },
         {
@@ -558,19 +530,6 @@
           ],
           "default": "editor",
           "markdownDescription": "Where **Start Session** puts the AI CLI and the Dabbler terminal. A terminal cannot be moved after it is created, so this decides where each one opens; terminals already open keep the location they were opened at."
-        },
-        "dabbler.release": {
-          "type": "string",
-          "enum": [
-            "on-request",
-            "ship-by-default"
-          ],
-          "enumDescriptions": [
-            "A session publishes only when its plan carries `release` with the one reason it releases now.",
-            "A session publishes unless its plan carries `hold_release` with the one reason it waits."
-          ],
-          "default": "on-request",
-          "markdownDescription": "When this solution's sessions publish. It is the solution's answer, so it belongs in the workspace's `.vscode/settings.json`, where the framework reads it; **Ship by Default** and **Release on Request** on the Solution Explorer's solution row, and `dabbler configure --release`, write it there. No session publishes without a VERIFIED verdict either way."
         }
       }
     }
@@ -591,7 +550,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.9",
-    "dabbler-ai-router": "3.18.0",
+    "dabbler-ai-router": "3.19.0",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",

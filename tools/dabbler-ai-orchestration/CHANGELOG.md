@@ -10,6 +10,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.19.0] — 2026-09-22
+
+**A release is a session of its own.** Every session used to carry a
+release decision, and a releasable session could not close without a
+published packaging run: work done and verified was stranded behind a feed
+it could not reach, and the only ways past were a person's verbs, which a
+VS Code terminal on Windows refused.
+
+### Changed
+
+- **Ordinary sessions never publish.** A release is a session headed
+  `(release: <version>)` in the session plan, planned, moved or cancelled
+  like any other. It has no AI work, no tests of its own and no review:
+  **Start Session** on one opens no AI, and the framework runs the whole
+  suites, packs with the release's version as `{version}`, pushes, tags,
+  records the run and closes, in the Dabbler terminal.
+- **A release session's start checks three things first**, and refuses
+  naming the way forward: a `packaging:` block is declared, every session
+  since the last published release closed VERIFIED, and `version.json` (or a
+  tag release) says the release's version. A failed pack or push is a stop
+  whose way on is to cancel the release, fix it in a session, and plan a new
+  release session; a version is spent only by a push that succeeded.
+- **Packaging is a session of its own.** New plans no longer write
+  `packaging.pack` in the skeleton session; the AI plans a packaging session
+  that writes the block and nothing else, and proposes each release's
+  version for you to approve with the plan.
+- **A person at a VS Code terminal is a person.** `hold-release`,
+  `cancel --force` and `close --force` no longer require an interactive
+  terminal, which the shipped `dabbler.cmd` never reports: anything without
+  an engine's marker is a person.
+- **A malformed `packaging:` block is refused** where a session is declared
+  releasable, in the block's own words, instead of being read as declared.
+
+### Removed
+
+- The `dabbler.release` setting, its **Ship by Default** / **Release on
+  Request** item on the Solution Explorer's solution row, and `dabbler
+  configure --release`. A work plan that names `release` or `hold_release`
+  is refused; one recorded earlier is read as it was.
+
 ## [3.18.0] — 2026-09-21
 
 **Every choice is this repository's, and the machine's is only its default.**

@@ -35,14 +35,6 @@ export { spawnProgram, terminateTree } from "./checks.ts";
 // second copy of a vocabulary -- which is the drift that has already been
 // paid for once here, in a phase list that was written down twice.
 export { VALID_TRANSPORTS, TRANSPORT_ENV_VAR } from "./config.ts";
-// When a session publishes: the solution row offers the command that changes
-// it, and reads the one answer the publish phase reads.
-export {
-  RELEASE_ON_REQUEST,
-  RELEASE_SHIP_BY_DEFAULT,
-  type ReleaseMode,
-  releaseMode,
-} from "./settings.ts";
 // The token a gate that judged nothing carries after its name. It is on the
 // contract because the terminal paints a gate row's mark as the bytes pass
 // and has to tell "passed" from "judged nothing", which wear the same mark.
@@ -131,6 +123,9 @@ export { preflightRefusedModel } from "./engines.ts";
 // Start Session asks the person before a start merges an origin branch that
 // shares no history with the checkout, and re-runs the start with this.
 export { COMMIT_CHANGES_FLAG, MERGE_ORIGIN_FLAG, UNDO_CHANGES_FLAG } from "./session.ts";
+// Whether the session a start would register is a release session: Start
+// Session then opens no engine CLI, and asks nothing.
+export { releaseSessionToStart } from "./session.ts";
 // Resume Session restarts the loop only when no heartbeat says one is driving.
 export { loopAlive } from "./drive.ts";
 // Whether a waiter has read what a session is waiting on: the Dabbler

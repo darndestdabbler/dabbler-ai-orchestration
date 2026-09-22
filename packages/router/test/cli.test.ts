@@ -238,8 +238,8 @@ describe("dabbler session, the whole surface", () => {
 
   it("has no typed declare, and refuses the flags that are gone with the rule that replaced them", async () => {
     // A second door decided releasability by a rule of its own: the typed
-    // verb shipped unless held, whatever the checkout's `dabbler.release` said,
-    // and a declaration made first beat the plan. The accepted plan declares.
+    // verb shipped unless held, and a declaration made first beat the plan.
+    // The accepted plan declares.
     const { sessionsDir } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const typed = await run(() => sessionVerb(["declare", "--sessions-dir", sessionsDir, "--task", "Do it."]));
@@ -285,7 +285,7 @@ describe("dabbler session, the whole surface", () => {
       assert.equal(engine.code, 3);
       assert.match(engine.err, /a person's verb, never the engine's/);
       delete process.env["DABBLER_DRIVEN"];
-      // A person: the extension's click here, because a test has no terminal.
+      // A person: the extension's click.
       const person = await run(() =>
         asAPersonsClick(() => sessionVerb(["cancel", "1", "--reason", "stop", "--force", "--sessions-dir", sessionsDir])),
       );
@@ -293,36 +293,6 @@ describe("dabbler session, the whole surface", () => {
       assert.match(person.out, /"status": "cancelled"/);
     } finally {
       restoreEnv();
-    }
-  });
-
-  it("refuses a forced cancel from a shell with no marker and no terminal, which is an engine nobody has measured", async () => {
-    // Verification raised it three times: an engine with no known variable,
-    // launched by hand outside the editor, read as a person because nothing
-    // said it was not one. The verbs that are a person's now ask what is
-    // THERE -- a click, or an interactive terminal -- and an AI's tool shell
-    // has neither, whatever its vendor calls its variables.
-    const { sessionsDir } = makeAnsweredSandbox();
-    registerSessionStart(sessionsDir, 1, { engine: "codex" });
-    const saved = ENGINE_MARKERS.map((name) => [name, process.env[name]] as const);
-    try {
-      for (const name of ENGINE_MARKERS) delete process.env[name];
-      for (const argv of [
-        ["cancel", "--force", "--reason", "stop"],
-        ["close", "--force"],
-        ["hold-release", "--reason", "stop"],
-      ]) {
-        const unmeasured = await run(() => sessionVerb([...argv, "--sessions-dir", sessionsDir]));
-        assert.equal(unmeasured.code, 3, argv.join(" "));
-        assert.match(unmeasured.err, /a person's verb, never the engine's/);
-      }
-      const record = (readRawSessionState(sessionsDir)?.["sessions"] as Record<string, unknown>[])[0];
-      assert.equal(record?.["status"], "in-progress");
-    } finally {
-      for (const [key, value] of saved) {
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = value;
-      }
     }
   });
 
@@ -485,7 +455,6 @@ describe("dabbler session report --next", () => {
       plan,
       JSON.stringify({
         task: "Make the widget real.",
-        hold_release: "nothing to ship yet",
         non_goals: ["Anything the step does not name."],
         steps: [{ id: "widget", ask: "Make the widget real.", files: ["src/widget.py"], checks: [{ argv: [process.execPath, "-e", "0"] }] }],
       }),

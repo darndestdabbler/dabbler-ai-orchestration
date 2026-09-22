@@ -53,7 +53,6 @@ import {
   chosenEngineIn,
   setAsMyDefault,
   setEngine,
-  setRelease,
   setRoleModel,
   setReviewerTransport,
 } from "./commands/configurationCommands";
@@ -330,14 +329,6 @@ export function activate(context: vscode.ExtensionContext): void {
     // checkout; a reviewing model's selection already lives in the
     // preferences, and a second entry beside it would be two controls
     // performing one write.
-    // When this solution's sessions publish; the solution row shows the one
-    // that changes the current setting.
-    vscode.commands.registerCommand("dabblerSolution.shipByDefault", () =>
-      setRelease(productionRouter(), "ship-by-default", () => solutionProvider.refresh()),
-    ),
-    vscode.commands.registerCommand("dabblerSolution.releaseOnRequest", () =>
-      setRelease(productionRouter(), "on-request", () => solutionProvider.refresh()),
-    ),
     vscode.commands.registerCommand("dabblerSolution.setAsMyDefault", (node?: SolutionNode) =>
       setAsMyDefault(
         productionRouter(),

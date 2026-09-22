@@ -201,7 +201,6 @@ try {
     planFile,
     JSON.stringify({
       task: "Make widget() return 2, and say so in the notes.",
-      hold_release: "the proof ships nothing",
       non_goals: ["Anything the two steps do not name."],
       steps: [
         {

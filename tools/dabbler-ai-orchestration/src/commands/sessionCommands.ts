@@ -28,6 +28,7 @@ import {
   MERGE_ORIGIN_FLAG,
   UNDO_CHANGES_FLAG,
   preflightRefusedModel,
+  releaseSessionToStart,
   type Router,
 } from "dabbler-ai-router";
 import { SESSIONS_REL, type SessionsRepository } from "../utils/fileSystem";
@@ -899,6 +900,19 @@ export async function runStartSession(
   register: SessionRegistrar = defaultSessionRegistrar(),
   ask = false,
 ): Promise<boolean> {
+  // A release session is the framework's alone: no engine, model or reviewer
+  // is asked for and no CLI opens. Its start runs it to the close, in the
+  // Dabbler terminal.
+  if (releaseSessionToStart(repository.sessionsDir) !== null) {
+    ui.showFrameworkTerminal(repository.root, undefined);
+    const released = await register(repository.root, ["session", "start", "--sessions-dir", SESSIONS_REL.replace(/\\/g, "/")]);
+    if (released.code !== 0) {
+      const said = released.output.trim();
+      ui.showErrorMessage(`The release session stopped before its close.${said === "" ? "" : ` ${said}`}`);
+      return false;
+    }
+    return true;
+  }
   const configured = ask ? null : (ui.configured ?? configuredStart)(repository.root);
   if (typeof configured === "string") {
     // To the Configuration and never to a pick list of Start's own: a choice

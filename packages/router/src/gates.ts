@@ -966,12 +966,13 @@ export function sessionChangedNothing(sessionsDir: string): boolean {
 
 /**
  * The gates a session that changed nothing passes without their evidence:
- * there was nothing to verify, to run the suite against, or to release.
+ * there was nothing to verify or to run the suite against. Publishing is not
+ * among them: a release session changes nothing by design, and what it
+ * exists to produce is exactly the packaging run that gate asks for.
  */
 export const NO_CHANGE_GATES: ReadonlySet<string> = new Set([
   "verification_clean",
   "test_run_fresh",
-  GATE_PUBLISHED_WHEN_RELEASABLE,
 ]);
 
 /** The remediation a gate passed for a session that changed nothing carries. */

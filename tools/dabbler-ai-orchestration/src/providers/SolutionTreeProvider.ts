@@ -26,7 +26,6 @@ import {
   solutionConfiguration,
   userConfigurationDirs,
 } from "../router/host";
-import { releaseMode } from "dabbler-ai-router";
 import { chosenEngineIn } from "../commands/configurationCommands";
 
 const PROJECTION_RELPATH = path.join(".dabbler", "solution", "solution.json");
@@ -283,7 +282,6 @@ export class SolutionTreeProvider
       // setting changed in the settings editor must not need a window
       // reload to reach the row that reports it.
       chosenEngine: chosenEngineIn(this.currentProjection()),
-      ...(this.workspaceRoot ? { release: releaseMode(this.workspaceRoot) } : {}),
     });
 
     const item = new vscode.TreeItem(

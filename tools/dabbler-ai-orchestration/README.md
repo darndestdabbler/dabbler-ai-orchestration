@@ -49,11 +49,10 @@ No verdict a person can type exists anywhere in the product.
 The Solution Explorer reads your `.slnx`, `.sln`, `.csproj` or `pom.xml` files
 and shows each project, what it references and what references it — there is
 nothing to declare beside them. Every session runs in the repository itself.
-Right-click the solution row for **Ship by Default** or **Release on
-Request**, whichever changes when the solution's sessions publish: on
-request, the default, a session's plan asks to release; ship by default, it
-releases unless its plan holds it. It is `dabbler.release` in
-`.vscode/settings.json`, and `dabbler configure --release` sets the same.
+Ordinary sessions never publish. A release is a session of its own, headed
+`(release: <version>)` in the session plan: **Start Session** on one opens
+no AI, and the framework runs the suites, publishes and closes it in the
+Dabbler terminal.
 
 **4. Works through a Copilot seat or direct API keys.**
 

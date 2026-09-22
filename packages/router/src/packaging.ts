@@ -20,7 +20,7 @@ import { join, relative, resolve, sep } from "node:path";
 
 import { childEnv, isSetBookkeeping, spawnSyncProgram } from "./checks.ts";
 import { type RouterConfig, loadConfig } from "./config.ts";
-import { GATE_PUBLISHED_WHEN_RELEASABLE, type GateResult, runGates } from "./gates.ts";
+import { GATE_PUBLISHED_WHEN_RELEASABLE, type GateResult, runGates, sessionChangedNothing } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { repoRelativePath, repoRootFor, runGit, snapshotWorktreeTree } from "./journal.ts";
 import {
@@ -1246,7 +1246,8 @@ export function packageSession(
   }
 
   // The close gates, asked exactly as the close asks them: no config is
-  // passed, because the close passes none. Handing them a different one is
+  // passed, because the close passes none, and a session that changed
+  // nothing -- every release session -- is judged as one, as the close judges it. Handing them a different one is
   // how packaging and the close come to disagree about whether the same
   // session was ready.
   //
@@ -1258,7 +1259,10 @@ export function packageSession(
   // than passed, so no reader can mistake its absence for a question that
   // was asked and answered; the close asks it, after this has written the
   // record it looks for.
-  const gates = runGates(sessionsDir, { omit: [GATE_PUBLISHED_WHEN_RELEASABLE] });
+  const gates = runGates(sessionsDir, {
+    omit: [GATE_PUBLISHED_WHEN_RELEASABLE],
+    noChange: sessionChangedNothing(sessionsDir),
+  });
   const failed = gates.filter((gate) => !gate.passed);
   if (failed.length > 0) {
     const refused = refusal(

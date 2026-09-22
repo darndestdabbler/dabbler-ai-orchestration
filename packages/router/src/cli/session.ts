@@ -38,7 +38,10 @@ import {
   restore,
   start,
   personIsPresent,
+  releaseSessionToStart,
+  RELEASE_ENGINE,
 } from "../session.ts";
+import { readInstruction } from "../driver.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 /** Every subcommand, in the order the usage text lists them. */
@@ -216,8 +219,8 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  A person's verb, for the session in flight: a release that cannot or should",
     "  not happen is held, and the session closes as held instead of stopping at the",
     "  publish. One way only -- nothing releases a hold -- and refused once the",
-    "  session has published. Whether a session releases at all is its accepted",
-    "  plan's to say, under this checkout's `dabbler.release`.",
+    "  session has published. Only a release session -- a session plan heading",
+    "  carrying `(release: <version>)` -- publishes at all.",
   ],
   close: [
     "  --dry-run                print the gate rows and write nothing",
@@ -278,8 +281,8 @@ const RETIRED_FLAGS: ReadonlyMap<string, string> = new Map([
     (flag) =>
       [
         flag,
-        `argument ${flag}: gone -- whether a session releases is its accepted plan's to say, under this ` +
-          "checkout's `dabbler.release`; a person holds one in flight with `dabbler session hold-release`",
+        `argument ${flag}: gone -- only a release session, headed \`(release: <version>)\` in the session ` +
+          "plan, publishes; a person holds one in flight with `dabbler session hold-release`",
       ] as const,
   ),
   ["--module", "argument --module: gone -- a session works in the whole solution, and its plan's steps name every file it changes"],
@@ -544,8 +547,12 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     // the layers every choice is read through, from files this router reads
     // for itself, so a start typed at a shell sees what the editor's pane set.
     // The flag still wins, because a person who typed one meant it.
+    // A release session is the framework's alone: no engine is asked for,
+    // and the start drives it through the publish to its close.
+    const releasing = releaseSessionToStart(sessionsDir, sessionNumber ?? null);
     const engine =
-      explainEngine(values.get("--engine") ?? null, repoRootFromSessionsDir(sessionsDir)).transport || undefined;
+      explainEngine(values.get("--engine") ?? null, repoRootFromSessionsDir(sessionsDir)).transport ||
+      (releasing !== null ? RELEASE_ENGINE : undefined);
     if (engine === undefined) {
       writeErr(
         "dabbler session start: the following arguments are required: --engine\n" +
@@ -560,7 +567,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(`dabbler session start: ${totalSessions}\n`);
       return EXIT_USAGE;
     }
-    return await start(sessionsDir, {
+    const started = await start(sessionsDir, {
       engine,
       provider: values.get("--provider") ?? null,
       model: values.get("--model") ?? null,
@@ -574,6 +581,14 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       commitChanges: switches.has("--commit-changes"),
       undoChanges: switches.has("--undo-changes"),
     });
+    if (started !== 0 || releasing === null) return started;
+    // Driven here, one call after another, until the instruction on the
+    // record is not a wait: the release's `done`, or a stop.
+    const repoRoot = repoRootFromSessionsDir(sessionsDir);
+    for (;;) {
+      const code = await sessionNext(sessionsDir, { waitInCallMs: WAIT_IN_CALL_MS });
+      if (code !== 0 || readInstruction(repoRoot, releasing.number)?.kind !== "wait") return code;
+    }
   }
 
   if (subcommand === "next") {

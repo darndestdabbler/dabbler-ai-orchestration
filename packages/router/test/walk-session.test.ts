@@ -22,17 +22,17 @@ import { mailboxEngine } from "../src/engines.ts";
 import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
 import { judgeSuiteDeclaration } from "../src/gates.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
-import { appendPackaging, readRounds } from "../src/ledger.ts";
+import { appendPackaging, readPackaging, readRounds } from "../src/ledger.ts";
 import { capture } from "../src/output.ts";
 import { readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import { EXIT_OK, cancel, holdRelease, interrupt, planAmend, report, start } from "../src/session.ts";
+import { EXIT_OK, EXIT_USAGE, RELEASE_ENGINE, cancel, declare, holdRelease, interrupt, planAmend, report, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
 import { amendmentEntries, readTaskDeclaration } from "../src/writers.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
 import { settleJobs, useInProcessJobs } from "./support/inProcessJobs.ts";
-import { gitOut, makeRepo } from "./support/repo.ts";
+import { git, gitOut, makeRepo } from "./support/repo.ts";
 
 const NODE = process.execPath;
 const WIDGET_V3 = "def widget():\n    return 3\n";
@@ -98,7 +98,6 @@ const NAMED = {
 
 const PLAN = {
   task: "Make widget() return 2.",
-  hold_release: "the walk ships nothing",
   non_goals: ["Anything the step does not name."],
   steps: [
     {
@@ -255,7 +254,7 @@ describe("one session, walked from next to done", () => {
     // Accepting a plan declares the session's task: the record says what this
     // session is for before any of it is done.
     assert.equal(readTaskDeclaration(sessionsDir, 1)?.["task"], PLAN.task);
-    assert.equal(readTaskDeclaration(sessionsDir, 1)?.["holdReason"], PLAN.hold_release);
+    assert.equal(readTaskDeclaration(sessionsDir, 1)?.["releasable"], false);
     milestones.push("planned and declared");
 
     // --- a report that names what the tree did not move is refused -----------
@@ -488,44 +487,100 @@ describe("one session, walked from next to done", () => {
   });
 });
 
-describe("a run left standing at the publish of a session already published", () => {
-  it("moves to the close without publishing a second time", async () => {
+/** A repository whose first session is a release of 1.0.0, packed with `{version}` and pushed nowhere. */
+const RELEASE_SEED: Record<string, string> = {
+  ...SEED,
+  "docs/sessions/session-plan.md":
+    "### Session 1 of 2: Release 1.0.0 (release: 1.0.0)\n\n### Session 2 of 2: Later\n1. Polish.\n",
+};
+const PACK = {
+  packaging: {
+    pack: {
+      argv: [
+        NODE,
+        "-e",
+        "require('fs').writeFileSync(require('path').join(process.argv[1], 'widget-' + process.argv[2] + '.tgz'), 'x')",
+        "{output}",
+        "{version}",
+      ],
+    },
+  },
+};
+
+/** Register the release session; no engine is named, because none runs it. */
+async function startRelease(sessionsDir: string): Promise<void> {
+  const started = await capture(() => Promise.resolve(start(sessionsDir, { engine: RELEASE_ENGINE })));
+  assert.equal(started.value, EXIT_OK, started.stderr);
+  assert.match(started.stdout, /a release of 1\.0\.0/);
+}
+
+describe("a release session", () => {
+  it("asks nothing, runs the whole suites, packs its version, publishes and closes", async () => {
     setProviderKeys();
     resetRouter();
     resetRuntimeMode();
-    const repo = makeRepo(SEED, { origin: true });
+    const repo = makeRepo(RELEASE_SEED, { origin: true });
     const sessionsDir = join(repo, "docs", "sessions");
-    // A tag release is packaging, so the plan below is declared releasable.
-    configure([VERIFIED], TESTING, { packaging: { release: "tag" } });
-    assert.equal(
-      (await capture(() =>
-        Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
-      )).value,
-      EXIT_OK,
-    );
-    const plan = await next(sessionsDir);
-    // Released on request, which is what a checkout with no setting does.
-    const releasable = {
-      ...Object.fromEntries(Object.entries(PLAN).filter(([key]) => key !== "hold_release")),
-      release: "the walk publishes",
-    };
-    assert.equal(await answerPlan(sessionsDir, plan.instruction?.seq ?? 0, releasable), EXIT_OK);
-    assert.equal((await next(sessionsDir)).instruction?.step_id, "widget");
+    configure([], TESTING, PACK);
+    await startRelease(sessionsDir);
+    // Real children, as `session start` meets them: one call carries the
+    // release from its declaration to `done`, and no plan is ever asked for.
+    restoreJobs();
+    try {
+      const collected = await capture(() => sessionNext(sessionsDir, { waitInCallMs: 120_000 }));
+      const instruction = JSON.parse(collected.stdout) as DriverInstruction;
+      assert.equal(instruction.kind, "done", collected.stderr);
+    } finally {
+      restoreJobs = useInProcessJobs();
+    }
+    assert.equal(readWorkPlan(repo, 1), null);
+    assert.equal(readTaskDeclaration(sessionsDir, 1)?.["releasable"], true);
+    const published = readPackaging(repo, 1).at(-1);
+    assert.equal(published?.["outcome"], "published");
+    assert.match(JSON.stringify(published?.["artifacts"]), /widget-1\.0\.0\.tgz/);
+    const whole = readRecords(repo).filter((row) => row.sessionNumber === 1 && row.stage === "final-full");
+    assert.deepEqual(whole.map((row) => row.suite).sort(), ["integration", "unit"]);
+  });
 
-    // The state `dabbler packaging` run directly leaves behind: the record
-    // says published and the run still says publish.
+  it("is judged on what the start pulled, and refuses before registering when origin's version disagrees", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    // Locally the release agrees with version.json; origin has since moved it.
+    const repo = makeRepo({ ...RELEASE_SEED, "version.json": '{"version": "1.0.0"}\n' }, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([], TESTING, PACK);
+    const other = join(tempDir("clone-"), "other");
+    git(join(repo, ".."), "clone", "-q", join(repo, "..", "remote.git"), other);
+    writeFileSync(join(other, "version.json"), '{"version": "0.9.0"}\n', "utf8");
+    git(other, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-am", "version moved on origin");
+    git(other, "push", "-q", "origin", "HEAD");
+
+    const started = await capture(() => Promise.resolve(start(sessionsDir, { engine: RELEASE_ENGINE })));
+    assert.equal(started.value, EXIT_USAGE, started.stdout);
+    assert.match(started.stderr, /version\.json says 0\.9\.0, and session 001 releases 1\.0\.0/);
+    assert.equal(readSessionState(sessionsDir)?.["currentSession"] ?? null, null);
+  });
+
+  it("moves to the close without publishing a second time when it is already published", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(RELEASE_SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([], TESTING, PACK);
+    await startRelease(sessionsDir);
+    // The state `dabbler packaging` run directly leaves behind.
     appendPackaging(repo, 1, {
       outcome: "published",
       session_number: 1,
       releasable: true,
       recorded_at: "2026-09-14T12:00:00-04:00",
-      feed: "../feed",
+      feed: "",
       secret_name: "",
       artifacts: ["widget-1.0.0.tgz"],
       steps: [{ step: "pack", command: "pack", exit_code: 0, duration_seconds: 1 }],
     });
-    writeRun(repo, 1, { ...readRun(repo, 1), phase: "publish", job: null });
-
     const move = await next(sessionsDir);
     assert.equal(readRun(repo, 1)?.phase, "close", move.err);
     assert.equal(
@@ -533,51 +588,30 @@ describe("a run left standing at the publish of a session already published", ()
       false,
       "no second publish ran",
     );
-    // The close it moved to started a job; the walkthroughs share one job
-    // runner, so it is settled here rather than left for the next file's walk.
     await settleJobs();
   });
-});
 
-describe("a run standing at the publish of a session a person has held", () => {
-  it("moves to the close without publishing, because the hold is what the publish phase reads", async () => {
-    // A release that could not succeed left two exits, publish or cancel.
-    // `hold-release` is the third, and it needs no phase of its own: the
-    // publish phase already passes a held session through to its close.
+  it("moves to the close without publishing once a person has held it", async () => {
+    // `hold-release` is a person's way to stop a release that cannot or
+    // should not happen, and the publish phase reads it off the declaration.
     setProviderKeys();
     resetRouter();
     resetRuntimeMode();
-    const repo = makeRepo(SEED, { origin: true });
+    const repo = makeRepo(RELEASE_SEED, { origin: true });
     const sessionsDir = join(repo, "docs", "sessions");
-    configure([VERIFIED], TESTING, { packaging: { release: "tag" } });
-    assert.equal(
-      (await capture(() =>
-        Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
-      )).value,
-      EXIT_OK,
-    );
-    const plan = await next(sessionsDir);
-    const releasable = {
-      ...Object.fromEntries(Object.entries(PLAN).filter(([key]) => key !== "hold_release")),
-      release: "the walk publishes",
-    };
-    assert.equal(await answerPlan(sessionsDir, plan.instruction?.seq ?? 0, releasable), EXIT_OK);
-    assert.equal((await next(sessionsDir)).instruction?.step_id, "widget");
-    assert.equal(readTaskDeclaration(sessionsDir, 1)?.["releasable"], true);
-
-    // Stopped at the publish, as a refused packaging run leaves it; then held.
-    writeRun(repo, 1, { ...readRun(repo, 1), phase: "publish", job: null });
+    configure([], TESTING, PACK);
+    await startRelease(sessionsDir);
+    assert.equal((await capture(() => Promise.resolve(declare(sessionsDir, { task: "Release 1.0.0", releasable: true })))).value, EXIT_OK);
     const held = await capture(() =>
       Promise.resolve(holdRelease(sessionsDir, { reason: "the feed's credential is not issued", engine: false })),
     );
     assert.equal(held.value, EXIT_OK, held.stderr);
-
     const move = await next(sessionsDir);
     assert.equal(readRun(repo, 1)?.phase, "close", move.err);
     assert.equal(
       existsSync(join(repo, ".dabbler", "runs", "s1", "driver", "jobs", "publish.status.json")),
       false,
-      "a held session published",
+      "a held release published",
     );
     await settleJobs();
   });

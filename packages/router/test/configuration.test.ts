@@ -24,7 +24,6 @@ import {
   SETTING_REVIEWER_MODEL,
   SETTING_CREDENTIAL_ANTHROPIC,
   SETTING_CREDENTIAL_OPENAI,
-  SETTING_RELEASE,
   SETTING_TRANSPORT,
   settingValue,
   writeSettings,
@@ -612,26 +611,6 @@ describe("whose a choice is, as the configuration and `explain` say it", () => {
       assert.match(said, /shadowed: .*preferences\.json.*= claude-code/);
     } finally {
       writeSettings(root, { [SETTING_REVIEWER_MODEL]: "", [SETTING_ENGINE]: "", [SETTING_AUTHORING_MODEL]: "" });
-      restore();
-    }
-  });
-});
-
-describe("when a solution's sessions publish", () => {
-  it("writes the release setting to the checkout, and refuses an unknown value and --mine", () => {
-    const { root, restore } = machine();
-    try {
-      assert.equal(configure({ repoRoot: root, release: "ship-by-default" }).refusal, null);
-      assert.equal(settingValue(root, SETTING_RELEASE), "ship-by-default");
-      assert.match(String(configure({ repoRoot: root, release: "always" }).refusal), /on-request, ship-by-default/);
-      // The solution's to say, so never one person's default.
-      assert.match(
-        String(configure({ repoRoot: root, release: "on-request", mine: true }).refusal),
-        /solution's to say/,
-      );
-      assert.equal(settingValue(root, SETTING_RELEASE), "ship-by-default");
-    } finally {
-      writeSettings(root, { [SETTING_RELEASE]: "" });
       restore();
     }
   });

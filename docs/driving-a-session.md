@@ -252,10 +252,7 @@ one.
 ## Answering
 
 The first instruction asks for a work plan — the task in a paragraph,
-the one plan member the checkout's `dabbler.release` reads (on request,
-the default: `release` with the one reason the session publishes now,
-without which it publishes nothing; ship by default: `hold_release` with
-the one reason it waits, without which it ships), at least one non-goal
+at least one non-goal
 (what the session will NOT do, which the reviewer holds the work to), and
 the ordered steps,
 each with the files it will touch and at least one mechanical check that
@@ -264,15 +261,15 @@ the file over:
 
 ```
 dabbler session report --sessions-dir docs/sessions --seq 1 --answer-file /tmp/plan.json
-report: session 001 seq 1 answered; work plan (1 step(s), ships) written to .dabbler/runs/s1/driver/plan.json; the driver reads it next.
+report: session 001 seq 1 answered; work plan (1 step(s)) written to .dabbler/runs/s1/driver/plan.json; the driver reads it next.
 ```
 
 The next call accepts it, declares the session from it, and asks for the
 first step:
 
 ```
-dabbler [11:31:21] plan-accepted steps=["widget"] hold=null non_goals=1
-declare: session 001 declared; releasable=no; held: this repository declares no packaging, so there is nothing to publish.
+dabbler [11:31:21] plan-accepted steps=["widget"] non_goals=1
+declare: session 001 declared; releasable=no.
 dabbler [11:31:21] phase phase=work
 dabbler [11:31:22] instruction-issued seq=2 kind=step step=widget
 ```
@@ -407,12 +404,10 @@ it inside the verification job.
 ## `wait`: the framework's own long work
 
 Three things take longer than a tool call: a verification round, the
-complete suite as the run of record, and the close — four, for a session
-that ships, whose publish runs between the push and the close. A session
-ships when `dabbler.release` and its plan say it does (a `release` on
-request, no `hold_release` by default), unless the repository declares no
-packaging or its verdict is not VERIFIED; the close's
-`published_when_releasable` row says which. (The preverify phase runs nothing: the tests that run are each
+complete suite as the run of record, and the close. A release session has
+no round and no step: its whole suites, its publish and its close are all
+it runs, and the close's `published_when_releasable` row says whether it
+shipped. (The preverify phase runs nothing: the tests that run are each
 step's own checks with the tests named after what the step changed, and the
 suites as the run of record — whole, or `final-targeted` where a whole run
 costs more than a session should spend, with the whole suite before a
@@ -666,11 +661,12 @@ provider calls on a fact that was never written down.
 
 ### Who ends a session, and who holds a release
 
-**Whether a session releases is decided in one place**: its accepted plan,
-read under the checkout's `dabbler.release`. There is no typed declaration
-and no second door. `on-request`, the default, publishes only a plan that
-names `release`; `ship-by-default` publishes unless the plan names
-`hold_release`.
+**Whether a session releases is decided in one place**: its heading in the
+session plan. A session headed `(release: <version>)` is a release session
+and is the only kind that publishes; `session start` on one opens no AI and
+drives it through the whole suites, the publish and the close. A work plan
+that names `release` or `hold_release` is refused: an ordinary session never
+publishes. There is no typed declaration and no second door.
 
 **A release that cannot or should not happen is held, by a person:**
 
@@ -686,14 +682,14 @@ succeed left two exits, publish or cancel.
 **Ending a session by force is a person's act, whichever engine asks.**
 `session cancel --force` and `session close --force` are refused to an
 engine in the same words, as `session hold-release` is: report the step
-blocked and say why. The router finds a person by what is there rather than
-by what is missing: a click in the editor, or an interactive terminal with no
-engine's marker in it. An AI's tool runs its commands with no terminal at
-all, which holds for an engine nobody has measured; the markers — each
-vendor's own, and `DABBLER_ENGINE_TERMINAL`, which the extension and the
-framework set on every engine they start — are read first and make a known
-engine an engine wherever it runs. So a person's verb typed into a script or
-a pipe is refused too, and says where a person does it.
+blocked and say why. The router reads the caller: a click in the editor is a
+person, an engine's marker is an engine, and anything else is a person. The
+markers — each vendor's own, and `DABBLER_ENGINE_TERMINAL`, which the
+extension and the framework set on every engine they start — make a known
+engine an engine wherever it runs. An interactive terminal is not asked
+for: the `dabbler` command the extension installs runs the router under the
+editor's Node, which reports none, and a person at a VS Code terminal is still
+a person.
 `docs/design/engine-environment-markers.md` has the readings and says what
 this is not. The cancel a stop prints runs as
 printed: `dabbler session cancel --force --reason "<why>"` means the session

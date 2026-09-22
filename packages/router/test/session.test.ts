@@ -59,6 +59,10 @@ import {
   judgeCancellation,
   judgeRestoration,
   judgeStartBoundary,
+  judgeReleasePreflight,
+  MalformedSlugError,
+  parseSessionPlans,
+  releaseSessionVersion,
   declare,
   holdRelease,
   interrupt,
@@ -1187,17 +1191,13 @@ describe("cancelling and restoring through the verb", () => {
     }
   });
 
-  it("finds a person where there is a click or an interactive terminal, and nowhere else", async () => {
-    // What is THERE, not what is absent: a list of engine markers cannot
-    // cover an engine nobody has measured, and an AI's tool shell -- whoever
-    // made it -- runs its commands with no terminal.
-    assert.equal(personIsPresent({}, true), true);
-    assert.equal(personIsPresent({}, false), false);
-    // A known engine is an engine even where its tool gives it a terminal.
-    for (const name of ENGINE_MARKERS) assert.equal(personIsPresent({ [name]: "1" }, true), false, name);
+  it("finds a person at a click or wherever no engine marker is, terminal or not", async () => {
+    // A VS Code terminal on Windows may report no interactive stdin, and the
+    // person typing in it is still a person.
+    assert.equal(personIsPresent({}), true);
+    for (const name of ENGINE_MARKERS) assert.equal(personIsPresent({ [name]: "1" }), false, name);
     // A click is a person, whatever the editor's own environment carries.
-    assert.equal(await asAPersonsClick(() => personIsPresent({ CLAUDECODE: "1" }, false)), true);
-    assert.equal(personIsPresent({}, false), false);
+    assert.equal(await asAPersonsClick(() => personIsPresent({ CLAUDECODE: "1" })), true);
   });
 
   it("refuses an engine at each of a person's three verbs in one sentence, the verb and what it does apart", async () => {
@@ -1469,10 +1469,9 @@ describe("a report that arrives after its session was cancelled", () => {
 
 describe("what the loop's declaration records about a release", () => {
   it("ships where packaging is declared, and holds in its own words where none is", async () => {
-    // The loop is the one caller, and it hands in what `releaseOfPlan` decided
-    // under the checkout's setting. What `declare` adds is the one fact a plan
-    // cannot know: a repository that declares no packaging has nothing to
-    // publish, whatever the plan proposed.
+    // The loop is the one caller, and a release session is declared
+    // releasable. What `declare` adds is the one fact a heading cannot know:
+    // a repository that declares no packaging has nothing to publish.
     const ships = makeAnsweredSandbox({ "dabbler.yaml": "schema_version: 1\npackaging:\n  release: tag\n" });
     registerSessionStart(ships.sessionsDir, 1, { engine: "claude-code" });
     const shipsResult = await run(() => declare(ships.sessionsDir, { task: "Do it.", releasable: true }));
@@ -1484,6 +1483,46 @@ describe("what the loop's declaration records about a release", () => {
     const nothing = await run(() => declare(bare.sessionsDir, { task: "Do it.", releasable: true }));
     assert.equal(nothing.code, EXIT_OK, nothing.err);
     assert.match(nothing.out, /releasable=no; held: this repository declares no packaging/);
+  });
+
+  it("refuses a releasable declaration over a packaging block it cannot read", async () => {
+    // Read as declared, a malformed block made a releasable session that
+    // could never publish.
+    const broken = makeAnsweredSandbox({ "dabbler.yaml": "schema_version: 1\npackaging:\n  pack:\n    argv: [make]\n" });
+    registerSessionStart(broken.sessionsDir, 1, { engine: "claude-code" });
+    const refused = await run(() => declare(broken.sessionsDir, { task: "Release it.", releasable: true }));
+    assert.equal(refused.code, EXIT_USAGE);
+    assert.match(refused.err, /packaging block in dabbler\.yaml cannot be read/);
+    assert.equal(readTaskDeclaration(broken.sessionsDir, 1), null);
+  });
+});
+
+describe("what a release session's start refuses", () => {
+  const CLEAR = {
+    packagingDeclared: true,
+    unverified: [],
+    versionFile: { path: "version.json", version: "2.0.0", reason: "" },
+  };
+
+  it("starts a release whose packaging is declared, whose sessions verified and whose version file agrees", () => {
+    assert.equal(judgeReleasePreflight(7, "2.0.0", CLEAR), null);
+    // A version kept in no file is passed to the pack alone, and agrees with nothing.
+    assert.equal(judgeReleasePreflight(7, "2.0.0", { ...CLEAR, versionFile: null }), null);
+  });
+
+  it("refuses each of the three, naming the cause and the session that fixes it", () => {
+    assert.match(
+      String(judgeReleasePreflight(7, "2.0.0", { ...CLEAR, packagingDeclared: false })),
+      /no `packaging:` block.*Plan a packaging session before it/,
+    );
+    assert.match(
+      String(judgeReleasePreflight(7, "2.0.0", { ...CLEAR, unverified: [4, 5] })),
+      /session\(s\) 004, 005 closed after the last published release without a VERIFIED verdict/,
+    );
+    assert.match(
+      String(judgeReleasePreflight(7, "2.0.1", CLEAR)),
+      /version\.json says 2\.0\.0, and session 007 releases 2\.0\.1.*plan one before session 007/,
+    );
   });
 });
 
@@ -1679,5 +1718,32 @@ describe("a session that publishes nothing", () => {
     } finally {
       published.restore();
     }
+  });
+});
+
+describe("a release session is declared in its heading", () => {
+  it("parses the release marker alone, beside a slug in either order, and refuses a malformed one", () => {
+    const plans = parseSessionPlans(
+      "### Session 1 of 3: Release 1.2.0 (release: 1.2.0)\n\n" +
+        "### Session 2 of 3: Ship it (slug: ship) (release: 1.3.0-rc.1)\n\n" +
+        "### Session 3 of 3: Ship again (release: 1.4.0) (slug: again)\n",
+    );
+    assert.deepEqual(
+      plans.map(({ title, slug, release }) => ({ title, slug, release })),
+      [
+        { title: "Release 1.2.0", slug: null, release: "1.2.0" },
+        { title: "Ship it", slug: "ship", release: "1.3.0-rc.1" },
+        { title: "Ship again", slug: "again", release: "1.4.0" },
+      ],
+    );
+    assert.throws(() => parseSessionPlans("### Session 1: Release (release: next)\n"), MalformedSlugError);
+  });
+
+  it("reads the version a session releases from the plan, and null for an ordinary session", () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, "session-plan.md"), "### Session 1: Work\n\n### Session 2: Release (release: 2.0.0)\n");
+    assert.equal(releaseSessionVersion(dir, 1), null);
+    assert.equal(releaseSessionVersion(dir, 2), "2.0.0");
+    assert.equal(releaseSessionVersion(join(dir, "absent"), 2), null);
   });
 });

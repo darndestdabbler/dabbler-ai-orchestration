@@ -43,7 +43,6 @@ import {
   dispositionRefusals,
   idleInstruction,
   judgeRegistration,
-  rewindFromPackaging,
   COMMIT_SUBJECT_WIDTH,
   landCommitMessage,
   judgeReportFiles,
@@ -72,7 +71,6 @@ import {
   waitingRecord,
   waitingForInstruction,
   gateSetBound,
-  packagingGates,
   recordDisputesFor,
   jobDeadlineSeconds,
   jobDurations,
@@ -411,17 +409,6 @@ describe("a stop the framework can cure", () => {
       alreadyRewoundFor([{ reason: bound }], gateSetBound([{ name: "pushed_to_remote", passed: false }])),
       false,
     );
-  });
-
-  it("reads the gates the last packaging attempt wrote, and nothing from the ones before it", () => {
-    const rows = [
-      { gates: [{ name: "test_run_fresh", passed: false }] },
-      { gates: [{ name: "pushed_to_remote", passed: false }] },
-    ];
-    assert.equal(gateSetBound(packagingGates(rows)), "gates: pushed_to_remote");
-    assert.equal(rewindFromPackaging(rows), "land");
-    assert.deepEqual(packagingGates([]), []);
-    assert.deepEqual(packagingGates([{ outcome: "published" }]), []);
   });
 
   it("hands a dispute the ledger refuses back as a refusal of the answer, and records the rest", () => {
@@ -1059,18 +1046,10 @@ describe("the land's push on a branch with no upstream", () => {
   });
 });
 
-describe("a publish refused on an earlier phase's evidence", () => {
+describe("a close refused on an earlier phase's evidence", () => {
   it("goes back to the phase that makes it, and stops when no phase can", () => {
-    // Session 137's own packaging record, both shapes it holds. The second
-    // attempt was refused with verification_clean, working_tree_clean and
-    // test_run_fresh all false; the third with every gate green and the tag
-    // simply not on origin. The driver stayed at `publish` for both, and the
-    // recovery from the first was done by hand -- verify, both suites,
-    // test-evidence record twice, commit, push -- which is exactly the set
-    // the managed body tells an engine are not its to run.
     const staleEvidence = [
       {
-        outcome: "refused",
         gates: [
           { name: "verification_clean", passed: false },
           { name: "working_tree_clean", passed: false },
@@ -1084,44 +1063,26 @@ describe("a publish refused on an earlier phase's evidence", () => {
     // The EARLIEST of the three, not the last one read: a tree that moved
     // after verification invalidates the suite and the push as well, and
     // rewinding only to the land would carry the stale round into the close.
-    assert.equal(rewindFromPackaging(staleEvidence), "verify");
     assert.equal(rewindPhaseFor(staleEvidence[0]?.gates ?? []), "verify");
 
-    // Every gate green and the refusal about the tag: no phase remakes that,
-    // so there is nothing to rewind to and the run stops.
-    const tagAbsent = [
-      {
-        outcome: "refused",
-        gates: [
-          { name: "verification_clean", passed: true },
-          { name: "working_tree_clean", passed: true },
-          { name: "pushed_to_remote", passed: true },
-          { name: "test_run_fresh", passed: true },
-        ],
-      },
-    ];
-    assert.equal(rewindFromPackaging(tagAbsent), null);
-
-    // Nor do the gates no phase owns: an owed decision is a person's to
-    // answer and a verdict's vocabulary is the verifier's, so a publish
-    // refused on either stops rather than looping through a phase that
-    // cannot change them.
+    // Every gate green: no phase remakes whatever refused, so the run stops.
     assert.equal(
-      rewindFromPackaging([
-        { outcome: "refused", gates: [{ name: "owed_decisions", passed: false }] },
+      rewindPhaseFor([
+        { name: "verification_clean", passed: true },
+        { name: "working_tree_clean", passed: true },
+        { name: "pushed_to_remote", passed: true },
+        { name: "test_run_fresh", passed: true },
       ]),
       null,
     );
 
-    // The LAST row, because a session may be refused, fixed and refused
-    // again, and what is to be remade is what failed this time.
-    assert.equal(rewindFromPackaging([...staleEvidence, ...tagAbsent]), null);
-    assert.equal(rewindFromPackaging([...tagAbsent, ...staleEvidence]), "verify");
+    // Nor do the gates no phase owns: an owed decision is a person's to
+    // answer and a verdict's vocabulary is the verifier's, so a close
+    // refused on either stops rather than looping through a phase that
+    // cannot change them.
+    assert.equal(rewindPhaseFor([{ name: "owed_decisions", passed: false }]), null);
 
-    // A record with nothing in it, and a row from before gates were written
-    // into it, are both "nothing to rewind to" rather than a crash.
-    assert.equal(rewindFromPackaging([]), null);
-    assert.equal(rewindFromPackaging([{ outcome: "refused" }]), null);
+    assert.equal(rewindPhaseFor([]), null);
 
     // The suite alone sends it to the run of record, and the tree or the
     // push alone to the land.

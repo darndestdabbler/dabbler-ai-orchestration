@@ -59,7 +59,6 @@ import {
   SETTING_AUTHORING_MODEL,
   SETTING_AUXILIARY_MODEL,
   SETTING_ENGINE,
-  SETTING_RELEASE,
   SETTING_REVIEWER_MODEL,
   SETTING_REVIEWER_TRANSPORT,
   SETTING_TRANSPORT,
@@ -1479,8 +1478,6 @@ export interface ConfigurationChoice {
   readonly credentialProvider?: string;
   /** The credential's NAME, never its value; "" clears the reference. */
   readonly credential?: string;
-  /** When this solution's sessions publish: `on-request` or `ship-by-default`. */
-  readonly release?: string;
 }
 
 /** What was written, and where. */
@@ -1539,7 +1536,6 @@ export function writeConfigurationChoice(
     }
     values[key] = choice.credential.trim();
   }
-  if (choice.release !== undefined) values[SETTING_RELEASE] = choice.release.trim();
   return writeSettings(root, values);
 }
 

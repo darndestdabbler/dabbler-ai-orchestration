@@ -95,10 +95,8 @@ import {
   writeReport,
   writeWorkPlan,
   appendSupervision,
-  releaseOfPlan,
 } from "./driver.ts";
 import type { DriverInstruction } from "./generated/index.ts";
-import { releaseMode } from "./settings.ts";
 import {
   CAUSE_NOT_LISTED,
   CAUSE_NO_KEY,
@@ -124,7 +122,7 @@ import {
   runGates,
   sessionChangedNothing,
 } from "./gates.ts";
-import { PackagingConfigError, loadDeclaration, loadTagRelease } from "./packaging.ts";
+import { PackagingConfigError, canonicalVersion, loadDeclaration, loadTagRelease, releaseVersion } from "./packaging.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { removeStopGate } from "./bootstrap/index.ts";
 import { isSessionBookkeeping } from "./testEvidence.ts";
@@ -188,7 +186,7 @@ import {
   workBegunRefusal,
 } from "./writers.ts";
 import { writeErr, writeOut } from "./output.ts";
-import { sessionVerdict } from "./verdict.ts";
+import { VERDICT_VERIFIED, sessionVerdict } from "./verdict.ts";
 
 /**
  * Bring a stale record up to date before the session is registered.
@@ -403,6 +401,8 @@ const TAB_WIDTH = 4;
 const SLUG_MARKER_LOOSE_RE = /\(\s*slug\s*:?\s*([^)]*)\)\s*$/i;
 const SLUG_MARKER_LITERAL_RE = /^\(slug: [a-z0-9-]+\)$/;
 const SLUG_OPEN_RE = /\(\s*slug\b/gi;
+const RELEASE_MARKER_LOOSE_RE = /\(\s*release\s*:?\s*([^)]*)\)\s*$/i;
+const RELEASE_MARKER_LITERAL_RE = /^\(release: \d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\)$/;
 
 /**
  * A trailing parenthetical looked like an authored `(slug: ...)` marker but
@@ -469,6 +469,33 @@ export function splitSlugMarker(text: string): [string, string | null] {
     );
   }
   return [text, null];
+}
+
+/**
+ * Split a trailing `(release: <version>)` marker off a session heading: the
+ * one thing that makes a session a release session. Anything that looks
+ * like an attempted marker but is not the literal form raises, as a
+ * malformed slug does.
+ */
+export function splitReleaseMarker(text: string): [string, string | null] {
+  const stripped = text.replace(/\s+$/, "");
+  const match = RELEASE_MARKER_LOOSE_RE.exec(stripped);
+  if (match === null) return [text, null];
+  if (!RELEASE_MARKER_LITERAL_RE.test(match[0])) {
+    throw new MalformedSlugError(
+      `release-like marker '${match[0]}' is not the literal '(release: x.y.z)' form`,
+    );
+  }
+  return [stripped.slice(0, match.index).replace(/\s+$/, ""), match[1].trim()];
+}
+
+/** A heading's title, slug and release version, the two markers in either order. */
+function splitHeadingMarkers(text: string): { title: string; slug: string | null; release: string | null } {
+  const [withoutRelease, release] = splitReleaseMarker(text);
+  const [title, slug] = splitSlugMarker(withoutRelease);
+  if (release !== null) return { title, slug, release };
+  const [bare, earlier] = splitReleaseMarker(title);
+  return { title: bare, slug, release: earlier };
 }
 
 /**
@@ -557,6 +584,8 @@ export interface SessionPlan {
   readonly number: number;
   readonly title: string;
   readonly slug: string | null;
+  /** The version a release session releases, from `(release: x.y.z)`; null for an ordinary session. */
+  readonly release: string | null;
   readonly steps: string[];
 }
 
@@ -564,7 +593,7 @@ export interface SessionPlan {
  * The plan's sessions and their steps.
  *
  * `slug` is the session's authored `(slug: xxx)` marker, or null when the
- * heading declares none. Two sessions declaring the same slug is refused
+ * heading declares none; `release` likewise. Two sessions declaring the same slug is refused
  * here, at parse time, rather than left for a later reader to resolve
  * however it likes.
  */
@@ -578,7 +607,7 @@ export function parseSessionPlans(specText: string): SessionPlan[] {
   matches.forEach((match, index) => {
     const end =
       index + 1 < matches.length ? matches[index + 1].index! : stripped.length;
-    const [title, slug] = splitSlugMarker(match[3].trim());
+    const { title, slug, release } = splitHeadingMarkers(match[3].trim());
     const number = Number.parseInt(match[1], 10);
     if (slug !== null) {
       const prior = seenSlugs.get(slug);
@@ -595,10 +624,26 @@ export function parseSessionPlans(specText: string): SessionPlan[] {
       number,
       title,
       slug,
+      release,
       steps: parseStepTexts(stripped.slice(segmentStart, end)),
     });
   });
   return plans;
+}
+
+/**
+ * The version session `sessionNumber` releases, or null when its heading
+ * declares no `(release: x.y.z)` -- that is, when it is an ordinary session.
+ * A plan that is missing or unreadable declares no release session.
+ */
+export function releaseSessionVersion(sessionsDir: string, sessionNumber: number): string | null {
+  let text: string;
+  try {
+    text = readFileSync(join(sessionsDir, SESSION_PLAN_FILENAME), "utf8");
+  } catch {
+    return null;
+  }
+  return parseSessionPlans(text).find((plan) => plan.number === sessionNumber)?.release ?? null;
 }
 
 /**
@@ -1253,6 +1298,180 @@ export function setSessionUseReading(reading: typeof assessSessionUse | null): v
   sessionUseReading = reading ?? assessSessionUse;
 }
 
+/** What a release session's start is judged on, read from the repository. */
+export interface ReleaseFacts {
+  /** A `packaging:` block is declared: a pack, or a tag release. */
+  readonly packagingDeclared: boolean;
+  /** Sessions closed after the last published release that did not verify. */
+  readonly unverified: readonly number[];
+  /** What the version file says, where the version is kept in one; null where it is not. */
+  readonly versionFile: { readonly path: string; readonly version: string | null; readonly reason: string } | null;
+}
+
+/**
+ * Why session `number`, a release of `version`, cannot start, with its way
+ * forward -- or null. Three questions and no fourth: nothing here probes a
+ * feed or a credential, which only a real push can answer.
+ */
+export function judgeReleasePreflight(number: number, version: string, facts: ReleaseFacts): string | null {
+  const shown = sessionDisplayNumber(number);
+  if (!facts.packagingDeclared) {
+    return (
+      `session ${shown} releases ${version}, and dabbler.yaml declares no \`packaging:\` block, so there ` +
+      "is nothing to publish with. Plan a packaging session before it -- one whose whole job is the " +
+      "block -- and start this release after that session closes."
+    );
+  }
+  if (facts.unverified.length > 0) {
+    const named = facts.unverified.map(sessionDisplayNumber).join(", ");
+    return (
+      `session(s) ${named} closed after the last published release without a VERIFIED verdict, and a ` +
+      `release publishes only verified work. Plan a session that fixes and verifies it before session ${shown}.`
+    );
+  }
+  const file = facts.versionFile;
+  if (file !== null && file.version !== version) {
+    return (
+      `${file.path} ${file.version === null ? `does not say a version this release can use: ${file.reason}` : `says ${file.version}`}` +
+      `, and session ${shown} releases ${version}. The version is bumped by an ordinary session, never by a ` +
+      `release: plan one before session ${shown} that sets ${file.path} to ${version}, or change the version in the heading.`
+    );
+  }
+  return null;
+}
+
+/** Read the facts a release session's start is judged on. */
+export function readReleaseFacts(sessionsDir: string, number: number): ReleaseFacts {
+  const root = repoRootFromSessionsDir(sessionsDir);
+  const config = loadConfig(undefined, root);
+  const tag = loadTagRelease(config, null);
+  const packagingDeclared = tag !== null || loadDeclaration(config, null) !== null;
+  const rows = readRawSessionState(sessionsDir)?.["sessions"];
+  const records = (Array.isArray(rows) ? rows : []).filter(
+    (row): row is Record<string, unknown> => typeof row === "object" && row !== null,
+  );
+  const published = records
+    .map((row) => Number(row["number"]))
+    .filter((n) => n < number && readPackaging(root, n).some((run) => run["outcome"] === OUTCOME_PUBLISHED));
+  const lastPublished = published.length > 0 ? Math.max(...published) : 0;
+  const unverified = records
+    .filter((row) => {
+      const n = Number(row["number"]);
+      if (n <= lastPublished || n >= number || row["status"] !== "complete") return false;
+      const verdict = row["verificationVerdict"];
+      // A session that changed nothing has no verdict and nothing to verify.
+      if (verdict === undefined || verdict === null) return row["noChange"] !== true;
+      return String(verdict) !== VERDICT_VERIFIED;
+    })
+    .map((row) => Number(row["number"]));
+  let versionFile: ReleaseFacts["versionFile"] = null;
+  if (tag !== null) {
+    const agreed = releaseVersion(root);
+    versionFile = { path: "version.json", version: agreed.version, reason: agreed.reason };
+  } else if (existsSync(join(root, "version.json"))) {
+    versionFile = { path: "version.json", version: canonicalVersion(root), reason: "it declares no x.y.z version" };
+  }
+  return { packagingDeclared, unverified, versionFile };
+}
+
+/** The refusal a release session's start meets, or null; an unreadable fact is a refusal in its own words. */
+export function releasePreflight(sessionsDir: string, number: number, version: string): string | null {
+  try {
+    return judgeReleasePreflight(number, version, readReleaseFacts(sessionsDir, number));
+  } catch (error) {
+    return `the release could not be checked: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+/**
+ * The session a start would register, where it is a release session: its
+ * number and version. Null for an ordinary session or a start that would be
+ * refused. Start Session and `session start` ask it to open no AI.
+ */
+export function releaseSessionToStart(
+  sessionsDir: string,
+  sessionNumber: number | null = null,
+): { readonly number: number; readonly version: string } | null {
+  const raw = readRawSessionState(sessionsDir);
+  const normalized = raw ? derivedView(raw) : null;
+  const boundary = judgeStartBoundary({
+    current: (normalized?.["currentSession"] ?? null) as number | null,
+    completed: [...completedNumbers(normalized)].sort((a, b) => a - b),
+    cancelled: cancelledNumbers(normalized),
+    requested: sessionNumber,
+  });
+  if (boundary.refusal !== null) return null;
+  const version = releaseSessionVersion(sessionsDir, boundary.requested);
+  return version === null ? null : { number: boundary.requested, version };
+}
+
+/** The engine a release session is registered under: no AI runs it. */
+export const RELEASE_ENGINE = "framework";
+
+/**
+ * Register a release session: no engine, no model and no reviewer is asked
+ * about, because none runs. The preflight, the clean tree and the pull are
+ * asked as for any session; the caller then drives it to the close.
+ */
+function startRelease(
+  sessionsDir: string,
+  requested: number,
+  version: string,
+  fresh: boolean,
+  options: StartOptions,
+): number {
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  if (fresh) {
+    const begun = materialWorktreeChanges(sessionsDir, { beforeWork: true });
+    if (begun.error) {
+      writeErr(`start: refused -- cannot tell whether the tree is clean: ${begun.error}\n`);
+      return EXIT_USAGE;
+    }
+    if (begun.paths.length > 0) {
+      writeErr(`start: refused -- ${workBegunRefusal(requested, begun.paths)} A release publishes what is committed.\n`);
+      return EXIT_USAGE;
+    }
+    const unanswered = remoteUnansweredLine(repoRoot);
+    if (unanswered !== null) {
+      writeOut(`${unanswered}\n`);
+    } else {
+      const pulled = pullBeforeStart(repoRoot, sessionsDir, options.mergeOrigin === true);
+      if (pulled.held !== null) {
+        writeErr(`start: refused -- ${originHoldsWorkRefusal(pulled.held)}\n`);
+        return EXIT_BOUNDARY;
+      }
+      if (pulled.line !== null) writeOut(`start: ${pulled.line}\n`);
+    }
+  }
+  // After the pull, on the trunk the release would publish: the plan, the
+  // record and the version file are read as origin left them.
+  const pulledVersion = releaseSessionVersion(sessionsDir, requested);
+  if (pulledVersion !== version) {
+    writeErr(
+      `start: refused -- the session plan pulled from origin ${pulledVersion === null ? "no longer makes" : `makes`} ` +
+        `session ${sessionDisplayNumber(requested)} ${pulledVersion === null ? "a release session" : `a release of ${pulledVersion}, not ${version}`}. Start it again.\n`,
+    );
+    return EXIT_USAGE;
+  }
+  const refused = releasePreflight(sessionsDir, requested, version);
+  if (refused !== null) {
+    writeErr(`start: refused -- ${refused}\n`);
+    return EXIT_USAGE;
+  }
+  if (fresh) {
+    const superseded = supersedeRunRecord(repoRoot, requested);
+    if (superseded !== null) {
+      writeOut(`start: an earlier run's record for session ${sessionDisplayNumber(requested)} was moved to ${superseded}\n`);
+    }
+    registerSessionStart(sessionsDir, requested, { engine: RELEASE_ENGINE, totalSessions: options.totalSessions });
+  }
+  writeOut(
+    `start: session ${sessionDisplayNumber(requested)} of ${basename(sessionsDir)} registered: a release of ${version}.\n` +
+      "Next: the framework runs the suites, publishes and closes it; no AI is asked anything.\n",
+  );
+  return EXIT_OK;
+}
+
 export async function start(sessionsDir: string, options: StartOptions): Promise<number> {
   // Named at the flag or left in a machine's preferences from before, a
   // retired engine is refused before anything is read or written.
@@ -1304,6 +1523,10 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       return boundary.exitCode;
     }
     const requested = boundary.requested;
+    const releasing = releaseSessionVersion(sessionsDir, requested);
+    if (releasing !== null) {
+      return startRelease(sessionsDir, requested, releasing, current === null || requested !== current, options);
+    }
 
     // Re-registering the session in flight is the ordinary way a pull
     // continues -- `dabbler session start --engine ...` called a second time
@@ -1770,13 +1993,15 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     // The sessions dir's own repository, not the cwd's: a typed declare and
     // a driven one both name the checkout they declare for.
     const config = loadConfig(undefined, repoRootFor(sessionsDir) ?? dirname(sessionsDir));
-    let declared = true;
+    let declared: boolean;
     try {
       // A tag release declares no pack and no push, and is packaging too.
       declared = loadTagRelease(config, null) !== null || loadDeclaration(config, null) !== null;
     } catch (error) {
-      // A malformed block is packaging's to refuse, in its own words.
+      // A malformed block is a refusal in packaging's own words: read as
+      // declared, it made a releasable session that could never publish.
       if (!(error instanceof PackagingConfigError)) throw error;
+      return refuse(`the packaging block in dabbler.yaml cannot be read: ${error.message}`, EXIT_USAGE);
     }
     if (!declared) holdReason = NOTHING_TO_PUBLISH;
   }
@@ -2077,10 +2302,8 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
   try {
     if (isPlan) {
       const plan = writeWorkPlan(repoRoot, target, stampAnswer(answer, stamps, "the work plan"));
-      const release = releaseOfPlan(plan, releaseMode(repoRoot));
       summary =
-        `work plan (${plan.steps.length} step(s), ` +
-        `${release.releasable ? "ships" : `held: ${release.holdReason}`}) ` +
+        `work plan (${plan.steps.length} step(s)) ` +
         `written to ${relative(repoRoot, planPath(repoRoot, target)).replace(/\\/g, "/")}`;
     } else {
       const set = writeDispositions(repoRoot, target, stampAnswer(answer, stamps, "the disposition"));
@@ -3161,19 +3384,15 @@ export async function asAPersonsClick<T>(work: () => T | Promise<T>): Promise<T>
 
 /**
  * Whether a person is where this command was run -- asked of the verbs that
- * are a person's, and answered by what is THERE rather than by what is
- * absent. A click is a person. Otherwise an engine's marker says an engine;
- * and with no marker at all, a person is someone at an interactive terminal,
- * because an AI's tool runs its commands with none (measured for Claude Code,
- * `docs/design/engine-environment-markers.md`). A list of markers cannot
- * cover an engine nobody has measured; this does not need to.
+ * are a person's. A click is a person, an engine's marker is an engine
+ * (`docs/design/engine-environment-markers.md`), and anything else is a
+ * person. Interactive stdin is not asked: a VS Code terminal on Windows may
+ * not report one, and requiring it left a person at their own terminal with
+ * no way past a stop.
  */
-export function personIsPresent(
-  env: NodeJS.ProcessEnv = process.env,
-  interactive: boolean = process.stdin.isTTY === true,
-): boolean {
+export function personIsPresent(env: NodeJS.ProcessEnv = process.env): boolean {
   if (clicks > 0) return true;
-  return !callerIsEngine(env) && interactive;
+  return !callerIsEngine(env);
 }
 
 /**

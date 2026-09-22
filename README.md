@@ -330,22 +330,38 @@ with the writing.
 
 ### When a session publishes
 
-`dabbler.release` in the checkout's `.vscode/settings.json` is the
-solution's answer, written by `dabbler configure --release
-on-request|ship-by-default` or by **Ship by Default** / **Release on
-Request** on the Solution Explorer's solution row. It is never a person's
-default, and it is not a `dabbler.yaml` key: `release:` there says *how* a
-repository releases.
+**Ordinary sessions never publish. A release is a session of its own**,
+planned, moved, renumbered or cancelled like any other, and marked in its
+heading in `session-plan.md`:
 
-- **On request** — the default, where nothing is set: a session publishes
-  only when its plan carries `release` with the one reason it releases now.
-- **Ship by default** — a session publishes unless its plan carries
-  `hold_release` with the one reason it waits. This repository commits it.
+    ### Session 12: Release 1.4.0 (release: 1.4.0)
 
-The plan ask names the member the setting reads, and a plan carrying the
-other is accepted with the setting deciding. Whichever it is, a repository
-that declares no packaging publishes nothing and no session publishes
-without a VERIFIED verdict.
+It has no AI work, no tests of its own and no review: the framework packs
+and pushes what is already on the trunk. The AI proposes each release's
+version when it writes or amends the plan — patch, minor or major by what
+the released sessions changed — and you approve it with the plan.
+
+**Packaging is a session of its own too.** The `packaging:` block is not
+written into `dabbler.yaml` until the session whose whole job is packaging,
+early with project files only or later. A packaging problem is then
+confined to that session or to a release, and never strands the session
+that did the feature work.
+
+**Start Session on a release session opens no AI.** `dabbler session start`
+(or the button) checks three things and refuses, naming the way forward:
+
+- no `packaging:` block is declared — plan a packaging session first;
+- a session since the last published release closed without a VERIFIED
+  verdict — plan a session that fixes it;
+- the version is kept in a file (`version.json`, a tag release) that does
+  not say the release's version — an ordinary session bumps it.
+
+Otherwise it runs the whole suites, packs with the release's version as
+`{version}`, pushes, tags, records the packaging run and closes. A failed
+pack or push is a stop: cancel the release session, then plan a session
+that fixes the cause and a new release session after it. A version is spent
+only by a push that succeeded. `dabbler session hold-release --reason
+"<why>"` is a person's way to stop a release session's publish.
 
 ## Credentials
 

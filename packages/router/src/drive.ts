@@ -161,10 +161,14 @@ import {
   acquireLockWithTimeout,
   releaseLock,
   reviewingVehicleRefusal,
+  applyChange,
+  unsettledProposal,
+  type AppliedChange,
   type DeclareRefusalCause,
   type ReportCliOptions,
 } from "./session.ts";
-import { resolveSessionOrchestratorIdentity } from "./identity.ts";
+import { IdentityResolutionError, resolveSessionOrchestratorIdentity } from "./identity.ts";
+import { RouterError } from "./route.ts";
 import {
   STAGE_FINAL_FULL,
   STAGE_FINAL_TARGETED,
@@ -184,6 +188,7 @@ import {
   EXIT_CALL_FAILED,
   EXIT_OK as VERIFY_OK,
   EXIT_UNRESOLVED,
+  VerifyError,
 } from "./verify/errors.ts";
 import {
   NO_ROUND_CAP_CLEAN,
@@ -191,8 +196,18 @@ import {
   NO_ROUND_TERMINAL,
   capDisputedRefusal,
   noRoundReason,
+  ruleOnProposal,
+  type ProposalRuling,
 } from "./verify/rounds.ts";
-import { readTaskDeclaration, releasabilityOf, sessionIsReleasable } from "./writers.ts";
+import {
+  proposalOutcomes,
+  proposalStanding,
+  recordProposalOutcome,
+  type ProposedChange,
+  readTaskDeclaration,
+  releasabilityOf,
+  sessionIsReleasable,
+} from "./writers.ts";
 
 // --- The engine --------------------------------------------------------------
 
@@ -1062,6 +1077,112 @@ export function firstSentence(text: string): string {
   const trimmed = text.trim();
   const end = /[.!?](\s|$)/.exec(trimmed);
   return end === null ? trimmed : trimmed.slice(0, end.index + 1);
+}
+
+/**
+ * A proposal waiting on a person, in one line: who asked for what and why,
+ * what the reviewer said, and the change exactly. The stop's reason, so the
+ * terminal and the dialog show the same words.
+ */
+export function proposalSentence(proposal: Record<string, unknown>, reviewer: string): string {
+  return (
+    `proposal ${String(proposal["number"])} from ${String(proposal["by"])} awaits you -- ` +
+    `${String(proposal["what"])}. Why: ${String(proposal["reason"])}. Reviewer: ${reviewer}. ` +
+    `The change: ${JSON.stringify(proposal["change"])}`
+  );
+}
+
+/** What the loop does about the next unsettled proposal. */
+export type ProposalMove =
+  | { readonly kind: "applied"; readonly number: number; readonly applied: AppliedChange }
+  | { readonly kind: "finding"; readonly number: number; readonly ask: string }
+  | { readonly kind: "person"; readonly number: number; readonly reason: string };
+
+/**
+ * Settle the next unsettled proposal as far as the framework may: have the
+ * reviewer rule on it, once; apply an endorsed plan amendment exactly as
+ * proposed, recorded as endorsed by the reviewer; hand a returned finding to
+ * the author; and anything else -- a hold, an answer that endorses nothing,
+ * a reviewer nobody could reach -- to a person. Null when nothing is
+ * unsettled. `rule` is the reviewer's call, handed in.
+ */
+export async function settleNextProposal(
+  sessionsDir: string,
+  sessionNumber: number,
+  rule: (number: number) => Promise<ProposalRuling>,
+): Promise<ProposalMove | null> {
+  const proposal = unsettledProposal(sessionsDir, sessionNumber);
+  if (proposal === null) return null;
+  const number = Number(proposal["number"]);
+  const standing = (): string => proposalStanding(proposal, proposalOutcomes(sessionsDir, sessionNumber));
+  if (standing() === "unruled") {
+    let ruling: ProposalRuling;
+    try {
+      ruling = await rule(number);
+    } catch (error) {
+      if (
+        !(error instanceof RouterError) &&
+        !(error instanceof VerifyError) &&
+        !(error instanceof IdentityResolutionError)
+      ) {
+        throw error;
+      }
+      // Unruled is not unanswerable: a person decides it as it stands.
+      return {
+        kind: "person",
+        number,
+        reason: proposalSentence(proposal, `no reviewer could rule on it: ${error.message}`),
+      };
+    }
+    if (ruling.ruling === "finding") {
+      return {
+        kind: "finding",
+        number,
+        ask:
+          `The Primary Reviewer did not endorse proposal ${number} (${String(proposal["what"])}) and ` +
+          `returned this finding instead: ${ruling.finding.description} Dispose of it as you would ` +
+          "any finding -- fix what it names, within the plan as it stands. The proposal is not " +
+          "applied, and the same change is not proposed twice.",
+      };
+    }
+  }
+  const verdict = proposalOutcomes(sessionsDir, sessionNumber)
+    .filter((entry) => entry["proposal"] === number)
+    .at(-1);
+  if (standing() === "apply") {
+    const reviewer = String(verdict?.["by"]);
+    let applied: AppliedChange;
+    try {
+      applied = applyChange(
+        sessionsDir,
+        sessionNumber,
+        proposal["change"] as ProposedChange,
+        String(proposal["reason"]),
+        `${reviewer}, endorsing proposal ${number} from ${String(proposal["by"])}`,
+      );
+    } catch (error) {
+      if (!(error instanceof LedgerError)) throw error;
+      // Endorsed, and no longer applicable as it stands: a person decides.
+      return {
+        kind: "person",
+        number,
+        reason: proposalSentence(proposal, `${reviewer} endorsed it, and it could not be applied: ${error.message}`),
+      };
+    }
+    recordProposalOutcome(sessionsDir, { sessionNumber, proposal: number, outcome: "applied", by: reviewer, reason: applied.said });
+    return { kind: "applied", number, applied };
+  }
+  return {
+    kind: "person",
+    number,
+    reason: proposalSentence(
+      proposal,
+      verdict === undefined
+        ? "it has not ruled"
+        : `${String(verdict["by"])} ${verdict["outcome"] === "endorsed" ? "endorsed" : "did not endorse"} it: ` +
+            String(verdict["reason"]),
+    ),
+  };
 }
 
 type StopKind = NonNullable<DriverRun["stop"]>["kind"];
@@ -3451,6 +3572,40 @@ class Driver {
     );
   }
 
+  /**
+   * Every proposal made since the last boundary, ruled on and acted on,
+   * oldest first. The reviewer rules once; an endorsed plan amendment is
+   * applied and the loop carries on; a returned finding is the author's to
+   * dispose of, as a step; a hold, or anything not endorsed, is a stop for
+   * a person -- and only this session waits.
+   */
+  private async settleProposals(): Promise<void> {
+    const rule = (number: number): Promise<ProposalRuling> => {
+      const author = resolveSessionOrchestratorIdentity(this.sessionsDir, this.sessionNumber);
+      return ruleOnProposal(this.sessionsDir, this.sessionNumber, number, {
+        excludeProviders: [author.effectiveProvider],
+        authorModel: author.model,
+        transport: this.run.verification?.transport ?? null,
+        repoRoot: this.repoRoot,
+      });
+    };
+    for (;;) {
+      const move = await settleNextProposal(this.sessionsDir, this.sessionNumber, rule);
+      if (move === null) return;
+      if (move.kind === "person") throw new Stop("proposal", move.reason);
+      if (move.kind === "finding") {
+        this.log("proposal-finding", { proposal: move.number });
+        await this.runSynthesisedStep(`proposal-${move.number}-finding`, move.ask, this.run.phase);
+        continue;
+      }
+      this.log("proposal-applied", { proposal: move.number, what: move.applied.what, reopened: move.applied.reopened });
+      // The change was written to the plan and the run beside this loop:
+      // both are read back, so nothing this loop saves next undoes it.
+      this.plan = null;
+      this.run = readRun(this.repoRoot, this.sessionNumber) ?? this.run;
+    }
+  }
+
   /** The start's refusal of the reviewing vehicle, asked again now; null where it is reachable or cannot be asked. */
   private reviewerUnreachable(): string | null {
     try {
@@ -4151,6 +4306,9 @@ class Driver {
           // Every phase boundary: a session cancelled or force-closed from
           // another process is not driven one phase further.
           this.refuseIfEnded();
+          // A proposal made since the last boundary is settled before any
+          // phase acts under the plan it may change.
+          if (this.run.phase !== "complete" && this.run.phase !== "plan") await this.settleProposals();
           // A synthesised step whose answer is outstanding is judged before
           // the phase it was issued from does anything else.
           const pending = this.run.pending_step ?? null;

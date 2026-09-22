@@ -457,6 +457,54 @@ export function adjudicationPrompt(
   return lines.join("\n");
 }
 
+/** A proposal as the reviewer is shown it: what changes, why, and who asked. */
+export interface ProposalForReview {
+  readonly number: number;
+  readonly what: string;
+  readonly change: unknown;
+  readonly reason: string;
+  readonly by: string;
+}
+
+/**
+ * The one question a proposal is put to the Primary Reviewer as: endorse
+ * it, or return ONE concrete finding instead. The reviewer rules on the
+ * change and nothing else -- it is not re-reviewing the work, and it may
+ * not propose a change of its own.
+ */
+export function proposalPrompt(proposal: ProposalForReview, planSection: string): string {
+  return [
+    "You are the PRIMARY REVIEWER of an AI-led coding session. The Authoring AI " +
+      "could not go on within the session's rules, and proposes one change the " +
+      "framework can apply. Rule on that change, once.",
+    "",
+    "#### The session's section of the plan",
+    "",
+    planSection,
+    "",
+    `#### Proposal ${proposal.number}, from ${proposal.by}: ${proposal.what}`,
+    "",
+    `Why: ${proposal.reason}`,
+    "",
+    "The change, exactly as it would be applied:",
+    "",
+    "```json",
+    dumps(proposal.change, { indent: 2 }),
+    "```",
+    "",
+    "#### Required output",
+    "",
+    "Answer ONE question: is this change the right way on? Reply with exactly " +
+      "one JSON object and nothing else:",
+    "",
+    '{"ruling": "endorse", "reason": "<one sentence>"}',
+    '{"ruling": "finding", "finding": {"description": "<the one concrete problem, and what to do instead>", "severity": "major"}}',
+    "",
+    "Return a finding only for a concrete problem with this change, and one " +
+      "finding at most. An answer that is neither is read as no endorsement.",
+  ].join("\n");
+}
+
 /**
  * `json.dumps(finding, indent=2)` -- insertion order, not sorted, because
  * the adjudicator is shown the row as it was recorded.

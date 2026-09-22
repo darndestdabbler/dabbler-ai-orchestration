@@ -1000,6 +1000,141 @@ export function releaseHold(sessionsDir: string, sessionNumber: number): string 
   return held === undefined ? null : `held by ${String(held["by"])}: ${String(held["reason"])}`;
 }
 
+/** A change asked for rather than made: applied only once it is endorsed or approved. */
+export const KIND_PROPOSAL = "proposal";
+
+/** The changes a proposal may name: exactly what the framework can apply, and nothing else. */
+export type ProposedChange =
+  | {
+      readonly kind: "step";
+      readonly step: string;
+      readonly files: readonly string[] | null;
+      readonly checks: readonly { readonly argv: readonly string[] }[] | null;
+    }
+  | { readonly kind: "drop-non-goal"; readonly text: string }
+  | { readonly kind: "max-rounds"; readonly cap: number }
+  | { readonly kind: "hold-release" };
+
+/** A proposed change in one clause, in the words an amendment of it is recorded under. */
+export function proposedChangeLine(change: ProposedChange): string {
+  switch (change.kind) {
+    case "step": {
+      const moved = [change.files === null ? null : "files", change.checks === null ? null : "checks"]
+        .filter((part): part is string => part !== null)
+        .join(" and ");
+      return `step '${change.step}': its ${moved}`;
+    }
+    case "drop-non-goal":
+      return `the non-goal '${change.text.trim()}', dropped`;
+    case "max-rounds":
+      return `the verification round cap, now ${change.cap}`;
+    case "hold-release":
+      return AMENDMENT_RELEASE_HELD;
+  }
+}
+
+/**
+ * Record a proposal, numbered within its session, and apply nothing. The
+ * change travels whole so that what is applied later is exactly what was
+ * proposed, and nothing a reader reconstructs from words.
+ */
+export function recordProposal(
+  sessionsDir: string,
+  options: {
+    readonly sessionNumber: number;
+    readonly change: ProposedChange;
+    readonly reason: string;
+    readonly by: string;
+  },
+): Entry {
+  const log = readOrCreateActivityLog(sessionsDir);
+  const prior = entriesOfKind(log, KIND_PROPOSAL).filter(
+    (entry) => entry["sessionNumber"] === options.sessionNumber,
+  );
+  const entry: Entry = {
+    kind: KIND_PROPOSAL,
+    sessionNumber: requireSessionNumber(options.sessionNumber),
+    number: prior.length + 1,
+    dateTime: nowIsoFull(),
+    what: proposedChangeLine(options.change),
+    change: options.change,
+    reason: requireText(options.reason, "reason"),
+    by: requireText(options.by, "by"),
+  };
+  pushEntry(log, entry);
+  writeActivityLog(sessionsDir, log);
+  return entry;
+}
+
+/**
+ * What became of a proposal, one entry per event: the reviewer's ruling
+ * (`endorsed`, `finding`, `unclear`), then the framework's application of
+ * an endorsed amendment (`applied`) or, where it reaches a person, theirs
+ * (`approved`, `rejected`).
+ */
+export const KIND_PROPOSAL_OUTCOME = "proposal-outcome";
+
+export type ProposalOutcome = "endorsed" | "finding" | "unclear" | "applied" | "approved" | "rejected";
+
+/** Record what became of proposal `proposal`, by whom, and in their words. */
+export function recordProposalOutcome(
+  sessionsDir: string,
+  options: {
+    readonly sessionNumber: number;
+    readonly proposal: number;
+    readonly outcome: ProposalOutcome;
+    readonly by: string;
+    readonly reason: string;
+    readonly finding?: { readonly description: string; readonly severity: string } | null;
+  },
+): Entry {
+  const entry: Entry = {
+    kind: KIND_PROPOSAL_OUTCOME,
+    sessionNumber: requireSessionNumber(options.sessionNumber),
+    proposal: options.proposal,
+    dateTime: nowIsoFull(),
+    outcome: options.outcome,
+    by: requireText(options.by, "by"),
+    reason: options.reason,
+    ...(options.finding ? { finding: options.finding } : {}),
+  };
+  const log = readOrCreateActivityLog(sessionsDir);
+  pushEntry(log, entry);
+  writeActivityLog(sessionsDir, log);
+  return entry;
+}
+
+/** What became of a session's proposals, oldest first. */
+export function proposalOutcomes(sessionsDir: string, sessionNumber: number): Entry[] {
+  return entriesOfKind(readOrCreateActivityLog(sessionsDir), KIND_PROPOSAL_OUTCOME).filter(
+    (entry) => entry["sessionNumber"] === sessionNumber,
+  );
+}
+
+/**
+ * Where a proposal stands. `unruled`: the reviewer has not ruled. `apply`:
+ * the reviewer endorsed a plan amendment, and it is the framework's to
+ * apply. `person`: it waits on a person -- a hold, anything not endorsed.
+ * `settled`: applied, decided by a person, or answered by the reviewer's
+ * finding, which went to the author instead.
+ */
+export type ProposalStanding = "unruled" | "apply" | "person" | "settled";
+
+export function proposalStanding(proposal: Entry, outcomes: readonly Entry[]): ProposalStanding {
+  const own = outcomes.filter((entry) => entry["proposal"] === proposal["number"]).map((entry) => entry["outcome"]);
+  if (["applied", "approved", "rejected", "finding"].some((outcome) => own.includes(outcome))) return "settled";
+  const hold = (proposal["change"] as { kind?: unknown } | undefined)?.kind === "hold-release";
+  if (own.includes("endorsed")) return hold ? "person" : "apply";
+  return own.includes("unclear") ? "person" : "unruled";
+}
+
+/** A session's proposals, oldest first. */
+export function proposalEntries(sessionsDir: string, sessionNumber: number): Entry[] {
+  return entriesOfKind(readOrCreateActivityLog(sessionsDir), KIND_PROPOSAL).filter(
+    (entry) => entry["sessionNumber"] === sessionNumber,
+  );
+}
+
 /** One amendment as a line a person reads: what moved, why, and who was working. */
 export function amendmentLine(entry: Entry): string {
   return `${String(entry["what"])}: ${String(entry["reason"])} (${String(entry["by"])})`;

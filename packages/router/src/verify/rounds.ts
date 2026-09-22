@@ -102,7 +102,14 @@ import {
   unremediatedFindings,
 } from "../verdict.ts";
 import { buildVerificationPrompt } from "../verifyjob.ts";
-import { appendChangeLogBlock, recordSessionVerification } from "../writers.ts";
+import {
+  appendChangeLogBlock,
+  proposalEntries,
+  proposalOutcomes,
+  recordProposalOutcome,
+  recordSessionVerification,
+  type ProposalOutcome,
+} from "../writers.ts";
 import {
   EXIT_BLOCKING,
   EXIT_CALL_FAILED,
@@ -113,7 +120,7 @@ import {
   EXIT_USAGE,
   VerifyError,
 } from "./errors.ts";
-import { buildTaskBlock, sliceCodePoints } from "./prompts.ts";
+import { buildTaskBlock, proposalPrompt, sliceCodePoints, specExcerpt } from "./prompts.ts";
 import { undisputedBlockingIndices } from "./disputes.ts";
 
 /**
@@ -190,6 +197,111 @@ export async function dispatchVerification(
     }
   }
   throw lastError; // unreachable; defensive
+}
+
+// --- A proposal, ruled on once -----------------------------------------------
+
+/** What the reviewer ruled on a proposal, read from its answer. */
+export type ProposalRuling =
+  | { readonly ruling: "endorse"; readonly reason: string }
+  | { readonly ruling: "finding"; readonly finding: { readonly description: string; readonly severity: string } }
+  | { readonly ruling: "unclear"; readonly reason: string };
+
+/**
+ * The reviewer's answer, read strictly: the JSON object in it, which
+ * endorses or returns one finding. Anything else is `unclear`, and an
+ * unclear ruling endorses nothing -- it goes to a person as it stands.
+ */
+export function parseProposalRuling(content: string): ProposalRuling {
+  const start = content.indexOf("{");
+  const end = content.lastIndexOf("}");
+  let parsed: unknown = null;
+  if (start !== -1 && end > start) {
+    try {
+      parsed = JSON.parse(content.slice(start, end + 1));
+    } catch {
+      parsed = null;
+    }
+  }
+  const answer = (parsed ?? {}) as Record<string, unknown>;
+  if (answer["ruling"] === "endorse") {
+    return { ruling: "endorse", reason: String(answer["reason"] ?? "").trim() };
+  }
+  const finding = answer["finding"] as Record<string, unknown> | undefined;
+  const description = typeof finding?.["description"] === "string" ? finding["description"].trim() : "";
+  if (answer["ruling"] === "finding" && description !== "") {
+    return {
+      ruling: "finding",
+      finding: {
+        description: sliceCodePoints(description, 2000),
+        severity: normalizeSeverity(finding?.["severity"] ?? "major"),
+      },
+    };
+  }
+  return { ruling: "unclear", reason: sliceCodePoints(content.trim(), 500) || "(the reviewer said nothing)" };
+}
+
+/** The outcomes that are the reviewer's, as against a person's. */
+const REVIEWER_OUTCOMES: ReadonlySet<ProposalOutcome> = new Set(["endorsed", "finding", "unclear"]);
+
+/**
+ * Put proposal `number` to the Primary Reviewer as its one question, and
+ * record the ruling against it. Dispatched as every round is -- cross-
+ * provider, the chosen reviewer retried once on a failed delivery -- and
+ * written to no round row: it opens no round and spends none of the cap.
+ * A proposal is ruled on once.
+ */
+export async function ruleOnProposal(
+  sessionsDir: string,
+  sessionNumber: number,
+  number: number,
+  options: {
+    readonly excludeProviders: readonly string[];
+    readonly authorModel: string | null;
+    readonly transport?: string | null;
+    readonly repoRoot: string | null;
+  },
+): Promise<ProposalRuling> {
+  const proposal = proposalEntries(sessionsDir, sessionNumber).find((entry) => entry["number"] === number);
+  if (proposal === undefined) {
+    throw new VerifyError(`session ${sessionNumber} has no proposal ${number}`);
+  }
+  const ruled = proposalOutcomes(sessionsDir, sessionNumber).find(
+    (entry) => entry["proposal"] === number && REVIEWER_OUTCOMES.has(entry["outcome"] as ProposalOutcome),
+  );
+  if (ruled !== undefined) {
+    throw new VerifyError(
+      `proposal ${number} was already ruled on (${String(ruled["outcome"])}, by ${String(ruled["by"])}); ` +
+        "a proposal is ruled on once",
+    );
+  }
+  const prompt = proposalPrompt(
+    {
+      number,
+      what: String(proposal["what"]),
+      change: proposal["change"],
+      reason: String(proposal["reason"]),
+      by: String(proposal["by"]),
+    },
+    specExcerpt(sessionsDir, sessionNumber),
+  );
+  const result = await dispatchVerification(prompt, {
+    excludeProviders: options.excludeProviders,
+    authorModel: options.authorModel,
+    sessionNumber,
+    transport: options.transport ?? null,
+    repoRoot: options.repoRoot,
+  });
+  const ruling = parseProposalRuling(result.truncated ? "" : result.content);
+  recordProposalOutcome(sessionsDir, {
+    sessionNumber,
+    proposal: number,
+    outcome: ruling.ruling === "endorse" ? "endorsed" : ruling.ruling,
+    by: `${result.model_name} (${result.provider})`,
+    reason: ruling.ruling === "finding" ? "" : ruling.reason,
+    finding: ruling.ruling === "finding" ? ruling.finding : null,
+  });
+  return ruling;
 }
 
 /**

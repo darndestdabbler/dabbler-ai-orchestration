@@ -12,6 +12,7 @@ import {
   buildTaskBlock,
   citedEvidenceLines,
   priorFindingsBlock,
+  proposalPrompt,
   splitDisputes,
   splitEvidenceRange,
   splitLines,
@@ -210,6 +211,28 @@ describe("the adjudicator's brief", () => {
     assert.ok(prompt.includes("UPHOLD keeps the finding standing, so the dispute fails"));
     assert.ok(prompt.includes("OVERRULE clears the finding, so the dispute succeeds"));
     assert.ok(prompt.includes("A dispute you do not clearly judge leaves its finding UPHELD."));
+  });
+});
+
+describe("the question a proposal is put as", () => {
+  it("shows the change exactly, with its reason and the plan, and asks one question with two answers", () => {
+    const prompt = proposalPrompt(
+      {
+        number: 2,
+        what: "the release, held",
+        change: { kind: "hold-release" },
+        reason: "dabbler.yaml names a feed nobody has created",
+        by: "claude-code",
+      },
+      "### Session 4 of 6: Ship the parser",
+    );
+    assert.ok(prompt.includes("### Session 4 of 6: Ship the parser"));
+    assert.ok(prompt.includes("#### Proposal 2, from claude-code: the release, held"));
+    assert.ok(prompt.includes("Why: dabbler.yaml names a feed nobody has created"));
+    assert.ok(prompt.includes('"kind": "hold-release"'));
+    assert.ok(prompt.includes('{"ruling": "endorse"'));
+    assert.ok(prompt.includes('{"ruling": "finding"'));
+    assert.ok(prompt.includes("one finding at most"));
   });
 });
 

@@ -16,9 +16,11 @@ import {
   instructionPath,
   loopPath,
   readRun,
+  readWorkPlan,
   renderStop,
   reportPath,
   runPath,
+  writeWorkPlan,
   appendSupervision,
   waiterSeenSince,
   watcherReading,
@@ -84,15 +86,22 @@ import {
   JOB_DEADLINE_EXCEEDED,
   beatWaiter,
   clearBeatIfMine,
+  settleNextProposal,
   type RegistrationFacts,
   type StepSpec,
 } from "../src/drive.ts";
 import { jobStatusPath } from "../src/jobs.ts";
 import { rewindPhaseFor } from "../src/gates.ts";
-import { capDisputedRefusal } from "../src/verify/rounds.ts";
+import { capDisputedRefusal, type ProposalRuling } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
-import { gitAnswers, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
-import { registerSessionStart } from "../src/writers.ts";
+import { cleanRepoAnswers, gitAnswers, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
+import {
+  amendmentEntries,
+  recordProposal,
+  recordProposalOutcome,
+  registerSessionStart,
+  releaseHold,
+} from "../src/writers.ts";
 const INSTRUCTION = {
   schema_version: 1,
   seq: 4,
@@ -1161,6 +1170,61 @@ describe("a publish refused on an earlier phase's evidence", () => {
       alreadyRewoundFor([...rewinds, { to: "land", reason: tag, at: "later" }], tag),
       true,
     );
+  });
+});
+
+describe("a proposal at the loop's boundary", () => {
+  it("applies an endorsed amendment as the reviewer's, and stops for a person on a hold it endorsed", async () => {
+    const repo = tempDir("proposal-");
+    seed(repo, {
+      "docs/sessions/session-plan.md": "### Session 1 of 1: Persist a Person\n1. Persist it.\n",
+      "dabbler.yaml": "schema_version: 1\n",
+    });
+    const sessionsDir = join(repo, "docs", "sessions");
+    const restore = cleanRepoAnswers(repo);
+    try {
+      registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+      writeWorkPlan(repo, 1, {
+        schema_version: 1,
+        session_number: 1,
+        task: "Persist a Person.",
+        non_goals: ["No dialect outside hibernate-core."],
+        steps: [{ id: "persist", ask: "Persist it.", files: ["src/Person.java"], checks: [{ argv: ["mvn", "test"] }] }],
+        recorded_at: "2026-09-22T10:00:00-04:00",
+      });
+      const endorse = (number: number): Promise<ProposalRuling> => {
+        recordProposalOutcome(sessionsDir, {
+          sessionNumber: 1,
+          proposal: number,
+          outcome: "endorsed",
+          by: "gpt-5.6-sol (openai)",
+          reason: "the change is the smallest way on",
+        });
+        return Promise.resolve({ ruling: "endorse", reason: "the change is the smallest way on" });
+      };
+
+      recordProposal(sessionsDir, {
+        sessionNumber: 1,
+        change: { kind: "drop-non-goal", text: "No dialect outside hibernate-core." },
+        reason: "SQLite's dialect is outside hibernate-core; H2's is inside it",
+        by: "claude-code",
+      });
+      const applied = await settleNextProposal(sessionsDir, 1, endorse);
+      assert.equal(applied?.kind, "applied");
+      assert.equal(readWorkPlan(repo, 1)?.non_goals, undefined);
+      assert.match(String(amendmentEntries(sessionsDir, 1).at(-1)?.["by"]), /gpt-5\.6-sol \(openai\), endorsing proposal 1 from claude-code/);
+      assert.equal(await settleNextProposal(sessionsDir, 1, endorse), null);
+
+      // A hold changes what the session delivers: endorsed, it still goes to a person.
+      recordProposal(sessionsDir, { sessionNumber: 1, change: { kind: "hold-release" }, reason: "no feed exists", by: "claude-code" });
+      const held = await settleNextProposal(sessionsDir, 1, endorse);
+      assert.equal(held?.kind, "person");
+      assert.match(held?.kind === "person" ? held.reason : "", /^proposal 2 from claude-code awaits you -- the release, held\./);
+      assert.match(held?.kind === "person" ? held.reason : "", /gpt-5\.6-sol \(openai\) endorsed it/);
+      assert.equal(releaseHold(sessionsDir, 1), null);
+    } finally {
+      restore();
+    }
   });
 });
 

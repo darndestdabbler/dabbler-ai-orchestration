@@ -393,7 +393,8 @@
         "publish",
         "close",
         "interrupted",
-        "crash"
+        "crash",
+        "proposal"
       ]
     },
     "stopCode": {

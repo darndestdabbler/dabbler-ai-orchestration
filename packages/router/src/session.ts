@@ -76,6 +76,7 @@ import {
   REPORT_SCHEMA,
   WORK_PLAN_SCHEMA,
   amendPlanStep,
+  reopenSteps,
   amendRoundCap,
   dispositionsPath,
   dropNonGoal,
@@ -84,6 +85,7 @@ import {
   readInstruction,
   readRepairs,
   readRun,
+  readWorkPlan,
   recordRepair,
   WAITER_IS_WHAT_IS_RUN,
   loopAlive,
@@ -184,6 +186,14 @@ import {
   recordAmendment,
   recordReleaseHold,
   releaseHold,
+  releasabilityOf,
+  proposalEntries,
+  proposalOutcomes,
+  proposalStanding,
+  proposedChangeLine,
+  recordProposal,
+  recordProposalOutcome,
+  type ProposedChange,
   WorkBegunError,
   workBegunRefusal,
 } from "./writers.ts";
@@ -2408,9 +2418,25 @@ export interface PlanAmendCliOptions {
   readonly sessionNumber?: number | null;
 }
 
+/** A step's checks, whole, from the file that holds them; a refusal's words where it cannot be read. */
+function readChecksFile(path: string | null): { argv: string[] }[] | null | string {
+  if (path === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    return `${path} could not be read as JSON: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  if (!Array.isArray(parsed)) {
+    return `${path} must hold a list of checks, each \`{"argv": ["<program>", "<argument>", ...]}\`.`;
+  }
+  return parsed as { argv: string[] }[];
+}
+
 /**
- * Amend what one not-yet-accepted step of the driven plan is measured
- * against, with the reason on the record beside who was working.
+ * Amend what one step of the driven plan is measured against, with the
+ * reason on the record beside who was working. An accepted step is
+ * re-opened with the steps after it, and the output names them.
  *
  * The plan under `.dabbler/runs/` is machine-owned like everything else
  * there, and this is the one writer for it -- which is the point. Session 62
@@ -2428,136 +2454,311 @@ export function planAmend(sessionsDir: string, options: PlanAmendCliOptions): nu
     writeErr(`plan amend: refused -- no session has been started under ${sessionsDir}.\n`);
     return EXIT_BOUNDARY;
   }
-  const repoRoot = repoRootFromSessionsDir(sessionsDir);
   const by = whoIsWorking(sessionsDir, target);
-
-  // The round cap is the one amendable thing that belongs to the RUN rather
-  // than to a step: it is not a bar a step is measured against, it is how
-  // many reviews the tree may still have. Same verb and same reason,
-  // because it is the same kind of change -- and no gate reads either one.
-  if (options.maxRounds !== null) {
-    try {
-      const run = amendRoundCap(
-        repoRoot,
-        target,
-        { cap: options.maxRounds, reason: options.reason, by },
-        nowIso(),
-      );
-      recordAmendment(sessionsDir, {
-        sessionNumber: target,
-        what: `the verification round cap, now ${String(run.verification?.max_rounds)}`,
-        reason: options.reason.trim(),
-        by,
-      });
-      writeOut(
-        `plan amend: the verification round cap for session ${sessionDisplayNumber(target)} is ` +
-          `now ${run.verification?.max_rounds}, amended by ${by}; the reason is on the ` +
-          "record with the rounds already run, and no gate reads it.\n",
-      );
-      return EXIT_OK;
-    } catch (error) {
-      if (!(error instanceof LedgerError)) throw error;
-      writeErr(`plan amend: refused -- ${error.message}\n`);
-      return EXIT_BOUNDARY;
-    }
+  const checks = readChecksFile(options.checksFile);
+  if (typeof checks === "string") {
+    writeErr(`plan amend: refused -- ${checks}\n`);
+    return EXIT_USAGE;
   }
-
-  // A non-goal the work falsified belongs to the plan's declaration rather
-  // than to any one step, so it moves here and not through `--step`. The AI
-  // runs it: the record is kept honest by what the reviewer is SHOWN, not by
-  // who is allowed to type, and a stop whose only forward exit is to argue
-  // that a true finding is false is a deadlock wearing a dispute's clothes.
-  if (options.dropNonGoal !== null && options.dropNonGoal !== undefined) {
-    try {
-      dropNonGoal(
-        repoRoot,
-        target,
-        { text: options.dropNonGoal, reason: options.reason, by },
-        nowIso(),
-      );
-    } catch (error) {
-      if (!(error instanceof LedgerError)) throw error;
-      writeErr(`plan amend: refused -- ${error.message}\n`);
-      return EXIT_BOUNDARY;
-    }
-    recordAmendment(sessionsDir, {
-      sessionNumber: target,
-      what: `the non-goal '${options.dropNonGoal.trim()}', dropped`,
-      reason: options.reason.trim(),
-      by,
-    });
-    writeOut(
-      `plan amend: session ${sessionDisplayNumber(target)} is no longer held to the ` +
-        `non-goal '${options.dropNonGoal.trim()}', dropped by ${by}; every round from ` +
-        "here is shown the drop with its reason, and judges the reason.\n",
-    );
-    return EXIT_OK;
-  }
-
-  let checks: { argv: string[] }[] | null = null;
-  if (options.checksFile !== null) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(readFileSync(options.checksFile, "utf8"));
-    } catch (error) {
-      writeErr(
-        `plan amend: refused -- ${options.checksFile} could not be read as JSON: ` +
-          `${error instanceof Error ? error.message : String(error)}\n`,
-      );
-      return EXIT_USAGE;
-    }
-    if (!Array.isArray(parsed)) {
-      writeErr(
-        `plan amend: refused -- ${options.checksFile} must hold a list of checks, ` +
-          'each `{"argv": ["<program>", "<argument>", ...]}`.\n',
-      );
-      return EXIT_USAGE;
-    }
-    checks = parsed as { argv: string[] }[];
-  }
-
-  let run;
+  // The round cap belongs to the RUN and a non-goal to the declaration, so
+  // neither moves through `--step`; all three are the same kind of change,
+  // with the same reason on the record, and no gate reads any of them.
+  const change: ProposedChange =
+    options.maxRounds !== null
+      ? { kind: "max-rounds", cap: options.maxRounds }
+      : options.dropNonGoal !== null && options.dropNonGoal !== undefined
+        ? { kind: "drop-non-goal", text: options.dropNonGoal }
+        : { kind: "step", step: options.stepId as string, files: options.files, checks };
+  let applied: AppliedChange;
   try {
-    run = readRun(repoRoot, target);
+    applied = applyChange(sessionsDir, target, change, options.reason, by);
   } catch (error) {
     if (!(error instanceof LedgerError)) throw error;
     writeErr(`plan amend: refused -- ${error.message}\n`);
     return EXIT_BOUNDARY;
   }
+  writeOut(`plan amend: session ${sessionDisplayNumber(target)}: ${applied.said}\n`);
+  return EXIT_OK;
+}
 
-  try {
+/** What applying a change did, in the words a person reads. */
+export interface AppliedChange {
+  readonly what: string;
+  readonly said: string;
+  /** Steps an amendment re-opened, in plan order. */
+  readonly reopened: readonly string[];
+}
+
+/**
+ * Apply one change to the session in flight, and put it on the record with
+ * its reason and who made it. The one implementation of every change `plan
+ * amend` makes, and of every proposal an endorsement or an approval applies
+ * -- so what is applied is what `plan amend` would have applied, always.
+ * Throws `LedgerError` for a change the plan refuses.
+ */
+export function applyChange(
+  sessionsDir: string,
+  target: number,
+  change: ProposedChange,
+  reason: string,
+  by: string,
+): AppliedChange {
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  const what = proposedChangeLine(change);
+  if (change.kind === "hold-release") {
+    const standing = releaseHold(sessionsDir, target);
+    if (standing === null) recordReleaseHold(sessionsDir, { sessionNumber: target, reason: reason.trim(), by });
+    return {
+      what,
+      said: standing ?? `it publishes nothing, held by ${by}: ${reason.trim()}. The session closes as held.`,
+      reopened: [],
+    };
+  }
+  let said: string;
+  let reopened: string[] = [];
+  if (change.kind === "max-rounds") {
+    amendRoundCap(repoRoot, target, { cap: change.cap, reason, by }, nowIso());
+    said =
+      `the verification round cap is now ${change.cap}, amended by ${by}; the reason is on the ` +
+      "record with the rounds already run, and no gate reads it.";
+  } else if (change.kind === "drop-non-goal") {
+    // The AI may run this: the record is kept honest by what the reviewer is
+    // SHOWN, and a stop whose only exit is to argue that a true finding is
+    // false is a deadlock wearing a dispute's clothes.
+    dropNonGoal(repoRoot, target, { text: change.text, reason, by }, nowIso());
+    said =
+      `no longer held to the non-goal '${change.text.trim()}', dropped by ${by}; every round from ` +
+      "here is shown the drop with its reason, and judges the reason.";
+  } else {
     amendPlanStep(
       repoRoot,
       target,
-      {
-        stepId: options.stepId as string,
-        files: options.files,
-        checks,
-        reason: options.reason,
-        by,
-      },
-      run?.accepted_steps ?? [],
+      { stepId: change.step, files: change.files, checks: change.checks, reason, by },
       nowIso(),
+    );
+    reopened = reopenSteps(repoRoot, target, change.step, nowIso());
+    said =
+      `step '${change.step}' amended by ${by}; the next instruction for it is measured against ` +
+      "the new step, and what changed is on the record." +
+      (reopened.length === 0
+        ? ""
+        : ` It had been accepted, so these steps are asked for again: ${reopened.map((id) => `'${id}'`).join(", ")}.`);
+  }
+  recordAmendment(sessionsDir, { sessionNumber: target, what, reason: reason.trim(), by });
+  return { what, said, reopened };
+}
+
+// --- propose -----------------------------------------------------------------
+
+export interface ProposeCliOptions {
+  readonly reason: string;
+  readonly stepId: string | null;
+  readonly files: readonly string[] | null;
+  readonly checksFile: string | null;
+  readonly maxRounds: number | null;
+  readonly dropNonGoal: string | null;
+  readonly holdRelease: boolean;
+  /** The caller is an engine; a person's proposal is recorded as the operator's. */
+  readonly engine?: boolean;
+  readonly sessionNumber?: number | null;
+}
+
+/** The shapes a proposal takes, for the refusal of one that names none. */
+export const PROPOSAL_SHAPES =
+  "a proposal names exactly one change the framework can apply:\n" +
+  '  dabbler session propose --reason "<why>" --step <id> --files <a,b> | --checks-file <path>\n' +
+  '  dabbler session propose --reason "<why>" --drop-non-goal "<the non-goal, word for word>"\n' +
+  '  dabbler session propose --reason "<why>" --max-rounds <n>\n' +
+  '  dabbler session propose --reason "<why>" --hold-release';
+
+/**
+ * Propose a change to the session in flight, and apply nothing.
+ *
+ * A rule an engine cannot act on used to be a wall: the close said a hold
+ * was "made at step (a), never here", and a plan that could not be built as
+ * written could not be changed by anyone who had found that out. This is
+ * the one door, for engine and person alike, and it opens only onto changes
+ * the framework can apply -- the Primary Reviewer rules on a proposal first,
+ * and what it does not settle goes to a person.
+ */
+export function propose(sessionsDir: string, options: ProposeCliOptions): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`propose: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  const reason = options.reason.trim();
+  if (reason === "") {
+    writeErr("propose: --reason carries why this change is the way on\n");
+    return EXIT_USAGE;
+  }
+  const checks = readChecksFile(options.checksFile);
+  if (typeof checks === "string") {
+    writeErr(`propose: refused -- ${checks}\n`);
+    return EXIT_USAGE;
+  }
+  const changes: ProposedChange[] = [];
+  if (options.stepId !== null) {
+    changes.push({ kind: "step", step: options.stepId, files: options.files, checks });
+  }
+  if (options.dropNonGoal !== null) changes.push({ kind: "drop-non-goal", text: options.dropNonGoal });
+  if (options.maxRounds !== null) changes.push({ kind: "max-rounds", cap: options.maxRounds });
+  if (options.holdRelease) changes.push({ kind: "hold-release" });
+  const change = changes.length === 1 ? changes[0] : null;
+  if (change === null || (change.kind === "step" && change.files === null && change.checks === null)) {
+    writeErr(`propose: refused -- ${PROPOSAL_SHAPES}\n`);
+    return EXIT_USAGE;
+  }
+
+  const target = resolveTargetSession(sessionsDir, options.sessionNumber ?? null);
+  if (target === null) {
+    writeErr(`propose: refused -- no session has been started under ${sessionsDir}.\n`);
+    return EXIT_BOUNDARY;
+  }
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  const refusal = proposalRefusal(sessionsDir, repoRoot, target, change);
+  if (refusal !== null) {
+    writeErr(`propose: refused -- ${refusal}\n`);
+    return EXIT_BOUNDARY;
+  }
+  const by = options.engine === false ? "the operator" : whoIsWorking(sessionsDir, target);
+  const entry = recordProposal(sessionsDir, { sessionNumber: target, change, reason, by });
+  writeOut(
+    `propose: proposal ${String(entry["number"])} of session ${sessionDisplayNumber(target)} -- ` +
+      `${String(entry["what"])} -- recorded, from ${by}. Nothing is applied yet: the Primary ` +
+      "Reviewer rules on it first, and what it does not settle goes to a person.\n",
+  );
+  return EXIT_OK;
+}
+
+/**
+ * Why this change cannot be proposed, or null. It must be one the framework
+ * could apply now -- checked as `plan amend` and `hold-release` check it --
+ * and it is proposed once: a second proposal of the same change names the
+ * first, whatever became of it.
+ */
+function proposalRefusal(
+  sessionsDir: string,
+  repoRoot: string,
+  target: number,
+  change: ProposedChange,
+): string | null {
+  const plan = readWorkPlan(repoRoot, target);
+  if (change.kind === "step" && !plan?.steps.some((step) => step.id === change.step)) {
+    return (
+      `the work plan declares no step '${change.step}'; its steps are ` +
+      (plan?.steps.map((step) => `'${step.id}'`).join(", ") || "none")
+    );
+  }
+  if (change.kind === "drop-non-goal") {
+    const declared = plan?.non_goals ?? [];
+    if (!declared.some((goal) => goal.trim() === change.text.trim())) {
+      return (
+        `the work plan declares no non-goal '${change.text.trim()}'; its non-goals are ` +
+        (declared.map((goal) => `'${goal}'`).join(", ") || "none")
+      );
+    }
+  }
+  if (change.kind === "max-rounds" && (!Number.isInteger(change.cap) || change.cap < 1)) {
+    return `a round cap is a whole number of rounds, at least one; '${change.cap}' is not`;
+  }
+  if (change.kind === "hold-release") {
+    if (!releasabilityOf(sessionsDir, target).declared) {
+      return `session ${sessionDisplayNumber(target)} does not release; there is nothing to hold`;
+    }
+    if (readPackaging(repoRoot, target).some((row) => row["outcome"] === OUTCOME_PUBLISHED)) {
+      return `session ${sessionDisplayNumber(target)} has already published; what reached a feed is not held by saying so`;
+    }
+  }
+  const what = proposalEntries(sessionsDir, target);
+  const first = what.find((entry) => JSON.stringify(entry["change"]) === JSON.stringify(change));
+  if (first !== undefined) {
+    return (
+      `proposal ${String(first["number"])} already proposed this, from ${String(first["by"])}: ` +
+      `${String(first["reason"])}. A change is proposed once`
+    );
+  }
+  return null;
+}
+
+/** The earliest proposal nothing has settled: the one the loop and a person act on next. */
+export function unsettledProposal(sessionsDir: string, target: number): Record<string, unknown> | null {
+  const outcomes = proposalOutcomes(sessionsDir, target);
+  return proposalEntries(sessionsDir, target).find((entry) => proposalStanding(entry, outcomes) !== "settled") ?? null;
+}
+
+export interface DecideProposalOptions {
+  readonly approve: boolean;
+  readonly reason: string | null;
+  /** The caller is an engine (`callerIsEngine`); deciding a proposal is a person's. */
+  readonly engine?: boolean;
+  readonly sessionNumber?: number | null;
+}
+
+/**
+ * A person decides the proposal the reviewer did not settle. Approval
+ * applies exactly what was proposed -- through the one implementation `plan
+ * amend` uses -- and records who approved it, when, and what it did;
+ * rejection records why. Never the engine's: it asked.
+ */
+export function decideProposal(sessionsDir: string, options: DecideProposalOptions): number {
+  const verb = options.approve ? "propose --approve" : "propose --reject";
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`${verb}: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  if (options.engine === true) {
+    writeErr(
+      `${verb}: ${isAPersonsVerb(
+        verb,
+        "decides a change the engine itself proposed",
+        "a person decides it from an interactive terminal of their own, or from the dialog VS Code opens",
+        "Wait for the person's decision",
+      )}\n`,
+    );
+    return EXIT_BOUNDARY;
+  }
+  const reason = (options.reason ?? "").trim();
+  if (!options.approve && reason === "") {
+    writeErr(`${verb}: --reason carries why the change is refused\n`);
+    return EXIT_USAGE;
+  }
+  const target = resolveTargetSession(sessionsDir, options.sessionNumber ?? null);
+  const proposal = target === null ? null : unsettledProposal(sessionsDir, target);
+  if (target === null || proposal === null) {
+    writeErr(`${verb}: refused -- no proposal awaits a decision.\n`);
+    return EXIT_BOUNDARY;
+  }
+  const number = Number(proposal["number"]);
+  if (!options.approve) {
+    recordProposalOutcome(sessionsDir, { sessionNumber: target, proposal: number, outcome: "rejected", by: "the operator", reason });
+    writeOut(
+      `${verb}: proposal ${number} (${String(proposal["what"])}) rejected by the operator: ${reason}. ` +
+        "Nothing changed; carry on and the session goes on under its plan as it stands.\n",
+    );
+    return EXIT_OK;
+  }
+  let applied: AppliedChange;
+  try {
+    applied = applyChange(
+      sessionsDir,
+      target,
+      proposal["change"] as ProposedChange,
+      reason || String(proposal["reason"]),
+      "the operator",
     );
   } catch (error) {
     if (!(error instanceof LedgerError)) throw error;
-    writeErr(`plan amend: refused -- ${error.message}\n`);
+    writeErr(`${verb}: refused -- ${error.message}\n`);
     return EXIT_BOUNDARY;
   }
-  const moved = [options.files === null ? null : "files", checks === null ? null : "checks"]
-    .filter((part): part is string => part !== null)
-    .join(" and ");
-  recordAmendment(sessionsDir, {
+  recordProposalOutcome(sessionsDir, {
     sessionNumber: target,
-    what: `step '${String(options.stepId)}': its ${moved}`,
-    reason: options.reason.trim(),
-    by,
+    proposal: number,
+    outcome: "approved",
+    by: "the operator",
+    reason: applied.said,
   });
-  writeOut(
-    `plan amend: step '${options.stepId}' of session ${sessionDisplayNumber(target)} amended by ` +
-      `${by}; the next instruction for it is measured against the new ` +
-      "step, and what changed is on the record.\n",
-  );
+  writeOut(`${verb}: proposal ${number} approved by the operator and applied: ${applied.said}\n`);
   return EXIT_OK;
 }
 
@@ -3407,6 +3608,7 @@ export function holdRelease(sessionsDir: string, options: HoldReleaseCliOptions)
         "hold-release",
         "decides after the work that a session its plan declared releasable publishes nothing",
         "a person holds a release from an interactive terminal of their own",
+        'Propose it instead: `dabbler session propose --hold-release --reason "<why>"`',
       )}\n`,
     );
     return EXIT_BOUNDARY;

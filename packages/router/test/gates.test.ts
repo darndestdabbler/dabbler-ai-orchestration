@@ -258,6 +258,8 @@ describe("published_when_releasable", () => {
     const row = judgePackagingRecord([]);
     assert.equal(row[0], false);
     assert.match(row[1], /no packaging run is on its record/);
+    // The way past it an engine can act on: a proposal, never "never here".
+    assert.match(row[1], /dabbler session propose --hold-release --reason/);
   });
 
   it("refuses a record of trying that shipped nothing", () => {

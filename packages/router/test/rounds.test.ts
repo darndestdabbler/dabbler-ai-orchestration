@@ -1,8 +1,11 @@
 // The round's own rules: which findings block, when no further round may
 // open, and what the run of record asks for. Rows in a temp directory.
 import assert from "node:assert/strict";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { proposalOutcomes, recordProposal } from "../src/writers.ts";
 import { appendDispute, appendRound, readRounds } from "../src/ledger.ts";
 import {
   DRIVER_RUNS_THE_REST,
@@ -13,7 +16,9 @@ import {
   dispatchVerification,
   droppedParams,
   noRoundReason,
+  parseProposalRuling,
   reportedInputTokens,
+  ruleOnProposal,
   runOfRecordLines,
   substitutionNote,
   turnCount,
@@ -279,6 +284,65 @@ describe("the reviewer a call that failed is retried against", () => {
     } finally {
       restore();
     }
+  });
+});
+
+describe("a proposal, ruled on once", () => {
+  const answering = (content: string): RouteResult => ({
+    content,
+    model_name: "gpt-5.6-sol",
+    model_id: "gpt-5.6-sol",
+    provider: "openai",
+    input_tokens: 1,
+    output_tokens: 1,
+    escalated: false,
+    escalation_history: [],
+    elapsed_seconds: 0.1,
+    transport: "offline",
+    truncated: false,
+    transport_session_id: null,
+    served_model_id: null,
+    metadata: {},
+  });
+
+  it("records an endorsement and a returned finding against the proposal, opens no round, and rules once", async () => {
+    const repo = tempDir();
+    const sessionsDir = join(repo, "docs", "sessions");
+    mkdirSync(sessionsDir, { recursive: true });
+    const why = "Hibernate 6 ships the SQLite dialect outside hibernate-core";
+    recordProposal(sessionsDir, { sessionNumber: 3, change: { kind: "max-rounds", cap: 4 }, reason: why, by: "claude-code" });
+    recordProposal(sessionsDir, { sessionNumber: 3, change: { kind: "hold-release" }, reason: "no feed", by: "claude-code" });
+    const options = { excludeProviders: ["anthropic"], authorModel: "claude-sonnet-5", repoRoot: repo };
+    const answers = [
+      'Here is my ruling: {"ruling": "endorse", "reason": "H2 is inside hibernate-core"}',
+      '{"ruling": "finding", "finding": {"description": "Configure the feed instead", "severity": "major"}}',
+    ];
+    const prompts: string[] = [];
+    const restore = setRouteSource((content) => {
+      prompts.push(content);
+      return Promise.resolve(answering(answers[prompts.length - 1]!));
+    });
+    try {
+      assert.equal((await ruleOnProposal(sessionsDir, 3, 1, options)).ruling, "endorse");
+      assert.equal((await ruleOnProposal(sessionsDir, 3, 2, options)).ruling, "finding");
+      await assert.rejects(ruleOnProposal(sessionsDir, 3, 1, options), /already ruled on/);
+    } finally {
+      restore();
+    }
+    assert.ok(prompts[0]!.includes(why));
+    const outcomes = proposalOutcomes(sessionsDir, 3);
+    assert.deepEqual(
+      outcomes.map((entry) => [entry["proposal"], entry["outcome"], entry["by"]]),
+      [
+        [1, "endorsed", "gpt-5.6-sol (openai)"],
+        [2, "finding", "gpt-5.6-sol (openai)"],
+      ],
+    );
+    assert.deepEqual(outcomes[1]!["finding"], { description: "Configure the feed instead", severity: "major" });
+    // No round row: a ruling spends none of the round cap.
+    assert.deepEqual(readRounds(repo, 3), []);
+    // An answer that is neither endorses nothing.
+    assert.equal(parseProposalRuling("I think it is fine").ruling, "unclear");
   });
 });
 

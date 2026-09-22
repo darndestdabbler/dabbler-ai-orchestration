@@ -7,7 +7,7 @@
  */
 export type DriverRunPhase = "plan" | "work" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "gate-wait" | "publish" | "close" | "complete";
 
-export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engine" | "tree" | "tests" | "verification" | "land" | "publish" | "close" | "interrupted" | "crash";
+export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engine" | "tree" | "tests" | "verification" | "land" | "publish" | "close" | "interrupted" | "crash" | "proposal";
 
 /**
  * Which refusal this was, where the kind is too coarse to act on. A kind says which bound the loop met; four unlike things meet the `verification` bound, with four actors and four next moves, and a surface keyed on the kind alone renders one sentence for all of them. Optional and closed: a stop with no code is its kind, which is what every run written before this member is, and a new refusal is named here before it can be recorded.

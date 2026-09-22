@@ -34,6 +34,8 @@ import {
   migrate,
   plan,
   planAmend,
+  decideProposal,
+  propose,
   report,
   restore,
   start,
@@ -53,6 +55,7 @@ const SUMMARY: Record<string, string> = {
   rebaseline: "record a repair made while the run was stopped, and move the baseline",
   report: "answer the driver's outstanding instruction",
   plan: "record the plan prose in project-work-plan.md; `plan amend` changes a driven step",
+  propose: "propose a change the framework can apply; the reviewer, then a person, decides",
   "hold-release": "hold this session's release, for a person's reason; it closes as held",
   close: "run gates and close the session",
   cancel: "cancel one session",
@@ -191,8 +194,9 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --body TEXT              the plan prose; mutually exclusive with --body-file",
     "  --body-file PATH         the plan prose, read from a file",
     "",
-    "  `dabbler session plan amend` instead amends ONE not-yet-accepted step of the",
-    "  driven work plan -- what the next instruction for it is measured against:",
+    "  `dabbler session plan amend` instead amends ONE step of the driven work plan",
+    "  -- what the next instruction for it is measured against. An accepted step is",
+    "  asked for again, with the steps after it:",
     "  --step ID                the step to amend; required unless --max-rounds or",
     "                           --drop-non-goal is given",
     "  --files A,B              the step's files as they should now read, whole",
@@ -209,6 +213,25 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --reason TEXT            required: why this is the minimal change. Who was working",
     "                           is on the record from `session start` and is written",
     "                           into the row; there is no flag for it",
+  ],
+  propose: [
+    "  --reason TEXT            why this change is the way on; a proposal and a",
+    "                           rejection both require it",
+    "  and exactly one change, as `plan amend` and `hold-release` take it:",
+    "  --step ID                a step, with --files A,B and/or --checks-file PATH; an",
+    "                           accepted step is asked for again, with those after it",
+    "  --drop-non-goal TEXT     a declared non-goal, word for word",
+    "  --max-rounds N           the verification round cap",
+    "  --hold-release           this session publishes nothing",
+    "",
+    "",
+    "  Nothing is applied on the call. The Primary Reviewer rules on it once; what",
+    "  it does not settle goes to a person. The last resort, and the way past a",
+    "  refusal nothing else can act on; every proposal is on the record.",
+    "",
+    "  A person's decision on the proposal the reviewer did not settle:",
+    "  --approve                apply exactly what was proposed, recorded as yours",
+    "  --reject                 refuse it; with --reason, why",
   ],
   "hold-release": [
     "  --reason TEXT            required: why this session publishes nothing",
@@ -288,7 +311,10 @@ const RETIRED_FLAGS: ReadonlyMap<string, string> = new Map([
 const SWITCHES = new Set([
   "--commit-changes",
   "--dry-run",
+  "--approve",
   "--force",
+  "--hold-release",
+  "--reject",
   "--mailbox",
   "--merge-origin",
   "--next",
@@ -488,6 +514,43 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       dryRun: switches.has("--dry-run"),
       forced: switches.has("--force"),
       engine: !personIsPresent(),
+    });
+  }
+
+  if (subcommand === "propose" && (switches.has("--approve") || switches.has("--reject"))) {
+    return decideProposal(sessionsDir, {
+      approve: switches.has("--approve"),
+      reason: values.get("--reason") ?? null,
+      engine: !personIsPresent(),
+      sessionNumber,
+    });
+  }
+
+  if (subcommand === "propose") {
+    const reason = values.get("--reason");
+    if (reason === undefined) {
+      writeErr("dabbler session propose: the following arguments are required: --reason\n");
+      return EXIT_USAGE;
+    }
+    const maxRounds = integer(values.get("--max-rounds"), "--max-rounds");
+    if (typeof maxRounds === "string") {
+      writeErr(`dabbler session propose: ${maxRounds}\n`);
+      return EXIT_USAGE;
+    }
+    const files = values.get("--files");
+    return propose(sessionsDir, {
+      reason,
+      stepId: values.get("--step") ?? null,
+      files:
+        files === undefined
+          ? null
+          : files.split(",").map((entry) => entry.trim()).filter((entry) => entry !== ""),
+      checksFile: values.get("--checks-file") ?? null,
+      maxRounds,
+      dropNonGoal: values.get("--drop-non-goal") ?? null,
+      holdRelease: switches.has("--hold-release"),
+      engine: !personIsPresent(),
+      sessionNumber,
     });
   }
 

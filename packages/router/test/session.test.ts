@@ -64,6 +64,8 @@ import {
   interrupt,
   personIsPresent,
   plan,
+  propose,
+  decideProposal,
   repairedPaths,
   report,
   restore,
@@ -73,9 +75,21 @@ import {
   steppedOverLines,
   type SequenceFacts,
 } from "../src/session.ts";
-import { loopPath, readInstruction, readReport, recordRepair, writeInstruction, writeRun } from "../src/driver.ts";
+import {
+  loopPath,
+  readInstruction,
+  readReport,
+  readWorkPlan,
+  recordRepair,
+  writeInstruction,
+  writeRun,
+  writeWorkPlan,
+} from "../src/driver.ts";
 import {
   amendmentEntries,
+  proposalEntries,
+  proposalOutcomes,
+  releaseHold,
   readTaskDeclaration,
   recordAmendment,
   recordSessionVerification,
@@ -1220,10 +1234,14 @@ describe("cancelling and restoring through the verb", () => {
         );
         assert.ok(refusal.err.includes(", and that judgement is not the engine's to make. "), refusal.err);
         // What to do instead is the one part that differs: an engine has a
-        // cancel of its own, and no close or hold of its own.
+        // cancel of its own, a proposal in place of a hold, and no close.
         assert.ok(
           refusal.err.includes(
-            index === 0 ? "yours to cancel without it: `dabbler session cancel <its number>" : "Report the step blocked and say why; a person ",
+            [
+              "yours to cancel without it: `dabbler session cancel <its number>",
+              "Report the step blocked and say why; a person ",
+              "Propose it instead: `dabbler session propose --hold-release",
+            ][index]!,
           ),
           refusal.err,
         );
@@ -1678,6 +1696,93 @@ describe("a session that publishes nothing", () => {
       assert.deepEqual(amendmentEntries(published.sessionsDir, 1), []);
     } finally {
       published.restore();
+    }
+  });
+});
+
+describe("a proposal", () => {
+  const NONE = {
+    stepId: null,
+    files: null,
+    checksFile: null,
+    maxRounds: null,
+    dropNonGoal: null,
+    holdRelease: false,
+  } as const;
+
+  it("is recorded and applies nothing; one naming no change, or naming one twice, is refused", async () => {
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      writeWorkPlan(state.repo, 1, {
+        schema_version: 1,
+        session_number: 1,
+        task: "Persist a Person.",
+        non_goals: ["No dialect outside hibernate-core."],
+        steps: [{ id: "persist", ask: "Persist it.", files: ["src/Person.java"], checks: [{ argv: ["mvn", "test"] }] }],
+        recorded_at: "2026-09-22T10:00:00-04:00",
+      });
+
+      // Free text alone is not a change anything can apply.
+      const bare = await run(() => propose(state.sessionsDir, { ...NONE, reason: "the plan is wrong" }));
+      assert.equal(bare.code, EXIT_USAGE);
+      assert.match(bare.err, /--drop-non-goal/);
+      assert.match(bare.err, /--hold-release/);
+
+      const why = "SQLite's dialect ships outside hibernate-core; H2's is inside it";
+      const made = await run(() =>
+        propose(state.sessionsDir, { ...NONE, reason: why, dropNonGoal: "No dialect outside hibernate-core." }),
+      );
+      assert.equal(made.code, EXIT_OK, made.err);
+      assert.deepEqual(readWorkPlan(state.repo, 1)?.non_goals, ["No dialect outside hibernate-core."]);
+      assert.deepEqual(amendmentEntries(state.sessionsDir, 1), []);
+      const [entry] = proposalEntries(state.sessionsDir, 1);
+      assert.equal(entry?.["number"], 1);
+      assert.equal(entry?.["reason"], why);
+      assert.deepEqual(entry?.["change"], { kind: "drop-non-goal", text: "No dialect outside hibernate-core." });
+
+      const again = await run(() =>
+        propose(state.sessionsDir, { ...NONE, reason: "again", dropNonGoal: "No dialect outside hibernate-core." }),
+      );
+      assert.equal(again.code, EXIT_BOUNDARY);
+      assert.match(again.err, /proposal 1 already proposed this/);
+      assert.equal(proposalEntries(state.sessionsDir, 1).length, 1);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("is a person's to approve, which applies exactly what was proposed and records who; an engine is refused", async () => {
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      const yaml = join(state.repo, "dabbler.yaml");
+      writeFileSync(yaml, readFileSync(yaml, "utf8") + "\npackaging:\n  release: tag\n");
+      await run(() => declare(state.sessionsDir, { task: "Ship it.", releasable: true }));
+      const proposed = await run(() =>
+        propose(state.sessionsDir, { ...NONE, reason: "no feed exists for this packaging block", holdRelease: true }),
+      );
+      assert.equal(proposed.code, EXIT_OK, proposed.err);
+
+      const engine = await run(() => decideProposal(state.sessionsDir, { approve: true, reason: null, engine: true }));
+      assert.equal(engine.code, EXIT_BOUNDARY);
+      assert.match(engine.err, /a person's verb, never the engine's/);
+      assert.equal(releaseHold(state.sessionsDir, 1), null);
+
+      const approved = await run(() => decideProposal(state.sessionsDir, { approve: true, reason: null }));
+      assert.equal(approved.code, EXIT_OK, approved.err);
+      assert.match(approved.out, /proposal 1 approved by the operator and applied/);
+      assert.equal(releaseHold(state.sessionsDir, 1), "held by the operator: no feed exists for this packaging block");
+      const outcome = proposalOutcomes(state.sessionsDir, 1).at(-1);
+      assert.equal(outcome?.["outcome"], "approved");
+      assert.equal(outcome?.["by"], "the operator");
+      assert.match(String(outcome?.["dateTime"]), /^\d{4}-\d{2}-\d{2}T/);
+      // Decided once: nothing is left to approve.
+      const twice = await run(() => decideProposal(state.sessionsDir, { approve: true, reason: null }));
+      assert.equal(twice.code, EXIT_BOUNDARY);
+      assert.match(twice.err, /no proposal awaits a decision/);
+    } finally {
+      state.restore();
     }
   });
 });

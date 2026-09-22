@@ -20,7 +20,9 @@ import {
   readAmendments,
   readDispositions,
   readReport,
+  readRun,
   readWatcher,
+  reopenSteps,
   renderAmendmentProposal,
   renderStop,
   renderUncollected,
@@ -347,6 +349,25 @@ describe("the four answer schemas", () => {
           ),
         /already dropped/,
       );
+    } finally {
+      restore();
+    }
+  });
+
+  it("re-opens an amended accepted step and every step after it, and sends a run past the work back to it", () => {
+    // A plan that cannot be built as written is found out mid-session; an
+    // acceptance measured against the old bar is not left standing.
+    const { repo, restore } = runDir();
+    try {
+      const step = (id: string) => ({ ...PLAN.steps[0]!, id });
+      writeWorkPlan(repo, 1, { ...PLAN, steps: [step("model"), step("persist"), step("report")] });
+      writeRun(repo, 1, { ...RUN, phase: "verify", accepted_steps: ["model", "persist", "report"] });
+      assert.deepEqual(reopenSteps(repo, 1, "persist", "2026-09-22T10:00:00-04:00"), ["persist", "report"]);
+      const run = readRun(repo, 1);
+      assert.deepEqual(run?.accepted_steps, ["model"]);
+      assert.equal(run?.phase, "work");
+      // A step nobody had accepted re-opens nothing.
+      assert.deepEqual(reopenSteps(repo, 1, "report", "2026-09-22T10:01:00-04:00"), []);
     } finally {
       restore();
     }
@@ -737,6 +758,35 @@ describe("a stop, as a person reads it", () => {
         );
         assert.ok(onward.length >= 1, `${code ?? kind}/${engine}: ${words.ways}`);
       }
+    }
+  });
+
+  it("asks a person to approve or reject a proposal, and names who acts", () => {
+    const words = renderStop(
+      { kind: "proposal", reason: "proposal 2 from claude-code awaits you -- the release, held" } as never,
+      { session_number: 7, phase: "close", engine: "cli" },
+    );
+    assert.equal(words.actor, "operator");
+    const commands = words.choices.map((choice) => choice.command);
+    assert.deepEqual(commands.slice(0, 2), [
+      "dabbler session propose --approve",
+      'dabbler session propose --reject --reason "<why>"',
+    ]);
+    assert.ok(commands.some((command) => /session cancel/.test(command)));
+    assert.match(words.happened, /^Proposal 2 from claude-code awaits you/);
+  });
+
+  it("offers the engine a proposal to hold the release where a close or a publish refused", () => {
+    for (const kind of ["close", "publish"]) {
+      const words = renderStop({ kind, reason: "no packaging run is on its record" } as never, {
+        session_number: 7,
+        phase: kind,
+        engine: "cli",
+      });
+      assert.ok(
+        words.choices.some((choice) => choice.command.startsWith("dabbler session propose --hold-release")),
+        `${kind}: ${words.ways}`,
+      );
     }
   });
 

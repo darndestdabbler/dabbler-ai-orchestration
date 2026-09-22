@@ -744,17 +744,17 @@ export function recordRepair(
  * amended plan goes back through `writeWorkPlan` -- an amendment that could
  * write a plan the reader refuses would break the session it meant to save.
  *
- * What is NOT amendable is deliberate. An accepted step's report has been
- * measured; moving its bar afterwards changes what the record says was
- * judged. `task` and `releasable` are the declaration, and a step's `id`
- * and `ask` are the work itself -- a session that wants to do different
- * work replans, and replanning is a thing the record can show.
+ * An accepted step may be amended too -- a plan that cannot be built as
+ * written is found out mid-session -- but its report was measured against
+ * the bar as it stood, so the caller re-opens it with `reopenSteps` rather
+ * than leaving an acceptance the new bar never judged. `task` and
+ * `releasable` are the declaration, and a step's `id` and `ask` are the
+ * work itself.
  */
 export function amendPlanStep(
   repoRoot: string,
   sessionNumber: number,
   input: AmendInput,
-  acceptedSteps: readonly string[],
   amendedAt: string,
 ): DriverWorkPlan {
   const reason = input.reason.trim();
@@ -780,12 +780,6 @@ export function amendPlanStep(
         plan.steps.map((step) => `'${step.id}'`).join(", "),
     );
   }
-  if (acceptedSteps.includes(input.stepId)) {
-    throw new LedgerError(
-      `step '${input.stepId}' has already been accepted; its report was measured against ` +
-        "the step as it stood, and amending it now would move that bar afterwards",
-    );
-  }
   const after = {
     ...before,
     ...(input.files === null ? {} : { files: [...input.files] }),
@@ -806,6 +800,37 @@ export function amendPlanStep(
     after: { files: after.files, checks: after.checks },
   });
   return amended;
+}
+
+/**
+ * Re-open an amended step and every step the plan orders after it: each was
+ * accepted over work the amended step no longer vouches for. Nothing is
+ * unwound in the tree; the loop asks for those steps again, and a run past
+ * the work goes back to it. Returns the ids re-opened, in plan order --
+ * empty when the step had not been accepted.
+ */
+export function reopenSteps(
+  repoRoot: string,
+  sessionNumber: number,
+  stepId: string,
+  reopenedAt: string,
+): string[] {
+  const run = readRun(repoRoot, sessionNumber);
+  const plan = readWorkPlan(repoRoot, sessionNumber);
+  if (run === null || plan === null || !run.accepted_steps.includes(stepId)) return [];
+  const from = plan.steps.findIndex((step) => step.id === stepId);
+  const later = new Set(plan.steps.slice(from).map((step) => step.id));
+  const reopened = plan.steps
+    .map((step) => step.id)
+    .filter((id) => later.has(id) && run.accepted_steps.includes(id));
+  const pastTheWork = !["plan", "work", "steps"].includes(run.phase);
+  writeRun(repoRoot, sessionNumber, {
+    ...run,
+    accepted_steps: run.accepted_steps.filter((id) => !later.has(id)),
+    ...(pastTheWork ? { phase: "work" } : {}),
+    updated_at: reopenedAt,
+  });
+  return reopened;
 }
 
 export interface DropNonGoalInput {
@@ -1521,6 +1546,21 @@ function cancelChoice(): StopChoice {
   };
 }
 
+/**
+ * The engine's way to a hold it may not make: a proposal, which the
+ * reviewer and then a person decide. A gate that refuses a release no one
+ * can deliver has this door, and never a skip.
+ */
+function proposeHoldChoice(): StopChoice {
+  return {
+    label: "Where this release cannot be delivered, propose holding it -- the engine may",
+    cost:
+      "Nothing is applied on the call: the Primary Reviewer rules on it, and a " +
+      "hold goes to a person to approve. Approved, the session closes as held.",
+    command: 'dabbler session propose --hold-release --reason "<why>"',
+  };
+}
+
 /** Carrying on from where it stopped, which most situations spell their own way. */
 function carryOn(parts: MoveParts, label: string, cost: string): StopChoice {
   return { label, cost, command: `${parts.resume}` };
@@ -1644,6 +1684,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "it. Carry on afterwards and the session closes as held.",
         command: "dabbler session hold-release --reason \"<why>\"",
       },
+      proposeHoldChoice(),
       cancelChoice(),
     ],
   },
@@ -1655,6 +1696,33 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         parts,
         "Satisfy the gate the close named, then carry on",
         "Whatever the gate demands; its row names it, and the close is run again.",
+      ),
+      proposeHoldChoice(),
+      cancelChoice(),
+    ],
+  },
+  proposal: {
+    what:
+      "A proposed change waits on you: the reviewer did not settle it, or it " +
+      "changes what the session delivers. Only this session waits.",
+    actor: "operator",
+    moves: (parts) => [
+      {
+        label: "Approve it: exactly the change proposed is applied, recorded as yours",
+        cost:
+          "What the change itself costs; an amended step that was accepted is asked " +
+          "for again with the steps after it. Carry on afterwards.",
+        command: "dabbler session propose --approve",
+      },
+      {
+        label: "Reject it: nothing changes, and the session goes on under its plan",
+        cost: "Nothing. The rejection and your reason are on the record. Carry on afterwards.",
+        command: 'dabbler session propose --reject --reason "<why>"',
+      },
+      carryOn(
+        parts,
+        "Once you have decided, carry on",
+        "The loop resumes where it stopped; nothing accepted is re-asked.",
       ),
       cancelChoice(),
     ],

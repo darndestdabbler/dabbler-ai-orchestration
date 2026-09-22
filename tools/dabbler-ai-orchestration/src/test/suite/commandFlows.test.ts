@@ -608,22 +608,6 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(refused.terminals.length, 0);
   });
 
-  test("Open a Mechanic is the consult launcher briefed with --mechanic, under a name of its own", async () => {
-    const copilot = ENGINES.find((e) => e.engine === "copilot")!;
-    const asked: string[] = [];
-    const run = driveUi({
-      pickEngine: async (purpose) => { asked.push(String(purpose)); return copilot; },
-      askModel: async () => "gpt-5-6-sol",
-    });
-    assert.strictEqual(await runConsultWithAi(makeRepository(), run.ui, 7, true), true);
-    assert.deepStrictEqual(asked, ["Open a Mechanic"]);
-    assert.strictEqual(run.terminals.length, 1);
-    const [cli] = run.terminals;
-    assert.match(cli.name, /^Mechanic/);
-    assert.match(cli.args[3], /dabbler consult --mechanic --sessions-dir docs\/sessions/);
-    assert.match(cli.args[3], /change nothing until I agree/);
-  });
-
   test("passes a dated model id exactly as it was chosen", () => {
     // `normalizeModelToken` drops the date suffix, and the date suffix is
     // what makes a pin a pin: generalising `claude-opus-5-20260901` here

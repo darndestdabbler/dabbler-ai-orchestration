@@ -111,7 +111,6 @@ import {
   checkVerificationClean,
   codeEcosystems,
   judgeSuiteDeclaration,
-  materialWorktreeChanges,
   rewindPhaseFor,
   runGates,
   sessionChangedNothing,
@@ -340,36 +339,6 @@ export function stepChangedPaths(diff: readonly string[], sessionsRel: string): 
     const name = canonical.split("/").pop() ?? canonical;
     return !(canonical.startsWith(`${sessionsRel}/`) && SET_BOOKKEEPING_COMMIT_BASENAMES.includes(name));
   });
-}
-
-/** The Mechanic's log, under the sessions root: tracked, so its entry rides in the diff beside the fix. */
-export const MECHANIC_LOG_FILENAME = "mechanic-log.md";
-
-/** The phases after the land, where a fix finds a committed tree and no step open to take it. */
-const AFTER_THE_LAND: ReadonlySet<string> = new Set(["gate-wait", "publish", "close"]);
-
-/**
- * A tree that moved after the land, judged as a Mechanic's fix: the reason
- * is the heading of the newest entry in the mechanic log, and a fix that
- * wrote no entry is refused. The log's entry is what the Primary Reviewer
- * judges "minimum" against, so a fix without one is not a fix it can review.
- * Pure: the paths that moved, the sessions root and the log's text in.
- */
-export function judgeIntervention(
-  changed: readonly string[],
-  sessionsRel: string,
-  logText: string | null,
-): { readonly reason: string } | { readonly refusal: string } {
-  const log = `${sessionsRel}/${MECHANIC_LOG_FILENAME}`;
-  const refusal =
-    `the tree moved after the land (${changed.slice(0, 5).join(", ")}) with no new entry in ${log}. ` +
-    "A fix made after the land is taken as an intervention only with its entry beside it: record what " +
-    "was done and why there, or revert the change, then carry on.";
-  if (!changed.includes(log)) return { refusal };
-  // The shape the log documents is fenced; only headings outside a fence are entries.
-  const unfenced = (logText ?? "").replace(/^```[\s\S]*?^```/gm, "");
-  const heading = [...unfenced.matchAll(/^## (.+)$/gm)].at(-1)?.[1]?.trim() ?? "";
-  return heading === "" ? { refusal } : { reason: heading };
 }
 
 /**
@@ -1674,38 +1643,6 @@ class Driver {
       rewinds: [...rewound, { to, reason: bound, at: nowIso() }].slice(-REWIND_HISTORY_CAP),
     };
     this.setPhase(to);
-  }
-
-  /**
-   * A tree that moved after the land is a Mechanic's fix: recorded as an
-   * intervention and sent back to verify, so it is reviewed and landed like
-   * any change. Nothing is asked while a job of this phase is still running.
-   */
-  private takeIntervention(): void {
-    if (!AFTER_THE_LAND.has(this.run.phase) || (this.run.job ?? null) !== null) return;
-    const { paths, error } = materialWorktreeChanges(this.sessionsDir);
-    if (error !== "" || paths.length === 0) return;
-    let logText: string | null = null;
-    try {
-      logText = readFileSync(join(this.sessionsDir, MECHANIC_LOG_FILENAME), "utf8");
-    } catch {
-      // No log is no entry, which the judgment refuses by name.
-    }
-    const judged = judgeIntervention(paths, repoRelativePath(this.repoRoot, this.sessionsDir), logText);
-    if ("refusal" in judged) throw new Stop("tree", judged.refusal);
-    const phase = this.run.phase;
-    this.run = {
-      ...this.run,
-      interventions: [...(this.run.interventions ?? []), { at: nowIso(), phase, reason: judged.reason, files: [...paths] }],
-    };
-    this.log("intervention", { phase, reason: judged.reason, files: paths });
-    this.rewindOrStop(
-      "verify",
-      `intervention: ${judged.reason}`,
-      "tree",
-      `the fix "${judged.reason}" was sent back to verify and the tree moved again under the same entry; ` +
-        "a further fix records an entry of its own",
-    );
   }
 
   private setPhase(phase: DriverRun["phase"]): void {
@@ -4193,15 +4130,6 @@ class Driver {
         }`,
       );
     }
-    // Every Mechanic's fix this session took, said where the session ends.
-    const interventions = this.run.interventions ?? [];
-    if (interventions.length > 0) {
-      writeOut(
-        `dabbler: session ${sessionDisplayNumber(this.sessionNumber)} closed after ` +
-          `${interventions.length} intervention(s):\n` +
-          interventions.map((row) => `  - ${row.reason} (in '${row.phase}': ${row.files.join(", ")})\n`).join(""),
-      );
-    }
     this.issueDone();
     this.setPhase("complete");
   }
@@ -4230,7 +4158,6 @@ class Driver {
             await this.runSynthesisedStep(pending.id, pending.ask, pending.then);
             continue;
           }
-          this.takeIntervention();
           // Dispatched on the canonical name, so a run recorded under the old
           // one resumes into the phase it stopped in without its record being
           // rewritten to be readable. `isWorkPhase` is the only place either

@@ -10,38 +10,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
-## [Unreleased]
-
-**A stuck session has a way on: open a Mechanic.** When developers get
-stuck, they open another AI chat and tell it to get things going again. That
-is now first-class. A session whose plan named a release reached the close
-with nothing published, and the close said the release could be declared
-off only "at step (a), never here". A plan that could not be built as
-written could not be changed. Both were walls with no door.
-
-### Added
-
-- **Open a Mechanic**, on the session in flight and its repository in the
-  Work Explorer: the consult launcher, briefed with `dabbler consult
-  --mechanic`, with the model box offering the Primary Reviewer's model. The
-  brief quotes the stop and the records behind it, lists the rules that keep
-  the session restartable and the verbs that are yours to type, and tells
-  the Mechanic to diagnose, recommend, act only when you agree, make the
-  smallest fix that lets the session carry on, and record it in
-  `docs/sessions/mechanic-log.md`.
-- **A fix after the land is taken as an intervention.** When the tree has
-  moved at the publish or the close and the change includes a new mechanic
-  log entry, the next `dabbler session next` records the intervention and
-  sends the session back to verification, so the fix is reviewed and landed
-  like any change. The close lists every intervention. A change with no log
-  entry stops and names the log.
-
-### Changed
-
-- **Every stop's ways on include *Open a Mechanic***, ahead of cancelling.
-  The close gate for a release that never published now names the Mechanic
-  and `dabbler session hold-release` instead of "never here".
-
 ## [3.18.0] — 2026-09-21
 
 **Every choice is this repository's, and the machine's is only its default.**

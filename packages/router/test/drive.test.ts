@@ -64,7 +64,6 @@ import {
   suiteRetrySeconds,
   staleJobDisposition,
   stepChangedPaths,
-  judgeIntervention,
   unchangedStepFiles,
   noLoopMessage,
   reviveLoop,
@@ -659,24 +658,6 @@ describe("whether the report names what the tree moved", () => {
       present,
     );
     assert.deepEqual(rules(refused), ["files-changed-unchanged", "files-changed-omits"]);
-  });
-});
-
-describe("judgeIntervention", () => {
-  it("takes a fix after the land by its newest log entry, and refuses one with no entry", () => {
-    const log =
-      "# Mechanic log\n\n```markdown\n## Session <N> -- <the stop>\n```\n\n" +
-      "## Session 7 -- SQLite has no JPA dialect\n\n- **Diagnosis:** ...\n\n" +
-      "## Session 7 -- the plan now names H2\n";
-    assert.deepEqual(
-      judgeIntervention(["docs/sessions/session-plan.md", "docs/sessions/mechanic-log.md"], "docs/sessions", log),
-      { reason: "Session 7 -- the plan now names H2" },
-    );
-    const noEntry = judgeIntervention(["pom.xml"], "docs/sessions", log);
-    assert.ok("refusal" in noEntry && /docs\/sessions\/mechanic-log\.md/.test(noEntry.refusal));
-    // The fenced shape is documentation, never an entry.
-    const onlyShape = judgeIntervention(["docs/sessions/mechanic-log.md"], "docs/sessions", "```\n## Session <N>\n```\n");
-    assert.ok("refusal" in onlyShape);
   });
 });
 

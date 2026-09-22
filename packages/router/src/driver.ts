@@ -1521,19 +1521,6 @@ function cancelChoice(): StopChoice {
   };
 }
 
-/**
- * Opening a Mechanic: what a developer does when stuck -- another instance,
- * with a fresh context, told to get things going again. A way on from every
- * stop, ahead of ending it; the brief it reads says what it may touch.
- */
-const MECHANIC_CHOICE: StopChoice = {
-  label: "Open a Mechanic -- a fresh AI instance, at least as capable as the author, that diagnoses and recommends",
-  cost:
-    "One conversation on the model you pick. It acts only when you agree, makes the smallest fix " +
-    "that lets the session carry on, and records it in the mechanic log for the reviewer to judge.",
-  command: "dabbler consult --mechanic",
-};
-
 /** Carrying on from where it stopped, which most situations spell their own way. */
 function carryOn(parts: MoveParts, label: string, cost: string): StopChoice {
   return { label, cost, command: `${parts.resume}` };
@@ -1990,19 +1977,12 @@ export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
   const ended = `The dabbler command that met it has ended; ${session.toLowerCase()} remains in flight.`;
   const { resume } = nextActor(run);
   const actor = actorFor(stop, run);
-  const moves = situation.moves({
+  const choices = situation.moves({
     resume,
     phase: run.phase,
     step: stop.step_id ? ` '${stop.step_id}'` : "",
     session: run.session_number,
   });
-  // Every stop's ways on name the Mechanic, ahead of cancelling where
-  // cancelling is one: stated here once rather than in every situation.
-  const cancelAt = moves.findIndex((choice) => choice.command === cancelChoice().command);
-  const choices =
-    cancelAt === -1
-      ? [...moves, MECHANIC_CHOICE]
-      : [...moves.slice(0, cancelAt), MECHANIC_CHOICE, ...moves.slice(cancelAt)];
   const next = actorSentence(
     actor,
     resume,

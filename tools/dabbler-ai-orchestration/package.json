@@ -110,11 +110,6 @@
         "category": "Dabbler"
       },
       {
-        "command": "dabbler.openMechanic",
-        "title": "Open a Mechanic",
-        "category": "Dabbler"
-      },
-      {
         "command": "dabblerSessionSets.closeSession",
         "title": "Close Session",
         "category": "Dabbler"
@@ -278,10 +273,6 @@
           "when": "false"
         },
         {
-          "command": "dabbler.openMechanic",
-          "when": "false"
-        },
-        {
           "command": "dabblerSolution.setEngine",
           "when": "false"
         },
@@ -368,11 +359,6 @@
           "command": "dabbler.consultWithAi",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-consultWithAi;/",
           "group": "6_session@605"
-        },
-        {
-          "command": "dabbler.openMechanic",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openMechanic;/",
-          "group": "6_session@607"
         },
         {
           "command": "dabblerSessionSets.cancel",

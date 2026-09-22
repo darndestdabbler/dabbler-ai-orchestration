@@ -33,7 +33,6 @@ const hasNextSession = (r: SessionsRepository): boolean =>
 
 const START_SESSION = "dabblerSessionSets.startSession";
 const CONSULT_WITH_AI = "dabbler.consultWithAi";
-const OPEN_MECHANIC = "dabbler.openMechanic";
 
 // Ordered list; `group` bands: 1xx Open File submenu, 3xx Copy Prompt
 // submenu, 9xx lifecycle.
@@ -47,8 +46,6 @@ export const REPOSITORY_ACTIONS: RepositoryAction[] = [
     when: (r) => r.currentSession !== null },
   // Whatever state the work is in: a consult drives nothing.
   { id: CONSULT_WITH_AI, label: "Consult with AI", group: 908, when: () => true },
-  // A Mechanic unblocks the session in flight, so it is offered only while there is one.
-  { id: OPEN_MECHANIC, label: "Open a Mechanic", group: 909, when: (r) => r.currentSession !== null },
 ];
 
 export function applicableRepositoryActions(
@@ -110,13 +107,6 @@ export const SESSION_ACTIONS: SessionAction[] = [
       repository.currentSession === session.number && session.status === "in-progress",
   },
   { id: CONSULT_WITH_AI, label: "Consult with AI", group: 904, when: () => true },
-  {
-    id: OPEN_MECHANIC,
-    label: "Open a Mechanic",
-    group: 907,
-    when: (repository, session) =>
-      repository.currentSession === session.number && session.status === "in-progress",
-  },
   {
     id: "dabblerSessionSets.cancel",
     label: "Cancel Session",

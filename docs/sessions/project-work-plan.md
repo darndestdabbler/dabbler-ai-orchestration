@@ -271,6 +271,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 231 | The Mechanic | no | 2026-09-22 |
 | 232 | A release is a session of its own | no | 2026-09-22 |
 | 233 | Release 3.19.0 (release: 3.19.0) | yes | 2026-09-22 |
+| 234 | A release runs only the tests nothing has proved | no | 2026-09-22 |
+| 235 | Release 3.19.1 (release: 3.19.1) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2997,3 +2999,9 @@ Make a release a session of its own, so ordinary sessions never publish. A perso
 **Releasable: yes.**
 
 Release 3.19.0: the framework packs and publishes what is on the trunk.
+
+### Session 234 — A release runs only the tests nothing has proved
+
+**Releasable: no.**
+
+Make a release session run a suite whole before the pack only where no passing whole run of it stands against the tree being released. The reading lives in testEvidence.ts beside the freshness judge the test_run_fresh gate already uses: the existing, now-unused session-scoped wholeRunsOwedBeforeRelease is replaced by one function that judges a suite with freshnessVerdict at the final-full stage (green, covered-surface digest current, tree digest unmoved) and also owes a whole run when a targeted run of record of that suite follows its last whole run; evaluateFreshness takes an option to judge by it. drive.ts's wholeRunsBeforeRelease reads that verdict per expensive suite: a suite so proved is not run and the log names the run that proved it (its recorded time and session); an unproved one runs whole as now, and a red whole run still stops the release with the same ways on. One test per behaviour in testEvidence.test.ts: a suite proved whole owes nothing, one run targeted since (or whose tree moved) owes a whole run. Then bump version.json to 3.19.1, stamp the manifests with npm run stamp:version, and add the 3.19.1 changelog section.

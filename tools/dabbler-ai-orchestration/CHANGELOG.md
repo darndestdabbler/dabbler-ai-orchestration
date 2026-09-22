@@ -10,6 +10,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.19.1] — 2026-09-22
+
+**A release runs only the tests nothing has proved.** A release session
+changes no code, yet it ran every expensive suite whole again, although
+the session before it had already run them against the same tree.
+
+### Changed
+
+- **Before the pack, a suite runs whole only where no passing whole run of
+  it stands against the tree being released** -- one a session ran
+  targeted since, or one the tree has moved under. The reading is the one
+  the close's freshness gate makes, and a suite so proved is not run: the
+  log names the run that proved it. A red whole run still stops the
+  release, with the same ways on.
+
 ## [3.19.0] — 2026-09-22
 
 **A release is a session of its own.** Every session used to carry a

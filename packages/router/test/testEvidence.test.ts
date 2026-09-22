@@ -18,7 +18,7 @@ import {
   recordRun,
   releaseTestsHold,
   runsWholeAtClose,
-  wholeRunsOwedBeforeRelease,
+  wholeRunStandsForRelease,
   type SuiteSpec,
   type TestRunRecord,
 } from "../src/testEvidence.ts";
@@ -261,17 +261,32 @@ describe("whether a suite runs whole at the end of a session", () => {
 });
 
 describe("the whole run before a release", () => {
-  it("is owed after a targeted run of record, and a red one holds the release naming the suite while a green one holds nothing", () => {
+  const facts = (records: TestRunRecord[], tree = "t1"): Parameters<typeof wholeRunStandsForRelease>[1] => ({
+    changed: [], current: "d1", records, currentTree: () => tree, driven: true,
+  });
+
+  it("runs none when a passing whole run stands against the tree, and names the run that proved it", () => {
+    const verdict = wholeRunStandsForRelease(UNIT, facts([record({ treeDigest: "t1", sessionNumber: 7, recordedAt: "then" })]));
+    assert.equal(verdict.passed, true);
+    assert.equal(verdict.reason, "proved by the whole run recorded then by session 7");
+  });
+
+  it("runs the suite whole when it ran targeted since its last whole run, or the tree moved under that run", () => {
+    const targeted = record({ stage: "final-targeted", command: "npm test -- test/a.test.ts", treeDigest: "t1", sessionNumber: 8 });
+    const since = wholeRunStandsForRelease(UNIT, facts([record({ treeDigest: "t1", sessionNumber: 7 }), targeted]));
+    assert.equal(since.passed, false);
+    assert.match(since.reason, /ran targeted after its last whole run/);
+    assert.equal(wholeRunStandsForRelease(UNIT, facts([record({ treeDigest: "t0" })])).passed, false);
+  });
+
+  it("holds the release on a red whole run after a targeted run of record, naming the suite, and on nothing else", () => {
     const targeted = [record({ stage: "final-targeted", command: "npm test -- test/a.test.ts", sessionNumber: 9 })];
-    assert.deepEqual(wholeRunsOwedBeforeRelease(targeted, 9), ["unit"]);
     assert.equal(releaseTestsHold(targeted, 9), null);
     const red = [...targeted, record({ outcome: "failed", sessionNumber: 9 })];
-    assert.deepEqual(wholeRunsOwedBeforeRelease(red, 9), []);
     assert.match(String(releaseTestsHold(red, 9)), /^held by its tests: the whole unit run before the release failed/);
     assert.equal(releaseTestsHold([...targeted, record({ sessionNumber: 9 })], 9), null);
-    // Another session's records hold nothing here, and a whole run of record owes nothing.
+    // Another session's records hold nothing here.
     assert.equal(releaseTestsHold(red, 10), null);
-    assert.deepEqual(wholeRunsOwedBeforeRelease([record({ sessionNumber: 9 })], 9), []);
   });
 });
 
@@ -308,14 +323,13 @@ describe("the run record", () => {
     const row = recordRun(root, UNIT, "none-selected", { stage: "preverify-targeted", durationSeconds: 1, policy: "none-selected", repoRoot: root });
     assert.equal(row.outcome, "none-selected");
     assert.equal(readRecords(root).length, 1);
-    // A targeted run of record that selected nothing is recorded with no command, and still owes a whole run before a release.
+    // A targeted run of record that selected nothing is recorded with no command.
     assert.throws(
       () => recordRun(root, UNIT, "none-selected", { stage: "final-targeted", durationSeconds: 1, command: "npm test", repoRoot: root }),
       /names no command, because nothing ran/,
     );
     const nothing = recordRun(root, UNIT, "none-selected", { stage: "final-targeted", durationSeconds: 1, sessionNumber: 4, repoRoot: root });
     assert.deepEqual([nothing.stage, nothing.outcome, nothing.command], ["final-targeted", "none-selected", ""]);
-    assert.deepEqual(wholeRunsOwedBeforeRelease(readRecords(root), 4), ["unit"]);
   });
 
   it("writes the duration as the float it is, and reads back leniently, dropping a stage or policy it does not recognise", () => {

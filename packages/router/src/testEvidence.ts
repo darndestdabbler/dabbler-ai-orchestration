@@ -162,17 +162,23 @@ function wholeRunsAfterTargeted(
 }
 
 /**
- * The suites a releasing session runs whole before it packages: every one
- * whose run of record this session was targeted and that has not run whole
- * since.
+ * Whether a whole run of `suite` already proves the tree a release would
+ * package: the close's own final-full judge -- green, over the covered
+ * surfaces as they are, against a tree that has not moved -- and no targeted
+ * run of record of it since. A passing verdict names the run that proved it.
  */
-export function wholeRunsOwedBeforeRelease(
-  records: readonly TestRunRecord[],
-  sessionNumber: number,
-): string[] {
-  return [...wholeRunsAfterTargeted(records, sessionNumber)]
-    .filter(([, outcome]) => outcome === null)
-    .map(([suite]) => suite);
+export function wholeRunStandsForRelease(suite: SuiteSpec, facts: FreshnessFacts): FreshnessVerdict {
+  const verdict = freshnessVerdict(suite, { ...facts, wholeAtClose: true });
+  if (!verdict.passed) return verdict;
+  const rows = facts.records.filter((row) => row.suite === suite.name);
+  let lastWhole = rows.length - 1;
+  while (lastWhole >= 0 && (rows[lastWhole] as TestRunRecord).stage !== STAGE_FINAL_FULL) lastWhole -= 1;
+  if (rows.slice(lastWhole + 1).some((row) => row.stage === STAGE_FINAL_TARGETED)) {
+    return { ...verdict, passed: false, reason: `${suite.name} ran targeted after its last whole run` };
+  }
+  const proof = rows[lastWhole] as TestRunRecord;
+  const by = proof.sessionNumber === null ? "" : ` by session ${proof.sessionNumber}`;
+  return { ...verdict, reason: `proved by the whole run recorded ${proof.recordedAt}${by}` };
 }
 
 /**
@@ -945,7 +951,7 @@ export function evaluateFreshness(
   sessionsDir: string,
   filesChanged: readonly string[] | null,
   suites: readonly SuiteSpec[],
-  options: { repoRoot?: string | null; driven?: boolean } = {},
+  options: { repoRoot?: string | null; driven?: boolean; beforeRelease?: boolean } = {},
 ): FreshnessVerdict[] {
   const driven = options.driven === true;
   const root = options.repoRoot ?? repoRootFor(sessionsDir);
@@ -986,15 +992,20 @@ export function evaluateFreshness(
     const current = surfaceDigest(root, suite.covers, { sessionsDir });
     // The tree digest is read only when a run of record exists to bind to;
     // the judge asks for it through the thunk.
+    const facts: FreshnessFacts = {
+      changed,
+      current,
+      records,
+      currentTree: () => treeDigest(root, { sessionsDir }),
+      driven,
+    };
     verdicts.push(
-      freshnessVerdict(suite, {
-        changed,
-        current,
-        records,
-        currentTree: () => treeDigest(root, { sessionsDir }),
-        driven,
-        wholeAtClose: runsWholeAtClose(suite, records, sessionSeconds, inFlight).whole,
-      }),
+      options.beforeRelease === true
+        ? wholeRunStandsForRelease(suite, facts)
+        : freshnessVerdict(suite, {
+            ...facts,
+            wholeAtClose: runsWholeAtClose(suite, records, sessionSeconds, inFlight).whole,
+          }),
     );
   }
   return verdicts;

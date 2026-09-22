@@ -4009,14 +4009,23 @@ class Driver {
   }
 
   /**
-   * Every expensive suite, whole, before anything is packaged, once per
-   * release session: a suite with a whole run on this session's record is
-   * not run again. A red one stops the release. CI's full run after the push
-   * is not this; it is unchanged.
+   * Every expensive suite, whole, before anything is packaged -- except one
+   * a passing whole run already proves against the tree being released,
+   * which is not run again. A red one stops the release. CI's full run after
+   * the push is not this; it is unchanged.
    */
   private async wholeRunsBeforeRelease(version: string): Promise<void> {
     for (const suite of this.expensiveSuites()) {
       const name = suite.name;
+      const standing = evaluateFreshness(this.sessionsDir, null, [suite], {
+        repoRoot: this.repoRoot,
+        driven: true,
+        beforeRelease: true,
+      }).find((verdict) => verdict.suite === name);
+      if (standing?.passed) {
+        this.log("whole-run-standing", { suite: name, reason: standing.reason });
+        continue;
+      }
       const whole = () =>
         readRecords(this.repoRoot)
           .filter((row) => row.sessionNumber === this.sessionNumber && row.suite === name && row.stage === STAGE_FINAL_FULL)

@@ -14526,6 +14526,11 @@ One test per behaviour, in the file named after what changed.
 
 ### Session 231 of 231: The Mechanic
 
+> **CANCELLED 2026-09-22 after it landed.** The operator shelved the
+> Mechanic to fix releases first. Its code stays on branch `mechanic` and
+> was reverted out of `master` (`e9caac09`); reverting that commit restores
+> it.
+
 Scope: `packages/router` -- `cli/consult.ts` and `session.ts` (the
 Mechanic's briefing), `drive.ts` (an intervention after the land rewinds
 to verify; the close lists interventions), `gates.ts`
@@ -14634,25 +14639,112 @@ does today.
 ships -- built and `--force`-installed from this checkout. Session 232
 releases.
 
-### Session 232 of 232: What the walk found, and the release
+### Session 232 of 233: A release is a session of its own
 
-Scope: whatever `docs/uat/uat-mechanic.md` recorded; the changelog
+Scope: `packages/router` -- `session.ts` (the heading marker,
+`personIsPresent`), `driver.ts` and `drive.ts` (what a session declares and
+which phases it runs), `writers.ts` and `gates.ts` (releasability and the
+close gate), `settings.ts`, `config.ts`, `cli/configure.ts`,
+`contracts/router.ts`, `index.ts`, the work-plan schema and its generated
+type, `bootstrap/templates.ts`, their tests -- the extension's Solution
+Explorer release item, the setting's contribution, Start Session on a
+release session, their tests -- this repository's `.vscode/settings.json`,
+the docs that describe releasing, the changelog, `version.json` and the
+stamped manifests
 
-**Why.** Session 231 is held so the operator can walk both scenarios on a
-local build before anything reaches the Marketplace. What the walk finds
-is this session's work; a clean walk makes it a release with nothing
-else.
+**Why.** The operator, 2026-09-22: releasability is blocking simple
+hello-world projects. Every ordinary session carries a release decision --
+`release` or `hold_release` in its plan, read through `dabbler.release` --
+and a session that is releasable cannot close without a published
+packaging run. The work is done and verified by then, and the only ways
+past are a person's verbs, which a VS Code terminal refuses on Windows
+because `personIsPresent` also demands an interactive stdin, and the
+Electron-hosted shim may not report one. A consumer repository's plan
+named `release` with no working feed behind it and had no way out; a
+sibling repository commented its packaging block out of `dabbler.yaml` to
+get going.
 
-**Step 1 -- the walk's findings.** Each finding recorded on the walk page
-is fixed here or is written down as owed with the reason -- by the rule
-that a finding gets a session only if it stops a session or misleads the
-operator.
+The operator's ruling: **ordinary sessions never publish. A release is a
+session of its own** -- planned, moved, renumbered or cancelled like any
+other -- that contains no AI work, no tests of its own and no review. It is
+the framework packing and pushing what is already on the trunk. Packaging
+setup is likewise a session of its own: the `packaging:` block is not
+written into `dabbler.yaml` until the session whose whole job is packaging,
+early with project files only or later. So a packaging problem is confined
+to the packaging or release session and never strands a feature session.
+Sol and Gemini were consulted on the earlier shape (packaging proved in
+session 3, preflight at every releasable session); both confirmed that a
+feed cannot be proven to accept a credential without pushing, which this
+design makes moot.
 
-**Step 2 -- the changelog.** The 3.19.0 section says what the Mechanic is,
-in the words the managed body uses.
+**Step 1 -- a person at a VS Code terminal is a person.** `personIsPresent`
+drops the interactive-stdin criterion: a click is a person, an engine
+marker is an engine, and anything else is a person. The engine markers are
+unchanged, and so is the refusal an engine meets.
 
-One test per behaviour, in the file named after what changed.
+**Step 2 -- a release session is declared in its heading.** A heading may
+carry `(release: <version>)` beside the optional slug marker, parsed where
+`splitSlugMarker` is, e.g. `### Session 233 of 233: Release 3.19.0
+(release: 3.19.0)`. A session is releasable if and only if it is a release
+session: its declaration's `releasable` is that fact, and an ordinary
+session's declaration carries no release and no hold. `dabbler.release`
+and its two modes, `releaseOfPlan`, `ON_REQUEST_HOLD`, the plan ask's
+release member and `dabbler configure --release` are deleted. The
+work-plan schema's `release` and `hold_release` are read and ignored in
+an older plan and refused in a new one, and the refusal says a release is
+a session of its own. `dabbler session hold-release` stays as a person's
+way to stop a release session's publish.
 
-**Non-goals.** Nothing beyond the walk's findings.
+**Step 3 -- a release session is the framework's alone.** `session start`
+on a release session registers it, opens no AI, and drives straight to
+publish: it refuses, naming the cause and its forward exit, when no
+`packaging:` block is declared (plan a packaging session first); when a
+session numbered after the last published packaging run on the record
+closed with a verdict other than VERIFIED, excluding cancelled ones (name
+it); or when the version is kept in files (`version.json`, a tag release)
+and they do not say the release's version (name the file; an ordinary
+session bumps it). Otherwise it runs the whole suites before the release
+as today, passes the version as the pack's `{version}`, pushes, tags,
+records the packaging run and closes. A failed pack or push is a stop
+whose ways on are to cancel the release session and plan a fix session and
+a new release session after it; a version is spent only by a push that
+succeeded. Ordinary sessions skip the publish phase entirely, and the
+close gate `published_when_releasable` applies only to release sessions.
+In the extension, Start Session on a release session opens no engine CLI
+and runs it in the Dabbler terminal alone.
 
-**Release.** `release`: 231's Mechanic and 232's fixes ship as 3.19.0.
+**Step 4 -- the AI plans releases and packaging, and writes neither
+early.** `DECOMPOSITION_PROMPT` and `BOOTSTRAP_PLAN` stop writing
+`packaging.pack` in the skeleton session. The managed body says: never
+add a `packaging:` block to `dabbler.yaml` until the next session is the
+packaging session, which does packaging and nothing else; a release is a
+session of its own, headed `(release: <version>)`, and the AI proposes its
+version when it writes or amends the plan -- patch, minor or major by what
+the released sessions changed -- and the person approves it with the plan.
+The plan ask's sentence about a releasing session bumping the version
+goes.
+
+**Step 5 -- the extension and this repository.** The Solution Explorer's
+Ship by Default / Release on Request item and the `dabbler.release`
+contribution go. This repository's `.vscode/settings.json` drops
+`dabbler.release`. README, `docs/driving-a-session.md`,
+`docs/quick-start.md`, `docs/schema-reference.md` and the extension README
+describe releasing as a session of its own. `version.json` goes to 3.19.0
+(a minor: a new kind of session), stamped with `npm run stamp:version`,
+and both changelogs get the 3.19.0 section.
+
+One test per behaviour, in the file named after what changed; tests of
+deleted behaviour go with it.
+
+**Non-goals.** No credential or feed probe. No preflight at session start
+beyond what step 3 names. No version stamping of consumer manifests: a
+consumer's version reaches the build through `{version}`. No change to
+which verbs are a person's. No Mechanic.
+
+**Hold.** `hold_release`: this repository's releases now happen in a
+release session, and session 233 is the first one -- it ships 3.19.0.
+
+### Session 233 of 233: Release 3.19.0 (release: 3.19.0)
+
+The first release session: the framework publishes session 232's work as
+3.19.0 and nothing else.

@@ -210,6 +210,16 @@ suite("ActionRegistry: package.json menu registry", () => {
     assert.ok(menuEntries.some((e) => e.command === id && (e.when ?? "").includes(token)));
   });
 
+  test("Open a Mechanic is offered only on the session in flight and its repository", () => {
+    const id = "dabbler.openMechanic";
+    assert.ok(!applicableRepositoryActions(finished).some((a) => a.id === id));
+    assert.ok(applicableRepositoryActions(inFlight).some((a) => a.id === id));
+    const offered = inFlight.sessions.filter((s) => applicableSessionActions(inFlight, s).some((a) => a.id === id));
+    assert.deepStrictEqual(offered.map((s) => s.number), [inFlight.currentSession]);
+    const token = tokenMatcher(actionToken({ id, label: "", group: 0, when: () => true }));
+    assert.ok(menuEntries.some((e) => e.command === id && (e.when ?? "").includes(token)));
+  });
+
   test("the Solution Explorer says what it is for, and offers a way in", () => {
     // csv-model's fourth feedback item: the view's purpose was unclear, and
     // an empty tree said nothing at all. What answers it is a welcome the

@@ -258,6 +258,9 @@ describe("published_when_releasable", () => {
     const row = judgePackagingRecord([]);
     assert.equal(row[0], false);
     assert.match(row[1], /no packaging run is on its record/);
+    // The way on is named: a Mechanic, and the hold the person types.
+    assert.match(row[1], /dabbler consult --mechanic/);
+    assert.match(row[1], /dabbler session hold-release/);
   });
 
   it("refuses a record of trying that shipped nothing", () => {

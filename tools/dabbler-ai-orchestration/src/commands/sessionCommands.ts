@@ -531,8 +531,14 @@ export const CONSULT_PURPOSE = "Consult with AI";
  * What an AI opened to consult is asked first: read the brief, then the
  * operator. It names no waiter, because a consult drives nothing.
  */
-export function consultSentence(session?: number): string {
+export function consultSentence(session?: number, mechanic = false): string {
   const dir = SESSIONS_REL.replace(/\\/g, "/");
+  if (mechanic) {
+    return (
+      `Run \`dabbler consult --mechanic --sessions-dir ${dir}\` and read what it prints before anything else. ` +
+      "Then tell me what is wrong and what you recommend, and change nothing until I agree."
+    );
+  }
   const about = session === undefined ? "" : ` --session ${session}`;
   return (
     `Run \`dabbler consult --sessions-dir ${dir}${about}\` and read what it prints before anything else. ` +
@@ -540,21 +546,37 @@ export function consultSentence(session?: number): string {
   );
 }
 
+/** How the engine and model boxes are titled for a Mechanic. */
+export const MECHANIC_PURPOSE = "Open a Mechanic";
+
 /** The CLI Consult with AI opens: Start's construction, the consult sentence, and a name of its own. */
 export function consultTerminalFor(
   repository: SessionsRepository,
   choice: EngineChoice,
   model: string,
   session?: number,
+  mechanic = false,
 ): EngineTerminal | string {
   const about = session === undefined ? "" : ` (session ${session})`;
   return engineTerminalFor(
     repository,
     choice,
     model,
-    consultSentence(session),
-    `Consult — ${choice.label} — ${repository.label}${about}`,
+    consultSentence(session, mechanic),
+    `${mechanic ? "Mechanic" : "Consult"} — ${choice.label} — ${repository.label}${about}`,
   );
+}
+
+/**
+ * What this checkout chose for the Primary Reviewer's model, or "": the
+ * Mechanic's default, because it is a different context from the author's
+ * and chosen to be at least as capable. Read as the authoring model is.
+ */
+export function chosenReviewerModel(repoRoot: string): string {
+  const configuration = solutionConfiguration(repoRoot) as {
+    primaryReviewer?: { chosen?: { model?: string } | null };
+  } | null;
+  return configuration?.primaryReviewer?.chosen?.model ?? "";
 }
 
 export interface SessionRunUi {
@@ -710,8 +732,8 @@ export function defaultSessionRunUi(
           {
             title: `${purpose} — which engine runs it?`,
             placeHolder:
-              purpose === CONSULT_PURPOSE
-                ? "This engine reads the consult brief and answers you; nothing is driven."
+              purpose === CONSULT_PURPOSE || purpose === MECHANIC_PURPOSE
+                ? "This engine reads the brief and answers you; nothing is driven."
                 : "The framework drives; this engine answers each step.",
             ignoreFocusOut: true,
           },
@@ -734,7 +756,7 @@ export function defaultSessionRunUi(
       return vscode.window.showInputBox({
         title,
         prompt: choice.modelRequired
-          ? purpose === CONSULT_PURPOSE
+          ? purpose === CONSULT_PURPOSE || purpose === MECHANIC_PURPOSE
             ? "Required: the seat's model. It is passed to the CLI; nothing is recorded."
             : "Required: the seat's model. It is passed to the CLI and recorded on the ledger."
           : "Optional: leave empty for the engine's default. It is passed to the CLI as `--model`.",
@@ -984,16 +1006,22 @@ export async function runStartSession(
  * The same engine and model questions as Start, and the same two refusals,
  * so a model Start would refuse is refused here too. Nothing is registered
  * and no loop is started: a consult drives no session.
+ *
+ * Open a Mechanic is the same launcher briefed with `--mechanic`, its model
+ * box offering the Primary Reviewer's model: a fresh instance for a stuck
+ * session, never the author's live one.
  */
 export async function runConsultWithAi(
   repository: SessionsRepository,
   ui: SessionRunUi,
   session?: number,
+  mechanic = false,
 ): Promise<boolean> {
-  const purpose = CONSULT_PURPOSE;
+  const purpose = mechanic ? MECHANIC_PURPOSE : CONSULT_PURPOSE;
   const picked = await ui.pickEngine(purpose);
   if (!picked) return false;
-  const model = await ui.askModel(repository.root, picked, chosenAuthoringModel(repository.root), purpose);
+  const offered = mechanic ? chosenReviewerModel(repository.root) : chosenAuthoringModel(repository.root);
+  const model = await ui.askModel(repository.root, picked, offered, purpose);
   if (model === undefined) return false;
   const impossible =
     engineModelRefusal(repository, picked, model) ??
@@ -1002,7 +1030,7 @@ export async function runConsultWithAi(
     ui.showErrorMessage(impossible);
     return false;
   }
-  const terminal = consultTerminalFor(repository, picked, model, session);
+  const terminal = consultTerminalFor(repository, picked, model, session, mechanic);
   if (typeof terminal === "string") {
     ui.showErrorMessage(terminal);
     return false;
@@ -1071,6 +1099,11 @@ export function registerSessionCommands(
       const repository = repositoryOf(arg);
       if (!repository) return;
       await runConsultWithAi(repository, ui, asSessionNode(arg)?.session.number);
+    }),
+    vscode.commands.registerCommand("dabbler.openMechanic", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      await runConsultWithAi(repository, ui, asSessionNode(arg)?.session.number, true);
     }),
     vscode.commands.registerCommand(
       "dabblerSessionSets.closeSession",

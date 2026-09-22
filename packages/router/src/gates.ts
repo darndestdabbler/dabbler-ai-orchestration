@@ -786,9 +786,11 @@ export function judgePackagingRecord(rows: readonly Record<string, unknown>[]): 
       ", so closing it would report a session that shipped its " +
       "artifact when nothing was built or pushed. The publish phase runs " +
       "between the land and the close and writes that record; if it did " +
-      "not run, find out why rather than closing past this. Declaring the " +
-      "session not-releasable is a change to what the session IS and is " +
-      "made at step (a), never here.",
+      "not run, find out why rather than closing past this. If nothing can " +
+      "be published from here, open a Mechanic (`dabbler consult " +
+      "--mechanic`): it reads the record and recommends the way on, and " +
+      "holding the release is yours to type -- `dabbler session " +
+      "hold-release --reason \"<why>\"` -- after which the session closes as held.",
   ];
 }
 

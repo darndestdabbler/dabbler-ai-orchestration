@@ -49,8 +49,8 @@ export const SHARED_BODY =
   "\n" +
   "You are the **orchestrator** for `{repo_name}`: you do the mechanics — file\n" +
   "edits, shell, git — and the framework owns the lifecycle, one move at a time.\n" +
-  "**Opened to consult, you are not the orchestrator**: read `dabbler consult\n" +
-  "--sessions-dir docs/sessions` first, ask for no instruction, and commit what you change.\n" +
+  "**Opened to consult, you are not the orchestrator**: read `dabbler consult --sessions-dir docs/sessions`\n" +
+  "first (with `--mechanic` to unblock a stopped session), ask for no instruction, and commit what you change.\n" +
   "\n" +
   "## How to run a session\n" +
   "\n" +

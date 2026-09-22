@@ -829,6 +829,10 @@ describe("a stop, as a person reads it", () => {
         // Ending it is always on the table, and never the recommendation.
         assert.match(commands, /session cancel/, label);
         assert.doesNotMatch(words.choices[0]!.command, /session cancel/, label);
+        // Every stop names the Mechanic, and ahead of ending it.
+        const mechanicAt = words.choices.findIndex((choice) => choice.command === "dabbler consult --mechanic");
+        const cancelAt = words.choices.findIndex((choice) => /session cancel/.test(choice.command));
+        assert.ok(mechanicAt !== -1 && mechanicAt < cancelAt, label);
         assert.doesNotMatch(words.text, /working on|is working|fixing it|STOPPED/, label);
         assert.doesNotMatch(words.text, /deadlock/i, label);
         for (const part of [words.headline, words.happened, words.ended, words.next]) {

@@ -5,8 +5,9 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { consultBrief } from "../src/cli/consult.ts";
+import { MECHANIC_INSTRUCTIONS, consultBrief, mechanicBrief } from "../src/cli/consult.ts";
 import { writeRun } from "../src/driver.ts";
+import { appendPackaging } from "../src/ledger.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 
@@ -77,5 +78,32 @@ describe("consultBrief", () => {
   it("says every file a consult changes is committed and pushed before it ends", () => {
     const { sessionsDir } = repository();
     assert.match(consultBrief(sessionsDir), /committed and pushed before the consultation ends, never left in the tree/);
+  });
+});
+
+describe("mechanicBrief", () => {
+  it("quotes the stop, names the rules and the person's verbs, and carries the instructions verbatim", () => {
+    const { repo, sessionsDir } = repository();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      ...RUN,
+      phase: "close",
+      stop: { kind: "close", reason: "no packaging run is on its record", at: "2026-08-31T12:30:00-04:00" },
+    });
+    // No packaging row yet is itself the evidence, and it is said.
+    assert.match(mechanicBrief(sessionsDir), /Latest packaging run: none recorded\./);
+    appendPackaging(repo, 1, {
+      recorded_at: "2026-08-31T12:20:00-04:00", session_number: 1, releasable: true,
+      outcome: "refused", refusal: "no credential for the feed",
+    });
+    const brief = mechanicBrief(sessionsDir);
+    assert.match(brief, /Latest packaging run: .*"outcome":"refused".*no credential for the feed/);
+    assert.match(brief, /stopped in phase 'close'.*kind 'close'/);
+    assert.match(brief, /no packaging run is on its record/);
+    assert.match(brief, /Never write under \.dabbler\/runs\//);
+    assert.match(brief, /Never weaken a gate, a verdict or a test/);
+    assert.match(brief, /dabbler session hold-release/);
+    assert.match(brief, /dabbler verify reopen/);
+    assert.ok(brief.includes(MECHANIC_INSTRUCTIONS));
   });
 });

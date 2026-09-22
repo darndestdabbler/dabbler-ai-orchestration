@@ -4588,9 +4588,9 @@
     {
       "number": 231,
       "title": "The Mechanic",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-22T07:02:04.093000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-22T07:32:35.977000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -14,6 +14,48 @@ kept by hand, and it is not a substitute for anything under `.dabbler/runs/`.
 
 ---
 
+## 2026-09-22 — No rule stands above finishing; plans change with approval; a proposal is the last resort
+
+**In force.** Given after a consumer repository's AI could not get past
+`published_when_releasable` -- the refusal said the declaration is *"made at
+step (a), never here"* and named no way out -- and a sibling repository
+commented the packaging block out of `dabbler.yaml` to close; and after the
+operator, walking a JPA sample, wanted to switch SQLite for H2 mid-plan and
+found the plan could not be changed. Consult round 21
+(`docs/design/consults/round21-*.md`).
+
+1. **No over-engineering.** The staff who will use this are ordinary
+   developers and will reject ceremony. One verb, one dialog, reuse what
+   exists.
+2. **Every impasse has a way out. No rule is so sacred that it stands above
+   the developer's need to get a solution over the finish line.** A human
+   override with a reason is always available, including past a gate or a
+   verdict. What survives is only honesty of the record: an override is
+   recorded as an override -- closed as held, reason given -- never as the
+   thing that did not happen, and is scoped to exactly what was approved.
+3. **Plans are modifiable at any time in the life of a solution, with the
+   operator's approval.** Agile, not waterfall. The immutable-declaration
+   doctrine is subordinate to this.
+4. **A proposal is the last resort.** The AI works within the rules first
+   and asks for an exception only when it has exhausted them.
+5. **The reviewer before the human.** A proposal goes to the Primary
+   Reviewer first, on the ordinary verification round: endorse it, or
+   return one concrete finding the author disposes of as normal work. An
+   endorsed engineering change is applied and the operator informed; an
+   outcome change -- nothing ships, no verdict -- still reaches the
+   operator, with the reviewer's verdict attached.
+6. **Proposals are counted and shown, never scored.** Both advisors, and
+   the framework, hold that a penalty for asking breeds concealment.
+7. **The walk before the release.** Session 229 is held; the operator walks
+   a local VSIX on the Java sample with `claude-sonnet-5` as the Authoring
+   AI -- one plan that cannot be built as written (SQLite through
+   `hibernate-core` only), one packaging block with no feed -- and 230
+   releases.
+
+Planned as sessions 229 and 230.
+
+---
+
 ## 2026-09-14 — Zero deadlocks first; then the module machinery goes, and the solution is planned by tier
 
 **In force.** Given after the operator's staff watched the CSV tutorial

@@ -14393,3 +14393,124 @@ click. No change to what an unset row shows. No refusal of `--mine`.
 
 **Hold.** `hold_release`: it rides in the 3.18.0 the operator is walking;
 nothing is tagged until they say so.
+
+### Session 229 of 229: A proposal is the way past every wall
+
+Scope: `packages/router` -- `session.ts` (`propose`, `plan amend`,
+`holdRelease`), `verify/rounds.ts` and `verify/prompts.ts` (the reviewer's
+one-question round), `gates.ts` (`judgePackagingRecord`'s words),
+`driver.ts` (the stop menus), `drive.ts` (the close summary), the
+`dispositions` schema and its generated type, `bootstrap/templates.ts` (the
+managed body), their tests -- the extension's `router/dabblerTerminal.ts`
+and `commands/sessionCommands.ts` (the modal), their tests -- a walk page
+and the changelog
+
+**Why.** The operator, 2026-09-22, from a consumer repository's terminal: a
+session whose plan named `release` reached the close with no publish on its
+record, the close said *"declaring the session not-releasable is made at
+step (a), never here"*, and the Authoring AI -- with no instruction it
+could act on -- tried flags that do not exist and gave up; in a sibling
+repository the workaround was to comment the packaging block out of
+`dabbler.yaml`. A week earlier the operator, walking a JPA sample, learned
+mid-plan that SQLite is poorly served by JPA, wanted H2, and found the plan
+could not be changed. Both are the same defect: a wall with no door. The
+operator's ruling, recorded in full in `docs/operator-decisions.md`: no
+over-engineering; every impasse has a way out and no rule stands above the
+developer finishing the work; a plan is modifiable at any time with the
+operator's approval; and a proposal is a LAST RESORT the AI reaches for
+only after working within the rules. Sol and Gemini were consulted twice
+and agree on the shape below; where they split (whether two AIs may change
+a session's promised OUTCOME with the operator only informed), the
+framework takes Sol's side: reviewer triage, never AI authorization.
+
+**Step 1 -- one verb, and it is concrete.** `dabbler session propose
+--reason "<why>" <what>`, callable by the engine or a person, on or off the
+loop. `<what>` is one of the changes the framework can APPLY, and nothing
+else: a plan amendment (a step's text, a dropped non-goal, the round cap --
+what `plan amend` already takes, now allowed against an accepted step too)
+or a hold of the release (`--hold-release`, the words `holdRelease` writes
+today). Free text alone is refused with the shapes it accepts. A proposal
+is recorded on the run and the activity log with who proposed it and why;
+nothing is applied yet. The close gate's words and the `close` stop's menu
+name this verb instead of "never here". `holdRelease` stays a person's
+verb; the engine's way to it is a proposal.
+
+**Step 2 -- the reviewer rules first, on the ordinary round.** A proposal
+is a labelled finding the framework hands the Primary Reviewer as a
+one-question round: *endorse it, or return ONE concrete finding instead.*
+A returned finding is disposed of by the author as any finding is -- the
+existing round, the existing tests, the existing remediation; no special
+agreement step, no special revert. An endorsed ENGINEERING change (a plan
+amendment) is applied and recorded as endorsed by the reviewer; the
+operator is informed at the close and asked nothing. An endorsed OUTCOME
+change (a hold) is not applied: it goes to the person, with the reviewer's
+verdict attached. Non-endorsed, either kind: to the person. One pass; a
+second proposal for the same thing is refused and names the first.
+
+**Step 3 -- the person decides in one screen.** A proposal that reaches
+the person is a stop of kind `proposal`, and the stop menu already carries
+typed moves: Approve (the command that applies it), Reject, Cancel the
+session. In VS Code the extension opens a MODAL for a stop of this kind
+and for no other -- the AI's reason, the reviewer's verdict, the exact
+change, three buttons -- and the terminal renders the same stop as it
+renders every stop. Approval applies exactly what was proposed and records
+approver, time and result; a plan amendment that touches a verified step
+re-opens that step and what depends on it for review, and the screen says
+which steps before the click. Only the affected session waits.
+
+**Step 4 -- counted and shown, never scored.** The close summary and
+`dabbler metrics` carry "proposals: N (endorsed E, approved A, rejected
+R)". The managed body tells the engine three things: work within the rules
+first; a proposal is the last resort, and the way past any refusal it
+cannot act on; the count is on the record and visible to the operator.
+Nothing lowers a model's standing for asking.
+
+**Step 5 -- the walk page.** `docs/uat/uat-proposals.md`, copy-pasteable,
+on the Java sample with Claude Code and `claude-sonnet-5` as the Authoring
+AI. Two scenarios, one branch each. (1) The plan's section says: persist a
+`Person` to SQLite through Hibernate JPA; dependencies `hibernate-core`
+only, no community or third-party dialects -- a plan that cannot be built
+as written, because Hibernate 6 ships the SQLite dialect outside
+`hibernate-core`. Expected: the author proposes H2, the reviewer endorses,
+the plan is amended, the session runs to the close and the close summary
+names the proposal; the operator clicks nothing. (2) `dabbler.yaml` carries
+a `packaging:` block with no feed behind it and the plan names `release`.
+Expected: the author proposes a hold, the reviewer returns no alternative,
+the modal opens with the reviewer's verdict, Approve closes the session as
+held by the operator. Each expected line is a check.
+
+One test per behaviour, in the file named after what changed.
+
+**Non-goals.** No new state on the run: a proposal awaiting the person is
+a stop. No side panel, badge or toast: the modal is rare by construction
+and the terminal already shows every stop. No score, no penalty, no
+per-model ledger. No reviewer that writes or runs anything. No second
+counter, no negotiation. No proposal that names a gate to skip: the close
+gates stay; what a person may approve is a hold, recorded as a hold.
+
+**Hold.** `hold_release`: the operator walks the local VSIX before this
+ships -- built and `--force`-installed from this checkout. Session 230
+releases.
+
+### Session 230 of 230: What the walk found, and the release
+
+Scope: whatever `docs/uat/uat-proposals.md` recorded; the changelog
+
+**Why.** Session 229 is held so the operator can walk both scenarios on a
+local build before anything reaches the Marketplace. What the walk finds
+is this session's work; a clean walk makes it a release with nothing
+else.
+
+**Step 1 -- the walk's findings.** Each finding recorded on the walk page
+is fixed here or is written down as owed with the reason -- by the rule
+that a finding gets a session only if it stops a session or misleads the
+operator.
+
+**Step 2 -- the changelog.** The 3.19.0 section says what a proposal is,
+in the words the managed body uses.
+
+One test per behaviour, in the file named after what changed.
+
+**Non-goals.** Nothing beyond the walk's findings.
+
+**Release.** `release`: 229's mechanism and 230's fixes ship as 3.19.0.

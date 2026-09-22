@@ -4646,9 +4646,9 @@
     {
       "number": 234,
       "title": "A release runs only the tests nothing has proved",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-22T11:09:43.493000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-22T11:18:48.668000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -14396,6 +14396,13 @@ nothing is tagged until they say so.
 
 ### Session 229 of 229: A proposal is the way past every wall
 
+> **CANCELLED 2026-09-22 -- superseded by session 231, the Mechanic.** Started
+> and three steps accepted before the operator ruled that the way past a wall
+> is a fresh-context instance working in prose, measured against what a
+> developer does when stuck, and not a verb with a closed menu
+> (`docs/operator-decisions.md`, 2026-09-22). The accepted work is kept on
+> `experiment/proposals` for reference and is not to be merged.
+
 Scope: `packages/router` -- `session.ts` (`propose`, `plan amend`,
 `holdRelease`), `verify/rounds.ts` and `verify/prompts.ts` (the reviewer's
 one-question round), `gates.ts` (`judgePackagingRecord`'s words),
@@ -14494,6 +14501,8 @@ releases.
 
 ### Session 230 of 230: What the walk found, and the release
 
+> **CANCELLED 2026-09-22 with 229.** Session 232 is the release.
+
 Scope: whatever `docs/uat/uat-proposals.md` recorded; the changelog
 
 **Why.** Session 229 is held so the operator can walk both scenarios on a
@@ -14514,3 +14523,136 @@ One test per behaviour, in the file named after what changed.
 **Non-goals.** Nothing beyond the walk's findings.
 
 **Release.** `release`: 229's mechanism and 230's fixes ship as 3.19.0.
+
+### Session 231 of 231: The Mechanic
+
+Scope: `packages/router` -- `cli/consult.ts` and `session.ts` (the
+Mechanic's briefing), `drive.ts` (an intervention after the land rewinds
+to verify; the close lists interventions), `gates.ts`
+(`judgePackagingRecord`'s words), `driver.ts` (every stop's ways on),
+`bootstrap/templates.ts` (the managed body), their tests -- the
+extension's `commands/sessionCommands.ts` (*Open a Mechanic*), its tests
+-- `docs/sessions/mechanic-log.md`, a walk page and the changelog
+
+**Why.** The operator, 2026-09-22, from a consumer repository's terminal: a
+session whose plan named `release` reached the close with no publish on its
+record, the close said *"declaring the session not-releasable is made at
+step (a), never here"*, and the Authoring AI -- with no instruction it
+could act on -- tried flags that do not exist and gave up; in a sibling
+repository the workaround was to comment the packaging block out of
+`dabbler.yaml`. A week earlier the operator, walking a JPA sample, learned
+mid-plan that SQLite is poorly served by JPA, wanted H2, and found the plan
+could not be changed. Both are the same defect: a wall with no door.
+
+The operator's ruling is in `docs/operator-decisions.md` (2026-09-22) and
+the two consults that led to it are round 21. What was first planned as 229
+-- a `propose` verb, a closed menu, the reviewer ruling on a round, a modal
+-- is superseded by the operator's own measure: **compare every option
+against what a developer does when stuck, which is to open another chat
+instance and tell it to fix the repository so things can get going again.**
+The Mechanic is that move made first-class, and almost all of it is
+instruction rather than machinery. Its model is any with a fresh or
+different context that is at least as capable as the author's -- the one
+criterion the operator has proved over and over -- and never the author's
+live session. It works in prose, because prose is the check-and-balance
+against a rule that has become an unreasonable obstacle; it is bounded by
+the operator's agreement before it acts and by its briefing. The two risks
+the operator named are each answered by an instruction: it might break the
+framework's own infrastructure, so it reads the rules first; it might
+change the author's work beyond what was needed, so it makes the **minimum
+viable unblocking fix** and records it as durable documentation. Lineage:
+round 17 rejected an AI that operated LIKE the framework; round 18 shaped
+session 217, a governor choosing from a closed menu, withdrawn before the
+soak; this is the third form, and the first that matches what developers
+do anyway.
+
+**Step 1 -- the briefing.** `dabbler consult --mechanic --sessions-dir
+<dir>` prints, for the session in flight, one screen a fresh instance can
+act on: the stop as the framework wrote it (kind, class, the rule that
+refused in its own words) and the record rows it rests on; where the
+author's transcript is; the rules that keep the session restartable --
+never a write under `.dabbler/runs/`, `sessions.json` or any record, never
+a gate, a verdict or a test weakened to pass; the person's verbs, which the
+Mechanic recommends and the person types (`hold-release`, `cancel`); the
+verbs it may run once the person agrees, `verify reopen`, `session plan
+amend` and the ordinary git and file work among them; and its two
+instructions verbatim: *diagnose, recommend, and act only when the person
+agrees; make the minimum viable unblocking fix -- the smallest change that
+lets the regular framework processes continue and keeps the author's work
+successful as is, at least in large part; then record what you did and why
+in `docs/sessions/mechanic-log.md`.* The managed body's consult paragraph
+names the form. Without `--mechanic`, `consult` is what it is today.
+
+**Step 2 -- the log.** `docs/sessions/mechanic-log.md`, tracked, one entry
+per intervention: the session, the stop, the diagnosis, the files, why this
+was the minimum, and what a deterministic fix would be. Tracked means the
+Primary Reviewer reads it in the session's diff beside the fix and judges
+"minimum" against what changed -- that is the whole MVUF check, and it is
+already built. The list is the defect report that earns the framework a
+fix later, as 217 intended of its `supervision.jsonl`.
+
+**Step 3 -- the framework accepts the fix.** A session stopped AT A STEP
+needs nothing: the Mechanic edits, the author answers, and the step's
+files are taken from what changed. A session stopped AFTER THE LAND --
+verify, publish, close, the consumer repository's case -- has a committed
+tree that a fix dirties and no phase open to take it: the next `session
+next` reads the moved tree as an intervention, records it with the log's
+entry as its reason, and rewinds the run to verify (`rewindOrStop`, one
+more reason to call it) so the fix is reviewed and landed like any change.
+The close lists every intervention. The close gate's words and every
+stop's ways on name *Open a Mechanic* -- `dabbler consult --mechanic` --
+where they named nothing or "never here".
+
+**Step 4 -- the button, and the walk.** *Open a Mechanic* in the
+extension: the existing consult launcher, briefed with `--mechanic`, on
+the reviewer's configured model by default and any other from the
+*Different Models...* list, never the author's live session. Walk page
+`docs/uat/uat-mechanic.md`, copy-pasteable, on the Java sample with Claude
+Code and `claude-sonnet-5` authoring, one litmus each: (1) a plan that
+cannot be built as written -- persist a `Person` to SQLite through
+Hibernate JPA with `hibernate-core` only, no community dialect -- the
+author stops, the Mechanic recommends H2, the person agrees, the Mechanic
+amends the plan, the session runs to the close and the close names the
+intervention; (2) a `packaging:` block with no feed behind it and a plan
+naming `release` -- the Mechanic recommends the hold, the person types
+`hold-release`, the session closes as held; (3) a cap terminal -- the
+Mechanic reads the rounds and recommends `verify reopen --rounds 2`, the
+person agrees, the Mechanic runs it, the session continues from the stop.
+Each expected line is a check.
+
+One test per behaviour, in the file named after what changed.
+
+**Non-goals.** No new verb but the flag on `consult`. No closed menu, no
+schema, no proposal record, no modal, no reviewer round for a proposal, no
+score. No Mechanic that is the Primary Reviewer of the same session: its
+fix is reviewed by the Primary as part of the diff, which is the safety
+net. No change to which verbs are a person's. No unattended Mechanic: it
+acts on a person's agreement, so an unattended run stops and waits as it
+does today.
+
+**Hold.** `hold_release`: the operator walks the local VSIX before this
+ships -- built and `--force`-installed from this checkout. Session 232
+releases.
+
+### Session 232 of 232: What the walk found, and the release
+
+Scope: whatever `docs/uat/uat-mechanic.md` recorded; the changelog
+
+**Why.** Session 231 is held so the operator can walk both scenarios on a
+local build before anything reaches the Marketplace. What the walk finds
+is this session's work; a clean walk makes it a release with nothing
+else.
+
+**Step 1 -- the walk's findings.** Each finding recorded on the walk page
+is fixed here or is written down as owed with the reason -- by the rule
+that a finding gets a session only if it stops a session or misleads the
+operator.
+
+**Step 2 -- the changelog.** The 3.19.0 section says what the Mechanic is,
+in the words the managed body uses.
+
+One test per behaviour, in the file named after what changed.
+
+**Non-goals.** Nothing beyond the walk's findings.
+
+**Release.** `release`: 231's Mechanic and 232's fixes ship as 3.19.0.

@@ -38,21 +38,35 @@ found the plan could not be changed. Consult round 21
    doctrine is subordinate to this.
 4. **A proposal is the last resort.** The AI works within the rules first
    and asks for an exception only when it has exhausted them.
-5. **The reviewer before the human.** A proposal goes to the Primary
-   Reviewer first, on the ordinary verification round: endorse it, or
-   return one concrete finding the author disposes of as normal work. An
-   endorsed engineering change is applied and the operator informed; an
-   outcome change -- nothing ships, no verdict -- still reaches the
-   operator, with the reviewer's verdict attached.
-6. **Proposals are counted and shown, never scored.** Both advisors, and
-   the framework, hold that a penalty for asking breeds concealment.
-7. **The walk before the release.** Session 229 is held; the operator walks
-   a local VSIX on the Java sample with `claude-sonnet-5` as the Authoring
-   AI -- one plan that cannot be built as written (SQLite through
-   `hibernate-core` only), one packaging block with no feed -- and 230
-   releases.
+5. **The Mechanic, not a proposal verb** (later the same day, superseding
+   the reviewer-rules-first shape and the closed menu that session 229 had
+   begun to build). **Every option is measured against what a developer
+   does when stuck: open another chat instance and tell it to fix the
+   repository so things can get going again.** The Mechanic is that move
+   made first-class. Its model is any with a fresh or different context
+   that is at least as capable as the author's -- the one criterion the
+   operator has proved over and over -- never the author's live session. It
+   works in **prose, not a closed menu**: prose is the check-and-balance
+   against a rule that has become an unreasonable obstacle. It is bounded
+   by two things: the operator agrees before it acts, and its briefing. The
+   two risks, each answered by an instruction: it might break the
+   framework's own infrastructure, so it reads the rules first; it might
+   change the author's work beyond what was needed, so it makes the
+   **minimum viable unblocking fix (MVUF)** and records it as durable
+   documentation. It diagnoses, recommends, and -- once the operator agrees
+   -- makes the fix itself. Litmus test, passed without new machinery: the
+   Mechanic can buy verification rounds past a cap (`verify reopen`).
+6. **Nothing is scored.** Interventions are logged and listed at the
+   close; a penalty for asking breeds concealment.
+7. **The walk before the release, on a branch.** The Mechanic is built on
+   `mechanic`, off master, and walked from a local VSIX on the Java sample
+   with `claude-sonnet-5` authoring -- a plan that cannot be built as
+   written (SQLite through `hibernate-core` only), a packaging block with
+   no feed, a cap terminal -- before it is merged; the release follows the
+   merge.
 
-Planned as sessions 229 and 230.
+Planned as sessions 231 and 232. Sessions 229 and 230 are cancelled;
+229's accepted work is kept on `experiment/proposals`, not to be merged.
 
 ---
 

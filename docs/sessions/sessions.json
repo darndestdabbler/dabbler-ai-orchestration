@@ -4588,7 +4588,7 @@
     {
       "number": 231,
       "title": "The Mechanic",
-      "status": "complete",
+      "status": "cancelled",
       "startedAt": "2026-09-22T07:02:04.093000-04:00",
       "completedAt": "2026-09-22T07:32:35.977000-04:00",
       "orchestrator": {
@@ -4604,7 +4604,10 @@
         "verifierModel": "gpt-5.6-terra",
         "verifierProvider": "openai",
         "transport": "copilot-cli"
-      }
+      },
+      "preCancelStatus": "complete",
+      "cancelledReason": "shelved functionality that may be revisited later, if needed.",
+      "cancelledAt": "2026-09-22T08:39:19-04:00"
     },
     {
       "number": 232,

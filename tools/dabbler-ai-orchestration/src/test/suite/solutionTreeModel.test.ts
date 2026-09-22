@@ -1,0 +1,1288 @@
+import * as assert from "assert";
+import * as fs from "fs";
+import * as path from "path";
+import { createRequire } from "module";
+import { configurationNode, spawnProgram, tryWriteProjection } from "dabbler-ai-router";
+import {
+  ConfigurationRole,
+  ConfigurationVehicle,
+  DecidedLayer,
+  NO_PROJECTS_YET,
+  PROJECTION_RELPATH,
+  PROJECTION_SOURCE_GLOBS,
+  Projection,
+  ProjectionConfiguration,
+  ProjectionProject,
+  childrenOf,
+  descriptorFor,
+  externalLocation,
+  repositoryPathOf,
+  rootNodes,
+  whoseChoice,
+} from "../../providers/solutionTreeModel";
+import {
+  repositoryTarget,
+  workspaceFileIn,
+} from "../../commands/openRepository";
+import * as vscode from "vscode";
+import {
+  ENGINES,
+  ENTER_MODEL_ID,
+  defaultSessionRunUi,
+  engineModelRefusal,
+  modelPickItems,
+  runConsultWithAi,
+  type EngineChoice,
+  type ModelPickItem,
+  type SessionRunUi,
+} from "../../commands/sessionCommands";
+import type { SessionsRepository } from "../../utils/fileSystem";
+import { makeTempDir, rmrf, writeFileTree } from "./helpers";
+
+/** A CSV service's three projects, as the router projects them: dependency order, usedBy derived. */
+function projects(): ProjectionProject[] {
+  return [
+    { name: "Csv.Model", path: "src/Csv.Model/Csv.Model.csproj", kind: "library", dependsOn: [], usedBy: ["Csv.Api", "Csv.Tests"] },
+    { name: "Csv.Api", path: "src/Csv.Api/Csv.Api.csproj", kind: "service", dependsOn: ["Csv.Model"], usedBy: ["Csv.Tests"] },
+    { name: "Csv.Tests", path: "tests/Csv.Tests/Csv.Tests.csproj", kind: "test", dependsOn: ["Csv.Api", "Csv.Model"], usedBy: [] },
+  ];
+}
+
+function projection(over: Partial<Projection> = {}): Projection {
+  const rows = projects();
+  return {
+    solution: { name: "csv", title: "csv", ecosystem: "dotnet", projectCount: rows.length },
+    projects: rows,
+    ...over,
+  };
+}
+
+/** A repository with no build files: the one project it is. */
+function single(): Projection {
+  return {
+    solution: { name: "csv-model", title: "csv-model", ecosystem: null, projectCount: 1 },
+    projects: [{ name: "csv-model", path: ".", kind: "application", dependsOn: [], usedBy: [] }],
+  };
+}
+
+suite("solutionTreeModel: projects", () => {
+  test("renders a projection's project rows in the router's dependency order, with depends-on and used-by", () => {
+    const p = projection();
+    const roots = rootNodes();
+    // The solution, and beside it what a session is run with.
+    assert.deepStrictEqual(roots.map((n) => n.kind), ["solution", "configuration"]);
+    const rows = childrenOf(roots[0], p);
+    assert.deepStrictEqual(rows.map((n) => (n as { name: string }).name), ["Csv.Model", "Csv.Api", "Csv.Tests"]);
+    // The library at the bottom is used by everything above it, and the row
+    // says so without anyone having written it down.
+    assert.deepStrictEqual(childrenOf({ kind: "project", name: "Csv.Model" }, p).map((n) => n.kind), ["usedBy"]);
+    assert.deepStrictEqual(
+      childrenOf({ kind: "usedBy", name: "Csv.Model" }, p).map((n) => (n as { consumer: string }).consumer),
+      ["Csv.Api", "Csv.Tests"],
+    );
+    assert.deepStrictEqual(
+      childrenOf({ kind: "dependsOn", name: "Csv.Tests" }, p).map((n) => (n as { dependency: string }).dependency),
+      ["Csv.Api", "Csv.Model"],
+    );
+    const api = descriptorFor({ kind: "project", name: "Csv.Api" }, p);
+    assert.strictEqual(api.description, "service · src/Csv.Api/Csv.Api.csproj");
+    assert.strictEqual(api.contextValue, "dabblerProject:service");
+    assert.strictEqual(api.expandable, true);
+    assert.strictEqual(descriptorFor({ kind: "solution" }, p).description, "3 projects");
+  });
+
+  test("a repository with no build files is one row with nothing under it", () => {
+    const p = single();
+    const rows = childrenOf({ kind: "solution" }, p);
+    assert.strictEqual(rows.length, 1);
+    assert.deepStrictEqual(childrenOf(rows[0], p), []);
+    const row = descriptorFor(rows[0], p);
+    assert.strictEqual(row.label, "csv-model");
+    assert.strictEqual(row.expandable, false);
+    assert.strictEqual(descriptorFor({ kind: "solution" }, p).description, "one project");
+  });
+
+  test("a projection with no projects, or one an older router wrote, says what session 1 does", () => {
+    const empty = projection({ solution: { name: "fresh", title: "fresh", projectCount: 0 }, projects: [] });
+    assert.deepStrictEqual(childrenOf({ kind: "solution" }, empty), []);
+    assert.strictEqual(descriptorFor({ kind: "solution" }, empty).description, NO_PROJECTS_YET);
+    const older = { solution: { name: "old", title: "old", projectCount: 0 } } as unknown as Projection;
+    assert.deepStrictEqual(childrenOf({ kind: "solution" }, older), []);
+    assert.deepStrictEqual(childrenOf({ kind: "project", name: "ghost" }, projection()), []);
+  });
+
+  test("every node kind resolves to a descriptor with a stable id", () => {
+    const p = projection();
+    const nodes = [
+      { kind: "solution" as const },
+      { kind: "project" as const, name: "Csv.Model" },
+      { kind: "dependsOn" as const, name: "Csv.Tests" },
+      { kind: "dependency" as const, name: "Csv.Tests", dependency: "Csv.Model" },
+      { kind: "usedBy" as const, name: "Csv.Model" },
+      { kind: "consumer" as const, name: "Csv.Model", consumer: "Csv.Api" },
+    ];
+    const ids = nodes.map((n) => descriptorFor(n, p).id);
+    assert.strictEqual(new Set(ids).size, ids.length);
+    ids.forEach((id) => assert.ok(id.length > 0));
+  });
+});
+
+suite("solutionTreeModel: what other repositories build", () => {
+  const external = (over: Record<string, unknown> = {}) => ({
+    id: "Dabbler.Csv.Model",
+    producedBy: "csv-model",
+    pinned: "1.0.0",
+    published: "2.0.0",
+    resolve: "feed",
+    root: "C:/repos/csv-model",
+    reason: "",
+    drift: "csv-model has published 2.0.0",
+    driftKind: "behind" as const,
+    ...over,
+  });
+
+  test("does not render a folder for a solution that consumes nothing", () => {
+    // An empty folder is a row the reader has to open to learn nothing.
+    const p = projection();
+    const kinds = childrenOf({ kind: "solution" }, p).map((n) => n.kind);
+    assert.ok(!kinds.includes("externalGroup"));
+  });
+
+  test("renders the drift line nothing has rendered before", () => {
+    const p = projection({ external: [external()] } as Partial<Projection>);
+    const row = descriptorFor({ kind: "external", id: "Dabbler.Csv.Model" }, p);
+    assert.ok(row.description?.includes("v1.0.0"));
+    assert.ok(row.description?.includes("2.0.0 is out"));
+  });
+
+  test("says a producer's checkout is ahead without calling it an upgrade", () => {
+    // A version bumped while preparing a release is not something anyone can
+    // move to yet.
+    const p = projection({
+      external: [external({ driftKind: "ahead", published: null })],
+    } as Partial<Projection>);
+    const row = descriptorFor({ kind: "external", id: "Dabbler.Csv.Model" }, p);
+    assert.ok(row.description?.includes("ahead"));
+    assert.ok(!row.description?.includes("is out"));
+  });
+
+  test("tells three location states apart, and gates each row's menu on which", () => {
+    // A menu entry that fails when it is used costs more trust than one that
+    // is not there -- and "not here" is not one state: a known remote is a
+    // clone away, while a producer nobody has placed needs a person.
+    const here = projection({ external: [external()] } as Partial<Projection>);
+    const cloneable = projection({
+      external: [
+        external({
+          root: null,
+          remote: "git@github.com:dabbler/csv-model.git",
+          reason: "not on this machine",
+        }),
+      ],
+    } as Partial<Projection>);
+    const away = projection({
+      external: [external({ root: null, remote: null, reason: "not on this machine" })],
+    } as Partial<Projection>);
+    const node = { kind: "external" as const, id: "Dabbler.Csv.Model" };
+    assert.strictEqual(externalLocation(here.external![0]), "here");
+    assert.strictEqual(descriptorFor(node, here).contextValue, "dabblerExternalHere");
+    assert.strictEqual(descriptorFor(node, cloneable).contextValue, "dabblerExternalRemote");
+    assert.strictEqual(descriptorFor(node, away).contextValue, "dabblerExternalUnknown");
+    // Muted, not attention: a checkout nobody made is a fact about this
+    // laptop and not a defect anyone has to answer for. Drift still wins,
+    // because that one IS something to do.
+    const quiet = projection({
+      external: [
+        external({ root: null, remote: null, drift: null, driftKind: null, published: null }),
+      ],
+    } as Partial<Projection>);
+    assert.strictEqual(descriptorFor(node, quiet).icon?.tone, "muted");
+    assert.strictEqual(descriptorFor(node, away).icon?.tone, "attention");
+
+    // A declared path that is not there was still DECLARED. Telling the
+    // reader nobody said where it lives sends them looking for a
+    // declaration that already exists and is simply wrong here.
+    const moved = projection({
+      external: [
+        external({ root: null, remote: null, declaredPath: "../csv-model" }),
+      ],
+    } as Partial<Projection>);
+    const row = descriptorFor(node, moved);
+    assert.strictEqual(row.contextValue, "dabblerExternalUnknown");
+    assert.ok(row.description?.includes("declared at ../csv-model"));
+    assert.ok(!row.description?.includes("nobody has said"));
+  });
+
+  test("renders a repository nothing depends on, and says which way each edge runs", () => {
+    // The upstream direction, without a second declared one: csv-cli is here
+    // because its own declaration names this solution (D254).
+    const p = projection({
+      external: [external()],
+      members: [
+        { id: "csv-app", self: true, root: "C:/repos/csv-app", provides: [], consumes: [], shell: false },
+        {
+          id: "csv-model",
+          self: false,
+          root: "C:/repos/csv-model",
+          provides: ["Dabbler.Csv.Model"],
+          consumes: [],
+          shell: false,
+        },
+        { id: "csv-cli", self: false, root: null, remote: null, provides: [], consumes: [], shell: true },
+      ],
+    } as Partial<Projection>);
+
+    const kinds = childrenOf({ kind: "solution" }, p).map((n) => n.kind);
+    assert.ok(kinds.includes("memberGroup"));
+    assert.deepStrictEqual(
+      childrenOf({ kind: "memberGroup" }, p).map((n) => (n as { id: string }).id),
+      ["csv-app", "csv-model", "csv-cli"],
+    );
+    const shell = descriptorFor({ kind: "member", id: "csv-cli" }, p);
+    assert.ok(shell.description?.includes("placemarker"));
+    assert.ok(shell.description?.includes("location undeclared"));
+    const producer = descriptorFor({ kind: "member", id: "csv-model" }, p);
+    assert.ok(producer.description?.includes("you take 1"));
+  });
+
+  test("resolves the path through the row the operator clicked", () => {
+    const p = projection({ external: [external()] } as Partial<Projection>);
+    const node = { kind: "external" as const, id: "Dabbler.Csv.Model" };
+    assert.strictEqual(repositoryPathOf(node, p), "C:/repos/csv-model");
+    assert.strictEqual(repositoryPathOf({ kind: "solution" }, p), null);
+  });
+
+  test("the tree watches what the projection is derived from, not only the projection", () => {
+    // csv-model feedback item 7. The projection is written by the four
+    // commands that record an event and by nothing else, so a declaration
+    // edited during a session moved nothing: the view watched one file that
+    // nobody had rewritten, and refreshing over it re-read the same bytes.
+    // What the tree re-derives on is the INPUTS.
+    const globs = [...PROJECTION_SOURCE_GLOBS];
+    // What this repository builds, and what it takes from the others: the
+    // project rows come from the solution and project files, the membership
+    // rows from the declaration and from nowhere else.
+    assert.ok(globs.includes("**/*.slnx") && globs.includes("**/*.sln"));
+    assert.ok(!globs.includes("docs/modules.yaml"));
+    assert.ok(globs.includes("solution-dependencies.json"));
+    // The pin is read from the build files on every projection rather than
+    // copied, so the drift rows change when they do.
+    assert.ok(globs.some((g) => g.endsWith("*.csproj")));
+    assert.ok(globs.some((g) => g.endsWith("pom.xml")));
+
+    // And never the projection itself: it is this list's output, so
+    // re-deriving on it would be a loop that never settles.
+    assert.ok(!globs.includes(PROJECTION_RELPATH));
+    assert.ok(!globs.some((g) => g.includes("projection.json")));
+    // Nothing under the run records either. Those are the session's
+    // lifecycle and the Work Explorer's subject; they change many times a
+    // minute and change nothing this tree renders.
+    assert.ok(!globs.some((g) => g.includes(".dabbler/runs")));
+  });
+
+  test("a membership row can be opened, cloned or located like a producer row", () => {
+    // "Solution repositories" was a list nothing could be done to: the rows
+    // carried no contextValue at all, so no menu entry matched, and
+    // `repositoryPathOf` answered only for producer rows, so the commands
+    // would have had no folder even if one had. It is the list holding the
+    // repositories no edge reaches yet -- the next one the plan needs.
+    const p = projection({
+      members: [
+        { id: "csv-app", self: true, root: "C:/repos/csv-app", provides: [], consumes: [], shell: false },
+        {
+          id: "csv-model",
+          self: false,
+          root: "C:/repos/csv-model",
+          provides: ["Dabbler.Csv.Model"],
+          consumes: [],
+          shell: false,
+        },
+        {
+          id: "csv-reports",
+          self: false,
+          root: null,
+          remote: "git@github.com:dabbler/csv-reports.git",
+          provides: [],
+          consumes: [],
+          shell: false,
+        },
+        { id: "csv-cli", self: false, root: null, remote: null, provides: [], consumes: [], shell: true },
+      ],
+    } as Partial<Projection>);
+    const row = (id: string) => descriptorFor({ kind: "member", id }, p);
+    // The same three values the producer rows carry, so the entries already
+    // in the manifest reach these rows with no second `when`.
+    assert.strictEqual(row("csv-model").contextValue, "dabblerExternalHere");
+    assert.strictEqual(row("csv-reports").contextValue, "dabblerExternalRemote");
+    assert.strictEqual(row("csv-cli").contextValue, "dabblerExternalUnknown");
+    // This repository's own row is here, because it is: Reveal on it is the
+    // ordinary way to find the checkout, and an exception would be a second
+    // rule about where a row's repository is.
+    assert.strictEqual(row("csv-app").contextValue, "dabblerExternalHere");
+
+    assert.strictEqual(
+      repositoryPathOf({ kind: "member", id: "csv-model" }, p),
+      "C:/repos/csv-model",
+    );
+    assert.strictEqual(repositoryPathOf({ kind: "member", id: "csv-app" }, p), "C:/repos/csv-app");
+    // Not on this machine, and the reading says so rather than guessing a
+    // folder for a command to fail on.
+    assert.strictEqual(repositoryPathOf({ kind: "member", id: "csv-reports" }, p), null);
+    assert.strictEqual(repositoryPathOf({ kind: "member", id: "nobody" }, p), null);
+  });
+
+  test("explains an absent sibling rather than failing at it", () => {
+    // The graph is a declaration about a solution, not about one laptop.
+    const p = projection({
+      external: [external({ root: null })],
+    } as Partial<Projection>);
+    const target = repositoryTarget({
+      node: { kind: "external", id: "Dabbler.Csv.Model" },
+      projection: p,
+    });
+    assert.strictEqual(target.path, null);
+    assert.ok(target.reason.includes("not on this machine"));
+  });
+
+  test("renders the consumers of a package as derived rows", () => {
+    // `usedBy` is a reading of who declares what, and it is why nothing is
+    // allowed to state it in a file.
+    const p = projection({
+      external: [
+        external({
+          usedBy: ["csv-app", "csv-report"],
+          pins: [
+            { repository: "csv-app", version: "1.0.0" },
+            { repository: "csv-report", version: "2.0.0" },
+          ],
+        }),
+      ],
+    } as Partial<Projection>);
+    const kids = childrenOf({ kind: "external", id: "Dabbler.Csv.Model" }, p);
+    assert.deepStrictEqual(kids, [
+      { kind: "externalUsedBy", id: "Dabbler.Csv.Model" },
+    ]);
+    const consumers = childrenOf({ kind: "externalUsedBy", id: "Dabbler.Csv.Model" }, p);
+    assert.strictEqual(consumers.length, 2);
+    const row = descriptorFor(
+      { kind: "externalConsumer", id: "Dabbler.Csv.Model", repository: "csv-report" },
+      p,
+    );
+    assert.strictEqual(row.description, "v2.0.0");
+  });
+
+  test("flags two repositories on two versions of one package", () => {
+    // The diamond that makes an upgrade a negotiation, and one repository
+    // cannot see it.
+    const p = projection({
+      external: [
+        external({
+          usedBy: ["csv-app", "csv-report"],
+          pins: [
+            { repository: "csv-app", version: "1.0.0" },
+            { repository: "csv-report", version: "2.0.0" },
+          ],
+        }),
+      ],
+    } as Partial<Projection>);
+    const row = descriptorFor({ kind: "externalUsedBy", id: "Dabbler.Csv.Model" }, p);
+    assert.strictEqual(row.icon?.tone, "attention");
+  });
+
+  test("does not open a package only this repository takes", () => {
+    // One consumer is what the row already says.
+    const p = projection({
+      external: [external({ usedBy: ["csv-app"] })],
+    } as Partial<Projection>);
+    assert.strictEqual(
+      descriptorFor({ kind: "external", id: "Dabbler.Csv.Model" }, p).expandable,
+      false,
+    );
+  });
+
+  test("asks for a row when it was given none", () => {
+    const target = repositoryTarget({});
+    assert.strictEqual(target.path, null);
+    assert.ok(target.reason.includes("Solution Explorer"));
+  });
+});
+
+suite("openSolutionWorkspace: one window over the solution", () => {
+  test("opens the file the router reported writing, not one it recomputed", () => {
+    // A second derivation eventually disagrees with the first, and opening a
+    // workspace other than the one just written is a near-miss nobody debugs
+    // quickly.
+    const said = [
+      "  csv-app                  .",
+      "  csv-model                ../csv-model",
+      "",
+      "wrote C:/repos/csv-app/.dabbler/solution.code-workspace",
+      "It is derived from the graph and lives under `.dabbler/`.",
+    ].join("\n");
+    assert.strictEqual(
+      workspaceFileIn(said),
+      "C:/repos/csv-app/.dabbler/solution.code-workspace",
+    );
+  });
+
+  test("opens nothing when the router wrote nothing", () => {
+    // "This repository reaches no other repository here" is an answer, and
+    // opening something anyway would contradict it.
+    assert.strictEqual(
+      workspaceFileIn(
+        "workspace: this repository reaches no other repository on this machine",
+      ),
+      null,
+    );
+  });
+
+  test("does not read a path out of prose that merely mentions one", () => {
+    // The line the router prints is the contract; a sentence describing the
+    // file is not the router saying it wrote it.
+    assert.strictEqual(
+      workspaceFileIn("it would go to C:/repos/x/.dabbler/solution.code-workspace"),
+      null,
+    );
+  });
+});
+
+suite("solutionTreeModel: what a session is run with", () => {
+  /** The document, made unwritable: a renderer may read it and nothing else. */
+  function deepFreeze<T>(value: T): T {
+    if (value !== null && typeof value === "object") {
+      for (const nested of Object.values(value)) deepFreeze(nested);
+      Object.freeze(value);
+    }
+    return value;
+  }
+
+  /** A projection whose configuration block is what the router read from files. */
+  function configured(over: Partial<ProjectionConfiguration> = {}): Projection {
+    return {
+      ...single(),
+      configuration: {
+        engines: {
+          chosen: "claude-code",
+          reason: "`claude` is the only engine CLI on PATH, so it is the engine the next session is offered.",
+          installed: [
+            { engine: "claude-code", program: "claude", path: "C:/bin/claude.cmd" },
+            { engine: "copilot", program: "copilot", path: null },
+          ],
+        },
+        transport: {
+          effective: "api",
+          decidedBy: "DABBLER_TRANSPORT env var",
+          layers: [
+            { source: "DABBLER_TRANSPORT env var", value: "api" },
+            { source: "transport.profile", value: "copilot-cli" },
+          ],
+        },
+        authoring: {
+          role: "authoring",
+          // The author's provider, stated once: every "same provider" /
+          // "different provider" word below is derived from it.
+          provider: "anthropic",
+          vehicle: {
+            kind: "engine",
+            options: [{ id: "claude-code", means: "claude" }],
+            withheld: [],
+            chosen: "claude-code",
+            decidedBy: "installed on PATH",
+            appliesTo: "next-session",
+          },
+          chosen: { model: "claude-opus-5", provider: "anthropic" },
+          candidates: [{ model: "claude-opus-5", provider: "anthropic" }],
+          excludes: [],
+          fellThrough: false,
+        },
+        primaryReviewer: {
+          role: "reviewer",
+          selected: "gpt-5.6-terra",
+          vehicle: {
+            kind: "transport",
+            options: [
+              { id: "api", means: "the provider's own endpoint, billed in tokens" },
+            ],
+            withheld: [
+              {
+                id: "copilot-cli",
+                means: "a Copilot seat, billed in AI credits per token",
+                note: "this machine's seat has not answered yet",
+              },
+            ],
+            chosen: "api",
+            decidedBy: "roles.reviewer.transport",
+            appliesTo: "next-session",
+          },
+          chosen: {
+            model: "gpt-5.6-terra",
+            provider: "openai",
+            priceCategory: "high",
+          },
+          candidates: [
+            {
+              model: "gpt-5.6-terra",
+              provider: "openai",
+              priceCategory: "high",
+            },
+          ],
+          excludes: [],
+          fellThrough: false,
+        },
+        auxiliaryReviewer: {
+          role: "auxiliary-reviewer",
+          chosen: {
+            model: "gemini-3.1-pro-preview",
+            provider: "google",
+          },
+          candidates: [
+            {
+              model: "gemini-3.1-pro-preview",
+              provider: "google",
+            },
+          ],
+          excludes: [],
+          fellThrough: false,
+          narrowedAtDispatch:
+            "At an adjudication, every provider that has already reviewed a round is excluded as well.",
+        },
+        // One row, because there is one catalog: it was three, and two of
+        // them were two dates on one file.
+        records: [
+          {
+            record: "ai-model-catalog",
+            path: "C:/Users/dev/AppData/Local/dabbler/ai-model-catalog.json",
+            present: true, datedAt: "2026-09-01T10:00:00Z", ageHours: 30,
+            thresholdHours: 24, command: "dabbler discovery refresh",
+            cost: "Nothing.", stale: true, notes: [],
+          },
+        ],
+        ...over,
+      },
+    };
+  }
+
+  test("renders every row from the dated record, and derives nothing while it does", () => {
+    // The claim is not only that the rows are right: it is that drawing them
+    // costs a disk read the router already did. Two halves prove it. The
+    // network is trapped for the duration, so a row that enumerated a vendor
+    // fails here; and the projection is FROZEN, so a row that wanted
+    // something the document does not carry has nowhere to put it and no way
+    // to fetch it. The other half of the same claim is the last assertion:
+    // with no configuration in the document there are no rows at all, which
+    // is what "it reads the record" means and what "it goes and finds out"
+    // would contradict.
+    const fetched = (globalThis as { fetch?: unknown }).fetch;
+    (globalThis as { fetch?: unknown }).fetch = () => {
+      throw new Error("the Configuration section reached for the network");
+    };
+    try {
+      const p = deepFreeze(configured());
+      const root = rootNodes().find((n) => n.kind === "configuration");
+      assert.ok(root);
+      const section = descriptorFor(root, p);
+      assert.strictEqual(section.expandable, true);
+      assert.ok(section.description?.includes("claude-code"));
+
+      // Two participants, each naming a thing being configured rather than
+      // the mechanism that configures it, and five leaves under them.
+      const parents = childrenOf(root, p);
+      assert.deepStrictEqual(
+        parents.map((n) => descriptorFor(n, p).label),
+        ["Authoring AI", "Reviewing AI"],
+      );
+      const leaves = parents.flatMap((parent) => childrenOf(parent, p));
+      const rendered = leaves.map((n) => descriptorFor(n, p));
+      assert.deepStrictEqual(
+        rendered.map((row) => row.label),
+        ["Vehicle", "Model", "Vehicle", "Primary Model", "Auxiliary Model"],
+      );
+      // Every leaf is a leaf: the section is two deep and no deeper.
+      assert.ok(leaves.every((leaf) => childrenOf(leaf, p).length === 0));
+
+      // The catalog's own age, where it lives, the command that re-reads it
+      // and what that costs -- all before anybody asks for a refresh. It was
+      // a row named after the mechanism; it is the section's own tooltip and
+      // the section's own action now.
+      assert.ok(section.tooltip?.includes("30h old"), section.tooltip);
+      assert.ok(section.tooltip?.includes("dabbler discovery refresh"));
+      assert.ok(section.tooltip?.includes("ai-model-catalog.json"));
+      assert.ok(section.tooltip?.includes("Nothing."));
+      assert.strictEqual(section.icon?.tone, "attention");
+
+      // The authoring AI: what it runs inside, and the model the engine's own
+      // CLI is launched on -- set here, for the NEXT session.
+      const [authoringVehicle, authoringModel] = rendered;
+      assert.strictEqual(authoringVehicle?.description, "claude-code");
+      assert.ok(authoringVehicle?.tooltip?.includes("the engine CLI the work is authored in"));
+      assert.ok(authoringModel?.description?.includes("claude-opus-5"));
+      assert.ok(authoringModel?.tooltip?.includes("launched on"), authoringModel?.tooltip);
+      // Set here and REPORTED while a session is in flight, which the row has
+      // to distinguish: only one of the two can be changed.
+      assert.strictEqual(authoringModel?.command, "dabblerSolution.setAuthoringModel");
+      assert.ok(
+        !authoringModel?.tooltip?.includes("`session start`, so the row reports it"),
+        authoringModel?.tooltip,
+      );
+      const inFlight = descriptorFor(
+        { kind: "configRole", role: "authoring" },
+        configured({
+          authoring: {
+            ...(configured().configuration?.authoring as ConfigurationRole),
+            declaredAtStart: true,
+          },
+        }),
+      );
+      assert.ok(
+        inFlight.tooltip?.includes("`session start`, so the row reports it"),
+        inFlight.tooltip,
+      );
+      // What a list IS -- a reading, against a CLI that is the authority --
+      // is the ROUTER's sentence, rendered here and not restated. A second
+      // copy is a second thing to go stale.
+      const noted = descriptorFor(
+        { kind: "configRole", role: "authoring" },
+        configured({
+          authoring: {
+            ...(configured().configuration?.authoring as ConfigurationRole),
+            note: "the router's own sentence about this list",
+          },
+        }),
+      );
+      assert.ok(
+        noted.tooltip?.includes("the router's own sentence about this list"),
+        noted.tooltip,
+      );
+      // **"Nobody has chosen" is not "nothing resolves".** Only one of them
+      // is a fault, and the pane read the wrong one on a machine holding
+      // four models it could author with -- found by driving the pane.
+      const unchosen = descriptorFor(
+        { kind: "configRole", role: "authoring" },
+        configured({
+          authoring: {
+            ...(configured().configuration?.authoring as ConfigurationRole),
+            chosen: null,
+          },
+        }),
+      );
+      assert.strictEqual(unchosen.description, "not chosen");
+      const nothing = descriptorFor(
+        { kind: "configRole", role: "authoring" },
+        configured({
+          authoring: {
+            ...(configured().configuration?.authoring as ConfigurationRole),
+            chosen: null,
+            candidates: [],
+          },
+        }),
+      );
+      assert.strictEqual(nothing.description, "nothing resolves");
+      // A reviewing role has a preference order, so a null chosen there IS
+      // nothing resolving and the word does not change.
+      const reviewing = descriptorFor(
+        { kind: "configRole", role: "primaryReviewer" },
+        configured({
+          primaryReviewer: {
+            ...(configured().configuration?.primaryReviewer as ConfigurationRole),
+            chosen: null,
+          },
+        }),
+      );
+      assert.ok(reviewing.description?.startsWith("nothing resolves"), reviewing.description);
+
+      // A vehicle a layer above is overriding says so; the value alone would
+      // look exactly like one that is in force.
+      const reviewingVehicle = rendered[2];
+      assert.ok(reviewingVehicle?.description?.includes("api"));
+      assert.ok(reviewingVehicle?.tooltip?.includes("roles.reviewer.transport"));
+      assert.ok(
+        reviewingVehicle?.tooltip?.includes("copilot-cli is not offered"),
+        reviewingVehicle?.tooltip,
+      );
+
+      // Cross-provider is a LABEL now rather than a refusal: the row says
+      // how this reviewer stands to the author, and says the price its own
+      // source stated as a price rather than as a capability.
+      const primaryReviewer = rendered[3];
+      assert.ok(primaryReviewer?.description?.includes("gpt-5.6-terra"));
+      assert.ok(primaryReviewer?.tooltip?.includes("different provider"));
+      assert.ok(primaryReviewer?.tooltip?.includes("PRICE and not a capability"));
+      assert.ok(primaryReviewer?.tooltip?.includes("You chose gpt-5.6-terra"));
+      assert.ok(primaryReviewer?.tooltip?.includes("nothing is substituted for it"));
+      assert.notStrictEqual(primaryReviewer?.icon?.tone, "attention");
+
+      // A chosen reviewer from today's authoring vendor takes the attention
+      // tone and says the conflict in the router's words.
+      const conflicting = descriptorFor(
+        { kind: "configRole", role: "primaryReviewer" },
+        configured({
+          primaryReviewer: {
+            ...(configured().configuration?.primaryReviewer as ConfigurationRole),
+            conflict: "not usable while authoring is OpenAI",
+          },
+        }),
+      );
+      assert.strictEqual(conflicting.icon?.tone, "attention");
+      assert.ok(conflicting.tooltip?.includes("not usable while authoring is OpenAI"), conflicting.tooltip);
+
+      // And the third voice, which is what this section never had: what it
+      // is for, and what narrows it at the round, in the router's own words.
+      const auxiliary = rendered[4];
+      assert.ok(auxiliary?.description?.includes("gemini-3.1-pro-preview"));
+      assert.ok(auxiliary?.tooltip?.includes("disputed"), auxiliary?.tooltip);
+      assert.ok(auxiliary?.tooltip?.includes("already reviewed a round"));
+
+      // The other half: a document that carries no configuration produces no
+      // rows. Nothing is derived here and nothing is asked for.
+      assert.deepStrictEqual(childrenOf(root, deepFreeze(single())), []);
+    } finally {
+      (globalThis as { fetch?: unknown }).fetch = fetched;
+    }
+  });
+
+  test("a row says whose its choice is: this repository's, or the machine's default it falls back to", () => {
+    // Two windows on two repositories showed one reviewer, and a value alone
+    // cannot say which of the two a person is looking at. The row reads the
+    // router's word for where the choice is KEPT and decides nothing.
+    const reviewer = configured().configuration?.primaryReviewer as ConfigurationRole;
+    const as = (decidedLayer: DecidedLayer) =>
+      descriptorFor(
+        { kind: "configRole", role: "primaryReviewer" },
+        configured({ primaryReviewer: { ...reviewer, decidedLayer } }),
+      );
+    const here = as("checkout");
+    const fallback = as("machine");
+    // The same model, two different facts, and the row says which.
+    assert.ok(here.description?.includes("gpt-5.6-terra") && fallback.description?.includes("gpt-5.6-terra"));
+    assert.ok(here.description?.includes("this repository"), here.description);
+    assert.ok(fallback.description?.includes("machine default"), fallback.description);
+    assert.ok(here.tooltip?.includes("another window has its own"), here.tooltip);
+    assert.ok(fallback.tooltip?.includes("names no choice of its own"), fallback.tooltip);
+    // A choice the reviewing vehicle does not list says whose it is too: that
+    // row is telling a person to change it, and they must know where it is kept.
+    const unlisted = descriptorFor(
+      { kind: "configRole", role: "primaryReviewer" },
+      configured({
+        primaryReviewer: { ...reviewer, selected: "gpt-5.6-terra", notListedBy: "copilot-cli", decidedLayer: "machine" },
+      }),
+    );
+    assert.ok(unlisted.description?.includes("machine default"), unlisted.description);
+    assert.ok(unlisted.description?.includes("not listed by copilot-cli"), unlisted.description);
+    assert.ok(unlisted.tooltip?.includes("names no choice of its own"), unlisted.tooltip);
+    // Nobody's choice says nothing of whose it is.
+    assert.ok(!/this repository|machine default/.test(as("default").description ?? ""));
+
+    // A vehicle row reads the same word the same way.
+    const vehicle = descriptorFor(
+      { kind: "configVehicle", who: "reviewing" },
+      configured({
+        primaryReviewer: {
+          ...reviewer,
+          vehicle: { kind: "transport", options: [], chosen: "api", decidedLayer: "checkout", layers: [] },
+        },
+      }),
+    );
+    assert.ok(vehicle.description?.includes("this repository"), vehicle.description);
+    assert.strictEqual(whoseChoice("shipped"), "shipped default");
+  });
+
+  test("says a configuration it could not read is unreadable, rather than showing an empty one", () => {
+    const p: Projection = { ...single(), configuration: { unavailable: "local-overrides.yaml: bad key" } };
+    const root = { kind: "configuration" as const };
+    assert.deepStrictEqual(childrenOf(root, p), []);
+    const row = descriptorFor(root, p);
+    assert.strictEqual(row.expandable, false);
+    assert.strictEqual(row.tooltip, "local-overrides.yaml: bad key");
+  });
+
+  test("the authoring Vehicle says none is chosen when engines are installed, and 'none installed' only when none is", () => {
+    // Session 160's walk, on the one machine that matters most: claude and
+    // copilot both on PATH, the router declining to default between them,
+    // and the row reading "none installed". Two facts, two readings.
+    const base = configured().configuration?.authoring as ConfigurationRole;
+    const unchosen = (installed: { engine: string; program: string; path: string | null }[]) =>
+      deepFreeze(
+        configured({
+          authoring: { ...base, vehicle: { ...(base.vehicle as ConfigurationVehicle), chosen: null } },
+          engines: { chosen: null, reason: "which one runs a session is a choice", installed },
+        }),
+      );
+    const node = { kind: "configVehicle" as const, who: "authoring" as const };
+    const two = descriptorFor(node, unchosen([
+      { engine: "claude-code", program: "claude", path: "C:/bin/claude.cmd" },
+      { engine: "copilot", program: "copilot", path: "C:/bin/copilot.cmd" },
+    ]));
+    assert.ok(two.description?.includes("none chosen"), two.description);
+    assert.ok(!two.description?.includes("none installed"), two.description);
+    const none = descriptorFor(node, unchosen([
+      { engine: "claude-code", program: "claude", path: null },
+      { engine: "copilot", program: "copilot", path: null },
+    ]));
+    assert.strictEqual(none.description, "none installed");
+  });
+
+  test("the reviewing Vehicle row sets the reviewing vehicle, and names the layer that overrides", () => {
+    // The operator's case: the machine's vehicle was already copilot-cli, the
+    // checkout's reviewerTransport said api, and the row wrote the machine's.
+    const base = configured().configuration?.primaryReviewer as ConfigurationRole;
+    const row = descriptorFor(
+      { kind: "configVehicle", who: "reviewing" },
+      deepFreeze(
+        configured({
+          primaryReviewer: {
+            ...base,
+            vehicle: {
+              ...(base.vehicle as ConfigurationVehicle),
+              decidedBy: "dabbler.reviewerTransport",
+              layers: [
+                { source: "dabbler.reviewerTransport", value: "api" },
+                { source: "dabbler.transport", value: "copilot-cli" },
+              ],
+            },
+          },
+        }),
+      ),
+    );
+    assert.strictEqual(row.command, "dabblerSolution.setReviewerTransport");
+    assert.ok(row.description?.includes("⚠"), row.description);
+    assert.ok(
+      row.tooltip?.includes("dabbler.transport says 'copilot-cli' and is overridden by dabbler.reviewerTransport"),
+      row.tooltip,
+    );
+  });
+});
+
+suite("solutionTreeModel: what a configuration reading costs", () => {
+  // The whole path, from the rows on disk to the row on the screen. The pane
+  // now derives this on EVERY read, so what it may touch matters more than
+  // it did when the answer sat in a file: a reading that enumerated a vendor
+  // would charge a window for being open, once per repaint.
+  const ROUND = {
+    round: 1,
+    verdict: "VERIFIED",
+    blocking: false,
+    findings: [],
+    completion_tree: "0".repeat(40),
+    recorded_at: "2026-09-01T10:00:00.000000-04:00",
+    verifier_model: "reviewer",
+    verifier_provider: "openai",
+  };
+
+  /** A registry of two models, so what is asserted is the reading and not the shipped list. */
+  /** One model, as a vendor's own free enumeration records it. */
+  const catalogRow = (id: string, provider: string): Record<string, unknown> => ({
+    id,
+    provider,
+    provider_source: "vendor-endpoint",
+    display_name: id,
+    enabled: true,
+    price_category: null,
+    cost: null,
+    listed_at: "2026-08-01T09:00:00Z",
+  });
+
+  const CONFIG = [
+    "providers:",
+    "  anthropic:",
+    "    api_key_env: TEST_ANTHROPIC_KEY",
+    "    rate_limit: { requests_per_minute: 10, tokens_per_minute: 100 }",
+    "    timeout_seconds: 30",
+    "    retry: { max_retries: 1, backoff_base_seconds: 0 }",
+    "  openai:",
+    "    api_key_env: TEST_OPENAI_KEY",
+    "    rate_limit: { requests_per_minute: 10, tokens_per_minute: 100 }",
+    "    timeout_seconds: 30",
+    "    retry: { max_retries: 1, backoff_base_seconds: 0 }",
+    "roles:",
+    "  reviewer:",
+    "    prefer: [o-reviewer]",
+    "escalation:",
+    "  enabled: false",
+    "  max_escalations: 0",
+    "  triggers: { empty_response: true, max_tokens_hit: true, min_output_tokens: 30, refusal_detection: true }",
+    "",
+  ].join("\n");
+
+  let root = "";
+  const saved = new Map<string, string | undefined>();
+
+  setup(() => {
+    root = makeTempDir("fidelity-");
+    // The environment is set rather than read: a suite that took the
+    // operator's own DABBLER_TRANSPORT would assert a different thing on
+    // their machine than on anyone else's.
+    for (const name of [
+      "AI_ROUTER_CONFIG",
+      "DABBLER_TRANSPORT",
+      "TEST_ANTHROPIC_KEY",
+      "TEST_OPENAI_KEY",
+    ]) {
+      saved.set(name, process.env[name]);
+    }
+    writeFileTree(root, {
+      "router-config.yaml": CONFIG,
+      // The engine and the model it declared when the session was
+      // registered. The authoring row REPORTS this rather than resolving a
+      // role, because this is the model that authors.
+      "docs/sessions/sessions.json": JSON.stringify({
+        schemaVersion: 5,
+        sessions: [
+          {
+            number: 1,
+            status: "in-progress",
+            orchestrator: { engine: "copilot", provider: "anthropic", model: "a-author" },
+          },
+        ],
+      }),
+      // Two rounds, and they are the two KINDS of evidence. The first is on
+      // the direct-API path, where the served id is the provider's own
+      // statement of what answered. The second is a seat round, where the
+      // same field carries the CLI's echo of what it was asked for -- a
+      // label, and this framework has never trusted a seat label.
+      ".dabbler/runs/s1/rounds.jsonl":
+        [
+          JSON.stringify({ ...ROUND, transport: "api", requested_model: "a-author", served_model: "a-author" }),
+          JSON.stringify({
+            ...ROUND,
+            round: 2,
+            previous_tree: "0".repeat(40),
+            transport: "copilot-cli",
+            requested_model: "o-reviewer",
+            served_model: "o-reviewer",
+          }),
+        ].join("\n") + "\n",
+    });
+    process.env.AI_ROUTER_CONFIG = path.join(root, "router-config.yaml");
+    process.env.DABBLER_TRANSPORT = "api";
+    process.env.TEST_ANTHROPIC_KEY = "k";
+    process.env.TEST_OPENAI_KEY = "k";
+    // What this machine's vendors listed, with a date NO refresh could
+    // produce: a refresh stamps now, so the date below is how the next test
+    // tells a record that was READ from one that was fetched. The runner
+    // points the catalog at a temp file, so this writes nothing of the
+    // operator's.
+    const catalog = process.env.DABBLER_CATALOG_PATH as string;
+    fs.mkdirSync(path.dirname(catalog), { recursive: true });
+    fs.writeFileSync(
+      catalog,
+      JSON.stringify({
+        schema_version: 1,
+        written_by: "test",
+        written_at: "2026-08-01T09:00:00Z",
+        transports: {
+          api: {
+            refreshed_at: "2026-08-01T09:00:00Z",
+            source: "vendor-enumeration",
+            // The set of providers whose keys are present: a block recorded
+            // for any other set is not a reading of this machine.
+            scope: { providers: ["anthropic", "openai"] },
+            models: [
+              catalogRow("a-author", "anthropic"),
+              catalogRow("a-second", "anthropic"),
+              catalogRow("o-reviewer", "openai"),
+            ],
+            retired: [],
+          },
+        },
+      }),
+      "utf8",
+    );
+  });
+
+  teardown(() => {
+    for (const [name, value] of saved) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    rmrf(root);
+  });
+
+  test("refuses to LAUNCH a model the engine's own list does not name", () => {
+    // Round 1's first blocking finding. `session start` revalidates a
+    // configured model before anything is billed, but the Start box takes
+    // free text and the terminal it opens belongs to the person -- nothing in
+    // this window can read what their CLI prints. So a stale id, a seat id
+    // under Claude Code or a plain typo produced a CLI that printed one
+    // warning line and carried on with a model nobody chose, while the ledger
+    // recorded the one they named.
+    //
+    // The fixture's session is in flight under `copilot`, so the engine's own
+    // record here is the seat's -- which this machine has never read, so the
+    // list is empty and NOTHING may be refused. That is the other half of the
+    // rule and is asserted first.
+    const repository = { root, label: "r" } as unknown as SessionsRepository;
+    const seat = ENGINES.find((entry) => entry.engine === "copilot") as EngineChoice;
+    assert.strictEqual(engineModelRefusal(repository, seat, "anything-at-all"), null);
+
+    // Under Claude Code the record IS readable -- the catalog's Anthropic
+    // block -- so a model it does not name is refused before the terminal
+    // opens, with what it offers instead.
+    const claude = ENGINES.find((entry) => entry.engine === "claude-code") as EngineChoice;
+    const refusal = engineModelRefusal(repository, claude, "not-a-model-anywhere");
+    assert.ok(refusal, "a model no list names was launched anyway");
+    assert.ok(refusal?.includes("not-a-model-anywhere"), refusal);
+    assert.ok(refusal?.includes("a-author"), refusal);
+    assert.ok(refusal?.includes("Nothing was launched"), refusal);
+    // A model it DOES name goes through, and so does an empty one, which
+    // means the engine's own default.
+    assert.strictEqual(engineModelRefusal(repository, claude, "a-author"), null);
+    assert.strictEqual(engineModelRefusal(repository, claude, ""), null);
+  });
+
+  test("Consult with AI refuses a model the engine's own list does not name, and opens nothing", async () => {
+    const repository = { root, label: "r" } as unknown as SessionsRepository;
+    const claude = ENGINES.find((entry) => entry.engine === "claude-code") as EngineChoice;
+    const errors: string[] = [];
+    const opened: unknown[] = [];
+    const ui = {
+      pickEngine: async () => claude,
+      askModel: async () => "not-a-model-anywhere",
+      // The installed CLI accepts it: the list alone refuses.
+      engineKnowsModel: async () => null,
+      showErrorMessage: (message: string) => errors.push(message),
+      openTerminal: (terminal: unknown) => opened.push(terminal),
+    } as unknown as SessionRunUi;
+    assert.strictEqual(await runConsultWithAi(repository, ui), false);
+    assert.strictEqual(errors.length, 1);
+    assert.ok(errors[0].includes("not-a-model-anywhere"), errors[0]);
+    assert.strictEqual(opened.length, 0);
+  });
+
+  test("the model question offers the engine's candidates, the chosen one first", () => {
+    const claude = ENGINES.find((entry) => entry.engine === "claude-code") as EngineChoice;
+    const items = modelPickItems(root, claude, "a-second");
+    assert.ok(items);
+    assert.deepStrictEqual(
+      items.map((item) => item.model),
+      ["a-second", "a-author", "", undefined],
+    );
+    assert.strictEqual(items[0].detail, "what you chose");
+    assert.strictEqual(items[3].label, ENTER_MODEL_ID);
+    // A seat is nothing without a model, so it is offered no default.
+    const required = modelPickItems(root, { ...claude, modelRequired: true }, "");
+    assert.deepStrictEqual(required?.map((item) => item.model), ["a-author", "a-second", undefined]);
+  });
+
+  test("the model question marks an authoring model from the chosen Primary Reviewer's vendor, and still offers it", () => {
+    const preferences = process.env.DABBLER_PREFERENCES_PATH as string;
+    const before = fs.existsSync(preferences) ? fs.readFileSync(preferences, "utf8") : null;
+    const chose = (reviewer: string): string =>
+      JSON.stringify({ schema_version: 1, written_by: "test", written_at: "2026-09-17T00:00:00Z", selected: { reviewer } });
+    fs.mkdirSync(path.dirname(preferences), { recursive: true });
+    fs.writeFileSync(preferences, chose("o-reviewer"), "utf8");
+    try {
+      const claude = ENGINES.find((entry) => entry.engine === "claude-code") as EngineChoice;
+      const items = modelPickItems(root, claude, "a-author");
+      assert.ok(items);
+      // Claude Code authors Anthropic only, so nothing on its list is the reviewer's vendor.
+      assert.ok(items.every((item) => !item.description?.includes("same vendor as your Primary Reviewer")));
+      fs.writeFileSync(preferences, chose("a-second"), "utf8");
+      const marked = modelPickItems(root, claude, "a-author");
+      const author = marked?.find((item) => item.model === "a-author");
+      assert.ok(
+        author?.description?.includes("same vendor as your Primary Reviewer (a-second); this session would not start"),
+        author?.description,
+      );
+    } finally {
+      if (before === null) fs.rmSync(preferences, { force: true });
+      else fs.writeFileSync(preferences, before, "utf8");
+    }
+  });
+
+  test("the model question falls back to the text box on 'Enter a model id…', no list, or the alias floor", async () => {
+    const window = vscode.window as unknown as Record<string, unknown>;
+    const [pick, input] = [window.showQuickPick, window.showInputBox];
+    const picks: unknown[] = [];
+    const boxes: Array<{ placeHolder?: string }> = [];
+    window.showInputBox = async (options: { placeHolder?: string }) => {
+      boxes.push(options);
+      return "typed-id";
+    };
+    try {
+      const claude = ENGINES.find((entry) => entry.engine === "claude-code") as EngineChoice;
+      const seat = ENGINES.find((entry) => entry.engine === "copilot") as EngineChoice;
+      window.showQuickPick = async (items: ModelPickItem[]) => {
+        picks.push(items);
+        return items.find((item) => item.label === ENTER_MODEL_ID);
+      };
+      const ui = defaultSessionRunUi();
+      assert.strictEqual(await ui.askModel(root, claude, ""), "typed-id");
+      assert.deepStrictEqual([picks.length, boxes.length], [1, 1]);
+      // This machine has read nothing for the seat: no pick, the box.
+      assert.strictEqual(await ui.askModel(root, seat, ""), "typed-id");
+      assert.deepStrictEqual([picks.length, boxes.length], [1, 2]);
+      // Nothing enumerated for Claude Code: the aliases are the reading, and
+      // the box shows them rather than offering them as the whole choice.
+      const catalog = process.env.DABBLER_CATALOG_PATH as string;
+      const record = JSON.parse(fs.readFileSync(catalog, "utf8"));
+      record.transports.api.models = [catalogRow("o-reviewer", "openai")];
+      fs.writeFileSync(catalog, JSON.stringify(record), "utf8");
+      assert.strictEqual(modelPickItems(root, claude, ""), null);
+      assert.strictEqual(await ui.askModel(root, claude, ""), "typed-id");
+      assert.deepStrictEqual([picks.length, boxes.length], [1, 3]);
+      assert.ok(boxes[2].placeHolder?.includes("sonnet"), boxes[2].placeHolder);
+    } finally {
+      window.showQuickPick = pick;
+      window.showInputBox = input;
+    }
+  });
+
+  test("reaches no vendor and no CLI, and renders the dated record it read", () => {
+    // The router's own reading runs here, over records on disk, with the
+    // network trapped: if assembling the configuration enumerated a vendor
+    // this throws, and if it probed the seat the dates below would be
+    // today's rather than the fixture's.
+    const fetched = (globalThis as { fetch?: unknown }).fetch;
+    const reached = (what: string) => () => {
+      throw new Error(`the projection reached ${what} while it was being assembled`);
+    };
+    (globalThis as { fetch?: unknown }).fetch = reached("a vendor");
+    // The other way a probe happens is a CLI: `dabbler copilot refresh`
+    // spawns the seat's binary once per model. So every process creation is
+    // trapped too -- except `git`, which the router runs to find a
+    // repository root and which is not a probe of anything. The trap is
+    // PROVEN ARMED before it is relied on, by calling the router's own spawn
+    // and requiring the trap's error back: a trap that silently failed to
+    // install would otherwise make this test pass by doing nothing.
+    const childProcess = createRequire(path.join(root, "index.js"))("child_process") as Record<
+      string,
+      unknown
+    >;
+    const spawners = ["spawn", "spawnSync", "execFile", "execFileSync", "exec", "execSync"];
+    const original = spawners.map((name) => [name, childProcess[name]] as const);
+    for (const [name, real] of original) {
+      childProcess[name] = (...args: unknown[]) => {
+        const program = String(args[0] ?? "");
+        if (/(^|[\\/])git(\.exe)?$/i.test(program)) {
+          return (real as (...rest: unknown[]) => unknown)(...args);
+        }
+        reached(`a CLI (${program})`)();
+      };
+    }
+    let configuration: Projection["configuration"];
+    try {
+      assert.throws(
+        () => spawnProgram(["definitely-not-a-real-program"], { stdio: "ignore" }),
+        /reached a CLI/,
+        "the process trap did not install, so this test proves nothing about spawning",
+      );
+      tryWriteProjection(root);
+      // The configuration half is NOT in the file. The pane asks the router
+      // for it at the moment it renders a row, so the trap has to be armed
+      // around this reading too -- it is the one that could reach a vendor.
+      configuration = configurationNode(root) as Projection["configuration"];
+    } finally {
+      for (const [name, value] of original) childProcess[name] = value;
+      (globalThis as { fetch?: unknown }).fetch = fetched;
+    }
+    const p = {
+      ...(JSON.parse(
+        fs.readFileSync(path.join(root, ".dabbler", "solution", "solution.json"), "utf8"),
+      ) as Projection),
+      configuration,
+    } as Projection;
+
+    // One record now, not three, and it carries the date the fixture wrote
+    // rather than the one a refresh would have stamped.
+    const records = p.configuration?.records ?? [];
+    assert.deepStrictEqual(
+      records.map((row) => row.record),
+      ["ai-model-catalog"],
+    );
+    assert.strictEqual(records[0]?.datedAt, "2026-08-01T09:00:00Z");
+
+    // And the rows render off that record: each names the model it read and
+    // whose it is, and the reviewer is labelled against the AUTHOR's
+    // provider -- derived from two fields, because the comparison is not a
+    // field of its own on 261 candidates.
+    const authoring = descriptorFor({ kind: "configRole", role: "authoring" }, p);
+    const primaryReviewer = descriptorFor({ kind: "configRole", role: "primaryReviewer" }, p);
+    assert.ok(authoring.description?.includes("a-author"));
+    assert.ok(primaryReviewer.description?.includes("o-reviewer"));
+    assert.ok(primaryReviewer.tooltip?.includes("different provider"));
+  });
+});
+
+suite("solutionTreeModel: which key a provider is reached with", () => {
+  /** A projection carrying the three states a credential row can be in. */
+  function withCredentials(): Projection {
+    return {
+      ...single(),
+      configuration: {
+        credentials: [
+          {
+            provider: "anthropic",
+            displayLabel: "Anthropic",
+            variable: "DABBLER_ANTHROPIC_API_KEY",
+            fromEnvironment: true,
+            reference: null,
+            held: false,
+            stop: null,
+            store: "dabbler auth set anthropic",
+            choose: "dabbler configure --credential anthropic=<name>",
+          },
+          {
+            provider: "google",
+            displayLabel: "Google",
+            variable: "DABBLER_GEMINI_API_KEY",
+            fromEnvironment: false,
+            reference: null,
+            held: false,
+            stop: null,
+            store: "dabbler auth set google",
+            choose: "dabbler configure --credential google=<name>",
+          },
+          {
+            provider: "openai",
+            displayLabel: "OpenAI",
+            variable: "DABBLER_OPENAI_API_KEY",
+            fromEnvironment: false,
+            reference: "client-a",
+            decidedBy: ".vscode/settings.json",
+            held: false,
+            stop: "openai is configured to use the credential 'client-a', and this machine holds no credential of that name.",
+            store: "dabbler auth set openai",
+            choose: "dabbler configure --credential openai=<name>",
+          },
+        ],
+      },
+    };
+  }
+
+  test("groups one row per provider under API Keys, saying what is in force and never a value", () => {
+    const p = withCredentials();
+    // One collapsed node beside the participants, so changing a model does
+    // not wade through keys.
+    const configurationChildren = childrenOf({ kind: "configuration" }, p);
+    assert.ok(!configurationChildren.some((node) => node.kind === "configCredential"));
+    const keysNode = configurationChildren.find((node) => node.kind === "configKeys");
+    assert.ok(keysNode);
+    const keys = descriptorFor(keysNode, p);
+    assert.strictEqual(keys.label, "API Keys");
+    // Available is supplied by the variable or held on this machine.
+    assert.strictEqual(keys.description, "1 of 3 available");
+    // A child's stop shows on the collapsed group.
+    assert.strictEqual(keys.icon?.tone, "attention");
+    const rows = childrenOf(keysNode, p).map((node) => descriptorFor(node, p));
+    assert.deepStrictEqual(
+      rows.map((row) => row.label),
+      ["Anthropic key", "Google key", "OpenAI key"],
+    );
+    // Where nothing names a credential the variable supplies the key, and
+    // the row says so with no attention tone.
+    assert.ok(rows[0]?.description?.includes("DABBLER_ANTHROPIC_API_KEY"));
+    assert.strictEqual(rows[0]?.icon?.tone, undefined);
+    assert.strictEqual(rows[1]?.description, "nothing resolves");
+    // A reference this machine cannot answer is the one row that asks for
+    // attention, and it says which credential rather than only that one is
+    // missing.
+    assert.ok(rows[2]?.description?.includes("client-a"));
+    assert.ok(rows[2]?.description?.includes("not on this machine"));
+    assert.strictEqual(rows[2]?.icon?.tone, "attention");
+    // And every one of them clicks through to the terminal that asks.
+    for (const row of rows) {
+      assert.strictEqual(row.command, "dabblerSolution.storeCredential");
+      assert.ok(row.tooltip?.includes("never typed into this window"));
+    }
+  });
+});

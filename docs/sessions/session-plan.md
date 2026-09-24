@@ -14787,3 +14787,62 @@ the close. No Mechanic.
 ### Session 235 of 235: Release 3.19.1 (release: 3.19.1)
 
 The framework publishes session 234's work as 3.19.1 and nothing else.
+
+### Session 236 of 237: A Start that cannot start says what to press
+
+Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
+(`configuredStart`, `runStartSession`, `SessionRunUi`, `defaultSessionRunUi`)
+and `src/test/suite/commandFlows.test.ts` -- the changelogs, `version.json`
+and the stamped manifests
+
+**Why.** The operator, 2026-09-24, from a staff member's machine: a GitHub
+Copilot seat with no authoring model chosen pressed Start Session and met a
+refusal that hands the work back. Three things in it are wrong at once. It
+ends "the Authoring AI's Model row in the Configuration, which is now in
+front of you", and that row is in front of nobody: all that runs is
+`dabblerSolutionTree.focus`, which focuses the view and reveals nothing,
+and this operator's Work Explorer keeps its sections collapsed. It says
+"this repository's Configuration names none" when reaching it means neither
+this repository nor this machine names one, so a person who set a machine
+default with `--mine` is sent to look in the wrong file. And it names no
+way on for anyone outside the editor, where `dabbler configure
+--authoring-model <id>` is the command. The no-engine refusal beside it has
+all three. A stop whose fix is one pick list away should carry the pick
+list, not a description of where to find it.
+
+**Step 1 -- the refusal carries its own way on.** `configuredStart` answers
+a refusal with the action that ends it rather than a bare sentence: the
+missing model offers the Authoring AI's Model row
+(`dabblerSolution.setAuthoringModel`), the missing engine offers its Vehicle
+row (`dabblerSolution.setEngine`). `runStartSession` shows it through one
+seam on `SessionRunUi`, and running the offered command is what the person
+presses; declining leaves the editor as it was and starts nothing. Not a
+modal -- an editor notification with a named button, so a person who wants
+the Configuration itself still has it. `openConfiguration` stays for the
+person who takes neither. Start Session asks nothing of its own either way:
+a choice made through the offered row is SAVED, which is the whole reason
+the pick lists of Start's own were deleted.
+
+**Step 2 -- the words say which layers were read, and the terminal way.**
+Both refusals say that neither this repository nor this machine names one,
+and both name the `dabbler configure` flag that does it from a terminal
+(`--authoring-model <id>`, `--engine <engine>`). Neither claims anything is
+in front of the person.
+
+**Step 3 -- the version.** `version.json` goes to 3.19.2 (a patch: a
+refusal gains its way on and no capability is new), stamped with `npm run
+stamp:version`, and both changelogs get the 3.19.2 section.
+
+One test per behaviour, in the file named after what changed: the existing
+test that pins the no-engine sentence is UPDATED rather than joined, and
+one test says that a refusal offers its row and that taking it runs that
+command and starts nothing.
+
+**Non-goals.** No change to which engines require a model, and none to the
+two model checks that run after the pick. No new preflight at Start. No
+change to the Configuration pane's own rows, to `dabbler configure`, or to
+the router's own `session start` refusals. No modal. No Mechanic.
+
+### Session 237 of 237: Release 3.19.2 (release: 3.19.2)
+
+The framework publishes session 236's work as 3.19.2 and nothing else.

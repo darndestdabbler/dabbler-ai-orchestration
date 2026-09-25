@@ -10,6 +10,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.19.2] — 2026-09-25
+
+**A Start that cannot start says what to press.** A seat with no authoring
+model met a refusal that handed the work back: it said the Configuration
+was "now in front of you" when nothing had been revealed, it named this
+repository when the machine had been read too, and it named no way on at
+all for anyone outside the editor.
+
+### Changed
+
+- **A Start refusal carries the row that ends it.** Where no authoring
+  model is named, the notification offers **Choose the Model**; where no
+  engine is, it offers **Choose the Vehicle**. Pressing one opens that
+  Configuration row's own pick, so what is chosen there is saved and the
+  next **Start Session** asks nothing. Declining starts nothing and
+  changes nothing, and the Solution Explorer is still there for whoever
+  takes neither.
+- **Both refusals say which layers were read**: neither this repository
+  nor this machine names one. Naming this repository alone sent anyone who
+  had set a machine default with `--mine` to look in the wrong file.
+- **Both name the terminal way on** -- `dabbler configure
+  --authoring-model <id>` and `dabbler configure --engine <engine>` --
+  and neither claims anything is in front of the person.
+
 ## [3.19.1] — 2026-09-22
 
 **A release runs only the tests nothing has proved.** A release session

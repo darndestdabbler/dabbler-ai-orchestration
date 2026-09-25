@@ -235,13 +235,23 @@ export function startArguments(choice: EngineChoice, model: string, reviewers: S
  * preference would be refusing the one command that starts the work.
  */
 export function chosenAuthoringModel(repoRoot: string): string {
-  const configuration = solutionConfiguration(repoRoot) as {
-    authoring?: {
-      declaredAtStart?: boolean;
-      chosen?: { model?: string } | null;
-    };
-  } | null;
-  const authoring = configuration?.authoring;
+  return authoringModelIn(solutionConfiguration(repoRoot));
+}
+
+/**
+ * The same answer, from a reading already taken.
+ *
+ * Separate from the read so that a caller holding one reading answers both
+ * of its questions from it: two reads of the same configuration can disagree
+ * across a write, and a refusal that named an engine from one and a model
+ * from the other would describe a repository that never existed.
+ */
+export function authoringModelIn(configuration: unknown): string {
+  const authoring = (
+    configuration as {
+      authoring?: { declaredAtStart?: boolean; chosen?: { model?: string } | null };
+    } | null
+  )?.authoring;
   // A session in flight REPORTS its own model here; offering it back as the
   // value for the next one would put a finished session's identity into a
   // box that starts another.
@@ -561,11 +571,11 @@ export function consultTerminalFor(
 export interface SessionRunUi {
   /**
    * What this repository's Configuration starts a session with, or the
-   * sentence saying what it does not name. `configuredStart` in production;
+   * refusal saying what it does not name. `configuredStart` in production;
    * a seam because the reading is this machine's, and a suite that read it
    * would be testing the developer's own preferences.
    */
-  configured?: (repoRoot: string) => { picked: EngineChoice; model: string } | string;
+  configured?: (repoRoot: string) => { picked: EngineChoice; model: string } | StartRefusal;
   /**
    * The router's reading of what a session with this author would be run
    * with. `solutionConfiguration` in production; a seam for the reason
@@ -587,6 +597,16 @@ export interface SessionRunUi {
   askReviewer: (role: string, models: readonly ConfigurationModel[], authorProvider: string | null) => Thenable<string | undefined>;
   /** Put the Solution Explorer, where the Configuration is, in front of the person. */
   openConfiguration?: () => void;
+  /**
+   * Say why nothing started, with the one action that ends it, and run that
+   * action if it is taken.
+   *
+   * A notification and not a modal: the stop is the person's to act on now
+   * or to leave, and a modal would take the editor hostage over a choice
+   * they may want to make somewhere else. Nothing starts either way -- the
+   * action fixes the Configuration, and the next Start is the one that runs.
+   */
+  refuseWithWayOn: (refusal: StartRefusal) => Thenable<void>;
   /** `purpose` titles the pick; Start's when omitted. */
   pickEngine: (purpose?: string) => Thenable<EngineChoice | undefined>;
   /**
@@ -665,6 +685,10 @@ export function defaultSessionRunUi(
     // The view the Configuration lives in. A view's own `focus` command is the
     // editor's, named after the view's id.
     openConfiguration: () => void vscode.commands.executeCommand("dabblerSolutionTree.focus"),
+    refuseWithWayOn: async (refusal) => {
+      const taken = await vscode.window.showErrorMessage(refusal.message, refusal.action.title);
+      if (taken === refusal.action.title) await vscode.commands.executeCommand(refusal.action.command);
+    },
     askReviewingVehicle: async (vehicles) => {
       const picked = await vscode.window.showQuickPick(
         vehicles.map((vehicle, at) => ({
@@ -856,31 +880,58 @@ export async function runStopSession(
 }
 
 /**
+ * A Start that cannot start, and the one action that ends it.
+ *
+ * The action is carried rather than described: a refusal whose fix is one
+ * pick list away was sending the person to find the row themselves, in a
+ * view that reveals nothing when it is focused. `command` is the row's own
+ * command, so the choice made through it is the one the row writes -- saved
+ * to this repository, which is why Start asks nothing of its own.
+ */
+export interface StartRefusal {
+  readonly message: string;
+  readonly action: { readonly title: string; readonly command: string };
+}
+
+/**
  * What this repository's Configuration starts a session with: the engine and
- * the model it names, or the sentence saying what it does not name.
+ * the model it names, or the refusal saying what it does not name.
  *
  * Read and never asked. The engine and the model were each a pick list at
  * every Start, offering back what the Configuration already showed -- so a
  * person answered twice, and the second answer was written nowhere.
+ *
+ * `reading` is the configuration this answer is drawn from, taken here by
+ * default: one reading answers both questions, and a suite can hand it one
+ * rather than the developer's own machine.
  */
-export function configuredStart(repoRoot: string): { picked: EngineChoice; model: string } | string {
-  const configuration = solutionConfiguration(repoRoot) as { engines?: { chosen?: string | null } } | null;
-  const engine = configuration?.engines?.chosen ?? null;
+export function configuredStart(
+  repoRoot: string,
+  reading: unknown = solutionConfiguration(repoRoot),
+): { picked: EngineChoice; model: string } | StartRefusal {
+  const engine = (reading as { engines?: { chosen?: string | null } } | null)?.engines?.chosen ?? null;
   const picked = ENGINES.find((choice) => choice.engine === engine);
   if (picked === undefined) {
-    return (
-      "This repository's Configuration names no engine to start a session with, so nothing was started. " +
-      "Choose one on the Authoring AI's Vehicle row in the Configuration, which is now in front of you: " +
-      "it is saved to this repository, and Start Session then asks nothing."
-    );
+    return {
+      // Neither layer, because reaching here means both were read and
+      // neither answered. Naming this repository alone sent a person who
+      // set a machine default with `--mine` to look in the wrong file.
+      message:
+        "Neither this repository nor this machine names an engine to start a session with, so nothing was started. " +
+        "Choose one on the Authoring AI's Vehicle row, or run `dabbler configure --engine <engine>` in a terminal: " +
+        "either is saved to this repository, and Start Session then asks nothing.",
+      action: { title: "Choose the Vehicle", command: "dabblerSolution.setEngine" },
+    };
   }
-  const model = chosenAuthoringModel(repoRoot);
+  const model = authoringModelIn(reading);
   if (picked.modelRequired && model === "") {
-    return (
-      `${picked.label} needs a model and this repository's Configuration names none, so nothing was started. ` +
-      "Choose one on the Authoring AI's Model row in the Configuration, which is now in front of you: " +
-      "it is saved to this repository, and Start Session then asks nothing."
-    );
+    return {
+      message:
+        `${picked.label} needs a model and neither this repository nor this machine names one, so nothing was started. ` +
+        "Choose one on the Authoring AI's Model row, or run `dabbler configure --authoring-model <id>` in a terminal: " +
+        "either is saved to this repository, and Start Session then asks nothing.",
+      action: { title: "Choose the Model", command: "dabblerSolution.setAuthoringModel" },
+    };
   }
   return { picked, model };
 }
@@ -914,13 +965,15 @@ export async function runStartSession(
     return true;
   }
   const configured = ask ? null : (ui.configured ?? configuredStart)(repository.root);
-  if (typeof configured === "string") {
-    // To the Configuration and never to a pick list of Start's own: a choice
-    // made there is SAVED, so the next Start asks nothing, where one made
-    // here would be written nowhere and this message would meet the person
-    // again at every Start. The other command is the one that asks.
-    ui.showErrorMessage(configured);
+  if (configured !== null && "message" in configured) {
+    // The Configuration's own row and never a pick list of Start's own: a
+    // choice made there is SAVED, so the next Start asks nothing, where one
+    // made here would be written nowhere and this message would meet the
+    // person again at every Start. The other command is the one that asks.
+    // The view is still focused for whoever takes neither the row nor the
+    // terminal, and nothing starts on this path either way.
     ui.openConfiguration?.();
+    await ui.refuseWithWayOn(configured);
     return false;
   }
   // A cancelled pick cancels the command, which is what cancelling a decision should do.

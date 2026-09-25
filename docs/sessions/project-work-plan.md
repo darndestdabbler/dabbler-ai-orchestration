@@ -273,6 +273,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 233 | Release 3.19.0 (release: 3.19.0) | yes | 2026-09-22 |
 | 234 | A release runs only the tests nothing has proved | no | 2026-09-22 |
 | 235 | Release 3.19.1 (release: 3.19.1) | yes | 2026-09-22 |
+| 236 | A Start that cannot start says what to press | no | 2026-09-25 |
+| 237 | Release 3.19.2 (release: 3.19.2) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3011,3 +3013,9 @@ Make a release session run a suite whole before the pack only where no passing w
 **Releasable: yes.**
 
 Release 3.19.1: the framework packs and publishes what is on the trunk.
+
+### Session 236 — A Start that cannot start says what to press
+
+**Releasable: no.**
+
+A Start Session that cannot start carries the pick list that ends it, instead of describing where to find one. In tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts, configuredStart stops answering a refusal with a bare sentence and answers with the sentence plus the one action that ends it: a seat with no authoring model offers the Authoring AI's Model row (dabblerSolution.setAuthoringModel), a reading that names no engine offers its Vehicle row (dabblerSolution.setEngine). runStartSession shows it through one new seam on SessionRunUi, an editor notification with a named button and not a modal; pressing the button runs that command and starts nothing, declining runs nothing and starts nothing, and openConfiguration stays for the person who takes neither. Both sentences are then rewritten to say what is true: that neither this repository nor this machine names one (so a person who set a machine default with --mine is not sent to the wrong file), to name the terminal way on (`dabbler configure --authoring-model <id>`, `dabbler configure --engine <engine>`), and to claim nothing is in front of the person. The test gap that let the wording ship is closed first: the one test covering this stop stubs configuredStart out entirely, so neither refusal has ever been tested -- that test is updated rather than joined, and configuredStart itself becomes testable against a reading (an optional reading parameter, with the authoring-model logic extracted from chosenAuthoringModel as a pure reader) and is tested on a seat with no model, on a reading with no engine, on a reading naming both, and on Claude Code with no model, which must still start. One walk step in configuration-pane.spec.ts, using the .notifications-toasts locator that spec already reads, proves the button renders and opens the model pick. Then version.json goes to 3.19.2, stamped with npm run stamp:version, and the changelog gains its 3.19.2 section. Note on the plan's wording: this repository has one authored changelog, tools/dabbler-ai-orchestration/CHANGELOG.md; docs/sessions/change-log.md is the framework's own and is never hand-edited, so only the one is touched.

@@ -24,6 +24,8 @@ import {
   type EngineTerminal,
   type SessionRegistrar,
   type SessionRunUi,
+  type StartRefusal,
+  configuredStart,
   defaultSessionRunUi,
   engineTerminalFor,
   repositoryOf,
@@ -381,11 +383,20 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
   infos: string[];
   /** Every terminal the UI was asked to open. */
   terminals: EngineTerminal[];
+  /** Every refusal the UI was asked to show, with the action it carried. */
+  refusals: StartRefusal[];
 } {
   const errors: string[] = [];
   const infos: string[] = [];
   const terminals: EngineTerminal[] = [];
+  const refusals: StartRefusal[] = [];
   const ui: SessionRunUi = {
+    // Taken by nobody unless a test says otherwise: a refusal that started
+    // the offered command by default would hide the difference between a
+    // person who pressed the button and one who did not.
+    refuseWithWayOn: async (refusal) => {
+      refusals.push(refusal);
+    },
     // Answers "it did not refuse" unless a test says otherwise. A suite that
     // let this reach the real `claude` would spawn the developer's own CLI
     // on every flow test -- passing here and meaning nothing anywhere else.
@@ -407,7 +418,7 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     withProgress: (_title, work) => work(),
     ...overrides,
   };
-  return { ui, errors, infos, terminals };
+  return { ui, errors, infos, terminals, refusals };
 }
 
 /** A registrar that answers `code` and records what it was asked to register. */
@@ -980,15 +991,20 @@ suite("Start opens the person's own CLI", () => {
     assert.ok(oneVendor.errors[0]?.includes("never from the author's vendor"), oneVendor.errors[0]);
   });
 
-  test("a Configuration that cannot start a session says what it lacks and opens it, and asks for nothing itself", async () => {
+  test("a Configuration that cannot start a session offers the row that ends it, and asks for nothing itself", async () => {
     // A choice made in the Configuration is SAVED, so the next Start asks
     // nothing. A pick list here would start one session and leave the
     // repository as unconfigured as it was, to meet this message again.
-    const lacks = "This repository's Configuration names no engine to start a session with, so nothing was started.";
+    //
+    // The refusal is the REAL one, read from a configuration handed in:
+    // this test used to answer `configured` with a sentence of its own, so
+    // neither refusal, and neither condition that produces one, was ever
+    // exercised -- which is how the words came to describe something the
+    // code does not do.
     let opened = 0;
     const asked: string[] = [];
     const unconfigured = driveUi({
-      configured: () => lacks,
+      configured: (root) => configuredStart(root, readingOf({})),
       openConfiguration: () => { opened += 1; },
       pickEngine: async () => { asked.push("engine"); return ENGINES[0]; },
       askModel: async () => { asked.push("model"); return "haiku"; },
@@ -996,10 +1012,123 @@ suite("Start opens the person's own CLI", () => {
     });
     const register = registrarOf();
     assert.strictEqual(await runStartSession(makeRepository(), unconfigured.ui, register), false);
-    assert.deepStrictEqual(unconfigured.errors, [lacks]);
+    assert.strictEqual(unconfigured.refusals.length, 1);
+    assert.strictEqual(unconfigured.refusals[0]?.action.command, "dabblerSolution.setEngine");
     assert.strictEqual(opened, 1);
     assert.deepStrictEqual(asked, []);
     assert.deepStrictEqual(register.calls, []);
+  });
+});
+
+/**
+ * A configuration reading, as the router hands one back: the engine this
+ * repository starts with and the authoring model it names.
+ */
+function readingOf({ engine, model }: { engine?: string; model?: string }): unknown {
+  return {
+    engines: { chosen: engine ?? null },
+    authoring: { declaredAtStart: false, chosen: model === undefined ? null : { model } },
+  };
+}
+
+suite("What the Configuration starts a session with", () => {
+  test("a seat with no authoring model refuses, and offers the Model row", () => {
+    const refusal = configuredStart("/repo", readingOf({ engine: "copilot" }));
+    assert.ok("message" in refusal, JSON.stringify(refusal));
+    assert.strictEqual(refusal.action.command, "dabblerSolution.setAuthoringModel");
+    // Both layers were read to get here, so both are named: saying this
+    // repository alone sends a person who set a machine default with
+    // `--mine` to look in the wrong file.
+    assert.ok(refusal.message.includes("neither this repository nor this machine"), refusal.message);
+    // The way on for a person outside the editor.
+    assert.ok(refusal.message.includes("dabbler configure --authoring-model"), refusal.message);
+    // Focusing the view reveals nothing, so nothing claims to be in front of anyone.
+    assert.ok(!refusal.message.includes("in front of you"), refusal.message);
+  });
+
+  test("a reading that names no engine refuses, and offers the Vehicle row", () => {
+    const refusal = configuredStart("/repo", readingOf({ model: "gpt-5-6-luna" }));
+    assert.ok("message" in refusal, JSON.stringify(refusal));
+    assert.strictEqual(refusal.action.command, "dabblerSolution.setEngine");
+    assert.ok(refusal.message.includes("Neither this repository nor this machine"), refusal.message);
+    assert.ok(refusal.message.includes("dabbler configure --engine"), refusal.message);
+    assert.ok(!refusal.message.includes("in front of you"), refusal.message);
+  });
+
+  test("a reading naming both returns the pair and refuses nothing", () => {
+    const start = configuredStart("/repo", readingOf({ engine: "copilot", model: "gpt-5-6-luna" }));
+    assert.ok(!("message" in start), JSON.stringify(start));
+    assert.strictEqual(start.picked.engine, "copilot");
+    assert.strictEqual(start.model, "gpt-5-6-luna");
+  });
+
+  test("an engine that needs no model is not refused for want of one, and starts on its own default", () => {
+    // The regression a careless fix makes: refusing every engine with no
+    // model named. Claude Code has a default of its own, and an empty model
+    // is how Start says "the engine's".
+    const start = configuredStart("/repo", readingOf({ engine: "claude-code" }));
+    assert.ok(!("message" in start), JSON.stringify(start));
+    assert.strictEqual(start.picked.engine, "claude-code");
+    assert.strictEqual(start.model, "");
+  });
+});
+
+suite("The way on a Start refusal carries", () => {
+  /**
+   * The real UI over the stub, so what is measured is what the EDITOR was
+   * asked to show and to run. `answer` is what the person presses.
+   */
+  function editorAnswering(answer: (title: string) => string | undefined): { ran: string[]; restore: () => void } {
+    const ran: string[] = [];
+    const window = vscode.window as unknown as { showErrorMessage: unknown };
+    const commands = vscode.commands as unknown as { executeCommand: unknown };
+    const wasShowing = window.showErrorMessage;
+    const wasRunning = commands.executeCommand;
+    window.showErrorMessage = async (_message: string, title?: string) =>
+      title === undefined ? undefined : answer(title);
+    commands.executeCommand = async (command: string) => {
+      ran.push(command);
+      return undefined;
+    };
+    return {
+      ran,
+      restore: () => {
+        window.showErrorMessage = wasShowing;
+        commands.executeCommand = wasRunning;
+      },
+    };
+  }
+
+  test("taking the offer runs that command, and registers nothing", async () => {
+    const editor = editorAnswering((title) => title);
+    try {
+      const ui = {
+        ...defaultSessionRunUi(),
+        configured: (root: string) => configuredStart(root, readingOf({ engine: "copilot" })),
+      };
+      const register = registrarOf();
+      assert.strictEqual(await runStartSession(makeRepository(), ui, register), false);
+      assert.ok(editor.ran.includes("dabblerSolution.setAuthoringModel"), editor.ran.join(", "));
+      assert.deepStrictEqual(register.calls, []);
+    } finally {
+      editor.restore();
+    }
+  });
+
+  test("declining it runs nothing and registers nothing", async () => {
+    const editor = editorAnswering(() => undefined);
+    try {
+      const ui = {
+        ...defaultSessionRunUi(),
+        configured: (root: string) => configuredStart(root, readingOf({ engine: "copilot" })),
+      };
+      const register = registrarOf();
+      assert.strictEqual(await runStartSession(makeRepository(), ui, register), false);
+      assert.ok(!editor.ran.includes("dabblerSolution.setAuthoringModel"), editor.ran.join(", "));
+      assert.deepStrictEqual(register.calls, []);
+    } finally {
+      editor.restore();
+    }
   });
 });
 

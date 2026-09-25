@@ -31,10 +31,14 @@ import {
   expandAllRows,
   launchVSCode,
   makeTmpDir,
+  repositoryLabel,
   rowContextMenuText,
   rowTexts,
+  runCommand,
   solutionExplorerPane,
   treeRow,
+  triggerRefresh,
+  workExplorerPane,
   writeSessionsRoot,
 } from "./electronLaunch";
 
@@ -190,15 +194,15 @@ test("right-clicking each leaf offers its own action and the way to keep it", as
   const rows = await rowTexts(pane);
   expect(rows.length).toBeGreaterThan(0);
 
-  // The two Vehicle rows. Both offer the setting AND *Keep as My Default*,
-  // which is the difference between this checkout's policy and this
-  // person's -- who else gets it.
+  // The two Vehicle rows. Both offer the setting AND *Keep as Machine
+  // Default*, which is the difference between this checkout's policy and
+  // this machine's -- who else gets it.
   const vehicles = pane.locator(".monaco-list-row").filter({ hasText: "Vehicle" });
   const vehicleCount = await vehicles.count();
   expect(vehicleCount).toBeGreaterThanOrEqual(2);
   for (let index = 0; index < vehicleCount; index += 1) {
     const menu = await rowContextMenuText(vscode.page, vehicles.nth(index));
-    expect(menu).toContain("Keep as My Default");
+    expect(menu).toContain("Keep as Machine Default");
     expect(menu).toMatch(/Set the (Authoring|Reviewing) Vehicle/);
   }
 
@@ -388,9 +392,12 @@ test("an Auxiliary chosen on the seat is said to be not listed once reviews move
   ) as Record<string, string>;
   expect(settings["dabbler.reviewerTransport"]).toBe("api");
   // Kept, and announced: the row names the vehicle that does not list it.
+  // Matched around whatever the row says between the two -- session 225 put
+  // the layer that chose it there, and an assertion spelling the row out
+  // end to end breaks on every word added to it.
   await expect
     .poll(async () => (await rowTexts(pane)).join(" | "), { timeout: 15_000 })
-    .toContain("gemini-3.8-flash — not listed by api");
+    .toMatch(/gemini-3\.8-flash[^|]*not listed by api/);
 });
 
 test("on api, every pick offers exactly what the router offers", async () => {
@@ -405,4 +412,65 @@ test("a Primary the two lists spell differently is accepted on api and repaints 
   await expect
     .poll(async () => (await rowTexts(pane)).join(" | "), { timeout: 15_000 })
     .toMatch(/Primary Model[^|]*claude-haiku-4-5-20251001/);
+});
+
+test("a Start that cannot start carries the button that ends it", async () => {
+  // The one failure no unit test can see: a button that never renders. The
+  // suite proves the refusal CARRIES its action; only a running editor
+  // proves the editor draws it and that pressing it opens the pick.
+  const settingsPath = path.join(workspace, ".vscode", "settings.json");
+  const wasSettings = fs.readFileSync(settingsPath, "utf8");
+  const wasPreferences = fs.readFileSync(preferencesPath, "utf8");
+  try {
+    // A repository on a seat -- the engine that needs a model -- naming no
+    // model at either layer, which is exactly the staff machine the
+    // operator reported from.
+    const settings = JSON.parse(wasSettings) as Record<string, unknown>;
+    delete settings["dabbler.authoringModel"];
+    fs.writeFileSync(settingsPath, JSON.stringify({ ...settings, "dabbler.engine": "copilot" }, null, 2), "utf8");
+    const preferences = JSON.parse(wasPreferences) as Record<string, unknown>;
+    delete preferences.authoring_model;
+    fs.writeFileSync(preferencesPath, JSON.stringify(preferences, null, 2), "utf8");
+    // A session left to start, or the repository row offers no Start at all.
+    writeSessionsRoot(workspace, [
+      { number: 1, title: "Ship the thing", status: "complete", verificationVerdict: "VERIFIED" },
+      { number: 2, title: "Ship the next thing", status: "not-started" },
+    ]);
+    await triggerRefresh(vscode.page);
+    // The toasts the steps above left standing, cleared: this step reads the
+    // notification area, and what it must read is the one Start puts there.
+    await runCommand(vscode.page, ">Notifications: Clear All Notifications", 500);
+
+    const work = await workExplorerPane(vscode.page);
+    const repository = treeRow(work, repositoryLabel(workspace));
+    await repository.click({ button: "right" });
+    const menu = vscode.page.locator(".context-view .monaco-menu");
+    await menu.waitFor({ state: "visible", timeout: 10_000 });
+    // Hover to select, Enter to invoke: a click on a monaco menu item makes
+    // it the active one and does not always run it.
+    await menu.getByRole("menuitem", { name: "Start Session", exact: true }).hover();
+    await vscode.page.keyboard.press("Enter");
+
+    // The refusal, drawn as a notification: its words, and the button.
+    const toast = vscode.page.locator(".notifications-toasts");
+    await toast.waitFor({ state: "visible", timeout: 20_000 });
+    const said = await toast.innerText();
+    expect(said).toContain("neither this repository nor this machine");
+    expect(said).toContain("dabbler configure --authoring-model");
+
+    // Pressing it opens the model pick -- the row's own command, so what is
+    // chosen there is saved and the next Start asks nothing.
+    await toast.getByRole("button", { name: "Choose the Model" }).click();
+    const picker = vscode.page.locator(".quick-input-widget");
+    await picker.waitFor({ state: "visible", timeout: 20_000 });
+    expect(await picker.innerText()).toContain("gpt-5.6");
+    await vscode.page.keyboard.press("Escape");
+    await vscode.page.waitForTimeout(300);
+  } finally {
+    fs.writeFileSync(settingsPath, wasSettings, "utf8");
+    fs.writeFileSync(preferencesPath, wasPreferences, "utf8");
+    writeSessionsRoot(workspace, [
+      { number: 1, title: "Ship the thing", status: "complete", verificationVerdict: "VERIFIED" },
+    ]);
+  }
 });

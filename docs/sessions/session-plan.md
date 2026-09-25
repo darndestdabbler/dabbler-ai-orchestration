@@ -14792,8 +14792,9 @@ The framework publishes session 234's work as 3.19.1 and nothing else.
 
 Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 (`configuredStart`, `runStartSession`, `SessionRunUi`, `defaultSessionRunUi`)
-and `src/test/suite/commandFlows.test.ts` -- the changelogs, `version.json`
-and the stamped manifests
+and its tests in `src/test/suite/commandFlows.test.ts` and
+`src/test/playwright/configuration-pane.spec.ts` -- the changelogs,
+`version.json` and the stamped manifests
 
 **Why.** The operator, 2026-09-24, from a staff member's machine: a GitHub
 Copilot seat with no authoring model chosen pressed Start Session and met a
@@ -14833,15 +14834,32 @@ in front of the person.
 refusal gains its way on and no capability is new), stamped with `npm run
 stamp:version`, and both changelogs get the 3.19.2 section.
 
-One test per behaviour, in the file named after what changed: the existing
-test that pins the no-engine sentence is UPDATED rather than joined, and
-one test says that a refusal offers its row and that taking it runs that
-command and starts nothing.
-
 **Non-goals.** No change to which engines require a model, and none to the
 two model checks that run after the pick. No new preflight at Start. No
 change to the Configuration pane's own rows, to `dabbler configure`, or to
 the router's own `session start` refusals. No modal. No Mechanic.
+
+**Tests.** In `commandFlows.test.ts`, the file named after what changed.
+**The gap that let this ship is named first:** the one test covering this
+stop stubs `configuredStart` out entirely (`configured: () => lacks`), so
+neither refusal sentence, and neither condition that produces one, has ever
+been tested -- which is exactly how the words came to describe something the
+code does not do. That test is UPDATED rather than joined, and
+`configuredStart` itself is tested against a reading: a seat with no model
+refuses, a reading with no engine refuses, and a reading naming both returns
+the pair and refuses nothing. Beside them, one test each for the seam: a
+refusal offers its row, taking the offer runs that command and registers
+nothing, and declining it registers nothing either. One regression guard,
+because a careless fix would refuse every engine: Claude Code with no model
+is not refused, and starts on the engine's own default.
+
+One walk step, in `configuration-pane.spec.ts`, which already reads
+`.notifications-toasts` -- so this is that mechanic used again and no new
+machinery. A button that never renders is the one failure no unit test can
+see: on a repository that names no authoring model, Start Session's
+notification carries the named button, and pressing it opens the model pick.
+
+**Releasable.** Yes -- session 237 publishes it as 3.19.2.
 
 ### Session 237 of 237: Release 3.19.2 (release: 3.19.2)
 

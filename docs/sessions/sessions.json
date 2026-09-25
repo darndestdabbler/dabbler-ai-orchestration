@@ -4680,9 +4680,9 @@
     {
       "number": 236,
       "title": "A Start that cannot start says what to press",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-25T07:41:11.290000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-25T08:05:56.577000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

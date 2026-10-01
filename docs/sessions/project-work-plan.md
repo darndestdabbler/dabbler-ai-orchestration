@@ -275,6 +275,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 235 | Release 3.19.1 (release: 3.19.1) | yes | 2026-09-22 |
 | 236 | A Start that cannot start says what to press | no | 2026-09-25 |
 | 237 | Release 3.19.2 (release: 3.19.2) | yes | 2026-09-25 |
+| 238 | A Copilot CLI that is only a shim gets every prompt by file | no | 2026-10-01 |
+| 239 | Release 3.19.3 (release: 3.19.3) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3025,3 +3027,9 @@ A Start Session that cannot start carries the pick list that ends it, instead of
 **Releasable: yes.**
 
 Release 3.19.2: the framework packs and publishes what is on the trunk.
+
+### Session 238 — A Copilot CLI that is only a shim gets every prompt by file
+
+**Releasable: no.**
+
+A Copilot seat whose CLI is only an npm-installed `copilot.cmd` shim becomes a working vehicle, because every prompt on that machine travels by file instead of on a `cmd.exe` command line. In `packages/router/src/checks.ts`, `spawnProgram`'s batch branch refuses an argv element holding a carriage return or a line feed before it spawns, with an error naming the shim's path and the reason -- `cmd.exe` stops reading its `/c` string at the first line break, so the argument would arrive cut rather than quoted, and every caller of `spawnProgram` already turns a spawn failure into a classified failed call rather than letting it escape. In `packages/router/src/transports/copilot.ts`, `dispatch` resolves the binary once through `resolveProgram` and, when it is a batch shim, takes `runHandoff` at every rendered length; an executable keeps the 24,000-unit threshold and the inline branch exactly as they are, because that is the higher-fidelity path and nothing about it is wrong. `buildHandoffBootstrap` becomes ONE line, the payload path set off by spaces and a sentence of its own rather than by line breaks, so it survives `cmd.exe` and reads the same to a model; the ack footer stays in the payload file and never reaches argv. The handoff metadata gains `handoff_reason`, `threshold` or `batch-shim`, beside `handoff: true`, so a reader of `rounds.jsonl` on a shim machine cannot take a 2,000-character prompt's handoff for a size bug. Nothing is retried: the whole of the shim's hazard is knowable before the spawn, and after this the inline branch never meets `cmd.exe`. Then the seat column of the vehicle table in `tools/dabbler-ai-orchestration/README.md` says what the two installs are -- WinGet's `GitHub.Copilot` puts `copilot.exe` on PATH, the npm package puts a shim there, and both work because a shim's prompts travel by file -- and `version.json` goes to 3.19.3, a patch because a seat that could not review can and no capability is new, stamped with `npm run stamp:version`. Note on the plan's wording: this repository has one authored changelog, `tools/dabbler-ai-orchestration/CHANGELOG.md`, which gains its 3.19.3 section; `docs/sessions/change-log.md` is the framework's own and is never hand-edited, so only the one is touched.

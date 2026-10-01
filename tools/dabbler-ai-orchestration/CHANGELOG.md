@@ -10,6 +10,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.19.3] — 2026-10-01
+
+**A Copilot seat whose CLI came from npm can author and review.** The npm
+package installs only a `copilot.cmd` shim, and a batch file can be run by
+nothing but `cmd.exe` — so on a machine with no `copilot.exe` every seat call
+went through a `cmd` command line, which cut a verification prompt at its
+first newline, dropped every flag that followed, and refused anything longer
+than 8,191 characters as *The command line is too long.* A staff member's
+verification round failed on exactly that; a coworker reproduced it.
+
+### Fixed
+
+- **Where the CLI is only a shim, every prompt travels by file.** The seat
+  writes the whole prompt to a temp file and hands the CLI a one-line
+  instruction pointing at it, whatever the prompt's length — the route large
+  prompts already took, now taken at every size on that machine, so nothing
+  reaches a command line that would break it. On a seat with the real
+  `copilot.exe` nothing changes: the prompt still travels inline up to the
+  existing threshold.
+- **A round record says why it pulled.** Round output carries
+  `handoff_reason`, `threshold` or `batch-shim`, so a small prompt that
+  travelled by file is not read as a size bug.
+- **An argument holding a newline is refused instead of silently cut.** A
+  call through a batch shim that would arrive truncated at exit 0 now fails
+  and says so.
+
+### Changed
+
+- The README's Copilot column names both installs: WinGet's `GitHub.Copilot`
+  and the npm package both work.
+
 ## [3.19.2] — 2026-09-25
 
 **A Start that cannot start says what to press.** A seat with no authoring

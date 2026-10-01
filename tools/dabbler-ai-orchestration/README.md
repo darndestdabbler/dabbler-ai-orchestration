@@ -58,7 +58,7 @@ Dabbler terminal.
 
 | | **Direct provider APIs** | **GitHub Copilot CLI seat** |
 |---|---|---|
-| Setup | Set `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_OPENAI_API_KEY` / `DABBLER_GEMINI_API_KEY` | Install the Copilot CLI and sign in; set the vehicle with `dabbler configure --transport copilot-cli` |
+| Setup | Set `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_OPENAI_API_KEY` / `DABBLER_GEMINI_API_KEY` | Install the Copilot CLI and sign in; set the vehicle with `dabbler configure --transport copilot-cli`. Either install works: WinGet's `GitHub.Copilot` puts `copilot.exe` on PATH, the npm package puts a `copilot.cmd` shim there, and a shim's prompts travel by file |
 | Spend | Metered API calls, every one recorded per model and per session | Covered by your existing Copilot subscription |
 | Best for | Anyone with provider accounts | Shops whose staff hold only a Copilot seat and cannot get provider keys |
 

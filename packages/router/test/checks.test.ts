@@ -412,6 +412,55 @@ describe("finding the program a name means", () => {
     assert.equal(code, 0);
     assert.match(seen, /reached/);
   });
+
+  it("refuses an argument holding a line break rather than letting cmd cut it", { skip: !onWindows }, () => {
+    // `cmd.exe` stops reading its /c line at the first break, so the argument
+    // would arrive truncated and every argument after it would not arrive at
+    // all -- at exit 0, which reads as a call that worked. A seat whose CLI is
+    // only an npm `.cmd` shim met exactly that: the prompt's first line
+    // reached the CLI and none of the flags did.
+    const [one] = pathWith(["tool.cmd"], []);
+    withPath([one], () => {
+      assert.throws(
+        () => spawnProgram(["tool", "first line\nsecond line"], { stdio: "ignore" }),
+        (error: Error) =>
+          error.message.includes(join(one, "tool.CMD")) && /line break/.test(error.message),
+      );
+    });
+  });
+
+  it("carries cmd's own metacharacters through a shim intact", { skip: !onWindows }, async () => {
+    // The other half of the same question, and the reason the refusal above
+    // is about line breaks ALONE: everything cmd otherwise treats as syntax
+    // is already handled, because `quoteForCmd` quotes every argument. A
+    // recorder rather than `echo`, because echoing these is its own puzzle
+    // and would be testing batch instead of the router -- reached by its
+    // absolute path, because `withPath` leaves the shim's own directory as
+    // the whole of PATH and a bare `node` would not be found there.
+    const directory = tempDir("cmd-meta-");
+    const recorder = join(directory, "recorder.js");
+    writeFileSync(
+      recorder,
+      "process.stdout.write(JSON.stringify(process.argv.slice(2)));\n",
+      "utf8",
+    );
+    writeFileSync(
+      join(directory, "tool.cmd"),
+      `@echo off\r\n"${process.execPath}" "${recorder}" %*\r\n`,
+      "utf8",
+    );
+    const argument = '& ( ) % ! ^ | < > "';
+    const child = withPath([directory], () =>
+      spawnProgram(["tool", argument], { stdio: ["ignore", "pipe", "pipe"] }),
+    );
+    let seen = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+      seen += chunk.toString();
+    });
+    const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
+    assert.equal(code, 0);
+    assert.deepEqual(JSON.parse(seen), [argument]);
+  });
 });
 
 describe("a check the machine cannot run, judged with the plan", () => {

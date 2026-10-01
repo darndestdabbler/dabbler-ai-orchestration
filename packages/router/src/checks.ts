@@ -1703,6 +1703,27 @@ export function quoteForCmd(argument: string): string {
 }
 
 /**
+ * The one thing `quoteForCmd` cannot do for an argument: make a line break
+ * survive. `cmd.exe` stops reading its `/c` string at the first `\r` or `\n`,
+ * and no quoting changes that -- the argument does not arrive escaped or
+ * rejected, it arrives CUT, with everything after the break gone and the
+ * flags that followed it gone too. A call that would do that is refused here
+ * rather than spawned, because `cmd` answers it with exit 0: the program runs,
+ * on a command line nobody wrote.
+ */
+function refuseLineBreakForCmd(shimPath: string, argv: readonly string[]): void {
+  for (const [index, argument] of argv.entries()) {
+    if (!/[\r\n]/.test(String(argument))) continue;
+    throw new Error(
+      `cannot run ${shimPath} with argument ${index}, which holds a line break: it is a batch ` +
+        "file, so `cmd.exe` is what interprets it, and `cmd.exe` stops reading its /c command " +
+        "line at the first carriage return or line feed. The argument would arrive cut -- not " +
+        "quoted, not refused -- and every argument after it would never arrive at all.",
+    );
+  }
+}
+
+/**
  * What every child spawned on these paths gets, whichever way it is reached.
  *
  * `windowsHide` is the one that has to be here rather than at a call site.
@@ -1786,6 +1807,7 @@ export function spawnProgram(argv: readonly string[], options: SpawnOptions): Ch
   const resolved = resolveProgram(String(program));
   const grouped: SpawnOptions = spawnOptionsFor(options, "argv");
   if (resolved.isBatch) {
+    refuseLineBreakForCmd(resolved.path, rest);
     // The outer pair is `/s`'s own rule and not decoration: cmd strips the
     // first and last quote of everything after `/c` when the first character
     // is a quote. Without it a shim under `C:\Program Files` loses the quotes

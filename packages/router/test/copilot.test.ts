@@ -4,7 +4,9 @@
 // The spawner is the one seam, and it is filled with a real in-process
 // stream rather than a stub -- so the line pump, the queue, the three
 // deadlines and the parser that ship are the ones under test. Nothing here
-// spawns a process, reaches a network or replaces a module.
+// reaches a network or replaces a module, and one test alone spawns a
+// process: a batch shim is interpreted by `cmd.exe`, and what `cmd.exe` does
+// to a command line is not something a fake spawner can be asked.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -25,10 +27,17 @@ import {
   renderedUtf16Units,
   resolveRoleCandidates,
   validateTransportTimeouts,
+  type CopilotCliTransportOptions,
   type ProcessHandle,
 } from "../src/transports/copilot.ts";
 import { type CatalogModel } from "../src/catalog.ts";
 import { tempDir } from "./support/answers.ts";
+
+/**
+ * A batch shim is a Windows fact: `resolveProgram` calls no program a batch
+ * file anywhere else, so the tests about one have nothing to assert there.
+ */
+const onWindows = process.platform === "win32";
 
 
 // --- The fake seat -----------------------------------------------------------
@@ -114,12 +123,35 @@ function dispatch(
   });
 }
 
+/**
+ * An executable, named as a path so no machine is asked about it:
+ * `resolveProgram` decides a path with a separator in it by its extension
+ * alone and never looks for it on disk.
+ */
+const EXECUTABLE_BINARY = join("C:", "seat", "copilot.exe");
+
+/**
+ * A seat on an EXECUTABLE, which is what every test that is not about the
+ * shim needs.
+ *
+ * Left to default, `binary` is the bare name `copilot` and `dispatch` resolves
+ * it against the real PATH -- so on a machine whose only install is the npm
+ * `copilot.cmd`, which is the machine this transport was fixed for, the pull
+ * is taken and every inline assertion here would be asserting the other
+ * branch. Measured: eight of these tests fail that way. A suite whose verdict
+ * depends on what the host happens to have installed is not a suite, so the
+ * binary is pinned here and a test that wants a shim says so by passing one.
+ */
+function seatTransport(options: CopilotCliTransportOptions = {}): CopilotCliTransport {
+  return new CopilotCliTransport({ binary: EXECUTABLE_BINARY, ...options });
+}
+
 // --- Dispatch ----------------------------------------------------------------
 
 describe("dispatching one turn through the seat", () => {
   it("parses the content, the tokens and the conversation id", async () => {
     const result = await dispatch(
-      new CopilotCliTransport({ spawner: spawnerFor(fakeProcess({ stdout: OK_STDOUT })) }),
+      seatTransport({ spawner: spawnerFor(fakeProcess({ stdout: OK_STDOUT })) }),
       { model_id: "claude-sonnet-4.6", system_prompt: "sys", user_message: "user" },
     );
     assert.equal(isOk(result), true);
@@ -137,7 +169,7 @@ describe("dispatching one turn through the seat", () => {
     // vendor will state on request. An estimate presented as a measurement
     // is what made 364 premium requests invisible until the bill.
     const spawner = spawnerFor(fakeProcess({ stdout: OK_STDOUT }));
-    const asked = await dispatch(new CopilotCliTransport({ spawner }));
+    const asked = await dispatch(seatTransport({ spawner }));
     const flagAt = spawner.argv.indexOf("--usage-output-file");
     assert.ok(flagAt >= 0, "the seat is asked for its usage file");
     assert.ok(spawner.argv[flagAt + 1]?.endsWith(".json"));
@@ -157,7 +189,7 @@ describe("dispatching one turn through the seat", () => {
       );
       return fakeProcess({ stdout: OK_STDOUT });
     };
-    const measured = await dispatch(new CopilotCliTransport({ spawner: writing }));
+    const measured = await dispatch(seatTransport({ spawner: writing }));
     assert.equal(measured.metadata["premium_requests"], 14);
     assert.equal(measured.metadata["premium_requests_source"], PREMIUM_SOURCE_USAGE_FILE);
   });
@@ -192,7 +224,7 @@ describe("dispatching one turn through the seat", () => {
     // AGENTS.md into the system prompt and tell a routed verifier it is
     // running the session it was asked to judge.
     const spawner = spawnerFor(fakeProcess({ stdout: OK_STDOUT }));
-    await dispatch(new CopilotCliTransport({ spawner }), {
+    await dispatch(seatTransport({ spawner }), {
       system_prompt: "SYS",
       user_message: "USER",
     });
@@ -222,7 +254,7 @@ describe("dispatching one turn through the seat", () => {
       { type: "result", sessionId: "s", usage: {} },
     );
     const result = await dispatch(
-      new CopilotCliTransport({ spawner: spawnerFor(fakeProcess({ stdout })) }),
+      seatTransport({ spawner: spawnerFor(fakeProcess({ stdout })) }),
     );
     // Both halves travel: the text the model saw, and the CLI's own diff of
     // the file, which is the only line-numbered framing a fidelity
@@ -257,7 +289,7 @@ describe("dispatching one turn through the seat", () => {
   ] as const) {
     it(`fails closed when ${label}`, async () => {
       const result = await dispatch(
-        new CopilotCliTransport({ spawner: spawnerFor(fakeProcess({ stdout })) }),
+        seatTransport({ spawner: spawnerFor(fakeProcess({ stdout })) }),
       );
       assert.equal(isOk(result), false);
       assert.equal(result.metadata["error_class"], "generic-unknown");
@@ -273,7 +305,7 @@ describe("dispatching one turn through the seat", () => {
     // lines are intact, and the answer is what the caller gets.
     const echo = '{"type":"user.message","data":{"content":"f\\"******" can arrive"}}\n';
     const result = await dispatch(
-      new CopilotCliTransport({ spawner: spawnerFor(fakeProcess({ stdout: echo + OK_STDOUT })) }),
+      seatTransport({ spawner: spawnerFor(fakeProcess({ stdout: echo + OK_STDOUT })) }),
     );
     assert.equal(isOk(result), true);
     assert.equal(result.content, "hello from seat");
@@ -288,7 +320,7 @@ describe("dispatching one turn through the seat", () => {
   ] as const) {
     it(`classifies '${expected}' from a non-zero exit's stderr`, async () => {
       const result = await dispatch(
-        new CopilotCliTransport({
+        seatTransport({
           spawner: spawnerFor(fakeProcess({ stderr: stderr + "\n", exitCode: 1 })),
           versionProbe: () => "v1.0.69",
         }),
@@ -303,14 +335,14 @@ describe("dispatching one turn through the seat", () => {
     // The cheap, unbilled question an auth failure raises: is the whole CLI
     // down, or did this one call fail?
     const auth = await dispatch(
-      new CopilotCliTransport({
+      seatTransport({
         spawner: spawnerFor(fakeProcess({ stderr: "unauthorized\n", exitCode: 1 })),
         versionProbe: () => "GitHub Copilot CLI 1.0.69.",
       }),
     );
     assert.equal(auth.metadata["reprobe_cli_version"], "GitHub Copilot CLI 1.0.69.");
     const quota = await dispatch(
-      new CopilotCliTransport({
+      seatTransport({
         spawner: spawnerFor(fakeProcess({ stderr: "429\n", exitCode: 1 })),
         versionProbe: () => "should not be asked",
       }),
@@ -320,7 +352,7 @@ describe("dispatching one turn through the seat", () => {
 
   it("classifies a spawn that never returns as a spawn timeout", async () => {
     const result = await dispatch(
-      new CopilotCliTransport({
+      seatTransport({
         spawner: () =>
           new Promise<ProcessHandle>(() => {
             /* never settles */
@@ -334,7 +366,7 @@ describe("dispatching one turn through the seat", () => {
   it("kills the child when no first byte arrives", async () => {
     const child = blockingProcess();
     const result = await dispatch(
-      new CopilotCliTransport({
+      seatTransport({
         spawner: spawnerFor(child),
         timeouts: { spawn_seconds: 1.0, first_byte_seconds: 0.05, total_seconds: 5.0 },
       }),
@@ -346,7 +378,7 @@ describe("dispatching one turn through the seat", () => {
   it("discards partial output at the total timeout rather than parsing it", async () => {
     const child = blockingProcess(['{"type":"other"}\n']);
     const result = await dispatch(
-      new CopilotCliTransport({
+      seatTransport({
         spawner: spawnerFor(child),
         timeouts: { spawn_seconds: 1.0, first_byte_seconds: 2.0, total_seconds: 0.2 },
       }),
@@ -358,7 +390,7 @@ describe("dispatching one turn through the seat", () => {
 
   it("trips the invocation breaker without spawning", async () => {
     let spawns = 0;
-    const transport = new CopilotCliTransport({
+    const transport = seatTransport({
       spawner: () => {
         spawns += 1;
         return fakeProcess({ stdout: OK_STDOUT });
@@ -375,7 +407,7 @@ describe("dispatching one turn through the seat", () => {
 
   it("classifies a spawner failure rather than letting it escape", async () => {
     const result = await dispatch(
-      new CopilotCliTransport({
+      seatTransport({
         spawner: () => {
           throw new Error("copilot not found");
         },
@@ -392,7 +424,7 @@ describe("dispatching one turn through the seat", () => {
       code: "ENAMETOOLONG",
     });
     const result = await dispatch(
-      new CopilotCliTransport({
+      seatTransport({
         spawner: () => {
           throw tooLong;
         },
@@ -538,13 +570,17 @@ describe("resolving a role against the seat", () => {
 
 const BIG_PROMPT = "x".repeat(30_000);
 
-/** The handoff payload path the bootstrap points the model at. */
+/**
+ * The handoff payload path the bootstrap points the model at. Read out of a
+ * ONE-LINE bootstrap by its own shape rather than by which line it is on: the
+ * bootstrap holds no line break, because on a batch shim it is an argument of
+ * a `cmd.exe` `/c` line and `cmd` stops reading at the first one.
+ */
 function payloadPathFrom(argv: readonly string[]): string {
   const bootstrap = argv[argv.indexOf("-p") + 1]!;
-  for (const line of bootstrap.split("\n")) {
-    if (line.endsWith(".txt")) return line.trim();
-  }
-  throw new Error(`no payload path in bootstrap: ${bootstrap}`);
+  const found = /\S+\.txt/.exec(bootstrap);
+  if (found === null) throw new Error(`no payload path in bootstrap: ${bootstrap}`);
+  return found[0];
 }
 
 function nonceOf(payloadText: string): string {
@@ -591,7 +627,7 @@ class HandoffSpawner {
 }
 
 function dispatchBig(spawner: HandoffSpawner): Promise<APIResult> {
-  return new CopilotCliTransport({ spawner: spawner.spawn }).dispatch({
+  return seatTransport({ spawner: spawner.spawn }).dispatch({
     model_id: "m",
     system_prompt: "sys",
     user_message: BIG_PROMPT,
@@ -718,17 +754,19 @@ describe("measuring the rendered command line", () => {
 describe("choosing between the inline argv and the pull", () => {
   it("stays inline below the threshold", async () => {
     const spawner = spawnerFor(fakeProcess({ stdout: OK_STDOUT }));
-    const result = await dispatch(new CopilotCliTransport({ spawner }), {
+    const result = await dispatch(seatTransport({ spawner }), {
       system_prompt: "sys",
       user_message: "small",
     });
     assert.equal(spawner.argv[spawner.argv.indexOf("-p") + 1], "sys\n\nsmall");
     assert.equal(result.metadata["handoff"], false);
     assert.ok(!Object.hasOwn(result.metadata, "payload_bytes"));
+    // No reason, because there was no handoff to give one for.
+    assert.ok(!Object.hasOwn(result.metadata, "handoff_reason"));
   });
 
   it("takes the pull exactly at the threshold, and not one unit below", async () => {
-    const transport = new CopilotCliTransport({ spawner: spawnerFor(null) });
+    const transport = seatTransport({ spawner: spawnerFor(null) });
     // Overhead measured against a one-character prompt, so an empty string's
     // own quoting does not skew the arithmetic -- and WITH a usage path on
     // it, because `dispatch` measures the command line it will really
@@ -744,27 +782,118 @@ describe("choosing between the inline argv and the pull", () => {
       HANDOFF_THRESHOLD_UTF16_UNITS,
     );
 
-    const below = await new CopilotCliTransport({
+    const below = await seatTransport({
       spawner: spawnerFor(fakeProcess({ stdout: OK_STDOUT })),
     }).dispatch({ model_id: "m", system_prompt: "", user_message: exact.slice(0, -1) });
     assert.equal(below.metadata["handoff"], false);
 
     const at = new HandoffSpawner();
-    const result = await new CopilotCliTransport({ spawner: at.spawn }).dispatch({
+    const result = await seatTransport({ spawner: at.spawn }).dispatch({
       model_id: "m",
       system_prompt: "",
       user_message: exact,
     });
     assert.equal(result.metadata["handoff"], true);
+    // On an executable the only reason to pull is the size, and the record
+    // says so -- the other reason is the binary, and it is not this one.
+    assert.equal(result.metadata["handoff_reason"], "threshold");
   });
 
-  it("names a POSIX path in the bootstrap and keeps the nonce out of argv", async () => {
+  it("pulls on a batch shim at any size, and says that is why", { skip: !onWindows }, async () => {
+    // The npm package installs `copilot.cmd` and no executable, so `cmd.exe`
+    // is the interpreter and the threshold is not what governs: a prompt far
+    // below it would be cut at its first line break, with every flag after it
+    // lost, at exit 0. Windows only, because `resolveProgram` calls no program
+    // a batch file anywhere else.
+    const spawner = new HandoffSpawner();
+    const result = await seatTransport({
+      spawner: spawner.spawn,
+      binary: join(tempDir("shim-"), "copilot.cmd"),
+    }).dispatch({ model_id: "m", system_prompt: "sys", user_message: "small" });
+    assert.equal(result.metadata["handoff"], true);
+    assert.equal(result.metadata["handoff_reason"], "batch-shim");
+    // And the prompt really did travel in the file rather than on the line.
+    assert.ok(spawner.payloadText.startsWith("sys\n\nsmall"));
+    assert.ok(!spawner.argv.includes("sys\n\nsmall"));
+  });
+
+  it("names a POSIX path in a one-line bootstrap and keeps the nonce out of argv", async () => {
     const spawner = new HandoffSpawner();
     await dispatchBig(spawner);
     const bootstrap = spawner.argv[spawner.argv.indexOf("-p") + 1]!;
     assert.ok(!payloadPathFrom(spawner.argv).includes("\\"));
     assert.ok(!bootstrap.includes(BIG_PROMPT));
     assert.ok(!spawner.argv.join(" ").includes(nonceOf(spawner.payloadText)));
+    // One line, on every branch: a `cmd.exe` `/c` argument stops at the first
+    // break, and a bootstrap cut there told the model to read a file without
+    // saying which.
+    assert.ok(!/[\r\n]/.test(bootstrap));
+  });
+
+  it("reaches a real `.cmd` with the whole prompt in a file and every flag on the line", { skip: !onWindows }, async () => {
+    // The ONE test here that spawns a process, and the repro that found this
+    // defect: the fake spawner cannot see `cmd.exe`, so nothing short of a
+    // real batch file proves what the CLI receives. No `spawner` option, so
+    // the default spawner runs the real `checks.spawnProgram`.
+    const directory = tempDir("seat-shim-");
+    const recorded = join(directory, "argv.json");
+    const recorder = join(directory, "recorder.js");
+    writeFileSync(
+      recorder,
+      `require("node:fs").writeFileSync(${JSON.stringify(recorded)}, ` +
+        "JSON.stringify(process.argv.slice(2)));\n",
+      "utf8",
+    );
+    const shim = join(directory, "copilot.cmd");
+    // Node by absolute path: a bare `node` would depend on the PATH the test
+    // happens to run under.
+    writeFileSync(shim, `@echo off\r\n"${process.execPath}" "${recorder}" %*\r\n`, "utf8");
+
+    const previous = process.env["DABBLER_COPILOT_DIAGNOSTICS"];
+    process.env["DABBLER_COPILOT_DIAGNOSTICS"] = "1";
+    let payloadPath = "";
+    try {
+      const result = await seatTransport({
+        binary: shim,
+        // Bounded, because this one waits on a real process. The child writes
+        // one file and exits, so these are a ceiling and not a wait.
+        timeouts: { spawn_seconds: 30, first_byte_seconds: 30, total_seconds: 60 },
+      }).dispatch({ model_id: "m", system_prompt: "sys", user_message: "a modest prompt" });
+      assert.equal(result.metadata["handoff"], true);
+      assert.equal(result.metadata["handoff_reason"], "batch-shim");
+
+      // What the CLI actually received, through `cmd.exe` -- the WHOLE argv
+      // and not a few flags out of it, because the failure this test exists
+      // for drops everything after one of them. The two per-call values are
+      // read back rather than predicted: the bootstrap names a fresh payload
+      // path and the usage file is a fresh path every dispatch. Every other
+      // element is asserted by value, the read-only tool list included, which
+      // is the grant that makes a routed call unable to write.
+      const argv = JSON.parse(readFileSync(recorded, "utf8")) as string[];
+      const bootstrap = argv[argv.indexOf("-p") + 1]!;
+      const usagePath = argv[argv.indexOf("--usage-output-file") + 1]!;
+      assert.deepEqual(argv, [
+        "-p", bootstrap,
+        "--model", "m",
+        "--allow-all-tools",
+        "--available-tools", "view,grep,glob",
+        "--no-custom-instructions",
+        "--output-format", "json",
+        "--usage-output-file", usagePath,
+        "--no-auto-update",
+      ]);
+      assert.ok(!/[\r\n]/.test(bootstrap));
+      assert.match(bootstrap, /\.txt/);
+      assert.match(usagePath, /\.json$/);
+
+      // And the prompt itself was in the file, whole.
+      payloadPath = payloadPathFrom(argv);
+      assert.match(readFileSync(payloadPath, "utf8"), /^sys\n\na modest prompt/);
+    } finally {
+      if (previous === undefined) delete process.env["DABBLER_COPILOT_DIAGNOSTICS"];
+      else process.env["DABBLER_COPILOT_DIAGNOSTICS"] = previous;
+      if (payloadPath !== "" && existsSync(payloadPath)) unlinkSync(payloadPath);
+    }
   });
 
   it("puts the exact prompt plus the footer in the payload", async () => {
@@ -776,7 +905,7 @@ describe("choosing between the inline argv and the pull", () => {
 
   it("builds an otherwise identical argv on both branches", async () => {
     const inline = spawnerFor(fakeProcess({ stdout: OK_STDOUT }));
-    await dispatch(new CopilotCliTransport({ spawner: inline }), {
+    await dispatch(seatTransport({ spawner: inline }), {
       system_prompt: "sys",
       user_message: "small",
     });

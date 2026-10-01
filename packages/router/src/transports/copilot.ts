@@ -288,14 +288,21 @@ function buildHandoffFooter(nonce: string): string {
  * forward-slash form (models mangle backslashes), demands a complete
  * sequential read before acting, and defers the ack line to the file's footer
  * so the nonce stays out of argv. Contains NO nonce.
+ *
+ * ONE line, and that is a constraint rather than a style: on a machine whose
+ * CLI is only a batch shim this string is an argument of a `cmd.exe` `/c`
+ * line, and `cmd` stops reading at the first line break -- which used to take
+ * the path with it and tell the model to read a file without saying which. The
+ * path is set off by spaces in a sentence of its own instead, which reads the
+ * same to a model and survives the interpreter.
  */
 function buildHandoffBootstrap(posixPath: string): string {
   return (
     "Your complete and authoritative task instructions for this turn are in " +
     "a UTF-8 text file. Before doing anything else, use your file-read tool " +
-    "to read the ENTIRE file at the path below, from the first byte through " +
-    "the end of file, reading in sequential chunks if it is large:\n" +
-    `${posixPath}\n` +
+    "to read the ENTIRE file at the path named next, from the first byte " +
+    "through the end of file, reading in sequential chunks if it is large. " +
+    `The path is: ${posixPath} ` +
     "Read it ONCE. When you have reached its footer you have the whole of " +
     "it; do not open it again afterwards, and do not re-read any part of it " +
     "to check -- every read of it is logged, and a second read proves " +
@@ -338,7 +345,16 @@ interface HandoffContext {
   readonly payloadPath: string;
   readonly payloadBytes: number;
   readonly hashBefore: string | null;
+  readonly reason: HandoffReason;
 }
+
+/**
+ * Why a dispatch pulled rather than went inline. On the record because a
+ * reader of `rounds.jsonl` from a shim machine would otherwise take a
+ * 2,000-character prompt's handoff for a size bug and go looking for the
+ * threshold.
+ */
+type HandoffReason = "threshold" | "batch-shim";
 
 /**
  * Did the payload file change between spawn and exit? An unreadable or
@@ -362,6 +378,7 @@ function handoffMetadataFields(
   if (handoff === null) return { handoff: false };
   return {
     handoff: true,
+    handoff_reason: handoff.reason,
     payload_bytes: handoff.payloadBytes,
     handoff_ack: ackOutcome,
     payload_file_modified: payloadModified(handoff),
@@ -506,15 +523,21 @@ function handleFor(child: ChildProcess): ProcessHandle {
  * of the executable on PATH, so this is the ordinary case and not an exotic
  * one.
  *
- * **The residual, named rather than hidden.** On a machine where ONLY a shim
- * exists, `cmd.exe` is what has to run it -- a batch file IS a cmd script, and
- * parsing it to find the invocation inside would be a guess about one package
- * manager's generated file (D174). There the 8,191 ceiling is real, and it is
- * real for the Python router too: `CreateProcess` special-cases a batch file
- * by launching `cmd /c` around it, so both routers are bounded identically and
- * both would need the handoff threshold lowered to cover it. That is a change
- * to a constant both routers must agree on, so it belongs to a session that
- * can make it on both sides at once, not to this one.
+ * **A shim pulls at every size.** On a machine where ONLY a shim exists --
+ * which the npm package is, since it installs a `copilot.cmd` and no
+ * executable -- `cmd.exe` is what has to run it, and parsing the batch file to
+ * find the invocation inside would be a guess about one package manager's
+ * generated file (D174). So the threshold is not what governs there: a batch
+ * binary takes the handoff whatever the prompt's length, because `cmd.exe`
+ * breaks a `-p` argument in three ways and only one of them is the 8,191
+ * ceiling. Below it, `cmd` stops reading its `/c` line at the first line
+ * break, so a multi-line prompt reaches the CLI as its first line with every
+ * flag after it missing -- at exit 0. Above 24,000 the handoff was already
+ * taken but its bootstrap was itself multi-line, so the model was told to read
+ * a file and not which. The bootstrap is one line for that reason, and
+ * `checks.spawnProgram` refuses a line break on this branch rather than
+ * letting `cmd` cut one. Nothing is retried: the whole of the hazard is
+ * knowable before the spawn.
  *
  * On that path each argument is quoted HERE rather than reassembled from a
  * string: `shell: true` would join the argv and let a shell re-split it, which
@@ -875,9 +898,10 @@ export class CopilotCliTransport implements Transport {
    *
    * The CLI has no separate system-prompt flag: system and user text join into
    * a single prompt. Below the size threshold that prompt is the `-p`
-   * argument; above it, `-p` carries a bootstrap and the prompt travels as a
-   * temp-file payload. `max_tokens` and `generation_params` are accepted for
-   * Transport parity and ignored -- the CLI exposes neither knob.
+   * argument; above it, and on a batch shim at any size, `-p` carries a
+   * bootstrap and the prompt travels as a temp-file payload. `max_tokens` and
+   * `generation_params` are accepted for Transport parity and ignored -- the
+   * CLI exposes neither knob.
    */
   async dispatch(request: DispatchRequest): Promise<APIResult> {
     // Reserved synchronously, before the first `await`: the breaker is a
@@ -903,13 +927,20 @@ export class CopilotCliTransport implements Transport {
     // still describes the command line that will actually be spawned.
     const usagePath = this.usageFilePath();
     const inlineArgv = this.buildArgv(prompt, request.model_id, usagePath);
-    // Inline stays primary and highest-fidelity; the pull is taken only when
-    // the rendered inline command line reaches the ceiling. One helper owns
-    // the decision so both branches stay exercised.
+    // A batch shim never goes inline, whatever the length: `cmd.exe` is what
+    // interprets it, and `cmd` cuts a `-p` argument at the first line break
+    // long before the 8,191 ceiling it also has. Resolved ONCE here, because
+    // the question is about the binary and not about this prompt.
+    if (resolveProgram(this.binary).isBatch) {
+      return this.runHandoff(prompt, request.model_id, usagePath, "batch-shim");
+    }
+    // On an executable the whole 32,767-unit line is available, so inline
+    // stays primary and highest-fidelity; the pull is taken only when the
+    // rendered command line reaches the ceiling.
     if (renderedUtf16Units(inlineArgv) < HANDOFF_THRESHOLD_UTF16_UNITS) {
       return this.run(inlineArgv, null, usagePath);
     }
-    return this.runHandoff(prompt, request.model_id, usagePath);
+    return this.runHandoff(prompt, request.model_id, usagePath, "threshold");
   }
 
   /**
@@ -946,7 +977,10 @@ export class CopilotCliTransport implements Transport {
   }
 
   /**
-   * Dispatch a large prompt through a temp-file pull.
+   * Dispatch a prompt through a temp-file pull, for the `reason` the caller
+   * decided: too large for the command line, or a binary only `cmd.exe` can
+   * run. The reason reaches the result's metadata and nothing else -- both
+   * pulls are the same pull.
    *
    * The payload is written UTF-8 with no BOM, flushed and CLOSED before spawn
    * -- an open handle blocks the child's read on Windows -- and the file is
@@ -955,7 +989,8 @@ export class CopilotCliTransport implements Transport {
   private async runHandoff(
     prompt: string,
     modelId: string,
-    usagePath: string | null = null,
+    usagePath: string | null,
+    reason: HandoffReason,
   ): Promise<APIResult> {
     const nonce = randomBytes(16).toString("hex");
     const payloadText = prompt + buildHandoffFooter(nonce);
@@ -988,6 +1023,7 @@ export class CopilotCliTransport implements Transport {
       payloadPath: path,
       payloadBytes: payload.length,
       hashBefore: sha256File(path),
+      reason,
     };
     const argv = this.buildArgv(
       buildHandoffBootstrap(path.replace(/\\/g, "/")),

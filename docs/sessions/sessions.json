@@ -4714,9 +4714,9 @@
     {
       "number": 238,
       "title": "A Copilot CLI that is only a shim gets every prompt by file",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-01T14:00:13.805000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-01T14:22:56.465000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

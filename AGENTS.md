@@ -1,0 +1,388 @@
+# dabbler-ai-orchestration v2
+
+The AI-led coding-session framework: one TypeScript implementation under
+`packages/router`, published as the npm package `dabbler-ai-router` with a
+`dabbler` command, plus the VS Code extension under `tools/` that bundles it
+and calls it in-process. The session plan and the decisions log live under
+`docs/sessions/`; `STATUS.md` carries the inter-session handoff.
+
+**There is no Python in this repository.** The rebuild started as a Python
+package with a TypeScript renderer over it, and sessions 22–36 ported the
+whole of it; session 36 deleted `ai_router/`, its suite, and the parity
+control that held the two implementations to each other. An instruction, a
+document or a comment that names `python -m ai_router.<module>` is describing
+something that no longer exists — the equivalent is `dabbler <verb>`, with
+the same arguments.
+
+## Working branch
+
+**Work happens on `master`**, per the standing trunk-based directive. Commit
+to it and push it.
+
+`experiment/verification-pipeline-v3` and `design/solution-decomposition`
+are both merged into `master` and are finished. The experiment branch
+carried the cheaper verification approach; the design branch carried the
+framework specification. Neither is the place to commit now — taking either
+one as the trunk strands work where nothing else can see it.
+
+## Ground rules
+
+1. **No new module without deleting one.** The module inventory in the
+   rebuild work plan is the ceiling.
+2. **No guard may guard another guard.** Every gate must cite the concrete v1
+   incident it would have prevented (the five kept gates each have one; see
+   Session 2).
+3. **One implementation of any rule.** It was "in one language, TS renders and
+   Python decides" while there were two; there is one now, and the rule is
+   the same one it always was — a rule stated twice is a rule that drifts.
+4. **Test budget is a ceiling: 215 TS.** One test per behavior. No
+   falsifier-twin doctrine, no tests of test infrastructure, no source-text
+   assertions (use ESLint), no migration-path tests, no tests asserting exact
+   markdown strings.
+5. **The machine owns the record.** Nothing under `.dabbler/runs/` is ever
+   hand-edited or exempted; no code path may accept a hand-written verdict.
+6. **No process ceremony on this repo itself.** Plain git commits with plain
+   messages. Do not use v1's session machinery, and do not build v2's own
+   machinery around v2's development.
+7. **Comments state constraints, not history.** No "Set NNN" archaeology. If a
+   lesson matters, encode it structurally.
+8. **LOC budgets are targets ±30%, not gates.** If a module wants to be 2× its
+   budget, stop and reconsider the design instead of writing a justification.
+
+> **Superseded, 2026-08-23.** The operator has set aside the ground rules for
+> the duration of the rebuild — see `docs/operator-decisions.md`, which is the
+> governing record. The text is kept because the constraints are restored once
+> the replacement works. Read it as what returns, not as what is in force.
+>
+> **The port's own envelope is spent.** Sets 142–147 ran under a relaxation of
+> rules 1 and 4 measured in Python lines, modules and tests; there are none of
+> those left to measure. Rule 4's number above is the TypeScript half of the
+> original, and the port's own budget is in the session plan under "Test
+> budget for sessions 22–36".
+
+## Traps that have already cost a session
+
+Read these before reaching for the tool they name. Each is here because a
+session hit it, not because anyone imagined it.
+
+### EVERY model list is FREE. Read `docs/model-and-pricing-sources.md` first
+
+**Three engines have now got this wrong, twice in one conversation.** Before
+you say anything about which models are available, what they cost, or what a
+refresh would spend:
+
+- **Copilot bills AI CREDITS, per token.** Premium requests are the LEGACY
+  platform — `copilot help billing` says so itself, and this seat has been
+  billed per token since 2026-06-01. What was actually spent is read by
+  `seatCost.ts` / `dabbler seat-cost`, in credits.
+- **The seat's model list costs nothing.** `session/new` over `copilot --acp`
+  returns `models.availableModels` — every model the seat can dispatch, with
+  its cost — measured on 2026-09-05 and transcribed in
+  `docs/acp-walkthrough.md` §1. The newer SDK route (`client.listModels()`,
+  RPC `models.list`) carries per-token prices instead of a legacy multiplier.
+- **The direct-API list costs nothing**: `dabbler discovery refresh` read
+  three vendors and 195 models in 2.4 seconds, billing no tokens.
+- **The Claude CLI cannot be enumerated** — no list command. Use the
+  Anthropic key's API enumeration as its list, and **do not maintain a third
+  list**: that rule stands, and the reason to keep it is that the alternative
+  is a hand-written set nobody can keep current. But the two are not the same
+  set, and the sentence here used to say they were. `claude` validates
+  against its own bundled catalog and says so when it refuses — *"isn't
+  described by this version's model catalog"* — so the API enumeration is a
+  **suggestion, and the launch is the authority**. Measured 2026-09-12: all
+  11 Anthropic ids the API lists were accepted, dated ones included, so the
+  two coincide today; a model a vendor ships before Claude Code supports it
+  would be offered and refused. Where no Anthropic key makes the enumeration
+  readable at all, `opus`, `sonnet` and `haiku` are always accepted and are
+  the floor — an empty list reads as a broken pane.
+
+**There is nothing left in this path that can bill a token.** Session 151
+deleted the prompting probe with the model registry it fed, so the question
+an engine keeps reaching for — "how expensive is a refresh?" — is no longer
+merely answered but unaskable: `dabbler discovery refresh` reads each
+vendor's metadata endpoint and opens one conversation on the seat, and
+neither sends a prompt. What a session actually spends on a seat is a
+different question, billed in AI credits per token and measured by `dabbler
+seat-cost`.
+
+**What this machine was told is one file**, `ai-model-catalog.json` under
+this platform's own per-user data directory, with one block per transport.
+It is a reading of THIS machine's seat and THIS machine's keys, and a block
+recorded for another account or another key set is read as unread rather
+than believed. Nothing ships a catalog: a copy that travelled in a package
+would tell every machine about somebody else's.
+
+### `session close --force` closes the WHOLE PLAN, not one session
+
+Its help says "bypass bookkeeping gates, never evidence; stamps
+forceClosed". What it does not say is in `writers.flipStateToClosed`:
+
+> `forced` promotes every open session — a forensic marker, not a shortcut.
+
+Every session not already `complete` or `cancelled` is flipped to
+`complete`. Session 24 used it to get past one bookkeeping gate and marked
+sessions 25–35 of the port plan finished. `forceClosed` is also stamped at
+the REPOSITORY level, so the record cannot even say which session forced
+it.
+
+**Use it only to abandon a whole plan deliberately.** It is never the way
+past a single gate. If a gate is wrong, prove it is wrong, record the
+proof, and satisfy the gate anyway — a five-minute test run is cheaper
+than a damaged ledger, every time. See D157 and D158.
+
+### FIXED after 137: the cap terminal that `--max-rounds` could not lift
+
+A session reaches the verification cap, the loop writes `remediated_at_cap`,
+and then the tree moves again — which is what an unreviewed fix usually
+needs. From there `verification_clean` says re-run `dabbler verify`,
+`dabbler verify` says close the session, and `close --force` cannot help
+because that gate is evidence rather than bookkeeping. **No forward exit.**
+
+Raising the cap is not the answer, though it looks like one:
+`noRoundReason` reads the terminal row *before* the cap, so `session plan
+amend --max-rounds` was accepted, recorded in `amendments.jsonl` and did
+nothing. Session 137 raised 3 to 5 twenty seconds after the terminal was
+written and never opened round 5.
+
+**The exit is `dabbler verify reopen --rounds N --reason "<why>"`.** A
+cap terminal is a spent budget, not a judgment, so
+an operator may buy the review it refused. It buys rounds and never a
+verdict, buys named rounds and never a mode, and never reaches an
+adjudication. `plan amend --max-rounds` now refuses after a terminal and
+names it. See `docs/driving-a-session.md`, "The one stop with no forward
+exit".
+
+### FIXED in session 26: the freshness gate and a deleted tracked file
+
+`testEvidence.surfaceDigest` used to hash every path `git ls-files`
+reported and write the literal string `"deleted"` for one it could not read.
+A deleted-but-tracked file contributed a `path\0deleted` line; committing
+dropped it from `ls-files` and that line left the digest. No file's content
+changed, and `test_run_fresh` failed anyway and asked for another full run.
+It cost session 23 a re-run and session 24 a forced close.
+
+**It no longer happens.** An unreadable path is omitted rather than marked,
+so a deletion moves the digest once — when the file goes — and the commit
+that records it moves nothing. D160 ruled it; D170 landed it. This entry
+stays only so a session that meets the symptom in an older checkout knows
+what it is looking at.
+
+### Repairing state: `sessions.json` is state, `activity-log.json` is history
+
+If the ledger must be recovered from git, restore **`sessions.json` only**.
+
+`activity-log.json` is append-only, and two things derive from it:
+decision numbering (`ordinal = decision entries + 1`) and
+`decisions-log.md`, which is RENDERED from it and is not a source. Rewinding
+the activity log therefore rolls the decision counter back, and the next
+decision recorded silently overwrites the last real one when the log is
+re-rendered. Session 24 did exactly this and lost the operator's D157 until
+it was restored from the later commit and re-rendered with
+`writers.renderDecisionsLog`.
+
+## Environment
+
+- Windows 11, PowerShell primary. Node 22.18+; nothing else to install.
+- Run the suite: `npm test` runs every workspace's; the router's alone is
+  `npm --prefix packages/router run test:unit`, which is `node --test` over
+  `packages/router/test` (no live network outside the tests marked live,
+  which skip without keys).
+- Run the router by hand: `node packages/router/dist/dabbler.cjs <verb>`
+  after `npm run build -w dabbler-ai-router`, or `dabbler <verb>` from a VS
+  Code terminal once the extension has installed its shim.
+- Provider keys via env vars: `DABBLER_ANTHROPIC_API_KEY`,
+  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`. Never in config or logs.
+- **Vehicle** is what a role is dispatched through. Authoring's is the engine
+  CLI; the two REVIEWING roles share one, because they differ in what they
+  may not *be* and not in how they are reached. Four layers decide it and
+  there is no fifth: CLI flag `--transport` > `<repo>/.vscode/settings.json`
+  (`dabbler.transport`, `dabbler.reviewerTransport`) > the user-level
+  `preferences.json` > the configuration the distribution ships
+  (`transport.profile`, and `roles.reviewer.transport` for the reviewing
+  pair) > default `api`. A vehicle nothing on this machine can reach is not
+  offered — and one a PERSON chose that cannot be reached is a stop at
+  `session start` naming the layer that chose it.
+- **`DABBLER_TRANSPORT` is retired: nothing writes it and nothing reads it.**
+  `bootstrap` used to persist it at user scope, and the variable outranked
+  every config layer — so it shadowed the very preference a later run tried
+  to set, for every repository on the machine, with no surface able to show
+  it. If it is still set in your environment, unset it: nothing reads it
+  and nothing reports it. `transport.profile` in a project's
+  `local-overrides.yaml` is retired the same way and refuses with the one
+  command that moves it: `dabbler configure --transport <vehicle>` writes
+  this checkout's own `.vscode/settings.json`.
+- **`dabbler configuration explain` answers "why is it this"**, naming the
+  layer that decided each value and the ones it shadows; `dabbler
+  configuration options` answers "what could I choose", with whether this
+  machine can reach each one.
+- **Every choice a person makes is the REPOSITORY's, and the machine's is
+  only its default.** The engine (`dabbler.engine`), the authoring model
+  (`dabbler.authoringModel`) and each reviewer's model
+  (`dabbler.reviewerModel`, `dabbler.auxiliaryModel`) are read through the
+  same layers a vehicle is: a flag on the call > this checkout's
+  `.vscode/settings.json` > the machine's `preferences.json`, beside the
+  model catalog under this platform's per-user data directory. `dabbler
+  configure` writes the checkout — and the machine's default too, where the
+  machine has none; `--mine` writes the machine's default and only that. A
+  choice kept only on the machine was one choice for every repository on it:
+  changed in one window it changed in all of them, and two repositories
+  whose authors are different vendors had no reviewer both could start under.
+  The checkout's file is committed, so a choice travels to the next clone,
+  and a seat that does not list it is refused at `session start`, naming the
+  file and the command that changes it. Never the catalog: it is a reading,
+  rebuildable for nothing, and a choice stored in it is one the next free
+  refresh wipes. A selection is used and never silently substituted; a
+  selection this call cannot reach is a stop that names it.
+- Git Bash heredocs mangle backslashes on this host — write files with
+  your editing tools, never with a heredoc.
+
+<!-- dabbler:managed:start -->
+# AI orchestrator instructions — `dabbler-ai-orchestration`
+
+> `AGENTS.md` is the single source of this managed body; `CLAUDE.md`
+> imports it and adds only its engine tail. Do not hand-edit inside the
+> fence; re-run `dabbler bootstrap` to refresh it.
+
+## Your role
+
+You are the **orchestrator** for `dabbler-ai-orchestration`: you do the mechanics — file
+edits, shell, git — and the framework owns the lifecycle, one move at a time.
+**Opened to consult, you are not the orchestrator**: read `dabbler consult
+--sessions-dir docs/sessions` first, ask for no instruction, and commit what you change.
+
+## How to run a session
+
+Sessions are numbered under one sessions root (`docs/sessions/`), so no
+command takes a handle to one.
+
+**Start Session registers the session and opens your CLI.** You ask the
+framework for an instruction once:
+
+    dabbler session next --sessions-dir docs/sessions
+
+It prints one instruction, as JSON, and exits. Do what its `ask` says, then
+start its `answer_command` — running it is the answer — **as a background
+command**, so this chat stays free for the operator. It stays open while the
+framework checks, tests, reviews, commits and pushes, which can take many
+minutes, and what it prints when it exits is your next instruction: act on
+that one the same way, until one says `done`. Never poll it, and never start
+anything else to wait with.
+
+The operator can talk to you while it runs: answer them, and leave it
+running. `dabbler status` says which instruction is owed, and for how long.
+
+Outside VS Code the operator types the start: `dabbler session start
+--sessions-dir docs/sessions --engine <engine> --provider <provider>` (a
+seat adds `--model`). `dabbler session run --mailbox` is the older loop, a
+fallback a person starts by hand; what it refuses says what to run under it.
+
+## What comes back
+
+Four kinds of instruction, and no fifth:
+
+- **`step`** — work to do. Its `ask` says what; do it, then report with
+  the `answer_command`. `--files` may be left out, and the framework takes
+  the step's files from what changed; named, it lists every file you
+  changed and nothing else.
+- **`rejection`** — the answer was refused, and `reasons` says why. Fix
+  it and answer again; three refusals of one step stop the session. A
+  round's findings arrive as one too, and that one is ANSWERED rather
+  than fixed: its `ask` says to change no file and to dispose of each.
+- **`interrupt`** — the same instruction re-issued because something
+  reached the framework while you worked; `reasons` carries it first,
+  and the answer owed is the one you already owed.
+- **`done`** — the session is over and closed. Stop.
+
+**When an answer command exits, read what it printed.** A JSON instruction:
+act on it. A line saying `refused`, or a stop (`Next:` and its ways on): do
+what it says, and never repeat a stop. Anything else — it ended on progress
+lines, or printed nothing — and it was cut off: start that exact command
+again at once. An answer is taken once, the repeat carries on from where the
+framework is, and the framework does not finish a session by itself.
+
+Everything the framework does for itself happens between instructions:
+declaring the work, each step's own checks, cross-provider verification and
+its remediation rounds, the suites as the run of record, the commit, the
+push, and the close. What runs is each step's own checks and the tests named
+after what it changed, then the suites — whole, or the ones the session
+selects where a whole run costs too much, and whole before a release; the
+Primary Reviewer reviews without writing or running one. None of them is
+yours to run or to skip ahead to — the instruction in hand is the whole of
+what is asked, and `dabbler version` says which router this is. A source
+file's tests are the file named after it (`checks.ts`, `checks.test.ts`): a
+new public method gets a test there, a changed one has its tests updated.
+
+**The framework owns the clock, the state and the sequencing.** An
+instruction that names a command is answered by running that command —
+never by watching `run.json` or any other record for what the framework
+will do next. The answer command you started is the one thing you wait on.
+
+**A release is a session of its own**, headed `(release: <version>)`: the
+framework packs and publishes what is on the trunk; no other session
+publishes. Propose each release's version (patch, minor or major) when you
+write or amend the plan, for the person to approve with it. Never add a
+`packaging:` block to `dabbler.yaml` until the next session is the packaging
+session, which does nothing else; the close refuses an unpublished release.
+
+## When the framework stops
+
+- Read the framework's own account before the scrollback: `dabbler status`,
+  the `stop` on `.dabbler/runs/s<N>/driver/run.json` with its kind and class,
+  the outstanding instruction's `reasons`, and the transcripts.
+- Where the framework is source in this tree you may fix it, and the fix
+  rides in this session's own diff; where it is an installed package,
+  report the step `blocked` with the diagnosis in its notes.
+- Never touch the record, a verdict or a gate to get past a stop. The
+  protocol is *When the framework stops* in `docs/driving-a-session.md`.
+
+## Hard rules
+
+- State files (`docs/sessions/sessions.json`) and everything under
+  `.dabbler/runs/` are written by the router only — never by hand.
+  The router commits the state files it writes at the land and the close,
+  and a report never names those; it names `session-plan.md` if it edits it.
+- Verdicts come from the **Primary Reviewer** -- *not the author* -- and a
+  disputed impasse from the **Auxiliary Reviewer** -- *not the author and
+  not the primary*. A verdict the framework did not hand you does not exist.
+- API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,
+  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files; the
+  same rule covers a feed PAT, which configuration names and never holds.
+- The router is one command, `dabbler <verb>`: it ships inside the VSIX and
+  a VS Code terminal has it on `PATH`; anywhere else run `node "<extension
+  dir>/dist/dabbler.cjs" <verb>`. "command not found" is PATH, not keys.
+- `cancel --force` and `close --force` are a person's, never yours. The session you are working is yours to cancel: `dabbler session cancel <its number> --reason "<why>"`.
+- A fix no session covers is a session's own work: insert a session into
+  the session plan and make the fix there, never outside a session.
+
+## Writing files
+
+**Write files with your editing tools, never with a shell heredoc.** On a
+Windows host the shell is usually Git Bash, and a heredoc there eats
+backslashes: `\n` arrives as a newline and `\\` as one backslash, so JSON
+escapes, regular expressions and Windows paths are silently corrupted on the
+way to disk. Nothing fails — the file is written, and it is wrong. The same
+goes for `echo` and for `printf` with a format you did not escape twice.
+
+**Nothing may touch the working tree between a report and the
+instruction that follows it.** The framework hashes the tree before and
+after a step's checks, and an edit made while one is running refuses the
+report — correctly, because a check run against a tree that moved under
+it proves nothing about either version. Finish the step, report it, and
+wait for the next instruction before starting the next step.
+
+---
+
+## Engine tail (GitHub Copilot)
+
+You read this `AGENTS.md` directly. `CLAUDE.md` imports it rather than
+repeating it, so this file is the one place the body exists. GitHub
+Copilot loads both files at once and de-duplicates nothing, which is
+exactly why only this one carries the body.
+
+Copilot seats: declare `--model` on the first call, the one that
+registers, and set the vehicle with `dabbler configure --transport
+copilot-cli` when routing through the seat. If `DABBLER_TRANSPORT` is still
+set in your environment, unset it: nothing reads it. Review stays
+cross-provider on every transport.
+
+<!-- dabbler:managed:end -->

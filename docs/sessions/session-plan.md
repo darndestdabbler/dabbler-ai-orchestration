@@ -14864,3 +14864,111 @@ notification carries the named button, and pressing it opens the model pick.
 ### Session 237 of 237: Release 3.19.2 (release: 3.19.2)
 
 The framework publishes session 236's work as 3.19.2 and nothing else.
+
+### Session 238 of 239: A Copilot CLI that is only a shim gets every prompt by file
+
+Scope: `packages/router` -- `src/checks.ts` (`spawnProgram`, `quoteForCmd`),
+`src/transports/copilot.ts` (`dispatch`, `runHandoff`,
+`buildHandoffBootstrap`, `handoffMetadataFields`) and their tests in
+`test/checks.test.ts` and `test/copilot.test.ts`; the seat column of the
+vehicle table in `tools/dabbler-ai-orchestration/README.md`; the changelogs,
+`version.json` and the stamped manifests
+
+**Why.** A staff member, 2026-10-01, on a Copilot seat for both authoring
+and review, with the Copilot CLI installed through npm: session 001 authored
+its plan and the verification round failed with a command-line error. Their
+coworker reproduced it. The operator's machine cannot: it has WinGet's
+`copilot.exe`, which `resolveProgram` prefers over any shim on PATH. The
+npm package installs ONLY a `copilot.cmd` shim, and a batch file can be run
+by nothing but `cmd.exe`, so on that machine every seat dispatch is a
+`cmd /d /s /v:off /c` line. Reproduced here with an npm-style shim first on
+PATH and no executable, driving the real transport class: a prompt between
+8,191 and 24,000 UTF-16 units -- where a verification round ordinarily lands;
+the csv-model trial's measured 20,402 -- is refused by `cmd.exe` with *The
+command line is too long.*, exit 1, classified `generic-unknown`. That is
+the loud failure the staff saw. Two quiet ones sit either side of it. Below
+8,191, `cmd.exe` stops reading its `/c` string at the first line break, so
+the CLI received the prompt's first line and NONE of the flags after it --
+no `--model`, no `--output-format json`, no read-only tool list -- and
+exited 0; measured on `cmd.exe` alone with no batch file, so it is the
+interpreter and not the shim. Above 24,000 the handoff is taken, and the
+bootstrap is itself four lines with the payload's path on the second, so
+the model is told to read a file and never told which. The brief's text is
+not involved: it is 1,766 characters of plain ASCII, and a single line
+holding `& ( ) % ! ^ | < > "` arrived intact, because `quoteForCmd` already
+quotes every argument. Authoring survived because `enginePrompt` is one
+sentence and the instruction travels by file -- which is exactly the rule
+this session extends to the seat. The transport's own header names this
+residual and defers it to "a session that can make it on both sides at
+once"; there is one side now.
+
+**Step 1 -- a line break never reaches `cmd.exe`.** On its batch branch,
+`spawnProgram` refuses an argv element holding `\r` or `\n` before it
+spawns, with an error naming the shim's path and the fact -- `cmd.exe`
+stops at the first line break, so the argument would arrive cut, not
+quoted. Every caller already classifies a spawn failure rather than letting
+it escape (`run` in the transport, `execute` in checks, the engine
+adapters), so a refusal becomes a failed call that says why, where today
+it is a successful call that did something else. No argument the router
+sends today is multi-line on this branch once step 2 lands; the guard is
+for the next one.
+
+**Step 2 -- a shim takes the handoff at every size.** `dispatch` resolves
+the binary once and, when `resolveProgram` says it is a batch shim, takes
+`runHandoff` whatever the rendered length; an executable keeps the 24,000
+rule and the inline branch exactly as they are, because that is the
+higher-fidelity path and nothing about it is wrong. `buildHandoffBootstrap`
+becomes ONE line, the path set off by spaces and a sentence of its own
+rather than by line breaks, so it survives `cmd.exe` and reads the same to
+a model; the ack footer stays in the file and is not on the command line.
+The handoff metadata gains `handoff_reason` (`threshold` or `batch-shim`)
+beside `handoff: true`, so a round record on a shim machine says why the
+model read a file -- a reader of `rounds.jsonl` must not take a 2,000
+character prompt's handoff for a size bug. Nothing is retried: the whole of
+the shim's hazard is knowable before the spawn, and after this step the
+inline branch never meets `cmd.exe`, so a retry on *too long* would guard
+a guard.
+
+**Step 3 -- the words, and the version.** The seat column of the README's
+vehicle table says what the installs are: WinGet's `GitHub.Copilot` puts
+`copilot.exe` on PATH and the npm package puts a shim there, and both work
+-- a shim's prompts travel by file. `version.json` goes to 3.19.3 (a patch:
+a seat that could not review can, and no capability is new), stamped with
+`npm run stamp:version`, and both changelogs get the 3.19.3 section.
+
+**Non-goals.** No parsing of the shim to find the executable inside it
+(D174 -- a guess about one package manager's file). No change to the 24,000
+threshold, to the inline branch on an executable, to the ack protocol, or
+to the handoff file's contents. No change to `enginePrompt`, to any engine
+adapter's argv, or to the ACP route, which carries flags only. No retry of a
+failed dispatch on any class. No new stop at `session start`: after this
+session a shim is a working vehicle and there is nothing to stop for. No
+Mechanic.
+
+**Tests.** In the two files named after what changed; skipped off Windows
+where `resolveProgram`'s own shim tests already are, because
+`resolveProgram` says no program is a batch file anywhere else. In
+`checks.test.ts`: with only a `.cmd` on PATH, an argv holding a two-line
+argument is refused before the spawn and the refusal names the shim; one
+single-line argument carrying `& ( ) % ! ^ | < > "` reaches the program
+intact, which is the special-character question answered once and kept
+answered. In `copilot.test.ts`, under "choosing between the inline argv and
+the pull": a batch binary takes the pull below the threshold and records
+`handoff_reason: batch-shim`; an executable at the same size stays inline
+(the existing threshold tests are the other half and are UPDATED to assert
+the reason `threshold`, not joined); the bootstrap holds no line break and
+still names the POSIX path, which amends "names a POSIX path in the
+bootstrap and keeps the nonce out of argv" rather than adding beside it.
+The transport's fake spawner cannot see `cmd.exe`, so the one test that
+proves the whole path runs the real `spawnProgram` against a scratch
+`.cmd` that records its argv -- the repro that found this -- and asserts
+the CLI received the one-line bootstrap, every flag, and a payload file
+holding the entire prompt.
+
+**Releasable.** Yes -- session 239 publishes it as 3.19.3. The walk that
+matters is the staff member's own machine: 3.19.3 installed, nothing else
+changed, the csv-parser session 001 verification runs on the seat.
+
+### Session 239 of 239: Release 3.19.3 (release: 3.19.3)
+
+The framework publishes session 238's work as 3.19.3 and nothing else.

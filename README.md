@@ -1,0 +1,410 @@
+# dabbler-ai-router
+
+A framework for AI-led coding sessions. Work is numbered directly in the
+repository: one session at a time, each with a plan that lists its steps. A
+router dispatches model calls across providers by **role**, with escalation
+and token accounting. Every session must pass **cross-provider
+verification** before it can close, and the verification record is
+machine-written: no code path accepts a hand-written verdict.
+
+There is one implementation, in TypeScript, and it runs two ways:
+
+- **`dabbler` — the command** an orchestrating engine runs from a terminal:
+  the session lifecycle, the verification loop, the record, the module
+  manifest. It ships inside the extension — there is nothing to install
+  beside it and no package to fetch.
+- **VS Code extension "Dabbler AI Orchestration"** — the Work Explorer
+  tree: one row per repository, its numbered sessions beneath it, and the
+  in-flight session's steps beneath that. It bundles the router and calls
+  it in-process, so a project installs nothing and the tree and the
+  terminal cannot disagree about what the record says.
+
+## How a session runs
+
+1. `dabbler session start` registers the session in `sessions.json` and
+   seeds the plan's step list into `activity-log.json`, once.
+2. The orchestrating AI (Claude Code, Copilot — any engine that reads
+   `AGENTS.md` or the `CLAUDE.md` that imports it) does the work.
+3. `dabbler verify` runs the verification loop **before commit**: round 1
+   reviews the full working-tree diff; rounds ≥ 2 review only the fix
+   delta. The **Primary Reviewer** is defined as *not the author*, and
+   where nobody has chosen a model it resolves on a different provider
+   than the orchestrator. Rounds append to a machine-only ledger under
+   `.dabbler/runs/`. A contested blocking finding has a sanctioned exit
+   ladder instead of an impasse: `verify dispute` records an
+   evidence-backed rebuttal the next round must engage, and `verify
+   adjudicate` hands the disputes to the **Auxiliary Reviewer** — *not
+   the author and not the primary*, so a third voice is the role's own
+   definition rather than a rule bolted on — which neither
+   orchestrated nor verified. At the round cap the loop ends itself:
+   **remediated at the cap** when every blocking finding was fixed and the
+   cap left the fix unreviewed (the work lands, labelled unreviewed),
+   **unresolved** when findings still stand (nothing lands but the
+   record). There is no waiver and no verdict a person can type.
+4. `dabbler session close` runs the gates `GATE_CHECKS` declares —
+   verification clean, working tree clean, pushed to remote, test run
+   fresh, published when releasable, and verdict
+   vocabulary — then flips the
+   state. The verification gate reads the ledger; there is no stamp, no
+   override, no hand-writable record.
+
+See [docs/quick-start.md](docs/quick-start.md) for the full walkthrough of
+the typed lifecycle, and [docs/driving-a-session.md](docs/driving-a-session.md)
+for the driven one — what happens when you press **Start Session** in the
+Work Explorer.
+
+### What you see when a session runs
+
+- **Your AI's own terminal.** Start Session opens Claude Code or the Copilot
+  CLI interactively, in your repository, and you can talk to it at any time.
+  It asks the framework for an instruction once, does what it says, and
+  answers with a command it starts in the background. That command stays open
+  while the framework checks, tests, reviews, commits and pushes, and hands
+  the AI its next instruction when it finishes — so the chat is never tied up,
+  and no framework process sits waiting for the AI.
+- **The Dabbler terminal**, beside it, only watches: the phase, who owes what
+  and for how long, and each job's output as it runs. Closing it changes
+  nothing about the session, and reopening it shows where the session is.
+  A `dotnet test` or Maven run reads as one line a test project —
+  `✔ CsvParser.Deserializer.Tests: 16 pass, 0 fail, 0 not run`, a red `✘`
+  with the failing tests named beneath it, `⚠ … no tests found` for a project
+  that ran nothing — and the suite's full output is kept in
+  `.dabbler/test-output/`.
+- **To say something to a running session**, tell the AI, or use `dabbler
+  session interrupt --reason "..."` (Stop Session adds `--stop`): the AI gets
+  it with its next instruction, and a stop ends the framework's work where it
+  is. To carry on afterwards, ask the AI to run `dabbler session next`.
+- **To end one**, cancel it. The AI may cancel the session it is working —
+  its number and a reason, nothing more — and your working tree is left as it
+  was. Cancelling any other session, and `--force`, are yours alone.
+
+Two UAT walkthroughs build a small multi-module solution end to end, from an
+empty folder to a running program, with every expected output captured from
+a real run: [docs/uat/uat-dotnet-json-solution.md](docs/uat/uat-dotnet-json-solution.md)
+(.NET) and [docs/uat/uat-java-json-solution.md](docs/uat/uat-java-json-solution.md)
+(Java, Maven and Spring).
+
+## Solutions
+
+A solution is its build files. The Solution Explorer reads the root `.slnx`
+or `.sln` — every `.csproj` under the root where there is neither — or the
+root `pom.xml` and its `<modules>`, and shows each project with its kind (a
+service, a worker, an application, a test project or a library), what it
+references and what references it. Nothing is declared beside the build
+files, and a repository with none is one project: itself. Every session runs
+in the repository you opened, and its plan names the files each step changes.
+
+**A sibling is a project reference.** A .NET project reaches a sibling with a
+`<ProjectReference>` to its project, and the solution file at the root lists
+both; a Maven module depends on a sibling at `${project.version}`, and the
+parent `pom.xml` lists both under `<modules>`, built in one reactor run. Where
+the build files hold more than one project and the root has no solution file
+or parent POM, the framework writes the root build files before a step's checks
+run, and never rewrites them: for .NET the `.slnx`, `Directory.Build.props` and
+`Directory.Build.targets`; for Maven the parent POM. Whoever wrote the root
+files, a .NET solution's `bin/` and `obj/` and a Maven reactor's `target/` are
+ignored before the first check builds.
+
+**Tests are named after what they test.** A source file's tests are the test
+file named after it: `CsvSerializer.cs` and `CsvSerializerTests.cs`,
+`CsvSerializer.java` and `CsvSerializerTest.java`, `checks.ts` and
+`checks.test.ts`. A suite in `dabbler.yaml` says so with `test_name`
+(`{name}Tests.cs`) and runs a selection with `select` — `dotnet test --filter
+{names}` with `select_separator: "|"`, or `mvn -q test -Dtest={names}
+-Dsurefire.failIfNoSpecifiedTests=false` — and `dabbler bootstrap` writes both
+for a .NET or Maven root. After each step's checks the framework runs the
+tests named after the files the step changed; a changed source file with no
+test named after it is shown to the reviewer and refuses nothing. At the end
+of a session each expensive suite runs whole when its last whole run took no
+more than a minute or 5% of the median length of the last five closed
+sessions, whichever is longer; past that it runs the tests the session's
+changes select, plus every test of a project that references a changed one,
+recorded as `final-targeted`. A releasing session runs whole every suite that
+ran targeted before it packages; a red whole run holds the release, names the
+suite, and the session closes with the failure on its record. Hand-written
+selection maps are no longer read, and `smoke` still runs where a changed
+file has no test named after it.
+
+**A repository that declared modules keeps its files.** A `modules.yaml` under
+`docs/`, a `modules:` block in `dabbler.yaml` and a suite's `module` or
+`against` are no longer read. `dabbler session start` names each one it
+finds, in one line, and refuses nothing.
+
+Worked end to end in the two UAT walkthroughs above and, project by project
+across a four-module solution, in
+[docs/tutorials/csv-solution/csv-multi-module-walkthrough.md](docs/tutorials/csv-solution/csv-multi-module-walkthrough.md).
+
+## Install
+
+Install the VS Code extension and a project needs nothing else:
+
+```
+code --install-extension dabbler-ai-orchestration-2.0.0.vsix
+```
+
+The extension puts `dabbler` on the integrated terminal's PATH, run on the
+editor's own Node — no runtime to install, no virtual environment, no
+global package, and no registry. Outside VS Code, or for a commit made from
+the Source Control panel (whose git does not inherit the terminal's
+environment), run the same file the shim runs — that path needs a Node of
+its own, 22.18 or newer, because there is no editor to borrow one from:
+
+```
+node "<extension dir>/dist/dabbler.cjs" <verb>
+```
+
+The extension requires VS Code 1.135 or newer, which is the earliest release
+measured to carry an extension host with an unflagged `node:sqlite` — the
+seat-cost reader needs it. Inside the editor that host is the runtime; a
+Node of your own is needed only to run `dabbler` outside it, or to build
+this repository.
+
+## The repository's artifacts
+
+A repository's sessions live under `docs/sessions/`. One file is written
+by hand and reviewed by a person; every other one is the router's, and
+two of them are *rendered* — a rendered file is an output, so editing it
+loses the edit at the next render and rewinding it rewinds the counter
+that numbers what it holds:
+
+| Artifact | Written by | Purpose |
+|---|---|---|
+| `session-plan.md` | the decomposition session, human-reviewed | the plan: sessions and their steps |
+| `sessions.json` | the router only | the numbered session ledger, schema v5 |
+| `activity-log.json` | the router only, append-only | per-step progress log, and the source of both rendered files |
+| `change-log.md` | the router (appends) | human-readable summary blocks per session |
+| `decisions-log.md` | the router, **rendered** from `activity-log.json` | the numbered decisions, in the order they were taken |
+| `project-work-plan.md` | the router, **rendered** | every numbered session beside what it declared |
+
+Verification round records live **outside the working tree** at
+`.dabbler/runs/s<N>/rounds.jsonl` (gitignored, machine-written only), and
+routed-call metrics append to `router-metrics.jsonl`. Field by field
+detail: [docs/schema-reference.md](docs/schema-reference.md).
+
+## Transports
+
+Both transports are first-class for every call type:
+
+- **GitHub Copilot CLI** — dispatches through a Copilot seat; models come
+  from a probed catalog lockfile. Calls are real spend and are not
+  attributable per session, so metrics rows carry
+  `billed_usage_unavailable: true` and seat spend is measured afterwards
+  by `dabbler seat-cost` from the CLI's local usage store.
+- **Direct API** — Anthropic, OpenAI, and Google, over their HTTP APIs.
+
+**Dollars are not computed on either path.** Tokens are recorded per call,
+per model and per session; reconciliation happens out of band against the
+vendor's own console, joined by the API key a repository names as its own.
+
+Verification may cross transports: an orchestrator on the direct API can be
+verified through the Copilot CLI on another provider's model, and vice
+versa. Each role carries its own **vehicle**: authoring's is the engine
+CLI, and each reviewer's is a transport, so a review may take the other
+transport when provider independence requires it. The one rule that is
+asserted at the wire rather than merely filtered during selection is the
+rule that needs no judgement: the reviewing model may not be the AUTHORING
+model. Which provider a reviewer is on is a label the person weighs, not a
+refusal the framework makes.
+
+### Selection is by role
+
+Two fields, and neither needs a special name. **`prefer`** is a preference
+order and is **ordering only**: a model the order does not name still
+qualifies and simply sorts after the named ones, so a list that has gone
+stale costs a slightly older model and never costs a candidate. It is
+declared under `roles:` in `router-config.yaml` and applied identically on
+both transports.
+
+**`selected`** is what the operator chose, and it lives somewhere else on
+purpose: in `preferences.json` beside this machine's model catalog, at the
+user level. The catalog is a reading and is rebuildable for nothing, so a
+selection stored inside it is a selection the next free refresh wipes; and
+which model reviews is a fact about who is at this keyboard rather than
+about the project. A selection is used and never silently substituted, and
+it NARROWS — a selection a call cannot reach is a stop that names the model
+rather than a fall to the next one.
+
+### Model discovery
+
+A role says what a reviewer may be; a discovery record says what currently
+exists. There are two records because there are two mechanisms:
+
+- **Direct API.** `dabbler discovery refresh` reads each vendor's models
+  endpoint. A models endpoint is a metadata request and **bills no tokens
+  on any of the three vendors**.
+- **Copilot seat.** The CLI has no list-models command, but the seat states
+  its own models in the reply to opening a conversation — free, with no
+  prompt sent.
+
+Both readings land in **one file per machine**,
+`ai-model-catalog.json` under this platform's own per-user data directory,
+with one block per transport. Nothing ships a catalog and nothing commits
+one: a catalog is a reading of THIS machine's seat and THIS machine's keys,
+and a copy that travelled in a package would tell every other machine about
+somebody else's models. A block recorded for a different seat or a different
+key set is read as unread rather than believed.
+
+Neither reading can bill a token, so the 24-hour cadence is a freshness
+preference rather than a budget control, and there is no question about what
+a refresh costs.
+
+`dabbler discovery status` reports both records' ages — **the API record is
+aged against its stalest enabled vendor**, so one vendor answering never
+dates the whole file while another's key is expired. `dabbler discovery
+drift` reports the gap between the records and the roles — models in a
+record that no role ranks, and models a role ranks that no record carries.
+**The gap is reported, never closed silently:** ranking one model above
+another is a judgment metadata cannot make, so a model may propose an
+ordering, enumeration or a probe confirms it, and the writer records it.
+Nothing is enabled by a name.
+
+**What a vendor stops reporting becomes unknown, never unsupported.**
+Vendors report unequally, and a hard capability filter would disqualify
+every model from the quietest vendor and end cross-vendor verification by
+accident. Capability metadata ranks; it never filters.
+
+**Enumeration refuses to run while a session is in flight**, and a stale
+record only ever warns — `session start` prints the warning and names the
+invocation. A session that changed its own reviewer pool mid-run would have
+edited the conditions of its own review, and a maintenance signal that can
+cause an outage is a maintenance signal that gets suppressed.
+
+### Transport preference
+
+Resolved in this precedence (first set wins):
+
+1. an explicit `--transport api|copilot-cli` flag
+   (`dabbler verify --transport …`)
+2. the `DABBLER_TRANSPORT` env var (`api` | `copilot-cli`) — the
+   operator's standing preference
+3. `transport.profile` in the loaded config — the packaged
+   `router-config.yaml`, with the repository's tracked `dabbler.yaml`
+   and then a machine-local `local-overrides.yaml` deep-merged over it
+4. default: `api`
+
+Both layers are config *sources*, not precedence tiers: they change what
+tier 3 says and nothing above it.
+
+`dabbler.yaml` is the repository's own, and it is **tracked**. It carries
+`testing` (suites, controls, smoke tests), `packaging` and `paths` —
+the facts CI and the next machine have to read, behind a `schema_version`.
+Providers, models and roles stay in the packaged config: those are
+distribution facts, and a repository declaring how to run `mvn -q test`
+must not have to fork the model registry to do it.
+
+`local-overrides.yaml` is machine facts only. It lives at the project
+root, carries only the keys it changes, and is never committed and never
+packaged — `.gitignore` reserves the name and it is not package data. A key
+the schema does not declare is **refused at load**, not dropped, because an
+override the router silently ignores is the failure the file exists to
+prevent; and a key the repository owns is refused by name, because a suite
+command from a gitignored file would be attributed by the run of record to
+a repository that never declared it.
+
+This is how a machine disagrees with the published default. The packaged
+`router-config.yaml` ships `transport: profile: copilot-cli`, because the
+seat is the surface staff receive; a machine with provider API keys and no
+seat says so once, in a file it does not publish:
+
+```yaml
+# local-overrides.yaml — this machine has API keys and no Copilot seat
+transport:
+  profile: api
+```
+
+Config is the only layer that is client-, model- and transport-
+independent. The env var reaches only processes started after it was
+written; `--transport` has to be repeated on every command; and instruction
+files are read by some clients and not others.
+
+This is the MACHINE's vehicle, used where no role says otherwise. A role
+may carry its own — `roles.<role>.transport`, read between the environment
+variable and `transport.profile` — because a review may need the other
+transport when provider independence requires it.
+
+**Nothing persists the environment variable for you.** `bootstrap` used to
+write it at user scope, and a variable that outranks every config layer
+shadowed the very preference a later run set, for every repository on the
+machine. It is read and never written; `--no-transport-detect` retired
+with the writing.
+
+### When a session publishes
+
+**Ordinary sessions never publish. A release is a session of its own**,
+planned, moved, renumbered or cancelled like any other, and marked in its
+heading in `session-plan.md`:
+
+    ### Session 12: Release 1.4.0 (release: 1.4.0)
+
+It has no AI work, no tests of its own and no review: the framework packs
+and pushes what is already on the trunk. The AI proposes each release's
+version when it writes or amends the plan — patch, minor or major by what
+the released sessions changed — and you approve it with the plan.
+
+**Packaging is a session of its own too.** The `packaging:` block is not
+written into `dabbler.yaml` until the session whose whole job is packaging,
+early with project files only or later. A packaging problem is then
+confined to that session or to a release, and never strands the session
+that did the feature work.
+
+**Start Session on a release session opens no AI.** `dabbler session start`
+(or the button) checks three things and refuses, naming the way forward:
+
+- no `packaging:` block is declared — plan a packaging session first;
+- a session since the last published release closed without a VERIFIED
+  verdict — plan a session that fixes it;
+- the version is kept in a file (`version.json`, a tag release) that does
+  not say the release's version — an ordinary session bumps it.
+
+Otherwise it runs the whole suites, packs with the release's version as
+`{version}`, pushes, tags, records the packaging run and closes. A failed
+pack or push is a stop: cancel the release session, then plan a session
+that fixes the cause and a new release session after it. A version is spent
+only by a push that succeeded. `dabbler session hold-release --reason
+"<why>"` is a person's way to stop a release session's publish.
+
+## Credentials
+
+API keys are resolved from environment variables only — never from config
+files, never logged:
+
+| Provider | Env var |
+|---|---|
+| Anthropic | `DABBLER_ANTHROPIC_API_KEY` |
+| OpenAI | `DABBLER_OPENAI_API_KEY` |
+| Google | `DABBLER_GEMINI_API_KEY` |
+
+A provider whose key does not resolve is simply not a candidate — the
+router selects among the providers that have keys (or the Copilot seat, on
+that transport). An empty-string value counts as absent.
+
+## Library use
+
+The package exports the router's contract and one implementation of it, and
+nothing behind it. A caller asks a `Router` for an answer:
+
+```ts
+import { createInProcessRouter } from "dabbler-ai-router";
+
+const router = createInProcessRouter();
+const projection = await router.progress({ repoRoot: process.cwd() });
+if (projection.ok) console.log(projection.value.sessions.length);
+```
+
+`dabbler metrics` prints the token report (per model, per task type, per
+session). Seat rows name the conversation id that prices them; no row is
+presented as a dollar figure.
+
+## Layout
+
+```
+packages/router/          the router: the dabbler command and the library
+packages/router/schemas/  JSON Schemas: the session ledger, the round record
+packages/router/prompt-templates/  system/task/verification prompts
+tools/dabbler-ai-orchestration/    the VS Code extension
+docs/                     quick-start and schema reference
+```
+
+Migrating a project from v1? See
+[MIGRATION-FROM-V1.md](MIGRATION-FROM-V1.md) — the short version is:
+nothing to migrate.

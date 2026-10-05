@@ -96,10 +96,16 @@ long, each job's output — so closing it changes nothing and reopening it
 shows where the session is. **Stop Session** (or `dabbler session interrupt --reason
 "..."` from a terminal) reaches the framework where it is working, and a
 plain message reaches the AI with its next instruction; to carry on after a
-stop, ask your AI to run `dabbler session next`. **Cancel Session** ends one
-with your reason on the record and your files left as they were. Your AI may
-cancel the session it is working, by its number with a reason; cancelling
-any other session, and `--force`, stay yours.
+stop, ask your AI to run `dabbler session next`. **Cancel Session** is for
+objectives no longer wanted: it ends the session with your reason on the
+record and your files left as they were. **Reset Session**, on the session
+in flight, is for an implementation that went wrong: it returns the
+repository to where the session started, discards everything the session
+did — a revert where its commit was already pushed — and puts the session
+back at not-started with its plan as it was, ready to amend and start again.
+It warns what will be lost and asks you to confirm. Your AI does neither:
+an engine that cannot carry a step reports it blocked and says why, and the
+session waits for you.
 
 **6. Seven gates at the close, each one earned.** `session close` runs
 verification clean, working tree clean, pushed to remote, test run fresh,

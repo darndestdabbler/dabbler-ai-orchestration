@@ -121,6 +121,17 @@ export const SESSION_ACTIONS: SessionAction[] = [
     group: 902,
     when: (_repository, session) => session.status === "cancelled",
   },
+  {
+    id: "dabblerSessionSets.reset",
+    label: "Reset Session",
+    group: 903,
+    // The third way to end a session, for an implementation that went
+    // wrong: back to where it started, everything it did discarded. The
+    // router applies it to the session in flight and to no other, so the
+    // item is on that row and on no other -- the Stop Session rule.
+    when: (repository, session) =>
+      repository.currentSession === session.number && session.status === "in-progress",
+  },
 ];
 
 export function applicableSessionActions(

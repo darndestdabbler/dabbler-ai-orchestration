@@ -206,6 +206,54 @@ export async function runRestoreSessionFlow(
   return true;
 }
 
+/**
+ * The third way to end a session, for an implementation that went wrong:
+ * back to where it started, everything it did discarded. The modal says
+ * what is lost before anything is asked of the router; the verb itself
+ * refuses an engine and any session but the one in flight, and the item
+ * is on that row only, so the click and the verb agree on which session.
+ */
+export async function runResetSessionFlow(
+  session: CancellableSession,
+  ui: CancelLifecycleUi = defaultUi(),
+  router: Router = productionRouter(),
+): Promise<boolean> {
+  const choice = await ui.confirm(
+    `Reset session ${session.number} "${session.name}"?`,
+    "The session goes back to where it started. Every change it made is " +
+      "discarded, including uncommitted work, and cannot be recovered. The " +
+      "session plan is kept, and the session can be started again.",
+    "Reset Session",
+    "Keep",
+  );
+  if (choice !== "Reset Session") return false;
+
+  const reason = await ui.promptReason(
+    `Reason for resetting "${session.name}" (optional)`,
+    "e.g. the step plan guessed a package",
+  );
+
+  const result = await call(ui, () =>
+    router.session.reset({
+      repoRoot: session.root,
+      sessionNumber: session.number,
+      reason: reason ?? "",
+    }),
+  );
+  if (!result || !result.ok) {
+    if (result) {
+      ui.showErrorMessage(
+        describeLifecycleFailure("Resetting", session.name, result),
+      );
+    }
+    return false;
+  }
+  ui.showInformationMessage(
+    `Reset session ${session.number}; amend the plan, then Start Session.`,
+  );
+  return true;
+}
+
 export function registerCancelLifecycleCommands(
   context: vscode.ExtensionContext,
   deps: RegisterDeps,
@@ -225,6 +273,14 @@ export function registerCancelLifecycleCommands(
         const session = cancellableSessionOf(arg);
         if (!session) return;
         if (await runRestoreSessionFlow(session)) deps.refreshView();
+      },
+    ),
+    vscode.commands.registerCommand(
+      "dabblerSessionSets.reset",
+      async (arg: unknown) => {
+        const session = cancellableSessionOf(arg);
+        if (!session) return;
+        if (await runResetSessionFlow(session)) deps.refreshView();
       },
     ),
   );

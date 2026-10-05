@@ -144,6 +144,30 @@ suite("ActionRegistry: session actions", () => {
     assert.ok(!applicableSessionActions(idle, sessions[1]).map((a) => a.id).includes("dabblerSessionSets.stopSession"));
   });
 
+  test("Reset Session is offered on the session in flight and on no other row", () => {
+    // The router resets the session in flight and refuses any other
+    // number, so an entry on another row would offer a reset the verb
+    // refuses -- or, worse, read as resetting the row it was clicked on.
+    const sessions = [
+      makeSession({ number: 1, status: "complete" }),
+      makeSession({ number: 2, status: "in-progress" }),
+      makeSession({ number: 3, status: "not-started" }),
+      makeSession({ number: 4, status: "cancelled" }),
+    ];
+    const running = makeRepository({ currentSession: 2, nextSession: 3, sessions });
+    const offered = (session: ReturnType<typeof makeSession>) =>
+      applicableSessionActions(running, session).map((a) => a.id);
+    assert.ok(offered(sessions[1]).includes("dabblerSessionSets.reset"));
+    assert.ok(offered(sessions[1]).includes("dabblerSessionSets.stopSession"));
+    for (const other of [sessions[0], sessions[2], sessions[3]]) {
+      assert.ok(!offered(other).includes("dabblerSessionSets.reset"), String(other.number));
+    }
+    // An in-progress row that is not the one in flight is a record the
+    // router would refuse; the item follows the router.
+    const stale = makeRepository({ currentSession: 3, nextSession: null, sessions });
+    assert.ok(!applicableSessionActions(stale, sessions[1]).map((a) => a.id).includes("dabblerSessionSets.reset"));
+  });
+
   test("cancel and restore are mutually exclusive on one row", () => {
     const cancelled = makeSession({ number: 1, status: "cancelled" });
     const ids = applicableSessionActions(

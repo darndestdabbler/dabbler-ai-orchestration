@@ -4,6 +4,7 @@ import {
   CancellableSession,
   CancelLifecycleUi,
   runCancelSessionFlow,
+  runResetSessionFlow,
   runRestoreSessionFlow,
 } from "../../commands/cancelLifecycleCommands";
 import {
@@ -119,6 +120,44 @@ suite("cancel/restore flows", () => {
     const refreshed = await runRestoreSessionFlow(CANCELLABLE, ui, fakeRouter(0).router);
     assert.strictEqual(refreshed, true);
     assert.ok(infos[0].includes("session 3"));
+  });
+
+  test("reset warns what is lost, asks, takes a reason, runs the verb and names the session", async () => {
+    const seen: { summary: string; detail: string; buttons: string[] }[] = [];
+    const { ui, infos, errors } = cancelUi({
+      confirm: async (summary, detail, affirmative, negative) => {
+        seen.push({ summary, detail, buttons: [affirmative, negative] });
+        return affirmative;
+      },
+    });
+    const refreshed = await runResetSessionFlow(CANCELLABLE, ui, fakeRouter(0).router);
+    assert.strictEqual(refreshed, true);
+    assert.strictEqual(errors.length, 0);
+    assert.strictEqual(seen[0].summary, 'Reset session 3 "Third things"?');
+    assert.ok(seen[0].detail.includes("Every change it made is discarded"));
+    assert.ok(seen[0].detail.includes("cannot be recovered"));
+    assert.deepStrictEqual(seen[0].buttons, ["Reset Session", "Keep"]);
+    assert.ok(infos[0].includes("Reset session 3"));
+    assert.ok(infos[0].includes("Start Session"));
+  });
+
+  test("a reset dismissed or kept runs nothing", async () => {
+    for (const answer of [undefined, "Keep"]) {
+      const { ui } = cancelUi({ confirm: async () => answer });
+      assert.strictEqual(await runResetSessionFlow(CANCELLABLE, ui, unusableRouter()), false);
+    }
+  });
+
+  test("a reset the router refuses surfaces in its words and does not refresh", async () => {
+    const { ui, errors } = cancelUi();
+    const refreshed = await runResetSessionFlow(
+      CANCELLABLE,
+      ui,
+      fakeRouter(3, "session reset is a person's verb").router,
+    );
+    assert.strictEqual(refreshed, false);
+    assert.ok(errors[0].startsWith('Resetting "Third things" refused'));
+    assert.ok(errors[0].includes("Nothing was written"));
   });
 });
 

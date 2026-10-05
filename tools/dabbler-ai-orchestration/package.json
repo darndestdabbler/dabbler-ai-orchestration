@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: solutions, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
-  "version": "3.19.3",
+  "version": "3.20.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -122,6 +122,11 @@
       {
         "command": "dabblerSessionSets.restore",
         "title": "Restore Session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.reset",
+        "title": "Reset Session",
         "category": "Dabbler"
       },
       {
@@ -353,6 +358,11 @@
           "group": "9_lifecycle@902"
         },
         {
+          "command": "dabblerSessionSets.reset",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-reset;/",
+          "group": "9_lifecycle@903"
+        },
+        {
           "command": "dabblerSolution.setEngine",
           "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfig(Vehicle|Participant);authoring$/",
           "group": "1_set@1"
@@ -550,7 +560,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.9",
-    "dabbler-ai-router": "3.19.3",
+    "dabbler-ai-router": "3.20.0",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",

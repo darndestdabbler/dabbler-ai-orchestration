@@ -10,6 +10,57 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.20.0] — 2026-10-05
+
+**A session that went wrong is reset to where it started.** A staff member's
+.NET sample, 2026-10-02: the engine's fix outgrew a check its own step plan
+had declared, the fix was refused three times on that check, and the engine
+cancelled the session — then started and cancelled the five sessions after
+it trying to get back, and committed the cancelled session's never-verified
+work on the way. Sessions 240 to 242 answer each of those.
+
+### Added
+
+- **`dabbler session reset --reason "<why>"`, and Reset Session in the Work
+  Explorer.** The third way to end a session, beside carrying on and
+  cancelling: the repository goes back to the commit the session started on
+  — a hard reset of the tree before the land, a revert of every commit since
+  the start and a push after it, so pushed history is never rewritten — the
+  session's run record is moved aside, its test runs leave the record, the
+  restored ledger is recorded as a sanctioned write so the close accepts it,
+  and the reset goes on the activity log under the session. It applies to
+  the session in flight and to no other, is a person's verb refused to an
+  engine, and every stop offers it beside the cancel. The Work Explorer's
+  item sits on the row in flight only, says what will be lost and asks you
+  to confirm; the session is then at not-started with its plan as it was,
+  ready to amend and Start again.
+
+### Changed
+
+- **A refused check names the step that declared it and the way past it.**
+  The fix round runs every step's checks; one that fails now says whose it
+  is and ends with the verb that amends a check that no longer describes its
+  step, and with `--status blocked` for a step that cannot be done. The
+  fix-round ask and the stop after three refusals say the same.
+- **Cancelling is a person's, forced or not.** An engine's cancel of the
+  session it is working is refused with "report the step blocked and say
+  why"; a blocked report leaves the session in flight and names the person,
+  and every start of a later session is refused until they decide. A cancel
+  is for objectives no longer wanted; implementation trouble is carried on,
+  reported blocked, or reset.
+- **What becomes of a cancelled session's work is a person's answer.**
+  `--commit-changes` and `--undo-changes` on `session start` are refused to
+  an engine.
+
+### Fixed
+
+- **The close read the session in flight off the raw ledger, which has no
+  such field.** So the gate counted the session's own whole run in deciding
+  what it owed while the run-of-record phase did not; a whole run that took
+  longer than the last one flipped the gate to a targeted record nobody had
+  made, and the close refused a session that had just passed its suites.
+  Both now read the in-progress row.
+
 ## [3.19.3] — 2026-10-01
 
 **A Copilot seat whose CLI came from npm can author and review.** The npm

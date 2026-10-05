@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "packaging.jsonl row (one attempt at step (f))",
+  "description": "One row per packaging attempt in .dabbler/runs/<set>/s<N>/packaging.jsonl. Written only by ai_router.packaging; nothing reads a hand-written row, and a row that fails this schema on read is a refusal rather than a skip. Refusals are recorded beside publications on purpose: 'this session was not allowed to publish' is a fact about the session, and a record that keeps only the successes cannot be read as a history of what was released. No property here ever holds a credential -- the push command is recorded with the secret placeholder still in it and command output is scrubbed of the resolved value before it is written, so the value exists only in the argv of a process that has already exited.",
+  "type": "object",
+  "required": [
+    "outcome",
+    "session_number",
+    "releasable",
+    "recorded_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": ["published", "refused", "failed"],
+      "description": "'refused' means nothing was run: a gate said no. 'failed' means a declared command ran and did not succeed. 'published' means pack succeeded and every artifact it produced was pushed. The three are kept apart because a session that was never allowed to publish and a session whose push was rejected by the feed are different things to read at planning time."
+    },
+    "session_number": { "type": "integer", "minimum": 1 },
+    "releasable": {
+      "type": "boolean",
+      "description": "What the session declared at step (a), read from the activity log rather than decided here. False includes the session that never declared at all: session_is_releasable fails closed."
+    },
+    "refusal": {
+      "type": "string",
+      "description": "Why nothing ran. Present exactly when outcome is 'refused'."
+    },
+    "feed": {
+      "type": "string",
+      "description": "Where the artifacts went, taken from the declaration that was substituted into the push command rather than from a label beside it."
+    },
+    "secret_name": {
+      "type": "string",
+      "description": "The name of the secret that was resolved, never its value. The name is the whole point of the record: it says which credential published this without saying what it is."
+    },
+    "tree_digest": {
+      "type": ["string", "null"],
+      "description": "The worktree tree id the artifacts were built from, so a publication binds to a tree the verification record can be checked against."
+    },
+    "post_tree_digest": {
+      "type": ["string", "null"],
+      "description": "The worktree tree id after the last command ran. Recorded whenever it differs from tree_digest, because then the two are the whole finding."
+    },
+    "tree_mutated": {
+      "type": "boolean",
+      "description": "A declared command changed the repository while it ran. This fails the attempt whatever the exit code said, on the same terms as a check that mutates the tree it was measuring: a build that leaves intermediates behind has produced artifacts from a tree nobody verified, and pushing them would record a release against a tree that no longer exists."
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "What pack produced, named relative to the run's own output directory. Absolute paths are deliberately absent: they carry a machine's home directory into a record that gets read elsewhere."
+    },
+    "recorded_at": { "type": "string", "minLength": 1 },
+    "gates": {
+      "type": "array",
+      "description": "The close gates as they stood when packaging asked them. Recorded because 'the order was satisfied' is a claim, and this is the evidence for it.",
+      "items": {
+        "type": "object",
+        "required": ["name", "passed"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "passed": { "type": "boolean" },
+          "remediation": { "type": "string" }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "Every command that ran, in order: pack once, then push once per artifact.",
+      "items": {
+        "type": "object",
+        "required": ["step", "command", "exit_code", "duration_seconds"],
+        "additionalProperties": false,
+        "properties": {
+          "step": { "type": "string", "enum": ["pack", "push"] },
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The argv that ran, joined for reading, with the secret placeholder left where the resolved value was substituted at spawn."
+          },
+          "artifact": { "type": "string" },
+          "exit_code": {
+            "type": ["integer", "null"],
+            "description": "Null means the command never returned an exit code: it timed out, or it could not be started at all. 'timed_out' tells those two apart."
+          },
+          "duration_seconds": { "type": "number", "minimum": 0 },
+          "timed_out": { "type": "boolean" },
+          "output": {
+            "type": "string",
+            "description": "Combined stdout and stderr, scrubbed of the resolved secret and truncated to its tail."
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "outcome": { "const": "refused" } },
+        "required": ["outcome"]
+      },
+      "then": { "required": ["refusal"] }
+    },
+    {
+      "if": {
+        "properties": { "outcome": { "const": "published" } },
+        "required": ["outcome"]
+      },
+      "then": {
+        "required": ["feed", "secret_name", "artifacts", "steps"],
+        "properties": {
+          "releasable": { "const": true },
+            "tree_mutated": { "const": false },
+            "artifacts": { "minItems": 1 }
+          }
+        }
+    }
+  ]
+}

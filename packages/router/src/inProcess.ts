@@ -54,7 +54,7 @@ import {
   type SessionDecisionOptions,
   type SessionInterruptOptions,
   type SessionRestoreOptions,
-  type SessionResetOptions,
+  type SessionRollbackOptions,
   type SessionStartOptions,
   type SessionVerbs,
   type TestEvidenceRecordOptions,
@@ -291,14 +291,14 @@ export class InProcessRouter implements Router {
         o.repoRoot,
       ),
     // A person's click; the verb refuses an engine, and a click is never one.
-    reset: (o: SessionResetOptions) =>
+    rollback: (o: SessionRollbackOptions) =>
       this.text(
         "session",
         [
-          "reset",
+          "rollback",
+          ...(o.sessionNumber === undefined ? [] : [String(o.sessionNumber)]),
           "--reason",
           o.reason,
-          ...(o.sessionNumber === undefined ? [] : ["--session-number", String(o.sessionNumber)]),
           ...targetArgs(o),
         ],
         o.repoRoot,

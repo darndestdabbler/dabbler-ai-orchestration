@@ -666,11 +666,12 @@ function runsPath(repoRoot: string): string {
 }
 
 /**
- * Drop one session's rows, as a reset does: the runs it recorded were taken
- * against a tree that no longer exists. Every other line, a bad one
- * included, is kept as it was. Answers how many rows went.
+ * Drop the rows of the sessions `undone` names, as a rollback does: the
+ * runs they recorded were taken against trees that no longer exist. Every
+ * other line, a bad one included, is kept as it was. Answers how many rows
+ * went.
  */
-export function dropSessionRecords(repoRoot: string, sessionNumber: number): number {
+export function dropSessionRecords(repoRoot: string, undone: (sessionNumber: number) => boolean): number {
   const path = runsPath(repoRoot);
   let text: string;
   try {
@@ -688,7 +689,7 @@ export function dropSessionRecords(repoRoot: string, sessionNumber: number): num
     } catch {
       row = null;
     }
-    if (isRecord(row) && row["sessionNumber"] === sessionNumber) {
+    if (isRecord(row) && typeof row["sessionNumber"] === "number" && undone(row["sessionNumber"])) {
       dropped += 1;
       continue;
     }

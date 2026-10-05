@@ -35,7 +35,7 @@ import {
   plan,
   planAmend,
   report,
-  reset,
+  rollback,
   restore,
   start,
   personIsPresent,
@@ -61,7 +61,7 @@ const SUMMARY: Record<string, string> = {
   close: "run gates and close the session",
   cancel: "cancel one session",
   restore: "restore a cancelled session",
-  reset: "return the repository to where the session in flight started, and the session to not-started",
+  rollback: "return the repository to where a session started, undoing it and every session after it",
   migrate: "fold a legacy session-set directory into the sessions root",
 };
 
@@ -240,12 +240,13 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           the step blocked instead",
   ],
   restore: ["  --reason TEXT            required: why it is coming back"],
-  reset: [
-    "  --reason TEXT            required: why the session is being reset",
-    "  --session-number N       the session in flight, named; any other number is",
-    "                           refused. A reset is a person's verb, refused to an",
-    "                           engine: everything the session did is discarded --",
-    "                           the tree before the land, a revert after it",
+  rollback: [
+    "  --reason TEXT            required: why the sessions are being rolled back",
+    "  session_number           the session to roll back to the start of: in flight",
+    "                           or completed; it and every session after it return to",
+    "                           not-started. Omitted: the session in flight. A person's",
+    "                           verb, refused to an engine. What was landed is reverted",
+    "                           and pushed; a release among them stays published",
   ],
   migrate: ["  --from PATH              required: the legacy session-set directory"],
 };
@@ -515,13 +516,22 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     return holdRelease(sessionsDir, { reason, engine: !personIsPresent() });
   }
 
-  if (subcommand === "reset") {
-    const reason = values.get("--reason");
-    if (reason === undefined) {
-      writeErr("dabbler session reset: the following arguments are required: --reason\n");
+  if (subcommand === "rollback") {
+    const positional = integer(parsed.positional[0], "session_number");
+    if (typeof positional === "string") {
+      writeErr(`dabbler session rollback: ${positional}\n`);
       return EXIT_USAGE;
     }
-    return reset(sessionsDir, { reason, sessionNumber: sessionNumber ?? null, engine: !personIsPresent() });
+    const reason = values.get("--reason");
+    if (reason === undefined) {
+      writeErr("dabbler session rollback: the following arguments are required: --reason\n");
+      return EXIT_USAGE;
+    }
+    return rollback(sessionsDir, {
+      reason,
+      sessionNumber: positional ?? sessionNumber ?? null,
+      engine: !personIsPresent(),
+    });
   }
 
   if (subcommand === "cancel" || subcommand === "restore") {

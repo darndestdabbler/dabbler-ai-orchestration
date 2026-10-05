@@ -1142,8 +1142,8 @@ class LeaseLost extends Error {
   }
 }
 
-/** How a session ends underneath its loop: a person's cancel, a forced close, or a reset. */
-export type SessionEndedStatus = "cancelled" | "closed" | "reset";
+/** How a session ends underneath its loop: a person's cancel, a forced close, or a rollback. */
+export type SessionEndedStatus = "cancelled" | "closed" | "rolled-back";
 
 class SessionEnded extends Error {
   readonly status: SessionEndedStatus;
@@ -1162,8 +1162,8 @@ class SessionEnded extends Error {
  * Cancelled is over in every phase. Complete is over too -- a person forced
  * the close -- except while the loop is itself closing, where it is the
  * loop's own close, collected where it always was. A row back at
- * not-started was reset: a person returned the repository to where the
- * session started, and the run this loop holds no longer exists.
+ * not-started was rolled back: a person returned the repository to where
+ * a session started, and the run this loop holds no longer exists.
  */
 export function judgeSessionEnded(
   status: unknown,
@@ -1177,7 +1177,7 @@ export function judgeSessionEnded(
   if (status === "complete" && phase !== "close" && phase !== "complete") {
     return { status: "closed", why: null };
   }
-  if (status === "not-started") return { status: "reset", why: null };
+  if (status === "not-started") return { status: "rolled-back", why: null };
   return null;
 }
 

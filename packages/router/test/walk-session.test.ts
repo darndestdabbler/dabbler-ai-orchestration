@@ -28,7 +28,7 @@ import { detectOutOfBandWrite } from "../src/evidence.ts";
 import { readRawSessionState, readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import { EXIT_OK, EXIT_USAGE, RELEASE_ENGINE, cancel, declare, holdRelease, interrupt, planAmend, report, reset, start } from "../src/session.ts";
+import { EXIT_OK, EXIT_USAGE, RELEASE_ENGINE, cancel, declare, holdRelease, interrupt, planAmend, report, rollback, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
 import { amendmentEntries, readTaskDeclaration } from "../src/writers.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
@@ -1925,7 +1925,7 @@ describe("a session-plan.md edit while a session is in progress", () => {
   });
 });
 
-describe("a session reset to where it started", () => {
+describe("a session rolled back to where it started", () => {
   /** Drive the session in flight from its first `next` to `done`, answering its one step. */
   async function driveToDone(repo: string, sessionsDir: string, sessionNumber: number, plan: unknown, work: string): Promise<void> {
     const planned = await next(sessionsDir);
@@ -1982,12 +1982,12 @@ describe("a session reset to where it started", () => {
     const before = readRecords(repo);
     assert.ok(before.length > 0 && before.every((row) => row.sessionNumber === 1));
 
-    const engine = await capture(() => Promise.resolve(reset(sessionsDir, { reason: "x", engine: true })));
+    const engine = await capture(() => Promise.resolve(rollback(sessionsDir, { reason: "x", engine: true })));
     assert.notEqual(engine.value, EXIT_OK);
     assert.equal(readSessionState(sessionsDir)?.["currentSession"], 2);
-    const done = await capture(() => Promise.resolve(reset(sessionsDir, { reason: "the step plan guessed a package", engine: false })));
+    const done = await capture(() => Promise.resolve(rollback(sessionsDir, { reason: "the step plan guessed a package", engine: false })));
     assert.equal(done.value, EXIT_OK, done.stderr);
-    assert.match(done.stderr, /session 002 is back at .{12}, where it started: the working tree was reset, discarding/);
+    assert.match(done.stderr, /rollback: session 002 undone; the repository is back at .{12}, where session 002 started: the working tree was reset, discarding/);
     assert.match(done.stderr, /src\/extra\.py/);
 
     // The tree: the work gone, the ignored file kept; the ledger: row 2 back
@@ -2001,13 +2001,13 @@ describe("a session reset to where it started", () => {
     assert.equal(readSessionState(sessionsDir)?.["currentSession"], null);
     assert.equal(detectOutOfBandWrite(sessionsDir, repo, { requireRecord: true }), null);
     // The framework's own records: the run moved aside, session 2's test
-    // runs gone and session 1's kept, the reset on the activity log and in
-    // the work plan, and only those files committed.
+    // runs gone and session 1's kept, the rollback on the activity log and
+    // in the work plan, and only those files committed.
     assert.equal(existsSync(join(repo, ".dabbler", "runs", "s2")), false);
     assert.ok(readdirSync(join(repo, ".dabbler", "superseded-runs")).some((name) => name.startsWith("s2-")));
     assert.deepEqual(readRecords(repo).map((row) => row.sessionNumber), before.map((row) => row.sessionNumber));
-    assert.match(readFileSync(join(sessionsDir, "project-work-plan.md"), "utf8"), /\*\*Reset:\*\*\n\n- \d{4}-\d{2}-\d{2} — the step plan guessed a package \(operator\)/);
-    assert.equal(gitOut(repo, "log", "--format=%s", `${anchor}..HEAD`).trim(), "Reset session 2 of sessions");
+    assert.match(readFileSync(join(sessionsDir, "project-work-plan.md"), "utf8"), /\*\*Rolled back:\*\*\n\n- \d{4}-\d{2}-\d{2} — session 2 — the step plan guessed a package \(operator\)/);
+    assert.equal(gitOut(repo, "log", "--format=%s", `${anchor}..HEAD`).trim(), "Roll back to the start of session 2 of sessions");
     assert.equal(gitOut(repo, "status", "--porcelain").trim(), "");
     assert.equal(gitOut(repo, "diff", "--name-only", anchor, "HEAD").trim().split("\n").sort().join(","), "docs/sessions/activity-log.json,docs/sessions/project-work-plan.md");
 
@@ -2043,11 +2043,11 @@ describe("a session reset to where it started", () => {
     git(repo, "push", "-q");
     const landed = gitOut(repo, "rev-parse", "HEAD").trim();
 
-    const done = await capture(() => Promise.resolve(reset(sessionsDir, { reason: "verification found the design wrong", engine: false })));
+    const done = await capture(() => Promise.resolve(rollback(sessionsDir, { reason: "verification found the design wrong", engine: false })));
     assert.equal(done.value, EXIT_OK, done.stderr);
     assert.match(done.stderr, /2 commit\(s\) were reverted and pushed/);
     assert.deepEqual(gitOut(repo, "log", "--format=%s", `${landed}..HEAD`).trim().split("\n"), [
-      "Reset session 1 of sessions",
+      "Roll back to the start of session 1 of sessions",
       'Revert "Session 1: The widget"',
       'Revert "Session 1: The widget, again"',
     ]);
@@ -2058,9 +2058,74 @@ describe("a session reset to where it started", () => {
     assert.equal(existsSync(join(repo, ".dabbler", "runs", "s1")), false);
     // No ledger was landed before session 1, so none is where it started.
     assert.equal(readRawSessionState(sessionsDir), null);
-    assert.match(readFileSync(join(sessionsDir, "project-work-plan.md"), "utf8"), /### Session 1 — Session 1\n\n\*\*Reset:\*\*/);
+    assert.match(readFileSync(join(sessionsDir, "project-work-plan.md"), "utf8"), /### Session 1 — Session 1\n\n\*\*Rolled back:\*\*/);
     const again = await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })));
     assert.equal(again.value, EXIT_OK, again.stderr);
     assert.equal(readSessionState(sessionsDir)?.["currentSession"], 1);
+  });
+
+  it("rolls back to the start of a closed session while a later one is in flight, undoing both, and the closed number starts afresh", async () => {
+    // The operator's case, 2026-10-05: a sample re-run from a chosen
+    // session, or a problem that spans several. Session 1 has landed and
+    // closed; session 2 is in flight with work in the tree. The rollback is
+    // to the start of session 1, so session 2 goes with it.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED, VERIFIED]);
+    const seed = gitOut(repo, "rev-parse", "HEAD").trim();
+    const rows = () => (readRawSessionState(sessionsDir)?.["sessions"] ?? null) as Array<Record<string, unknown>> | null;
+
+    assert.equal((await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })))).value, EXIT_OK);
+    // The anchor rides on the row from the start, before anything lands.
+    assert.equal(rows()?.[0]?.["startCommit"], seed);
+    await driveToDone(repo, sessionsDir, 1, PLAN, "def widget():\n    return 2\n");
+    const closed = gitOut(repo, "rev-parse", "HEAD").trim();
+    assert.equal(rows()?.[0]?.["status"], "complete");
+    assert.equal(rows()?.[0]?.["startCommit"], seed);
+
+    assert.equal((await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })))).value, EXIT_OK);
+    assert.equal(rows()?.[1]?.["startCommit"], closed);
+    const planned = await next(sessionsDir);
+    assert.equal(await answerPlan(sessionsDir, planned.instruction?.seq ?? 0, { ...PLAN, task: "Make widget() return 3." }), EXIT_OK);
+    const step = await next(sessionsDir);
+    assert.equal(step.instruction?.step_id, "widget", step.err);
+    writeFileSync(join(repo, "src", "widget.py"), WIDGET_V3, "utf8");
+    assert.ok(readRecords(repo).some((row) => row.sessionNumber === 1));
+
+    const done = await capture(() =>
+      Promise.resolve(rollback(sessionsDir, { sessionNumber: 1, reason: "the model was wrong from the first session", engine: false })),
+    );
+    assert.equal(done.value, EXIT_OK, done.stderr);
+    assert.match(done.stderr, /rollback: sessions 001 to 002 undone; the repository is back at .{12}, where session 001 started: 2 commit\(s\) were reverted and pushed/);
+    assert.match(done.stderr, /2 run record\(s\) moved aside/);
+
+    // The reverts undo session 1's land and close and nothing else; the tree
+    // they leave is the seed's, and origin has it.
+    const log = gitOut(repo, "log", "--format=%s", `${closed}..HEAD`).trim().split("\n");
+    assert.equal(log[0], "Roll back to the start of session 1 of sessions");
+    assert.equal(log.length, 3, log.join(" | "));
+    assert.ok(log.slice(1).every((subject) => subject.startsWith('Revert "')), log.join(" | "));
+    assert.equal(gitOut(repo, "rev-parse", "HEAD~1^{tree}").trim(), gitOut(repo, "rev-parse", `${seed}^{tree}`).trim());
+    assert.equal(gitOut(repo, "rev-parse", "origin/main").trim(), gitOut(repo, "rev-parse", "HEAD").trim());
+    assert.equal(readFileSync(join(repo, "src", "widget.py"), "utf8"), "def widget():\n    return 1\n");
+    // Where session 1 started there was no ledger yet, so there is none; the
+    // framework's own records are gone with the sessions.
+    assert.equal(rows(), null);
+    assert.equal(existsSync(join(repo, ".dabbler", "runs", "s1")), false);
+    assert.equal(existsSync(join(repo, ".dabbler", "runs", "s2")), false);
+    const aside = readdirSync(join(repo, ".dabbler", "superseded-runs"));
+    assert.ok(aside.some((name) => name.startsWith("s1-")) && aside.some((name) => name.startsWith("s2-")), aside.join(","));
+    assert.deepEqual(readRecords(repo), []);
+    assert.match(readFileSync(join(sessionsDir, "project-work-plan.md"), "utf8"), /\*\*Rolled back:\*\*\n\n- \d{4}-\d{2}-\d{2} — sessions 1 to 2 — the model was wrong from the first session \(operator\)/);
+    assert.equal(gitOut(repo, "status", "--porcelain").trim(), "");
+
+    // And session 1 starts afresh, on the commit the rollback left.
+    const again = await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })));
+    assert.equal(again.value, EXIT_OK, again.stderr);
+    assert.equal(readSessionState(sessionsDir)?.["currentSession"], 1);
+    assert.equal(rows()?.[0]?.["startCommit"], gitOut(repo, "rev-parse", "HEAD").trim());
   });
 });

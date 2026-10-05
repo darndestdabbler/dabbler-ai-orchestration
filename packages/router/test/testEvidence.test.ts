@@ -309,7 +309,7 @@ describe("the whole run before a release", () => {
 });
 
 describe("the run record", () => {
-  it("drops one session's rows at a reset and leaves every other line, a bad one included", () => {
+  it("drops the rows of the sessions a rollback undoes and leaves every other line, a bad one included", () => {
     const root = tempDir();
     const path = join(root, ".dabbler", "runs", "test-runs.jsonl");
     mkdirSync(dirname(path), { recursive: true });
@@ -323,11 +323,11 @@ describe("the run record", () => {
       ].join("\n") + "\n",
       "utf8",
     );
-    assert.equal(dropSessionRecords(root, 8), 2);
+    assert.equal(dropSessionRecords(root, (sessionNumber) => sessionNumber >= 8), 2);
     assert.deepEqual(readRecords(root).map((row) => row.sessionNumber), [7]);
     assert.match(readFileSync(path, "utf8"), /not json/);
-    assert.equal(dropSessionRecords(root, 8), 0);
-    assert.equal(dropSessionRecords(join(root, "nowhere"), 8), 0);
+    assert.equal(dropSessionRecords(root, (sessionNumber) => sessionNumber >= 8), 0);
+    assert.equal(dropSessionRecords(join(root, "nowhere"), () => true), 0);
   });
 
   // The writer digests the covered surfaces through git: an empty listing

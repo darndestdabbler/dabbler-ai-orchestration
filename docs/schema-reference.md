@@ -91,10 +91,17 @@ Machine-written, append-only. Shape:
 - Every entry names its `kind`. `task-declaration` is written once per
   session by the loop, from the accepted plan and before the work; `decision` by
   `dabbler session decision`; `project-plan` by `dabbler session plan`;
-  `amendment` by `dabbler session plan amend` and a held release; `reset` by
-  `dabbler session reset`, appended after the log went back to the commit
-  the session started on, so it is the one trace the attempt leaves
-  (`sessionNumber`, `reason`, `by`).
+  `amendment` by `dabbler session plan amend` and a held release; `rollback`
+  by `dabbler session rollback`, appended after the log went back to the
+  commit the session started on, so it is the one trace the undone sessions
+  leave (`sessionNumber` the session rolled back to, `through` the last
+  session undone, `reason`, `by`).
+- A session row carries `startCommit`, the commit it started on: HEAD when
+  the start registered it, after any commit the start made of changes it
+  was asked to commit. It is the anchor a rollback returns to, and it rides
+  on the row the land commits. Rows written before it existed carry none; a
+  rollback reads those through the run record or the framework's own
+  commit subjects.
 - Decision numbering is derived from this file (`ordinal = decision
   entries + 1`) and `decisions-log.md` is rendered from it, which is why
   it is never rewound: restore `sessions.json` alone when a ledger has to

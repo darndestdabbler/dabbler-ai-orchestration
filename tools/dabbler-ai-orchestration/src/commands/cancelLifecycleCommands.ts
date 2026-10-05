@@ -234,7 +234,7 @@ export async function runResetSessionFlow(
   );
 
   const result = await call(ui, () =>
-    router.session.reset({
+    router.session.rollback({
       repoRoot: session.root,
       sessionNumber: session.number,
       reason: reason ?? "",

@@ -12374,6 +12374,21 @@
       "dateTime": "2026-10-05T11:12:36.783000-04:00",
       "task": "Release 3.20.0: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 244,
+      "dateTime": "2026-10-05T14:17:17.801000-04:00",
+      "task": "Session 244 replaces the in-flight-only reset with a rollback to the start of any session that has run: `dabbler session rollback [N] --reason \"<why>\"`, a person's verb, for a session in flight or completed (a cancelled one is restore's, a not-started one has nothing to roll back), which undoes that session and every session after it. A start records the commit it started on in the session row (`startCommit`), so the anchor travels with the ledger; older rows are read through the run record's plan_head or the parent of the earliest framework commit for that session. The verb cancels any session in flight first so loops end, reverts every commit since the anchor newest first and pushes (a hard reset and clean when there are none), moves aside the run records and drops the test rows of every session from N on, records the restored ledger as a sanctioned write, puts a `rollback` entry on the activity log folded under session N, and names any release among the undone sessions as staying published. `reset` is removed everywhere; the stop move, the in-process contract, the extension's fake router, the loop's ended reading, the walks and the words follow.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 244,
+      "dateTime": "2026-10-05T14:26:51.255000-04:00",
+      "what": "step 'the-rollback-verb': its files",
+      "reason": "Removing reset from the contract breaks the typecheck of the two callers that still name it: the extension's flow (renamed to call rollback, redesigned in 245) and the walk test (its import and calls renamed, the walks rewritten in step 3)",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

@@ -71,8 +71,8 @@ export { KIND_TASK_DECLARATION };
 export const KIND_PROJECT_PLAN = "project-plan";
 /** A step, a round cap or a verification loop moved after the plan was accepted, with its reason. */
 export const KIND_AMENDMENT = "amendment";
-/** A person reset the session in flight: everything it did discarded, the row back at not-started. */
-export const KIND_RESET = "reset";
+/** A person rolled back to the start of a session: it and every session after it discarded, back at not-started. */
+export const KIND_ROLLBACK = "rollback";
 
 /**
  * Who decided. Closed, because "who made it" is only answerable against a
@@ -314,6 +314,9 @@ function buildSessionsArray(
       "auxiliaryModel",
       // The declaration's modules, written once by the declaring writer.
       "modules",
+      // The commit a session started on is that session's anchor: a later
+      // registration must not erase where an earlier session began.
+      "startCommit",
     ]) {
       if (prior[key] !== null && prior[key] !== undefined) record[key] = prior[key];
     }
@@ -374,6 +377,8 @@ export interface RegisterOptions {
   readonly auxiliaryModel?: string | null;
   /** The vehicle those reviewers are reached through, for this session alone. */
   readonly reviewerTransport?: string | null;
+  /** The commit the session starts on: the anchor a rollback returns to. Null outside git. */
+  readonly startCommit?: string | null;
 }
 
 /**
@@ -466,6 +471,9 @@ export function stateAfterStart(
   for (const record of sessions) {
     if (record["number"] !== sessionNumber) continue;
     record["startedAt"] = record["startedAt"] || now;
+    // This start's, never a restarted row's: a session started again starts
+    // on the commit it is started on now.
+    record["startCommit"] = options.startCommit ?? null;
     record["completedAt"] = null;
     record["orchestrator"] = buildOrchestratorBlock(
       options.engine,
@@ -965,18 +973,20 @@ export function amendmentEntries(sessionsDir: string, sessionNumber: number): En
 }
 
 /**
- * A person's reset of the session in flight, on the record the landed
- * history carries. The reset returns the activity log to the commit the
+ * A person's rollback to the start of a session, on the record the landed
+ * history carries. The rollback returns the activity log to the commit the
  * session started on, so the entry is appended after that and is the one
- * trace the attempt leaves; the work plan folds it under the session.
+ * trace the undone sessions leave; the work plan folds it under the session
+ * rolled back to. `through` is the last session undone.
  */
-export function recordReset(
+export function recordRollback(
   sessionsDir: string,
-  options: { readonly sessionNumber: number; readonly reason: string; readonly by: string },
+  options: { readonly sessionNumber: number; readonly through: number; readonly reason: string; readonly by: string },
 ): Entry {
   const entry: Entry = {
-    kind: KIND_RESET,
+    kind: KIND_ROLLBACK,
     sessionNumber: requireSessionNumber(options.sessionNumber),
+    through: requireSessionNumber(options.through),
     dateTime: nowIsoFull(),
     reason: String(options.reason ?? "").trim(),
     by: requireText(options.by, "by"),
@@ -988,9 +998,9 @@ export function recordReset(
   return entry;
 }
 
-/** A session's resets, oldest first. */
-export function resetEntries(sessionsDir: string, sessionNumber: number): Entry[] {
-  return entriesOfKind(readOrCreateActivityLog(sessionsDir), KIND_RESET).filter(
+/** The rollbacks that returned to the start of a session, oldest first. */
+export function rollbackEntries(sessionsDir: string, sessionNumber: number): Entry[] {
+  return entriesOfKind(readOrCreateActivityLog(sessionsDir), KIND_ROLLBACK).filter(
     (entry) => entry["sessionNumber"] === sessionNumber,
   );
 }
@@ -1265,11 +1275,11 @@ export function renderProjectWorkPlan(sessionsDir: string): string {
     declarations.set(entry["sessionNumber"], entry);
   }
   const records = sessionRecords(sessionsDir);
-  // A session known only by its reset -- the first session, reset before
-  // any ledger was landed -- is still a row and a section.
-  const resetNumbers = entriesOfKind(log, KIND_RESET).map((entry) => entry["sessionNumber"]);
+  // A session known only by its rollback -- the first session, rolled back
+  // before any ledger was landed -- is still a row and a section.
+  const rollbackNumbers = entriesOfKind(log, KIND_ROLLBACK).map((entry) => entry["sessionNumber"]);
   const numbers = [
-    ...new Set<unknown>([...records.keys(), ...declarations.keys(), ...resetNumbers]),
+    ...new Set<unknown>([...records.keys(), ...declarations.keys(), ...rollbackNumbers]),
   ]
     .filter((value): value is number => Number.isInteger(value))
     .sort((left, right) => left - right);
@@ -1314,10 +1324,10 @@ export function renderProjectWorkPlan(sessionsDir: string): string {
   }
   for (const number of numbers) {
     const declared = declarations.get(number);
-    // A reset session's declaration went back with its tree; the reset is
-    // the one trace the attempt leaves, and it is shown under the session.
-    const resets = entriesOfKind(log, KIND_RESET).filter((entry) => entry["sessionNumber"] === number);
-    if (declared === undefined && resets.length === 0) continue;
+    // A rolled-back session's declaration went back with its tree; the
+    // rollback is the one trace the attempt leaves, shown under the session.
+    const rollbacks = entriesOfKind(log, KIND_ROLLBACK).filter((entry) => entry["sessionNumber"] === number);
+    if (declared === undefined && rollbacks.length === 0) continue;
     const title = records.get(number)?.title || `Session ${number}`;
     lines.push("", `### Session ${number} — ${title}`);
     if (declared !== undefined) {
@@ -1340,12 +1350,15 @@ export function renderProjectWorkPlan(sessionsDir: string): string {
         }
       }
     }
-    if (resets.length > 0) {
-      lines.push("", "**Reset:**", "");
-      for (const entry of resets) {
+    if (rollbacks.length > 0) {
+      lines.push("", "**Rolled back:**", "");
+      for (const entry of rollbacks) {
         const reason = String(entry["reason"] ?? "").trim();
+        const through = entry["through"];
+        const span =
+          Number.isInteger(through) && through !== number ? `sessions ${number} to ${String(through)}` : `session ${number}`;
         lines.push(
-          `- ${String(entry["dateTime"] ?? "").slice(0, 10)} — ${reason === "" ? "no reason given" : reason} (${String(entry["by"] ?? "")})`,
+          `- ${String(entry["dateTime"] ?? "").slice(0, 10)} — ${span} — ${reason === "" ? "no reason given" : reason} (${String(entry["by"] ?? "")})`,
         );
       }
     }

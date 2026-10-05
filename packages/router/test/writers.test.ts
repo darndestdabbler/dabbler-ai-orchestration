@@ -29,11 +29,11 @@ import { namedReviewers, namedReviewingVehicle } from "../src/sessionState.ts";
 import { VERSION } from "../src/version.ts";
 import {
   KIND_AMENDMENT,
-  KIND_RESET,
+  KIND_ROLLBACK,
   SanctionedWriteError,
   amendmentEntries,
-  recordReset,
-  resetEntries,
+  recordRollback,
+  rollbackEntries,
   appendDecision,
   decisionEntries,
   buildOrchestratorBlock,
@@ -232,6 +232,23 @@ describe("registering a session start", () => {
     assert.equal(sessions[1]["title"], "Second");
   });
 
+  it("records the commit the session started on, and null when the start had none to give", () => {
+    // The anchor a rollback returns to, on the row the land commits: the run
+    // record's plan_head is machine-side and may be gone by the time a
+    // closed session is rolled back.
+    const { sessionsDir } = makeSessionsDir();
+    const started = registerSessionStart(sessionsDir, 1, { engine: "claude-code", startCommit: "c0b2b0dd4cecf78d248ae6a73573caee843bede3" })["sessions"] as Record<string, unknown>[];
+    assert.equal(started[0]["startCommit"], "c0b2b0dd4cecf78d248ae6a73573caee843bede3");
+    assert.equal("startCommit" in started[1], false);
+    const path = join(sessionsDir, "sessions.json");
+    const state = JSON.parse(readFileSync(path, "utf8"));
+    state.sessions[0].status = "complete";
+    writeFileSync(path, JSON.stringify(state), "utf8");
+    const next = registerSessionStart(sessionsDir, 2, { engine: "claude-code" })["sessions"] as Record<string, unknown>[];
+    assert.equal(next[1]["startCommit"], null);
+    assert.equal(next[0]["startCommit"], "c0b2b0dd4cecf78d248ae6a73573caee843bede3");
+  });
+
   it("refuses to re-open a closed session at the writer, not only the CLI", () => {
     const { sessionsDir } = makeSessionsDir();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
@@ -314,22 +331,24 @@ describe("registering a session start", () => {
   });
 });
 
-describe("recording a reset", () => {
-  it("folds it into the activity log and the work plan renders it under its session, declared or not", () => {
-    // The reset returned the log to the commit the session started on, so
-    // the session has no declaration left; the entry is the attempt's one
-    // trace and is shown under the session anyway.
+describe("recording a rollback", () => {
+  it("folds it into the activity log and the work plan renders it under the session rolled back to, with the span undone", () => {
+    // The rollback returned the log to the commit the session started on,
+    // so the session has no declaration left; the entry is the one trace the
+    // undone sessions leave and is shown under the session anyway.
     const { sessionsDir } = makeSessionsDir();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    const entry = recordReset(sessionsDir, { sessionNumber: 1, reason: "the step plan guessed a package", by: "operator" });
-    assert.equal(entry["kind"], KIND_RESET);
-    assert.equal(resetEntries(sessionsDir, 1).length, 1);
-    assert.equal(resetEntries(sessionsDir, 2).length, 0);
+    const entry = recordRollback(sessionsDir, { sessionNumber: 1, through: 2, reason: "the step plan guessed a package", by: "operator" });
+    assert.equal(entry["kind"], KIND_ROLLBACK);
+    assert.equal(rollbackEntries(sessionsDir, 1).length, 1);
+    assert.equal(rollbackEntries(sessionsDir, 2).length, 0);
     const rendered = renderProjectWorkPlan(sessionsDir);
     assert.match(rendered, /### Session 1 — /);
-    assert.match(rendered, /\*\*Reset:\*\*/);
-    assert.match(rendered, /— the step plan guessed a package \(operator\)/);
+    assert.match(rendered, /\*\*Rolled back:\*\*/);
+    assert.match(rendered, /— sessions 1 to 2 — the step plan guessed a package \(operator\)/);
     assert.doesNotMatch(rendered, /\*\*Releasable:/);
+    recordRollback(sessionsDir, { sessionNumber: 1, through: 1, reason: "again", by: "operator" });
+    assert.match(renderProjectWorkPlan(sessionsDir), /— session 1 — again \(operator\)/);
   });
 });
 

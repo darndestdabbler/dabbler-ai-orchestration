@@ -70,7 +70,8 @@ import {
   plan,
   repairedPaths,
   report,
-  reset,
+  judgeRollback,
+  rollback,
   restore,
   reviewingVehicleRefusal,
   setSessionUseReading,
@@ -1179,29 +1180,37 @@ describe("a repair made while the run was stopped", () => {
 });
 
 describe("cancelling and restoring through the verb", () => {
-  it("resets only for a person, only the session in flight, and nothing when nothing is in flight", async () => {
-    // The three refusals of the reset verb, each writing nothing: an engine
-    // (cancelling and resetting are a person's), a number that is not the
-    // session in flight, and no session in flight at all. What a reset does
-    // when it is allowed is walked over a real repository in walk-session.
+  it("rolls back only for a person, and rules which session it returns to the start of", async () => {
+    // The refusals, each writing nothing: an engine (cancelling and rolling
+    // back are a person's); a session not on record, one that has not
+    // started, and a cancelled one (restore's). A session in flight or
+    // completed is the target, and everything after it goes with it. What
+    // a rollback does when allowed is walked over a real repository.
+    const rows = [
+      { number: 1, status: "complete" },
+      { number: 2, status: "cancelled" },
+      { number: 3, status: "in-progress" },
+      { number: 4, status: "not-started" },
+    ];
+    assert.deepEqual(judgeRollback(rows, null), { target: 3, through: 3, refusal: null });
+    assert.deepEqual(judgeRollback(rows, 1), { target: 1, through: 3, refusal: null });
+    assert.match(String(judgeRollback(rows, 2).refusal), /session 002 is cancelled.*dabbler session restore 2/);
+    assert.match(String(judgeRollback(rows, 4).refusal), /session 004 has not started; there is nothing to roll back/);
+    assert.match(String(judgeRollback(rows, 9).refusal), /no session 009 on record/);
+    assert.match(String(judgeRollback([{ number: 1, status: "complete" }], null).refusal), /nothing is in flight; name the session/);
+
     const state = stateDir();
     try {
       registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
-      const engine = await run(() => reset(state.sessionsDir, { reason: "x", engine: true }));
+      const engine = await run(() => rollback(state.sessionsDir, { reason: "x", engine: true }));
       assert.equal(engine.code, EXIT_BOUNDARY);
-      assert.match(engine.err, /`session reset` is a person's verb, never the engine's/);
-      assert.match(engine.err, /Report the step blocked and say why; a person resets from the Work Explorer/);
-      const other = await run(() => reset(state.sessionsDir, { reason: "x", sessionNumber: 2, engine: false }));
-      assert.equal(other.code, EXIT_BOUNDARY);
-      assert.match(other.err, /session 002 is not the session in flight \(001 is\), and a reset applies to the session in flight/);
+      assert.match(engine.err, /`session rollback` is a person's verb, never the engine's/);
+      assert.match(engine.err, /Report the step blocked and say why; a person rolls back from the Work Explorer/);
+      const planned = await run(() => rollback(state.sessionsDir, { reason: "x", sessionNumber: 2, engine: false }));
+      assert.equal(planned.code, EXIT_BOUNDARY);
+      assert.match(planned.err, /session 002 has not started/);
       assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
       assert.equal(sessionOf(state.sessionsDir)["cancelledReason"], undefined);
-
-      assert.equal(await run(() => cancel(state.sessionsDir, 1, { reason: "settled", force: true, engine: false })).then((r) => r.code), EXIT_OK);
-      const idle = await run(() => reset(state.sessionsDir, { reason: "x", engine: false }));
-      assert.equal(idle.code, EXIT_BOUNDARY);
-      assert.match(idle.err, /nothing is in flight, and a reset applies to the session in flight/);
-      assert.equal(sessionOf(state.sessionsDir)["status"], "cancelled");
     } finally {
       state.restore();
     }

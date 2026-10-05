@@ -21,6 +21,10 @@ export type SessionsSessionRecord = {
    */
   type?: "verification" | "remediation";
   startedAt?: string | null;
+  /**
+   * The commit the session started on: HEAD when the start registered it, after any commit the start made of changes it was asked to commit. The anchor a rollback returns to, on the record the land commits and the next clone receives. Null outside a git repository; absent on rows written before it existed, which a rollback reads through the run record or the framework's own commit subjects.
+   */
+  startCommit?: string | null;
   completedAt?: string | null;
   orchestrator?: SessionsOrchestratorBlock | null;
   /**

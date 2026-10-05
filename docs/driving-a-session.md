@@ -709,31 +709,37 @@ the working tree is left exactly as it was, and the framework reads the
 ledger again before every commit, push, publish and close, so nothing of a
 cancelled session is landed afterwards.
 
-**Reset: the third way.** A cancel is for objectives no longer wanted; a
-session whose implementation went wrong, or that the framework could not
-carry, is reset instead:
+**Rollback: the third way.** A cancel is for objectives no longer wanted; a
+session whose implementation went wrong, or a problem that spans several
+sessions, is rolled back instead -- to the start of whichever session you
+name:
 
-    dabbler session reset --reason "<why>"
+    dabbler session rollback [N] --reason "<why>"
 
-It applies to the session in flight and to no other -- a closed or
-cancelled session is settled, and a reset past where this one started is a
-plan change, not a recovery. A person's verb, refused to an engine like the
-cancel; every stop offers it beside the cancel. What it does, in order: the
-session is cancelled with the reason marked `reset:`, which is the write
-every loop and waiter reads at its next boundary and ends on; the
-repository goes back to the commit the session started on -- before the
-land a hard reset of the tracked tree and a clean of untracked files
-(ignored files stay), after the land a revert of every commit since the
-start and a push, so pushed history is never rewritten; the session's run
-record is moved aside the way a start moves a reused number's, its test
-runs leave the record, and the restored ledger is recorded as a sanctioned
-write, so the close's integrity axis accepts it -- which is why a `git
-checkout` of an older ledger by hand never worked. The reset goes on the
-activity log, under the session in `project-work-plan.md`, and is committed
-as the framework's own files: "Reset session N of sessions". The session is
-at not-started with the plan as it was when it started; amend the plan,
-then Start Session again. A job still running finishes into a directory
-nothing reads. Nothing under `.dabbler/` is tracked for any of this.
+N is a session in flight or completed; omitted, it is the session in
+flight. It and every session after it are undone and return to
+not-started. A cancelled session is restore's, and one that has not started
+has nothing to roll back. A person's verb, refused to an engine like the
+cancel; every stop offers it beside the cancel. What it does, in order: any
+session in flight is cancelled with the reason marked `rollback:`, which is
+the write every loop and waiter reads at its next boundary and ends on; the
+repository goes back to the commit session N started on -- recorded on its
+row as `startCommit` when it was started -- by reverting every commit since
+it, newest first, and pushing, so pushed history is never rewritten (a
+hard reset and a clean of untracked files where nothing was committed;
+ignored files stay); the run record of every undone session is moved aside
+the way a start moves a reused number's, their test runs leave the record,
+and the restored ledger is recorded as a sanctioned write, so the close's
+integrity axis accepts it -- which is why a `git checkout` of an older
+ledger by hand never worked. The rollback goes on the activity log, under
+session N in `project-work-plan.md` with the span it undid, and is
+committed as the framework's own files: "Roll back to the start of session
+N of sessions". What it cannot undo is a publication: a release among the
+undone sessions keeps its tag and its listing, and the next release carries
+a higher version; the output says so. The sessions are at not-started with
+the plan as it was at that start; amend the plan, then Start Session again.
+A job still running finishes into a directory nothing reads. Nothing under
+`.dabbler/` is tracked for any of this.
 
 **A cancelled session ends its loop.** The loop reads the ledger at every
 phase boundary, while it waits for an answer, while a job runs, and again

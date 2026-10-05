@@ -724,7 +724,7 @@ describe("a stop, as a person reads it", () => {
     assert.ok(onward.cost.includes(AMEND_CHECKS_COMMAND), onward.cost);
   });
 
-  it("offers the reset beside every cancel, before it, and names it as the person's", () => {
+  it("offers the rollback beside every cancel, before it, and names it as the person's", () => {
     // A stop whose only ending was the cancel left what the session did in
     // the tree, for the next start to offer to commit. The third way is on
     // every stop that offers the cancel, ahead of it, and never recommended
@@ -738,12 +738,12 @@ describe("a stop, as a person reads it", () => {
         const commands = renderStop(stop as never, { session_number: 7, phase: "verify", engine }).choices.map((choice) => choice.command);
         const cancelAt = commands.findIndex((command) => /session cancel/.test(command));
         if (cancelAt < 0) continue;
-        assert.equal(commands[cancelAt - 1], 'dabbler session reset --reason "<why>"', `${code ?? kind}/${engine}: ${commands.join(" | ")}`);
-        assert.notEqual(cancelAt - 1, 0, `${code ?? kind}/${engine}: the reset is never the recommendation`);
+        assert.equal(commands[cancelAt - 1], 'dabbler session rollback --reason "<why>"', `${code ?? kind}/${engine}: ${commands.join(" | ")}`);
+        assert.notEqual(cancelAt - 1, 0, `${code ?? kind}/${engine}: the rollback is never the recommendation`);
       }
     }
     const words = renderStop({ kind: "blocked", code: null, reason: "x", step_id: "widget" } as never, { session_number: 7, phase: "work", engine: "cli" });
-    const offered = words.choices.find((choice) => /session reset/.test(choice.command));
+    const offered = words.choices.find((choice) => /session rollback/.test(choice.command));
     assert.match(String(offered?.label), /yours to run, never the engine's/);
     assert.match(String(offered?.cost), /back to not-started/);
   });

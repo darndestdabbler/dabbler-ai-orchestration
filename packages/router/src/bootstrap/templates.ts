@@ -152,7 +152,7 @@ export const SHARED_BODY =
   "- The router is one command, `dabbler <verb>`: it ships inside the VSIX and\n" +
   "  a VS Code terminal has it on `PATH`; anywhere else run `node \"<extension\n" +
   "  dir>/dist/dabbler.cjs\" <verb>`. \"command not found\" is PATH, not keys.\n" +
-  "- `cancel`, `reset` and `close` are a person's, never yours: report the step blocked and say why, and the person cancels or resets from the Work Explorer.\n" +
+  "- `cancel`, `rollback` and `close` are a person's, never yours: report the step blocked and say why, and the person cancels or rolls back from the Work Explorer.\n" +
   "- A fix no session covers is a session's own work: insert a session into\n" +
   "  the session plan and make the fix there, never outside a session.\n" +
   "\n" +

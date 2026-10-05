@@ -17,7 +17,7 @@ import {
   generateModule,
   type SchemaSource,
 } from "../src/schema/generate.ts";
-import { allSchemaFailures, schemaFailure } from "../src/schema/validate.ts";
+import { allSchemaFailures, loadSchemaFile, schemaFailure } from "../src/schema/validate.ts";
 
 function moduleFor(schema: Record<string, unknown>): string {
   return generateModule({ fileName: "demo.schema.json", schema } as SchemaSource);
@@ -30,6 +30,25 @@ describe("validating against a schema", () => {
     properties: { id: { type: "integer" }, name: { type: "string" } },
     additionalProperties: false,
   };
+
+  it("admits a session row with the commit it started on, and an older row without one", () => {
+    // `startCommit` is the anchor a rollback returns to; rows written before
+    // it existed carry none, and the ledger that holds them must still read.
+    const schema = loadSchemaFile("sessions.schema.json");
+    const state = {
+      schemaVersion: 5,
+      sessions: [
+        { number: 1, title: "First", status: "complete", startCommit: "c0b2b0dd4cecf78d248ae6a73573caee843bede3" },
+        { number: 2, title: "Second", status: "in-progress", startCommit: null },
+        { number: 3, title: "Third", status: "not-started" },
+      ],
+    };
+    assert.equal(schemaFailure(state, schema, "session-state"), null);
+    assert.match(
+      String(schemaFailure({ ...state, sessions: [{ ...state.sessions[0], startCommit: 7 }] }, schema, "session-state")),
+      /startCommit/,
+    );
+  });
 
   it("says nothing about data the schema admits", () => {
     assert.equal(schemaFailure({ id: 1, name: "x" }, SCHEMA, "demo"), null);

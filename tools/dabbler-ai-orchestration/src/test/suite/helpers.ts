@@ -242,7 +242,7 @@ export function fakeRouter(
         close: text("session close"),
         cancel: text("session cancel"),
         restore: text("session restore"),
-        reset: text("session reset"),
+        rollback: text("session rollback"),
         decision: text("session decision"),
         interrupt: (options: SessionInterruptOptions) => {
           interruptOptions.push(options);

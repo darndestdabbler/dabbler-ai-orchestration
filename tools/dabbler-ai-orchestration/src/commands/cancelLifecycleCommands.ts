@@ -206,50 +206,107 @@ export async function runRestoreSessionFlow(
   return true;
 }
 
+/** What the router's dry run answers: the facts the dialog states. */
+interface RollbackFacts {
+  session: number;
+  through: number;
+  /** The HEAD the facts were read at; the confirm is bound to it. */
+  head: string;
+  commits: number;
+  authors: string[];
+  oldest: string | null;
+  uncommitted: number;
+}
+
+const ROLLBACK_REASON = "Rollback to Start of This Session from the Work Explorer";
+
 /**
- * The third way to end a session, for an implementation that went wrong:
- * back to where it started, everything it did discarded. The modal says
- * what is lost before anything is asked of the router; the verb itself
- * refuses an engine and any session but the one in flight, and the item
- * is on that row only, so the click and the verb agree on which session.
+ * The dialog's detail, from the facts and nothing else: the sessions
+ * undone, the commits reverted and whose, the oldest, and that uncommitted
+ * work is kept. No count of files: that is the plan's own line. A clause
+ * that does not apply is left out rather than written as zero. Pure, so
+ * the suite can hold the words.
  */
-export async function runResetSessionFlow(
+export function rollbackDetail(facts: RollbackFacts): string {
+  const span =
+    facts.through === facts.session
+      ? `Session ${facts.session} is undone`
+      : `Sessions ${facts.session} to ${facts.through} are undone`;
+  const clauses: string[] = [];
+  if (facts.commits > 0) {
+    const who = facts.authors.length > 0 ? ` by ${facts.authors.join(" and ")}` : "";
+    const since = facts.oldest ? `, the oldest from ${facts.oldest.slice(0, 10)}` : "";
+    clauses.push(`${facts.commits} commit${facts.commits === 1 ? "" : "s"}${who}${since}, ${facts.commits === 1 ? "is" : "are"} reverted on the trunk`);
+  }
+  if (facts.uncommitted > 0) {
+    clauses.push("uncommitted work is kept on a safety branch");
+  }
+  clauses.push(`the session${facts.through === facts.session ? " returns" : "s return"} to not-started`);
+  return `${span}: ${clauses.join("; ")}. The session plan is kept.`;
+}
+
+/**
+ * The third way to end a session, for an implementation that went wrong
+ * or a problem that spans several: back to where this session started, it
+ * and every session after it discarded. One dialog: the router's dry run
+ * supplies the facts, the modal states them and asks once, and nothing is
+ * asked after it -- a second box after the modal is where two clicks were
+ * lost. The confirm is bound to the facts: the verb is given the HEAD they
+ * were read at and refuses a repository that moved while the dialog was
+ * open. A dry run the router refuses (a release in the span, a row that is
+ * no longer what it was) is shown in the router's words and asks nothing.
+ */
+export async function runRollbackSessionFlow(
   session: CancellableSession,
   ui: CancelLifecycleUi = defaultUi(),
   router: Router = productionRouter(),
 ): Promise<boolean> {
+  const preview = await call(ui, () =>
+    router.session.rollback({
+      repoRoot: session.root,
+      sessionNumber: session.number,
+      reason: ROLLBACK_REASON,
+      dryRun: true,
+    }),
+  );
+  if (!preview || !preview.ok) {
+    if (preview) {
+      ui.showErrorMessage(describeLifecycleFailure("Rolling back", session.name, preview));
+    }
+    return false;
+  }
+  let facts: RollbackFacts;
+  try {
+    facts = JSON.parse(preview.value.stdout) as RollbackFacts;
+  } catch {
+    ui.showErrorMessage(`Rolling back "${session.name}": the router's answer could not be read. Nothing was written.`);
+    return false;
+  }
+
   const choice = await ui.confirm(
-    `Reset session ${session.number} "${session.name}"?`,
-    "The session goes back to where it started. Every change it made is " +
-      "discarded, including uncommitted work, and cannot be recovered. The " +
-      "session plan is kept, and the session can be started again.",
-    "Reset Session",
+    `Roll back to the start of session ${session.number} "${session.name}"?`,
+    rollbackDetail(facts),
+    "Roll Back",
     "Keep",
   );
-  if (choice !== "Reset Session") return false;
-
-  const reason = await ui.promptReason(
-    `Reason for resetting "${session.name}" (optional)`,
-    "e.g. the step plan guessed a package",
-  );
+  if (choice !== "Roll Back") return false;
 
   const result = await call(ui, () =>
     router.session.rollback({
       repoRoot: session.root,
       sessionNumber: session.number,
-      reason: reason ?? "",
+      reason: ROLLBACK_REASON,
+      asOf: facts.head,
     }),
   );
   if (!result || !result.ok) {
     if (result) {
-      ui.showErrorMessage(
-        describeLifecycleFailure("Resetting", session.name, result),
-      );
+      ui.showErrorMessage(describeLifecycleFailure("Rolling back", session.name, result));
     }
     return false;
   }
   ui.showInformationMessage(
-    `Reset session ${session.number}; amend the plan, then Start Session.`,
+    `Rolled back to the start of session ${session.number}; amend the plan, then Start Session.`,
   );
   return true;
 }
@@ -276,11 +333,11 @@ export function registerCancelLifecycleCommands(
       },
     ),
     vscode.commands.registerCommand(
-      "dabblerSessionSets.reset",
+      "dabblerSessionSets.rollback",
       async (arg: unknown) => {
         const session = cancellableSessionOf(arg);
         if (!session) return;
-        if (await runResetSessionFlow(session)) deps.refreshView();
+        if (await runRollbackSessionFlow(session)) deps.refreshView();
       },
     ),
   );

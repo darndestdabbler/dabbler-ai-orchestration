@@ -299,6 +299,8 @@ export class InProcessRouter implements Router {
           ...(o.sessionNumber === undefined ? [] : [String(o.sessionNumber)]),
           "--reason",
           o.reason,
+          ...(o.dryRun === true ? ["--dry-run"] : []),
+          ...(o.asOf ? ["--as-of", o.asOf] : []),
           ...targetArgs(o),
         ],
         o.repoRoot,

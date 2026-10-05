@@ -10,6 +10,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.21.0] — 2026-10-05
+
+**Roll back to the start of any session that ran.** The reset 3.20.0 shipped
+applied to the session in flight only, and the operator's first walk of it
+met the narrowness at once: on a sample whose sessions ran two to three
+minutes each, the click reached the verb after the session it was clicked
+on had closed and the next had started. The recovery a developer needs is
+a rollback to the start of whatever session they select — in flight or
+completed — which undoes that session and every session after it: a
+sample re-run from a chosen session, or a problem that spans several
+sessions undone back to where it began. Sessions 244 and 245.
+
+### Added
+
+- **`dabbler session rollback [N] --reason "<why>"`**, replacing `reset`. A
+  person's verb for a session in flight or completed; a cancelled session
+  is restore's and a not-started one has nothing to roll back. It cancels
+  any session in flight so loops end, reverts every commit since the
+  session's start (newest first) and pushes — never rewriting pushed
+  history, a hard reset only where nothing had landed — moves aside the run
+  records of every undone session, returns their rows to not-started, and
+  puts a `rollback` entry on the activity log naming the span and the
+  reason. Every session row now records `startCommit`, the commit it
+  started on, so the anchor travels with the ledger.
+- **Three guard rails, and no more.** A rollback refuses to reach or pass a
+  session that released: a tag and a listing cannot be unpublished, and a
+  release run again would collide with its own tag. Work no commit holds is
+  kept first as one commit on a local branch `dabbler/rolled-back/s<N>-<time>`,
+  so nothing a rollback touches is gone — and what it reverted is still in
+  history, so a rollback is itself undone with `git revert` of its commits.
+  `--dry-run` answers what would be undone — the sessions, the commits,
+  whose and how old, the files the tree carries — as JSON and changes
+  nothing.
+- **Rollback to Start of This Session** in the Work Explorer, replacing
+  Reset Session, on a session in flight or completed. One dialog, built
+  from the dry run's facts: the sessions undone, the commits reverted and
+  whose, the oldest, the files kept on a safety branch. Roll Back or Keep,
+  and nothing asked after it — the reason box that followed the old
+  confirmation is where a click was lost, waiting unseen.
+
 ## [3.20.0] — 2026-10-05
 
 **A session that went wrong is reset to where it started.** A staff member's

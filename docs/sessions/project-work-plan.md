@@ -282,7 +282,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 242 | Reset Session in the Work Explorer | no | 2026-10-05 |
 | 243 | Release 3.20.0 (release: 3.20.0) | yes | 2026-10-05 |
 | 244 | A rollback to the start of any session that has run | no | 2026-10-05 |
-| 245 | Rollback to Start of This Session in the Work Explorer | — | not declared |
+| 245 | Rollback to Start of This Session in the Work Explorer | no | 2026-10-05 |
 | 246 | Release 3.21.0 (release: 3.21.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -3084,3 +3084,15 @@ Session 244 replaces the in-flight-only reset with a rollback to the start of an
 **Amended after acceptance:**
 
 - 2026-10-05 — step 'the-rollback-verb': its files: Removing reset from the contract breaks the typecheck of the two callers that still name it: the extension's flow (renamed to call rollback, redesigned in 245) and the walk test (its import and calls renamed, the walks rewritten in step 3) (claude-code (anthropic, claude-opus-5))
+
+### Session 245 — Rollback to Start of This Session in the Work Explorer
+
+**Releasable: no.**
+
+Session 245 puts the rollback where developers work: 'Rollback to Start of This Session' replaces Reset Session in the Work Explorer's row menu, offered on a session that is in flight or completed and on no other row. It is one dialog -- the warning that names the span of sessions undone, what is discarded, what stays published and that it cannot be undone, with Roll Back and Keep -- and nothing after it: no reason box, a fixed reason on the record. It calls the router's `session rollback` as a person's click, shows a refusal in the router's words and refreshes on success. The version goes to 3.21.0 with the changelog section for sessions 244 and 245, and the README's Work Explorer paragraph says what the item is for.
+
+**Amended after acceptance:**
+
+- 2026-10-05 — the non-goal 'Any change to the router: the verb and its refusals are session 244's', dropped: The operator approved three guard rails on 2026-10-05 after consulting Sol and Gemini: a hard line at the last release, a safety branch for discarded in-flight work, and a dry run that gives the dialog its facts; all three are the verb's, so this session changes the router after all (claude-code (anthropic, claude-opus-5))
+- 2026-10-05 — step 'the-item': its files and checks: The first step becomes the verb's three guard rails, approved 2026-10-05: a rollback cannot reach or pass a session that released (a re-run would collide with its tag), discarded in-flight work goes to a safety branch first, and --dry-run answers what would be undone so the dialog states facts; the plan's section says so (claude-code (anthropic, claude-opus-5))
+- 2026-10-05 — step 'one-dialog': its files and checks: The item and the one dialog become one step, and the dialog reads the dry run's facts: the sessions, the commits, whose, how old, and what stays published (claude-code (anthropic, claude-opus-5))

@@ -246,7 +246,12 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           or completed; it and every session after it return to",
     "                           not-started. Omitted: the session in flight. A person's",
     "                           verb, refused to an engine. What was landed is reverted",
-    "                           and pushed; a release among them stays published",
+    "                           and pushed; a session that released is never reached",
+    "  --dry-run                say what would be undone -- the sessions, the commits,",
+    "                           whose and how old -- as JSON, and change nothing",
+    "  --as-of SHA              the HEAD the dry run's facts were read at; refused when",
+    "                           the repository has moved since, so a confirm is of",
+    "                           the facts it was shown",
   ],
   migrate: ["  --from PATH              required: the legacy session-set directory"],
 };
@@ -531,6 +536,8 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       reason,
       sessionNumber: positional ?? sessionNumber ?? null,
       engine: !personIsPresent(),
+      dryRun: switches.has("--dry-run"),
+      asOf: values.get("--as-of") ?? null,
     });
   }
 

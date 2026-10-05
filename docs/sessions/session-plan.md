@@ -15358,34 +15358,60 @@ manifests
 nothing visible happened. The one that reached the verb had spent the time
 between the click and the verb in two dialogs -- the modal, then an input
 box for a reason -- while the session in flight changed underneath it; the
-other never reached the verb, and no input box was seen. A destructive,
-time-sensitive action is one dialog: the warning and the confirm, and
-nothing after it.
+other sat in that input box, which the operator did not see until later. A
+destructive, time-sensitive action is one dialog: the warning and the
+confirm, and nothing after it. The operator then paused this session to
+weigh the general rollback itself -- a week of work, or another
+developer's, undone with one click -- and, after Sol and Gemini were
+consulted, approved three guard rails and no more (2026-10-05): a hard line
+at the last release, a safety branch for discarded work, and a dialog that
+states facts instead of a rule. Both advisors wanted a typed confirmation;
+refused, because a second box after the modal is the flow that lost the
+clicks. Neither wanted a multi-author refusal or an undo verb, and the code
+agrees: a landed rollback is undone with `git revert` of its commits, and
+the ledger's integrity check accepts the restored file because the router
+wrote it once. The non-goal that kept this session out of the router is
+dropped on the record for it.
 
-**Step 1 -- the item.** `dabblerSessionSets.rollback`, titled "Rollback to
-Start of This Session", replaces `dabblerSessionSets.reset` in
-`package.json` (command and `9_lifecycle@903` menu entry gated on
+**Step 1 -- the verb's three guard rails.** In the router: a rollback
+refuses to reach or pass a session that released (its tag and listing
+cannot be unpublished, and run again it would collide with its own tag),
+before anything is changed; work no commit holds is kept first as one
+commit on a local branch `dabbler/rolled-back/s<N>-<time>`, named in the
+output, so nothing a rollback touches is gone; and `--dry-run` answers
+what would be undone -- the sessions, the commits, whose and how old, and
+how many files the tree carries, and the HEAD it read them at -- as JSON on
+stdout and changes nothing, on the CLI and the in-process contract; and
+`--as-of <HEAD>` binds a rollback to the facts a person confirmed, refusing
+a repository that moved while the dialog was open (the round-1 finding:
+without it the confirm and the rollback could be of different facts). The
+driving doc says all of it.
+Tests: the release line in `session.test.ts`; the dry run and the safety
+branch in the walks of `walk-session.test.ts`.
+
+**Step 2 -- the item, and one dialog on facts.** `dabblerSessionSets.rollback`,
+titled "Rollback to Start of This Session", replaces `dabblerSessionSets.reset`
+in `package.json` (command and `9_lifecycle@903` menu entry gated on
 `act-rollback`) and in the registry, offered on a session that is
-in-progress or complete and on no other row (not-started and cancelled rows
-do not carry it). Tests in `actionRegistry.test.ts` and
-`workExplorerTreeModel.test.ts` updated from their reset forms: offered on
-the in-flight and the completed rows, not on a planned or a cancelled one.
-
-**Step 2 -- one dialog.** `runRollbackSessionFlow` replaces the reset flow:
-one modal, summary `Roll back to the start of session N "<title>"?`, detail
-"Sessions N to M are undone: every change they made is discarded, work
-already committed is reverted on the trunk, and they return to not-started.
-A version they released stays published. This cannot be undone." -- where M
-is the last session that has started, read off the repository node, and
-"Session N is undone" when N is the last. Buttons "Roll Back" and "Keep";
-no reason box; the reason passed is "Rollback to Start of This Session from
-the Work Explorer". A refusal is shown in the router's words
-(`describeLifecycleFailure("Rolling back", ...)`); success says "Rolled back
-to the start of session N; amend the plan, then Start Session." and
-refreshes. Tests in `commandFlows.test.ts` mirroring the reset ones: the
-flow confirms and calls the router with the number and the fixed reason,
-naming the span in the detail; a declined or dismissed modal calls nothing;
-a refusal surfaces and does not refresh.
+in-progress or complete and on no other row. `runRollbackSessionFlow`
+replaces the reset flow: it asks the router's dry run first, and a refusal
+there -- the release line, a stale row -- is shown in the router's words
+and nothing else is asked; otherwise ONE modal, summary `Roll back to the
+start of session N "<title>"?`, detail built from the facts: "Sessions N to
+M are undone: K commits by <authors>, the oldest from <date>, are reverted
+on the trunk; uncommitted work is kept on a safety branch; the sessions
+return to not-started." -- with "Session N is undone" when N is the last,
+the clauses that do not apply left out, and no count of files (the
+non-goal stands: a count is the verb's output, not the dialog's). Buttons
+"Roll Back" and "Keep"; no reason box; the reason passed is "Rollback to
+Start of This Session from the Work Explorer", and the rollback carries
+`--as-of` the HEAD the facts were read at. Success says "Rolled back to the start of session N; amend
+the plan, then Start Session." and refreshes. Tests updated from their
+reset forms in `actionRegistry.test.ts`, `workExplorerTreeModel.test.ts`
+and `commandFlows.test.ts`: offered on the in-flight and completed rows and
+not on a planned or cancelled one; the flow asks the dry run, names the
+facts in the detail, calls the verb with the number and the fixed reason; a
+dry-run refusal shows and asks nothing; a declined modal calls nothing.
 
 **Step 3 -- the version and the words.** `version.json` to 3.21.0 (a
 minor: the verb and the item changed shape), stamped; the changelog's

@@ -3634,6 +3634,14 @@ export interface RollbackCliOptions {
   readonly sessionNumber?: number | null;
   /** The caller is an engine (`callerIsEngine`); a rollback is a person's. */
   readonly engine?: boolean;
+  /** Say what would be undone, as JSON, and change nothing: the dialog's facts. */
+  readonly dryRun?: boolean;
+  /**
+   * The HEAD the facts a person confirmed were read at. A repository that
+   * moved since -- a land, a close, another start -- is refused rather than
+   * rolled back on facts the dialog no longer states.
+   */
+  readonly asOf?: string | null;
 }
 
 /**
@@ -3689,6 +3697,20 @@ export function judgeRollback(
     .map((candidate) => candidate["number"] as number)
     .reduce((highest, number) => Math.max(highest, number), target);
   return { target, through, refusal: null };
+}
+
+/** Who made the commits since the anchor, and how old the oldest is: the facts a dialog states. */
+function rollbackFacts(repoRoot: string, anchor: string): { readonly authors: string[]; readonly oldest: string | null } {
+  const log = runGit(repoRoot, ["log", "--format=%an%x09%aI", `${anchor}..HEAD`]);
+  if (log.code !== 0) return { authors: [], oldest: null };
+  const authors = new Set<string>();
+  let oldest: string | null = null;
+  for (const line of log.stdout.split("\n")) {
+    const [author, when] = line.split("\t");
+    if (author && author.trim() !== "") authors.add(author.trim());
+    if (when && when.trim() !== "") oldest = when.trim();
+  }
+  return { authors: [...authors].sort(), oldest };
 }
 
 /** The paths a rollback discards: changed since the anchor, committed or not, and untracked. */
@@ -3809,13 +3831,21 @@ export function rollback(sessionsDir: string, options: RollbackCliOptions): numb
       writeErr(`rollback: no session ${sessionDisplayNumber(target)} on record\n`);
       return EXIT_USAGE;
     }
-    // Read before the tree moves: the plan file goes back with everything else.
-    const released: string[] = [];
+    // The hard line: a tag and a listing cannot be unpublished, and a release
+    // session run again would collide with its own tag, so a rollback stops
+    // short of any session that released.
     for (let number = target; number <= through; number += 1) {
       const row = sessionRecord(state, number);
       if (row === null || canonicalizeStatus(row["status"]) !== STATUS_COMPLETE) continue;
       const version = releaseSessionVersion(sessionsDir, number);
-      if (version !== null) released.push(`session ${sessionDisplayNumber(number)} released ${version}`);
+      if (version !== null) {
+        writeErr(
+          `rollback: refused -- session ${sessionDisplayNumber(number)} released ${version}, and a rollback cannot reach ` +
+            "or pass a session that released: its tag and its listing cannot be unpublished, and run again it would " +
+            "collide with its own tag. Roll back to the start of a later session, or cancel. Nothing was changed.\n",
+        );
+        return EXIT_BOUNDARY;
+      }
     }
     const anchor = startAnchor(repoRoot, record, target);
     if (anchor === null) {
@@ -3834,6 +3864,58 @@ export function rollback(sessionsDir: string, options: RollbackCliOptions): numb
     }
     const commits = since.stdout.split("\n").map((line) => line.trim()).filter((line) => line !== "");
     const discarded = discardedPaths(repoRoot, anchor);
+    const facts = rollbackFacts(repoRoot, anchor);
+    // The developer's work the tree carries, as a start counts it: the
+    // framework's own bookkeeping is not what a person is told they will lose.
+    const uncommitted = materialWorktreeChanges(sessionsDir).paths;
+    const headNow = runGit(repoRoot, ["rev-parse", "HEAD"]).stdout.trim();
+    if (options.dryRun === true) {
+      writeOut(
+        `${dumps({
+          session: target,
+          through,
+          anchor,
+          head: headNow,
+          commits: commits.length,
+          authors: facts.authors,
+          oldest: facts.oldest,
+          uncommitted: uncommitted.length,
+        })}\n`,
+      );
+      return EXIT_OK;
+    }
+    // The confirm is bound to the facts it was given: the dialog read them at
+    // one HEAD, and a repository that moved since is not the one confirmed.
+    if (typeof options.asOf === "string" && options.asOf.trim() !== "" && options.asOf.trim() !== headNow) {
+      writeErr(
+        `rollback: refused -- the repository moved since the facts were read: HEAD was ${options.asOf.trim().slice(0, 12)}, ` +
+          `and is ${headNow.slice(0, 12)}. Ask again, and confirm what it says now. Nothing was changed.\n`,
+      );
+      return EXIT_BOUNDARY;
+    }
+    // Nothing a rollback touches is gone: work no commit holds is kept on a
+    // local branch first, as one commit of everything the tree carried that
+    // is not ignored. Before the cancel, so the branch holds the work and not
+    // the ledger's row on its way out.
+    let safety: string | null = null;
+    if (uncommitted.length > 0) {
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      safety = `dabbler/rolled-back/s${target}-${stamp}`;
+      const added = runGit(repoRoot, ["add", "-A"]);
+      const stashed = added.code === 0
+        ? runGit(repoRoot, ["stash", "push", "--quiet", "-m", `dabbler rollback of session ${target}`])
+        : added;
+      const branched = stashed.code === 0 ? runGit(repoRoot, ["branch", safety, "stash@{0}"]) : stashed;
+      if (branched.code !== 0) {
+        if (stashed.code === 0) runGit(repoRoot, ["stash", "pop", "--quiet"]);
+        writeErr(
+          `rollback: refused -- the uncommitted work could not be kept on a safety branch: ${firstLine(branched.stderr || branched.stdout)}. ` +
+            "Nothing was changed.\n",
+        );
+        return EXIT_GATE_FAILED;
+      }
+      runGit(repoRoot, ["stash", "drop", "--quiet"]);
+    }
     // The loop's ending first: a cancelled row is what every loop and waiter
     // reads before an act it cannot take back.
     const inFlight = rows.find((row) => canonicalizeStatus(row["status"]) === STATUS_IN_PROGRESS);
@@ -3910,9 +3992,7 @@ export function rollback(sessionsDir: string, options: RollbackCliOptions): numb
         (commits.length === 0 ? "the working tree was reset" : `${commits.length} commit(s) were reverted and pushed`) +
         (discarded.length > 0 ? `, discarding ${previewPaths(discarded)}` : "") +
         `. ${superseded.length} run record(s) moved aside; ${dropped} test run record(s) dropped. ` +
-        (released.length > 0
-          ? `${released.join("; ")}: a tag and a publication stay, because a rollback reverts the trunk and unpublishes nothing; the next release carries a higher version. `
-          : "") +
+        (safety !== null ? `Uncommitted work (${uncommitted.length} file(s)) is kept on branch ${safety}. ` : "") +
         "A job still running finishes into a directory nothing reads. The session plan is as it was at that start; amend it, then Start Session again.\n",
     );
     return EXIT_OK;

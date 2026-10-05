@@ -734,12 +734,24 @@ integrity axis accepts it -- which is why a `git checkout` of an older
 ledger by hand never worked. The rollback goes on the activity log, under
 session N in `project-work-plan.md` with the span it undid, and is
 committed as the framework's own files: "Roll back to the start of session
-N of sessions". What it cannot undo is a publication: a release among the
-undone sessions keeps its tag and its listing, and the next release carries
-a higher version; the output says so. The sessions are at not-started with
-the plan as it was at that start; amend the plan, then Start Session again.
-A job still running finishes into a directory nothing reads. Nothing under
-`.dabbler/` is tracked for any of this.
+N of sessions". Three guard rails, and no more. A rollback stops short of a
+release: it refuses to reach or pass a session that released, because a tag
+and a listing cannot be unpublished and a release run again would collide
+with its own tag. Work no commit holds is kept first, as one commit on a
+local branch named `dabbler/rolled-back/s<N>-<time>`, so nothing a rollback
+touches is gone -- and what it reverted is still in history, so a rollback
+itself is undone with `git revert` of its commits, which the ledger's
+integrity check accepts because the restored file is one the router wrote.
+`--dry-run` says what would be undone -- the sessions, the commits, whose
+and how old, and what the tree carries -- as JSON and changes nothing; the
+Work Explorer's dialog reads it, so the person decides on facts, and the
+rollback it then runs carries `--as-of <HEAD>`, the commit those facts were
+read at: a repository that moved while the dialog was open is refused
+rather than rolled back on facts it no longer states. The
+sessions are at not-started with the plan as it was at that start; amend
+the plan, then Start Session again. A job still running finishes into a
+directory nothing reads. Nothing under `.dabbler/` is tracked for any of
+this.
 
 **A cancelled session ends its loop.** The loop reads the ledger at every
 phase boundary, while it waits for an answer, while a job runs, and again

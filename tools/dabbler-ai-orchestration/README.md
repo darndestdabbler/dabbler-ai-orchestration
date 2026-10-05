@@ -98,14 +98,17 @@ shows where the session is. **Stop Session** (or `dabbler session interrupt --re
 plain message reaches the AI with its next instruction; to carry on after a
 stop, ask your AI to run `dabbler session next`. **Cancel Session** is for
 objectives no longer wanted: it ends the session with your reason on the
-record and your files left as they were. **Reset Session**, on the session
-in flight, is for an implementation that went wrong: it returns the
-repository to where the session started, discards everything the session
-did — a revert where its commit was already pushed — and puts the session
-back at not-started with its plan as it was, ready to amend and start again.
-It warns what will be lost and asks you to confirm. Your AI does neither:
-an engine that cannot carry a step reports it blocked and says why, and the
-session waits for you.
+record and your files left as they were. **Rollback to Start of This
+Session**, on a session in flight or completed, is for an implementation
+that went wrong or a problem that spans several sessions: it returns the
+repository to where that session started and undoes it and every session
+after it — committed work is reverted on the trunk, never rewritten;
+uncommitted work is kept on a local safety branch; the sessions go back to
+not-started with the plan as it was, ready to amend and start again. It
+never reaches a session that released. It asks once, with the facts: which
+sessions, how many commits, whose, how old. Your AI does neither: an engine
+that cannot carry a step reports it blocked and says why, and the session
+waits for you.
 
 **6. Seven gates at the close, each one earned.** `session close` runs
 verification clean, working tree clean, pushed to remote, test run fresh,

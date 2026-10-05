@@ -595,12 +595,14 @@ suite("workExplorerTreeModel: session descriptor", () => {
     assert.ok(!hasToken(d.contextValue, "act-cancel"));
   });
 
-  test("the session in flight carries the reset token and a planned row does not", () => {
+  test("the in-flight and completed rows carry the rollback token and a planned row does not", () => {
+    const done = makeSession({ number: 1, status: "complete" });
     const inFlight = makeSession({ number: 2, status: "in-progress" });
     const planned = makeSession({ number: 3, status: "not-started" });
-    const repo = makeRepository({ currentSession: 2, nextSession: 3, sessions: [inFlight, planned] });
-    assert.ok(hasToken(sessionDescriptor({ kind: "session", repository: repo, session: inFlight }).contextValue, "act-reset"));
-    assert.ok(!hasToken(sessionDescriptor({ kind: "session", repository: repo, session: planned }).contextValue, "act-reset"));
+    const repo = makeRepository({ currentSession: 2, nextSession: 3, sessions: [done, inFlight, planned] });
+    assert.ok(hasToken(sessionDescriptor({ kind: "session", repository: repo, session: done }).contextValue, "act-rollback"));
+    assert.ok(hasToken(sessionDescriptor({ kind: "session", repository: repo, session: inFlight }).contextValue, "act-rollback"));
+    assert.ok(!hasToken(sessionDescriptor({ kind: "session", repository: repo, session: planned }).contextValue, "act-rollback"));
   });
 
   test("an untitled session falls back to its number", () => {

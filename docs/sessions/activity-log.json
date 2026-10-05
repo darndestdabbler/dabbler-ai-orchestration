@@ -12389,6 +12389,37 @@
       "what": "step 'the-rollback-verb': its files",
       "reason": "Removing reset from the contract breaks the typecheck of the two callers that still name it: the extension's flow (renamed to call rollback, redesigned in 245) and the walk test (its import and calls renamed, the walks rewritten in step 3)",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 245,
+      "dateTime": "2026-10-05T14:44:35.960000-04:00",
+      "task": "Session 245 puts the rollback where developers work: 'Rollback to Start of This Session' replaces Reset Session in the Work Explorer's row menu, offered on a session that is in flight or completed and on no other row. It is one dialog -- the warning that names the span of sessions undone, what is discarded, what stays published and that it cannot be undone, with Roll Back and Keep -- and nothing after it: no reason box, a fixed reason on the record. It calls the router's `session rollback` as a person's click, shows a refusal in the router's words and refreshes on success. The version goes to 3.21.0 with the changelog section for sessions 244 and 245, and the README's Work Explorer paragraph says what the item is for.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 245,
+      "dateTime": "2026-10-05T16:07:24.665000-04:00",
+      "what": "the non-goal 'Any change to the router: the verb and its refusals are session 244's', dropped",
+      "reason": "The operator approved three guard rails on 2026-10-05 after consulting Sol and Gemini: a hard line at the last release, a safety branch for discarded in-flight work, and a dry run that gives the dialog its facts; all three are the verb's, so this session changes the router after all",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 245,
+      "dateTime": "2026-10-05T16:07:25.577000-04:00",
+      "what": "step 'the-item': its files and checks",
+      "reason": "The first step becomes the verb's three guard rails, approved 2026-10-05: a rollback cannot reach or pass a session that released (a re-run would collide with its tag), discarded in-flight work goes to a safety branch first, and --dry-run answers what would be undone so the dialog states facts; the plan's section says so",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 245,
+      "dateTime": "2026-10-05T16:07:26.409000-04:00",
+      "what": "step 'one-dialog': its files and checks",
+      "reason": "The item and the one dialog become one step, and the dialog reads the dry run's facts: the sessions, the commits, whose, how old, and what stays published",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

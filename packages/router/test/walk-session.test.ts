@@ -1985,10 +1985,37 @@ describe("a session rolled back to where it started", () => {
     const engine = await capture(() => Promise.resolve(rollback(sessionsDir, { reason: "x", engine: true })));
     assert.notEqual(engine.value, EXIT_OK);
     assert.equal(readSessionState(sessionsDir)?.["currentSession"], 2);
-    const done = await capture(() => Promise.resolve(rollback(sessionsDir, { reason: "the step plan guessed a package", engine: false })));
+    // The dry run says what would go -- nothing landed, two files in the tree -- and changes nothing.
+    const dry = await capture(() => Promise.resolve(rollback(sessionsDir, { reason: "x", engine: false, dryRun: true })));
+    assert.equal(dry.value, EXIT_OK, dry.stderr);
+    const facts = JSON.parse(dry.stdout) as Record<string, unknown>;
+    assert.equal(facts["session"], 2);
+    assert.equal(facts["through"], 2);
+    assert.equal(facts["commits"], 0);
+    assert.equal(facts["uncommitted"], 2);
+    assert.equal(facts["head"], anchor);
+    assert.equal(readSessionState(sessionsDir)?.["currentSession"], 2);
+    assert.equal(readFileSync(join(repo, "src", "widget.py"), "utf8"), WIDGET_V3);
+    // A confirm bound to facts the repository has moved past is refused, and changes nothing.
+    const stale = await capture(() =>
+      Promise.resolve(rollback(sessionsDir, { reason: "x", engine: false, asOf: "0000000000000000000000000000000000000000" })),
+    );
+    assert.equal(stale.value, 3, stale.stderr);
+    assert.match(stale.stderr, /the repository moved since the facts were read: HEAD was 000000000000, and is .{12}\. Ask again/);
+    assert.equal(readSessionState(sessionsDir)?.["currentSession"], 2);
+    assert.equal(readFileSync(join(repo, "src", "widget.py"), "utf8"), WIDGET_V3);
+    const done = await capture(() =>
+      Promise.resolve(rollback(sessionsDir, { reason: "the step plan guessed a package", engine: false, asOf: String(facts["head"]) })),
+    );
     assert.equal(done.value, EXIT_OK, done.stderr);
     assert.match(done.stderr, /rollback: session 002 undone; the repository is back at .{12}, where session 002 started: the working tree was reset, discarding/);
     assert.match(done.stderr, /src\/extra\.py/);
+    // Nothing is gone: the work no commit held is one commit on a safety branch.
+    assert.match(done.stderr, /Uncommitted work \(2 file\(s\)\) is kept on branch dabbler\/rolled-back\/s2-/);
+    const safety = gitOut(repo, "branch", "--list", "dabbler/rolled-back/s2-*").replace(/^\*?\s*/, "").trim();
+    assert.ok(safety.startsWith("dabbler/rolled-back/s2-"), safety);
+    assert.equal(gitOut(repo, "show", `${safety}:src/widget.py`).trim(), WIDGET_V3.trim());
+    assert.equal(gitOut(repo, "show", `${safety}:src/extra.py`).trim(), "x = 1");
 
     // The tree: the work gone, the ignored file kept; the ledger: row 2 back
     // at not-started, nothing in flight, and the integrity axis content.
@@ -2094,6 +2121,17 @@ describe("a session rolled back to where it started", () => {
     assert.equal(step.instruction?.step_id, "widget", step.err);
     writeFileSync(join(repo, "src", "widget.py"), WIDGET_V3, "utf8");
     assert.ok(readRecords(repo).some((row) => row.sessionNumber === 1));
+
+    // The facts a dialog states: two sessions, session 1's two commits by one
+    // author, and the one file session 2 has in the tree.
+    const dry = await capture(() => Promise.resolve(rollback(sessionsDir, { sessionNumber: 1, reason: "x", engine: false, dryRun: true })));
+    assert.equal(dry.value, EXIT_OK, dry.stderr);
+    const facts = JSON.parse(dry.stdout) as Record<string, unknown>;
+    assert.equal(facts["through"], 2);
+    assert.equal(facts["commits"], 2);
+    assert.equal((facts["authors"] as string[]).length, 1);
+    assert.match(String(facts["oldest"]), /^\d{4}-\d{2}-\d{2}T/);
+    assert.equal(facts["uncommitted"], 1);
 
     const done = await capture(() =>
       Promise.resolve(rollback(sessionsDir, { sessionNumber: 1, reason: "the model was wrong from the first session", engine: false })),

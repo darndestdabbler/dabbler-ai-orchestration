@@ -1211,6 +1211,27 @@ describe("cancelling and restoring through the verb", () => {
       assert.match(planned.err, /session 002 has not started/);
       assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
       assert.equal(sessionOf(state.sessionsDir)["cancelledReason"], undefined);
+
+      // The hard line: a session that released is never reached or passed. A
+      // tag and a listing cannot be unpublished, and the release run again
+      // would collide with its own tag.
+      writeFileSync(
+        join(state.sessionsDir, "session-plan.md"),
+        "### Session 1 of 2: First things\n1. Register.\n\n### Session 2 of 2: Release 1.0.0 (release: 1.0.0)\n1. Register.\n",
+        "utf8",
+      );
+      const path = join(state.sessionsDir, "sessions.json");
+      const closed = JSON.parse(readFileSync(path, "utf8"));
+      closed.sessions[0].status = "complete";
+      closed.sessions[1].status = "complete";
+      writeFileSync(path, JSON.stringify(closed), "utf8");
+      for (const target of [1, 2]) {
+        const refused = await run(() => rollback(state.sessionsDir, { reason: "x", sessionNumber: target, engine: false }));
+        assert.equal(refused.code, EXIT_BOUNDARY, String(target));
+        assert.match(refused.err, /session 002 released 1\.0\.0, and a rollback cannot reach or pass a session that released/);
+        assert.match(refused.err, /Nothing was changed/);
+      }
+      assert.equal(sessionOf(state.sessionsDir, 1)["status"], "complete");
     } finally {
       state.restore();
     }

@@ -141,6 +141,10 @@ export interface SessionRestoreOptions extends RepositoryTarget {
 export interface SessionRollbackOptions extends RepositoryTarget {
   readonly reason: string;
   readonly sessionNumber?: number;
+  /** Answer what would be undone, as JSON on stdout, and change nothing. */
+  readonly dryRun?: boolean;
+  /** The HEAD the dry run's facts were read at; a repository that moved since is refused. */
+  readonly asOf?: string;
 }
 
 export interface SessionDecisionOptions extends RepositoryTarget {

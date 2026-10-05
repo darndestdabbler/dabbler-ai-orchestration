@@ -3,8 +3,9 @@ import * as vscode from "vscode";
 import {
   CancellableSession,
   CancelLifecycleUi,
+  rollbackDetail,
   runCancelSessionFlow,
-  runResetSessionFlow,
+  runRollbackSessionFlow,
   runRestoreSessionFlow,
 } from "../../commands/cancelLifecycleCommands";
 import {
@@ -122,41 +123,82 @@ suite("cancel/restore flows", () => {
     assert.ok(infos[0].includes("session 3"));
   });
 
-  test("reset warns what is lost, asks, takes a reason, runs the verb and names the session", async () => {
+  const FACTS = { session: 3, through: 5, head: "a2073057d2b1a6b9e1b8c0d1e2f3a4b5c6d7e8f9", commits: 7, authors: ["Alice", "Bob"], oldest: "2026-09-29T10:00:00-04:00", uncommitted: 2 };
+
+  /** A router whose rollback answers the dry run with FACTS and records every call. */
+  function rollbackRouter(facts: unknown = FACTS): { router: Parameters<typeof runRollbackSessionFlow>[2]; calls: Record<string, unknown>[] } {
+    const calls: Record<string, unknown>[] = [];
+    const router = {
+      session: {
+        rollback: async (options: Record<string, unknown>) => {
+          calls.push(options);
+          return { ok: true, outcome: "ok", value: { stdout: `${JSON.stringify(facts)}\n` } };
+        },
+      },
+    } as unknown as Parameters<typeof runRollbackSessionFlow>[2];
+    return { router, calls };
+  }
+
+  test("rollback asks the router's dry run, states its facts in one dialog, runs the verb with the fixed reason and names the session", async () => {
     const seen: { summary: string; detail: string; buttons: string[] }[] = [];
+    let prompted = 0;
     const { ui, infos, errors } = cancelUi({
       confirm: async (summary, detail, affirmative, negative) => {
         seen.push({ summary, detail, buttons: [affirmative, negative] });
         return affirmative;
       },
+      promptReason: async () => { prompted += 1; return "never"; },
     });
-    const refreshed = await runResetSessionFlow(CANCELLABLE, ui, fakeRouter(0).router);
+    const { router, calls } = rollbackRouter();
+    const refreshed = await runRollbackSessionFlow(CANCELLABLE, ui, router);
     assert.strictEqual(refreshed, true);
     assert.strictEqual(errors.length, 0);
-    assert.strictEqual(seen[0].summary, 'Reset session 3 "Third things"?');
-    assert.ok(seen[0].detail.includes("Every change it made is discarded"));
-    assert.ok(seen[0].detail.includes("cannot be recovered"));
-    assert.deepStrictEqual(seen[0].buttons, ["Reset Session", "Keep"]);
-    assert.ok(infos[0].includes("Reset session 3"));
+    assert.strictEqual(prompted, 0, "one dialog: no reason box after the modal");
+    assert.strictEqual(seen.length, 1);
+    assert.strictEqual(seen[0].summary, 'Roll back to the start of session 3 "Third things"?');
+    assert.strictEqual(
+      seen[0].detail,
+      "Sessions 3 to 5 are undone: 7 commits by Alice and Bob, the oldest from 2026-09-29, are reverted on the trunk; uncommitted work is kept on a safety branch; the sessions return to not-started. The session plan is kept.",
+    );
+    assert.deepStrictEqual(seen[0].buttons, ["Roll Back", "Keep"]);
+    assert.strictEqual(calls.length, 2);
+    assert.strictEqual(calls[0].dryRun, true);
+    assert.strictEqual(calls[1].dryRun, undefined);
+    assert.strictEqual(calls[1].sessionNumber, 3);
+    assert.strictEqual(calls[1].reason, "Rollback to Start of This Session from the Work Explorer");
+    // The confirm is bound to the facts shown: the verb is told the HEAD they were read at.
+    assert.strictEqual(calls[1].asOf, FACTS.head);
+    assert.ok(infos[0].includes("Rolled back to the start of session 3"));
     assert.ok(infos[0].includes("Start Session"));
+    // The clauses that do not apply are left out, never written as zero, and no file is counted.
+    assert.strictEqual(
+      rollbackDetail({ session: 4, through: 4, head: FACTS.head, commits: 0, authors: [], oldest: null, uncommitted: 1 }),
+      "Session 4 is undone: uncommitted work is kept on a safety branch; the session returns to not-started. The session plan is kept.",
+    );
   });
 
-  test("a reset dismissed or kept runs nothing", async () => {
+  test("a rollback declined or dismissed at the dialog runs nothing", async () => {
     for (const answer of [undefined, "Keep"]) {
       const { ui } = cancelUi({ confirm: async () => answer });
-      assert.strictEqual(await runResetSessionFlow(CANCELLABLE, ui, unusableRouter()), false);
+      const { router, calls } = rollbackRouter();
+      assert.strictEqual(await runRollbackSessionFlow(CANCELLABLE, ui, router), false);
+      assert.strictEqual(calls.length, 1, "the dry run only");
+      assert.strictEqual(calls[0].dryRun, true);
     }
   });
 
-  test("a reset the router refuses surfaces in its words and does not refresh", async () => {
-    const { ui, errors } = cancelUi();
-    const refreshed = await runResetSessionFlow(
+  test("a rollback the router refuses at the dry run surfaces in its words, asks nothing, and does not refresh", async () => {
+    let asked = 0;
+    const { ui, errors } = cancelUi({ confirm: async (_s, _d, affirmative) => { asked += 1; return affirmative; } });
+    const refreshed = await runRollbackSessionFlow(
       CANCELLABLE,
       ui,
-      fakeRouter(3, "session reset is a person's verb").router,
+      fakeRouter(3, "session 005 released 1.0.0, and a rollback cannot reach or pass a session that released").router,
     );
     assert.strictEqual(refreshed, false);
-    assert.ok(errors[0].startsWith('Resetting "Third things" refused'));
+    assert.strictEqual(asked, 0);
+    assert.ok(errors[0].startsWith('Rolling back "Third things" refused'));
+    assert.ok(errors[0].includes("session 005 released 1.0.0"));
     assert.ok(errors[0].includes("Nothing was written"));
   });
 });

@@ -4824,9 +4824,9 @@
     {
       "number": 244,
       "title": "A rollback to the start of any session that has run",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-05T14:15:37.177000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-05T14:43:12.464000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

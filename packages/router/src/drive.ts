@@ -1142,11 +1142,14 @@ class LeaseLost extends Error {
   }
 }
 
+/** How a session ends underneath its loop: a person's cancel, a forced close, or a reset. */
+export type SessionEndedStatus = "cancelled" | "closed" | "reset";
+
 class SessionEnded extends Error {
-  readonly status: "cancelled" | "closed";
+  readonly status: SessionEndedStatus;
   readonly why: string | null;
 
-  constructor(status: "cancelled" | "closed", why: string | null) {
+  constructor(status: SessionEndedStatus, why: string | null) {
     super(`the session was ${status} while the loop was driving it`);
     this.status = status;
     this.why = why;
@@ -1158,13 +1161,15 @@ class SessionEnded extends Error {
  * Whether a session's ledger row says it ended underneath a loop in `phase`.
  * Cancelled is over in every phase. Complete is over too -- a person forced
  * the close -- except while the loop is itself closing, where it is the
- * loop's own close, collected where it always was.
+ * loop's own close, collected where it always was. A row back at
+ * not-started was reset: a person returned the repository to where the
+ * session started, and the run this loop holds no longer exists.
  */
 export function judgeSessionEnded(
   status: unknown,
   cancelledReason: unknown,
   phase: string,
-): { readonly status: "cancelled" | "closed"; readonly why: string | null } | null {
+): { readonly status: SessionEndedStatus; readonly why: string | null } | null {
   if (status === "cancelled") {
     const why = typeof cancelledReason === "string" ? cancelledReason.trim() : "";
     return { status: "cancelled", why: why === "" ? null : why };
@@ -1172,6 +1177,7 @@ export function judgeSessionEnded(
   if (status === "complete" && phase !== "close" && phase !== "complete") {
     return { status: "closed", why: null };
   }
+  if (status === "not-started") return { status: "reset", why: null };
   return null;
 }
 
@@ -1432,7 +1438,7 @@ export function closedAsk(sessionNumber: number): string {
  * loop is over, stop -- and different words, because the work is NOT landed
  * and an AI told otherwise would tell the operator so.
  */
-export function endedAsk(sessionNumber: number, status: "cancelled" | "closed", why: string | null): string {
+export function endedAsk(sessionNumber: number, status: SessionEndedStatus, why: string | null): string {
   return (
     `Session ${sessionDisplayNumber(sessionNumber)} was ${status} by a person` +
     (why ? `, who said: ${why}` : "") +

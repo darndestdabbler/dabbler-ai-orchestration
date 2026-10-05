@@ -67,6 +67,7 @@ import {
   changedPathsBetween,
   snapshotWorktreeTree,
   pushRoundRefs,
+  recordStateWrite,
   repoRootFromSessionsDir,
   upstreamRemote,
 } from "./evidence.ts";
@@ -125,7 +126,7 @@ import {
 import { PackagingConfigError, canonicalVersion, loadDeclaration, loadTagRelease, releaseVersion } from "./packaging.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { removeStopGate } from "./bootstrap/index.ts";
-import { isSessionBookkeeping } from "./testEvidence.ts";
+import { dropSessionRecords, isSessionBookkeeping } from "./testEvidence.ts";
 import {
   type OriginReconciliation,
   nowIso,
@@ -181,6 +182,7 @@ import {
   amendmentLine,
   recordAmendment,
   recordReleaseHold,
+  recordReset,
   releaseHold,
   WorkBegunError,
   workBegunRefusal,
@@ -3449,7 +3451,7 @@ const CANCEL_COMMIT_BASENAMES: readonly string[] = [
  * is left exactly as it was. Nothing is pushed. Returns why the commit
  * failed, or null.
  */
-function commitCancellation(sessionsDir: string, sessionNumber: number): string | null {
+function commitFrameworkFiles(sessionsDir: string, message: string): string | null {
   const repoRoot = repoRootFor(sessionsDir);
   if (repoRoot === null) return null;
   const paths = CANCEL_COMMIT_BASENAMES.map((name) => resolve(sessionsDir, name)).filter(isFile);
@@ -3457,13 +3459,7 @@ function commitCancellation(sessionsDir: string, sessionNumber: number): string 
   const changed = runGit(repoRoot, ["status", "--porcelain", "--", ...paths]);
   if (changed.code !== 0 || changed.stdout.trim() === "") return null;
   runGit(repoRoot, ["add", "--", ...paths]);
-  const committed = runGit(repoRoot, [
-    "commit",
-    "-m",
-    `Cancel session ${sessionNumber} of ${basename(sessionsDir)}`,
-    "--",
-    ...paths,
-  ]);
+  const committed = runGit(repoRoot, ["commit", "-m", message, "--", ...paths]);
   if (committed.code !== 0 && !`${committed.stdout}${committed.stderr}`.toLowerCase().includes("nothing to commit")) {
     return committed.stderr.trim() || committed.stdout.trim();
   }
@@ -3533,7 +3529,7 @@ export function cancel(
       writeErr(`cancel: refused -- ${error.message}\n`);
       return EXIT_GATE_FAILED;
     }
-    const committed = commitCancellation(sessionsDir, sessionNumber);
+    const committed = commitFrameworkFiles(sessionsDir, `Cancel session ${sessionNumber} of ${basename(sessionsDir)}`);
     if (committed !== null) {
       writeErr(`cancel: state written but commit failed: ${committed}\n`);
       return EXIT_GATE_FAILED;
@@ -3603,6 +3599,220 @@ export function restore(
       return EXIT_GATE_FAILED;
     }
     writeOut(`${dumps({ session: sessionNumber, status: prior })}\n`);
+    return EXIT_OK;
+  } finally {
+    releaseLock(lock);
+  }
+}
+
+// --- reset ---------------------------------------------------------------------
+
+export interface ResetCliOptions {
+  readonly reason: string;
+  /** The session named; it must be the one in flight. Null means the one in flight. */
+  readonly sessionNumber?: number | null;
+  /** The caller is an engine (`callerIsEngine`); a reset is a person's. */
+  readonly engine?: boolean;
+}
+
+/**
+ * What a reset's cancellation reason begins with: the loop or waiter that
+ * reads the row at its next boundary ends on it, and says this is why.
+ */
+export const RESET_REASON_PREFIX = "reset: ";
+
+/**
+ * Which session a reset means, and whether it may have it. Pure: the
+ * session in flight and the number named, in; the target or the refusal,
+ * out. A reset applies to the session in flight and to no other -- a closed
+ * or cancelled session is settled, and a reset past where this one started
+ * is a plan change, not a recovery.
+ */
+export function judgeReset(
+  inFlight: number | null,
+  requested: number | null,
+): { readonly target: number | null; readonly refusal: string | null } {
+  if (inFlight === null) {
+    return { target: null, refusal: "refused -- nothing is in flight, and a reset applies to the session in flight." };
+  }
+  if (requested !== null && requested !== inFlight) {
+    return {
+      target: null,
+      refusal:
+        `refused -- session ${sessionDisplayNumber(requested)} is not the session in flight ` +
+        `(${sessionDisplayNumber(inFlight)} is), and a reset applies to the session in flight.`,
+    };
+  }
+  return { target: inFlight, refusal: null };
+}
+
+/** The paths a reset discards: changed since the anchor, committed or not, and untracked. */
+function discardedPaths(repoRoot: string, anchor: string): string[] {
+  const paths = new Set<string>();
+  const changed = runGit(repoRoot, ["diff", "--name-only", anchor]);
+  if (changed.code === 0) {
+    for (const line of changed.stdout.split("\n")) if (line.trim() !== "") paths.add(line.trim());
+  }
+  const status = runGit(repoRoot, ["status", "--porcelain", "--untracked-files=all"]);
+  if (status.code === 0) {
+    for (const line of status.stdout.split("\n")) {
+      if (line.startsWith("?? ")) paths.add(line.slice(3).trim());
+    }
+  }
+  return [...paths].sort();
+}
+
+/**
+ * Return the repository to where the session in flight started, and the
+ * session to not-started.
+ *
+ * A cancel unwinds nothing, and the next start offered to commit what it
+ * left -- which is how a never-verified skeleton reached a trunk on
+ * 2026-10-02. A revert by hand was refused every time: `state-writes.jsonl`
+ * chains every sanctioned write of `sessions.json`, so a checked-out older
+ * ledger read as hand-edited, and the run record still held the run. So
+ * the router does the revert, in this order: the session is cancelled with
+ * the reason marked, which is the write every loop and waiter reads at its
+ * next boundary and ends on; the tree goes back to the commit the session
+ * started on -- a hard reset before the land, a revert of every commit
+ * since it after the land, so pushed history is never rewritten; the run
+ * record is moved aside the way a start moves a reused number's; the
+ * session's test runs leave the record; the restored ledger is recorded as
+ * a sanctioned write; and the reset goes on the activity log, committed as
+ * the framework's own files. Nothing under `.dabbler/` is tracked for it.
+ */
+export function reset(sessionsDir: string, options: ResetCliOptions): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`reset: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  if (options.engine === true) {
+    writeErr(
+      `reset: ${isAPersonsVerb(
+        "reset",
+        "discards everything the session in flight did and returns the repository to where it started",
+        "a person resets from the Work Explorer (Reset Session) or an interactive terminal of their own",
+      )}\n`,
+    );
+    return EXIT_BOUNDARY;
+  }
+  let lock: string;
+  try {
+    lock = acquireLock(sessionsDir, `reset/${process.pid}`);
+  } catch (error) {
+    if (!(error instanceof LockContentionError)) throw error;
+    writeErr(`reset: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+  try {
+    const raw = readRawSessionState(sessionsDir);
+    if (raw === null) {
+      writeErr(`reset: no session record under ${sessionsDir}\n`);
+      return EXIT_USAGE;
+    }
+    const working = derivedView(raw)?.["currentSession"];
+    const ruling = judgeReset(typeof working === "number" ? working : null, options.sessionNumber ?? null);
+    if (ruling.refusal !== null || ruling.target === null) {
+      writeErr(`reset: ${ruling.refusal}\n`);
+      return EXIT_BOUNDARY;
+    }
+    const target = ruling.target;
+    const repoRoot = repoRootFor(sessionsDir);
+    if (repoRoot === null) {
+      writeErr("reset: refused -- not inside a git repository, and a reset is a git operation.\n");
+      return EXIT_USAGE;
+    }
+    const state = onDiskState(raw);
+    const record = sessionRecord(state, target);
+    if (record === null) {
+      writeErr(`reset: no session ${sessionDisplayNumber(target)} on record\n`);
+      return EXIT_USAGE;
+    }
+    // The loop's ending first: a cancelled row is what every loop and waiter
+    // reads before an act it cannot take back.
+    applyCancellation(record, `${RESET_REASON_PREFIX}${options.reason}`, nowIsoSeconds());
+    try {
+      validateAndWriteState(sessionsDir, state);
+    } catch (error) {
+      if (!(error instanceof SessionStateInvariantError)) throw error;
+      writeErr(`reset: refused -- ${error.message}\n`);
+      return EXIT_GATE_FAILED;
+    }
+    // The anchor: the commit the session started on. Nothing of a session is
+    // committed before its land, so HEAD is still the start where no plan was
+    // accepted yet.
+    const head = runGit(repoRoot, ["rev-parse", "HEAD"]);
+    if (head.code !== 0) {
+      writeErr(`reset: refused -- HEAD could not be read: ${firstLine(head.stderr)}. The session is cancelled; the tree is as it was.\n`);
+      return EXIT_GATE_FAILED;
+    }
+    const anchor = readRun(repoRoot, target)?.plan_head ?? head.stdout.trim();
+    const since = runGit(repoRoot, ["rev-list", "--reverse", `${anchor}..HEAD`]);
+    if (since.code !== 0) {
+      writeErr(
+        `reset: refused -- the start commit ${anchor} is not in this branch's history: ${firstLine(since.stderr)}. ` +
+          "The session is cancelled; the tree is as it was.\n",
+      );
+      return EXIT_GATE_FAILED;
+    }
+    const commits = since.stdout.split("\n").map((line) => line.trim()).filter((line) => line !== "");
+    const discarded = discardedPaths(repoRoot, anchor);
+    // The tree. Before the land nothing of the session is committed, and a
+    // hard reset to the anchor is the whole of it; after the land its
+    // commits are on the remote, and each is reverted, newest first.
+    const restored = commits.length === 0
+      ? runGit(repoRoot, ["reset", "--hard", anchor])
+      : runGit(repoRoot, ["checkout", "--", "."]);
+    if (restored.code !== 0) {
+      writeErr(`reset: refused -- the working tree could not be restored: ${firstLine(restored.stderr)}\n`);
+      return EXIT_GATE_FAILED;
+    }
+    const cleaned = runGit(repoRoot, ["clean", "-fd"]);
+    if (cleaned.code !== 0) {
+      writeErr(`reset: refused -- untracked files could not be removed: ${firstLine(cleaned.stderr)}\n`);
+      return EXIT_GATE_FAILED;
+    }
+    if (commits.length > 0) {
+      const reverted = runGit(repoRoot, ["revert", "--no-edit", `${anchor}..HEAD`]);
+      if (reverted.code !== 0) {
+        runGit(repoRoot, ["revert", "--abort"]);
+        writeErr(
+          `reset: refused -- the session's ${commits.length} commit(s) could not be reverted: ` +
+            `${firstLine(reverted.stderr || reverted.stdout)}. The tree is as the land left it, and the session is cancelled.\n`,
+        );
+        return EXIT_GATE_FAILED;
+      }
+    }
+    // The framework's own records: the run moved aside, the test runs dropped,
+    // the restored ledger sanctioned, and the reset on the activity log.
+    const superseded = supersedeRunRecord(repoRoot, target);
+    const dropped = dropSessionRecords(repoRoot, target);
+    recordStateWrite(sessionsDir, repoRoot);
+    recordReset(sessionsDir, { sessionNumber: target, reason: options.reason, by: "operator" });
+    const committed = commitFrameworkFiles(sessionsDir, `Reset session ${target} of ${basename(sessionsDir)}`);
+    if (committed !== null) {
+      writeErr(`reset: the repository was reset, but the record's commit failed: ${committed}\n`);
+      return EXIT_GATE_FAILED;
+    }
+    if (commits.length > 0) {
+      const upstream = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
+      if (upstream.code === 0) {
+        const pushed = runGit(repoRoot, ["push"]);
+        if (pushed.code !== 0) {
+          writeErr(`reset: the reverts are committed, but git push failed: ${firstLine(pushed.stderr)}\n`);
+          return EXIT_GATE_FAILED;
+        }
+      }
+    }
+    writeOut(`${dumps({ session: target, status: STATUS_NOT_STARTED, anchor, reverted: commits.length })}\n`);
+    writeErr(
+      `reset: session ${sessionDisplayNumber(target)} is back at ${anchor.slice(0, 12)}, where it started: ` +
+        (commits.length === 0 ? "the working tree was reset" : `${commits.length} commit(s) were reverted and pushed`) +
+        (discarded.length > 0 ? `, discarding ${previewPaths(discarded)}` : "") +
+        `. Its run record ${superseded === null ? "did not exist" : `was moved to ${superseded}`}; ` +
+        `${dropped} test run record(s) were dropped. A job it still had running finishes into a directory nothing reads. ` +
+        "The session plan is as it was at the start; amend it, then Start Session again.\n",
+    );
     return EXIT_OK;
   } finally {
     releaseLock(lock);

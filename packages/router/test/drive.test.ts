@@ -902,12 +902,15 @@ describe("`session next` under a live loop", () => {
 });
 
 describe("judgeSessionEnded", () => {
-  it("reads a cancelled session as over in every phase, a forced close as over outside the loop's own, and a session in flight as the loop's", () => {
+  it("reads a cancelled session as over in every phase, a forced close as over outside the loop's own, a row back at not-started as reset, and a session in flight as the loop's", () => {
     // The loop never re-read the ledger: cancelled underneath it, it waited
-    // on a session that did not exist, or went on to commit its work.
+    // on a session that did not exist, or went on to commit its work. A
+    // reset returns the row to not-started after its cancel, and a loop that
+    // reads that has no run left to drive.
     assert.deepEqual(judgeSessionEnded("cancelled", " wrong repository ", "work"), { status: "cancelled", why: "wrong repository" });
     assert.deepEqual(judgeSessionEnded("cancelled", undefined, "close"), { status: "cancelled", why: null });
     assert.deepEqual(judgeSessionEnded("complete", null, "verify"), { status: "closed", why: null });
+    assert.deepEqual(judgeSessionEnded("not-started", undefined, "work"), { status: "reset", why: null });
     // The loop's own close flips the status while the loop is closing, and
     // is collected where it always was.
     assert.equal(judgeSessionEnded("complete", null, "close"), null);

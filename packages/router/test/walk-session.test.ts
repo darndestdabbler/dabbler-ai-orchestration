@@ -24,10 +24,11 @@ import { judgeSuiteDeclaration } from "../src/gates.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
 import { appendPackaging, readPackaging, readRounds } from "../src/ledger.ts";
 import { capture } from "../src/output.ts";
-import { readSessionState } from "../src/progress.ts";
+import { detectOutOfBandWrite } from "../src/evidence.ts";
+import { readRawSessionState, readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import { EXIT_OK, EXIT_USAGE, RELEASE_ENGINE, cancel, declare, holdRelease, interrupt, planAmend, report, start } from "../src/session.ts";
+import { EXIT_OK, EXIT_USAGE, RELEASE_ENGINE, cancel, declare, holdRelease, interrupt, planAmend, report, reset, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
 import { amendmentEntries, readTaskDeclaration } from "../src/writers.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
@@ -1921,5 +1922,145 @@ describe("a session-plan.md edit while a session is in progress", () => {
     // Mid-step: the check's tree moved, so the checks prove nothing. It is the
     // step's third refusal, so it is the stop's own reason.
     assert.match(String(readRun(repo, 1)?.stop?.reason), /\[check-failed\].*\(the check changed the tree\)/s);
+  });
+});
+
+describe("a session reset to where it started", () => {
+  /** Drive the session in flight from its first `next` to `done`, answering its one step. */
+  async function driveToDone(repo: string, sessionsDir: string, sessionNumber: number, plan: unknown, work: string): Promise<void> {
+    const planned = await next(sessionsDir);
+    assert.equal(planned.instruction?.step_id, "plan", planned.err);
+    assert.equal(await answerPlan(sessionsDir, planned.instruction?.seq ?? 0, plan), EXIT_OK);
+    const step = await next(sessionsDir);
+    assert.equal(step.instruction?.kind, "step", step.err);
+    writeFileSync(join(repo, "src", "widget.py"), work, "utf8");
+    assert.equal((await answerStep(sessionsDir, step.instruction?.seq ?? 0, String(step.instruction?.step_id), ["src/widget.py"])).code, EXIT_OK);
+    const deadline = Date.now() + 180_000;
+    for (;;) {
+      const move = await next(sessionsDir);
+      if (move.instruction?.kind === "done") break;
+      assert.equal(move.instruction?.kind, "wait", `session ${sessionNumber}: ${move.err}`);
+      if (Date.now() > deadline) assert.fail("the framework's own jobs never finished");
+      await settleJobs();
+    }
+  }
+
+  it("returns the tree and the ledger row to the start commit before the land, keeps what is ignored, and leaves a record the integrity axis accepts", async () => {
+    // The recovery a cancel never was: session 1 has landed and closed, so
+    // the ledger is committed with session 2 at not-started; session 2 is
+    // in flight with a step's work in the tree. A hand `git checkout` of the
+    // older ledger was refused as hand-edited every time (state-writes.jsonl
+    // chains every sanctioned write), and the run record resumed the run.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED, VERIFIED]);
+    assert.equal((await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })))).value, EXIT_OK);
+    await driveToDone(repo, sessionsDir, 1, PLAN, "def widget():\n    return 2\n");
+    assert.equal(readSessionState(sessionsDir)?.["currentSession"], null);
+    const anchor = gitOut(repo, "rev-parse", "HEAD").trim();
+    assert.match(gitOut(repo, "log", "-1", "--format=%s"), /^Close session 1 of sessions/);
+
+    // Session 2 in flight: planned, a step issued, the work in the tree, an
+    // ignored file beside it, and a test run on the record.
+    assert.equal((await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })))).value, EXIT_OK);
+    const planned = await next(sessionsDir);
+    assert.equal(await answerPlan(sessionsDir, planned.instruction?.seq ?? 0, {
+      ...PLAN,
+      task: "Make widget() return 3.",
+      steps: [{ ...PLAN.steps[0], ask: "Make widget() return 3." }],
+    }), EXIT_OK);
+    const step = await next(sessionsDir);
+    assert.equal(step.instruction?.step_id, "widget", step.err);
+    assert.equal(readRun(repo, 2)?.plan_head, anchor);
+    writeFileSync(join(repo, "src", "widget.py"), WIDGET_V3, "utf8");
+    writeFileSync(join(repo, "src", "extra.py"), "x = 1\n", "utf8");
+    mkdirSync(join(repo, ".dabbler", "notes"), { recursive: true });
+    writeFileSync(join(repo, ".dabbler", "notes", "scratch.txt"), "kept\n", "utf8");
+    const before = readRecords(repo);
+    assert.ok(before.length > 0 && before.every((row) => row.sessionNumber === 1));
+
+    const engine = await capture(() => Promise.resolve(reset(sessionsDir, { reason: "x", engine: true })));
+    assert.notEqual(engine.value, EXIT_OK);
+    assert.equal(readSessionState(sessionsDir)?.["currentSession"], 2);
+    const done = await capture(() => Promise.resolve(reset(sessionsDir, { reason: "the step plan guessed a package", engine: false })));
+    assert.equal(done.value, EXIT_OK, done.stderr);
+    assert.match(done.stderr, /session 002 is back at .{12}, where it started: the working tree was reset, discarding/);
+    assert.match(done.stderr, /src\/extra\.py/);
+
+    // The tree: the work gone, the ignored file kept; the ledger: row 2 back
+    // at not-started, nothing in flight, and the integrity axis content.
+    assert.equal(readFileSync(join(repo, "src", "widget.py"), "utf8"), "def widget():\n    return 2\n");
+    assert.equal(existsSync(join(repo, "src", "extra.py")), false);
+    assert.equal(readFileSync(join(repo, ".dabbler", "notes", "scratch.txt"), "utf8"), "kept\n");
+    const rows = readRawSessionState(sessionsDir)?.["sessions"] as Array<Record<string, unknown>>;
+    assert.equal(rows[1]?.["status"], "not-started");
+    assert.equal(rows[1]?.["cancelledReason"], undefined);
+    assert.equal(readSessionState(sessionsDir)?.["currentSession"], null);
+    assert.equal(detectOutOfBandWrite(sessionsDir, repo, { requireRecord: true }), null);
+    // The framework's own records: the run moved aside, session 2's test
+    // runs gone and session 1's kept, the reset on the activity log and in
+    // the work plan, and only those files committed.
+    assert.equal(existsSync(join(repo, ".dabbler", "runs", "s2")), false);
+    assert.ok(readdirSync(join(repo, ".dabbler", "superseded-runs")).some((name) => name.startsWith("s2-")));
+    assert.deepEqual(readRecords(repo).map((row) => row.sessionNumber), before.map((row) => row.sessionNumber));
+    assert.match(readFileSync(join(sessionsDir, "project-work-plan.md"), "utf8"), /\*\*Reset:\*\*\n\n- \d{4}-\d{2}-\d{2} — the step plan guessed a package \(operator\)/);
+    assert.equal(gitOut(repo, "log", "--format=%s", `${anchor}..HEAD`).trim(), "Reset session 2 of sessions");
+    assert.equal(gitOut(repo, "status", "--porcelain").trim(), "");
+    assert.equal(gitOut(repo, "diff", "--name-only", anchor, "HEAD").trim().split("\n").sort().join(","), "docs/sessions/activity-log.json,docs/sessions/project-work-plan.md");
+
+    // And the same number starts afresh.
+    const again = await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })));
+    assert.equal(again.value, EXIT_OK, again.stderr);
+    assert.equal(readSessionState(sessionsDir)?.["currentSession"], 2);
+    assert.equal(readRun(repo, 2), null);
+  });
+
+  it("reverts every commit since the start after the land, pushes, and the same number starts afresh", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+    const anchor = gitOut(repo, "rev-parse", "HEAD").trim();
+    assert.equal((await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })))).value, EXIT_OK);
+    const planned = await next(sessionsDir);
+    assert.equal(await answerPlan(sessionsDir, planned.instruction?.seq ?? 0, PLAN), EXIT_OK);
+    const step = await next(sessionsDir);
+    assert.equal(step.instruction?.step_id, "widget", step.err);
+    assert.equal(readRun(repo, 1)?.plan_head, anchor);
+    // The land, as the framework makes it: the work and the ledger in one
+    // commit, pushed. Two commits, because a re-land after a rewind is two.
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+    git(repo, "add", "-A");
+    git(repo, "commit", "-q", "-m", "Session 1: The widget");
+    writeFileSync(join(repo, "src", "widget.py"), WIDGET_V3, "utf8");
+    git(repo, "add", "-A");
+    git(repo, "commit", "-q", "-m", "Session 1: The widget, again");
+    git(repo, "push", "-q");
+    const landed = gitOut(repo, "rev-parse", "HEAD").trim();
+
+    const done = await capture(() => Promise.resolve(reset(sessionsDir, { reason: "verification found the design wrong", engine: false })));
+    assert.equal(done.value, EXIT_OK, done.stderr);
+    assert.match(done.stderr, /2 commit\(s\) were reverted and pushed/);
+    assert.deepEqual(gitOut(repo, "log", "--format=%s", `${landed}..HEAD`).trim().split("\n"), [
+      "Reset session 1 of sessions",
+      'Revert "Session 1: The widget"',
+      'Revert "Session 1: The widget, again"',
+    ]);
+    // The tree the reverts leave is the start commit's, and it is on origin.
+    assert.equal(gitOut(repo, "rev-parse", "HEAD~1^{tree}").trim(), gitOut(repo, "rev-parse", `${anchor}^{tree}`).trim());
+    assert.equal(gitOut(repo, "rev-parse", "origin/main").trim(), gitOut(repo, "rev-parse", "HEAD").trim());
+    assert.equal(readFileSync(join(repo, "src", "widget.py"), "utf8"), "def widget():\n    return 1\n");
+    assert.equal(existsSync(join(repo, ".dabbler", "runs", "s1")), false);
+    // No ledger was landed before session 1, so none is where it started.
+    assert.equal(readRawSessionState(sessionsDir), null);
+    assert.match(readFileSync(join(sessionsDir, "project-work-plan.md"), "utf8"), /### Session 1 — Session 1\n\n\*\*Reset:\*\*/);
+    const again = await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })));
+    assert.equal(again.value, EXIT_OK, again.stderr);
+    assert.equal(readSessionState(sessionsDir)?.["currentSession"], 1);
   });
 });

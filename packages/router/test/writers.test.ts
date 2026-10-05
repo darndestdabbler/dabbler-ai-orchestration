@@ -29,8 +29,11 @@ import { namedReviewers, namedReviewingVehicle } from "../src/sessionState.ts";
 import { VERSION } from "../src/version.ts";
 import {
   KIND_AMENDMENT,
+  KIND_RESET,
   SanctionedWriteError,
   amendmentEntries,
+  recordReset,
+  resetEntries,
   appendDecision,
   decisionEntries,
   buildOrchestratorBlock,
@@ -308,6 +311,25 @@ describe("registering a session start", () => {
     writeFileSync(path, JSON.stringify(state), "utf8");
     const rebuilt = registerSessionStart(sessionsDir, 1, { engine: "claude-code" })["sessions"] as Record<string, unknown>[];
     assert.equal("verification" in rebuilt[0], false);
+  });
+});
+
+describe("recording a reset", () => {
+  it("folds it into the activity log and the work plan renders it under its session, declared or not", () => {
+    // The reset returned the log to the commit the session started on, so
+    // the session has no declaration left; the entry is the attempt's one
+    // trace and is shown under the session anyway.
+    const { sessionsDir } = makeSessionsDir();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const entry = recordReset(sessionsDir, { sessionNumber: 1, reason: "the step plan guessed a package", by: "operator" });
+    assert.equal(entry["kind"], KIND_RESET);
+    assert.equal(resetEntries(sessionsDir, 1).length, 1);
+    assert.equal(resetEntries(sessionsDir, 2).length, 0);
+    const rendered = renderProjectWorkPlan(sessionsDir);
+    assert.match(rendered, /### Session 1 — /);
+    assert.match(rendered, /\*\*Reset:\*\*/);
+    assert.match(rendered, /— the step plan guessed a package \(operator\)/);
+    assert.doesNotMatch(rendered, /\*\*Releasable:/);
   });
 });
 

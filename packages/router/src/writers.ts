@@ -71,6 +71,8 @@ export { KIND_TASK_DECLARATION };
 export const KIND_PROJECT_PLAN = "project-plan";
 /** A step, a round cap or a verification loop moved after the plan was accepted, with its reason. */
 export const KIND_AMENDMENT = "amendment";
+/** A person reset the session in flight: everything it did discarded, the row back at not-started. */
+export const KIND_RESET = "reset";
 
 /**
  * Who decided. Closed, because "who made it" is only answerable against a
@@ -963,6 +965,37 @@ export function amendmentEntries(sessionsDir: string, sessionNumber: number): En
 }
 
 /**
+ * A person's reset of the session in flight, on the record the landed
+ * history carries. The reset returns the activity log to the commit the
+ * session started on, so the entry is appended after that and is the one
+ * trace the attempt leaves; the work plan folds it under the session.
+ */
+export function recordReset(
+  sessionsDir: string,
+  options: { readonly sessionNumber: number; readonly reason: string; readonly by: string },
+): Entry {
+  const entry: Entry = {
+    kind: KIND_RESET,
+    sessionNumber: requireSessionNumber(options.sessionNumber),
+    dateTime: nowIsoFull(),
+    reason: String(options.reason ?? "").trim(),
+    by: requireText(options.by, "by"),
+  };
+  const log = readOrCreateActivityLog(sessionsDir);
+  pushEntry(log, entry);
+  writeActivityLog(sessionsDir, log);
+  renderProjectWorkPlan(sessionsDir);
+  return entry;
+}
+
+/** A session's resets, oldest first. */
+export function resetEntries(sessionsDir: string, sessionNumber: number): Entry[] {
+  return entriesOfKind(readOrCreateActivityLog(sessionsDir), KIND_RESET).filter(
+    (entry) => entry["sessionNumber"] === sessionNumber,
+  );
+}
+
+/**
  * A session's decisions, oldest first, as a verification round reads them.
  *
  * The verifier read no part of `decisions-log.md`, so a decision recorded
@@ -1232,8 +1265,11 @@ export function renderProjectWorkPlan(sessionsDir: string): string {
     declarations.set(entry["sessionNumber"], entry);
   }
   const records = sessionRecords(sessionsDir);
+  // A session known only by its reset -- the first session, reset before
+  // any ledger was landed -- is still a row and a section.
+  const resetNumbers = entriesOfKind(log, KIND_RESET).map((entry) => entry["sessionNumber"]);
   const numbers = [
-    ...new Set<unknown>([...records.keys(), ...declarations.keys()]),
+    ...new Set<unknown>([...records.keys(), ...declarations.keys(), ...resetNumbers]),
   ]
     .filter((value): value is number => Number.isInteger(value))
     .sort((left, right) => left - right);
@@ -1278,26 +1314,39 @@ export function renderProjectWorkPlan(sessionsDir: string): string {
   }
   for (const number of numbers) {
     const declared = declarations.get(number);
-    if (declared === undefined) continue;
+    // A reset session's declaration went back with its tree; the reset is
+    // the one trace the attempt leaves, and it is shown under the session.
+    const resets = entriesOfKind(log, KIND_RESET).filter((entry) => entry["sessionNumber"] === number);
+    if (declared === undefined && resets.length === 0) continue;
     const title = records.get(number)?.title || `Session ${number}`;
-    lines.push(
-      "",
-      `### Session ${number} — ${title}`,
-      "",
-      `**Releasable: ${declared["releasable"] ? "yes" : "no"}` +
-        `${declared["holdReason"] ? ` — held: ${String(declared["holdReason"])}` : ""}.**`,
-      "",
-      String(declared["task"] ?? "").trim(),
-    );
-    // What moved after the plan was accepted, one line each; a session
-    // with none says nothing about it.
-    const amended = entriesOfKind(log, KIND_AMENDMENT).filter(
-      (entry) => entry["sessionNumber"] === number,
-    );
-    if (amended.length > 0) {
-      lines.push("", "**Amended after acceptance:**", "");
-      for (const entry of amended) {
-        lines.push(`- ${String(entry["dateTime"] ?? "").slice(0, 10)} — ${amendmentLine(entry)}`);
+    lines.push("", `### Session ${number} — ${title}`);
+    if (declared !== undefined) {
+      lines.push(
+        "",
+        `**Releasable: ${declared["releasable"] ? "yes" : "no"}` +
+          `${declared["holdReason"] ? ` — held: ${String(declared["holdReason"])}` : ""}.**`,
+        "",
+        String(declared["task"] ?? "").trim(),
+      );
+      // What moved after the plan was accepted, one line each; a session
+      // with none says nothing about it.
+      const amended = entriesOfKind(log, KIND_AMENDMENT).filter(
+        (entry) => entry["sessionNumber"] === number,
+      );
+      if (amended.length > 0) {
+        lines.push("", "**Amended after acceptance:**", "");
+        for (const entry of amended) {
+          lines.push(`- ${String(entry["dateTime"] ?? "").slice(0, 10)} — ${amendmentLine(entry)}`);
+        }
+      }
+    }
+    if (resets.length > 0) {
+      lines.push("", "**Reset:**", "");
+      for (const entry of resets) {
+        const reason = String(entry["reason"] ?? "").trim();
+        lines.push(
+          `- ${String(entry["dateTime"] ?? "").slice(0, 10)} — ${reason === "" ? "no reason given" : reason} (${String(entry["by"] ?? "")})`,
+        );
       }
     }
   }

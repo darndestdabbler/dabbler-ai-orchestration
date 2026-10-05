@@ -90,7 +90,11 @@ Machine-written, append-only. Shape:
 
 - Every entry names its `kind`. `task-declaration` is written once per
   session by the loop, from the accepted plan and before the work; `decision` by
-  `dabbler session decision`; `project-plan` by `dabbler session plan`.
+  `dabbler session decision`; `project-plan` by `dabbler session plan`;
+  `amendment` by `dabbler session plan amend` and a held release; `reset` by
+  `dabbler session reset`, appended after the log went back to the commit
+  the session started on, so it is the one trace the attempt leaves
+  (`sessionNumber`, `reason`, `by`).
 - Decision numbering is derived from this file (`ordinal = decision
   entries + 1`) and `decisions-log.md` is rendered from it, which is why
   it is never rewound: restore `sessions.json` alone when a ledger has to

@@ -4,7 +4,7 @@
 // real tree are walked in walk-record.test.ts.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -12,6 +12,7 @@ import {
   affectedSuites,
   closedSessionSeconds,
   digestOfEntries,
+  dropSessionRecords,
   freshnessVerdict,
   inFlightSession,
   loadSuitesChecked,
@@ -308,6 +309,27 @@ describe("the whole run before a release", () => {
 });
 
 describe("the run record", () => {
+  it("drops one session's rows at a reset and leaves every other line, a bad one included", () => {
+    const root = tempDir();
+    const path = join(root, ".dabbler", "runs", "test-runs.jsonl");
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(
+      path,
+      [
+        JSON.stringify(record({ sessionNumber: 7 })),
+        "not json",
+        JSON.stringify(record({ sessionNumber: 8 })),
+        JSON.stringify(record({ sessionNumber: 8, stage: "final-targeted" })),
+      ].join("\n") + "\n",
+      "utf8",
+    );
+    assert.equal(dropSessionRecords(root, 8), 2);
+    assert.deepEqual(readRecords(root).map((row) => row.sessionNumber), [7]);
+    assert.match(readFileSync(path, "utf8"), /not json/);
+    assert.equal(dropSessionRecords(root, 8), 0);
+    assert.equal(dropSessionRecords(join(root, "nowhere"), 8), 0);
+  });
+
   // The writer digests the covered surfaces through git: an empty listing
   // answers every question here.
   gitAnswers([

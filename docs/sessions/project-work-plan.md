@@ -278,7 +278,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 238 | A Copilot CLI that is only a shim gets every prompt by file | no | 2026-10-01 |
 | 239 | Release 3.19.3 (release: 3.19.3) | yes | 2026-10-01 |
 | 240 | A refused check names the way past it, and cancelling is a person's | no | 2026-10-05 |
-| 241 | A session that went wrong is reset to where it started | — | not declared |
+| 241 | A session that went wrong is reset to where it started | no | 2026-10-05 |
 | 242 | Reset Session in the Work Explorer | — | not declared |
 | 243 | Release 3.20.0 (release: 3.20.0) | — | not declared |
 
@@ -3049,3 +3049,13 @@ Release 3.19.3: the framework packs and publishes what is on the trunk.
 **Releasable: no.**
 
 Session 240 makes three changes at the places the 2026-10-02 staff-member incident shows were decisive, without touching the fix round's rule that every plan step's checks run. The check-failed refusal names the step that declared the check when it is not the step being answered and ends with the sentence that a check which no longer describes its step is amended with `dabbler session plan amend --step <id> --checks-file <path> --reason` and a step that cannot be done is reported `--status blocked`; the fix-round ask and the rejected-thrice stop's carry-on move say the same. An engine's unforced cancel of its own session is refused through isAPersonsVerb with 'report the step blocked and say why', the managed body's hard rule and docs/driving-a-session.md change with it, and AGENTS.md here is refreshed to the new body. The --commit-changes and --undo-changes answers at session start are refused to an engine as a person's answer to a dead session's leavings, while an engine's start itself stays allowed.
+
+### Session 241 — A session that went wrong is reset to where it started
+
+**Releasable: no.**
+
+Session 241 adds the third way to end a session that went wrong: `dabbler session reset --reason "<why>"`, a person's verb for the session in flight and only it, refused to an engine. It cancels the session first with the reason prefixed `reset:` so every loop and waiter ends at its next boundary, then returns the repository to the commit the session started on (`plan_head` on run.json, or HEAD where no plan was accepted): a hard reset and a clean of untracked, non-ignored files before the land, and a revert of every commit since the anchor plus a push after it, so pushed history is never rewritten. It moves the session's run record aside the way a start does for a reused number, drops the session's rows from test-runs.jsonl, records the restored ledger as a sanctioned write so the close's integrity axis accepts it, and appends a `reset` entry to the activity log that project-work-plan.md folds under the session, committed as the framework's own files. A loop that reads the row back at not-started ends as reset. Every stop that offers a cancel offers the reset beside it, the in-process router gains `session.reset` for the Work Explorer, and the driving doc, the schema reference and the managed body say what a reset is and whose it is.
+
+**Amended after acceptance:**
+
+- 2026-10-05 — step 'the-walk': its files: The walk of a first session's reset found the work plan listing only sessions the ledger or a declaration knows; a session known only by its reset is a row too, one line in the fold (claude-code (anthropic, claude-opus-5))

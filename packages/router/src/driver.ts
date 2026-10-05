@@ -1498,6 +1498,25 @@ function cancelChoice(): StopChoice {
 export const AMEND_CHECKS_COMMAND =
   'dabbler session plan amend --step <id> --checks-file <path> --reason "<why>"';
 
+/**
+ * The third way to end a session, beside carrying on and cancelling: back to
+ * where it started. A person's, because what a cancel leaves in the tree
+ * was how unverified work reached a trunk, and an engine cannot judge that
+ * a session's objectives still stand.
+ */
+function resetChoice(): StopChoice {
+  return {
+    label:
+      "Reset the session -- yours to run, never the engine's: back to where " +
+      "it started, every change it made discarded, the session plan kept",
+    cost:
+      "Everything the session did is lost -- the tree before the land, a " +
+      "revert after it -- and the session goes back to not-started with " +
+      "your reason on the record. Amend the plan, then start it again.",
+    command: 'dabbler session reset --reason "<why>"',
+  };
+}
+
 /** Carrying on from where it stopped, which most situations spell their own way. */
 function carryOn(parts: MoveParts, label: string, cost: string): StopChoice {
   return { label, cost, command: `${parts.resume}` };
@@ -1524,6 +1543,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         // The bound is on a run that invokes its engine, and `session next` invokes nobody.
         command: `${parts.resume === PULL_RESUME ? "dabbler session run" : parts.resume} --max-invocations <larger>`,
       },
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1538,6 +1558,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "no provider call is made by asking. A check that was wrong is amended " +
           `first, not fought: ${AMEND_CHECKS_COMMAND}.`,
       ),
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1550,6 +1571,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         `Clear what step${parts.step} is blocked on, then carry on`,
         "Whatever the blocker itself costs; the step's report says what it is.",
       ),
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1563,6 +1585,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "The declaration is made again over a clean tree. No provider call, " +
           "and the plan already answered is not re-asked.",
       ),
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1576,6 +1599,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "One more invocation of the engine, and whatever the phase it " +
           "re-enters spends.",
       ),
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1588,6 +1612,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "Put right what stopped the run, then carry on",
         "The suite runs again -- your machine's time, and no provider call.",
       ),
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1601,6 +1626,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "The commit and the push are made again. No provider call, and " +
           "nothing already verified is re-verified.",
       ),
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1622,6 +1648,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "Carry on afterwards and the session closes as held.",
         command: "dabbler session hold-release --reason \"<why>\"",
       },
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1634,6 +1661,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "Satisfy the gate the close named, then carry on",
         "Whatever the gate demands; its row names it, and the close is run again.",
       ),
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1652,6 +1680,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "nothing already accepted is asked for again.",
         command: "dabbler session run --mailbox",
       },
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1664,6 +1693,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         `Carry on from '${parts.phase}'`,
         "The session resumes where it stopped. Nothing accepted is re-asked.",
       ),
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1678,6 +1708,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "One more verification round: a provider call for the verifier, and " +
           "the round's own clock.",
       ),
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1691,6 +1722,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "One more verification round: a provider call for the verifier, and " +
           "the round's own clock. Nothing already verified is re-verified.",
       ),
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1716,6 +1748,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "environment, never in a file.",
         command: "dabbler configure --reviewer-model <id>",
       },
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1748,6 +1781,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         cost: "Verification stays cross-provider on every vehicle; what changes is how the round is reached.",
         command: "dabbler configure --reviewer-transport <vehicle>",
       },
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1789,6 +1823,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         cost: REOPEN_COST,
         command: REOPEN_COMMAND,
       },
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1810,6 +1845,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
       // No second move: a dispute is never withdrawn -- the ledger keeps it --
       // and `verify reopen` refuses a cap reached over disputes, so offering
       // either would print a command that refuses.
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1830,6 +1866,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "The repair is given up. Nothing is spent, and the session closes on " +
           "the tree the round actually saw.",
       ),
+      resetChoice(),
       cancelChoice(),
     ],
   },
@@ -1845,6 +1882,7 @@ const UNNAMED: StopSituation = {
       `Read the reason, put it right, then carry on from '${parts.phase}'`,
       "Whatever the phase it re-enters spends.",
     ),
+    resetChoice(),
     cancelChoice(),
   ],
 };

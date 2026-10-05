@@ -14,7 +14,7 @@
 // you did.
 
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { repoRootFromSessionsDir } from "./evidence.ts";
@@ -663,6 +663,41 @@ export function treeDigest(
 
 function runsPath(repoRoot: string): string {
   return join(repoRoot, ...RUNS_DIRNAME.split("/"), TEST_RUNS_FILENAME);
+}
+
+/**
+ * Drop one session's rows, as a reset does: the runs it recorded were taken
+ * against a tree that no longer exists. Every other line, a bad one
+ * included, is kept as it was. Answers how many rows went.
+ */
+export function dropSessionRecords(repoRoot: string, sessionNumber: number): number {
+  const path = runsPath(repoRoot);
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    return 0;
+  }
+  const kept: string[] = [];
+  let dropped = 0;
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    if (line.trim() === "") continue;
+    let row: unknown = null;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      row = null;
+    }
+    if (isRecord(row) && row["sessionNumber"] === sessionNumber) {
+      dropped += 1;
+      continue;
+    }
+    kept.push(line);
+  }
+  if (dropped > 0) {
+    writeFileSync(path, platformNewlines(kept.length > 0 ? `${kept.join("\n")}\n` : ""), { encoding: "utf8" });
+  }
+  return dropped;
 }
 
 /**

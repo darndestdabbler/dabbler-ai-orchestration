@@ -133,6 +133,16 @@ export interface SessionRestoreOptions extends RepositoryTarget {
   readonly reason: string;
 }
 
+/**
+ * A person's reset of the session in flight: the repository goes back to
+ * where that session started, and the session to not-started. Only the
+ * session in flight may be named; any other number is refused.
+ */
+export interface SessionResetOptions extends RepositoryTarget {
+  readonly reason: string;
+  readonly sessionNumber?: number;
+}
+
 export interface SessionDecisionOptions extends RepositoryTarget {
   readonly sessionNumber?: number;
   readonly decider: string;
@@ -165,6 +175,7 @@ export interface SessionVerbs {
   close(options: SessionCloseOptions): Promise<RouterResult<RouterText>>;
   cancel(options: SessionCancelOptions): Promise<RouterResult<RouterText>>;
   restore(options: SessionRestoreOptions): Promise<RouterResult<RouterText>>;
+  reset(options: SessionResetOptions): Promise<RouterResult<RouterText>>;
   decision(options: SessionDecisionOptions): Promise<RouterResult<RouterText>>;
   interrupt(options: SessionInterruptOptions): Promise<RouterResult<RouterText>>;
 }

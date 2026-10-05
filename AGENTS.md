@@ -350,7 +350,7 @@ session, which does nothing else; the close refuses an unpublished release.
 - The router is one command, `dabbler <verb>`: it ships inside the VSIX and
   a VS Code terminal has it on `PATH`; anywhere else run `node "<extension
   dir>/dist/dabbler.cjs" <verb>`. "command not found" is PATH, not keys.
-- `cancel` and `close` are a person's, never yours: report the step blocked and say why, and the person cancels from the Work Explorer.
+- `cancel`, `reset` and `close` are a person's, never yours: report the step blocked and say why, and the person cancels or resets from the Work Explorer.
 - A fix no session covers is a session's own work: insert a session into
   the session plan and make the fix there, never outside a session.
 

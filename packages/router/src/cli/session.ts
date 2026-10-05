@@ -35,6 +35,7 @@ import {
   plan,
   planAmend,
   report,
+  reset,
   restore,
   start,
   personIsPresent,
@@ -60,6 +61,7 @@ const SUMMARY: Record<string, string> = {
   close: "run gates and close the session",
   cancel: "cancel one session",
   restore: "restore a cancelled session",
+  reset: "return the repository to where the session in flight started, and the session to not-started",
   migrate: "fold a legacy session-set directory into the sessions root",
 };
 
@@ -238,6 +240,13 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           the step blocked instead",
   ],
   restore: ["  --reason TEXT            required: why it is coming back"],
+  reset: [
+    "  --reason TEXT            required: why the session is being reset",
+    "  --session-number N       the session in flight, named; any other number is",
+    "                           refused. A reset is a person's verb, refused to an",
+    "                           engine: everything the session did is discarded --",
+    "                           the tree before the land, a revert after it",
+  ],
   migrate: ["  --from PATH              required: the legacy session-set directory"],
 };
 
@@ -504,6 +513,15 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       return EXIT_USAGE;
     }
     return holdRelease(sessionsDir, { reason, engine: !personIsPresent() });
+  }
+
+  if (subcommand === "reset") {
+    const reason = values.get("--reason");
+    if (reason === undefined) {
+      writeErr("dabbler session reset: the following arguments are required: --reason\n");
+      return EXIT_USAGE;
+    }
+    return reset(sessionsDir, { reason, sessionNumber: sessionNumber ?? null, engine: !personIsPresent() });
   }
 
   if (subcommand === "cancel" || subcommand === "restore") {

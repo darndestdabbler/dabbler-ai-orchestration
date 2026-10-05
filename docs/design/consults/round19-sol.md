@@ -1,0 +1,11 @@
+# Consult round 19 — gpt-5.6-sol via the Copilot seat (26 s; served gpt-5.6-sol)
+
+VERDICT: adopt with changes
+1. Choosing concrete resolutions is better because it produces an executable outcome rather than merely declaring who was right. Strict UPHOLD/OVERRULE can leave the author interpreting how to fix an upheld finding, while resolution choice can fail when proposals are underspecified, infeasible, or materially equivalent. Final-offer arbitration also encourages strategic or overly broad proposals. Require each resolution to include scope and observable acceptance criteria.
+2. Call the Auxiliary immediately after the primary UPHOLDS a properly evidenced dispute. The impasse already exists; waiting until round 7 only spends money and encourages repetitive argument. Keep the one-adjudication-per-session rule.
+3. Allow a narrow third option: `NEITHER`, accompanied by one binding concrete resolution and acceptance criteria. A strict two-way choice can force a known-bad implementation when both sides misunderstand the code. The Auxiliary still may not raise unrelated findings.
+4. The author implements the ruling and runs the normal checks, then the primary gets one review scoped solely to conformity with the binding resolution. It may confirm compliance or identify concrete implementation gaps, but may not revisit the ruling or introduce new concerns. Any stated gaps become mandatory corrections; after they and the prescribed checks pass, the session closes without another dispute cycle.
+5. The primary should state its alternative only when it UPHOLDS a disputed finding. Requiring alternatives with every initial finding wastes tokens and encourages premature solution design. The alternative must be implementable, scoped, and include acceptance criteria.
+6. Ship this: early Auxiliary adjudication after the first upheld evidence-backed dispute; choices of `AUTHOR`, `PRIMARY`, or `NEITHER` with a binding replacement; author implementation; one primary compliance-only review; mandatory correction of implementation gaps; close. Record the proposals, ruling, acceptance criteria, implementation diff, and compliance result.
+
+BIGGEST RISK: Poorly specified “concrete” resolutions can turn adjudication into binding ambiguous requirements rather than actually ending the disagreement.

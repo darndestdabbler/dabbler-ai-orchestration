@@ -283,7 +283,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 243 | Release 3.20.0 (release: 3.20.0) | yes | 2026-10-05 |
 | 244 | A rollback to the start of any session that has run | no | 2026-10-05 |
 | 245 | Rollback to Start of This Session in the Work Explorer | no | 2026-10-05 |
-| 246 | Release 3.21.0 (release: 3.21.0) | — | not declared |
+| 246 | Release 3.21.0 (release: 3.21.0) | yes | 2026-10-05 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3096,3 +3096,9 @@ Session 245 puts the rollback where developers work: 'Rollback to Start of This 
 - 2026-10-05 — the non-goal 'Any change to the router: the verb and its refusals are session 244's', dropped: The operator approved three guard rails on 2026-10-05 after consulting Sol and Gemini: a hard line at the last release, a safety branch for discarded in-flight work, and a dry run that gives the dialog its facts; all three are the verb's, so this session changes the router after all (claude-code (anthropic, claude-opus-5))
 - 2026-10-05 — step 'the-item': its files and checks: The first step becomes the verb's three guard rails, approved 2026-10-05: a rollback cannot reach or pass a session that released (a re-run would collide with its tag), discarded in-flight work goes to a safety branch first, and --dry-run answers what would be undone so the dialog states facts; the plan's section says so (claude-code (anthropic, claude-opus-5))
 - 2026-10-05 — step 'one-dialog': its files and checks: The item and the one dialog become one step, and the dialog reads the dry run's facts: the sessions, the commits, whose, how old, and what stays published (claude-code (anthropic, claude-opus-5))
+
+### Session 246 — Release 3.21.0 (release: 3.21.0)
+
+**Releasable: yes.**
+
+Release 3.21.0: the framework packs and publishes what is on the trunk.

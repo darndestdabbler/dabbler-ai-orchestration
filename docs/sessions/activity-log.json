@@ -12420,6 +12420,13 @@
       "what": "step 'one-dialog': its files and checks",
       "reason": "The item and the one dialog become one step, and the dialog reads the dry run's facts: the sessions, the commits, whose, how old, and what stays published",
       "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 246,
+      "dateTime": "2026-10-05T16:39:14.295000-04:00",
+      "task": "Release 3.21.0: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

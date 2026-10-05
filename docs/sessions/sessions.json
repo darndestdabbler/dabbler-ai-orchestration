@@ -4855,23 +4855,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "17930d310a5e5196a2c0a97b8095f19df6ae953d",
-      "frameworkVersion": "3.20.0",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5.6-terra",
         "verifierProvider": "openai",
         "transport": "copilot-cli"
-      }
+      },
+      "frameworkVersion": "3.20.0",
+      "startCommit": "17930d310a5e5196a2c0a97b8095f19df6ae953d"
     },
     {
       "number": 246,
       "title": "Release 3.21.0 (release: 3.21.0)",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "status": "complete",
+      "startedAt": "2026-10-05T16:39:13.620000-04:00",
+      "completedAt": "2026-10-05T16:39:25.049000-04:00",
+      "orchestrator": {
+        "engine": "framework",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null,
+      "startCommit": "ebd4b032f249dd239b8fcf2239a4aff493dfe093",
+      "frameworkVersion": "3.21.0",
+      "noChange": true
     }
   ]
 }

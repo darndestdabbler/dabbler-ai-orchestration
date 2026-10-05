@@ -4748,9 +4748,9 @@
     {
       "number": 240,
       "title": "A refused check names the way past it, and cancelling is a person's",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-05T10:08:12.475000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-05T10:35:45.620000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

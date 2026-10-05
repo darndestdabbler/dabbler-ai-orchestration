@@ -4769,9 +4769,9 @@
     {
       "number": 241,
       "title": "A session that went wrong is reset to where it started",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-05T10:36:24.320000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-05T11:00:55.239000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

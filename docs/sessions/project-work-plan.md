@@ -277,6 +277,10 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 237 | Release 3.19.2 (release: 3.19.2) | yes | 2026-09-25 |
 | 238 | A Copilot CLI that is only a shim gets every prompt by file | no | 2026-10-01 |
 | 239 | Release 3.19.3 (release: 3.19.3) | yes | 2026-10-01 |
+| 240 | A refused check names the way past it, and cancelling is a person's | no | 2026-10-05 |
+| 241 | A session that went wrong is reset to where it started | — | not declared |
+| 242 | Reset Session in the Work Explorer | — | not declared |
+| 243 | Release 3.20.0 (release: 3.20.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3039,3 +3043,9 @@ A Copilot seat whose CLI is only an npm-installed `copilot.cmd` shim becomes a w
 **Releasable: yes.**
 
 Release 3.19.3: the framework packs and publishes what is on the trunk.
+
+### Session 240 — A refused check names the way past it, and cancelling is a person's
+
+**Releasable: no.**
+
+Session 240 makes three changes at the places the 2026-10-02 staff-member incident shows were decisive, without touching the fix round's rule that every plan step's checks run. The check-failed refusal names the step that declared the check when it is not the step being answered and ends with the sentence that a check which no longer describes its step is amended with `dabbler session plan amend --step <id> --checks-file <path> --reason` and a step that cannot be done is reported `--status blocked`; the fix-round ask and the rejected-thrice stop's carry-on move say the same. An engine's unforced cancel of its own session is refused through isAPersonsVerb with 'report the step blocked and say why', the managed body's hard rule and docs/driving-a-session.md change with it, and AGENTS.md here is refreshed to the new body. The --commit-changes and --undo-changes answers at session start are refused to an engine as a person's answer to a dead session's leavings, while an engine's start itself stays allowed.

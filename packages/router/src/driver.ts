@@ -1490,6 +1490,14 @@ function cancelChoice(): StopChoice {
   };
 }
 
+/**
+ * The verb that changes a step's checks on the record, as a refusal and a
+ * stop name it. Here rather than in drive.ts because this module is the
+ * one the other imports.
+ */
+export const AMEND_CHECKS_COMMAND =
+  'dabbler session plan amend --step <id> --checks-file <path> --reason "<why>"';
+
 /** Carrying on from where it stopped, which most situations spell their own way. */
 function carryOn(parts: MoveParts, label: string, cost: string): StopChoice {
   return { label, cost, command: `${parts.resume}` };
@@ -1527,7 +1535,8 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         parts,
         `Read the last rejection's reasons and answer step${parts.step} again`,
         "The step is asked afresh. Nothing already accepted is re-asked, and " +
-          "no provider call is made by asking.",
+          "no provider call is made by asking. A check that was wrong is amended " +
+          `first, not fought: ${AMEND_CHECKS_COMMAND}.`,
       ),
       cancelChoice(),
     ],

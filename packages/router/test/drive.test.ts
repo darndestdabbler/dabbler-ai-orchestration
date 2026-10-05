@@ -64,6 +64,8 @@ import {
   staleJobDisposition,
   stepChangedPaths,
   unchangedStepFiles,
+  checkFailedRefusal,
+  CHECK_FAILED_WAYS,
   noLoopMessage,
   reviveLoop,
   waiterEnd,
@@ -645,6 +647,25 @@ describe("whether the report names what the tree moved", () => {
       present,
     );
     assert.deepEqual(rules(refused), ["files-changed-unchanged", "files-changed-omits"]);
+  });
+});
+
+describe("a check that fails", () => {
+  it("names the step that declared it when that is another step, and ends with the way past a wrong check", () => {
+    // The fix round runs every plan step's checks. An engine whose fix
+    // outgrew a check an earlier step declared diagnosed exactly that and,
+    // with no verb named, cancelled the session (2026-10-02). The refusal
+    // says whose check it was and how a wrong one is amended.
+    const run = { exitCode: 1, treeMutated: false, output: "" };
+    const inherited = checkFailedRefusal("fix-round-1", { argv: ["grep", "ArchUnitNET", "x.csproj"], owner: "add-architecture-test" }, run);
+    assert.match(inherited, /^\[check-failed\] check failed: grep ArchUnitNET x.csproj -> exit 1 \(declared by step 'add-architecture-test'\)/);
+    assert.ok(inherited.endsWith(CHECK_FAILED_WAYS), inherited);
+    assert.match(CHECK_FAILED_WAYS, /dabbler session plan amend --step <id> --checks-file <path> --reason/);
+    assert.match(CHECK_FAILED_WAYS, /--status blocked/);
+    const own = checkFailedRefusal("add-architecture-test", { argv: ["grep", "ArchUnitNET", "x.csproj"], owner: "add-architecture-test" }, run);
+    assert.ok(!own.includes("declared by step"), own);
+    const timedOut = checkFailedRefusal("widget", { argv: ["sleep"] }, { exitCode: null, treeMutated: true, output: "tick\n" });
+    assert.match(timedOut, /-> exit none \(timed out\) \(the check changed the tree\)\ntick\n/);
   });
 });
 

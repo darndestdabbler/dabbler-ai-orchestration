@@ -12338,6 +12338,13 @@
       "dateTime": "2026-10-01T14:32:50.442000-04:00",
       "task": "Release 3.19.3: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 240,
+      "dateTime": "2026-10-05T10:10:17.615000-04:00",
+      "task": "Session 240 makes three changes at the places the 2026-10-02 staff-member incident shows were decisive, without touching the fix round's rule that every plan step's checks run. The check-failed refusal names the step that declared the check when it is not the step being answered and ends with the sentence that a check which no longer describes its step is amended with `dabbler session plan amend --step <id> --checks-file <path> --reason` and a step that cannot be done is reported `--status blocked`; the fix-round ask and the rejected-thrice stop's carry-on move say the same. An engine's unforced cancel of its own session is refused through isAPersonsVerb with 'report the step blocked and say why', the managed body's hard rule and docs/driving-a-session.md change with it, and AGENTS.md here is refreshed to the new body. The --commit-changes and --undo-changes answers at session start are refused to an engine as a person's answer to a dead session's leavings, while an engine's start itself stays allowed.",
+      "releasable": false
     }
   ]
 }

@@ -88,6 +88,7 @@ import {
   appendSupervision,
   progressResumed,
   renderStop,
+  AMEND_CHECKS_COMMAND,
 } from "./driver.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
@@ -1205,9 +1206,46 @@ export interface StepSpec {
   readonly id: string;
   readonly ask: string;
   readonly files: readonly string[];
-  readonly checks: ReadonlyArray<{ readonly argv: readonly string[] }>;
+  /**
+   * `owner` is the plan step that declared the check, carried where a step
+   * runs checks that are not its own -- the fix round and the synthesised
+   * steps run every plan step's -- so a refusal can say whose check it was.
+   */
+  readonly checks: ReadonlyArray<{ readonly argv: readonly string[]; readonly owner?: string }>;
   /** A work-plan step is remembered as accepted; a fix step is not a plan step. */
   readonly fromPlan: boolean;
+}
+
+/**
+ * The sentence every failed check ends with: the way past a check that is
+ * wrong, and the way out of a step that cannot be done. An engine that
+ * diagnosed its own stale check and had no verb in hand cancelled the
+ * session instead (2026-10-02); the verb is named where the diagnosis is made.
+ */
+export const CHECK_FAILED_WAYS =
+  "A check that no longer describes its step is amended, not fought: " +
+  `${AMEND_CHECKS_COMMAND}. A step that cannot be done is reported --status blocked, ` +
+  "with the reason in --notes.";
+
+/**
+ * The refusal one failed check makes, naming the step that declared it
+ * where that is not the step being answered. Pure: the facts of the run in,
+ * the words out.
+ */
+export function checkFailedRefusal(
+  stepId: string,
+  check: { readonly argv: readonly string[]; readonly owner?: string },
+  run: { readonly exitCode: number | null; readonly treeMutated: boolean; readonly output: string },
+): string {
+  const owner = check.owner !== undefined && check.owner !== stepId ? ` (declared by step '${check.owner}')` : "";
+  return refusal(
+    RULE.checkFailed,
+    `check failed: ${check.argv.join(" ")} -> exit ${run.exitCode === null ? "none (timed out)" : run.exitCode}` +
+      owner +
+      (run.treeMutated ? " (the check changed the tree)" : "") +
+      (run.output.trim() ? `\n${tail(run.output)}` : "") +
+      `\n${CHECK_FAILED_WAYS}`,
+  );
 }
 
 function clock(): string {
@@ -2969,17 +3007,8 @@ class Driver {
       // The log event and the rule are the same fact, so they are the same
       // string: a log line saying one thing while the refusal says another
       // is two names for one failure.
-      this.log(green ? "check-passed" : RULE.checkFailed, { step: spec.id, argv });
-      if (!green) {
-        reasons.push(
-          refusal(
-            RULE.checkFailed,
-            `check failed: ${argv.join(" ")} -> exit ${run.exitCode === null ? "none (timed out)" : run.exitCode}` +
-              (run.treeMutated ? " (the check changed the tree)" : "") +
-              (run.output.trim() ? `\n${tail(run.output)}` : ""),
-          ),
-        );
-      }
+      this.log(green ? "check-passed" : RULE.checkFailed, { step: spec.id, argv, ...(check.owner ? { owner: check.owner } : {}) });
+      if (!green) reasons.push(checkFailedRefusal(spec.id, check, run));
     }
     if (reasons.length === 0) reasons.push(...(await this.namedTestRefusals(spec.id, changed, current, config)));
     return reasons;
@@ -3029,7 +3058,9 @@ class Driver {
   }
 
   private allPlanChecks(): StepSpec["checks"] {
-    return this.requirePlan().steps.flatMap((step) => step.checks);
+    return this.requirePlan().steps.flatMap((step) =>
+      step.checks.map((check) => ({ ...check, owner: step.id })),
+    );
   }
 
   /**
@@ -3554,7 +3585,9 @@ class Driver {
         "of them:\n" +
         chosen.map((line) => `  ${line}`).join("\n") +
         "\n\nMake the fixes. The framework will run every step's checks and another " +
-        "verification round on what you changed; the complete suite follows as the run of record.",
+        "verification round on what you changed; the complete suite follows as the run of record. " +
+        "A check an earlier step declared that your fix outgrows is amended first, not fought: " +
+        `${AMEND_CHECKS_COMMAND}.`,
       files: [],
       checks: this.allPlanChecks(),
       fromPlan: false,

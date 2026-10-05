@@ -99,9 +99,11 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           this one and holds more than a README (a README-only",
     "                           initial commit is merged without it)",
     "  --commit-changes         commit the uncommitted changes a start refuses over,",
-    "                           push them where the branch has an upstream, and start",
+    "                           push them where the branch has an upstream, and start.",
+    "                           A person's answer, refused to an engine",
     "  --undo-changes           copy those changes outside the repository, undo them",
-    "                           in the tree, and start",
+    "                           in the tree, and start. A person's answer, refused to",
+    "                           an engine",
   ],
   decision: [
     "  --decider WHO            required: operator | orchestrator | verifier | framework",
@@ -231,8 +233,9 @@ const OPTIONS: Record<string, readonly string[]> = {
   ],
   cancel: [
     "  --reason TEXT            required: why the session is being cancelled",
-    "  --force                  a person's form, refused to an engine; the session in",
-    "                           flight is cancelled by its number and a reason without it",
+    "  --force                  cancel the session in flight. A cancel is a person's verb,",
+    "                           forced or not, and is refused to an engine: it reports",
+    "                           the step blocked instead",
   ],
   restore: ["  --reason TEXT            required: why it is coming back"],
   migrate: ["  --from PATH              required: the legacy session-set directory"],
@@ -580,6 +583,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       mergeOrigin: switches.has("--merge-origin"),
       commitChanges: switches.has("--commit-changes"),
       undoChanges: switches.has("--undo-changes"),
+      byEngine: !personIsPresent(),
     });
     if (started !== 0 || releasing === null) return started;
     // Driven here, one call after another, until the instruction on the

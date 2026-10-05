@@ -303,6 +303,38 @@ describe("what a start refuses before a session exists", () => {
     }
   });
 
+  it("refuses an engine's --commit-changes and --undo-changes, naming the person, and commits nothing", async () => {
+    // 2026-10-02: an engine answered --commit-changes at a start and a
+    // cancelled session's never-verified skeleton landed on the trunk. What
+    // becomes of a dead session's work is the person's to say; the start
+    // itself stays the engine's.
+    const state = stateDir();
+    const calls: string[][] = [];
+    const answers = cleanRepoAnswers(state.repo, [
+      [(args) => { calls.push([...args]); return false; }, {}],
+      [["status", "--porcelain"], { stdout: " M src/widget.py\n" }],
+    ]);
+    try {
+      for (const flag of ["commitChanges", "undoChanges"] as const) {
+        const refused = await run(() =>
+          start(state.sessionsDir, { engine: "claude-code", provider: "anthropic", [flag]: true, byEngine: true }),
+        );
+        assert.equal(refused.code, EXIT_BOUNDARY, flag);
+        assert.match(refused.err, /is a person's verb, never the engine's: it decides what becomes of a cancelled session's uncommitted work/);
+        assert.match(refused.err, /--commit-changes or --undo-changes/);
+      }
+      assert.ok(!calls.some((args) => args[0] === "commit" || args[0] === "checkout"), JSON.stringify(calls));
+      assert.equal(readRawSessionState(state.sessionsDir), null);
+      // With neither flag an engine's start is refused over the changes as before, and told who answers.
+      const plain = await run(() => start(state.sessionsDir, { engine: "claude-code", provider: "anthropic", byEngine: true }));
+      assert.notEqual(plain.code, EXIT_OK);
+      assert.match(plain.err, /a person runs the same start with --commit-changes/);
+    } finally {
+      answers();
+      state.restore();
+    }
+  });
+
   it("commits and pushes the uncommitted changes with --commit-changes, then registers", async () => {
     const state = stateDir();
     const calls: string[][] = [];
@@ -1047,27 +1079,32 @@ describe("what a cancellation is allowed to say", () => {
     assert.match(String(ruling.refusal), /already cancelled/);
   });
 
-  it("lets the author cancel the session in flight by number, with a reason and no --force, and leaves the tree alone", async () => {
-    // Session 213 made every in-flight cancel a forced one, and a forced one a
-    // person's: an author whose session should not go on had no verb for it.
+  it("refuses an engine's unforced cancel of the session it is working, names the blocked report, and writes nothing", async () => {
+    // Session 213 made every in-flight cancel a forced one; the author's own
+    // unforced cancel was added so a session that should not go on had an
+    // exit. On 2026-10-02 an engine used it over a check it could have
+    // amended, then started and cancelled the five sessions after it. The
+    // exit is the blocked report, which leaves the session in flight and
+    // names the person; cancelling is theirs, forced or not.
     const state = stateDir();
     try {
       registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
       const unfinished = join(state.repo, "half-written.txt");
       writeFileSync(unfinished, "work in progress\n", "utf8");
 
-      // Another session's number -- the mistake an engine makes -- is refused,
-      // and that session's record is as it was. A person may still cancel it.
-      const other = await run(() => cancel(state.sessionsDir, 2, { reason: "wrong number", engine: true }));
-      assert.equal(other.code, EXIT_BOUNDARY);
-      assert.match(other.err, /session 002 is not the session in flight \(001 is\)/);
-      assert.equal(sessionOf(state.sessionsDir, 1)["status"], "not-started");
-      assert.equal(sessionOf(state.sessionsDir, 1)["cancelledReason"], undefined);
-
       const result = await run(() => cancel(state.sessionsDir, 1, { reason: "the plan names a file that does not exist", engine: true }));
-      assert.equal(result.code, EXIT_OK, result.err);
+      assert.equal(result.code, EXIT_BOUNDARY);
+      assert.match(result.err, /`session cancel` is a person's verb, never the engine's/);
+      assert.match(result.err, /Report the step blocked and say why; a person cancels from the Work Explorer/);
+      assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
+      assert.equal(sessionOf(state.sessionsDir)["cancelledReason"], undefined);
+      assert.equal(readFileSync(unfinished, "utf8"), "work in progress\n");
+
+      // A person's, unforced, by number: taken, and the tree left alone.
+      const person = await run(() => cancel(state.sessionsDir, 1, { reason: "the objective moved to session 3", engine: false }));
+      assert.equal(person.code, EXIT_OK, person.err);
       assert.equal(sessionOf(state.sessionsDir)["status"], "cancelled");
-      assert.equal(sessionOf(state.sessionsDir)["cancelledReason"], "the plan names a file that does not exist");
+      assert.equal(sessionOf(state.sessionsDir)["cancelledReason"], "the objective moved to session 3");
       assert.equal(readFileSync(unfinished, "utf8"), "work in progress\n");
     } finally {
       state.restore();
@@ -1160,11 +1197,9 @@ describe("cancelling and restoring through the verb", () => {
       registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
       const engine = await run(() => cancel(state.sessionsDir, 1, { reason: "wrong window", force: true, engine: true }));
       assert.equal(engine.code, EXIT_BOUNDARY);
-      assert.match(engine.err, /a person's verb, never the engine's/);
-      // And it says the engine's own way: walked on the installed extension, an
-      // engine told only to report `blocked` paused a session it had been asked to cancel.
-      assert.match(engine.err, /yours to cancel without it: `dabbler session cancel <its number> --reason/);
-      assert.doesNotMatch(engine.err, /Report the step blocked/);
+      assert.match(engine.err, /`session cancel --force` is a person's verb, never the engine's/);
+      // And the engine's way is the blocked report: it has no cancel of its own.
+      assert.match(engine.err, /Report the step blocked and say why; a person cancels from the Work Explorer/);
       assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
       const person = await run(() => cancel(state.sessionsDir, 1, { reason: "stop", force: true, engine: false }));
       assert.equal(person.code, EXIT_OK);
@@ -1219,14 +1254,9 @@ describe("cancelling and restoring through the verb", () => {
           refusal.err,
         );
         assert.ok(refusal.err.includes(", and that judgement is not the engine's to make. "), refusal.err);
-        // What to do instead is the one part that differs: an engine has a
-        // cancel of its own, and no close or hold of its own.
-        assert.ok(
-          refusal.err.includes(
-            index === 0 ? "yours to cancel without it: `dabbler session cancel <its number>" : "Report the step blocked and say why; a person ",
-          ),
-          refusal.err,
-        );
+        // What to do instead is the same at all three: an engine has no
+        // cancel, close or hold of its own.
+        assert.ok(refusal.err.includes("Report the step blocked and say why; a person "), refusal.err);
       }
       assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
     } finally {

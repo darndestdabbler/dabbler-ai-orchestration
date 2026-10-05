@@ -696,14 +696,18 @@ printed: `dabbler session cancel --force --reason "<why>"` means the session
 in flight. It says what it left uncommitted, and the next `session start`
 offers to commit that or undo it.
 
-**The author may cancel the session it is working, and no other**, and needs
-no force for it: `dabbler session cancel <its number> --reason "<why>"`. Any
-other number is refused to an engine, and that session's record is left as it
-was: cancelling another session is a person's. The reason goes
-on the record, the working tree is left exactly as it was, and the framework
-reads the ledger again before every commit, push, publish and close, so
-nothing of a cancelled session is landed afterwards. `--force` stays the
-person's form, refused to an engine.
+**Cancelling is a person's, forced or not.** A cancel is for objectives no
+longer wanted, which an engine cannot judge, so `session cancel` is refused
+to an engine in the same sentence as the forced form: report the step
+blocked and say why, and the person cancels from the Work Explorer. An
+engine that could cancel the session it was working did so over a check it
+could have amended, then started and cancelled the five sessions after it
+chasing the one it had ended (2026-10-02); a blocked report leaves the
+session in flight, names the person as the next move, and every start of a
+later session is refused until they decide. The reason goes on the record,
+the working tree is left exactly as it was, and the framework reads the
+ledger again before every commit, push, publish and close, so nothing of a
+cancelled session is landed afterwards.
 
 **A cancelled session ends its loop.** The loop reads the ledger at every
 phase boundary, while it waits for an answer, while a job runs, and again

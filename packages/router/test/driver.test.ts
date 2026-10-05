@@ -12,6 +12,7 @@ import { describe, it } from "node:test";
 
 import { judgeLease, nextLeaseEpoch, staleJobDisposition } from "../src/drive.ts";
 import {
+  AMEND_CHECKS_COMMAND,
   WATCHER_JOB_OUTSTANDING,
   WATCHER_OUTSTANDING,
   WATCHER_QUIET,
@@ -709,6 +710,18 @@ describe("a stop, as a person reads it", () => {
         assert.ok(onward.length >= 1, `${code ?? kind}/${engine}: ${words.ways}`);
       }
     }
+  });
+
+  it("names the amendment of a wrong check on the way past three refusals", () => {
+    // The stop an engine met after its fix outgrew an earlier step's check
+    // said only "answer the step again"; the engine that could not pass the
+    // check cancelled the session. The way on names the verb that changes
+    // the check, so the fourth answer is not the same answer.
+    const stop = { kind: "rejected-thrice", code: null, reason: "step 'fix-round-1' was refused 3 times", step_id: "fix-round-1" };
+    const words = renderStop(stop as never, { session_number: 7, phase: "work", engine: "cli" });
+    const onward = words.choices.find((choice) => !/session cancel/.test(choice.command));
+    assert.ok(onward !== undefined, words.ways);
+    assert.ok(onward.cost.includes(AMEND_CHECKS_COMMAND), onward.cost);
   });
 
   it("prints no command its own verb would refuse as usage, and the cancel it prints runs as printed", async () => {

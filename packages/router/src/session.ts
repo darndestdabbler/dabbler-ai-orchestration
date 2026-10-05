@@ -704,6 +704,12 @@ export interface StartOptions {
   readonly commitChanges?: boolean;
   /** Undo them, keeping a copy of each file outside the repository, as the person answered. */
   readonly undoChanges?: boolean;
+  /**
+   * The caller is an engine (`callerIsEngine`). A start is allowed it; the
+   * two answers above are a person's, because what a start refuses over is
+   * a cancelled session's leavings, and whether they land or go is theirs.
+   */
+  readonly byEngine?: boolean;
 }
 
 /** The first line of a git error, for a one-line message. */
@@ -718,10 +724,24 @@ export const MERGE_ORIGIN_FLAG = "--merge-origin";
 export const COMMIT_CHANGES_FLAG = "--commit-changes";
 export const UNDO_CHANGES_FLAG = "--undo-changes";
 
-/** What a start refused over uncommitted changes says next, naming both ways through. */
+/** What a start refused over uncommitted changes says next, naming both ways through -- a person's. */
 const UNCOMMITTED_CHANGES_NEXT =
-  `start: next -- run the same start with ${COMMIT_CHANGES_FLAG} to commit and push them, or with ` +
+  `start: next -- a person runs the same start with ${COMMIT_CHANGES_FLAG} to commit and push them, or with ` +
   `${UNDO_CHANGES_FLAG} to undo them (a copy of each file is kept outside the repository).`;
+
+/**
+ * The refusal an engine meets at either answer. On 2026-10-02 an engine
+ * answered `--commit-changes` at a start and a cancelled session's
+ * never-verified skeleton landed on the trunk; the answer is the person's.
+ */
+function changesAnswerRefusal(flag: string): string {
+  return isAPersonsVerb(
+    `start ${flag}`,
+    "decides what becomes of a cancelled session's uncommitted work",
+    `a person runs the start with ${COMMIT_CHANGES_FLAG} or ${UNDO_CHANGES_FLAG} from the Work Explorer (Start Session) or an interactive terminal of their own`,
+    "Run the start with neither flag, or report the step blocked and say why",
+  );
+}
 
 /**
  * Commit the changes a start refused over, as a person chose, and push them
@@ -1482,6 +1502,10 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
   if (!isDirectory(sessionsDir)) {
     writeErr(`start: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
+  }
+  if (options.byEngine === true && (options.commitChanges === true || options.undoChanges === true)) {
+    writeErr(`start: ${changesAnswerRefusal(options.commitChanges === true ? COMMIT_CHANGES_FLAG : UNDO_CHANGES_FLAG)}\n`);
+    return EXIT_BOUNDARY;
   }
   if (options.commitChanges === true && options.undoChanges === true) {
     writeErr(`start: refused -- ${COMMIT_CHANGES_FLAG} and ${UNDO_CHANGES_FLAG} cannot both be given; choose one.\n`);
@@ -3250,11 +3274,10 @@ const ALLOWED: BoundaryRuling = { refusal: null, exitCode: EXIT_OK };
  * Whether this session may be cancelled, decided from its own record.
  *
  * A session already cancelled is settled. One in flight may be cancelled by
- * whoever is working it, with the reason the verb requires: the cancellation
- * unwinds nothing, so the tree is left as it was, and the loop reads the
- * ledger before every act it cannot take back. Requiring `--force` here --
- * a person's verb -- left the author of a session that should not go on
- * with no way to end it, and the beta test's AI ended one by other means.
+ * a person, with the reason the verb requires: the cancellation unwinds
+ * nothing, so the tree is left as it was, and the loop reads the ledger
+ * before every act it cannot take back. Who may ask is decided by the verb
+ * (`cancel`), not here: this ruling reads the record alone.
  */
 export function judgeCancellation(
   record: Record<string, unknown>,
@@ -3456,19 +3479,21 @@ export function cancel(
     writeErr(`cancel: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
-  // A forced cancel is a person's verb. The proof of 2026-09-08 saw an
-  // engine cancel its own registration and drive another folder's session
-  // from the wrong window; an engine that asks is refused with the way a
+  // A cancel is a person's verb, forced or not. The proof of 2026-09-08 saw
+  // an engine cancel its own registration with --force and drive another
+  // folder's session from the wrong window; 2026-10-02 saw one cancel the
+  // session it was working over a check it could have amended, then start
+  // and cancel the five sessions after it chasing the one it had ended.
+  // Cancelling is for objectives no longer wanted, which an engine cannot
+  // judge; implementation trouble is a blocked report, and the stop that
+  // raises names the person. An engine that asks is refused with the way a
   // person does it, and nothing is written.
-  if (options.force === true && options.engine === true) {
+  if (options.engine === true) {
     writeErr(
       `cancel: ${isAPersonsVerb(
-        "cancel --force",
-        "ends a session in flight",
+        options.force === true ? "cancel --force" : "cancel",
+        "ends a session whose objectives are no longer wanted",
         "a person cancels from the Work Explorer (Cancel Session) or an interactive terminal of their own",
-        // The engine has a form of its own, and an engine told only to report
-        // `blocked` paused a session its operator had asked it to cancel.
-        'The session you are working is yours to cancel without it: `dabbler session cancel <its number> --reason "<why>"`',
       )}\n`,
     );
     return EXIT_BOUNDARY;
@@ -3494,19 +3519,6 @@ export function cancel(
         `cancel: no session ${sessionDisplayNumber(sessionNumber)} on record\n`,
       );
       return EXIT_USAGE;
-    }
-    // An engine ends the session it is working, and no other: a number it got
-    // wrong would otherwise cancel planned or finished work it was never given.
-    // Whose session a person cancels is theirs to say, as it always was.
-    const working = derivedView(raw)?.["currentSession"];
-    if (options.engine === true && working !== sessionNumber) {
-      writeErr(
-        `cancel: refused -- session ${sessionDisplayNumber(sessionNumber)} is not the session in flight` +
-          (typeof working === "number" ? ` (${sessionDisplayNumber(working)} is)` : "") +
-          ", and an engine cancels only the session it is working. Cancelling another is a person's: the " +
-          "Work Explorer (Cancel Session), or an interactive terminal of their own.\n",
-      );
-      return EXIT_BOUNDARY;
     }
     const ruling = judgeCancellation(record, sessionNumber);
     if (ruling.refusal !== null) {

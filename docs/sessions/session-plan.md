@@ -14972,3 +14972,270 @@ changed, the csv-parser session 001 verification runs on the seat.
 ### Session 239 of 239: Release 3.19.3 (release: 3.19.3)
 
 The framework publishes session 238's work as 3.19.3 and nothing else.
+
+### Session 240 of 243: A refused check names the way past it, and cancelling is a person's
+
+Scope: `packages/router` -- `src/drive.ts` (the `check-failed` refusal in
+`judge`, the `fix-round` ask in `phaseFix`), `src/driver.ts` (the
+`rejected-thrice` situation), `src/session.ts` (`cancel`, the
+`--commit-changes` / `--undo-changes` answers in `start`), `src/cli/session.ts`
+(the help text), `src/bootstrap/templates.ts` (the managed body's hard
+rules, which `AGENTS.md` here takes from `dabbler bootstrap`),
+`docs/driving-a-session.md` ("When an answer is refused", "Who ends a
+session"); tests in `test/drive.test.ts`, `test/driver.test.ts` and
+`test/session.test.ts`
+
+**Why.** A staff member, 2026-10-02, on a .NET sample with claude-haiku-4.5
+authoring over the Copilot seat and gpt-5.6-terra reviewing, under 3.19.3.
+Session 3, the skeleton, declared in its own step plan a check that greps
+the test project for `ArchUnitNET`; the step was accepted, and three
+minutes later the package was gone and the architecture test was an
+`Assert.Pass` placeholder (the next step's `dotnet build` check is the
+likely reason -- a step's acceptance runs only that step's checks, so
+undoing an earlier one is silent). The verifier found it, correctly, as a
+major. The engine chose to fix it and did: the test now asserts over
+assembly references by reflection, which is a sound design. The fix round
+runs EVERY plan step's checks (`allPlanChecks`), the stale `ArchUnitNET`
+check refused the report three times, and the session stopped
+`rejected-thrice`. The engine's own cancel reason diagnosed it exactly --
+"inherited an ArchUnitNET check from the original add-architecture-test
+step ... need to update the step plan" -- and it had run `session plan
+amend --checks-file` six times earlier that session. The `check-failed`
+refusal does not name that verb, and the stop's carry-on move says only
+"answer the step again". So it cancelled. Then, chasing session 3, it ran
+`session start` five times -- a start steps over cancelled sessions, so
+each landed on the next number -- and cancelled 4, 5, 6, 7 and 8 in turn
+("need to focus on completing session 3"). At 5's start it answered the
+uncommitted-changes question with `--commit-changes`, and session 3's
+never-verified skeleton landed on the trunk as "Commit changes made before
+session 5 started". The operator's framing, 2026-10-05: cancelling is for
+objectives no longer wanted, which an engine cannot judge; implementation
+trouble is answered by carrying on, by reporting blocked, or by the reset
+session 241 adds. Three changes, each at a place the record shows was
+decisive; none of them touches the fix round's rule, which was right.
+
+**Step 1 -- a refused check says whose it is and how it is amended.** The
+`check-failed` refusal names the step that declared the check wherever that
+is not the step being answered -- the fix round is the case -- and ends with
+one sentence: a check that no longer describes its step is amended, not
+fought, with `dabbler session plan amend --step <id> --checks-file <path>
+--reason "<why>"`, and a step that cannot be done is reported `--status
+blocked` with the reason in `--notes`. The `fix-round` ask carries the
+first half of that sentence beside "the framework will run every step's
+checks", so the engine reads it before the refusal and not only after. The
+`rejected-thrice` situation's carry-on move says the same: the step is
+asked afresh, and a check that was wrong is amended first.
+
+**Step 2 -- an engine's cancel is "report blocked".** `cancel` without
+`--force` from an engine (`callerIsEngine`) is refused through
+`isAPersonsVerb`, in the words the forced form already uses, with the
+instead-sentence: report the step blocked and say why; a person cancels
+from the Work Explorer (Cancel Session) or, once 241 lands, resets. The
+unforced author's cancel existed because an engine told only to report
+blocked once paused a session its operator had asked it, in chat, to
+cancel; that is now a click, and the stop a blocked report raises names
+the person as its owner. The managed body's hard rule in `templates.ts`
+changes with it -- "`cancel` and `close` are a person's, never yours:
+report the step blocked and say why" -- and `AGENTS.md` here is refreshed
+by `dabbler bootstrap` rather than edited. `docs/driving-a-session.md`
+says the same under "Who ends a session".
+
+**Step 3 -- what becomes of a dead session's work is a person's answer.**
+`--commit-changes` and `--undo-changes` on `session start` are refused to
+an engine through `isAPersonsVerb`: the uncommitted changes a start refuses
+over are a cancelled session's leavings, and whether they land or go is the
+person's to say -- the refusal says so and names the two flags as theirs.
+A start with neither flag is unchanged for an engine: it is refused over
+the changes as today, and now says who answers. Nothing else about a start
+changes; an engine's start stays allowed, because a session is driven from
+chat here and the cascade this prevents cannot recur once step 2 holds
+the cancelled session in flight.
+
+**Non-goals.** No change to the fix round running every plan step's checks.
+No change to `judgeStartBoundary`: a cancelled session is still stepped
+over, and a start is still allowed to an engine. No re-run of a step's
+checks on a later step's acceptance (the silent undoing above is real, and
+is the verifier's to find, which it did). No reset verb (241), no UI (242).
+No repair of the staff member's checkout. No Mechanic.
+
+**Tests.** In the files named after what changed. `drive.test.ts`: a check
+declared by an earlier step that fails in the fix round is refused naming
+that step and the amend verb -- the existing `check-failed` test is UPDATED
+to assert the owner and the sentence, not joined by a twin. `driver.test.ts`:
+the rendered `rejected-thrice` stop's carry-on move names the amendment;
+the existing rendering test is updated. `session.test.ts`: an engine's
+unforced cancel of the session it is working is refused with "report the
+step blocked" and nothing is written -- the test that today proves the
+author may cancel inverts, it is not duplicated; an engine's
+`--commit-changes` is refused naming the person; a person's still commits.
+The managed body's rule changes with no test: it is text, and its
+rendering test stands.
+
+**Releasable.** Yes -- with 241 and 242, as 3.20.0 in session 243.
+
+### Session 241 of 243: A session that went wrong is reset to where it started
+
+Scope: `packages/router` -- `src/session.ts` (`reset`, beside `cancel` and
+`restore`; `judgeReset`, `applyReset`), `src/cli/session.ts` (`session
+reset`), `src/contracts/router.ts` and `src/inProcess.ts`
+(`SessionVerbs.reset`), `src/driver.ts` (every stop's moves), `src/drive.ts`
+(`judgeSessionEnded`, only if the cancel-first ordering below does not
+already end the loop), `src/evidence.ts` (`recordStateWrite`),
+`src/testEvidence.ts` (dropping one session's rows), `src/writers.ts` (the
+activity-log entry and its fold into `project-work-plan.md`),
+`docs/driving-a-session.md`, `docs/schema-reference.md`; tests in
+`test/session.test.ts`, `test/walk-session.test.ts` and `test/driver.test.ts`
+
+**Why.** A session has two exits today: carry on, or cancel. Cancel unwinds
+nothing -- its header says so -- and the next start offers to commit what
+it left, which is how an unverified skeleton reached a trunk on 2026-10-02.
+The operator has tried to revert a session by hand with git and been
+refused every time, and the record says why: `state-writes.jsonl` chains
+the hash of every sanctioned write of `sessions.json`, so a checked-out
+older ledger reads as hand-edited at the integrity axis the close gate
+runs first (`detectOutOfBandWrite`); and `.dabbler/runs/s<N>/driver/run.json`
+still holds the run, its phase, its lease and its stop, so the next start
+resumes it. Both are the framework's own files disagreeing with what git
+restored. The resolution is that the router does the revert: then the
+write of the reverted ledger is sanctioned and the run directory is its
+own to remove. Nothing under `.dabbler` is tracked for it -- D135's reason
+stands (both tree digests enumerate tracked files, the driver writes
+`run.json` at every instruction, and job logs carry another machine's
+paths). The operator's decision, 2026-10-05: a reset applies to the session
+in flight, and only to it; cancelling is for objectives no longer wanted.
+
+**Step 1 -- the verb, a person's, for the session in flight.** `dabbler
+session reset --reason "<why>"` names no session: it is the in-flight
+one's, as a cancel that names none is; a number that is not the session in
+flight is refused ("reset applies to the session in flight"), and so is a
+reset with nothing in flight. It is refused to an engine through
+`isAPersonsVerb` ("report the step blocked and say why; a person resets
+from the Work Explorer"). What it does, in this order, under the sessions
+lock: first it cancels the session with the reason prefixed `reset:`, which
+is the sanctioned write every loop and waiter already reads at its next
+boundary and ends on, printing the reason -- so no new ending is taught to
+`judgeSessionEnded` unless the walk below proves one is needed. Then the
+anchor: the commit the session started on, which is `plan_head` on
+`run.json`, or HEAD where no plan was accepted (nothing of a session is
+committed before its land, so HEAD is still the start); after the land,
+`gate-receipt.json` carries `landed_sha` and the session's commit is on
+the remote, so the reset is `git revert --no-edit <landed_sha>` and a push,
+never a rewrite of pushed history. Before the land it is `git reset --hard
+<anchor>` and the removal of files created since (`git clean` of what is
+untracked and NOT ignored, so `bin`, `obj` and `.dabbler` stay). Then
+`.dabbler/runs/s<N>` is removed, session N's rows leave `test-runs.jsonl`
+(they carry `sessionNumber`), and the ledger as git restored it -- the row
+back at `not-started` -- is recorded with `recordStateWrite`, so the
+integrity axis accepts it. Last, the record: a `reset` entry on
+`activity-log.json` with the session number, the reason and the date, folded
+into `project-work-plan.md` under the session as "Reset <date> -- <reason>",
+and the framework's own files committed as "Reset session N of sessions",
+the way a cancel commits only what it owns; pushed only after the land,
+where the revert must follow what was pushed. A job still running finishes
+into a directory nothing reads, and that is said in the verb's output
+rather than guarded. The verb prints what it discarded, by path, before it
+discards it is NOT a question: the modal in 242 is the question, and a
+person at a terminal typed the reason.
+
+**Step 2 -- every stop offers it.** Beside `cancelChoice` a `resetChoice`
+-- "Reset the session -- yours to run, never the engine's: back to where
+it started, every change it made discarded, the session plan kept" --
+with the command and its cost, on every situation that offers a cancel.
+The `cancel` verb's trailing note ("left uncommitted, exactly as it was")
+says that a reset is the other way to have ended it, and the
+`UNCOMMITTED_CHANGES_NEXT` refusal at a start is unchanged: nothing is in
+flight there. The in-process seam gains `session.reset(options)` with the
+same shape as `restore`, so 242 calls it as a person's click.
+
+**Step 3 -- the words.** `docs/driving-a-session.md` gains "Reset: the
+third way" under "Who ends a session": what a reset is for, what it
+discards, that it is a person's, that it applies to the session in flight
+only, and that after the land it is a revert. `docs/schema-reference.md`
+records the `reset` entry kind. The managed body in `templates.ts` tells the
+engine the reset exists and is the person's, in one line beside the cancel
+rule 240 wrote.
+
+**Non-goals.** A reset past the start of the session in flight -- to an
+earlier session's close -- which is a plan change, not a recovery, and is
+cancel plus a new plan session. A reset of a closed or a cancelled session.
+Tracking anything under `.dabbler/` (D135). Killing a running job. Rewriting
+pushed history. A reset the engine may run. No Mechanic.
+
+**Tests.** `session.test.ts`: refused to an engine naming the person;
+refused for a number not in flight; refused with nothing in flight -- one
+each. `walk-session.test.ts`, over a real repository as that file already
+works: a reset before the land returns the tracked tree and the ledger to
+the start commit, leaves an ignored file where it was, removes the run
+directory and the session's test rows, and the integrity axis accepts the
+ledger afterwards (the fact that made every hand revert fail); a reset
+after the land adds one revert commit whose tree equals the start commit's.
+`driver.test.ts`: the rendered `rejected-thrice` and `blocked` stops carry
+the reset move -- the existing rendering tests updated. A loop that meets
+the reset at its boundary is the existing cancelled-under-a-loop test, and
+is not written twice.
+
+**Releasable.** Yes -- with 240 and 242, as 3.20.0 in session 243.
+
+### Session 242 of 243: Reset Session in the Work Explorer
+
+Scope: `tools/dabbler-ai-orchestration` -- `package.json` (the command and
+its menu entry), `src/commands/cancelLifecycleCommands.ts`
+(`runResetSessionFlow`, registered beside cancel and restore),
+`src/providers/rowMenuHelpers.ts` and `workExplorerTreeModel.ts` (the action
+on the in-flight row), `src/test/suite/commandFlows.test.ts` and
+`workExplorerTreeModel.test.ts`; the Work Explorer section of the README;
+both changelogs, `version.json` and the stamped manifests
+
+**Why.** Developers use the UI, not the command line. A developer whose
+session has gone wrong tells the AI to stop in the chat, and then needs one
+item on the session that is in flight: Reset Session, with a warning that
+says what is lost and asks them to confirm. The verb is 241's; this session
+is the surface.
+
+**Step 1 -- the item.** "Reset Session" (`dabblerSessionSets.reset`) in the
+`9_lifecycle` group of the Work Explorer's row menu, after Cancel Session,
+shown on the in-flight session row only: the row's actions carry
+`act-reset` for a session whose status is in-progress and for no other, the
+way `act-cancel` and `act-restore` are decided in `rowMenuHelpers.ts`.
+
+**Step 2 -- the modal.** Through the lifecycle commands' `confirm` seam, so
+it is testable with the same fake: summary `Reset session N "<title>"?`,
+detail "The session goes back to where it started. Every change it made is
+discarded, including uncommitted work, and cannot be recovered. The
+session plan is kept, and the session can be started again." Buttons
+"Reset Session" and "Keep"; a dismissed modal does nothing. Then the
+reason box, optional, as cancel's is; then `router.session.reset` with the
+repository root, the session number and the reason, as a person's click;
+a refusal is shown in the router's words through `describeLifecycleFailure`
+("Resetting"), and success says "Reset session N" and refreshes the view.
+The loop's own ending reaches the Dabbler terminal by the path a cancel
+already takes, and this session adds nothing to it.
+
+**Step 3 -- the version and the words.** `version.json` goes to 3.20.0 -- a
+minor: a new verb and a new command -- stamped with `npm run
+stamp:version`; both changelogs get the 3.20.0 section naming 240, 241 and
+242; the README's Work Explorer section lists Reset Session beside Cancel
+Session and says what it is for and what it is not (cancel is for
+objectives no longer wanted).
+
+**Non-goals.** No reset from the chat, the terminal pane or a keybinding:
+one item, on one row. No count of the files to be discarded in the modal
+(the verb prints them, and a count the modal computed would be a second
+reader of the tree). No change to Cancel Session or Restore Session. No
+change to the router.
+
+**Tests.** `commandFlows.test.ts`, mirroring cancel's: the reset flow
+confirms, prompts for a reason, calls the router with the number and the
+reason, and refreshes; a dismissed modal calls nothing; a refusal is shown
+in the router's words. `workExplorerTreeModel.test.ts`: the in-flight row
+carries `act-reset` and a not-started, complete or cancelled row does not
+-- one test.
+
+**Releasable.** Yes -- 243 publishes 3.20.0. The walk, on this machine
+before the release: a scratch repository with a session in flight and a
+change the AI made, Reset Session from the row, confirm, and the tree, the
+row and the next Start are as before it.
+
+### Session 243 of 243: Release 3.20.0 (release: 3.20.0)
+
+The framework publishes sessions 240 to 242 as 3.20.0 and nothing else.

@@ -15239,3 +15239,165 @@ row and the next Start are as before it.
 ### Session 243 of 243: Release 3.20.0 (release: 3.20.0)
 
 The framework publishes sessions 240 to 242 as 3.20.0 and nothing else.
+
+### Session 244 of 246: A rollback to the start of any session that has run
+
+Scope: `packages/router` -- `schemas/sessions.schema.json` and
+`src/generated/sessions.ts` (`startCommit` on a row), `src/writers.ts`
+(`registerSessionStart` writes it; `recordRollback` replaces `recordReset`),
+`src/session.ts` (`rollback` replaces `reset`; `judgeRollback`),
+`src/cli/session.ts`, `src/contracts/router.ts` and `src/inProcess.ts`
+(`session.rollback` replaces `session.reset`), `src/testEvidence.ts`
+(`dropSessionRecords` over a range), `src/drive.ts` (the ended status),
+`src/driver.ts` (the stop move), `src/bootstrap/templates.ts`, `AGENTS.md`,
+`docs/driving-a-session.md`, `docs/schema-reference.md`; the extension's
+fake router in `tools/dabbler-ai-orchestration/src/test/suite/helpers.ts`;
+tests in `test/writers.test.ts`, `test/schema.test.ts`,
+`test/session.test.ts`, `test/drive.test.ts`, `test/driver.test.ts`,
+`test/testEvidence.test.ts` and `test/walk-session.test.ts`
+
+**Why.** The reset 241 shipped applies to the session in flight and to no
+other, and the operator's first walk of it, 2026-10-05 on a Java sample,
+met the narrowness at once: the sessions were two to three minutes long,
+the one attempt that reached the verb ran after the session it was clicked
+on had closed and the next had started, and the verb refused it correctly
+-- "session 004 is not the session in flight (005 is)". The operator's
+decision, 2026-10-05: the recovery a developer needs is a rollback to the
+start of whatever session they select, in flight OR completed, which undoes
+that session and every session after it. A sample project is re-run from a
+chosen session; a problem that spans several sessions is undone back to
+where it began. Cancelled sessions are not a target (restore is their verb)
+and a session that has not started has nothing to roll back. One verb,
+replacing the reset rather than standing beside it: the reset is the
+rollback of the session in flight.
+
+**Step 1 -- a start records the commit it started on.** The session row
+gains `startCommit` (`schemas/sessions.schema.json`, regenerated into
+`src/generated/sessions.ts` with `npm run generate:types`): the HEAD
+`registerSessionStart` reads when it writes the row, after any commit a
+start made of changes it was asked to commit, and null outside a git
+repository. It is the anchor a rollback returns to, on the record the land
+commits and the next clone receives -- `plan_head` on the run record is
+machine-side and the run record of a closed session may be gone. A row
+without it (started by an earlier build) is read through `plan_head`
+where the run record exists, else through the parent of the earliest
+commit whose subject the framework wrote for that session (`Session N:`,
+`Close session N of`, `Cancel session N of`, `Reset session N of`). Tests
+in `writers.test.ts` (the row carries HEAD) and `schema.test.ts` (a row
+with and without it validates).
+
+**Step 2 -- the verb.** `dabbler session rollback [N] --reason "<why>"`,
+a person's, refused to an engine through `isAPersonsVerb`; N defaults to
+the session in flight, and is refused for a cancelled session (naming
+`restore`), a not-started one, and a number not on record. What it does,
+in order: if a session is in flight it is cancelled first with the reason
+marked `rollback:`, which is the write every loop and waiter reads at its
+next boundary and ends on; the anchor is read as step 1 says; the commits
+since it (`git rev-list <anchor>..HEAD`) are reverted newest first after
+the working tree is discarded, and pushed where the branch has an
+upstream -- with none, the hard reset and clean the reset did; the run
+record of every session from N on is moved aside, their rows leave
+`test-runs.jsonl` (`dropSessionRecords` takes a predicate or a range), the
+restored ledger is recorded with `recordStateWrite`, and a `rollback`
+entry (`sessionNumber` N, `through` the last session undone, `reason`,
+`by`) goes on the activity log, folded under session N in the work plan
+as "Rolled back <date> -- sessions N to M -- <reason>", committed as "Roll
+back to the start of session N of sessions" and pushed when commits were
+reverted. A release session among N..M is named in the output with the
+plain fact that its tag and publication stay: a rollback reverts the
+trunk and unpublishes nothing, so the next release must carry a higher
+version. `reset` is removed: the CLI subcommand, `SessionVerbs.reset` and
+`SessionResetOptions`, `recordReset`/`resetEntries`/`KIND_RESET`, the
+`RESET_REASON_PREFIX`; the extension's fake gains `rollback` in their
+place; `judgeSessionEnded` reads a row back at not-started as
+`rolled-back`; the stop move becomes "Roll back to the start of this
+session" with `dabbler session rollback --reason "<why>"`. Tests, one per
+behaviour: `session.test.ts` (refused to an engine; refused for a
+cancelled, a not-started and an unknown session; a named completed
+session is accepted by the ruling), `drive.test.ts`, `driver.test.ts`,
+`writers.test.ts`, `testEvidence.test.ts` updated from their reset forms.
+
+**Step 3 -- the walk.** In `walk-session.test.ts`, the two reset walks
+become rollback walks of the session in flight, and a third is added: a
+rollback to the start of CLOSED session 1 while session 2 is in flight --
+session 2 ends, both rows return to not-started, the revert commits undo
+session 1's land and close and nothing of session 2's (which never
+landed), the tree the reverts leave equals session 1's start commit's,
+origin has it, both run records are aside and both sessions' test rows
+gone, the integrity axis accepts the ledger, and `session start`
+registers session 1 afresh.
+
+**Step 4 -- the words.** `docs/driving-a-session.md`: "Rollback: the third
+way" replaces the reset paragraph, saying what it is for, that it applies
+to a session in flight or completed and undoes every session after it,
+what it discards and what it cannot (a publication), and that after the
+land it is a revert. `docs/schema-reference.md`: `startCommit` on the row
+and the `rollback` entry kind in place of `reset`. The managed body's
+hard rule in `templates.ts`, one line: "`cancel`, `rollback` and `close`
+are a person's, never yours: report the step blocked and say why, and
+the person cancels or rolls back from the Work Explorer." -- `AGENTS.md`
+here the same.
+
+**Non-goals.** Unpublishing a release or deleting a tag. Rolling back a
+cancelled session (restore) or one that has not started. Rewriting pushed
+history: a revert, always. Any Work Explorer surface (245). Keeping
+`reset` as an alias: one verb. No Mechanic.
+
+**Releasable.** Yes -- with 245, as 3.21.0 in session 246.
+
+### Session 245 of 246: Rollback to Start of This Session in the Work Explorer
+
+Scope: `tools/dabbler-ai-orchestration` -- `package.json`,
+`src/providers/ActionRegistry.ts`, `src/commands/cancelLifecycleCommands.ts`,
+their tests in `src/test/suite/actionRegistry.test.ts`,
+`workExplorerTreeModel.test.ts` and `commandFlows.test.ts`; the README's
+Work Explorer paragraph; the changelog, `version.json` and the stamped
+manifests
+
+**Why.** The operator's walk of Reset Session, 2026-10-05: two clicks,
+nothing visible happened. The one that reached the verb had spent the time
+between the click and the verb in two dialogs -- the modal, then an input
+box for a reason -- while the session in flight changed underneath it; the
+other never reached the verb, and no input box was seen. A destructive,
+time-sensitive action is one dialog: the warning and the confirm, and
+nothing after it.
+
+**Step 1 -- the item.** `dabblerSessionSets.rollback`, titled "Rollback to
+Start of This Session", replaces `dabblerSessionSets.reset` in
+`package.json` (command and `9_lifecycle@903` menu entry gated on
+`act-rollback`) and in the registry, offered on a session that is
+in-progress or complete and on no other row (not-started and cancelled rows
+do not carry it). Tests in `actionRegistry.test.ts` and
+`workExplorerTreeModel.test.ts` updated from their reset forms: offered on
+the in-flight and the completed rows, not on a planned or a cancelled one.
+
+**Step 2 -- one dialog.** `runRollbackSessionFlow` replaces the reset flow:
+one modal, summary `Roll back to the start of session N "<title>"?`, detail
+"Sessions N to M are undone: every change they made is discarded, work
+already committed is reverted on the trunk, and they return to not-started.
+A version they released stays published. This cannot be undone." -- where M
+is the last session that has started, read off the repository node, and
+"Session N is undone" when N is the last. Buttons "Roll Back" and "Keep";
+no reason box; the reason passed is "Rollback to Start of This Session from
+the Work Explorer". A refusal is shown in the router's words
+(`describeLifecycleFailure("Rolling back", ...)`); success says "Rolled back
+to the start of session N; amend the plan, then Start Session." and
+refreshes. Tests in `commandFlows.test.ts` mirroring the reset ones: the
+flow confirms and calls the router with the number and the fixed reason,
+naming the span in the detail; a declined or dismissed modal calls nothing;
+a refusal surfaces and does not refresh.
+
+**Step 3 -- the version and the words.** `version.json` to 3.21.0 (a
+minor: the verb and the item changed shape), stamped; the changelog's
+3.21.0 section; the README's Work Explorer paragraph says Rollback to
+Start of This Session in place of Reset Session, on which rows it is
+offered, what it undoes and what stays published.
+
+**Non-goals.** A reason box, a second dialog, or a count of files in the
+modal. A rollback from the chat or a keybinding. Any change to the router.
+
+**Releasable.** Yes -- 246 publishes 3.21.0.
+
+### Session 246 of 246: Release 3.21.0 (release: 3.21.0)
+
+The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.

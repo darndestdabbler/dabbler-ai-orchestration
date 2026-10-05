@@ -214,6 +214,23 @@ export function closedSessionSeconds(state: Record<string, unknown> | null): num
     .map((row) => row.seconds);
 }
 
+/**
+ * The number of the session in flight, read from the raw rows: the ledger
+ * file carries no `currentSession` -- that is the derived view's, and this
+ * module cannot import the view without a cycle. Read off the raw state it
+ * was always null, so the close gate counted the session's own whole runs
+ * in deciding what it owed while the run-of-record phase did not: a whole
+ * run that took longer than the last one flipped the gate to a targeted
+ * record nobody had made, and the close refused (session 240).
+ */
+export function inFlightSession(state: Record<string, unknown> | null): number | null {
+  const rows = state !== null && Array.isArray(state["sessions"]) ? (state["sessions"] as unknown[]) : [];
+  const row = rows.find((candidate): candidate is Record<string, unknown> =>
+    isRecord(candidate) && candidate["status"] === "in-progress",
+  );
+  return row !== undefined && typeof row["number"] === "number" ? row["number"] : null;
+}
+
 // What made a pre-verification command acceptable, or what made it invalid.
 // `final-full` runs carry none of these: the complete suite IS the declared
 // command, so the vocabulary cannot apply to it.
@@ -961,7 +978,7 @@ export function evaluateFreshness(
   const records = root ? readRecords(root) : [];
   const state = readRawSessionState(sessionsDir);
   const sessionSeconds = closedSessionSeconds(state);
-  const inFlight = typeof state?.["currentSession"] === "number" ? (state["currentSession"] as number) : null;
+  const inFlight = inFlightSession(state);
   const verdicts: FreshnessVerdict[] = [];
 
   for (const suite of suites) {

@@ -13,6 +13,7 @@ import {
   closedSessionSeconds,
   digestOfEntries,
   freshnessVerdict,
+  inFlightSession,
   loadSuitesChecked,
   readRecords,
   recordRun,
@@ -245,6 +246,22 @@ describe("whether a suite runs whole at the end of a session", () => {
     assert.equal(runsWholeAtClose(SELECTING, [whole(200, 8)], HOUR, 8).whole, true);
     assert.equal(runsWholeAtClose(SELECTING, [], HOUR, 8).whole, true);
     assert.equal(runsWholeAtClose(UNIT, [whole(200)], HOUR, 8).whole, true);
+  });
+
+  it("reads the session in flight off the raw ledger rows, so the gate and the phase exclude the same session's own runs", () => {
+    // The raw file has no `currentSession`; read there it was always null,
+    // the gate counted the session's own 76-second whole run, decided a
+    // targeted run was owed, and refused a close the phase had just earned.
+    const raw = {
+      sessions: [
+        { number: 7, status: "complete" },
+        { number: 8, status: "in-progress" },
+        { number: 9, status: "not-started" },
+      ],
+    };
+    assert.equal(inFlightSession(raw), 8);
+    assert.equal(inFlightSession({ sessions: [{ number: 7, status: "complete" }] }), null);
+    assert.equal(inFlightSession(null), null);
   });
 
   it("accepts a targeted run of record over the same tree for a suite past the threshold, and neither kind in the other's place", () => {

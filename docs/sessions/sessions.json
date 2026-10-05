@@ -4790,9 +4790,9 @@
     {
       "number": 242,
       "title": "Reset Session in the Work Explorer",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-05T11:01:32.137000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-05T11:11:43.779000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

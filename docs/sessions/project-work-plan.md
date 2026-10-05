@@ -280,7 +280,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 240 | A refused check names the way past it, and cancelling is a person's | no | 2026-10-05 |
 | 241 | A session that went wrong is reset to where it started | no | 2026-10-05 |
 | 242 | Reset Session in the Work Explorer | no | 2026-10-05 |
-| 243 | Release 3.20.0 (release: 3.20.0) | — | not declared |
+| 243 | Release 3.20.0 (release: 3.20.0) | yes | 2026-10-05 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3065,3 +3065,9 @@ Session 241 adds the third way to end a session that went wrong: `dabbler sessio
 **Releasable: no.**
 
 Session 242 puts the reset where developers work: a Reset Session item in the Work Explorer's row menu, on the session in flight and on no other row, that warns what will be lost, asks the person to confirm, takes an optional reason, and calls the router's `session reset` as a person's click, showing a refusal in the router's words and refreshing the view on success. The version goes to 3.20.0 for the new verb and the new command, with the changelog section for sessions 240 to 242, and the README's Work Explorer paragraph says what Reset Session is for, what Cancel Session is for, and that an engine does neither.
+
+### Session 243 — Release 3.20.0 (release: 3.20.0)
+
+**Releasable: yes.**
+
+Release 3.20.0: the framework packs and publishes what is on the trunk.

@@ -296,7 +296,7 @@ function readJobExit(path: string): string {
   try {
     const row: unknown = JSON.parse(readFileSync(path, "utf8"));
     if (typeof row === "object" && row !== null) {
-      const code = (row as Record<string, unknown>)["exitCode"];
+      const code = (row as Record<string, unknown>)["exit"];
       if (typeof code === "number") return String(code);
     }
   } catch {

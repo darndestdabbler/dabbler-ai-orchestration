@@ -173,9 +173,9 @@ describe("one session's transcript", () => {
   it("carries a failed job's bytes by default and a passing job's only on request", () => {
     const root = repoWithASession();
     write(jobLogPath(root, 5, "close"), "it refused, and here is why\n");
-    write(jobStatusPath(root, 5, "close"), JSON.stringify({ exitCode: 1 }));
+    write(jobStatusPath(root, 5, "close"), JSON.stringify({ exit: 1 }));
     write(jobLogPath(root, 5, "run of record"), "ten thousand green lines\n");
-    write(jobStatusPath(root, 5, "run of record"), JSON.stringify({ exitCode: 0 }));
+    write(jobStatusPath(root, 5, "run of record"), JSON.stringify({ exit: 0 }));
 
     const outline = render(root);
     assert.match(outline, /it refused, and here is why/);
@@ -192,7 +192,7 @@ describe("one session's transcript", () => {
     const root = repoWithASession();
     const key = "sk-ant-notarealkey-0123456789abcdef";
     write(jobLogPath(root, 5, "close"), `authorization: Bearer ${key}\n`);
-    write(jobStatusPath(root, 5, "close"), JSON.stringify({ exitCode: 1 }));
+    write(jobStatusPath(root, 5, "close"), JSON.stringify({ exit: 1 }));
 
     const previous = process.env["DABBLER_ANTHROPIC_API_KEY"];
     process.env["DABBLER_ANTHROPIC_API_KEY"] = key;

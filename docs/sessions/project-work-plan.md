@@ -290,7 +290,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 250 | A choice made in the Configuration is committed as it is made | no | 2026-10-16 |
 | 251 | The tests 250's run of record did not reach | no | 2026-10-16 |
 | 252 | This repository's suites run whole at every close | no | 2026-10-16 |
-| 253 | The transcript walked in a real repository first | — | not declared |
+| 253 | The transcript walked in a real repository first | no | 2026-10-16 |
 | 254 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -3158,3 +3158,13 @@ Make true again the twelve router tests that went red after session 250 made `co
 **Releasable: no.**
 
 Add a suite key `whole_at_close: true` that makes the close run a suite whole regardless of the 5% rule, and declare it on this repository's three expensive suites. `checks.ts` adds the key to SUITE_FIELDS so both loaders accept it; `testEvidence.ts` loads it into SuiteSpec as `wholeAtClose` (default false) and `runsWholeAtClose` answers whole for a suite that declares it, with a reason naming the key. One assertion joins the existing `runsWholeAtClose` test, and the existing suite-loading test in `checks.test.ts` declares the key. `dabbler.yaml` declares it on `typescript`, `typescript-windows` and `extension` with a comment naming sessions 247 and 250, and the sentence in `README.md` and `docs/schema-reference.md` that states the close's rule gains the key.
+
+### Session 253 — The transcript walked in a real repository first
+
+**Releasable: no.**
+
+Build the 3.22.0 candidate VSIX from the trunk and install it into this machine's VS Code with --force (no tag, no Marketplace, no feed), then write docs/uat/uat-transcript.md: a copy-pasteable walk in ../survsys that renders its completed sessions with `dabbler transcript --from 1 --to 23 --out <dir>` without --commit first, opens three of them (one with a failure, one with several verification rounds), then commits and confirms only docs/transcripts/ moved; says survsys must have no session in flight when the VSIX is installed; says what to look for in the next step instruction survsys issues (249's existing/new file marks, keep the instruction if an author overwrites a file marked existing); and walks 250's fix on survsys's release session 29 from its Work Explorer (set the authoring model, see one-file commit pushed and a clean status, Start the release, see it publish to D:/handoff/survsys; keep run.json if it stops). The uncommitted render is done here against survsys's records and what it shows is written beside the step that found it; a defect that stops the walk is fixed in this session, any other is recorded for the operator.
+
+**Amended after acceptance:**
+
+- 2026-10-16 — step 'render-findings': its files: The survsys render found every job's exit as '?': transcript.ts reads exitCode from jobs/<name>.status.json, which jobs.ts writes as exit, so every job renders red and carries its whole output. The walk's check 1 cannot pass over it; the fix is the one key the renderer reads and the test fixtures that wrote the wrong key. (claude-code (anthropic, claude-opus-5-5))

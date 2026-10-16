@@ -15428,7 +15428,7 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
 
-### Session 247 of 263: A session's transcript, rendered and committed
+### Session 247 of 264: A session's transcript, rendered and committed
 
 Scope: `packages/router` -- `schemas/events.schema.json` and
 `src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
@@ -15539,7 +15539,7 @@ Changing what the terminal shows.
 
 **Releasable.** Yes -- 263 publishes 3.22.0, after 253's walk.
 
-### Session 248 of 263: The record is written before the session is told it is done
+### Session 248 of 264: The record is written before the session is told it is done
 
 Scope: `packages/router` -- `src/drive.ts` (`phaseClose` and `phaseLog`:
 the order of the `done` instruction against the Log phase),
@@ -15597,7 +15597,7 @@ path other than the two named.
 
 **Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 263.
 
-### Session 249 of 263: A step is told which of its files are already there
+### Session 249 of 264: A step is told which of its files are already there
 
 Scope: `packages/router` -- `src/drive.ts` (`stepAsk` names the step's own
 files and reads the tree for each), `docs/driving-a-session.md`; tests in
@@ -15648,7 +15648,7 @@ measured before it can refuse anything.
 
 **Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 263.
 
-### Session 250 of 263: A choice made in the Configuration is committed as it is made
+### Session 250 of 264: A choice made in the Configuration is committed as it is made
 
 Scope: `packages/router` -- `src/cli/configure.ts` (the write commits and
 pushes), `src/checks.ts` (`materialPaths` stops exempting the settings
@@ -15710,7 +15710,7 @@ settings file counts before the declaration as it does at the close.
 **Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 263,
 after 253 walks it in survsys.
 
-### Session 251 of 263: The tests 250's run of record did not reach
+### Session 251 of 264: The tests 250's run of record did not reach
 
 Scope: `packages/router` -- `test/configuration.test.ts`,
 `test/projection.test.ts`, `test/session.test.ts`,
@@ -15769,7 +15769,7 @@ settled here by a fix session. Any change to the walkthrough list in
 **Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 263, after
 253's walk.
 
-### Session 252 of 263: This repository's suites run whole at every close
+### Session 252 of 264: This repository's suites run whole at every close
 
 Scope: `packages/router` -- `src/checks.ts` (the suite key),
 `src/testEvidence.ts` (`runsWholeAtClose`), their tests;
@@ -15819,7 +15819,7 @@ other projects still record. Deleting the companion table.
 **Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 263, after
 253's walk.
 
-### Session 253 of 263: The transcript walked in a real repository first
+### Session 253 of 264: The transcript walked in a real repository first
 
 Scope: `docs/uat/uat-transcript.md` (new); `dabbler.yaml` only if the
 walk finds a selection rule the transcripts directory needs
@@ -15887,7 +15887,7 @@ did not ask for.
 
 **Releasable.** No -- 263 publishes, on the operator's yes.
 
-### Session 254 of 263: The two transcripts written by the renderer 253 fixed
+### Session 254 of 264: The two transcripts written by the renderer 253 fixed
 
 Scope: `docs/transcripts/session-252.html`, `docs/transcripts/session-253.html`
 
@@ -15909,7 +15909,7 @@ Publishing or tagging.
 
 **Releasable.** Yes -- with 247 to 253, as 3.22.0 in session 263.
 
-### Session 255 of 263: A review is sized by what it reads
+### Session 255 of 264: A review is sized by what it reads
 
 Scope: `packages/router/src/facts.ts`, `packages/router/src/route.ts`
 
@@ -15949,7 +15949,7 @@ other kind of generated file.
 
 **Releasable.** Yes -- with 247 to 254, as 3.22.0 in session 263.
 
-### Session 256 of 263: A passing job's omitted output says why it is omitted
+### Session 256 of 264: A passing job's omitted output says why it is omitted
 
 Scope: `packages/router/src/transcript.ts` (`renderJobs`), tests in
 `transcript.test.ts`
@@ -15977,7 +15977,7 @@ verb, or the extension.
 
 **Releasable.** Yes -- with 247 to 255, as 3.22.0 in session 263.
 
-### Session 257 of 263: A round that found issues says what they were
+### Session 257 of 264: A round that found issues says what they were
 
 Scope: `packages/router/src/transcript.ts` (`renderRounds`), tests in
 `transcript.test.ts`
@@ -16007,7 +16007,7 @@ already committed.
 
 **Releasable.** Yes -- with 247 to 256 and 258, as 3.22.0 in session 263.
 
-### Session 258 of 263: A finding's transcript says how it was answered
+### Session 258 of 264: A finding's transcript says how it was answered
 
 Scope: `packages/router/src/drive.ts` (two event rows),
 `packages/router/src/transcript.ts` (the findings 257 lists); tests in
@@ -16055,7 +16055,7 @@ script on the page.
 
 **Releasable.** Yes -- with 247 to 257, as 3.22.0 in session 263.
 
-### Session 259 of 263: A run of record says how many tests it ran
+### Session 259 of 264: A run of record says how many tests it ran
 
 Scope: `packages/router/src/testOutput.ts` (two readers beside the two it
 has), `packages/router/src/transcript.ts` (`readSession`,
@@ -16110,7 +16110,7 @@ already committed. Any script on the page.
 **Releasable.** Yes -- with 247 to 258, as 3.22.0 in session 263, after
 the operator has walked the packed VSIX.
 
-### Session 260 of 263: A run's totals are read by the latest row, not by the job's end
+### Session 260 of 264: A run's totals are read by the latest row, not by the job's end
 
 Scope: `packages/router/src/transcript.ts` (`readTotals`), tests in
 `transcript.test.ts`; `docs/transcripts/session-259.html`, deleted and
@@ -16152,7 +16152,7 @@ change to how the record or the status file is stamped.
 the operator has walked the packed VSIX in survsys and seen session 11's
 row carry 33, 0 and 0.
 
-### Session 261 of 263: The transcript lists the files a session changed
+### Session 261 of 264: The transcript lists the files a session changed
 
 Scope: `packages/router/src/drive.ts` (the `landed` row),
 `packages/router/src/transcript.ts` (a Files section); tests in
@@ -16188,7 +16188,7 @@ script on the page.
 
 **Releasable.** Yes -- with 247 to 260, as 3.22.0 in session 263.
 
-### Session 262 of 263: A session recorded before the event log still lists its files
+### Session 262 of 264: A session recorded before the event log still lists its files
 
 Scope: `packages/router/src/transcript.ts` (the Files section); a test in
 `transcript.test.ts`
@@ -16219,6 +16219,78 @@ script on the page.
 
 **Releasable.** Yes -- with 247 to 261, as 3.22.0 in session 263.
 
-### Session 263 of 263: Release 3.22.0 (release: 3.22.0)
+### Session 263 of 264: Release 3.22.0 (release: 3.22.0)
 
 The framework publishes sessions 247 to 262 as 3.22.0 and nothing else.
+
+### Session 264 of 264: The transcript opens with the plan it ran under and the work plan it was given
+
+Scope: `packages/router/src/transcript.ts` (two sections at the top of the
+page, the `Steps accepted` section folded into one of them, a renderer for
+the markdown the plan uses); `packages/router/src/cli/transcript.ts` and
+`packages/router/src/drive.ts` (the sessions root reaches the renderer);
+`humanizeStepKey` moves from
+`tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts` to
+the router and the extension imports it; tests in `transcript.test.ts`.
+
+**Why.** The page records what a session did -- where it stopped, what the
+framework said, the rounds, the runs, the files -- and nothing of what it
+was asked to do. The session's section of `session-plan.md` says why the
+session exists and what each step was to do; the work plan the framework
+drove says what each step was actually told, which files it was given and
+which checks it ran under. In VS Code the second of these is the hover on
+each work step in the Work Explorer, and it is gone the moment the page is
+the only record a second developer sees. A transcript is read by someone
+who was not there, and the first thing that reader needs is what the
+session set out to do, before the account of whether it did it.
+
+**Step 1 -- the Session Plan section.** The first section after the stamp
+lines, headed `Session Plan`: the section of `session-plan.md` under the
+sessions root headed `### Session <N>`, from that heading to the next `###`
+heading or the end of the file, read by the one heading grammar
+`progress.ts` already has (`SESSION_HEADING_RE`, exported rather than
+restated). Rendered with the formatting the plan's markdown carries, not as
+escaped text: the heading, paragraphs, `**bold**`, backtick code, bulleted
+and numbered lists, and `--` as it is written. No library -- a small
+renderer for exactly those forms, in `transcript.ts`, and everything it
+emits passes through `escapeHtml` first so a plan is never a way to put
+markup on the page. The renderer takes the sessions root as an option; the
+transcript verb passes the root `resolveSessionsDir` gives it and the Log
+phase passes its own. A session with no section in the plan lists `its
+section of the session plan` under `This session left no:` -- the same rule
+as every other absent record. Tests in `transcript.test.ts`: a session
+whose plan section carries bold, code and a list renders them as `<strong>`,
+`<code>` and `<li>` and the next session's section is not on the page; a
+session the plan does not name is listed as absent.
+
+**Step 2 -- the Work Plan section.** Second on the page, headed `Work
+Plan`, from the work plan `readWorkPlan` returns, which is what the Files
+section reads: the plan's task sentence first, then one table with the
+columns `Step`, `Ask`, `Files`, `Checks` and `Accepted`, in plan order, and
+the non-goals under it as a list. `Step` is the label the Work Explorer's
+hover shows -- the id humanized by `humanizeStepKey`, which moves to the
+router so the page and the tree read one function, and the extension
+imports it from `dabbler-ai-router` as it imports the rest. `Ask` is the
+step's ask as written, through the same markdown renderer as Step 1.
+`Files` lists the files the step declared, one per line; `Checks` lists
+each check's argv as one code line; `Accepted` is `yes` where `run.json`
+names the step and `no` where it does not. The `Steps accepted` section is
+removed: its one fact is the last column. The step's start time is not
+carried: it is a row in What the framework said already, and the hover
+reads it from the execution record rather than the plan. A session with no
+work plan lists `a work plan` as absent and has no table. Tests: a session
+with a two-step plan and one accepted step renders the task sentence, two
+rows with their asks, files and checks, `yes` then `no`, and its non-goals;
+the extension's own `humanizeStepKey` test moves to the router with the
+function.
+
+**Non-goals.** Re-rendering any page already committed. A markdown
+renderer for anything the plan does not use -- no tables, no links, no
+headings below `###`, no HTML pass-through. Any change to the plan files,
+the work plan on disk or the record. Any script on the page. Any change to
+what the Work Explorer shows.
+
+**Tests.** Three in `transcript.test.ts` as named in the steps, and the
+moved `humanizeStepKey` test; the extension's suite loses the one it moved.
+
+**Releasable.** Yes -- 3.23.0, in a release session that follows it.

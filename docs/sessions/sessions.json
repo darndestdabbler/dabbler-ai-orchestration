@@ -5343,9 +5343,9 @@
     {
       "number": 268,
       "title": "The version goes to 3.22.0",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T16:04:20.013000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T16:08:34.851000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -306,7 +306,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 266 | The transcript links the commit, and no file | no | 2026-10-16 |
 | 267 | A rollback pushes its own commit, and a release refused over a push says push | no | 2026-10-16 |
 | 268 | The version goes to 3.22.0 | no | 2026-10-16 |
-| 269 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 269 | Release 3.22.0 (release: 3.22.0) | yes | 2026-10-16 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3273,3 +3273,9 @@ Make a rollback push its own record commit and make a release refused only over 
 **Releasable: no.**
 
 Set the repository's release version to 3.22.0 so session 269 can publish it: edit version.json to 3.22.0, run `npm run stamp:version` to write it into the router and extension manifests and the lockfile, and add a 3.22.0 section to the extension's CHANGELOG.md naming what sessions 247 to 267 changed for a developer (a session's transcript rendered and committed, configuration choices committed as made, suites run whole at every close in this repository, a rollback pushing its own commit, and the related fixes).
+
+### Session 269 — Release 3.22.0 (release: 3.22.0)
+
+**Releasable: yes.**
+
+Release 3.22.0: the framework packs and publishes what is on the trunk.

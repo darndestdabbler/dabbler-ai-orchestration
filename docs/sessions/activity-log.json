@@ -12637,6 +12637,13 @@
       "dateTime": "2026-10-16T16:04:47.376000-04:00",
       "task": "Set the repository's release version to 3.22.0 so session 269 can publish it: edit version.json to 3.22.0, run `npm run stamp:version` to write it into the router and extension manifests and the lockfile, and add a 3.22.0 section to the extension's CHANGELOG.md naming what sessions 247 to 267 changed for a developer (a session's transcript rendered and committed, configuration choices committed as made, suites run whole at every close in this repository, a rollback pushing its own commit, and the related fixes).",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 269,
+      "dateTime": "2026-10-16T16:08:53.274000-04:00",
+      "task": "Release 3.22.0: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

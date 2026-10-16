@@ -15428,7 +15428,7 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
 
-### Session 247 of 252: A session's transcript, rendered and committed
+### Session 247 of 253: A session's transcript, rendered and committed
 
 Scope: `packages/router` -- `schemas/events.schema.json` and
 `src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
@@ -15537,9 +15537,9 @@ Persisting the terminal's live scrollback. An index page over the
 transcripts, a search across them, or any reader of a transcript.
 Changing what the terminal shows.
 
-**Releasable.** Yes -- 252 publishes 3.22.0, after 251's walk.
+**Releasable.** Yes -- 253 publishes 3.22.0, after 252's walk.
 
-### Session 248 of 252: The record is written before the session is told it is done
+### Session 248 of 253: The record is written before the session is told it is done
 
 Scope: `packages/router` -- `src/drive.ts` (`phaseClose` and `phaseLog`:
 the order of the `done` instruction against the Log phase),
@@ -15595,9 +15595,9 @@ simply has none and the verb can render it on request. Any change to the
 renderer, the verb or the setting. Changing what selection means for any
 path other than the two named.
 
-**Releasable.** Yes -- with 247, 249 and 250, as 3.22.0 in session 252.
+**Releasable.** Yes -- with 247, 249, 250 and 251, as 3.22.0 in session 253.
 
-### Session 249 of 252: A step is told which of its files are already there
+### Session 249 of 253: A step is told which of its files are already there
 
 Scope: `packages/router` -- `src/drive.ts` (`stepAsk` names the step's own
 files and reads the tree for each), `docs/driving-a-session.md`; tests in
@@ -15646,9 +15646,9 @@ file it removed -- that is the NEXT thing to try if clobbering survives
 this, and it begins as a logged observation so its false-positive rate is
 measured before it can refuse anything.
 
-**Releasable.** Yes -- with 247, 248 and 250, as 3.22.0 in session 252.
+**Releasable.** Yes -- with 247, 248, 250 and 251, as 3.22.0 in session 253.
 
-### Session 250 of 252: A choice made in the Configuration is committed as it is made
+### Session 250 of 253: A choice made in the Configuration is committed as it is made
 
 Scope: `packages/router` -- `src/cli/configure.ts` (the write commits and
 pushes), `src/checks.ts` (`materialPaths` stops exempting the settings
@@ -15707,10 +15707,69 @@ with a session in flight leaves the file for the land and says so.
 `checks.test.ts`: the existing exemption test flips -- an uncommitted
 settings file counts before the declaration as it does at the close.
 
-**Releasable.** Yes -- with 247 to 249, as 3.22.0 in session 252, after
-251 walks it in survsys.
+**Releasable.** Yes -- with 247 to 249 and 251, as 3.22.0 in session 253,
+after 252 walks it in survsys.
 
-### Session 251 of 252: The transcript walked in a real repository first
+### Session 251 of 253: The tests 250's run of record did not reach
+
+Scope: `packages/router` -- `test/configuration.test.ts`,
+`test/projection.test.ts`, `test/session.test.ts`,
+`test/walk-session.test.ts`; `scripts/suite.mjs` (this repository's
+selected-run rule)
+
+**Why.** 250 closed VERIFIED at `4e7b5243` and the Test workflow went red
+on that commit and the close after it: twelve router tests in four files,
+on the Windows runner where the whole suite runs. Ten of them -- six in
+`configuration.test.ts`, four in `projection.test.ts` -- call `configure`,
+which since 250 asks git `status --porcelain -- .vscode/settings.json`
+before committing the choice; their git answer tables hold no row for that
+question, and the answers seam refuses an unrecorded one by design. The
+other two assert the behaviour 250 removed: `session.test.ts` "registers
+with the settings file the pane wrote the only change in the tree", and
+the start in `walk-session.test.ts`, which seeds an uncommitted settings
+file on the comment that the land commits it. Both now meet Start's
+refusal and get exit 2 where they assert 0.
+
+**Why 250 did not see it.** Its run of record was selected: `checks.test.ts`
+and `configure.test.ts`, 45 tests, the files named after the two source
+files that changed. The four red files are named after other source files
+and were not run, and the Windows run of record is `copilot.test.ts`
+alone. It is the class STATUS.md owes and the one 247 fell to: a test that
+exercises a verb through another file's name is reachable only by a whole
+run. 248 answered it for the driver with a table in `scripts/suite.mjs`
+that runs `walk-session.test.ts` whenever `drive.test.ts` or
+`driver.test.ts` is selected.
+
+**Step 1 -- the ten.** The shared git answer table in each of
+`configuration.test.ts` and `projection.test.ts` answers the status
+question with an empty porcelain, so `configure` finds nothing to commit
+and each test tests what it tested. One row per file, not ten.
+
+**Step 2 -- the two.** The `session.test.ts` test is deleted: the behaviour
+it asserted no longer exists, and Start's refusal with its two answers is
+tested beside it already. `walk-session.test.ts` stops seeding an
+uncommitted settings file before its start, and the comment says why: the
+configure verb commits the choice as it is made, and a settings file still
+uncommitted at Start is refused like any other.
+
+**Step 3 -- the selection rule.** The table in `scripts/suite.mjs` gains
+one entry: a change that selects `configure.test.ts` also runs
+`configuration.test.ts` and `projection.test.ts`, as 248 did for the
+driver.
+
+**Non-goals.** Any change under `src`: `commitChoice` does what 250 said
+it would. The general selection rule, owed in STATUS.md as its second
+item -- this is the second session the class has bitten, and that fact is
+raised there for the operator, whose cost decision it is; it is not
+settled here by a fix session. Any change to the walkthrough list in
+`test/support/no-git.ts`.
+
+**Tests.** None added. Twelve made true again, one deleted.
+
+**Releasable.** Yes -- with 247 to 250, as 3.22.0 in session 253, after
+252's walk.
+
+### Session 252 of 253: The transcript walked in a real repository first
 
 Scope: `docs/uat/uat-transcript.md` (new); `dabbler.yaml` only if the
 walk finds a selection rule the transcripts directory needs
@@ -15776,8 +15835,8 @@ drives survsys from its own Work Explorer, and the page says what to look
 for. Backfilling this repository. Any change to the renderer that the walk
 did not ask for.
 
-**Releasable.** No -- 252 publishes, on the operator's yes.
+**Releasable.** No -- 253 publishes, on the operator's yes.
 
-### Session 252 of 252: Release 3.22.0 (release: 3.22.0)
+### Session 253 of 253: Release 3.22.0 (release: 3.22.0)
 
-The framework publishes sessions 247 to 251 as 3.22.0 and nothing else.
+The framework publishes sessions 247 to 252 as 3.22.0 and nothing else.

@@ -5057,9 +5057,9 @@
     {
       "number": 255,
       "title": "A review is sized by what it reads",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T10:01:30.234000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T10:08:28.465000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

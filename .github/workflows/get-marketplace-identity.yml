@@ -1,0 +1,34 @@
+name: Verify Marketplace identity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify-identity:
+    name: Verify managed identity Marketplace access
+    runs-on: ubuntu-latest
+    environment: marketplace
+
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Sign in to Azure using GitHub OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Verify Marketplace publishing permission
+        shell: bash
+        run: |
+          npx --yes @vscode/vsce verify-pat \
+            DarndestDabbler \
+            --azure-credential

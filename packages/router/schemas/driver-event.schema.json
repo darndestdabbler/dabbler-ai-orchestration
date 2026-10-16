@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "events.jsonl row (one line the framework said)",
+  "description": "One row per line the driver printed, in .dabbler/runs/s<N>/driver/events.jsonl. The driver's `log` writes to stdout, and stdout is a terminal's scrollback: capped, in memory, and gone when the window closes. This is the same line, written down -- so a transcript QUOTES what the framework said rather than inferring it from file times, and the phase sequence falls out of the rows. Append-only, written by the driver and by nothing else, and read by the transcript renderer. It is the record of a run, never the run: a row that cannot be written is dropped and the session goes on.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sequence",
+    "event",
+    "at",
+    "session_number",
+    "fields"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Where this line fell among the lines of this run, counted from the rows already on disk. Two drivers cannot both be moving one run -- the lease fence settles that -- so a gap or a repeat here says the file was truncated or hand-touched, which is the one thing a reader of a record needs to be able to see."
+    },
+    "event": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The event word, exactly as the terminal printed it: `phase`, `step`, `rejected`, `verify`, `tests`, `job-started`. It is what the tone grammar is keyed on, so a transcript and the Dabbler Terminal paint one line the same way."
+    },
+    "at": {
+      "type": "string",
+      "minLength": 1,
+      "description": "When the line was said, as a full ISO instant. The terminal prints a wall clock of hours, minutes and seconds; a record that kept only that could not say which day, nor order two sessions."
+    },
+    "session_number": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "phase": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The phase the run stood in when the line was said. Absent for a line said before the run had one -- the first lines of a run are exactly those."
+    },
+    "fields": {
+      "type": "object",
+      "description": "The line's own `key=value` pairs, as the caller passed them and before they were flattened for printing. Open, because the events are the driver's own vocabulary and a closed list here would be a second copy of it that drifts; a value is whatever `log` was given."
+    }
+  }
+}

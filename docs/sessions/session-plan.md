@@ -16028,19 +16028,30 @@ carries the report's `notes`. Nothing new is written anywhere else and no
 file is kept that is deleted today. A test in `drive.test.ts` asserts both
 rows carry them.
 
-**Step 2 -- the page says it.** Under each finding 257 lists, the
-transcript adds how it was answered, read from those events of the
-finding's round: `fixed` with the `fix-round-N` step's notes and files, or
-`disputed` with the reason, and the dispute's outcome where the next round
-recorded one. A finding no disposition named (a non-blocking one the
-author left) reads `not answered`. A test in `transcript.test.ts`: a round
-with one fixed and one disputed finding renders both answers.
+**Step 2 -- the page says it, in the round's own row.** 257's list under
+the table goes. A round with findings has its Findings cell become a
+native `<details>` toggle (`N findings`) -- no script, as the Jobs section
+already does it -- and is followed by a row spanning every column that
+holds a subtable: `#`, `Severity` (with the `blocking` tag), `Finding`,
+`Response`. The Response is read from those events of the finding's round:
+`fixed` with the `fix-round-N` step's notes and files, or `disputed` with
+the reason, and the dispute's outcome where the next round recorded one. A
+finding no disposition named (a non-blocking one the author left) reads
+`not answered`; a session recorded before this one, whose events never
+carried an answer, reads `not recorded`. A round whose verdict is
+`ISSUES_FOUND` opens expanded; any other round with findings opens
+collapsed. Descriptions stay escaped and scrubbed as 257 made them. A test
+in `transcript.test.ts`: an `ISSUES_FOUND` round with one fixed and one
+disputed finding renders both answers in its subtable and opens expanded,
+and a `VERIFIED` round's findings open collapsed.
 
 **Non-goals.** Asking the author for anything it does not already write --
 the notes stay one line per step, not one per finding. Keeping
 `dispositions.json` after it is spent. Answers for sessions recorded
 before this one, whose events never carried them. Re-rendering any page
-already committed.
+already committed. Merging a finding the reviewer's output split into
+fragments: each fragment is its own row, as it is its own index. Any
+script on the page.
 
 **Releasable.** Yes -- with 247 to 257, as 3.22.0 in session 259.
 

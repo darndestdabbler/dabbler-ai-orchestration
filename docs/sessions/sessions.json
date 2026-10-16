@@ -5035,9 +5035,9 @@
     {
       "number": 254,
       "title": "The two transcripts written by the renderer 253 fixed",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T09:43:25.987000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T09:53:08.472000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

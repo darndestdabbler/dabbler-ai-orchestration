@@ -4881,9 +4881,9 @@
     {
       "number": 247,
       "title": "A session's transcript, rendered and committed",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T03:43:41.581000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T04:31:31.145000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

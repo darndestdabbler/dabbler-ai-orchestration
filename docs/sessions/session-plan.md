@@ -15428,7 +15428,7 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
 
-### Session 247 of 249: A session's transcript, rendered and committed
+### Session 247 of 250: A session's transcript, rendered and committed
 
 Scope: `packages/router` -- `schemas/events.schema.json` and
 `src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
@@ -15537,20 +15537,73 @@ Persisting the terminal's live scrollback. An index page over the
 transcripts, a search across them, or any reader of a transcript.
 Changing what the terminal shows.
 
-**Releasable.** Yes -- 249 publishes 3.22.0, after 248's walk.
+**Releasable.** Yes -- 250 publishes 3.22.0, after 249's walk.
 
-### Session 248 of 249: The transcript walked in a real repository first
+### Session 248 of 250: A step is told which of its files are already there
+
+Scope: `packages/router` -- `src/drive.ts` (`stepAsk` names the step's own
+files and reads the tree for each), `docs/driving-a-session.md`; tests in
+`test/drive.test.ts`
+
+**Why.** The operator's staff keep meeting an author that creates a file
+which already exists -- a test file, a class file -- and writes over what
+was there. A plausible shape: the author derives `CsvSerializerTests.cs`
+from the naming rule the plan ask states, writes it fresh, and replaces
+twelve tests with one. The step's checks then pass, because the one new
+test passes.
+
+**The author is never told the file is there, and it was told once.** The
+step declared its `files` at plan time; `stepAsk` does not name them
+again, so the path is derived from prose a second time with no list in
+front of it. The framework holds both halves of the missing fact -- the
+declared list on the accepted plan, and the tree -- and puts neither in
+the instruction the work is done from.
+
+The cure is to say it, and nothing more. `planAsk` is not touched: it
+shapes every plan in every project that uses this framework, carries
+sentences added for specific past incidents, and a regression in plan
+quality would be diffuse and hard to attribute. Two advisors were asked
+on 2026-10-16 and both said a filesystem check at plan ACCEPTANCE is the
+wrong instrument -- a plan whose first step creates what its second step
+changes makes the acceptance reason about state that does not exist yet,
+and tightening the check means simulating the plan forward. That is more
+machinery than the fault is worth.
+
+**Step 1 -- the step's ask names its files, and says which exist.** The
+instruction a step is answered from gains the step's own declared files,
+each read from the tree as the instruction is issued and marked as
+existing or new, with the sentence that an existing file is read before it
+is written. Appended, as the non-goals and the timeout line already are:
+no existing sentence changes, no schema moves, nothing is refused. A step
+that declared no files says so rather than printing an empty list.
+
+**Step 2 -- the words.** `docs/driving-a-session.md` says what a step's
+instruction carries and why the existing-file mark is in it.
+
+**Non-goals.** Any change to `planAsk`, to the work-plan schema or to its
+generated types. A `creates` / `changes` distinction on a step. Any
+refusal, at the plan's acceptance or on the report: this session makes the
+author better informed and adds no gate. Judging a diff for how much of a
+file it removed -- that is the NEXT thing to try if clobbering survives
+this, and it begins as a logged observation so its false-positive rate is
+measured before it can refuse anything.
+
+**Releasable.** Yes -- with 247, as 3.22.0 in session 250.
+
+### Session 249 of 250: The transcript walked in a real repository first
 
 Scope: `docs/uat/uat-transcript.md` (new); `dabbler.yaml` only if the
 walk finds a selection rule the transcripts directory needs
 
 **Why.** 3.22.0 reaches a developer with a dozen sessions of real work
-behind it, and the renderer will have been run against this repository's
-records alone. The operator has `../survsys` on this machine -- 56
-sessions planned, 23 complete -- which is the honest test: records written
-by a different project, a different language and a different shape of
-session. A defect found there costs a walk; the same defect found after
-3.22.0 is published costs every seat that installed it.
+behind it, and both of the things it carries -- 247's renderer and 248's
+annotated step instruction -- will have been exercised against this
+repository alone. The operator has `../survsys` on this machine -- 56
+sessions planned, 23 complete, and sessions running in it now -- which is
+the honest test: records written by a different project, a different
+language and a different shape of session. A defect found there costs a
+walk; the same defect found after 3.22.0 is published costs every seat
+that installed it.
 
 **The VSIX is built and installed locally, and the release waits.** This
 session packs the extension and nothing else: no tag, no Marketplace, no
@@ -15573,7 +15626,16 @@ says plainly that survsys must have NO session in flight when the VSIX is
 installed: the extension carries the router, and replacing it under a
 running session swaps the code driving that session mid-run.
 
-**Step 3 -- what the walk found.** The findings go in the page beside the
+**Step 3 -- the step instruction, read in passing.** 248's annotation is
+not walked by driving a session here: the operator is already driving
+survsys, and the next step it issues there carries the list. The page says
+what to look for in it -- each of the step's declared files named once,
+marked existing or new, the marks agreeing with the tree -- and where to
+read it (the instruction's `ask`). An author that then writes over a file
+marked existing is the finding worth having, and the page says to keep
+that instruction.
+
+**Step 4 -- what the walk found.** The findings go in the page beside the
 step that found them. A defect that stops the walk is fixed in this
 session; one that does not is recorded for the operator to schedule.
 
@@ -15581,8 +15643,8 @@ session; one that does not is recorded for the operator to schedule.
 or changing its plan. Backfilling this repository. Any change to the
 renderer that the walk did not ask for.
 
-**Releasable.** No -- 249 publishes, on the operator's yes.
+**Releasable.** No -- 250 publishes, on the operator's yes.
 
-### Session 249 of 249: Release 3.22.0 (release: 3.22.0)
+### Session 250 of 250: Release 3.22.0 (release: 3.22.0)
 
-The framework publishes sessions 247 and 248 as 3.22.0 and nothing else.
+The framework publishes sessions 247, 248 and 249 as 3.22.0 and nothing else.

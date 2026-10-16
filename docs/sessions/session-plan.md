@@ -15428,7 +15428,7 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
 
-### Session 247 of 250: A session's transcript, rendered and committed
+### Session 247 of 251: A session's transcript, rendered and committed
 
 Scope: `packages/router` -- `schemas/events.schema.json` and
 `src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
@@ -15537,9 +15537,9 @@ Persisting the terminal's live scrollback. An index page over the
 transcripts, a search across them, or any reader of a transcript.
 Changing what the terminal shows.
 
-**Releasable.** Yes -- 250 publishes 3.22.0, after 249's walk.
+**Releasable.** Yes -- 251 publishes 3.22.0, after 250's walk.
 
-### Session 248 of 250: A step is told which of its files are already there
+### Session 248 of 251: A step is told which of its files are already there
 
 Scope: `packages/router` -- `src/drive.ts` (`stepAsk` names the step's own
 files and reads the tree for each), `docs/driving-a-session.md`; tests in
@@ -15588,9 +15588,67 @@ file it removed -- that is the NEXT thing to try if clobbering survives
 this, and it begins as a logged observation so its false-positive rate is
 measured before it can refuse anything.
 
-**Releasable.** Yes -- with 247, as 3.22.0 in session 250.
+**Releasable.** Yes -- with 247, as 3.22.0 in session 251.
 
-### Session 249 of 250: The transcript walked in a real repository first
+### Session 249 of 251: The record is written before the session is told it is done
+
+Scope: `packages/router` -- `src/drive.ts` (`phaseClose` and `phaseLog`:
+the order of the `done` instruction against the Log phase),
+`dabbler.yaml` (the selection rule for the driver's phase machine); tests
+in `test/walk-session.test.ts` and `test/drive.test.ts`
+
+**Why.** CI's Router suite has been red on every commit since 247 landed,
+and the suite is right. `walk-session.test.ts` asserts that when the loop
+issues `done` the run record says `complete`; `phaseClose` now ends
+`issueDone(); setPhase("log")`, so at that moment it says `log`. Three
+commits have been red, including one that changed only this plan.
+
+**The stale assertion is the symptom; the order is the defect.** `done`
+means what `AGENTS.md` says it means -- the session is over and closed,
+stop -- so an author that obeys it never calls the framework again, and
+the Log phase after it never runs. The evidence is 247's own session: its
+run record reached `complete`, and NEITHER of the two records 247 built
+exists for it. There is no `docs/transcripts/` in this repository and no
+`events.jsonl` under `s247/driver/`, with `dabbler.transcript` unset and
+its default `outline`. The feature wrote nothing about the one session
+guaranteed to exercise it.
+
+**And a green close hid it.** 247's run of record was a SELECTED run of
+eleven named files -- `checks`, `config`, `drive`, `driver`, `evidence`,
+`inProcess`, `journal`, `schema`, `settings`, `testEvidence`,
+`transcript`. `walk-session.test.ts` was not among them, because tests are
+selected by being named after what they test and that suite is named after
+no file. So the one suite that drives a session end to end did not run in
+the session that changed the phase machine, and CI met it first.
+
+**Step 1 -- the record is written first, and `done` is last.** `phaseClose`
+moves to `log` without issuing anything; `phaseLog` writes the page,
+reaches `complete`, and the `done` instruction is issued there. Every
+early return in the Log phase -- the setting unreadable, `off`, a page
+already on disk, a render that threw -- still reaches `complete` and still
+issues `done`, because the rule that the transcript cannot stop a session
+is the one thing about this phase that must not change. A session is told
+it is over once, after its record exists.
+
+**Step 2 -- the suite that drives a session follows the phase machine.**
+`walk-session.test.ts`'s assertions take the new order, and the walk
+proves the two records exist at the close rather than only the phase: a
+page under `docs/transcripts/` and an `events.jsonl` under the run.
+`dabbler.yaml` gains the rule that a change to `src/drive.ts` or
+`src/driver.ts` selects that suite, so a phase-machine change can never
+again be measured by a run that skipped it. `drive.test.ts`'s unused
+`repo` binding, which CI reports as a lint warning, goes with it.
+
+**Non-goals.** Making a transcript's absence a gate, or anything else that
+lets a page stop a session. Backfilling 247's own transcript -- a page is
+rendered against the tree it names and 247's is no longer HEAD, so 247
+simply has none and the verb can render it on request. Any change to the
+renderer, the verb or the setting. Changing what selection means for any
+path other than the two named.
+
+**Releasable.** Yes -- with 247 and 248, as 3.22.0 in session 251.
+
+### Session 250 of 251: The transcript walked in a real repository first
 
 Scope: `docs/uat/uat-transcript.md` (new); `dabbler.yaml` only if the
 walk finds a selection rule the transcripts directory needs
@@ -15643,8 +15701,8 @@ session; one that does not is recorded for the operator to schedule.
 or changing its plan. Backfilling this repository. Any change to the
 renderer that the walk did not ask for.
 
-**Releasable.** No -- 250 publishes, on the operator's yes.
+**Releasable.** No -- 251 publishes, on the operator's yes.
 
-### Session 250 of 250: Release 3.22.0 (release: 3.22.0)
+### Session 251 of 251: Release 3.22.0 (release: 3.22.0)
 
-The framework publishes sessions 247, 248 and 249 as 3.22.0 and nothing else.
+The framework publishes sessions 247 to 250 as 3.22.0 and nothing else.

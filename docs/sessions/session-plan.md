@@ -15428,7 +15428,7 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
 
-### Session 247 of 251: A session's transcript, rendered and committed
+### Session 247 of 252: A session's transcript, rendered and committed
 
 Scope: `packages/router` -- `schemas/events.schema.json` and
 `src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
@@ -15537,9 +15537,9 @@ Persisting the terminal's live scrollback. An index page over the
 transcripts, a search across them, or any reader of a transcript.
 Changing what the terminal shows.
 
-**Releasable.** Yes -- 251 publishes 3.22.0, after 250's walk.
+**Releasable.** Yes -- 252 publishes 3.22.0, after 251's walk.
 
-### Session 248 of 251: The record is written before the session is told it is done
+### Session 248 of 252: The record is written before the session is told it is done
 
 Scope: `packages/router` -- `src/drive.ts` (`phaseClose` and `phaseLog`:
 the order of the `done` instruction against the Log phase),
@@ -15595,9 +15595,9 @@ simply has none and the verb can render it on request. Any change to the
 renderer, the verb or the setting. Changing what selection means for any
 path other than the two named.
 
-**Releasable.** Yes -- with 247 and 249, as 3.22.0 in session 251.
+**Releasable.** Yes -- with 247, 249 and 250, as 3.22.0 in session 252.
 
-### Session 249 of 251: A step is told which of its files are already there
+### Session 249 of 252: A step is told which of its files are already there
 
 Scope: `packages/router` -- `src/drive.ts` (`stepAsk` names the step's own
 files and reads the tree for each), `docs/driving-a-session.md`; tests in
@@ -15646,17 +15646,79 @@ file it removed -- that is the NEXT thing to try if clobbering survives
 this, and it begins as a logged observation so its false-positive rate is
 measured before it can refuse anything.
 
-**Releasable.** Yes -- with 247 and 248, as 3.22.0 in session 251.
+**Releasable.** Yes -- with 247, 248 and 250, as 3.22.0 in session 252.
 
-### Session 250 of 251: The transcript walked in a real repository first
+### Session 250 of 252: A choice made in the Configuration is committed as it is made
+
+Scope: `packages/router` -- `src/cli/configure.ts` (the write commits and
+pushes), `src/checks.ts` (`materialPaths` stops exempting the settings
+file), `docs/driving-a-session.md`; tests in `test/configure.test.ts` and
+`test/checks.test.ts`
+
+**Why.** On 2026-10-16 the operator set survsys's authoring model in the
+Configuration pane and, fifteen seconds later, started its release session
+29. The release stopped at publish with two gates refused --
+`working_tree_clean` over the untracked `.vscode/settings.json`, and
+`verification_clean` because that same file made the no-change judgment
+see a changed tree, so a session with no steps was asked for a
+verification round it can never have. The three releases before it had
+published cleanly; the file did not exist yet.
+
+**One assumption, and the one kind of session it does not hold for.** The
+write leaves the file uncommitted on purpose: `materialPaths` exempts it
+before the declaration on the sentence "a settings choice configures the
+session; the land commits it". A release session has no steps and
+therefore no land, so the file waits for a commit that never comes, and
+the publish gate -- which exempts nothing -- counts it. The repository's
+own copy is committed, and the pane says the choice travels to the next
+clone, so an uncommitted settings file is the one state the design never
+meant to leave the tree in.
+
+**Step 1 -- the write commits.** `configure` writes the checkout's
+`.vscode/settings.json` as it does now, then commits that one path and
+nothing else, with a message naming the setting, and pushes where the
+branch tracks an upstream -- the rule `commitChangesBeforeStart` already
+applies. Only when no session is in flight in the repository's sessions
+root: in flight, the land commits it as today, and the verb's output says
+so. A commit or push that fails is reported in the verb's output and
+refuses nothing: the choice is written either way, and the next Start
+meets the file as an uncommitted change and offers Commit and Push. The
+`--mine` form writes the machine's default and no file in the checkout, so
+it commits nothing.
+
+**Step 2 -- the exemption goes.** `materialPaths` stops exempting
+`.vscode/settings.json` before the declaration. A settings file still
+uncommitted at a Start is now a failed commit or a hand's edit, and either
+is what Start's existing Commit-and-Push answer is for. The hook file's
+exemption stands: that edit is the registration's own.
+
+**Step 3 -- the words.** `docs/driving-a-session.md` says a choice made in
+the Configuration lands on the trunk the moment it is made, and when it
+instead rides with the session.
+
+**Non-goals.** Any change to the publish gates or to the release path:
+with the file committed at the write, they are right as they are.
+Committing anything else the tree holds. A new verb. A commit while a
+session is in flight.
+
+**Tests.** `configure.test.ts`: the choice is committed and pushed, and a
+second uncommitted file in the fixture stays uncommitted; a choice made
+with a session in flight leaves the file for the land and says so.
+`checks.test.ts`: the existing exemption test flips -- an uncommitted
+settings file counts before the declaration as it does at the close.
+
+**Releasable.** Yes -- with 247 to 249, as 3.22.0 in session 252, after
+251 walks it in survsys.
+
+### Session 251 of 252: The transcript walked in a real repository first
 
 Scope: `docs/uat/uat-transcript.md` (new); `dabbler.yaml` only if the
 walk finds a selection rule the transcripts directory needs
 
 **Why.** 3.22.0 reaches a developer with a dozen sessions of real work
-behind it, and both of the things it carries -- 247's renderer and 249's
-annotated step instruction -- will have been exercised against this
-repository alone. The operator has `../survsys` on this machine -- 56
+behind it, and the three things it carries -- 247's renderer, 249's
+annotated step instruction and 250's committed Configuration choice --
+will have been exercised against this repository alone. The operator has `../survsys` on this machine -- 56
 sessions planned, 23 complete, and sessions running in it now -- which is
 the honest test: records written by a different project, a different
 language and a different shape of session. A defect found there costs a
@@ -15693,16 +15755,29 @@ read it (the instruction's `ask`). An author that then writes over a file
 marked existing is the finding worth having, and the page says to keep
 that instruction.
 
-**Step 4 -- what the walk found.** The findings go in the page beside the
+**Step 4 -- 250's fix, walked on the release that found it.** survsys's
+release session 29 is the stop 250 exists for, and the operator has rolled
+it back to its start, which discards the untracked settings file with the
+rest. The page says what to do, in the operator's own hands from survsys's
+Work Explorer: set the authoring model in the Configuration pane with the
+new VSIX installed, and see the commit land and push with that one file in
+it and `git status` clean; then Start the release session, and see it
+publish to `D:/handoff/survsys` without a refused gate. A release that
+stops at publish again is the finding worth having, and the page says to
+keep its `run.json`.
+
+**Step 5 -- what the walk found.** The findings go in the page beside the
 step that found them. A defect that stops the walk is fixed in this
 session; one that does not is recorded for the operator to schedule.
 
-**Non-goals.** Publishing anything. Tagging. Driving a session in survsys
-or changing its plan. Backfilling this repository. Any change to the
-renderer that the walk did not ask for.
+**Non-goals.** Publishing anything from this repository. Tagging. Driving a
+session in survsys from this session, or changing its plan: the operator
+drives survsys from its own Work Explorer, and the page says what to look
+for. Backfilling this repository. Any change to the renderer that the walk
+did not ask for.
 
-**Releasable.** No -- 251 publishes, on the operator's yes.
+**Releasable.** No -- 252 publishes, on the operator's yes.
 
-### Session 251 of 251: Release 3.22.0 (release: 3.22.0)
+### Session 252 of 252: Release 3.22.0 (release: 3.22.0)
 
-The framework publishes sessions 247 to 250 as 3.22.0 and nothing else.
+The framework publishes sessions 247 to 251 as 3.22.0 and nothing else.

@@ -195,6 +195,15 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "render a module's contract from its declaration",
   },
   {
+    // A driven session renders its own at the Log phase, so this verb is
+    // for the sessions that came before the one you are in. It reads
+    // records already on disk and dispatches nothing, which is why it is
+    // safe to hand a range of a dozen.
+    verb: "transcript",
+    extensionFacing: false,
+    summary: "render a range of sessions as self-contained pages, from records on disk",
+  },
+  {
     // The managed body tells an engine to report the version it ran; this
     // is what it runs. `dabbler --version` is the same handler.
     verb: "version",

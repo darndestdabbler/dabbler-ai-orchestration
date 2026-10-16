@@ -200,3 +200,75 @@ describe("the verb table", () => {
     assert.equal(findVerb("python"), undefined);
   });
 });
+
+function without(row: Record<string, unknown>, key: string): Record<string, unknown> {
+  const copy = { ...row };
+  delete copy[key];
+  return copy;
+}
+
+describe("the driver event row", () => {
+  const schema = loadSchemaFile("driver-event.schema.json");
+  const row = {
+    schema_version: 1,
+    sequence: 4,
+    event: "verify",
+    at: "2026-10-16T03:49:03.033-04:00",
+    session_number: 247,
+    phase: "verify",
+    fields: { verdict: "VERIFIED", round: 2 },
+  };
+
+  it("admits a line the framework said, with or without a phase", () => {
+    assert.equal(schemaFailure(row, schema, "driver event"), null);
+    // The first lines a process says are made before the run has a phase.
+    assert.equal(schemaFailure(without(row, "phase"), schema, "driver event"), null);
+  });
+
+  it("leaves the fields open, because the events are the driver's own vocabulary", () => {
+    // A closed list here would be a second copy of the driver's event
+    // vocabulary, and the two would drift the first time a phase gained a
+    // line. The ROW is closed; what a line carries is not.
+    assert.equal(
+      schemaFailure({ ...row, fields: { anything: [1, { nested: true }] } }, schema, "driver event"),
+      null,
+    );
+    assert.match(
+      String(schemaFailure({ ...row, unexpected: true }, schema, "driver event")),
+      /additional properties/,
+    );
+  });
+
+  it("refuses a row with no sequence, so a gap cannot be mistaken for a quiet session", () => {
+    assert.match(String(schemaFailure(without(row, "sequence"), schema, "driver event")), /sequence/);
+  });
+
+  it("requires the version and pins it, because nothing wrote this record before it existed", () => {
+    // Every other record here makes `schema_version` optional so that rows
+    // written before the field existed still read. There are no such rows
+    // for this one, so there is nothing to be tolerant of -- and a reader
+    // that accepted version 2 would be guessing at a shape it has never
+    // seen.
+    assert.match(
+      String(schemaFailure(without(row, "schema_version"), schema, "driver event")),
+      /schema_version/,
+    );
+    assert.match(
+      String(schemaFailure({ ...row, schema_version: 2 }, schema, "driver event")),
+      /schema_version/,
+    );
+  });
+});
+
+describe("the Log phase on a run record", () => {
+  it("is a phase a run may stand in, between the close and complete", () => {
+    // The order is the whole reason it is a phase of its own: a record
+    // describing a verified tree can only be committed once that tree is.
+    const phases = (loadSchemaFile("driver-run.schema.json")["$defs"] as Record<string, unknown>)[
+      "phase"
+    ] as { enum: string[] };
+    assert.ok(phases.enum.includes("log"));
+    assert.equal(phases.enum.indexOf("log"), phases.enum.indexOf("close") + 1);
+    assert.equal(phases.enum.indexOf("complete"), phases.enum.indexOf("log") + 1);
+  });
+});

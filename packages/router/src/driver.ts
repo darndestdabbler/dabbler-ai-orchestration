@@ -26,6 +26,7 @@ import { join } from "node:path";
 
 import type {
   DriverDisposition,
+  DriverEvent,
   DriverInstruction,
   DriverReport,
   DriverRun,
@@ -2181,4 +2182,126 @@ export function appendSupervision(
     `${JSON.stringify({ at: new Date().toISOString(), ...event })}\n`,
     "utf8",
   );
+}
+
+// --- The framework's own lines ------------------------------------------------
+//
+// `drive.ts`'s `log` writes one line to stdout for every move the framework
+// makes -- the phase it reached, the step it accepted, the rejection and its
+// reasons -- and stdout is a terminal's scrollback: capped, held in memory,
+// and gone when the window closes. Every one of those lines is written here
+// as well, one row each, so that what the framework SAID outlives the
+// terminal it was said in. A transcript then QUOTES these rows rather than
+// reconstructing a session's shape from the modification times of files.
+//
+// It is the record OF a run and never the run itself. An append that cannot
+// be made is dropped and the session goes on: a run that died of its own
+// logging would be a worse outcome than a transcript with a hole in it, and
+// the hole is visible anyway -- `sequence` is dense, so a reader can see
+// that something is missing rather than being told a tidy lie.
+
+const EVENTS_FILENAME = "events.jsonl";
+
+export function eventsPath(repoRoot: string, sessionNumber: number): string {
+  return join(driverDir(repoRoot, sessionNumber), EVENTS_FILENAME);
+}
+
+/**
+ * The next sequence number for one events file, per process.
+ *
+ * Seeded once from the rows already on disk and counted in memory after
+ * that. Under the pull every `dabbler session next` is a fresh process, so
+ * the file has to be consulted at least once; counting it on every line
+ * would make the cost of logging grow with the length of the session.
+ * Two drivers cannot both be appending to one run -- the lease fence in
+ * `drive.ts` settles that -- so one counter per path is the whole of it.
+ */
+const eventSequences = new Map<string, number>();
+
+function nextEventSequence(path: string): number {
+  const known = eventSequences.get(path);
+  const next = known === undefined ? countEventRows(path) + 1 : known + 1;
+  eventSequences.set(path, next);
+  return next;
+}
+
+function countEventRows(path: string): number {
+  if (!existsSync(path)) return 0;
+  try {
+    return readFileSync(path, "utf8").split("\n").filter((line) => line.trim() !== "").length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Write down one line the framework said.
+ *
+ * `fields` arrives as the caller passed it and is recorded as such, before
+ * it is flattened into `key=value` for printing: the row is the line's
+ * meaning, and a renderer that wanted the printed form could always make it
+ * from this and never the other way round.
+ */
+export function appendDriverEvent(
+  repoRoot: string,
+  sessionNumber: number,
+  event: string,
+  fields: Record<string, unknown> = {},
+  phase?: string | null,
+): void {
+  const path = eventsPath(repoRoot, sessionNumber);
+  try {
+    appendJsonl(path, {
+      schema_version: DRIVER_SCHEMA_VERSION,
+      sequence: nextEventSequence(path),
+      event,
+      at: new Date().toISOString(),
+      session_number: sessionNumber,
+      ...(phase ? { phase } : {}),
+      fields,
+    });
+  } catch {
+    // Deliberately silent: see the note above. There is nowhere to report a
+    // failure to report, and a throw here would unwind a phase that had
+    // nothing wrong with it.
+  }
+}
+
+export const EVENT_SCHEMA = "driver-event.schema.json";
+
+export function validateDriverEvent(record: unknown): DriverEvent {
+  return validateAgainst<DriverEvent>(record, EVENT_SCHEMA, "driver event");
+}
+
+/**
+ * Every line this session's driver said, in the order it said them.
+ *
+ * Tolerant where the rest of the ledger refuses, and for a reason the rest
+ * of the ledger does not have: the last row of this file is written by a
+ * process that may be killed between the newline and the next byte, and
+ * the file is read by a transcript rather than by a gate. Nothing here is
+ * evidence anything passed, so a half-written row costs the reader that
+ * row and not the session's whole account of itself. The rows that survive
+ * carry their own `sequence`, so a gap SHOWS -- which is the honest form of
+ * "say what was absent rather than infer it".
+ */
+export function readDriverEvents(repoRoot: string, sessionNumber: number): DriverEvent[] {
+  const path = eventsPath(repoRoot, sessionNumber);
+  if (!existsSync(path)) return [];
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    return [];
+  }
+  const events: DriverEvent[] = [];
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    if (!line.trim()) continue;
+    try {
+      events.push(validateDriverEvent(JSON.parse(line)));
+    } catch {
+      continue;
+    }
+  }
+  return events;
 }

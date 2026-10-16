@@ -61,12 +61,16 @@
 // session's test runs, and each job log already on disk, named with where
 // it is. Only bytes appended after the terminal opened pass through.
 //
-// Colour is this file's own, and it says what a line IS rather than naming
-// a colour: see `Tone`, `lineTone` and `fieldTone`. Two palettes, resolved
-// from the editor's theme kind and re-read when it changes. There is no
-// background behind the framework's lines: the clock and the indent are
-// what separate them from a job's output, and a band did that at the cost
-// of competing with the line it was behind.
+// Colour says what a line IS rather than naming a colour: see `Tone`,
+// `lineTone` and `fieldTone`, which come from the ROUTER. They used to be
+// this file's own, and a session's committed transcript renders the same
+// records into a page -- so the rule about what a line is now has two
+// renderers over it, and is stated once where both can reach it. This file
+// paints a tone as an ANSI escape; the transcript paints it as a CSS class.
+// Two palettes, resolved from the editor's theme kind and re-read when it
+// changes. There is no background behind the framework's lines: the clock
+// and the indent are what separate them from a job's output, and a band did
+// that at the cost of competing with the line it was behind.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -78,7 +82,10 @@ import {
   TESTS_PASSED,
   TESTS_RUNNING,
   TEST_FAILURE,
+  TONES,
   WATCHER_QUIET,
+  fieldTone,
+  lineTone,
   progressResumed,
   readUncollectedJob,
   readWatcher,
@@ -86,50 +93,12 @@ import {
   renderWaiting,
   stalledAfterSeconds,
   waiterSeenSince,
+  type ThemeKind,
+  type Tone,
 } from "dabbler-ai-router";
 
 import { RUNS_REL } from "../utils/projection";
 import { SESSIONS_REL } from "../utils/fileSystem";
-
-export type ThemeKind = "dark" | "light";
-
-/**
- * What a line, or a value inside one, IS -- which is the only thing that
- * decides its colour. No event names a colour; it names what it is, and the
- * palette answers in the theme at hand. `plain` is the terminal's own
- * foreground and is painted with nothing.
- */
-export type Tone = "milestone" | "good" | "warn" | "bad" | "muted" | "plain";
-
-/** The tones that carry a colour of their own. */
-export type PaintedTone = Exclude<Tone, "plain">;
-
-/**
- * The two palettes, one per theme kind.
- *
- * The dark values are the operator's, chosen on 2026-09-06 against the
- * editor's defaults: the milestone blue rather than a teal that read as a
- * second green, and a green and an amber each a step less saturated than
- * the token colours they replaced. The light values are the darker
- * relatives that stay readable on a white terminal; the same hex on both
- * backgrounds would be unreadable on one of them.
- */
-export const TONES: Readonly<Record<ThemeKind, Readonly<Record<PaintedTone, string>>>> = {
-  dark: {
-    milestone: "#3874db",
-    good: "#54a33b",
-    warn: "#b79427",
-    bad: "#f14c4c",
-    muted: "#8c8c8c",
-  },
-  light: {
-    milestone: "#2a5db0",
-    good: "#256029",
-    warn: "#8a6100",
-    bad: "#a31515",
-    muted: "#6b6b6b",
-  },
-};
 
 /** Where `jobs.ts` writes a background job's log, under the run's driver dir. */
 const JOBS_DIRNAME = "jobs";
@@ -170,96 +139,6 @@ const SUPERVISION_FILENAME = "supervision.jsonl";
  * runs where nobody can see it" true however the loop was started.
  */
 const LOOP_LOG_FILENAME = "loop.log";
-
-/**
- * A verdict's tone.
- *
- * `VERIFIED` is the only clean one and it is the only green one. Everything
- * else is a verdict that asks for something -- findings to dispose, a round
- * to run again -- and reads as such. An unknown token is warned rather than
- * assumed good, because a verdict this does not recognise is exactly the
- * case where guessing "fine" is worst.
- */
-export function verdictTone(verdict: string): Tone {
-  const token = verdict.trim().toUpperCase();
-  if (token === "VERIFIED") return "good";
-  if (token === "ISSUES_FOUND" || token === "REJECTED" || token === "FAILED") return "bad";
-  return "warn";
-}
-
-/**
- * What a whole line is, which decides the event word's colour.
- *
- * A stop is the one thing in this terminal that must not be scrolled past.
- * A milestone phase, a verdict and a test run are the lifecycle reaching
- * somewhere -- what the operator opened this terminal to see. Everything
- * else is traffic, and traffic is muted so that the three above stand out
- * of it rather than competing with it.
- */
-export function lineTone(event: string, fields: Record<string, string> = {}): Tone {
-  // A pause is amber: the loop met a bound and a person is told who acts
-  // next, which is not an alarm. Every pause, whatever class a run written
-  // before 2.9.0 carries.
-  if (event === "paused") return "warn";
-  // The one honest green event, and no second: the phase moved past a
-  // pause with nothing in its place.
-  if (event === "progress-resumed") return "good";
-  // A finished job nobody collected is amber for the watcher's reason: the
-  // framework knows of nothing wrong, and what is being said is that the
-  // next call is owed and nobody has made it.
-  if (event === "uncollected") return "warn";
-  // The watcher is a nudge, not a verdict: nothing has gone wrong that the
-  // framework knows of, and the only thing being said is that the engine
-  // has been quiet over an unmoved tree. `warn` is the amber the indicator
-  // already spins in, which is exactly the weight it should carry.
-  if (event === "watcher") return "warn";
-  if (event === "instruction-overdue") return "warn";
-  if (event === "verify") return verdictTone(fields["verdict"] ?? "");
-  if (event === "tests") return (fields["outcome"] ?? "") === "passed" ? "good" : "bad";
-  // Every phase, and not a chosen eight. A list of the interesting ones put
-  // `preverify`, `dispositions`, `fix` and `publish` in the plain tone --
-  // which are precisely the phases where a session stops being routine and
-  // an operator most wants to catch it -- so one session read blue, blue,
-  // plain, blue, plain, plain, blue, blue, plain, blue as it moved, and the
-  // reader had to know the list to know what the change of colour meant. A
-  // phase line is the framework saying where the session is, and where the
-  // session is is always worth the same weight.
-  if (event === "phase") return "milestone";
-  if (event === "session-closed") return "milestone";
-  // A step beginning is the session's own progress, in the milestone blue;
-  // an answer refused is the amber of a nudge, not the red of a failure --
-  // the engine is told why and answers again.
-  if (event === "step") return "milestone";
-  if (event === "rejected") return "warn";
-  return "muted";
-}
-
-/** A job's exit code as a tone: zero is good, anything else is bad. */
-function exitTone(exit: string): Tone {
-  return exit === "0" ? "good" : "bad";
-}
-
-/**
- * What one field's VALUE is, independent of the line it sits on.
- *
- * Keyed on the key rather than on the event, so a verdict is green wherever
- * it appears and a phase is a milestone wherever it appears. The event is
- * still passed because a `reason` on a stop is the diagnosis and a `reason`
- * anywhere else would not be.
- */
-export function fieldTone(event: string, key: string, value: string): Tone {
-  if (key === "verdict") return verdictTone(value);
-  if (key === "outcome") return value === "passed" ? "good" : "bad";
-  if (key === "exit") return exitTone(value);
-  // `now` is the phase line's own word for where the run is; `phase` is the
-  // same value wherever another line carries it. Every one of them, for the
-  // reason `lineTone` gives above.
-  if (key === "now" || key === "phase") return "milestone";
-  // On a pause the kind is amber; the words themselves stay plain, because
-  // prose painted whole is a wall.
-  if (event === "paused" && key === "kind") return "warn";
-  return "plain";
-}
 
 /**
  * A suite's result events, drawn as a person reads a test run: a mark, the

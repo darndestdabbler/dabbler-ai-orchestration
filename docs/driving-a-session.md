@@ -911,6 +911,93 @@ Behind that, in the close's own log:
 close: session 001 of sessions closed (VERIFIED).
 ```
 
+### The Log phase: what the session looked like
+
+One phase runs after the close, and it is the only one that happens with
+nothing owed to anybody:
+
+```
+dabbler [11:31:49] phase phase=log
+dabbler [11:31:49] transcript-committed path=docs/transcripts/session-001.html carry=outline
+dabbler [11:31:50] transcript-pushed path=docs/transcripts/session-001.html
+dabbler [11:31:50] phase phase=complete
+```
+
+It renders this session into one self-contained HTML page — the
+framework's own lines, the verification rounds with their verdicts and
+reviewers, the test runs, the steps accepted, the stop where there was
+one, and each job's own bytes with its colour intact — commits it in a
+commit of its own, and **pushes it**.
+
+The push is not decoration. The land's push has already happened by the
+time this phase runs, so a transcript that was only committed would sit on
+one machine until some later session's push happened to carry it — and the
+last session of a repository would leave its page nowhere a second clone
+could ever see. That is the whole purpose of the phase, so the phase
+finishes the job.
+
+A page already at that path is **kept**, exactly as `dabbler transcript`
+keeps one: it carries the commit it was rendered against on its face, and
+replacing it would describe one session under another session's stamp.
+
+**Why it is a phase and not part of the close.** A record describing a
+verified tree can only be committed once that tree is committed and
+pushed. And the commit is its own because the land's commit is the WORK; a
+record of the work does not belong inside it.
+
+**Why a page rather than the records.** Everything the Dabbler Terminal
+shows is reconstructed from `.dabbler/`, which is gitignored whole and
+stays that way — rollback depends on nothing there being tracked. So a
+second developer who clones the repository can read what every session
+DECIDED and see nothing of what any session LOOKED like. A record only
+`dabbler` can parse is also worth nothing the day `dabbler` is replaced,
+and an HTML file opens in any browser with no tooling at all.
+
+**It cannot stop a session.** A render that throws, a commit that refuses
+or a push that is rejected is said in a line and the phase moves on to
+`complete`. The transcript is the record of the run and not the run, and a
+session that passed every gate must not end un-closed over a page.
+
+`dabbler.transcript` in this checkout's `.vscode/settings.json` decides
+what it carries:
+
+| value     | what is committed                                           |
+| --------- | ----------------------------------------------------------- |
+| `off`     | nothing; the session's record then lives only under `.dabbler/` |
+| `outline` | the default: the session's shape, and the output of jobs that FAILED |
+| `full`    | the same, plus every job's own output                        |
+
+It belongs to the repository rather than to the machine: whether a
+codebase keeps a readable record of how its sessions ran is a fact about
+the codebase, and it travels to the next clone. A value nobody declared is
+refused rather than quietly read as the default.
+
+### `dabbler transcript`: the sessions that came before
+
+A driven session renders its own. For the ones that came before the one
+you are in — a developer a dozen sessions into a project wanting the
+dozen — the verb reads records already on disk and dispatches nothing:
+
+```
+dabbler transcript --from 1 --to 12
+```
+
+| flag       | what it does                                                     |
+| ---------- | ---------------------------------------------------------------- |
+| `--from N` | the first session to render; required                             |
+| `--to M`   | the last; the same as `--from` when absent                        |
+| `--full`   | carry every job's output, not only the failed ones'               |
+| `--out`    | where the pages land; `docs/transcripts/` when absent             |
+| `--commit` | commit what was written, in one commit                            |
+
+A page that already exists is left exactly as it is and said so. It
+carries the head commit it was rendered against, so replacing it quietly
+would describe one session under another session's stamp. A session whose
+records are missing or partial is rendered from what there is, and the
+page SAYS what was absent rather than omitting the section — a reader who
+cannot tell "this session had no verification round" from "this session's
+ledger is gone" has been told nothing by the omission.
+
 ## Starting from the Work Explorer
 
 Everything above is what you type. The extension's job is to open the
@@ -1106,9 +1193,10 @@ Resume-by-id for the seat is owed, once one is measured.
   report.json         your current answer
   plan.json           the work plan
   dispositions.json   the answer to the reviewer's findings
+  events.jsonl        every line the framework said, as it said it
   jobs/*.log          what the framework's own long work printed
   jobs/*.status.json  the exit code it ended on
-  engine-01.log ...   one transcript per invocation, under `session drive`
+  engine-01.log ...   one log per engine invocation, under `session drive`
 ```
 
 Machine-owned, like everything under `.dabbler/runs/`: never hand-edited,
@@ -1116,3 +1204,10 @@ and not the place a verdict can be typed. The lifecycle's own records —
 `docs/sessions/sessions.json`, `activity-log.json`, the rounds ledger —
 are written by the same verbs a typed session uses, so a driven session
 leaves exactly the record a typed one leaves.
+
+One record is TRACKED, and it is the only one: `docs/transcripts/` holds
+the rendered page the Log phase commits. Everything above stays untracked,
+permanently — rollback reads it, and a tracked ledger would make every
+verified session look like it drifted the moment it was verified. The
+transcript travels and the ledger does not, which is why the transcript is
+a rendering and not a copy.

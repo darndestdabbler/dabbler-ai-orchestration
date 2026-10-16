@@ -7,7 +7,8 @@ import { describe, it } from "node:test";
 import {
   canonicalPath,
   hiddenSpawn,
-  isMachineStatePath,
+  TRANSCRIPTS_DIRNAME,
+  isSessionRecordPath,
   nowIso,
   platformNewlines,
   repoRelativePath,
@@ -57,12 +58,26 @@ describe("what the router hands the OS", () => {
 
 describe("telling the record from the work", () => {
   it("counts everything under .dabbler as the record, whichever separator spells it", () => {
-    assert.equal(isMachineStatePath(".dabbler/runs/s1/rounds.jsonl"), true);
-    assert.equal(isMachineStatePath(".dabbler\\runs\\s1\\rounds.jsonl"), true);
+    assert.equal(isSessionRecordPath(".dabbler/runs/s1/rounds.jsonl"), true);
+    assert.equal(isSessionRecordPath(".dabbler\\runs\\s1\\rounds.jsonl"), true);
+  });
+
+  it("counts a committed transcript too, because it is written after the tree it describes", () => {
+    // The whole-tree digest is stamped on every run-of-record row and read
+    // back at a release. A transcript is committed after the close, so
+    // counting it would move that digest past the row it belongs to and the
+    // next release would read a tree that no longer matches.
+    assert.equal(isSessionRecordPath(`${TRANSCRIPTS_DIRNAME}/session-247.html`), true);
+    assert.equal(isSessionRecordPath(TRANSCRIPTS_DIRNAME), true);
+    assert.equal(isSessionRecordPath(`./${TRANSCRIPTS_DIRNAME}/session-247.html`), true);
   });
 
   it("does not count a path that merely starts with the same letters", () => {
-    assert.equal(isMachineStatePath(".dabblerish/notes.md"), false);
+    assert.equal(isSessionRecordPath(".dabblerish/notes.md"), false);
+    // Everything else under docs/ is the work of a session like any other
+    // file: the exclusion is this one directory, not the documents.
+    assert.equal(isSessionRecordPath("docs/transcripts-archive/old.html"), false);
+    assert.equal(isSessionRecordPath("docs/driving-a-session.md"), false);
   });
 });
 

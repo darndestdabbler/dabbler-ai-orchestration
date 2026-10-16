@@ -45,7 +45,7 @@ import { workingDirectory } from "./workdir.ts";
 // slice is re-exported here rather than reached for twice.
 export {
   changedPathsBetween,
-  isMachineStatePath,
+  isSessionRecordPath,
   repoRootFor,
   runGit,
   snapshotWorktreeTree,

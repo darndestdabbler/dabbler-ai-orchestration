@@ -5,7 +5,7 @@
 /**
  * The phase names a run may carry. `work` is what the driver writes and what the Work Explorer has always called the row; `steps` is the name it was written under before session 140 and is kept because every run already on disk carries it. No writer emits `steps` and every reader accepts it -- the retired-`ROW_WAIVE` shape -- and nothing rewrites a record that exists.
  */
-export type DriverRunPhase = "plan" | "work" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "gate-wait" | "publish" | "close" | "complete";
+export type DriverRunPhase = "plan" | "work" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "gate-wait" | "publish" | "close" | "log" | "complete";
 
 export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engine" | "tree" | "tests" | "verification" | "land" | "publish" | "close" | "interrupted" | "crash";
 
@@ -33,7 +33,7 @@ export type DriverRun = {
    */
   engine: string;
   /**
-   * Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do. `publish` sits between the land and the close, and runs only for a session whose plan declared it releasable: packaging asks the close's own gates, and neither `working_tree_clean` nor `pushed_to_remote` passes before the commit and the push, so it cannot run earlier.
+   * Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do. `publish` sits between the land and the close, and runs only for a session whose plan declared it releasable: packaging asks the close's own gates, and neither `working_tree_clean` nor `pushed_to_remote` passes before the commit and the push, so it cannot run earlier. `log` sits between the close and `complete` and renders this session's transcript: a record describing a verified tree can only be committed once that tree is, which is why it is a phase of its own and not part of the close. It is the one phase that cannot stop a session -- a record of the run is not the run.
    */
   phase: DriverRunPhase;
   /**

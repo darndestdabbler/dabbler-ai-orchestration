@@ -13,6 +13,9 @@ import { describe, it } from "node:test";
 import { judgeLease, nextLeaseEpoch, staleJobDisposition } from "../src/drive.ts";
 import {
   AMEND_CHECKS_COMMAND,
+  appendDriverEvent,
+  eventsPath,
+  readDriverEvents,
   WATCHER_JOB_OUTSTANDING,
   WATCHER_OUTSTANDING,
   WATCHER_QUIET,
@@ -1128,5 +1131,50 @@ describe("the stale-job disposition", () => {
       "stale",
     );
     assert.equal(staleJobDisposition("verification", "close", "vanished"), "stale");
+  });
+});
+
+describe("the lines the framework said, written down", () => {
+  it("numbers them densely, carries the phase, and keeps the fields unflattened", () => {
+    const root = tempDir("events-");
+    appendDriverEvent(root, 7, "phase", { phase: "work" }, "declare");
+    appendDriverEvent(root, 7, "verify", { verdict: "VERIFIED", round: 2 }, "verify");
+
+    const events = readDriverEvents(root, 7);
+    assert.deepEqual(events.map((event) => event.sequence), [1, 2]);
+    assert.deepEqual(events.map((event) => event.event), ["phase", "verify"]);
+    assert.equal(events[0].phase, "declare");
+    assert.equal(events[0].session_number, 7);
+    // The pairs, not the printed `key=value`: a renderer can make the
+    // string from these and never these from the string.
+    assert.deepEqual(events[1].fields, { verdict: "VERIFIED", round: 2 });
+    assert.match(events[1].at, /^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("says nothing for a session that said nothing", () => {
+    assert.deepEqual(readDriverEvents(tempDir("events-none-"), 1), []);
+  });
+
+  it("skips a row it cannot read and lets the sequence show the gap", () => {
+    // The last row is written by a process that may be killed between the
+    // newline and the next byte, and this file is read by a transcript
+    // rather than by a gate. Refusing the whole account over one torn line
+    // would cost the reader the session; the dense sequence makes the loss
+    // visible instead.
+    const root = tempDir("events-torn-");
+    appendDriverEvent(root, 3, "run-started", {}, null);
+    appendDriverEvent(root, 3, "phase", { phase: "work" }, "declare");
+    const path = eventsPath(root, 3);
+    const lines = readFileSync(path, "utf8").split(/\r?\n/).filter((line) => line.trim() !== "");
+    writeFileSync(path, `${lines[0]}\n{"sequence":2,"event":\n${lines[1]}\n`, "utf8");
+
+    const events = readDriverEvents(root, 3);
+    assert.deepEqual(events.map((event) => event.sequence), [1, 2]);
+  });
+
+  it("records a line said before the run has a phase without inventing one", () => {
+    const root = tempDir("events-early-");
+    appendDriverEvent(root, 2, "run-started", { mode: "pull" }, null);
+    assert.equal(readDriverEvents(root, 2)[0].phase, undefined);
   });
 });

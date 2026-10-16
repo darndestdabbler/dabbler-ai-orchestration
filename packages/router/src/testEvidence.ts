@@ -25,7 +25,7 @@ import { repoRootFromSessionsDir } from "./evidence.ts";
 // same place, for the same reason.
 import { SUITE_FIELDS, matchingPrefixes, normaliseRel } from "./checks.ts";
 import {
-  isMachineStatePath,
+  isSessionRecordPath,
   nowIso,
   platformNewlines,
   repoRelativePath,
@@ -615,13 +615,15 @@ export function enumerateSurface(
   for (const rel of [...new Set([...tracked, ...untracked])]) {
     if (matchingPrefixes(rel, covers).length === 0) continue;
     if (isSessionBookkeeping(rel, sessionsRel)) continue;
-    if (isMachineStatePath(rel)) {
-      // The fifth reader that has to know the run ledger is not work. This
-      // digest is recorded and then its caller appends a row to
-      // `.dabbler/runs/` -- so counting it makes the digest it just stored
-      // wrong the instant it is stored, and the freshness gate can never
-      // pass. A round is appended after the tree it describes; the ledger is
-      // the record, not the work.
+    if (isSessionRecordPath(rel)) {
+      // The fifth reader that has to know a session's record is not its
+      // work. This digest is recorded and then its caller appends a row to
+      // `.dabbler/runs/` -- so counting that makes the digest it just
+      // stored wrong the instant it is stored, and the freshness gate can
+      // never pass. The transcript is the same shape one phase later: it is
+      // committed after the close, and this digest is stamped on the run of
+      // record a release reads back. Both are written AFTER the tree they
+      // describe, which is the whole of why neither counts.
       continue;
     }
     try {

@@ -13,7 +13,9 @@ import { describe, it } from "node:test";
 
 import {
   SETTINGS_RELPATH,
+  SETTING_KEYS,
   SETTING_REVIEWER_TRANSPORT,
+  SETTING_TRANSCRIPT,
   SETTING_TRANSPORT,
   SettingsError,
   readSettings,
@@ -110,5 +112,15 @@ describe("what a checkout says it is run with", () => {
     assert.deepEqual(readSettings(root).values, {});
     writeSettings(root, { [SETTING_TRANSPORT]: "api" });
     assert.equal(readSettings(root).values[SETTING_TRANSPORT], "api");
+  });
+});
+
+describe("the transcript setting, which belongs to the checkout", () => {
+  it("is one of this framework's keys, so a surface can enumerate it", () => {
+    // A key nothing lists is a key written by one surface and read by none.
+    assert.ok(SETTING_KEYS.includes(SETTING_TRANSCRIPT));
+    const root = checkout(null);
+    writeSettings(root, { [SETTING_TRANSCRIPT]: "full" });
+    assert.equal(readSettings(root).values[SETTING_TRANSCRIPT], "full");
   });
 });

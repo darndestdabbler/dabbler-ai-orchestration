@@ -273,6 +273,7 @@ export function fakeRouter(
           return answer("deps scaffold", { stdout: message });
         },
       },
+      transcript: { render: text("transcript render") },
       ledger: { latestRound: () => answer("ledger latestRound", null) },
       testEvidence: { record: text("test-evidence record") },
       approvedPlan: {

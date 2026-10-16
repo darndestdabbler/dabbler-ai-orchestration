@@ -27,6 +27,8 @@ import {
   explainEngine,
   explainReviewingTransport,
   explainRoleModel,
+  explainTranscript,
+  transcriptCarry,
   keptIn,
   layerOfSource,
   resolveTransport,
@@ -51,6 +53,7 @@ import { writePreferences } from "../src/preferences.ts";
 import {
   SETTINGS_RELPATH,
   SETTING_ENGINE,
+  SETTING_TRANSCRIPT,
   SETTING_REVIEWER_MODEL,
   SETTING_REVIEWER_TRANSPORT,
   SETTING_TRANSPORT,
@@ -828,5 +831,31 @@ describe("the engine and a reviewer's model, read through the layers", () => {
       writePreferences({ engine: "" });
       writePreferences({ role: "reviewer", selected: "" });
     }
+  });
+});
+
+describe("what a session's committed transcript carries", () => {
+  it("is this checkout's choice, and the outline where it makes none", () => {
+    // A framework whose record of itself is opt-in is a framework with no
+    // record: the repository that most needs one is the one nobody thought
+    // to switch it on in.
+    const quiet = tempDir("transcript-default-");
+    assert.equal(transcriptCarry(quiet), "outline");
+    assert.equal(explainTranscript(quiet).decidedBy, null);
+
+    const chosen = tempDir("transcript-chosen-");
+    writeSettings(chosen, { [SETTING_TRANSCRIPT]: "full" });
+    const reading = explainTranscript(chosen);
+    assert.equal(reading.transport, "full");
+    assert.match(String(reading.decidedBy), /settings\.json/);
+    assert.equal(layerOfSource(String(reading.decidedBy)), "checkout");
+  });
+
+  it("refuses a word it does not know rather than quietly rendering the default", () => {
+    // A developer who wrote "none" meant to turn it off. Rendering the
+    // outline for months would be the setting they can see being ignored.
+    const root = tempDir("transcript-bad-");
+    writeSettings(root, { [SETTING_TRANSCRIPT]: "none" });
+    assert.throws(() => transcriptCarry(root), /must be one of/);
   });
 });

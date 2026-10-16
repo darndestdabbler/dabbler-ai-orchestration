@@ -402,6 +402,34 @@ export interface AffectedOptions extends RepositoryTarget {
  * their answer is prose for a person to read and no schema describes it;
  * each sharpens if and when one does.
  */
+export interface TranscriptRenderOptions extends RepositoryTarget {
+  /** The first session to render. */
+  readonly from: number;
+  /** The last; the same as `from` when absent. */
+  readonly to?: number;
+  /**
+   * True carries every job's output, false the outline and the output of
+   * jobs that FAILED. A whole green run of record is megabytes saying so.
+   */
+  readonly full?: boolean;
+  /** Where the pages land; `docs/transcripts/` when absent. */
+  readonly out?: string;
+  /** Commit what was written, in one commit. */
+  readonly commit?: boolean;
+}
+
+/**
+ * Rendering a session as a page that outlives the framework.
+ *
+ * On the contract rather than left to the command line because the host
+ * that watches a session is the one with a reason to ask for its record,
+ * and a host that spawned `dabbler transcript` would be parsing stdout to
+ * find out whether anything was written.
+ */
+export interface TranscriptVerbs {
+  render(options: TranscriptRenderOptions): Promise<RouterResult<RouterText>>;
+}
+
 export interface Router {
   readonly session: SessionVerbs;
   readonly verify: VerifyVerbs;
@@ -410,6 +438,8 @@ export interface Router {
   readonly approvedPlan: ApprovedPlanVerbs;
   /** Where each producing repository is, and putting one there. */
   readonly deps: DepsVerbs;
+  /** What a session LOOKED like, as a page that needs no tooling to read. */
+  readonly transcript: TranscriptVerbs;
   /** The Work Explorer's whole view of one repository, computed fresh. */
   progress(options: RepositoryTarget): Promise<RouterResult<ProgressProjection>>;
   /**

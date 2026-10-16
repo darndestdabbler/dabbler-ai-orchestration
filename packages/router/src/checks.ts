@@ -34,7 +34,7 @@ import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { hiddenSpawn, isMachineStatePath, snapshotWorktreeTree } from "./journal.ts";
+import { hiddenSpawn, isSessionRecordPath, snapshotWorktreeTree } from "./journal.ts";
 import { LIFECYCLE_WRITTEN_FILES } from "./ledger.ts";
 import { pythonRepr } from "./pythonJson.ts";
 
@@ -840,8 +840,8 @@ export function materialPaths(
     if (isSetBookkeeping(path, setRel)) {
       continue; // the close commits its own bookkeeping after the flip
     }
-    if (isMachineStatePath(path)) {
-      continue; // the run ledger is the record, not the work
+    if (isSessionRecordPath(path)) {
+      continue; // the ledger and the transcript record the session; neither is it
     }
     if (options.beforeWork && options.hookRemoved === true && isFrameworkInstalledPath(path)) {
       continue; // the registration's own edit to the hook file, not work; the land commits it

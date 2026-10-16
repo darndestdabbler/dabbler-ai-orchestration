@@ -31,7 +31,7 @@
     },
     "phase": {
       "$ref": "#/$defs/phase",
-      "description": "Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do. `publish` sits between the land and the close, and runs only for a session whose plan declared it releasable: packaging asks the close's own gates, and neither `working_tree_clean` nor `pushed_to_remote` passes before the commit and the push, so it cannot run earlier."
+      "description": "Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do. `publish` sits between the land and the close, and runs only for a session whose plan declared it releasable: packaging asks the close's own gates, and neither `working_tree_clean` nor `pushed_to_remote` passes before the commit and the push, so it cannot run earlier. `log` sits between the close and `complete` and renders this session's transcript: a record describing a verified tree can only be committed once that tree is, which is why it is a phase of its own and not part of the close. It is the one phase that cannot stop a session -- a record of the run is not the run."
     },
     "pending_step": {
       "type": ["object", "null"],
@@ -377,6 +377,7 @@
         "gate-wait",
         "publish",
         "close",
+        "log",
         "complete"
       ]
     },

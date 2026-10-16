@@ -7,18 +7,19 @@ import * as assert from "assert";
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { GATE_NOT_APPLICABLE } from "dabbler-ai-router";
+// The tone grammar comes from the ROUTER, which is where it now lives: the
+// terminal and a session's committed transcript paint the same records, so
+// what a line IS is settled in one place. Asserting it through the import
+// is what proves the terminal did not keep a copy.
+import { GATE_NOT_APPLICABLE, TONES, fieldTone, lineTone, type Tone } from "dabbler-ai-router";
 
 import {
   DabblerTerminal,
   HANGING_INDENT,
-  TONES,
   type Span,
-  type Tone,
   disposeDabblerTerminals,
   ensureDabblerTerminal,
   forgetClosedTerminal,
-  fieldTone,
   forTerminal,
   frameworkTerminalLocation,
   isSessionStart,
@@ -26,7 +27,6 @@ import {
   openDabblerTerminal,
   revealDabblerTerminal,
   revealOnSessionStart,
-  lineTone,
   paint,
   RULE_CHAR,
   terminalLocation,

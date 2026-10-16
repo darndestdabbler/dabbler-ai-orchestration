@@ -106,6 +106,7 @@
       "members": [
         "progress",
         "projection",
+        "transcript",
         "cli",
         "inProcess",
         "index"

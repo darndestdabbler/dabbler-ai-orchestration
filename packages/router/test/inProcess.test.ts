@@ -285,6 +285,25 @@ describe("the in-process router", () => {
     for (const answer of answers) assert.equal(answer.ok, true);
   });
 
+  it("renders a range of transcripts through the same dispatch the command line uses", async () => {
+    // The host that watches a session is the one with a reason to ask for
+    // its record. It spends nothing: the verb reads what is on disk.
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    const out = join(repo, "rendered");
+    const { echo, lines } = recordingEcho();
+    const result = await createInProcessRouter({ echo }).transcript.render({
+      repoRoot: repo,
+      sessionsDir,
+      from: 1,
+      to: 2,
+      full: true,
+      out,
+    });
+    assert.equal(result.ok, true);
+    assert.ok(existsSync(join(out, "session-001.html")), "the first page");
+    assert.ok(existsSync(join(out, "session-002.html")), "the last page");
+    assert.match(String(lines[0]), /dabbler transcript .*--from 1 --to 2 --full/);
+  });
   it("keeps answering after a call rejects, rather than wedging the queue", async () => {
     const { repo, sessionsDir } = makeAnsweredSandbox();
     const router = new InProcessRouter();

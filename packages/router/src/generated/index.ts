@@ -7,6 +7,7 @@ export * from "./dabbler.ts";
 export * from "./dispositions.ts";
 export * from "./disputes.ts";
 export * from "./driver-disposition.ts";
+export * from "./driver-event.ts";
 export * from "./driver-instruction.ts";
 export * from "./driver-report.ts";
 export * from "./driver-run.ts";

@@ -12427,6 +12427,53 @@
       "dateTime": "2026-10-05T16:39:14.295000-04:00",
       "task": "Release 3.21.0: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 247,
+      "dateTime": "2026-10-16T03:49:02.461000-04:00",
+      "task": "Give every session a transcript that outlives the terminal it was watched in. The framework's own lines become a record: `drive.ts`'s `log` keeps printing and also appends each event, its fields and its clock to `.dabbler/runs/s<N>/driver/events.jsonl`, schema'd and generated like every other record. A new `packages/router/src/transcript.ts` reads one session's records -- those events, the verification rounds with their verdicts and reviewers, the test runs with their commands and durations, the accepted steps, the stop where there is one, and each job's own bytes with its exit -- and returns one self-contained HTML document with inline CSS, both palettes under `prefers-color-scheme`, a job's ANSI escapes turned into spans, secrets scrubbed through `packaging.ts`'s own `redact`, and the generator's version, the head commit and the time of rendering stamped on it. The tone grammar is not written twice: `TONES`, `verdictTone`, `lineTone` and `fieldTone` move out of the extension's `dabblerTerminal.ts` into the router and the terminal imports them, one rule with two renderers over it. `dabbler transcript --from <N> --to <M> [--full] [--out <dir>] [--commit]` renders a range from records already on disk, never overwriting an existing file and saying what was absent rather than inferring it; `transcript.render` joins the `Router` contract. After the close, a Log phase renders this session's transcript to `docs/transcripts/session-<N>.html` and commits it on its own, with `dabbler.transcript` (`off`, `outline`, `full`) read through the same layers every other choice is -- and `docs/transcripts/` joins `.dabbler/` under one predicate, renamed for what it decides, so that a record committed after the run of record cannot move the whole-tree digest that run is held to. The documents say so.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 247,
+      "dateTime": "2026-10-16T03:50:03.450000-04:00",
+      "what": "step 'events': its files",
+      "reason": "The append belongs beside appendSupervision in driver.ts, which already owns the driver directory's paths and its append-only records; writing it in drive.ts would have made the renderer import the huge driver loop for a filename, or duplicated the path. driver.test.ts follows the rule that a source file's tests are the file named after it.",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 247,
+      "dateTime": "2026-10-16T03:50:56.717000-04:00",
+      "what": "step 'events': its files",
+      "reason": "The generator names the type from the filename, so events.schema.json emitted 'Events' for a single row. driver-event.schema.json emits DriverEvent, singular and beside DriverRun, DriverReport and DriverInstruction -- the other records in the same driver/ directory. The file it describes is still .dabbler/runs/s<N>/driver/events.jsonl, as run-event.schema.json describes journal.jsonl.",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 247,
+      "dateTime": "2026-10-16T04:07:59.155000-04:00",
+      "what": "step 'renderer': its files",
+      "reason": "boundaries.json: the lint control refuses a module no context declares, so a new src/ module cannot land without a line there -- transcript joins 'projection', which is where the record's readers and renderers already are. schema.test.ts: the destructuring I used in the previous step raised an unused-variable warning that this step's lint run surfaced; it is replaced with a helper here rather than left red.",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 247,
+      "dateTime": "2026-10-16T04:12:14.994000-04:00",
+      "what": "step 'verb': its files",
+      "reason": "transcript.ts gains TRANSCRIPTS_DIRNAME and sessionTranscriptName, because the verb, the Log phase and the predicate that keeps these files out of the digests must read one spelling of the directory, not three. helpers.ts holds the extension suite's stub Router, which no longer satisfies the contract once it gains a member; the stub is where that is answered.",
+      "by": "claude-code (anthropic, claude-opus-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 247,
+      "dateTime": "2026-10-16T04:15:12.281000-04:00",
+      "what": "step 'record-path': its files",
+      "reason": "The ask puts the transcripts directory in journal.ts beside MACHINE_DIRNAME, and the previous step had declared it in transcript.ts. It moves here, which is also what the module boundaries require -- journal is platform and transcript is projection, so journal could not import it the other way. The three files that named the old home are repointed at the new one, so there is still exactly one spelling.",
+      "by": "claude-code (anthropic, claude-opus-5)"
     }
   ]
 }

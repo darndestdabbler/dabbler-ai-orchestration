@@ -42,6 +42,8 @@ import {
   type ApprovedPlanVerbs,
   type DepsRepositoryOptions,
   type DepsVerbs,
+  type TranscriptRenderOptions,
+  type TranscriptVerbs,
   type BootstrapOptions,
   type ConfigureOptions,
   type LedgerVerbs,
@@ -475,6 +477,25 @@ export class InProcessRouter implements Router {
       const args = ["scaffold", "--repository", o.repository, ...targetArgs(o)];
       optional(args, "--path", o.path);
       return this.text("deps", args, o.repoRoot);
+    },
+  };
+
+  /**
+   * One session's record, or a range of them, as pages.
+   *
+   * The host that watches a session is the one with a reason to ask for
+   * its record, and this spends nothing: the verb reads what is already on
+   * disk. Reached through the same dispatch the command line uses, so
+   * there is one implementation of what `--full` and `--commit` mean.
+   */
+  public readonly transcript: TranscriptVerbs = {
+    render: (o: TranscriptRenderOptions) => {
+      const args = [...targetArgs(o), "--from", String(o.from)];
+      if (o.to !== undefined) args.push("--to", String(o.to));
+      if (o.full === true) args.push("--full");
+      if (o.commit === true) args.push("--commit");
+      optional(args, "--out", o.out);
+      return this.text("transcript", args, o.repoRoot);
     },
   };
 

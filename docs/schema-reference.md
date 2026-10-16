@@ -370,6 +370,7 @@ for people and the framework never reads it.
 | `run.json` | `dabbler session drive` | `driver-run` | where the loop is, and why it stopped |
 | `interrupt.json` | `dabbler session interrupt` | — | a request to end the running invocation; consumed by the driver as it is read |
 | `engine-<NN>.log` | the driver | — | the engine's output for invocation NN, line by line (stderr prefixed `stderr: `), whether or not it was shown |
+| `events.jsonl` | the driver | `driver-event` | every line the framework said, one row each, append-only |
 
 `interrupt.json` is the one file here that is a message rather than a
 record: `session interrupt --reason "<text>"` writes it (refused when
@@ -392,11 +393,38 @@ instruction as `sent: <text>`, first among its `reasons`. A person
 at the keyboard, the extension's Stop and a gate that tripped all go
 through this one verb.
 
-The transcript is the same whether `driver.engine_output` (in
+The engine log is the same whether `driver.engine_output` (in
 `dabbler.yaml`; `--show-engine` overrides for one run) is `stream` or
 `quiet`: the mode decides what the terminal shows — Claude Code's
 stream-json as thinking / tool / text / result lines with only the `init`
 system event, Copilot's own progress lines — never what is recorded.
+
+### `events.jsonl` — the lines the framework said
+
+Append-only, one row per line the driver printed, validated against
+`driver-event.schema.json`. The driver's `log` writes to stdout and here
+in one call, because a line printed and not recorded — or recorded and not
+printed — is a divergence nobody would notice until they went looking for
+a line that is in neither place. Stdout is a terminal's scrollback: capped,
+held in memory, and gone when the window closes. This is where a framework
+line exists, so a session's transcript QUOTES what was said rather than
+reconstructing a session's shape from the modification times of files.
+
+| Field | What it is |
+|---|---|
+| `schema_version` | 1 |
+| `sequence` | where this line fell among the lines of this run, counted from the rows already on disk; dense, so a gap SHOWS |
+| `event` | the event word exactly as the terminal printed it: `phase`, `step`, `rejected`, `verify`, `tests`, `job-started` |
+| `at` | when it was said, as a full ISO instant — the terminal prints only hours, minutes and seconds |
+| `session_number` | whose line it is |
+| `phase` | the phase the run stood in; absent for a line said before the run had one, which the first lines of a run are |
+| `fields` | the line's own `key=value` pairs, as the caller passed them and before they were flattened for printing. Open, because the events are the driver's own vocabulary and a closed list here would be a second copy of it that drifts |
+
+It is the record OF a run and never the run: a row that cannot be written
+is dropped and the session goes on, and a row that cannot be READ — the
+last one, from a process killed between the newline and the next byte — is
+skipped rather than refusing the whole account. That is why `sequence` is
+dense: the loss is visible instead of invisible. Nothing gates on it.
 
 All three answers travel through the one engine verb. A step is answered
 with the flags (`--step --status --files --notes [--tests]`); a plan or a

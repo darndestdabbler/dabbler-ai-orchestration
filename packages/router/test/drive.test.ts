@@ -20,6 +20,7 @@ import {
   reportPath,
   runPath,
   appendSupervision,
+  readDriverEvents,
   waiterSeenSince,
   watcherReading,
   writeRun,
@@ -93,6 +94,7 @@ import { capDisputedRefusal } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
 import { gitAnswers, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
 import { registerSessionStart } from "../src/writers.ts";
+import { SETTING_TRANSCRIPT, writeSettings } from "../src/settings.ts";
 const INSTRUCTION = {
   schema_version: 1,
   seq: 4,
@@ -1240,5 +1242,104 @@ describe("the landed commit's message", () => {
     assert.ok(untitled.subject.startsWith("Session 12: Session 1 authors"));
     assert.ok(untitled.subject.length <= COMMIT_SUBJECT_WIDTH);
     assert.equal(untitled.body, task);
+  });
+});
+
+describe("the framework's own lines, printed and written down", () => {
+  it("records every line it prints, in order, with the phase it stood in", async () => {
+    // One call, two destinations, deliberately: a line printed and not
+    // recorded -- or recorded and not printed -- is a divergence nobody
+    // would notice until they went looking for a line that is in neither
+    // place. The terminal's scrollback is capped and dies with the window;
+    // this file is what a transcript quotes.
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+
+    const asked = await capture(() => sessionNext(sessionsDir, {}));
+
+    const printed = [...asked.stderr.matchAll(/^dabbler \[\d\d:\d\d:\d\d\] (\S+)/gm)].map(
+      (match) => match[1],
+    );
+    const recorded = readDriverEvents(repo, 1);
+    assert.ok(printed.length > 0, "the call said nothing to record");
+    assert.deepEqual(recorded.map((event) => event.event), printed);
+    assert.deepEqual(recorded.map((event) => event.sequence), printed.map((_, index) => index + 1));
+    assert.deepEqual([...new Set(recorded.map((event) => event.phase))], ["plan"]);
+    // The fields are the pairs the caller passed, so the printed form can
+    // be made from the row and the row never has to be parsed back out.
+    assert.equal(recorded[0].fields["mode"], "pull");
+  });
+});
+
+describe("the Log phase, which records the session it cannot stop", () => {
+  /** A sandbox whose run stands at the Log phase, with the close already done. */
+  function atTheLogPhase(): { repo: string; sessionsDir: string } {
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase: "log", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: ["one"], baseline_tree: null,
+      stop: null, lease_epoch: 1,
+      started_at: "2026-10-16T10:00:00-04:00", updated_at: "2026-10-16T10:00:00-04:00",
+    });
+    return { repo, sessionsDir };
+  }
+
+  it("renders the session's page, commits it on its own, and completes", async () => {
+    const { repo, sessionsDir } = atTheLogPhase();
+    const asked = await capture(() => sessionNext(sessionsDir, {}));
+
+    const page = join(repo, "docs", "transcripts", "session-001.html");
+    assert.ok(existsSync(page), "the Log phase wrote no page");
+    assert.match(readFileSync(page, "utf8"), /^<!doctype html>/);
+    assert.match(asked.stderr, /transcript-committed/);
+    assert.equal(readRun(repo, 1)?.phase, "complete");
+  });
+
+  it("writes nothing when the checkout turned it off, and still completes", () => {
+    const { repo, sessionsDir } = atTheLogPhase();
+    writeSettings(repo, { [SETTING_TRANSCRIPT]: "off" });
+
+    return capture(() => sessionNext(sessionsDir, {})).then((asked) => {
+      assert.ok(!existsSync(join(repo, "docs", "transcripts", "session-001.html")));
+      assert.match(asked.stderr, /transcript-skipped/);
+      assert.equal(readRun(repo, 1)?.phase, "complete");
+    });
+  });
+
+  it("pushes the commit, because a page only committed reaches no second clone", async () => {
+    // The land pushed before this phase ran, so a transcript that was only
+    // committed would wait for some later session to carry it -- and the
+    // last session of a repository would leave its page nowhere.
+    const { repo, sessionsDir } = atTheLogPhase();
+    const asked = await capture(() => sessionNext(sessionsDir, {}));
+    assert.match(asked.stderr, /transcript-pushed/);
+  });
+
+  it("keeps a page already at that path rather than replacing it", async () => {
+    // One rule wherever a transcript is written: the page carries the
+    // commit it was rendered against, so replacing it would describe one
+    // session under another session's stamp.
+    const { repo, sessionsDir } = atTheLogPhase();
+    const page = join(repo, "docs", "transcripts", "session-001.html");
+    mkdirSync(dirname(page), { recursive: true });
+    writeFileSync(page, "<!doctype html><p>the one that was there</p>", "utf8");
+
+    const asked = await capture(() => sessionNext(sessionsDir, {}));
+    assert.equal(readFileSync(page, "utf8"), "<!doctype html><p>the one that was there</p>");
+    assert.match(asked.stderr, /transcript-kept/);
+    assert.equal(readRun(repo, 1)?.phase, "complete");
+  });
+  it("completes even when the page cannot be written, because a record is not a gate", async () => {
+    // A session that had passed every gate must not end un-closed because
+    // a page could not be written. The directory is taken by a FILE here,
+    // which is the cheapest way to make the write fail for real.
+    const { repo, sessionsDir } = atTheLogPhase();
+    mkdirSync(join(repo, "docs"), { recursive: true });
+    writeFileSync(join(repo, "docs", "transcripts"), "not a directory", "utf8");
+
+    const asked = await capture(() => sessionNext(sessionsDir, {}));
+    assert.match(asked.stderr, /transcript-failed/);
+    assert.equal(readRun(repo, 1)?.phase, "complete");
   });
 });

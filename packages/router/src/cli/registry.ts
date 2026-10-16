@@ -26,6 +26,7 @@ import { statusVerb } from "./status.ts";
 import { seatCostVerb } from "./seatCost.ts";
 import { sessionVerb } from "./session.ts";
 import { testEvidenceVerb } from "./testEvidence.ts";
+import { transcriptVerb } from "./transcript.ts";
 import { triageVerb } from "./triage.ts";
 import { verifyVerb } from "./verify.ts";
 import { versionVerb } from "./version.ts";
@@ -55,6 +56,7 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   session: sessionVerb,
   status: statusVerb,
   "test-evidence": testEvidenceVerb,
+  transcript: transcriptVerb,
   triage: triageVerb,
   verify: verifyVerb,
   version: versionVerb,

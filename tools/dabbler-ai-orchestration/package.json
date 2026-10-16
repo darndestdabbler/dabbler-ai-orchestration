@@ -540,6 +540,21 @@
           ],
           "default": "editor",
           "markdownDescription": "Where **Start Session** puts the AI CLI and the Dabbler terminal. A terminal cannot be moved after it is created, so this decides where each one opens; terminals already open keep the location they were opened at."
+        },
+        "dabbler.transcript": {
+          "type": "string",
+          "enum": [
+            "off",
+            "outline",
+            "full"
+          ],
+          "enumDescriptions": [
+            "Write no transcript. The session's record then lives only under .dabbler/, which is never committed, so nobody who clones this repository can see how a session ran.",
+            "The session's shape — the framework's own lines, the verification rounds, the test runs, the steps accepted, the stop — and the output of jobs that FAILED.",
+            "The same, plus every job's own output. A green run of record is megabytes saying so, and all of it is committed."
+          ],
+          "default": "outline",
+          "markdownDescription": "What a session's committed transcript carries. After the close, the framework renders `docs/transcripts/session-NNN.html` — one self-contained page, no script and no network — and commits it on its own.\n\nThis belongs to the **repository**, not to this machine: whether a codebase keeps a readable record of how its sessions ran is a fact about the codebase, and it travels to the next clone in `.vscode/settings.json`. `docs/transcripts/` is excluded from the framework's tree digests, so committing a page after the run of record cannot invalidate it."
         }
       }
     }

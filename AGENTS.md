@@ -235,6 +235,19 @@ it was restored from the later commit and re-rendered with
   selection this call cannot reach is a stop that names it.
 - Git Bash heredocs mangle backslashes on this host — write files with
   your editing tools, never with a heredoc.
+- **The transcript travels; the ledger does not.** `.dabbler/` is
+  untracked, permanently, and nothing in this repository may change that:
+  rollback reads it, and a tracked ledger makes every verified session look
+  like it drifted the moment it was verified. So the record that a second
+  developer can see is a RENDERING rather than a copy —
+  `docs/transcripts/session-NNN.html`, one self-contained page per session,
+  committed by the Log phase after the close. It is generated and never
+  hand-edited, nothing reads it back, and `docs/transcripts/` answers to
+  `isSessionRecordPath` exactly as `.dabbler/` does, so committing a page
+  after the run of record cannot move the digest that run is held to.
+  `dabbler.transcript` (`off`, `outline`, `full`) says what it carries, and
+  `dabbler transcript --from N --to M` renders the sessions that came
+  before, for nothing.
 
 <!-- dabbler:managed:start -->
 # AI orchestrator instructions — `dabbler-ai-orchestration`

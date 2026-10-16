@@ -60,6 +60,19 @@ export const SETTING_REVIEWER_MODEL = "dabbler.reviewerModel";
 export const SETTING_AUXILIARY_MODEL = "dabbler.auxiliaryModel";
 
 /**
+ * What a session's committed transcript carries: `off`, `outline` or `full`.
+ *
+ * A repository's choice and only a repository's. Whether this codebase
+ * keeps a readable record of how its sessions ran is a fact about the
+ * codebase, it travels to the next clone in this file, and it is the second
+ * developer -- the one who was not here -- that it is kept for. There is no
+ * machine-level default beside it for the same reason: a person who liked
+ * full transcripts would otherwise be committing somebody else's megabytes
+ * into every repository they opened.
+ */
+export const SETTING_TRANSCRIPT = "dabbler.transcript";
+
+/**
  * Which credential this solution uses for a provider -- a NAME, never a key.
  *
  * One key per provider, spelled out rather than derived, because this table
@@ -85,6 +98,7 @@ export const SETTING_KEYS = [
   SETTING_AUTHORING_MODEL,
   SETTING_REVIEWER_MODEL,
   SETTING_AUXILIARY_MODEL,
+  SETTING_TRANSCRIPT,
   SETTING_CREDENTIAL_ANTHROPIC,
   SETTING_CREDENTIAL_OPENAI,
   SETTING_CREDENTIAL_GOOGLE,

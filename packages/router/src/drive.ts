@@ -55,6 +55,8 @@ import {
   driverInvocationCap,
   loadConfig,
   verificationRoundCap,
+  transcriptCarry,
+  type TranscriptCarry,
   PROJECT_CONFIG_FILENAME,
 } from "./config.ts";
 import {
@@ -85,11 +87,14 @@ import {
   transcriptPath,
   writeInstruction,
   writeRun,
+  appendDriverEvent,
   appendSupervision,
   progressResumed,
   renderStop,
   AMEND_CHECKS_COMMAND,
 } from "./driver.ts";
+import { renderSessionTranscript, sessionTranscriptName } from "./transcript.ts";
+import { SETTING_TRANSCRIPT } from "./settings.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
 import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
@@ -134,6 +139,7 @@ import {
   runGit,
   snapshotWorktreeTree,
   treeWithPaths,
+  TRANSCRIPTS_DIRNAME,
 } from "./journal.ts";
 import {
   LedgerError,
@@ -1521,12 +1527,47 @@ class Driver {
 
   // --- output and state ------------------------------------------------------
 
+  /**
+   * One line the framework said -- printed, and written down.
+   *
+   * Printing alone made every framework line as durable as the terminal it
+   * appeared in, which is to say not at all: the scrollback is capped, held
+   * in memory, and gone with the window. The same line goes to
+   * `events.jsonl` under the run's driver directory, so that a transcript
+   * can quote what was said rather than infer it. The two are ONE call for
+   * the same reason there is one `log`: a line printed and not recorded,
+   * or recorded and not printed, is a divergence nobody would see until
+   * they went looking for a line that was never in either place.
+   *
+   * The record takes `fields` as the caller passed them, not the flattened
+   * string: a renderer can always make `key=value` from the pairs, and
+   * never the pairs back out of the string.
+   */
   private log(event: string, fields: Record<string, unknown> = {}): void {
-    const extra = Object.entries(fields)
-      .filter(([, value]) => value !== undefined)
+    const said = Object.entries(fields).filter(([, value]) => value !== undefined);
+    const extra = said
       .map(([key, value]) => `${key}=${typeof value === "string" ? value : JSON.stringify(value)}`)
       .join(" ");
     writeOut(`dabbler [${clock()}] ${event}${extra ? ` ${extra}` : ""}\n`);
+    appendDriverEvent(
+      this.repoRoot,
+      this.sessionNumber,
+      event,
+      Object.fromEntries(said),
+      this.phaseNow,
+    );
+  }
+
+  /**
+   * The phase this driver stands in, or null before it has a run.
+   *
+   * `run!` is a promise to the type system, and the first lines a process
+   * says are exactly the ones made before it is kept. Reading it through
+   * here says so once instead of at every caller.
+   */
+  private get phaseNow(): string | null {
+    const run = this.run as DriverRun | undefined;
+    return run?.phase ?? null;
   }
 
   private save(): void {
@@ -4110,7 +4151,7 @@ class Driver {
       if (row?.["status"] === "complete") {
         this.log("close-collected", { session: sessionDisplayNumber(this.sessionNumber) });
         this.issueDone();
-        this.setPhase("complete");
+        this.setPhase("log");
         return;
       }
     }
@@ -4148,6 +4189,104 @@ class Driver {
       );
     }
     this.issueDone();
+    this.setPhase("log");
+  }
+
+  /**
+   * The record of the session, written after the session.
+   *
+   * A phase of its own rather than part of the close, and the order is the
+   * whole reason: a transcript describes a tree that has been verified,
+   * committed and pushed, so it cannot be written until that has happened.
+   * Its commit is its own for the same reason -- the land's commit is the
+   * WORK, and a record of the work does not belong inside it.
+   *
+   * **It cannot stop a session.** A render that throws or a commit that
+   * refuses is said in a line and the phase moves on. The transcript is the
+   * record of the run and not the run, and a session that had passed every
+   * gate must not end un-closed because a page could not be written.
+   * `docs/transcripts/` is excluded from the digests by
+   * `isSessionRecordPath`, which is what makes this commit safe to make
+   * after the run of record that those digests are stamped on.
+   */
+  private phaseLog(): void {
+    let carry: TranscriptCarry;
+    try {
+      carry = transcriptCarry(this.repoRoot);
+    } catch (error) {
+      // A malformed settings file refuses every other choice this framework
+      // makes, and correctly. Here it must not: the session is closed, and
+      // the only question left is whether to write a page about it.
+      this.log("transcript-skipped", {
+        why: error instanceof Error ? error.message : String(error),
+      });
+      this.setPhase("complete");
+      return;
+    }
+    if (carry === "off") {
+      this.log("transcript-skipped", { why: `${SETTING_TRANSCRIPT} is off` });
+      this.setPhase("complete");
+      return;
+    }
+    const relative = `${TRANSCRIPTS_DIRNAME}/${sessionTranscriptName(this.sessionNumber)}`;
+    const path = join(this.repoRoot, TRANSCRIPTS_DIRNAME, sessionTranscriptName(this.sessionNumber));
+    // Never overwritten, and the rule is the verb's: a page on disk was
+    // rendered against a tree that is no longer HEAD and carries that
+    // commit on its face, so replacing it would describe one session under
+    // another's stamp. One rule, wherever a transcript is written.
+    if (existsSync(path)) {
+      this.log("transcript-kept", { path: relative, why: "a page is already there" });
+      this.setPhase("complete");
+      return;
+    }
+    try {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(
+        path,
+        renderSessionTranscript(this.repoRoot, this.sessionNumber, {
+          jobs: carry === "full" ? "all" : "failed",
+        }),
+        "utf8",
+      );
+      const added = runGit(this.repoRoot, ["add", "--", relative]);
+      const committed =
+        added.code === 0
+          ? runGit(this.repoRoot, [
+              "commit",
+              "-m",
+              `Transcript for session ${sessionDisplayNumber(this.sessionNumber)}`,
+              "--",
+              relative,
+            ])
+          : added;
+      if (committed.code !== 0) {
+        this.log("transcript-uncommitted", { path: relative, why: committed.stderr.trim() });
+        this.setPhase("complete");
+        return;
+      }
+      this.log("transcript-committed", { path: relative, carry });
+      // And PUSHED, which is the whole point of committing it. The land's
+      // push is already done by the time this phase runs, so a transcript
+      // left on this machine would sit here until some later session's push
+      // happened to carry it -- and the last session of a repository would
+      // leave its page nowhere a second clone could ever see. `pushLanded`
+      // is reused rather than restated, so the upstream rule has one home;
+      // its refusal is a Stop, and this is the one phase that may not stop,
+      // so the Stop is caught and said instead.
+      try {
+        pushLanded(this.repoRoot);
+        this.log("transcript-pushed", { path: relative });
+      } catch (error) {
+        this.log("transcript-unpushed", {
+          path: relative,
+          why: error instanceof Error ? error.message : String(error),
+        });
+      }
+    } catch (error) {
+      this.log("transcript-failed", {
+        why: error instanceof Error ? error.message : String(error),
+      });
+    }
     this.setPhase("complete");
   }
 
@@ -4212,6 +4351,9 @@ class Driver {
               break;
             case "close":
               await this.phaseClose();
+              break;
+            case "log":
+              this.phaseLog();
               break;
             case "complete":
               this.log("session-complete", {

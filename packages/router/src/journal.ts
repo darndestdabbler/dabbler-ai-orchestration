@@ -483,19 +483,44 @@ export const MACHINE_DIRNAME = ".dabbler";
 export const RUNS_DIRNAME = `${MACHINE_DIRNAME}/runs`;
 
 /**
- * True for anything under the router's own `.dabbler/` directory.
+ * Where a session's rendered transcript is committed.
  *
- * The one place that decides what is *the record of* a session rather than
- * *the work of* one. A round is appended after the tree snapshot it
- * describes, so counting the ledger as session content makes every verified
- * session look like it drifted the instant it was verified.
+ * Tracked, unlike everything under `.dabbler/`, and spelled here rather
+ * than beside the renderer because the predicate below is what makes the
+ * directory safe to write to -- and a constant that lived with the writer
+ * would leave the exclusion free to name a different path than the writer
+ * wrote to.
  */
-export function isMachineStatePath(path: string): boolean {
+export const TRANSCRIPTS_DIRNAME = "docs/transcripts";
+
+/**
+ * The directories that hold the RECORD of a session rather than the WORK of
+ * one. Both answer to the one predicate below; a second rule beside the
+ * first is how one of them comes to be counted and the other not.
+ */
+const SESSION_RECORD_DIRNAMES: readonly string[] = [MACHINE_DIRNAME, TRANSCRIPTS_DIRNAME];
+
+/**
+ * True for a path that RECORDS a session rather than being the work of one.
+ *
+ * The one place that decides it, and the distinction is load-bearing in the
+ * same way for both directories it covers: each is written AFTER the tree it
+ * describes. A round is appended after the snapshot it judges, so counting
+ * the ledger as session content makes every verified session look like it
+ * drifted the instant it was verified. A transcript is committed after the
+ * close, so counting it would move the whole-tree digest after the run of
+ * record that digest is stamped on -- and the next release would read a tree
+ * no longer matching the row.
+ *
+ * It was `isMachineStatePath` while `.dabbler/` was the only such directory,
+ * which named where the files were rather than what they are. The name is
+ * what the second directory had to fit.
+ */
+export function isSessionRecordPath(path: string): boolean {
   let normalized = String(path).replace(/\\/g, "/");
   if (normalized.startsWith("./")) normalized = normalized.slice(2);
-  return (
-    normalized === MACHINE_DIRNAME ||
-    normalized.startsWith(`${MACHINE_DIRNAME}/`)
+  return SESSION_RECORD_DIRNAMES.some(
+    (dirname) => normalized === dirname || normalized.startsWith(`${dirname}/`),
   );
 }
 

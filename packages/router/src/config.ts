@@ -61,6 +61,7 @@ import {
   SETTING_ENGINE,
   SETTING_REVIEWER_MODEL,
   SETTING_REVIEWER_TRANSPORT,
+  SETTING_TRANSCRIPT,
   SETTING_TRANSPORT,
   type SettingKey,
   readSettings,
@@ -1107,7 +1108,8 @@ export function layerOfSource(source: string): Exclude<ChoiceLayer, "default"> |
     source === AUTHORING_MODEL_SOURCE_SETTINGS ||
     source === REVIEWER_MODEL_SOURCE_SETTINGS ||
     source === AUXILIARY_MODEL_SOURCE_SETTINGS ||
-    source === ENGINE_SOURCE_SETTINGS
+    source === ENGINE_SOURCE_SETTINGS ||
+    source === TRANSCRIPT_SOURCE_SETTINGS
   ) {
     return "checkout";
   }
@@ -1240,6 +1242,59 @@ export function explainRoleModel(
       : [[setting[1], checkoutSettings(root)[setting[0]] ?? null] as const]),
     [roleModelSourcePreferences(role), personal(() => readPreferences().selected?.[role])],
   ]);
+}
+
+export const TRANSCRIPT_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_TRANSCRIPT})`;
+
+/** What a session's committed transcript may carry. */
+export const TRANSCRIPT_CARRIES = ["off", "outline", "full"] as const;
+export type TranscriptCarry = (typeof TRANSCRIPT_CARRIES)[number];
+
+/**
+ * The default, and it is deliberately not `off`.
+ *
+ * A framework whose record of itself is opt-in is a framework with no
+ * record: the repository that most needs one is the repository nobody
+ * thought to switch it on in. `outline` carries the session's shape and a
+ * failed job's bytes, which is what a reader is looking for and is small.
+ */
+export const TRANSCRIPT_DEFAULT: TranscriptCarry = "outline";
+
+/**
+ * What this checkout's transcript carries, and the layer that said so.
+ *
+ * One layer and a default, where a vehicle has four. That is the whole of
+ * the choice rather than a thinning of it: there is no flag, because the
+ * phase that reads it is not typed; no shipped value, because the
+ * distribution has no opinion about another repository's record; and no
+ * machine default, for the reason `SETTING_TRANSCRIPT` gives.
+ *
+ * A value this does not recognise is REFUSED rather than quietly defaulted.
+ * A developer who wrote `dabbler.transcript: "none"` meant to turn it off,
+ * and silently rendering `outline` for months would be the setting they can
+ * see being ignored.
+ */
+export function explainTranscript(root?: string | null): TransportReading {
+  const checkout = root ?? projectRoot();
+  const reading = explainChoice([
+    [TRANSCRIPT_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_TRANSCRIPT] ?? null],
+  ]);
+  if (reading.decidedBy === null) {
+    return { transport: TRANSCRIPT_DEFAULT, decidedBy: null, layers: reading.layers };
+  }
+  const normalized = reading.transport.toLowerCase();
+  if (!(TRANSCRIPT_CARRIES as readonly string[]).includes(normalized)) {
+    throw new ConfigError(
+      `${reading.decidedBy} must be one of ${renderList(TRANSCRIPT_CARRIES)}, ` +
+        `got '${reading.transport}'`,
+    );
+  }
+  return { transport: normalized, decidedBy: reading.decidedBy, layers: reading.layers };
+}
+
+/** What this checkout's transcript carries. */
+export function transcriptCarry(root?: string | null): TranscriptCarry {
+  return explainTranscript(root).transport as TranscriptCarry;
 }
 
 /** The engine in force, and every layer that named one. */

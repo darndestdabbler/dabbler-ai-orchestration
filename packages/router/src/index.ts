@@ -144,3 +144,19 @@ export { TESTS_FAILED, TESTS_NONE, TESTS_PASSED, TESTS_RUNNING, TEST_FAILURE } f
 // built on an absolute base can, so the directory is exported rather than
 // the conclusion that it is unwatchable.
 export { configurationSourceDirs } from "./preferences.ts";
+// What a line IS, and the two palettes that answer it. Exported because the
+// Dabbler Terminal and a session's committed transcript render the same
+// records, and a terminal that decided its own tones would be the second
+// statement of a rule -- the drift this package has already paid for once,
+// in a phase list that was written down twice. The terminal paints a tone
+// as an ANSI escape; the transcript paints it as a CSS class; what the line
+// IS is settled in one place.
+export {
+  TONES,
+  fieldTone,
+  lineTone,
+  verdictTone,
+  type PaintedTone,
+  type ThemeKind,
+  type Tone,
+} from "./transcript.ts";

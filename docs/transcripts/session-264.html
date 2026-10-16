@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 264 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.absent { background: var(--panel); border-left: 3px solid var(--tone-warn); padding: .6rem .9rem; margin: 1.25rem 0; }
+.absent ul { margin: .35rem 0 0; padding-left: 1.2rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 264 transcript</h1>
+<p class="stamp">Rendered 2026-10-16T17:07:34.343Z by dabbler-ai-router 3.21.0 at 6426e8753a72da5b7bc8862c846236cd97f352cc.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-16T13:01:52.225-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 264 of 265: The work plan carries the files a session changed, and the Files section goes</h3>
+<p>Scope: <code>packages/router/src/transcript.ts</code> (the Work Plan section's <code>Files</code> column and the line above its table; the Files section removed; GitHub's file link); tests in <code>transcript.test.ts</code></p>
+<p><strong>Why.</strong> Since 263 a page lists each step's files twice: in the Work Plan's <code>Files</code> column, and again in the Files section as one row per file under its step. Read on survsys's session 13, the two lists are the same files in the same order, and what the second adds is only the commit and a link on each file. The link itself opens the whole file at the landed commit on GitHub, not the change -- and what a reader of a transcript wants from a file is what the step did to it.</p>
+<p><strong>Step 1 -- the Work Plan carries the commit and the files.</strong> Above the Work Plan's table, one line: <code>Landed &lt;hash&gt;</code>, the full hash in text and linked to the host's commit page by 261's rule, or <code>not landed</code>. Under it, where the session has an event log, nothing more, and each step's <code>Files</code> cell lists the files its <code>report-accepted</code> row named; where it has none, a line saying the files are what each step declared rather than what it changed, and the cell lists the declared files, as now. A step with no accepted report shows its declared files in either case. Each file links where the remote is GitHub or Azure DevOps and the session landed; otherwise it is plain text, as now. The commit and the files are read by the two readings 261 and 262 wrote, which move to feed this section rather than their own. The Files section is removed.</p>
+<p><strong>Step 2 -- a GitHub file link opens its diff.</strong> <code>commitPages</code>'s GitHub <code>file</code> link becomes the commit page anchored at that file's diff, <code>&lt;base&gt;/commit/&lt;sha&gt;#diff-&lt;hex sha256 of the path&gt;</code>, the anchor GitHub gives each file on a commit page; Azure DevOps's <code>commit/&lt;sha&gt;?path=</code> already opens the file's change and stays.</p>
+<p><strong>Non-goals.</strong> Embedding any diff in the page. Re-rendering any page already committed. Any other column of the Work Plan, or any change to the Session Plan section. Files the framework itself changed at the land. Any script on the page.</p>
+<p><strong>Tests.</strong> 261's and 262's tests in <code>transcript.test.ts</code> are rewritten to read the Work Plan's cells and the <code>Landed</code> line rather than a Files section -- with an event log, the reported files and a GitHub diff link whose anchor is the path's sha256; without one, the declared files under the declared line, and an unknown remote with the hash and no link. No new test.</p>
+<p><strong>Releasable.</strong> Yes -- with 247 to 263, as 3.22.0 in session 265.</p>
+<h2>Work Plan</h2>
+<p>Fold the transcript's Files section into its Work Plan section and make a GitHub file link open that file's diff. In packages/router/src/transcript.ts the Work Plan section opens, above its table, with one line: <code>Landed &lt;hash&gt;</code>, the full hash in text linked to the host's commit page by commitPages, or <code>not landed</code>; where the session has no event log, a line under it says the files are what each step declared rather than what it changed. Each step's Files cell lists the files its report-accepted rows named where an event log exists, and its declared files otherwise or where the step has no accepted report; each file links to the host's file page where the remote is GitHub or Azure DevOps and the session landed, and is plain text otherwise. readReportedFiles and the gate-receipt reading feed this section; the Files section and its renderer are removed. commitPages's GitHub file link becomes <code>&lt;base&gt;/commit/&lt;sha&gt;#diff-&lt;hex sha256 of the path&gt;</code>; Azure DevOps's link stays. 261's and 262's tests in transcript.test.ts are rewritten to read the Work Plan's cells and the Landed line; no new test.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Work plan carries files</td><td><p>In packages/router/src/transcript.ts: renderWorkPlan takes the landed commit and the per-step files. Above the table, <code>&lt;p&gt;Landed &lt;linked full hash&gt;.&lt;/p&gt;</code> or <code>&lt;p&gt;not landed&lt;/p&gt;</code>; with no event log, a line saying these are the files each step declared, not what it changed. Each step's Files cell lists the files its report-accepted rows named (deduplicated, in order) when there is an event log and the step has an accepted report, else the step's declared files; each file linked via commitPages(origin).file when the remote is GitHub/Azure DevOps and the session landed, plain text otherwise. The landed commit comes from the last <code>landed</code> event, or the gate receipt's landed_sha where there is no event log. Remove the Files section and renderFiles/readDeclaredFiles's own section. Rewrite 261's and 262's tests in packages/router/test/transcript.test.ts to read the Work Plan's Files cells and the Landed line instead of a Files section: with an event log the reported files; without one the declared files under the declared line; an unknown remote shows the hash with no link.</p></td><td><span class="mono">packages/router/src/transcript.ts</span><br><span class="mono">packages/router/test/transcript.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>node --test packages/router/test/transcript.test.ts</code></td><td>yes</td></tr>
+<tr><td>Github file link opens diff</td><td><p>In packages/router/src/transcript.ts, commitPages's GitHub <code>file</code> link becomes <code>${base}/commit/${sha}#diff-${sha256 hex of the path}</code> (createHash from node:crypto); Azure DevOps's <code>commit/&lt;sha&gt;?path=</code> link is unchanged. Update the GitHub link assertion in packages/router/test/transcript.test.ts so the anchor is the path's sha256.</p></td><td><span class="mono">packages/router/src/transcript.ts</span><br><span class="mono">packages/router/test/transcript.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>node --test packages/router/test/transcript.test.ts</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Embedding any diff in the page</li><li>Re-rendering any transcript page already committed</li><li>Any other column of the Work Plan, or any change to the Session Plan section</li><li>Files the framework itself changed at the land</li><li>Any script on the page</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[17:01:52]</span> <span class="muted">run-started</span> session=264 mode=pull</div>
+<div class="line"><span class="at">[17:01:52]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[17:02:17]</span> <span class="muted">run-resumed</span> session=264 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[17:02:17]</span> <span class="muted">plan-accepted</span> steps=[&quot;work-plan-carries-files&quot;,&quot;github-file-link-opens-diff&quot;] non_goals=5</div>
+<div class="line"><span class="at">[17:02:17]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[17:02:18]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=work-plan-carries-files</div>
+<div class="line"><span class="at">[17:03:34]</span> <span class="muted">run-resumed</span> session=264 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:03:39]</span> <span class="muted">check-passed</span> step=work-plan-carries-files argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[17:03:40]</span> <span class="muted">check-passed</span> step=work-plan-carries-files argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/transcript.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:03:44]</span> <span class="muted">named-tests-passed</span> step=work-plan-carries-files suite=typescript command=node scripts/suite.mjs container packages/router/test/transcript.test.ts</div>
+<div class="line"><span class="at">[17:03:44]</span> <span class="muted">report-accepted</span> seq=2 step=work-plan-carries-files files=[&quot;packages/router/src/transcript.ts&quot;,&quot;packages/router/test/transcript.test.ts&quot;] notes=Work Plan carries the Landed line and each step's reported (or declared) files, linked by host; Files section removed</div>
+<div class="line"><span class="at">[17:03:44]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=github-file-link-opens-diff</div>
+<div class="line"><span class="at">[17:04:18]</span> <span class="muted">run-resumed</span> session=264 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:04:23]</span> <span class="muted">check-passed</span> step=github-file-link-opens-diff argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[17:04:24]</span> <span class="muted">check-passed</span> step=github-file-link-opens-diff argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/transcript.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:04:27]</span> <span class="muted">named-tests-passed</span> step=github-file-link-opens-diff suite=typescript command=node scripts/suite.mjs container packages/router/test/transcript.test.ts</div>
+<div class="line"><span class="at">[17:04:27]</span> <span class="muted">report-accepted</span> seq=3 step=github-file-link-opens-diff files=[&quot;packages/router/src/transcript.ts&quot;,&quot;packages/router/test/transcript.test.ts&quot;] notes=GitHub file link is the commit page anchored at #diff-&lt;sha256 of path&gt;; Azure DevOps unchanged</div>
+<div class="line"><span class="at">[17:04:27]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[17:04:29]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[17:04:30]</span> <span class="muted">job-started</span> name=verification pid=47304 log=.dabbler/runs/s264/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:05:42]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s264/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:05:42]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[17:05:42]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[17:05:42]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[17:05:44]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=47732 log=.dabbler/runs/s264/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:05:47]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s264/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:05:47]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[17:05:48]</span> <span class="muted">job-started</span> name=run of record: typescript pid=47436 log=.dabbler/runs/s264/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:07:02]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s264/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:07:03]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[17:07:04]</span> <span class="muted">job-started</span> name=run of record: extension pid=37140 log=.dabbler/runs/s264/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:07:22]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s264/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:07:22]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[17:07:26]</span> <span class="muted">landed</span> commit=fc7ae39b49c0768ac1bf6f30ca223297ebbffddc</div>
+<div class="line"><span class="at">[17:07:26]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[17:07:26]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[17:07:26]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[17:07:27]</span> <span class="muted">job-started</span> name=close pid=41644 log=.dabbler/runs/s264/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:07:34]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s264/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:07:34]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gemini-4-argon</td><td>google</td><td>api</td><td><details><summary>2 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** In `packages/router/test/transcript.test.ts`, the event-log test (`&quot;puts the landed commit over the work plan and each step's reported files in its row, linked only where the host is known&quot;`) gives every step in the plan (`events` and `renderer`) a `report-accepted` event, so the per-step fallback (`reported.get(step.id) ?? step.files`) is only exercised when the entire event log is absent. A case starting with a work plan containing a third step `step(&quot;unreported&quot;, [&quot;src/fallback.ts&quot;])` alongside the `events` and `renderer` `report-accepted` events and rendering the transcript would assert that the `Unreported` row still renders `src/fallback.ts` while `Events` renders `src/a.ts` instead of `src/declared.ts`.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** In `packages/router/test/transcript.test.ts`, `reportedFiles` deduplicates files across multiple `report-accepted` events for the same step (`if (!named.includes(file)) named.push(file)`), which is not exercised by the test inputs in the diff. A case appending two `report-accepted` events for `&quot;events&quot;` with `[&quot;src/a.ts&quot;, &quot;src/c.ts&quot;]` and `[&quot;src/a.ts&quot;, &quot;src/d.ts&quot;]` and asserting `src/a.ts&lt;br&gt;...src/c.ts&lt;br&gt;...src/d.ts` with `src/a.ts` appearing once in the `Events` cell would pin the deduplication and ordering.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>52</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>72s</td><td>1341</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>282</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Files</h2>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/fc7ae39b49c0768ac1bf6f30ca223297ebbffddc"><code>fc7ae39b49c0768ac1bf6f30ca223297ebbffddc</code></a>.</p>
+<table>
+<tr><th>Step</th><th>File</th></tr>
+<tr><td><code>work-plan-carries-files</code></td><td><a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/fc7ae39b49c0768ac1bf6f30ca223297ebbffddc/packages/router/src/transcript.ts"><span class="mono">packages/router/src/transcript.ts</span></a></td></tr>
+<tr><td><code>work-plan-carries-files</code></td><td><a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/fc7ae39b49c0768ac1bf6f30ca223297ebbffddc/packages/router/test/transcript.test.ts"><span class="mono">packages/router/test/transcript.test.ts</span></a></td></tr>
+<tr><td><code>github-file-link-opens-diff</code></td><td><a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/fc7ae39b49c0768ac1bf6f30ca223297ebbffddc/packages/router/src/transcript.ts"><span class="mono">packages/router/src/transcript.ts</span></a></td></tr>
+<tr><td><code>github-file-link-opens-diff</code></td><td><a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/fc7ae39b49c0768ac1bf6f30ca223297ebbffddc/packages/router/test/transcript.test.ts"><span class="mono">packages/router/test/transcript.test.ts</span></a></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

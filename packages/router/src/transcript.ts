@@ -1,0 +1,1073 @@
+// What a session LOOKED like, in a file that outlives the framework.
+//
+// A second developer who clones this repository can read what every session
+// DECIDED -- the decisions log and the change log are tracked -- and can see
+// nothing of what any session looked like while it ran. The Dabbler Terminal
+// is where that is visible, and it persists nothing: its scrollback is in
+// memory, capped, and gone when the window closes. Everything it shows is
+// reconstructed from records under `.dabbler/`, which is gitignored whole
+// and stays that way, because the rollback depends on nothing there being
+// tracked.
+//
+// So the record TRAVELS as a rendered artifact rather than as the records
+// themselves: one self-contained HTML file per session, committed. The
+// reason is this framework's own mortality -- a record only `dabbler` can
+// parse is worth nothing the day `dabbler` is replaced, and an HTML file
+// opens in any browser with no tooling at all. The repository already works
+// this way: `decisions-log.md` is RENDERED from the activity log and is
+// explicitly not a source.
+//
+// **No script, no network, no CDN.** Inline CSS and nothing else: a page
+// that fetched a stylesheet would be a record that stops rendering the day
+// the host goes away, which is the failure this file exists to avoid. Both
+// palettes travel in the page under `prefers-color-scheme`, so one file
+// reads correctly on either kind of screen.
+//
+// **The tone grammar lives here, and the Dabbler Terminal imports it.** What
+// a line IS is one rule with two renderers over it -- ANSI colour in a
+// terminal, a CSS class in a page. Written twice it would be two rules that
+// agreed on the day they were written.
+
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+
+import { driverDir, readDriverEvents, readRun, readWorkPlan } from "./driver.ts";
+import { SESSION_PLAN_FILENAME } from "./evidence.ts";
+import { jobLogPath, jobStatusPath, jobsDir } from "./jobs.ts";
+import { runGit } from "./journal.ts";
+import { readRounds } from "./ledger.ts";
+import { redact } from "./packaging.ts";
+import { SESSION_HEADING_RE } from "./progress.ts";
+import { readRecords, type TestRunRecord } from "./testEvidence.ts";
+import { totalsOf, type TestTotals } from "./testOutput.ts";
+import { VERSION } from "./version.ts";
+import type { DriverEvent, DriverRun, DriverWorkPlan } from "./generated/index.ts";
+
+// --- The tone grammar ---------------------------------------------------------
+//
+// Moved here from the extension's `dabblerTerminal.ts` unchanged, because a
+// transcript and the terminal must agree about what every line IS. The
+// terminal paints a tone as an ANSI escape; this file paints it as a class.
+
+export type ThemeKind = "dark" | "light";
+
+/**
+ * What a line, or a value inside one, IS -- which is the only thing that
+ * decides its colour. No event names a colour; it names what it is, and the
+ * palette answers in the theme at hand. `plain` is the terminal's own
+ * foreground and is painted with nothing.
+ */
+export type Tone = "milestone" | "good" | "warn" | "bad" | "muted" | "plain";
+
+/** The tones that carry a colour of their own. */
+export type PaintedTone = Exclude<Tone, "plain">;
+
+/**
+ * The two palettes, one per theme kind.
+ *
+ * The dark values are the operator's, chosen on 2026-09-06 against the
+ * editor's defaults: the milestone blue rather than a teal that read as a
+ * second green, and a green and an amber each a step less saturated than
+ * the token colours they replaced. The light values are the darker
+ * relatives that stay readable on a white terminal; the same hex on both
+ * backgrounds would be unreadable on one of them.
+ */
+export const TONES: Readonly<Record<ThemeKind, Readonly<Record<PaintedTone, string>>>> = {
+  dark: {
+    milestone: "#3874db",
+    good: "#54a33b",
+    warn: "#b79427",
+    bad: "#f14c4c",
+    muted: "#8c8c8c",
+  },
+  light: {
+    milestone: "#2a5db0",
+    good: "#256029",
+    warn: "#8a6100",
+    bad: "#a31515",
+    muted: "#6b6b6b",
+  },
+};
+
+/**
+ * A verdict's tone.
+ *
+ * `VERIFIED` is the only clean one and it is the only green one. Everything
+ * else is a verdict that asks for something -- findings to dispose, a round
+ * to run again -- and reads as such. An unknown token is warned rather than
+ * assumed good, because a verdict this does not recognise is exactly the
+ * case where guessing "fine" is worst.
+ */
+export function verdictTone(verdict: string): Tone {
+  const token = verdict.trim().toUpperCase();
+  if (token === "VERIFIED") return "good";
+  if (token === "ISSUES_FOUND" || token === "REJECTED" || token === "FAILED") return "bad";
+  return "warn";
+}
+
+/**
+ * What a whole line is, which decides the event word's colour.
+ *
+ * A stop is the one thing in this terminal that must not be scrolled past.
+ * A milestone phase, a verdict and a test run are the lifecycle reaching
+ * somewhere -- what the operator opened this terminal to see. Everything
+ * else is traffic, and traffic is muted so that the three above stand out
+ * of it rather than competing with it.
+ */
+export function lineTone(event: string, fields: Record<string, string> = {}): Tone {
+  // A pause is amber: the loop met a bound and a person is told who acts
+  // next, which is not an alarm. Every pause, whatever class a run written
+  // before 2.9.0 carries.
+  if (event === "paused") return "warn";
+  // The one honest green event, and no second: the phase moved past a
+  // pause with nothing in its place.
+  if (event === "progress-resumed") return "good";
+  // A finished job nobody collected is amber for the watcher's reason: the
+  // framework knows of nothing wrong, and what is being said is that the
+  // next call is owed and nobody has made it.
+  if (event === "uncollected") return "warn";
+  // The watcher is a nudge, not a verdict: nothing has gone wrong that the
+  // framework knows of, and the only thing being said is that the engine
+  // has been quiet over an unmoved tree. `warn` is the amber the indicator
+  // already spins in, which is exactly the weight it should carry.
+  if (event === "watcher") return "warn";
+  if (event === "instruction-overdue") return "warn";
+  if (event === "verify") return verdictTone(fields["verdict"] ?? "");
+  if (event === "tests") return (fields["outcome"] ?? "") === "passed" ? "good" : "bad";
+  // Every phase, and not a chosen eight. A list of the interesting ones put
+  // `preverify`, `dispositions`, `fix` and `publish` in the plain tone --
+  // which are precisely the phases where a session stops being routine and
+  // an operator most wants to catch it -- so one session read blue, blue,
+  // plain, blue, plain, plain, blue, blue, plain, blue as it moved, and the
+  // reader had to know the list to know what the change of colour meant. A
+  // phase line is the framework saying where the session is, and where the
+  // session is is always worth the same weight.
+  if (event === "phase") return "milestone";
+  if (event === "session-closed") return "milestone";
+  // A step beginning is the session's own progress, in the milestone blue;
+  // an answer refused is the amber of a nudge, not the red of a failure --
+  // the engine is told why and answers again.
+  if (event === "step") return "milestone";
+  if (event === "rejected") return "warn";
+  return "muted";
+}
+
+/** A job's exit code as a tone: zero is good, anything else is bad. */
+function exitTone(exit: string): Tone {
+  return exit === "0" ? "good" : "bad";
+}
+
+/**
+ * What one field's VALUE is, independent of the line it sits on.
+ *
+ * Keyed on the key rather than on the event, so a verdict is green wherever
+ * it appears and a phase is a milestone wherever it appears. The event is
+ * still passed because a `reason` on a stop is the diagnosis and a `reason`
+ * anywhere else would not be.
+ */
+export function fieldTone(event: string, key: string, value: string): Tone {
+  if (key === "verdict") return verdictTone(value);
+  if (key === "outcome") return value === "passed" ? "good" : "bad";
+  if (key === "exit") return exitTone(value);
+  // `now` is the phase line's own word for where the run is; `phase` is the
+  // same value wherever another line carries it. Every one of them, for the
+  // reason `lineTone` gives above.
+  if (key === "now" || key === "phase") return "milestone";
+  // On a pause the kind is amber; the words themselves stay plain, because
+  // prose painted whole is a wall.
+  if (event === "paused" && key === "kind") return "warn";
+  return "plain";
+}
+
+/**
+ * A step's label, as the Work Explorer shows it and the page lists it:
+ * "verify-changes" / "verify_changes" -> "Verify changes".
+ */
+export function humanizeStepKey(key: string): string {
+  const words = key.replace(/[-_]+/g, " ").trim();
+  if (!words) return key;
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+// --- Where a transcript lives -------------------------------------------------
+
+/**
+ * One session's page, named so that the directory sorts the way it reads.
+ *
+ * Where they land is `TRANSCRIPTS_DIRNAME` in `journal.ts`, beside the
+ * predicate that keeps them out of the digests: the writer and the
+ * exclusion must name one directory, and a constant kept here would leave
+ * the exclusion free to name a path nothing writes to.
+ */
+export function sessionTranscriptName(sessionNumber: number): string {
+  return `session-${String(sessionNumber).padStart(3, "0")}.html`;
+}
+
+// --- Reading one session's records --------------------------------------------
+
+/** How much of the jobs' own output a transcript carries. */
+export type JobCarry = "failed" | "all";
+
+export interface TranscriptOptions {
+  /**
+   * `failed` -- the default -- carries the outline and the bytes of jobs
+   * that did not exit zero; `all` carries every job's bytes. The whole of a
+   * run of record is megabytes of somebody else's runner output, and a
+   * reader who wants it says so.
+   */
+  readonly jobs?: JobCarry;
+  /** Where `session-plan.md` is; without it the page has no plan section. */
+  readonly sessionsDir?: string;
+  /** Fixed by a test; otherwise now. */
+  readonly renderedAt?: string;
+}
+
+interface JobReading {
+  readonly name: string;
+  readonly exit: string;
+  /** Null where the carry left the output out, which is not an empty log. */
+  readonly output: string | null;
+}
+
+interface TestRunReading {
+  readonly row: TestRunRecord;
+  /** What the run's own log says it ran; null where nothing could be read. */
+  readonly totals: TestTotals | null;
+}
+
+interface SessionReading {
+  readonly sessionNumber: number;
+  /** The session's own section of the session plan, as markdown. */
+  readonly planSection: string | null;
+  readonly workPlan: DriverWorkPlan | null;
+  readonly run: DriverRun | null;
+  readonly events: readonly DriverEvent[];
+  readonly rounds: readonly Record<string, unknown>[];
+  readonly testRuns: readonly TestRunReading[];
+  readonly jobs: readonly JobReading[];
+  /** True where `rounds.jsonl` exists and would not read, which is not "no round". */
+  readonly roundsUnreadable: boolean;
+}
+
+/** Everything one session left behind, as much of it as there is. */
+function readSession(
+  repoRoot: string,
+  sessionNumber: number,
+  carry: JobCarry,
+  sessionsDir: string | undefined,
+): SessionReading {
+  const planSection = sessionsDir === undefined ? null : readPlanSection(sessionsDir, sessionNumber);
+  let workPlan: DriverWorkPlan | null;
+  try {
+    workPlan = readWorkPlan(repoRoot, sessionNumber);
+  } catch {
+    workPlan = null;
+  }
+  const run = readRun(repoRoot, sessionNumber);
+  const events = readDriverEvents(repoRoot, sessionNumber);
+
+  let rounds: Record<string, unknown>[] = [];
+  let roundsUnreadable = false;
+  try {
+    rounds = readRounds(repoRoot, sessionNumber);
+  } catch {
+    roundsUnreadable = true;
+  }
+
+  const rows = readRecords(repoRoot).filter((row) => row.sessionNumber === sessionNumber);
+  const testRuns = rows.map((row) => ({ row, totals: readTotals(repoRoot, sessionNumber, row, rows) }));
+  const jobs = readJobs(repoRoot, sessionNumber, carry);
+
+  return { sessionNumber, planSection, workPlan, run, events, rounds, testRuns, jobs, roundsUnreadable };
+}
+
+/** From the session's `###` heading to the next `###` heading or the end. */
+function readPlanSection(sessionsDir: string, sessionNumber: number): string | null {
+  let plan: string;
+  try {
+    plan = readFileSync(join(sessionsDir, SESSION_PLAN_FILENAME), "utf8");
+  } catch {
+    return null;
+  }
+  const heading = [...plan.matchAll(SESSION_HEADING_RE)].find((match) => Number(match[1]) === sessionNumber);
+  if (heading === undefined) return null;
+  const after = plan.slice(heading.index + heading[0].length);
+  const end = after.search(/^###\s/m);
+  return heading[0] + (end < 0 ? after : after.slice(0, end));
+}
+
+function readJobs(repoRoot: string, sessionNumber: number, carry: JobCarry): JobReading[] {
+  const dir = jobsDir(repoRoot, sessionNumber);
+  if (!existsSync(dir)) return [];
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  const jobs: JobReading[] = [];
+  for (const entry of entries.filter((name) => name.endsWith(".log")).sort()) {
+    const name = entry.slice(0, -".log".length);
+    const exit = readJobExit(join(dir, `${name}.status.json`));
+    // The default carries a passing job's outline and not its bytes: a run
+    // of record that went green is megabytes saying so.
+    const wanted = carry === "all" || exit !== "0";
+    jobs.push({
+      name,
+      exit,
+      output: wanted ? readTextOrEmpty(join(dir, entry)) : null,
+    });
+  }
+  return jobs;
+}
+
+/**
+ * A run's totals, from the job log named after its suite -- whatever the
+ * carry put on the page. A suite run twice in one session has one log, the
+ * later run's, so only the suite's latest row reads it, and only where it was
+ * recorded after that job started; an earlier row stays blank rather than
+ * borrowing the later numbers. The job's end is no bound: the row is stamped
+ * by the child that ran the suite and the end by the runner that reaped it.
+ */
+function readTotals(
+  repoRoot: string,
+  sessionNumber: number,
+  row: TestRunRecord,
+  rows: readonly TestRunRecord[],
+): TestTotals | null {
+  const at = Date.parse(row.recordedAt);
+  if (rows.some((other) => other.suite === row.suite && Date.parse(other.recordedAt) > at)) return null;
+  const job = `run of record: ${row.suite}`;
+  let status: Record<string, unknown>;
+  try {
+    status = JSON.parse(readFileSync(jobStatusPath(repoRoot, sessionNumber, job), "utf8")) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (!(at >= Date.parse(String(status["started_at"])))) return null;
+  return totalsOf(readTextOrEmpty(jobLogPath(repoRoot, sessionNumber, job)));
+}
+
+function readJobExit(path: string): string {
+  try {
+    const row: unknown = JSON.parse(readFileSync(path, "utf8"));
+    if (typeof row === "object" && row !== null) {
+      const code = (row as Record<string, unknown>)["exit"];
+      if (typeof code === "number") return String(code);
+    }
+  } catch {
+    // An unreadable status is an unknown exit, which the page says.
+  }
+  return "?";
+}
+
+function readTextOrEmpty(path: string): string {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * A variable whose VALUE is a credential, by the name it is kept under.
+ *
+ * Every secret this framework reads lives in the environment and nowhere
+ * else -- the provider keys, the feed PAT -- and every one of them is named
+ * for what it holds. That is the rule this matches, and it is deliberately
+ * the whole rule.
+ *
+ * It was the configuration's `api_key_env` list first, and that was wrong in
+ * the one direction that matters: reading a config can FAIL, and a failure
+ * there scrubbed nothing at all while saying nothing at all. A transcript is
+ * the one record of a run that gets COMMITTED, and D278 found three provider
+ * keys sitting in plaintext in a job log. Over-scrubbing costs a reader a
+ * line they can get from the ledger; under-scrubbing publishes a key.
+ */
+const CREDENTIAL_NAME = /(?:KEY|TOKEN|SECRET|PASSWORD|PAT|CREDENTIAL)S?$/i;
+
+/**
+ * Every credential value this process can see, so a job's bytes can be
+ * scrubbed of them.
+ *
+ * `redact` in `packaging.ts` is the single implementation of the rule and
+ * this only feeds it -- including its minimum length, which is what keeps a
+ * short, ordinary value from burying the page under redactions.
+ */
+function machineSecrets(): string[] {
+  const secrets: string[] = [];
+  for (const [name, value] of Object.entries(process.env)) {
+    if (typeof value === "string" && value !== "" && CREDENTIAL_NAME.test(name)) {
+      secrets.push(value);
+    }
+  }
+  return secrets;
+}
+
+function scrub(text: string, secrets: readonly string[]): string {
+  let out = text;
+  for (const secret of secrets) out = redact(out, secret);
+  return out;
+}
+
+// --- HTML ---------------------------------------------------------------------
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Backtick code and `**bold**` in one line, escaped before any markup. */
+function inlineMarkdown(line: string): string {
+  const parts = line.split("`");
+  // An unpaired backtick is a character, not the start of a code span.
+  if (parts.length % 2 === 0) parts.push(`\`${parts.pop() ?? ""}`);
+  return parts
+    .map((part, index) =>
+      index % 2 === 1
+        ? `<code>${escapeHtml(part)}</code>`
+        : escapeHtml(part).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"),
+    )
+    .join("");
+}
+
+/**
+ * The markdown a session plan is written in, and nothing more: the `###`
+ * heading, paragraphs, bulleted and numbered lists, backtick code and
+ * `**bold**`. Anything else is text, so a plan can never put markup on the
+ * page.
+ */
+export function planMarkdownToHtml(source: string): string {
+  const blocks: string[] = [];
+  let paragraph: string[] = [];
+  let list: { tag: "ul" | "ol"; items: string[] } | null = null;
+  const flush = (): void => {
+    if (paragraph.length > 0) blocks.push(`<p>${inlineMarkdown(paragraph.join(" "))}</p>`);
+    paragraph = [];
+    if (list !== null) {
+      const items = list.items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("");
+      blocks.push(`<${list.tag}>${items}</${list.tag}>`);
+    }
+    list = null;
+  };
+  for (const raw of source.split(/\r?\n/)) {
+    const line = raw.trim();
+    const heading = /^###\s+(.*)$/.exec(line);
+    const item = /^(?:([-*])|\d+[.)])\s+(.*)$/.exec(line);
+    if (line === "") {
+      flush();
+    } else if (heading !== null) {
+      flush();
+      blocks.push(`<h3>${inlineMarkdown(heading[1])}</h3>`);
+    } else if (item !== null) {
+      const tag = item[1] === undefined ? "ol" : "ul";
+      if (paragraph.length > 0 || (list !== null && list.tag !== tag)) flush();
+      list ??= { tag, items: [] };
+      list.items.push(item[2]);
+    } else if (list !== null) {
+      // A wrapped line continues the item above it until a blank line.
+      list.items[list.items.length - 1] += ` ${line}`;
+    } else {
+      paragraph.push(line);
+    }
+  }
+  flush();
+  return blocks.join("\n");
+}
+
+/**
+ * A job's own bytes, with its colour.
+ *
+ * The runners' colour is most of why the terminal is worth preserving at
+ * all: a failing suite says which assertion failed in red, and a page that
+ * stripped the escapes would hand the reader the same text with the one
+ * thing they were looking for taken out of it. Only SGR sequences are
+ * understood -- foreground colour, bold, and the resets. Everything else a
+ * program may write (cursor moves, an alternate screen, a title) is
+ * dropped: it is instruction to a terminal and means nothing on a page.
+ */
+export function ansiToHtml(text: string): string {
+  const open: string[] = [];
+  let out = "";
+  let plain = "";
+
+  const flush = (): void => {
+    if (plain !== "") out += escapeHtml(plain);
+    plain = "";
+  };
+  const closeAll = (): void => {
+    flush();
+    while (open.length > 0) {
+      open.pop();
+      out += "</span>";
+    }
+  };
+
+  // `\u001b[` … `m` is a colour; any other final byte is a terminal
+  // instruction and is swallowed whole rather than printed as mojibake.
+  // eslint-disable-next-line no-control-regex -- ESC is the byte being matched
+  const pattern = /\u001b\[([0-9;]*)([A-Za-z])|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g;
+  let last = 0;
+  for (let match = pattern.exec(text); match !== null; match = pattern.exec(text)) {
+    plain += text.slice(last, match.index);
+    last = match.index + match[0].length;
+    if (match[2] !== "m") continue;
+    const codes = (match[1] ?? "").split(";").filter((code) => code !== "");
+    if (codes.length === 0 || codes[0] === "0") {
+      closeAll();
+      continue;
+    }
+    const style = sgrStyle(codes);
+    if (style === null) continue;
+    flush();
+    open.push(style);
+    out += `<span style="${style}">`;
+  }
+  plain += text.slice(last);
+  closeAll();
+  return out;
+}
+
+/** The 16 terminal colours, as a page has to spell them. */
+const ANSI_COLOURS: readonly string[] = [
+  "#000000", "#cd3131", "#0dbc79", "#e5e510", "#2472c8", "#bc3fbc", "#11a8cd", "#e5e5e5",
+  "#666666", "#f14c4c", "#23d18b", "#f5f543", "#3b8eea", "#d670d6", "#29b8db", "#ffffff",
+];
+
+function sgrStyle(codes: readonly string[]): string | null {
+  const parts: string[] = [];
+  for (let index = 0; index < codes.length; index += 1) {
+    const code = Number(codes[index]);
+    if (code === 1) parts.push("font-weight:600");
+    else if (code === 2) parts.push("opacity:.7");
+    else if (code === 3) parts.push("font-style:italic");
+    else if (code >= 30 && code <= 37) parts.push(`color:${ANSI_COLOURS[code - 30]}`);
+    else if (code >= 90 && code <= 97) parts.push(`color:${ANSI_COLOURS[code - 90 + 8]}`);
+    else if (code === 38 && codes[index + 1] === "5") {
+      const colour = xterm256(Number(codes[index + 2]));
+      if (colour !== null) parts.push(`color:${colour}`);
+      index += 2;
+    } else if (code === 38 && codes[index + 1] === "2") {
+      const [red, green, blue] = codes.slice(index + 2, index + 5).map(Number);
+      if ([red, green, blue].every((value) => Number.isInteger(value) && value >= 0 && value <= 255)) {
+        parts.push(`color:rgb(${red},${green},${blue})`);
+      }
+      index += 4;
+    }
+  }
+  return parts.length === 0 ? null : parts.join(";");
+}
+
+function xterm256(index: number): string | null {
+  if (!Number.isInteger(index) || index < 0 || index > 255) return null;
+  if (index < 16) return ANSI_COLOURS[index];
+  if (index < 232) {
+    const steps = [0, 95, 135, 175, 215, 255];
+    const offset = index - 16;
+    const channel = (value: number): string => String(steps[value]);
+    return `rgb(${channel(Math.floor(offset / 36))},${channel(
+      Math.floor(offset / 6) % 6,
+    )},${channel(offset % 6)})`;
+  }
+  const grey = 8 + (index - 232) * 10;
+  return `rgb(${grey},${grey},${grey})`;
+}
+
+/**
+ * The page's own styles.
+ *
+ * Tokens on `:root` for the light palette and the same tokens redefined
+ * under `prefers-color-scheme: dark`, so one committed file reads correctly
+ * on either kind of screen without a script deciding anything. `body` gets
+ * an explicit background for the same reason.
+ */
+function styles(): string {
+  const tokens = (kind: ThemeKind): string =>
+    (Object.keys(TONES[kind]) as PaintedTone[])
+      .map((tone) => `  --tone-${tone}: ${TONES[kind][tone]};`)
+      .join("\n");
+  return `
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+${tokens("light")}
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+${tokens("dark")}
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+`.trim();
+}
+
+function toned(tone: Tone, text: string): string {
+  const escaped = escapeHtml(text);
+  return tone === "plain" ? escaped : `<span class="${tone}">${escaped}</span>`;
+}
+
+function clockOf(instant: string): string {
+  const match = /T(\d\d:\d\d:\d\d)/.exec(instant);
+  return match === null ? instant : match[1];
+}
+
+/** One framework line, painted by the same grammar the terminal paints it by. */
+function renderEvent(event: DriverEvent, secrets: readonly string[]): string {
+  // A report's notes and a dispute's reason are an engine's own words.
+  const fields = Object.entries(event.fields ?? {}).map(
+    ([key, value]) => [key, scrub(typeof value === "string" ? value : JSON.stringify(value), secrets)] as const,
+  );
+  const asStrings = Object.fromEntries(fields);
+  const painted = fields
+    .map(
+      ([key, value]) =>
+        ` ${escapeHtml(key)}=${toned(fieldTone(event.event, key, value), value)}`,
+    )
+    .join("");
+  return (
+    `<div class="line"><span class="at">[${escapeHtml(clockOf(event.at))}]</span> ` +
+    `${toned(lineTone(event.event, asStrings), event.event)}${painted}</div>`
+  );
+}
+
+function section(title: string, body: string): string {
+  return body === "" ? "" : `<h2>${escapeHtml(title)}</h2>\n${body}`;
+}
+
+function table(
+  headings: readonly string[],
+  rows: readonly (readonly string[])[],
+  after: (index: number) => string = () => "",
+): string {
+  if (rows.length === 0) return "";
+  const head = headings.map((cell) => `<th>${escapeHtml(cell)}</th>`).join("");
+  const body = rows
+    .map((row, index) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>${after(index)}`)
+    .join("\n");
+  return `<table>\n<tr>${head}</tr>\n${body}\n</table>`;
+}
+
+function text(value: unknown): string {
+  return value === undefined || value === null ? "" : String(value);
+}
+
+const ROUND_COLUMNS = ["Round", "Phase", "Verdict", "Reviewer", "Provider", "Transport", "Findings"];
+
+function fieldsOf(event: DriverEvent): Record<string, unknown> {
+  return (event.fields ?? {}) as Record<string, unknown>;
+}
+
+/**
+ * How the author answered one finding, read from the events of its round.
+ *
+ * `dispositions.json` is deleted once spent, so the events are the only
+ * record: the disposition, the `fix-round-N` step's report, and the
+ * adjudication the next round recorded, where there was one. Events
+ * written before they carried answers say nothing, and the page says so
+ * rather than reading that silence as "not answered".
+ */
+function findingResponse(
+  roundNumber: number,
+  index: number,
+  events: readonly DriverEvent[],
+  rounds: readonly Record<string, unknown>[],
+): string {
+  const answerable = events.some(
+    (event) =>
+      (event.event === "dispositions-accepted" && Array.isArray(fieldsOf(event)["answers"])) ||
+      (event.event === "report-accepted" && "notes" in fieldsOf(event)),
+  );
+  if (!answerable) return "not recorded";
+  const answers = events
+    .filter((event) => event.event === "dispositions-accepted" && Number(fieldsOf(event)["round"]) === roundNumber)
+    .flatMap((event) => (Array.isArray(fieldsOf(event)["answers"]) ? fieldsOf(event)["answers"] : []))
+    .filter((answer): answer is Record<string, unknown> => typeof answer === "object" && answer !== null);
+  const answer = answers.reverse().find((entry) => Number(entry["finding"]) === index);
+  if (answer === undefined) return "not answered";
+  if (answer["action"] === "fix") {
+    const report = events
+      .filter((event) => event.event === "report-accepted" && fieldsOf(event)["step"] === `fix-round-${roundNumber}`)
+      .map(fieldsOf)
+      .at(-1);
+    const notes = text(report?.["notes"]);
+    const files = Array.isArray(report?.["files"]) ? (report["files"] as unknown[]).map(text) : [];
+    return ["fixed", notes, files.length === 0 ? "" : `(${files.join(", ")})`].filter((part) => part !== "").join(" — ");
+  }
+  const adjudication = rounds.find(
+    (round) => round["type"] === "adjudication" && Number(round["round"]) === roundNumber + 1,
+  );
+  const outcome = (Array.isArray(adjudication?.["outcomes"]) ? (adjudication["outcomes"] as Record<string, unknown>[]) : [])
+    .find((entry) => Number(entry["finding_index"]) === index);
+  return [
+    "disputed",
+    text(answer["reason"]),
+    outcome === undefined ? "" : `${text(outcome["outcome"])}: ${text(outcome["reasons"])}`,
+  ]
+    .filter((part) => part !== "")
+    .join(" — ");
+}
+
+/**
+ * What a round found, and how each was answered, in the row under it.
+ *
+ * The count says there were issues; this is the one place a second
+ * developer can read what they were. A description is a reviewer's own
+ * words and may quote anything it read, so everything here is scrubbed as
+ * a job's output is.
+ */
+function renderFindings(
+  round: Record<string, unknown>,
+  events: readonly DriverEvent[],
+  rounds: readonly Record<string, unknown>[],
+  secrets: readonly string[],
+): string {
+  const findings = round["findings"] as Record<string, unknown>[];
+  const rows = findings.map((finding, index) => {
+    const blocking = finding["blocking"] === true ? ` ${toned("bad", "blocking")}` : "";
+    const response = findingResponse(Number(round["round"]), index, events, rounds);
+    return [
+      escapeHtml(String(index)),
+      `<strong>${escapeHtml(text(finding["severity"]))}</strong>${blocking}`,
+      escapeHtml(scrub(text(finding["description"]), secrets)),
+      escapeHtml(scrub(response, secrets)),
+    ];
+  });
+  return (
+    `<tr class="findings"><td colspan="${ROUND_COLUMNS.length}">` +
+    `${table(["#", "Severity", "Finding", "Response"], rows)}</td></tr>`
+  );
+}
+
+function renderRounds(
+  rounds: readonly Record<string, unknown>[],
+  events: readonly DriverEvent[],
+  secrets: readonly string[],
+): string {
+  const found = (round: Record<string, unknown>): number =>
+    Array.isArray(round["findings"]) ? round["findings"].length : 0;
+  return table(
+    ROUND_COLUMNS,
+    rounds.map((round) => {
+      const verdict = text(round["verdict"]);
+      const count = found(round);
+      // The toggle hides the row after it by the stylesheet alone; a round
+      // still owed a fix opens, a settled one does not.
+      const open = verdict === "ISSUES_FOUND" ? " open" : "";
+      return [
+        escapeHtml(text(round["round"])),
+        escapeHtml(text(round["phase"])),
+        toned(verdictTone(verdict), verdict),
+        // Rows written before the role was renamed carry the old spelling,
+        // and archived rows are never rewritten.
+        escapeHtml(text(round["reviewer_model"] ?? round["verifier_model"])),
+        escapeHtml(text(round["reviewer_provider"] ?? round["verifier_provider"])),
+        escapeHtml(text(round["transport"])),
+        count === 0
+          ? "0"
+          : `<details${open}><summary>${count} finding${count === 1 ? "" : "s"}</summary></details>`,
+      ];
+    }),
+    (index) => (found(rounds[index]) === 0 ? "" : renderFindings(rounds[index], events, rounds, secrets)),
+  );
+}
+
+// Outcome is the exit code's verdict and the counts are a reading: a build
+// that never reached its tests is red with nothing to count.
+function renderTestRuns(runs: readonly TestRunReading[]): string {
+  return table(
+    ["Suite", "Stage", "Outcome", "Duration", "Passed", "Failed", "Skipped", "Command"],
+    runs.map(({ row, totals }) => [
+      escapeHtml(row.suite),
+      escapeHtml(row.stage),
+      toned(fieldTone("tests", "outcome", row.outcome), row.outcome),
+      escapeHtml(row.durationSeconds === null ? "" : `${Math.round(row.durationSeconds)}s`),
+      totals === null ? "" : String(totals.passed),
+      totals === null ? "" : totals.failed > 0 ? toned("bad", String(totals.failed)) : "0",
+      totals === null ? "" : String(totals.skipped),
+      `<span class="mono">${escapeHtml(row.command)}</span>`,
+    ]),
+  );
+}
+
+function renderJobs(jobs: readonly JobReading[], secrets: readonly string[]): string {
+  if (jobs.length === 0) return "";
+  return jobs
+    .map((job) => {
+      const heading =
+        `<strong>${escapeHtml(job.name)}</strong> ` +
+        `exit ${toned(fieldTone("job-finished", "exit", job.exit), job.exit)}`;
+      // The label is where a reader meets the carry rule, so it names it.
+      if (job.output === null) {
+        return (
+          `<div>${heading} <span class="muted">(passed -- output not carried; ` +
+          `dabbler transcript --full carries it)</span></div>`
+        );
+      }
+      if (job.output === "") {
+        return `<div>${heading} <span class="muted">(no output)</span></div>`;
+      }
+      return (
+        `<details><summary>${heading}</summary>\n` +
+        `<pre>${ansiToHtml(scrub(job.output, secrets))}</pre></details>`
+      );
+    })
+    .join("\n");
+}
+
+/**
+ * What each step was told, given and checked by, and whether it was
+ * accepted, under the commit the session landed. A step's files are those
+ * its accepted reports named where the session has an event log, and those
+ * it declared otherwise. The hash is in text whatever the remote, because a
+ * link lasts as long as its host and the hash as long as the clone.
+ */
+function renderWorkPlan(
+  repoRoot: string,
+  sessionNumber: number,
+  plan: DriverWorkPlan | null,
+  run: DriverRun | null,
+  events: readonly DriverEvent[],
+): string {
+  if (plan === null) return "";
+  const logged = events.length > 0;
+  const landed = logged ? lastLanded(events) : receiptLanded(repoRoot, sessionNumber);
+  const reported = logged ? reportedFiles(events) : new Map<string, string[]>();
+  const origin = landed ? runGit(repoRoot, ["remote", "get-url", "origin"]) : null;
+  const pages = origin !== null && origin.code === 0 ? commitPages(origin.stdout) : null;
+  const fileCell = (file: string): string =>
+    link(pages && landed ? pages.file(landed, file) : null, `<span class="mono">${escapeHtml(file)}</span>`);
+  const accepted = new Set(run?.accepted_steps ?? []);
+  const rows = plan.steps.map((step) => [
+    escapeHtml(humanizeStepKey(step.id)),
+    planMarkdownToHtml(step.ask),
+    (reported.get(step.id) ?? step.files).map(fileCell).join("<br>"),
+    step.checks.map((check) => `<code>${escapeHtml(check.argv.join(" "))}</code>`).join("<br>"),
+    accepted.has(step.id) ? "yes" : "no",
+  ]);
+  const commit = landed
+    ? `<p>Landed ${link(pages ? pages.commit(landed) : null, `<code>${escapeHtml(landed)}</code>`)}.</p>`
+    : "<p>not landed</p>";
+  const declared = logged
+    ? ""
+    : "<p>This session has no event log: the files are what each step declared, not what it changed.</p>";
+  const nonGoals = (plan.non_goals ?? []).map((line) => `<li>${inlineMarkdown(line)}</li>`).join("");
+  return [
+    planMarkdownToHtml(plan.task),
+    commit,
+    declared,
+    table(["Step", "Ask", "Files", "Checks", "Accepted"], rows),
+    nonGoals === "" ? "" : `<p>Non-goals:</p>\n<ul>${nonGoals}</ul>`,
+  ]
+    .filter((part) => part !== "")
+    .join("\n");
+}
+
+function renderStopBlock(run: DriverRun | null): string {
+  const stop = run?.stop ?? null;
+  if (stop === null) return "";
+  return (
+    `<div class="stop"><strong>${escapeHtml(stop.kind)}</strong>` +
+    `${stop.code ? ` / ${escapeHtml(stop.code)}` : ""} ` +
+    `<span class="at">at ${escapeHtml(stop.at)}</span>` +
+    `<div>${escapeHtml(stop.reason)}</div></div>`
+  );
+}
+
+/** Where a host shows a commit, and one file's change in it. */
+interface CommitPages {
+  readonly commit: (sha: string) => string;
+  readonly file: (sha: string, path: string) => string;
+}
+
+/**
+ * The web pages of `origin`'s commits, for GitHub and Azure DevOps; null for
+ * any other remote. Built from the host and the path alone, so a credential
+ * written into the remote's URL never reaches the page.
+ */
+function commitPages(remote: string): CommitPages | null {
+  const url = remote.trim().replace(/\.git$/, "");
+  const github = /^(?:https:\/\/(?:[^@/]+@)?|ssh:\/\/git@|git@)github\.com[:/]([^/]+\/[^/]+)$/.exec(url);
+  if (github !== null) {
+    const base = `https://github.com/${github[1]}`;
+    return {
+      commit: (sha) => `${base}/commit/${sha}`,
+      // GitHub anchors each file on a commit page at the sha256 of its path.
+      file: (sha, path) => `${base}/commit/${sha}#diff-${createHash("sha256").update(path).digest("hex")}`,
+    };
+  }
+  const azure =
+    /^https:\/\/(?:[^@/]+@)?dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)$/.exec(url) ??
+    /^(?:ssh:\/\/)?[^@/]+@ssh\.dev\.azure\.com:(?:22\/)?v3\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(url);
+  const visualStudio =
+    /^https:\/\/(?:[^@/]+@)?([^./]+)\.visualstudio\.com\/(?:DefaultCollection\/)?([^/]+)\/_git\/([^/]+)$/.exec(url) ??
+    /^(?:ssh:\/\/)?[^@/]+@vs-ssh\.visualstudio\.com:(?:22\/)?v3\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(url);
+  const ado = azure ?? visualStudio;
+  if (ado !== null) {
+    const base = `https://dev.azure.com/${ado[1]}/${ado[2]}/_git/${ado[3]}`;
+    return {
+      commit: (sha) => `${base}/commit/${sha}`,
+      file: (sha, path) => `${base}/commit/${sha}?path=/${encodeURI(path)}`,
+    };
+  }
+  return null;
+}
+
+function link(href: string | null, body: string): string {
+  return href === null ? body : `<a href="${escapeHtml(href)}">${body}</a>`;
+}
+
+/** The commit the last `landed` row names. */
+function lastLanded(events: readonly DriverEvent[]): string | undefined {
+  const commit = events.filter((event) => event.event === "landed").map((event) => text(fieldsOf(event)["commit"])).at(-1);
+  return commit === "" ? undefined : commit;
+}
+
+/** A session recorded before the event log existed: the gate receipt's commit. */
+function receiptLanded(repoRoot: string, sessionNumber: number): string | undefined {
+  try {
+    const receipt = JSON.parse(
+      readFileSync(join(driverDir(repoRoot, sessionNumber), "gate-receipt.json"), "utf8"),
+    ) as Record<string, unknown>;
+    return typeof receipt["landed_sha"] === "string" && receipt["landed_sha"] !== "" ? receipt["landed_sha"] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The files each step's `report-accepted` rows named, once each, in order. */
+function reportedFiles(events: readonly DriverEvent[]): Map<string, string[]> {
+  const files = new Map<string, string[]>();
+  for (const event of events) {
+    if (event.event !== "report-accepted") continue;
+    const fields = fieldsOf(event);
+    const step = text(fields["step"]);
+    const named = files.get(step) ?? [];
+    for (const file of Array.isArray(fields["files"]) ? (fields["files"] as unknown[]).map(text) : []) {
+      if (!named.includes(file)) named.push(file);
+    }
+    files.set(step, named);
+  }
+  return files;
+}
+
+function headCommit(repoRoot: string): string {
+  const result = runGit(repoRoot, ["rev-parse", "HEAD"]);
+  return result.code === 0 && result.stdout !== "" ? result.stdout : "unknown";
+}
+
+// --- The document -------------------------------------------------------------
+
+/**
+ * One session's transcript, as one self-contained HTML document.
+ *
+ * Never throws for a session that left little behind: a missing record
+ * leaves its section off, except a verification round and a test run,
+ * whose absence is news about the work and is said where they would be.
+ */
+export function renderSessionTranscript(
+  repoRoot: string,
+  sessionNumber: number,
+  options: TranscriptOptions = {},
+): string {
+  const carry: JobCarry = options.jobs ?? "failed";
+  const reading = readSession(repoRoot, sessionNumber, carry, options.sessionsDir);
+  const secrets = machineSecrets();
+  const renderedAt = options.renderedAt ?? new Date().toISOString();
+  const title = `Session ${String(sessionNumber).padStart(3, "0")} transcript`;
+
+  const body = [
+    `<h1>${escapeHtml(title)}</h1>`,
+    `<p class="stamp">Rendered ${escapeHtml(renderedAt)} by dabbler-ai-router ${escapeHtml(
+      VERSION,
+    )} at ${escapeHtml(headCommit(repoRoot))}.</p>`,
+    reading.run === null
+      ? ""
+      : `<p class="stamp">Engine ${escapeHtml(text(reading.run.engine))}, ` +
+        `last phase ${toned("milestone", text(reading.run.phase))}, ` +
+        `started ${escapeHtml(text(reading.run.started_at))}.</p>`,
+    section("Session Plan", reading.planSection === null ? "" : planMarkdownToHtml(reading.planSection)),
+    section("Work Plan", renderWorkPlan(repoRoot, sessionNumber, reading.workPlan, reading.run, reading.events)),
+    section("Where it stopped", renderStopBlock(reading.run)),
+    section(
+      "What the framework said",
+      reading.events.length === 0
+        ? ""
+        : `<div class="lines">${reading.events.map((event) => renderEvent(event, secrets)).join("\n")}</div>`,
+    ),
+    // The two absences a reader can act on are said in their own sections;
+    // a session without a verification round or a test run is news.
+    section(
+      "Verification",
+      reading.roundsUnreadable
+        ? "<p>The verification record could not be read.</p>"
+        : reading.rounds.length === 0
+          ? "<p>No verification round was recorded.</p>"
+          : renderRounds(reading.rounds, reading.events, secrets),
+    ),
+    section(
+      "Test runs",
+      reading.testRuns.length === 0 ? "<p>No test run was recorded.</p>" : renderTestRuns(reading.testRuns),
+    ),
+    section("Jobs", renderJobs(reading.jobs, secrets)),
+  ]
+    .filter((part) => part !== "")
+    .join("\n");
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)}</title>
+<style>
+${styles()}
+</style>
+</head>
+<body>
+<main>
+${body}
+</main>
+</body>
+</html>
+`;
+}

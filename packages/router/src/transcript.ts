@@ -788,6 +788,80 @@ function renderStopBlock(run: DriverRun | null): string {
   );
 }
 
+/** Where a host shows a commit, and a file at it. */
+interface CommitPages {
+  readonly commit: (sha: string) => string;
+  readonly file: (sha: string, path: string) => string;
+}
+
+/**
+ * The web pages of `origin`'s commits, for GitHub and Azure DevOps; null for
+ * any other remote. Built from the host and the path alone, so a credential
+ * written into the remote's URL never reaches the page.
+ */
+function commitPages(remote: string): CommitPages | null {
+  const url = remote.trim().replace(/\.git$/, "");
+  const github = /^(?:https:\/\/(?:[^@/]+@)?|ssh:\/\/git@|git@)github\.com[:/]([^/]+\/[^/]+)$/.exec(url);
+  if (github !== null) {
+    const base = `https://github.com/${github[1]}`;
+    return {
+      commit: (sha) => `${base}/commit/${sha}`,
+      file: (sha, path) => `${base}/blob/${sha}/${encodeURI(path)}`,
+    };
+  }
+  const azure =
+    /^https:\/\/(?:[^@/]+@)?dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)$/.exec(url) ??
+    /^(?:ssh:\/\/)?[^@/]+@ssh\.dev\.azure\.com:(?:22\/)?v3\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(url);
+  const visualStudio =
+    /^https:\/\/(?:[^@/]+@)?([^./]+)\.visualstudio\.com\/(?:DefaultCollection\/)?([^/]+)\/_git\/([^/]+)$/.exec(url) ??
+    /^(?:ssh:\/\/)?[^@/]+@vs-ssh\.visualstudio\.com:(?:22\/)?v3\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(url);
+  const ado = azure ?? visualStudio;
+  if (ado !== null) {
+    const base = `https://dev.azure.com/${ado[1]}/${ado[2]}/_git/${ado[3]}`;
+    return {
+      commit: (sha) => `${base}/commit/${sha}`,
+      file: (sha, path) => `${base}/commit/${sha}?path=/${encodeURI(path)}`,
+    };
+  }
+  return null;
+}
+
+function link(href: string | null, body: string): string {
+  return href === null ? body : `<a href="${escapeHtml(href)}">${body}</a>`;
+}
+
+/**
+ * What the session changed: the commit it landed, and the files each
+ * accepted step named, in step order. The hash is in text whatever the
+ * remote, because a link lasts as long as its host and the hash as long as
+ * the clone.
+ */
+function renderFiles(repoRoot: string, events: readonly DriverEvent[]): string {
+  if (events.length === 0) return "";
+  const landed = events.filter((event) => event.event === "landed").map((event) => text(fieldsOf(event)["commit"])).at(-1);
+  const origin = runGit(repoRoot, ["remote", "get-url", "origin"]);
+  const pages = origin.code === 0 && landed ? commitPages(origin.stdout) : null;
+  const seen = new Set<string>();
+  const rows: string[][] = [];
+  for (const event of events) {
+    if (event.event !== "report-accepted") continue;
+    const fields = fieldsOf(event);
+    const step = text(fields["step"]);
+    for (const file of Array.isArray(fields["files"]) ? (fields["files"] as unknown[]).map(text) : []) {
+      if (seen.has(`${step}\0${file}`)) continue;
+      seen.add(`${step}\0${file}`);
+      rows.push([
+        `<code>${escapeHtml(step)}</code>`,
+        link(pages && landed ? pages.file(landed, file) : null, `<span class="mono">${escapeHtml(file)}</span>`),
+      ]);
+    }
+  }
+  const commit = landed
+    ? `<p>Landed ${link(pages ? pages.commit(landed) : null, `<code>${escapeHtml(landed)}</code>`)}.</p>`
+    : "<p>not landed</p>";
+  return `${commit}\n${table(["Step", "File"], rows)}`;
+}
+
 function headCommit(repoRoot: string): string {
   const result = runGit(repoRoot, ["rev-parse", "HEAD"]);
   return result.code === 0 && result.stdout !== "" ? result.stdout : "unknown";
@@ -845,6 +919,7 @@ export function renderSessionTranscript(
     ),
     section("Verification", renderRounds(reading.rounds, reading.events, secrets)),
     section("Test runs", renderTestRuns(reading.testRuns)),
+    section("Files", renderFiles(repoRoot, reading.events)),
     section("Steps accepted", steps === "" ? "" : `<p>${steps}</p>`),
     section("Jobs", renderJobs(reading.jobs, secrets)),
   ]

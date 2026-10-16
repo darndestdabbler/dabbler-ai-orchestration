@@ -52,6 +52,7 @@ import {
   judgeReportShape,
   reportIsSpent,
   localGateReceipt,
+  landedFields,
   loopAlive,
   loopLogPath,
   superviseLoop,
@@ -1071,6 +1072,18 @@ describe("what the local gate receipt names", () => {
   // that can actually move, which is a fact about a real remote and not
   // about a script. The assertion lives in walk-git-states.test.ts, over a
   // real origin, beside the receipt's deliberate exception.
+});
+
+describe("the landed row", () => {
+  it("carries the whole hash, which the transcript links the commit from", () => {
+    const full = "0123456789abcdef0123456789abcdef01234567";
+    const restore = gitAnswers([[["rev-parse", "HEAD"], { stdout: full }]]);
+    try {
+      assert.deepEqual(landedFields("/repo"), { commit: full });
+    } finally {
+      restore();
+    }
+  });
 });
 
 describe("the land's push on a branch with no upstream", () => {

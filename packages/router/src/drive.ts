@@ -1144,6 +1144,14 @@ export function pushLanded(repoRoot: string): void {
 }
 
 /**
+ * The `landed` row: the whole hash, because the transcript links the commit
+ * from it and a short hash can stop being unique as the history grows.
+ */
+export function landedFields(repoRoot: string): { commit: string } {
+  return { commit: runGit(repoRoot, ["rev-parse", "HEAD"]).stdout };
+}
+
+/**
  * The pull's unwind: an instruction has been issued and this call is over.
  *
  * `dabbler session next` advances one move. When a phase reaches the point
@@ -3962,7 +3970,7 @@ class Driver {
     );
     mkdirSync(dirname(localReceiptPath), { recursive: true });
     writeFileSync(localReceiptPath, `${JSON.stringify(localReceipt, null, 2)}\n`, "utf8");
-    this.log("landed", { commit: runGit(this.repoRoot, ["rev-parse", "--short", "HEAD"]).stdout });
+    this.log("landed", landedFields(this.repoRoot));
     this.setPhase("publish");
   }
 
@@ -4014,7 +4022,7 @@ class Driver {
     if (pulled.code !== 0) {
       throw new Stop("land", `master moved but the pull was refused: ${tail(pulled.stderr, 300)}`);
     }
-    this.log("landed", { commit: runGit(this.repoRoot, ["rev-parse", "--short", "HEAD"]).stdout });
+    this.log("landed", landedFields(this.repoRoot));
     this.setPhase("publish");
   }
 

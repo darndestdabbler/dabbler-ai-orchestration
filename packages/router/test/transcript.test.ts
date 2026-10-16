@@ -67,8 +67,15 @@ function repoWithASession(): string {
   return root;
 }
 
-function render(root: string, options: Parameters<typeof renderSessionTranscript>[2] = {}): string {
-  const restore = gitAnswers([[["rev-parse", "HEAD"], { stdout: HEAD }]]);
+function render(
+  root: string,
+  options: Parameters<typeof renderSessionTranscript>[2] = {},
+  origin: { stdout?: string; code?: number } = { code: 2 },
+): string {
+  const restore = gitAnswers([
+    [["rev-parse", "HEAD"], { stdout: HEAD }],
+    [["remote", "get-url", "origin"], origin],
+  ]);
   try {
     return renderSessionTranscript(root, 5, { renderedAt: "2026-10-16T10:00:00Z", ...options });
   } finally {
@@ -288,6 +295,28 @@ describe("one session's transcript", () => {
     assert.match(html, /class="stop"/);
     assert.match(html, /the close refused: a gate was red/);
   });
+
+  it("lists each accepted step's files under the landed commit, linked only where the host is known", () => {
+    // A reader who wants the diff had to find the commit in the change log
+    // and open it by hand. The hash stays in text: a link lasts as long as
+    // its host, the hash as long as the clone.
+    const root = repoWithASession();
+    appendDriverEvent(root, 5, "report-accepted", { step: "events", files: ["src/a.ts"] }, "work");
+    appendDriverEvent(root, 5, "report-accepted", { step: "renderer", files: ["src/b.ts", "test/b.test.ts"] }, "work");
+    appendDriverEvent(root, 5, "landed", { commit: HEAD }, "land");
+
+    const linked = render(root, {}, { stdout: "https://github.com/owner/repo.git" });
+    assert.match(linked, new RegExp(`href="https://github\\.com/owner/repo/commit/${HEAD}"><code>${HEAD}</code>`));
+    assert.match(linked, /<code>events<\/code><\/td><td><a href="https:\/\/github\.com\/owner\/repo\/blob\/[0-9a-f]{40}\/src\/a\.ts">/);
+    assert.match(linked, /<code>renderer<\/code><\/td><td><a href="[^"]+\/blob\/[0-9a-f]{40}\/src\/b\.ts">/);
+    assert.match(linked, /\/blob\/[0-9a-f]{40}\/test\/b\.test\.ts"/);
+    assert.ok(linked.indexOf("src/a.ts") < linked.indexOf("src/b.ts"), "files are in step order");
+
+    const plain = render(root, {}, { stdout: "https://example.org/somewhere/repo.git" });
+    assert.match(plain, new RegExp(`Landed <code>${HEAD}</code>`));
+    assert.match(plain, /test\/b\.test\.ts/);
+    assert.ok(!/<a href/.test(plain), "an unknown host gets no link");
+  });
 });
 
 describe("the arguments `dabbler transcript` takes", () => {
@@ -322,6 +351,7 @@ describe("the verb over records on disk", () => {
     const restore = gitAnswers([
       [["rev-parse", "--show-toplevel"], { stdout: root }],
       [["rev-parse", "HEAD"], { stdout: HEAD }],
+      [["remote"], { code: 2 }],
     ]);
     try {
       const run = await capture(() =>
@@ -349,6 +379,7 @@ describe("the verb over records on disk", () => {
     const restore = gitAnswers([
       [["rev-parse", "--show-toplevel"], { stdout: root }],
       [["rev-parse", "HEAD"], { stdout: HEAD }],
+      [["remote"], { code: 2 }],
     ]);
     try {
       const run = await capture(() =>

@@ -298,7 +298,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 258 | A finding's transcript says how it was answered | no | 2026-10-16 |
 | 259 | A run of record says how many tests it ran | no | 2026-10-16 |
 | 260 | A run's totals are read by the latest row, not by the job's end | no | 2026-10-16 |
-| 261 | The transcript lists the files a session changed | — | not declared |
+| 261 | The transcript lists the files a session changed | no | 2026-10-16 |
 | 262 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -3218,3 +3218,9 @@ Make a transcript's Test runs table say how many tests each run of record ran. t
 **Releasable: no.**
 
 Fix how the transcript reads a run of record's totals: readTotals in packages/router/src/transcript.ts drops the job's ended_at edge and instead reads the suite's log only for the LATEST recorded row of that suite in the session, provided it was recorded at or after the job started; every earlier row stays blank. The transcript test is updated so a row recorded 2 ms after the job's end is read and an earlier row for the same suite is blank. Then docs/transcripts/session-259.html is deleted and rendered again with the router built from this tree, so its final-full rows carry their counts.
+
+### Session 261 — The transcript lists the files a session changed
+
+**Releasable: no.**
+
+Put what a session changed on its transcript page. The `landed` row in drive.ts logs the full commit hash instead of the short one (both places it is written), and transcript.ts gains a Files section after Test runs: the landed commit (read from the last `landed` row, whatever length an older session wrote, or `not landed` where there is none) and one table of the files each accepted step named in its `report-accepted` row, with the step, in step order. Where the `origin` remote is a GitHub or Azure DevOps URL the commit links to the host's commit page and each file to that commit at the file; any other remote gets the hash in text and no link, and the hash is in text on every page.

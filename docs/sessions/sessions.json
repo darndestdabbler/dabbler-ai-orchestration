@@ -4903,9 +4903,9 @@
     {
       "number": 248,
       "title": "The record is written before the session is told it is done",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T05:11:24.298000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T05:23:28.833000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

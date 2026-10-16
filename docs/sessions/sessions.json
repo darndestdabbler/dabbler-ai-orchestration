@@ -5123,9 +5123,9 @@
     {
       "number": 258,
       "title": "A finding's transcript says how it was answered",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T10:37:21.494000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T10:45:43.217000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

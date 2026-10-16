@@ -5211,9 +5211,9 @@
     {
       "number": 262,
       "title": "A session recorded before the event log still lists its files",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T12:21:13.497000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T12:26:21.701000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

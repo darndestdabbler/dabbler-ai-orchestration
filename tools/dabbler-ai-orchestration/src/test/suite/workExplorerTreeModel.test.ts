@@ -14,7 +14,6 @@ import {
   descriptorFor,
   findingDescriptor,
   hasToken,
-  humanizeStepKey,
   repositoryDescriptor,
   repositoryNodes,
   repositoryTooltip,
@@ -681,11 +680,6 @@ suite("workExplorerTreeModel: severity", () => {
 });
 suite("workExplorerTreeModel: task rows", () => {
   const repository = makeRepository();
-
-  test("humanizeStepKey turns kebab and snake case into a sentence word", () => {
-    assert.strictEqual(humanizeStepKey("verify-changes"), "Verify changes");
-    assert.strictEqual(humanizeStepKey("run_tests"), "Run tests");
-  });
 
   test("the six lifecycle rows read in the operator's words, and the ids do not move", () => {
     // csv-model feedback item 16. The step ids are what the plan, the

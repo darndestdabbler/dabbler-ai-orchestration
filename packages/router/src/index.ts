@@ -154,6 +154,7 @@ export { configurationSourceDirs } from "./preferences.ts";
 export {
   TONES,
   fieldTone,
+  humanizeStepKey,
   lineTone,
   verdictTone,
   type PaintedTone,

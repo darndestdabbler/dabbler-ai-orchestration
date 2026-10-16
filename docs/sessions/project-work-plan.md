@@ -300,7 +300,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 260 | A run's totals are read by the latest row, not by the job's end | no | 2026-10-16 |
 | 261 | The transcript lists the files a session changed | no | 2026-10-16 |
 | 262 | A session recorded before the event log still lists its files | no | 2026-10-16 |
-| 263 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 263 | The transcript opens with the plan it ran under and the work plan it was given | no | 2026-10-16 |
+| 264 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3231,3 +3232,9 @@ Put what a session changed on its transcript page. The `landed` row in drive.ts 
 **Releasable: no.**
 
 Make the transcript's Files section fall back to the records a session written before 3.22.0 left behind. Where a session has no event log, renderFiles takes the commit from gate-receipt.json's landed_sha (or says not landed) and the files from plan.json's steps that run.json lists as accepted, in step order, under a line saying these are the files each step declared rather than what it changed; links follow 261's rule for GitHub and Azure DevOps remotes. A session with neither an event log nor a plan keeps having no Files section. One test in transcript.test.ts covers a session with a plan, a receipt and no event log.
+
+### Session 263 — The transcript opens with the plan it ran under and the work plan it was given
+
+**Releasable: no.**
+
+Open each session transcript with what the session was asked to do. A Session Plan section, first after the stamp lines, renders the session's own section of session-plan.md (found by progress.ts's exported SESSION_HEADING_RE, up to the next ### heading) through a small markdown renderer in transcript.ts covering only the forms the plan uses -- paragraphs, the heading, **bold**, backtick code, bulleted and numbered lists -- with every emitted text escaped first; the sessions root reaches the renderer as an option from the transcript verb and from the Log phase in drive.ts. A Work Plan section follows, from readWorkPlan: the task sentence, one table with Step (the id through humanizeStepKey, moved from the extension's workExplorerTreeModel.ts into the router and imported back from dabbler-ai-router), Ask (through the same renderer), Files, Checks (each argv as one code line) and Accepted (yes where run.json names the step), then the non-goals as a list; the Steps accepted section is removed. A missing plan section or work plan is listed under This session left no:. Tests in transcript.test.ts; the extension's humanizeStepKey test moves to the router.

@@ -28,6 +28,7 @@ import type {
   ProgressProjectionTask as TaskRecord,
   ProgressProjectionFinding as VerificationFinding,
 } from "dabbler-ai-router";
+import { humanizeStepKey } from "dabbler-ai-router";
 import type { SessionsRepository } from "../utils/fileSystem";
 import {
   REPOSITORY_ACTIONS,
@@ -830,13 +831,6 @@ export function findingDescriptor(node: FindingNode): RowDescriptor {
     ]),
     collapsible: "none",
   };
-}
-
-/** "verify-changes" / "verify_changes" -> "Verify changes". */
-export function humanizeStepKey(key: string): string {
-  const words = key.replace(/[-_]+/g, " ").trim();
-  if (!words) return key;
-  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /**

@@ -4296,6 +4296,7 @@ class Driver {
         path,
         renderSessionTranscript(this.repoRoot, this.sessionNumber, {
           jobs: carry === "full" ? "all" : "failed",
+          sessionsDir: this.sessionsDir,
         }),
         "utf8",
       );

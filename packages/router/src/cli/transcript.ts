@@ -122,8 +122,10 @@ function run(argv: string[]): number {
   }
 
   let root: string | null;
+  let sessionsDir: string;
   try {
-    root = repoRootFor(resolveSessionsDir(parsed.sessionsDir));
+    sessionsDir = resolveSessionsDir(parsed.sessionsDir);
+    root = repoRootFor(sessionsDir);
   } catch (error) {
     if (!(error instanceof SessionsRootNotFoundError)) throw error;
     writeErr(`transcript: ${error.message}\n`);
@@ -144,7 +146,7 @@ function run(argv: string[]): number {
       writeOut(`transcript: session ${session} already has one at ${path}; left as it is\n`);
       continue;
     }
-    writeFileSync(path, renderSessionTranscript(root, session, { jobs: parsed.jobs }), "utf8");
+    writeFileSync(path, renderSessionTranscript(root, session, { jobs: parsed.jobs, sessionsDir }), "utf8");
     written.push(path);
     writeOut(`transcript: session ${session} -> ${path}\n`);
   }

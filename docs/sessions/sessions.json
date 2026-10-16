@@ -5221,7 +5221,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "65de2664ca304ce86bffd41c88e4b6c1b06d5d9c",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gemini-4-argon",
+        "verifierProvider": "google",
+        "transport": "api"
+      },
+      "frameworkVersion": "3.21.0",
+      "startCommit": "65de2664ca304ce86bffd41c88e4b6c1b06d5d9c"
+    },
+    {
+      "number": 263,
+      "title": "The transcript opens with the plan it ran under and the work plan it was given",
+      "status": "in-progress",
+      "startedAt": "2026-10-16T12:37:33.561000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "544d19fbe337aca5ca2fdf26e8b2afefe294fde9",
       "frameworkVersion": "3.21.0",
       "verification": {
         "rounds": 1,
@@ -5231,7 +5253,7 @@
       }
     },
     {
-      "number": 263,
+      "number": 264,
       "title": "Release 3.22.0 (release: 3.22.0)",
       "status": "not-started",
       "startedAt": null,

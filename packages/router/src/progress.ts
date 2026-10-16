@@ -157,7 +157,7 @@ function pyStr(value: unknown): string {
 // `\s`, not `[ \t]`: the Python twin uses `\s+` under `re.MULTILINE`, and
 // `session.ts`'s plan grammar matches the same headings. Two readers of one
 // heading that disagreed on its shape is exactly the drift the port removes.
-const SESSION_HEADING_RE =
+export const SESSION_HEADING_RE =
   /^###\s+Session\s+(\d+)(?:\s+of\s+\d+)?\s*:\s*(.+?)\s*$/gm;
 const GENERIC_TITLE_RE = /^Session\s+(\d+)$/;
 

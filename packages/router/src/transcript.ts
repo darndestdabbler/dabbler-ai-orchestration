@@ -32,10 +32,12 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { driverDir, readDriverEvents, readRun, readWorkPlan } from "./driver.ts";
+import { SESSION_PLAN_FILENAME } from "./evidence.ts";
 import { jobLogPath, jobStatusPath, jobsDir } from "./jobs.ts";
 import { runGit } from "./journal.ts";
 import { readRounds } from "./ledger.ts";
 import { redact } from "./packaging.ts";
+import { SESSION_HEADING_RE } from "./progress.ts";
 import { readRecords, type TestRunRecord } from "./testEvidence.ts";
 import { totalsOf, type TestTotals } from "./testOutput.ts";
 import { VERSION } from "./version.ts";
@@ -177,6 +179,16 @@ export function fieldTone(event: string, key: string, value: string): Tone {
   return "plain";
 }
 
+/**
+ * A step's label, as the Work Explorer shows it and the page lists it:
+ * "verify-changes" / "verify_changes" -> "Verify changes".
+ */
+export function humanizeStepKey(key: string): string {
+  const words = key.replace(/[-_]+/g, " ").trim();
+  if (!words) return key;
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 // --- Where a transcript lives -------------------------------------------------
 
 /**
@@ -204,6 +216,8 @@ export interface TranscriptOptions {
    * reader who wants it says so.
    */
   readonly jobs?: JobCarry;
+  /** Where `session-plan.md` is; without it the page has no plan section. */
+  readonly sessionsDir?: string;
   /** Fixed by a test; otherwise now. */
   readonly renderedAt?: string;
 }
@@ -223,6 +237,9 @@ interface TestRunReading {
 
 interface SessionReading {
   readonly sessionNumber: number;
+  /** The session's own section of the session plan, as markdown. */
+  readonly planSection: string | null;
+  readonly workPlan: DriverWorkPlan | null;
   readonly run: DriverRun | null;
   readonly events: readonly DriverEvent[];
   readonly rounds: readonly Record<string, unknown>[];
@@ -244,8 +261,18 @@ function readSession(
   repoRoot: string,
   sessionNumber: number,
   carry: JobCarry,
+  sessionsDir: string | undefined,
 ): SessionReading {
   const absent: string[] = [];
+  const planSection = sessionsDir === undefined ? null : readPlanSection(sessionsDir, sessionNumber);
+  if (planSection === null) absent.push("its section of the session plan");
+  let workPlan: DriverWorkPlan | null;
+  try {
+    workPlan = readWorkPlan(repoRoot, sessionNumber);
+  } catch {
+    workPlan = null;
+  }
+  if (workPlan === null) absent.push("a work plan");
   const run = readRun(repoRoot, sessionNumber);
   if (run === null) absent.push("the run record (run.json)");
 
@@ -273,7 +300,22 @@ function readSession(
   const jobs = readJobs(repoRoot, sessionNumber, carry);
   if (jobs.length === 0) absent.push("any background job");
 
-  return { sessionNumber, run, events, rounds, testRuns, jobs, absent };
+  return { sessionNumber, planSection, workPlan, run, events, rounds, testRuns, jobs, absent };
+}
+
+/** From the session's `###` heading to the next `###` heading or the end. */
+function readPlanSection(sessionsDir: string, sessionNumber: number): string | null {
+  let plan: string;
+  try {
+    plan = readFileSync(join(sessionsDir, SESSION_PLAN_FILENAME), "utf8");
+  } catch {
+    return null;
+  }
+  const heading = [...plan.matchAll(SESSION_HEADING_RE)].find((match) => Number(match[1]) === sessionNumber);
+  if (heading === undefined) return null;
+  const after = plan.slice(heading.index + heading[0].length);
+  const end = after.search(/^###\s/m);
+  return heading[0] + (end < 0 ? after : after.slice(0, end));
 }
 
 function readJobs(repoRoot: string, sessionNumber: number, carry: JobCarry): JobReading[] {
@@ -398,6 +440,64 @@ function escapeHtml(text: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** Backtick code and `**bold**` in one line, escaped before any markup. */
+function inlineMarkdown(line: string): string {
+  const parts = line.split("`");
+  // An unpaired backtick is a character, not the start of a code span.
+  if (parts.length % 2 === 0) parts.push(`\`${parts.pop() ?? ""}`);
+  return parts
+    .map((part, index) =>
+      index % 2 === 1
+        ? `<code>${escapeHtml(part)}</code>`
+        : escapeHtml(part).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"),
+    )
+    .join("");
+}
+
+/**
+ * The markdown a session plan is written in, and nothing more: the `###`
+ * heading, paragraphs, bulleted and numbered lists, backtick code and
+ * `**bold**`. Anything else is text, so a plan can never put markup on the
+ * page.
+ */
+export function planMarkdownToHtml(source: string): string {
+  const blocks: string[] = [];
+  let paragraph: string[] = [];
+  let list: { tag: "ul" | "ol"; items: string[] } | null = null;
+  const flush = (): void => {
+    if (paragraph.length > 0) blocks.push(`<p>${inlineMarkdown(paragraph.join(" "))}</p>`);
+    paragraph = [];
+    if (list !== null) {
+      const items = list.items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("");
+      blocks.push(`<${list.tag}>${items}</${list.tag}>`);
+    }
+    list = null;
+  };
+  for (const raw of source.split(/\r?\n/)) {
+    const line = raw.trim();
+    const heading = /^###\s+(.*)$/.exec(line);
+    const item = /^(?:([-*])|\d+[.)])\s+(.*)$/.exec(line);
+    if (line === "") {
+      flush();
+    } else if (heading !== null) {
+      flush();
+      blocks.push(`<h3>${inlineMarkdown(heading[1])}</h3>`);
+    } else if (item !== null) {
+      const tag = item[1] === undefined ? "ol" : "ul";
+      if (paragraph.length > 0 || (list !== null && list.tag !== tag)) flush();
+      list ??= { tag, items: [] };
+      list.items.push(item[2]);
+    } else if (list !== null) {
+      // A wrapped line continues the item above it until a blank line.
+      list.items[list.items.length - 1] += ` ${line}`;
+    } else {
+      paragraph.push(line);
+    }
+  }
+  flush();
+  return blocks.join("\n");
 }
 
 /**
@@ -777,6 +877,27 @@ function renderJobs(jobs: readonly JobReading[], secrets: readonly string[]): st
     .join("\n");
 }
 
+/** What each step was told, given and checked by, and whether it was accepted. */
+function renderWorkPlan(plan: DriverWorkPlan | null, run: DriverRun | null): string {
+  if (plan === null) return "";
+  const accepted = new Set(run?.accepted_steps ?? []);
+  const rows = plan.steps.map((step) => [
+    escapeHtml(humanizeStepKey(step.id)),
+    planMarkdownToHtml(step.ask),
+    step.files.map((file) => `<span class="mono">${escapeHtml(file)}</span>`).join("<br>"),
+    step.checks.map((check) => `<code>${escapeHtml(check.argv.join(" "))}</code>`).join("<br>"),
+    accepted.has(step.id) ? "yes" : "no",
+  ]);
+  const nonGoals = (plan.non_goals ?? []).map((line) => `<li>${inlineMarkdown(line)}</li>`).join("");
+  return [
+    planMarkdownToHtml(plan.task),
+    table(["Step", "Ask", "Files", "Checks", "Accepted"], rows),
+    nonGoals === "" ? "" : `<p>Non-goals:</p>\n<ul>${nonGoals}</ul>`,
+  ]
+    .filter((part) => part !== "")
+    .join("\n");
+}
+
 function renderStopBlock(run: DriverRun | null): string {
   const stop = run?.stop ?? null;
   if (stop === null) return "";
@@ -934,7 +1055,7 @@ export function renderSessionTranscript(
   options: TranscriptOptions = {},
 ): string {
   const carry: JobCarry = options.jobs ?? "failed";
-  const reading = readSession(repoRoot, sessionNumber, carry);
+  const reading = readSession(repoRoot, sessionNumber, carry, options.sessionsDir);
   const secrets = machineSecrets();
   const renderedAt = options.renderedAt ?? new Date().toISOString();
   const title = `Session ${String(sessionNumber).padStart(3, "0")} transcript`;
@@ -946,10 +1067,6 @@ export function renderSessionTranscript(
           .map((line) => `<li>${escapeHtml(line)}</li>`)
           .join("")}</ul></div>`;
 
-  const steps = (reading.run?.accepted_steps ?? [])
-    .map((step) => `<code>${escapeHtml(step)}</code>`)
-    .join(", ");
-
   const body = [
     `<h1>${escapeHtml(title)}</h1>`,
     `<p class="stamp">Rendered ${escapeHtml(renderedAt)} by dabbler-ai-router ${escapeHtml(
@@ -960,6 +1077,8 @@ export function renderSessionTranscript(
       : `<p class="stamp">Engine ${escapeHtml(text(reading.run.engine))}, ` +
         `last phase ${toned("milestone", text(reading.run.phase))}, ` +
         `started ${escapeHtml(text(reading.run.started_at))}.</p>`,
+    section("Session Plan", reading.planSection === null ? "" : planMarkdownToHtml(reading.planSection)),
+    section("Work Plan", renderWorkPlan(reading.workPlan, reading.run)),
     absent,
     section("Where it stopped", renderStopBlock(reading.run)),
     section(
@@ -971,7 +1090,6 @@ export function renderSessionTranscript(
     section("Verification", renderRounds(reading.rounds, reading.events, secrets)),
     section("Test runs", renderTestRuns(reading.testRuns)),
     section("Files", renderFiles(repoRoot, sessionNumber, reading.events, reading.run)),
-    section("Steps accepted", steps === "" ? "" : `<p>${steps}</p>`),
     section("Jobs", renderJobs(reading.jobs, secrets)),
   ]
     .filter((part) => part !== "")

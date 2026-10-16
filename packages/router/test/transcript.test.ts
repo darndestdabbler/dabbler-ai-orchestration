@@ -20,6 +20,7 @@ import {
   TONES,
   ansiToHtml,
   fieldTone,
+  humanizeStepKey,
   lineTone,
   renderSessionTranscript,
   verdictTone,
@@ -164,7 +165,34 @@ describe("one session's transcript", () => {
     assert.match(html, /node scripts\/suite\.mjs container/);
     assert.ok(!html.includes("somebody else&#39;s run"), "another session's run leaked in");
     assert.ok(!html.includes("somebody else's run"), "another session's run leaked in");
-    assert.match(html, /events<\/code>/);
+  });
+
+  it("lays out the work plan: task, one row per step with its ask, files, checks and acceptance, then non-goals", () => {
+    const root = repoWithASession();
+    writeWorkPlan(root, 5, {
+      schema_version: 1, session_number: 5, task: "Render the **plan**.", recorded_at: "2026-10-16T09:01:00-04:00",
+      non_goals: ["Any script on the page"],
+      steps: [
+        { id: "events", ask: "Write `events.jsonl`.", files: ["src/a.ts", "src/a.test.ts"], checks: [{ argv: ["node", "--test", "a"] }] },
+        { id: "unused-step", ask: "Never reached.", files: ["src/z.ts"], checks: [{ argv: ["npm", "test"] }] },
+      ],
+    });
+    const html = render(root);
+    const plan = html.slice(html.indexOf("<h2>Work Plan</h2>"), html.indexOf("<h2>", html.indexOf("<h2>Work Plan</h2>") + 1));
+    assert.match(plan, /<p>Render the <strong>plan<\/strong>\.<\/p>/);
+    assert.match(
+      plan,
+      /<td>Events<\/td><td><p>Write <code>events\.jsonl<\/code>\.<\/p><\/td><td><span class="mono">src\/a\.ts<\/span><br><span class="mono">src\/a\.test\.ts<\/span><\/td><td><code>node --test a<\/code><\/td><td>yes<\/td>/,
+    );
+    assert.match(plan, /<td>Unused step<\/td><td><p>Never reached\.<\/p><\/td>.*<code>npm test<\/code><\/td><td>no<\/td>/);
+    assert.match(plan, /<ul><li>Any script on the page<\/li><\/ul>/);
+    assert.ok(!html.includes("Steps accepted"), "acceptance is the table's last column");
+    assert.ok(!html.includes("<li>a work plan</li>"), "a session with a plan is not missing one");
+  });
+
+  it("humanizeStepKey turns kebab and snake case into a sentence word", () => {
+    assert.equal(humanizeStepKey("verify-changes"), "Verify changes");
+    assert.equal(humanizeStepKey("run_tests"), "Run tests");
   });
 
   it("says what a session left none of rather than quietly omitting it", () => {
@@ -318,6 +346,31 @@ describe("one session's transcript", () => {
     assert.ok(!/<a href/.test(plain), "an unknown host gets no link");
   });
 
+  it("opens with the session's own section of the plan, formatted, and no other session's", () => {
+    const root = repoWithASession();
+    const sessionsDir = join(root, "docs", "sessions");
+    write(
+      join(sessionsDir, "session-plan.md"),
+      "# Plan\n\n### Session 5 of 6: The renderer\n\n**Why.** Read `run.json` --\nand say so.\n\n" +
+        "- one <b>item</b>\n- two\n\n### Session 6 of 6: Not this one\n\nLater work.\n",
+    );
+    const html = render(root, { sessionsDir });
+    assert.match(html, /<h2>Session Plan<\/h2>\n<h3>Session 5 of 6: The renderer<\/h3>/);
+    assert.match(html, /<p><strong>Why\.<\/strong> Read <code>run\.json<\/code> -- and say so\.<\/p>/);
+    assert.match(html, /<ul><li>one &lt;b&gt;item&lt;\/b&gt;<\/li><li>two<\/li><\/ul>/);
+    assert.ok(!html.includes("Later work"), "the next session's section leaked in");
+    assert.ok(!html.includes("section of the session plan"), "a named session is not absent");
+  });
+
+  it("lists the plan section as absent for a session the plan does not name", () => {
+    const root = repoWithASession();
+    const sessionsDir = join(root, "docs", "sessions");
+    write(join(sessionsDir, "session-plan.md"), "### Session 6 of 6: Another\n\nLater work.\n");
+    const html = render(root, { sessionsDir });
+    assert.match(html, /<li>its section of the session plan<\/li>/);
+    assert.ok(!html.includes("Session Plan</h2>"), "no section for a session the plan does not name");
+  });
+
   it("lists an older session's declared files and the receipt's commit where there is no event log", () => {
     // Every session recorded before 3.22.0 has no events.jsonl, and its
     // plan and gate receipt still say what each step declared and where it landed.
@@ -340,7 +393,7 @@ describe("one session's transcript", () => {
     assert.match(html, /files each step declared/);
     assert.match(html, /<code>events<\/code><\/td><td><a href="[^"]+\/blob\/[0-9a-f]{40}\/src\/a\.ts">/);
     assert.ok(html.indexOf("src/a.ts") < html.indexOf("src/b.ts"), "files are in step order");
-    assert.ok(!html.includes("src/gone.ts"), "a step that was not accepted is left out");
+    assert.ok(!html.slice(html.indexOf("<h2>Files</h2>")).includes("src/gone.ts"), "a step that was not accepted is left out");
   });
 });
 

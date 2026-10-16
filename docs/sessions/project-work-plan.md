@@ -285,8 +285,10 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 245 | Rollback to Start of This Session in the Work Explorer | no | 2026-10-05 |
 | 246 | Release 3.21.0 (release: 3.21.0) | yes | 2026-10-05 |
 | 247 | A session's transcript, rendered and committed | no | 2026-10-16 |
-| 248 | The transcript walked in a real repository first | — | not declared |
-| 249 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 248 | The record is written before the session is told it is done | no | 2026-10-16 |
+| 249 | A step is told which of its files are already there | — | not declared |
+| 250 | The transcript walked in a real repository first | — | not declared |
+| 251 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3119,3 +3121,13 @@ Give every session a transcript that outlives the terminal it was watched in. Th
 - 2026-10-16 — step 'renderer': its files: boundaries.json: the lint control refuses a module no context declares, so a new src/ module cannot land without a line there -- transcript joins 'projection', which is where the record's readers and renderers already are. schema.test.ts: the destructuring I used in the previous step raised an unused-variable warning that this step's lint run surfaced; it is replaced with a helper here rather than left red. (claude-code (anthropic, claude-opus-5))
 - 2026-10-16 — step 'verb': its files: transcript.ts gains TRANSCRIPTS_DIRNAME and sessionTranscriptName, because the verb, the Log phase and the predicate that keeps these files out of the digests must read one spelling of the directory, not three. helpers.ts holds the extension suite's stub Router, which no longer satisfies the contract once it gains a member; the stub is where that is answered. (claude-code (anthropic, claude-opus-5))
 - 2026-10-16 — step 'record-path': its files: The ask puts the transcripts directory in journal.ts beside MACHINE_DIRNAME, and the previous step had declared it in transcript.ts. It moves here, which is also what the module boundaries require -- journal is platform and transcript is projection, so journal could not import it the other way. The three files that named the old home are repointed at the new one, so there is still exactly one spelling. (claude-code (anthropic, claude-opus-5))
+
+### Session 248 — The record is written before the session is told it is done
+
+**Releasable: no.**
+
+Make the session's record exist before the session is told it is over. In packages/router/src/drive.ts, phaseClose (both its normal end and its 'already closed' collection) moves to the log phase without issuing `done`; phaseLog writes, commits and pushes the transcript and reaches `complete`, and the existing `complete` case issues the one `done` -- so every early return in the Log phase (setting unreadable, off, page already there, render or commit failure) still reaches `complete` and still issues `done`, and a transcript still cannot stop a session. walk-session.test.ts takes the new order and asserts, at the close, that a page under docs/transcripts/ and an events.jsonl under the run both exist; drive.test.ts loses its unused `repo` binding (CI's lint warning). The plan names dabbler.yaml for the selection rule, but dabbler.yaml has no per-path selection rule any more (`rules` and `repo_wide` are read and ignored by checks.ts), and adding one back would change selection for every repository; the repository's own selected-run command, scripts/suite.mjs, which dabbler.yaml's `select:` names, is where this repository's rule lives instead: when it is handed drive.test.ts or driver.test.ts -- the tests a change to src/drive.ts or src/driver.ts selects -- it also runs walk-session.test.ts.
+
+**Amended after acceptance:**
+
+- 2026-10-16 — step 'walk-follows-phase-machine': its files: the walk showed the Log phase never ran: judgeSessionEnded read the loop's own close as a close made underneath it once the phase was log; the fix is one condition in drive.ts (claude-code (anthropic, claude-opus-5-5))

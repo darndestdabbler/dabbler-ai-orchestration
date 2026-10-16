@@ -458,6 +458,12 @@ describe("one session, walked from next to done", () => {
     assert.equal(readInstruction(repo, 1)?.answer_command, undefined);
     assert.ok(existsSync(join(repo, ".dabbler", "runs", "s1", "driver", "run.json")));
 
+    // The record was written before `done` was issued: an author that obeys
+    // `done` never calls again, so a page written after it never is.
+    assert.equal(readRun(repo, 1)?.phase, "complete");
+    assert.ok(existsSync(join(repo, "docs", "transcripts", "session-001.html")));
+    assert.ok(existsSync(join(repo, ".dabbler", "runs", "s1", "driver", "events.jsonl")));
+
     // --- a run left standing at the close of a session already closed -------
     // The state `dabbler session close` run directly leaves behind: the
     // ledger says complete and the run still says close. The next call
@@ -1961,7 +1967,10 @@ describe("a session rolled back to where it started", () => {
     await driveToDone(repo, sessionsDir, 1, PLAN, "def widget():\n    return 2\n");
     assert.equal(readSessionState(sessionsDir)?.["currentSession"], null);
     const anchor = gitOut(repo, "rev-parse", "HEAD").trim();
-    assert.match(gitOut(repo, "log", "-1", "--format=%s"), /^Close session 1 of sessions/);
+    assert.deepEqual(gitOut(repo, "log", "-2", "--format=%s").trim().split("\n"), [
+      "Transcript for session 001",
+      "Close session 1 of sessions",
+    ]);
 
     // Session 2 in flight: planned, a step issued, the work in the tree, an
     // ignored file beside it, and a test run on the record.
@@ -2122,13 +2131,14 @@ describe("a session rolled back to where it started", () => {
     writeFileSync(join(repo, "src", "widget.py"), WIDGET_V3, "utf8");
     assert.ok(readRecords(repo).some((row) => row.sessionNumber === 1));
 
-    // The facts a dialog states: two sessions, session 1's two commits by one
-    // author, and the one file session 2 has in the tree.
+    // The facts a dialog states: two sessions, session 1's three commits --
+    // land, close, transcript -- by one author, and the one file session 2
+    // has in the tree.
     const dry = await capture(() => Promise.resolve(rollback(sessionsDir, { sessionNumber: 1, reason: "x", engine: false, dryRun: true })));
     assert.equal(dry.value, EXIT_OK, dry.stderr);
     const facts = JSON.parse(dry.stdout) as Record<string, unknown>;
     assert.equal(facts["through"], 2);
-    assert.equal(facts["commits"], 2);
+    assert.equal(facts["commits"], 3);
     assert.equal((facts["authors"] as string[]).length, 1);
     assert.match(String(facts["oldest"]), /^\d{4}-\d{2}-\d{2}T/);
     assert.equal(facts["uncommitted"], 1);
@@ -2137,14 +2147,14 @@ describe("a session rolled back to where it started", () => {
       Promise.resolve(rollback(sessionsDir, { sessionNumber: 1, reason: "the model was wrong from the first session", engine: false })),
     );
     assert.equal(done.value, EXIT_OK, done.stderr);
-    assert.match(done.stderr, /rollback: sessions 001 to 002 undone; the repository is back at .{12}, where session 001 started: 2 commit\(s\) were reverted and pushed/);
+    assert.match(done.stderr, /rollback: sessions 001 to 002 undone; the repository is back at .{12}, where session 001 started: 3 commit\(s\) were reverted and pushed/);
     assert.match(done.stderr, /2 run record\(s\) moved aside/);
 
-    // The reverts undo session 1's land and close and nothing else; the tree
-    // they leave is the seed's, and origin has it.
+    // The reverts undo session 1's land, close and transcript and nothing
+    // else; the tree they leave is the seed's, and origin has it.
     const log = gitOut(repo, "log", "--format=%s", `${closed}..HEAD`).trim().split("\n");
     assert.equal(log[0], "Roll back to the start of session 1 of sessions");
-    assert.equal(log.length, 3, log.join(" | "));
+    assert.equal(log.length, 4, log.join(" | "));
     assert.ok(log.slice(1).every((subject) => subject.startsWith('Revert "')), log.join(" | "));
     assert.equal(gitOut(repo, "rev-parse", "HEAD~1^{tree}").trim(), gitOut(repo, "rev-parse", `${seed}^{tree}`).trim());
     assert.equal(gitOut(repo, "rev-parse", "origin/main").trim(), gitOut(repo, "rev-parse", "HEAD").trim());

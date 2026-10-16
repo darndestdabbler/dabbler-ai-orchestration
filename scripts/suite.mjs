@@ -144,6 +144,33 @@ function partition(mode, paths) {
   return { mine, theirs };
 }
 
+/**
+ * The tests a selected test brings with it. The framework selects a source
+ * file's tests by name, and the walk that drives a session end to end is
+ * named after no file -- so a change to the phase machine (`drive.ts`,
+ * `driver.ts`) was measured by a run that skipped the one suite that walks
+ * it. This repository's rule, applied to what the selector hands over.
+ */
+const COMPANIONS = {
+  "packages/router/test/drive.test.ts": ["packages/router/test/walk-session.test.ts"],
+  "packages/router/test/driver.test.ts": ["packages/router/test/walk-session.test.ts"],
+};
+
+/** `paths` with each one's companions added once, in the order first named. */
+export function withCompanions(paths) {
+  const out = [...paths];
+  const have = new Set(paths.map(normalize));
+  for (const path of paths) {
+    for (const companion of COMPANIONS[normalize(path)] ?? []) {
+      if (have.has(companion)) continue;
+      have.add(companion);
+      out.push(companion);
+      note(`added ${companion}: ${normalize(path)} selects it`);
+    }
+  }
+  return out;
+}
+
 /** Exit 2 is "could not run", the spelling `run-ts.mjs` already uses here. */
 const CANNOT_RUN = 2;
 
@@ -506,7 +533,7 @@ function main(argv) {
     );
   }
   const other = mode === "container" ? "host" : "container";
-  const { mine, theirs } = partition(mode, asked.length > 0 ? asked : allTests());
+  const { mine, theirs } = partition(mode, asked.length > 0 ? withCompanions(asked) : allTests());
   for (const path of theirs) {
     note(`declined ${path}: it is the ${other} suite's, and runs there`);
   }

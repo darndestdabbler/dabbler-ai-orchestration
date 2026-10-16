@@ -1166,8 +1166,8 @@ class SessionEnded extends Error {
 /**
  * Whether a session's ledger row says it ended underneath a loop in `phase`.
  * Cancelled is over in every phase. Complete is over too -- a person forced
- * the close -- except while the loop is itself closing, where it is the
- * loop's own close, collected where it always was. A row back at
+ * the close -- except while the loop is itself closing or logging the close
+ * it made, where it is the loop's own close. A row back at
  * not-started was rolled back: a person returned the repository to where
  * a session started, and the run this loop holds no longer exists.
  */
@@ -1180,7 +1180,7 @@ export function judgeSessionEnded(
     const why = typeof cancelledReason === "string" ? cancelledReason.trim() : "";
     return { status: "cancelled", why: why === "" ? null : why };
   }
-  if (status === "complete" && phase !== "close" && phase !== "complete") {
+  if (status === "complete" && phase !== "close" && phase !== "log" && phase !== "complete") {
     return { status: "closed", why: null };
   }
   if (status === "not-started") return { status: "rolled-back", why: null };
@@ -4150,7 +4150,6 @@ class Driver {
       );
       if (row?.["status"] === "complete") {
         this.log("close-collected", { session: sessionDisplayNumber(this.sessionNumber) });
-        this.issueDone();
         this.setPhase("log");
         return;
       }
@@ -4188,7 +4187,9 @@ class Driver {
         }`,
       );
     }
-    this.issueDone();
+    // No `done` yet: an author told the session is over never calls again,
+    // so a phase after the `done` would never run. It is issued at
+    // `complete`, once the Log phase has written the record.
     this.setPhase("log");
   }
 
@@ -4208,6 +4209,9 @@ class Driver {
    * `docs/transcripts/` is excluded from the digests by
    * `isSessionRecordPath`, which is what makes this commit safe to make
    * after the run of record that those digests are stamped on.
+   *
+   * Every way out reaches `complete`, and `complete` issues the `done`: the
+   * session is told it is over once, after its record exists.
    */
   private phaseLog(): void {
     let carry: TranscriptCarry;
@@ -4368,11 +4372,14 @@ class Driver {
                 `dabbler: session ${sessionDisplayNumber(this.sessionNumber)} complete` +
                   (this.pull ? ".\n" : ` after ${this.run.invocations} engine invocation(s).\n`),
               );
-              // Nothing more is expected, and the pull says so in the one
-              // shape it says everything: the `done` the close issued.
-              if (this.pull) {
-                const done = readInstruction(this.repoRoot, this.sessionNumber) ?? this.issueDone();
-                throw new Awaiting(done.kind === "done" ? done : this.issueDone());
+              // Nothing more is expected, and it is said in the one shape
+              // everything is said: the `done`, issued here the first time --
+              // after the Log phase, under both modes, since a waiter ends on
+              // it -- and re-read on every call after.
+              {
+                const last = readInstruction(this.repoRoot, this.sessionNumber);
+                const done = last?.kind === "done" ? last : this.issueDone();
+                if (this.pull) throw new Awaiting(done);
               }
               return EXIT_OK;
           }

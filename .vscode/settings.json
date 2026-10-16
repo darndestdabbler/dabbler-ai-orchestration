@@ -4,6 +4,6 @@
   // run a session or a review. A checkout that holds provider keys reaches
   // the direct API deliberately, with `--transport api`.
   "dabbler.transport": "copilot-cli",
-  "dabbler.authoringModel": "claude-opus-5",
+  "dabbler.authoringModel": "claude-opus-5-5",
   "dabbler.reviewerTransport": "copilot-cli"
 }

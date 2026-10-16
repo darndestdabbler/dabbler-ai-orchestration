@@ -914,8 +914,10 @@ describe("judgeSessionEnded", () => {
     assert.deepEqual(judgeSessionEnded("complete", null, "verify"), { status: "closed", why: null });
     assert.deepEqual(judgeSessionEnded("not-started", undefined, "work"), { status: "rolled-back", why: null });
     // The loop's own close flips the status while the loop is closing, and
-    // is collected where it always was.
+    // is collected where it always was -- and the Log phase after it is the
+    // same loop recording that close, not a close made underneath it.
     assert.equal(judgeSessionEnded("complete", null, "close"), null);
+    assert.equal(judgeSessionEnded("complete", null, "log"), null);
     assert.equal(judgeSessionEnded("complete", null, "complete"), null);
     assert.equal(judgeSessionEnded("in-progress", null, "land"), null);
   });
@@ -1311,7 +1313,7 @@ describe("the Log phase, which records the session it cannot stop", () => {
     // The land pushed before this phase ran, so a transcript that was only
     // committed would wait for some later session to carry it -- and the
     // last session of a repository would leave its page nowhere.
-    const { repo, sessionsDir } = atTheLogPhase();
+    const { sessionsDir } = atTheLogPhase();
     const asked = await capture(() => sessionNext(sessionsDir, {}));
     assert.match(asked.stderr, /transcript-pushed/);
   });

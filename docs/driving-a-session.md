@@ -147,6 +147,13 @@ answer now asks, and that a `wait` never reaches the engine.
   engine those layers name. The checkout's settings file is committed: a
   choice travels to the next clone, and where their seat does not list it
   the start refuses, naming the file and the one command that changes it.
+  A choice written to the checkout is committed the moment it is made --
+  that one file and nothing else, pushed where the branch tracks an
+  upstream -- so no session, a release least of all, meets it as
+  undeclared work. With a session in flight it rides with that session
+  instead, and its land commits it. A commit or push that fails is said
+  and refuses nothing: the next Start meets the file as an uncommitted
+  change and offers Commit and Push.
 
 - **The round cap is not typeable on a driving call.** It is
   `verification.settings.max_rounds` in the configuration, and `next` and

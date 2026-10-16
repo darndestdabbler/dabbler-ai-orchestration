@@ -33,7 +33,7 @@ import {
   writeSettings,
 } from "../src/settings.ts";
 import { setSeatIdentity } from "../src/transports/copilot.ts";
-import { gitAnswers, tempDir } from "./support/answers.ts";
+import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 
 const SEAT = { host: "https://github.com", login: "someone" };
 
@@ -124,6 +124,26 @@ function clearSelections(root?: string): void {
   writePreferences({ role: ROLE_PRIMARY_REVIEWER, selected: "" });
   writePreferences({ role: ROLE_AUXILIARY_REVIEWER, selected: "" });
   if (root !== undefined) writeSettings(root, { [SETTING_REVIEWER_MODEL]: "", [SETTING_AUXILIARY_MODEL]: "" });
+}
+
+/**
+ * `root` as a checkout on a branch with an upstream, holding the settings
+ * file uncommitted and nothing else asked about; every git call is recorded.
+ */
+function checkout(root: string): { calls: string[][]; restore: () => void } {
+  const calls: string[][] = [];
+  const restore = gitAnswers([
+    [(args) => { calls.push([...args]); return false; }, {}],
+    [["rev-parse", "--show-toplevel"], { stdout: root.split("\\").join("/") }],
+    [["status", "--porcelain", "--", ".vscode/settings.json"], { stdout: "?? .vscode/settings.json" }],
+    [["add"], {}],
+    [["commit"], {}],
+    [["rev-parse", "--abbrev-ref"], { stdout: "origin/main" }],
+    [["push"], {}],
+    [() => true, { code: 128, stderr: "not a git repository" }],
+  ]);
+  resetProjectRootCache();
+  return { calls, restore: () => { restore(); resetProjectRootCache(); } };
 }
 
 describe("configure, called for a checkout it is not standing in", () => {
@@ -235,6 +255,44 @@ describe("where a choice made with configure is kept", () => {
       assert.equal(readPreferences().authoring_model, "claude-opus-5");
     } finally {
       restore();
+    }
+  });
+
+  // survsys's release stopped at publish over a settings file the pane had
+  // written fifteen seconds before and nothing had committed.
+  it("is committed and pushed as it is made, and nothing else the tree holds is", () => {
+    const root = tempDir("configure-commit-");
+    const { calls, restore } = checkout(root);
+    try {
+      const outcome = configure({ repoRoot: root, engine: "claude-code" });
+      assert.equal(outcome.refusal, null);
+      assert.ok(outcome.changed.includes(".vscode/settings.json is committed and pushed"), outcome.changed.join("\n"));
+      const writes = calls.filter((args) => args[0] === "add" || args[0] === "commit");
+      assert.deepEqual(writes.map((args) => args.slice(args.indexOf("--") + 1)), [
+        [".vscode/settings.json"],
+        [".vscode/settings.json"],
+      ]);
+      assert.ok(calls.some((args) => args[0] === "push"));
+    } finally {
+      restore();
+      writePreferences({ engine: "" });
+    }
+  });
+
+  it("is left for the land while a session is in flight, and says so", () => {
+    const root = tempDir("configure-in-flight-");
+    seed(root, {
+      "docs/sessions/sessions.json": JSON.stringify({ sessions: [{ number: 7, status: "in-progress" }] }),
+    });
+    const { calls, restore } = checkout(root);
+    try {
+      const outcome = configure({ repoRoot: root, engine: "claude-code" });
+      assert.equal(outcome.refusal, null);
+      assert.ok(outcome.changed.some((line) => /left for session 7 to commit when it lands/.test(line)), outcome.changed.join("\n"));
+      assert.ok(!calls.some((args) => ["add", "commit", "push"].includes(args[0] as string)));
+    } finally {
+      restore();
+      writePreferences({ engine: "" });
     }
   });
 

@@ -47,6 +47,8 @@
 // The refusal is read from selection rather than restated, so the operator
 // reads the rule's own words and not this file's paraphrase of them.
 
+import { resolve } from "node:path";
+
 import {
   ConfigError,
   VALID_TRANSPORTS,
@@ -60,7 +62,9 @@ import {
   type ConfigurationChoice,
 } from "../config.ts";
 import { BUILT_IN_ENGINES } from "../engines.ts";
-import { repoRootFor } from "../journal.ts";
+import { sessionsDirFor } from "../evidence.ts";
+import { repoRootFor, runGit } from "../journal.ts";
+import { readRawSessionState } from "../sessionState.ts";
 import { configuredModelRefusal } from "../session.ts";
 import {
   PREFERENCES_FILENAME,
@@ -69,7 +73,7 @@ import {
   type Preferences,
 } from "../preferences.ts";
 import { credentialProvider, holdsCredential, looksLikeASecret } from "../credentials.ts";
-import { vehicleRefusal } from "../discovery.ts";
+import { inFlightSessions, vehicleRefusal } from "../discovery.ts";
 import {
   CREDENTIAL_SETTING_BY_PROVIDER,
   MINE_FLAG,
@@ -767,6 +771,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     Object.keys(choice).length === 0
       ? { path: null, changed: [] as readonly string[] }
       : writeConfigurationChoice(options.repoRoot, choice);
+  const landed = written.path === null ? null : commitChoice(options.repoRoot, Object.keys(choice));
   // The pane reads the projection, and the projection is derived. Without
   // this the operator's own change is the one thing the surface does not
   // show until something unrelated moves a declaration.
@@ -777,6 +782,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
       ...written.changed,
       ...preferenceLines,
       ...(credentialNote === null ? [] : [credentialNote]),
+      ...(landed === null ? [] : [landed]),
     ],
     path: written.path,
     // Read AFTER the write, so a call that fixes the stale choice reports
@@ -784,6 +790,45 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     stale: staleModelChoice(options.repoRoot),
     warnings,
   };
+}
+
+/**
+ * Commit the checkout's settings file, that path alone, and push it where the
+ * branch tracks an upstream: the file is committed so a choice travels, and
+ * left uncommitted it is work no session declared -- a release session has
+ * no land to commit it, and its publish gate counts it. With a session in
+ * flight the land commits it instead. A failure is said and refuses nothing:
+ * the next Start meets the file and offers Commit and Push. Answers the line
+ * to report, or null where there is nothing to say.
+ */
+function commitChoice(repoRoot: string, keys: readonly string[]): string | null {
+  const top = repoRootFor(repoRoot);
+  if (top === null || resolve(top) !== resolve(repoRoot)) return null;
+  const path = SETTINGS_RELPATH.split("\\").join("/");
+  const inFlight = inFlightSessions(readRawSessionState(sessionsDirFor(repoRoot)));
+  if (inFlight.length > 0) {
+    return `${path} is left for ${inFlight.join(", ")} to commit when it lands`;
+  }
+  if (runGit(repoRoot, ["status", "--porcelain", "--", path]).stdout === "") return null;
+  const added = runGit(repoRoot, ["add", "--", path]);
+  const committed =
+    added.code === 0
+      ? runGit(repoRoot, ["commit", "-m", `Configure ${keys.join(", ")}`, "--", path])
+      : added;
+  if (committed.code !== 0) {
+    return `${path} was not committed (${firstLine(committed.stderr || committed.stdout)}); the next Start offers to commit and push it`;
+  }
+  if (runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).code !== 0) {
+    return `${path} is committed`;
+  }
+  const pushed = runGit(repoRoot, ["push"]);
+  return pushed.code === 0
+    ? `${path} is committed and pushed`
+    : `${path} is committed, but git push failed (${firstLine(pushed.stderr)})`;
+}
+
+function firstLine(text: string): string {
+  return text.trim().split(/\r?\n/)[0] ?? "";
 }
 
 export async function configureVerb(argv: string[]): Promise<number> {

@@ -15428,7 +15428,7 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
 
-### Session 247 of 265: A session's transcript, rendered and committed
+### Session 247 of 266: A session's transcript, rendered and committed
 
 Scope: `packages/router` -- `schemas/events.schema.json` and
 `src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
@@ -15539,7 +15539,7 @@ Changing what the terminal shows.
 
 **Releasable.** Yes -- 263 publishes 3.22.0, after 253's walk.
 
-### Session 248 of 265: The record is written before the session is told it is done
+### Session 248 of 266: The record is written before the session is told it is done
 
 Scope: `packages/router` -- `src/drive.ts` (`phaseClose` and `phaseLog`:
 the order of the `done` instruction against the Log phase),
@@ -15595,9 +15595,9 @@ simply has none and the verb can render it on request. Any change to the
 renderer, the verb or the setting. Changing what selection means for any
 path other than the two named.
 
-**Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 265.
+**Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 266.
 
-### Session 249 of 265: A step is told which of its files are already there
+### Session 249 of 266: A step is told which of its files are already there
 
 Scope: `packages/router` -- `src/drive.ts` (`stepAsk` names the step's own
 files and reads the tree for each), `docs/driving-a-session.md`; tests in
@@ -15646,9 +15646,9 @@ file it removed -- that is the NEXT thing to try if clobbering survives
 this, and it begins as a logged observation so its false-positive rate is
 measured before it can refuse anything.
 
-**Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 265.
+**Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 266.
 
-### Session 250 of 265: A choice made in the Configuration is committed as it is made
+### Session 250 of 266: A choice made in the Configuration is committed as it is made
 
 Scope: `packages/router` -- `src/cli/configure.ts` (the write commits and
 pushes), `src/checks.ts` (`materialPaths` stops exempting the settings
@@ -15707,10 +15707,10 @@ with a session in flight leaves the file for the land and says so.
 `checks.test.ts`: the existing exemption test flips -- an uncommitted
 settings file counts before the declaration as it does at the close.
 
-**Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 265,
+**Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 266,
 after 253 walks it in survsys.
 
-### Session 251 of 265: The tests 250's run of record did not reach
+### Session 251 of 266: The tests 250's run of record did not reach
 
 Scope: `packages/router` -- `test/configuration.test.ts`,
 `test/projection.test.ts`, `test/session.test.ts`,
@@ -15766,10 +15766,10 @@ settled here by a fix session. Any change to the walkthrough list in
 
 **Tests.** None added. Twelve made true again, one deleted.
 
-**Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 265, after
+**Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 266, after
 253's walk.
 
-### Session 252 of 265: This repository's suites run whole at every close
+### Session 252 of 266: This repository's suites run whole at every close
 
 Scope: `packages/router` -- `src/checks.ts` (the suite key),
 `src/testEvidence.ts` (`runsWholeAtClose`), their tests;
@@ -15816,10 +15816,10 @@ other projects still record. Deleting the companion table.
 **Tests.** None added; one assertion in `testEvidence.test.ts`, one in
 `checks.test.ts`.
 
-**Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 265, after
+**Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 266, after
 253's walk.
 
-### Session 253 of 265: The transcript walked in a real repository first
+### Session 253 of 266: The transcript walked in a real repository first
 
 Scope: `docs/uat/uat-transcript.md` (new); `dabbler.yaml` only if the
 walk finds a selection rule the transcripts directory needs
@@ -15887,7 +15887,7 @@ did not ask for.
 
 **Releasable.** No -- 263 publishes, on the operator's yes.
 
-### Session 254 of 265: The two transcripts written by the renderer 253 fixed
+### Session 254 of 266: The two transcripts written by the renderer 253 fixed
 
 Scope: `docs/transcripts/session-252.html`, `docs/transcripts/session-253.html`
 
@@ -15907,9 +15907,9 @@ and no `exit ?` remains on either page.
 **Non-goals.** Any change to the renderer. Pages for sessions before 252.
 Publishing or tagging.
 
-**Releasable.** Yes -- with 247 to 253, as 3.22.0 in session 265.
+**Releasable.** Yes -- with 247 to 253, as 3.22.0 in session 266.
 
-### Session 255 of 265: A review is sized by what it reads
+### Session 255 of 266: A review is sized by what it reads
 
 Scope: `packages/router/src/facts.ts`, `packages/router/src/route.ts`
 
@@ -15947,9 +15947,9 @@ carries none). Raising or removing `AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS`.
 Any change to the renderer or to `isSessionRecordPath`. Excluding any
 other kind of generated file.
 
-**Releasable.** Yes -- with 247 to 254, as 3.22.0 in session 265.
+**Releasable.** Yes -- with 247 to 254, as 3.22.0 in session 266.
 
-### Session 256 of 265: A passing job's omitted output says why it is omitted
+### Session 256 of 266: A passing job's omitted output says why it is omitted
 
 Scope: `packages/router/src/transcript.ts` (`renderJobs`), tests in
 `transcript.test.ts`
@@ -15975,9 +15975,9 @@ an empty log reads `no output`.
 Re-rendering any page already committed. Any change to the setting, the
 verb, or the extension.
 
-**Releasable.** Yes -- with 247 to 255, as 3.22.0 in session 265.
+**Releasable.** Yes -- with 247 to 255, as 3.22.0 in session 266.
 
-### Session 257 of 265: A round that found issues says what they were
+### Session 257 of 266: A round that found issues says what they were
 
 Scope: `packages/router/src/transcript.ts` (`renderRounds`), tests in
 `transcript.test.ts`
@@ -16005,9 +16005,9 @@ into findings, though one finding is sometimes recorded as several
 fragments. Rendering markdown in a description. Re-rendering any page
 already committed.
 
-**Releasable.** Yes -- with 247 to 256 and 258, as 3.22.0 in session 265.
+**Releasable.** Yes -- with 247 to 256 and 258, as 3.22.0 in session 266.
 
-### Session 258 of 265: A finding's transcript says how it was answered
+### Session 258 of 266: A finding's transcript says how it was answered
 
 Scope: `packages/router/src/drive.ts` (two event rows),
 `packages/router/src/transcript.ts` (the findings 257 lists); tests in
@@ -16053,9 +16053,9 @@ already committed. Merging a finding the reviewer's output split into
 fragments: each fragment is its own row, as it is its own index. Any
 script on the page.
 
-**Releasable.** Yes -- with 247 to 257, as 3.22.0 in session 265.
+**Releasable.** Yes -- with 247 to 257, as 3.22.0 in session 266.
 
-### Session 259 of 265: A run of record says how many tests it ran
+### Session 259 of 266: A run of record says how many tests it ran
 
 Scope: `packages/router/src/testOutput.ts` (two readers beside the two it
 has), `packages/router/src/transcript.ts` (`readSession`,
@@ -16107,10 +16107,10 @@ Removing or changing the Outcome column. Changing what `outline` or
 `full` carries. Any change to the Jobs section. Re-rendering any page
 already committed. Any script on the page.
 
-**Releasable.** Yes -- with 247 to 258, as 3.22.0 in session 265, after
+**Releasable.** Yes -- with 247 to 258, as 3.22.0 in session 266, after
 the operator has walked the packed VSIX.
 
-### Session 260 of 265: A run's totals are read by the latest row, not by the job's end
+### Session 260 of 266: A run's totals are read by the latest row, not by the job's end
 
 Scope: `packages/router/src/transcript.ts` (`readTotals`), tests in
 `transcript.test.ts`; `docs/transcripts/session-259.html`, deleted and
@@ -16148,11 +16148,11 @@ never the installed one. Its three final-full rows carry their counts.
 job's bytes the carry leaves out. Pages for sessions before 259. Any
 change to how the record or the status file is stamped.
 
-**Releasable.** Yes -- with 247 to 259, as 3.22.0 in session 265, after
+**Releasable.** Yes -- with 247 to 259, as 3.22.0 in session 266, after
 the operator has walked the packed VSIX in survsys and seen session 11's
 row carry 33, 0 and 0.
 
-### Session 261 of 265: The transcript lists the files a session changed
+### Session 261 of 266: The transcript lists the files a session changed
 
 Scope: `packages/router/src/drive.ts` (the `landed` row),
 `packages/router/src/transcript.ts` (a Files section); tests in
@@ -16186,9 +16186,9 @@ itself changed at the land (state files), which the commit holds and
 the steps did not name. Re-rendering any page already committed. Any
 script on the page.
 
-**Releasable.** Yes -- with 247 to 260, as 3.22.0 in session 265.
+**Releasable.** Yes -- with 247 to 260, as 3.22.0 in session 266.
 
-### Session 262 of 265: A session recorded before the event log still lists its files
+### Session 262 of 266: A session recorded before the event log still lists its files
 
 Scope: `packages/router/src/transcript.ts` (the Files section); a test in
 `transcript.test.ts`
@@ -16217,9 +16217,9 @@ leaves out a step that was not accepted.
 from git history or the commit itself. Any change to the record. Any
 script on the page.
 
-**Releasable.** Yes -- with 247 to 261, as 3.22.0 in session 265.
+**Releasable.** Yes -- with 247 to 261, as 3.22.0 in session 266.
 
-### Session 263 of 265: The transcript opens with the plan it ran under and the work plan it was given
+### Session 263 of 266: The transcript opens with the plan it ran under and the work plan it was given
 
 Scope: `packages/router/src/transcript.ts` (two sections at the top of the
 page, the `Steps accepted` section folded into one of them, a renderer for
@@ -16289,9 +16289,9 @@ what the Work Explorer shows.
 **Tests.** Three in `transcript.test.ts` as named in the steps, and the
 moved `humanizeStepKey` test; the extension's suite loses the one it moved.
 
-**Releasable.** Yes -- with 247 to 262, as 3.22.0 in session 265.
+**Releasable.** Yes -- with 247 to 262, as 3.22.0 in session 266.
 
-### Session 264 of 265: The work plan carries the files a session changed, and the Files section goes
+### Session 264 of 266: The work plan carries the files a session changed, and the Files section goes
 
 Scope: `packages/router/src/transcript.ts` (the Work Plan section's
 `Files` column and the line above its table; the Files section removed;
@@ -16336,8 +16336,45 @@ whose anchor is the path's sha256; without one, the declared files under
 the declared line, and an unknown remote with the hash and no link. No
 new test.
 
-**Releasable.** Yes -- with 247 to 263, as 3.22.0 in session 265.
+**Releasable.** Yes -- with 247 to 263, as 3.22.0 in session 266.
 
-### Session 265 of 265: Release 3.22.0 (release: 3.22.0)
+### Session 265 of 266: The transcript says what is missing in the section it is missing from
 
-The framework publishes sessions 247 to 264 as 3.22.0 and nothing else.
+Scope: `packages/router/src/transcript.ts` (`readSession`'s `absent`
+list, the block that renders it, the Verification and Test runs
+sections); tests in `transcript.test.ts`
+
+**Why.** Every transcript page opens a box headed `This session left
+no:` and lists the records it could not find in the framework's own
+names -- `the framework's own lines (events.jsonl) -- every session
+before 3.22.0 has none`, `the run record (run.json)`, `any background
+job`. A developer reading the page cannot act on any of it, and most
+of it is true of every session before 3.22.0. Of the eight absences only
+two tell a reader something about the work: that no verification round
+was recorded, and that no test run was.
+
+**Step 1 -- the box goes, and two sections say it in their own
+words.** `readSession` no longer builds an `absent` list and the page
+no longer renders the `This session left no:` block. A missing plan
+section, work plan, run record, event log or job leaves its section off
+the page and says nothing. The Verification section, where there is no
+round, says `No verification round was recorded.`, and where
+`rounds.jsonl` would not read, `The verification record could not be
+read.`; the Test runs section, where there is none, says `No test run
+was recorded.`
+
+**Non-goals.** Re-rendering any page already committed. Any other
+section's content. Any change to what is read or how. Any script on the
+page.
+
+**Tests.** The tests in `transcript.test.ts` that assert the box or its
+lines are rewritten to assert its absence and the two sections'
+sentences: a session with no rounds and no test runs says both
+sentences and has no `This session left no`; the plan-section and
+work-plan tests drop their assertions about the box. No new test.
+
+**Releasable.** Yes -- with 247 to 264, as 3.22.0 in session 266.
+
+### Session 266 of 266: Release 3.22.0 (release: 3.22.0)
+
+The framework publishes sessions 247 to 265 as 3.22.0 and nothing else.

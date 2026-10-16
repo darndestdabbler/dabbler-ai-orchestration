@@ -301,7 +301,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 261 | The transcript lists the files a session changed | no | 2026-10-16 |
 | 262 | A session recorded before the event log still lists its files | no | 2026-10-16 |
 | 263 | The transcript opens with the plan it ran under and the work plan it was given | no | 2026-10-16 |
-| 264 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 264 | The work plan carries the files a session changed, and the Files section goes | no | 2026-10-16 |
+| 265 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3238,3 +3239,9 @@ Make the transcript's Files section fall back to the records a session written b
 **Releasable: no.**
 
 Open each session transcript with what the session was asked to do. A Session Plan section, first after the stamp lines, renders the session's own section of session-plan.md (found by progress.ts's exported SESSION_HEADING_RE, up to the next ### heading) through a small markdown renderer in transcript.ts covering only the forms the plan uses -- paragraphs, the heading, **bold**, backtick code, bulleted and numbered lists -- with every emitted text escaped first; the sessions root reaches the renderer as an option from the transcript verb and from the Log phase in drive.ts. A Work Plan section follows, from readWorkPlan: the task sentence, one table with Step (the id through humanizeStepKey, moved from the extension's workExplorerTreeModel.ts into the router and imported back from dabbler-ai-router), Ask (through the same renderer), Files, Checks (each argv as one code line) and Accepted (yes where run.json names the step), then the non-goals as a list; the Steps accepted section is removed. A missing plan section or work plan is listed under This session left no:. Tests in transcript.test.ts; the extension's humanizeStepKey test moves to the router.
+
+### Session 264 — The work plan carries the files a session changed, and the Files section goes
+
+**Releasable: no.**
+
+Fold the transcript's Files section into its Work Plan section and make a GitHub file link open that file's diff. In packages/router/src/transcript.ts the Work Plan section opens, above its table, with one line: `Landed <hash>`, the full hash in text linked to the host's commit page by commitPages, or `not landed`; where the session has no event log, a line under it says the files are what each step declared rather than what it changed. Each step's Files cell lists the files its report-accepted rows named where an event log exists, and its declared files otherwise or where the step has no accepted report; each file links to the host's file page where the remote is GitHub or Azure DevOps and the session landed, and is plain text otherwise. readReportedFiles and the gate-receipt reading feed this section; the Files section and its renderer are removed. commitPages's GitHub file link becomes `<base>/commit/<sha>#diff-<hex sha256 of the path>`; Azure DevOps's link stays. 261's and 262's tests in transcript.test.ts are rewritten to read the Work Plan's cells and the Landed line; no new test.

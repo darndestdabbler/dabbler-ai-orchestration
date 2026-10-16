@@ -6,6 +6,7 @@
 // a key never does, and that a session which left little behind SAYS so
 // rather than rendering a tidy page about nothing.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
@@ -324,21 +325,31 @@ describe("one session's transcript", () => {
     assert.match(html, /the close refused: a gate was red/);
   });
 
-  it("lists each accepted step's files under the landed commit, linked only where the host is known", () => {
+  it("puts the landed commit over the work plan and each step's reported files in its row, linked only where the host is known", () => {
     // A reader who wants the diff had to find the commit in the change log
     // and open it by hand. The hash stays in text: a link lasts as long as
     // its host, the hash as long as the clone.
     const root = repoWithASession();
+    const step = (id: string, files: string[]) => ({ id, ask: id, files, checks: [{ argv: ["node", "-v"] }] });
+    writeWorkPlan(root, 5, {
+      schema_version: 1, session_number: 5, task: "t", recorded_at: "2026-10-16T09:01:00-04:00",
+      steps: [step("events", ["src/declared.ts"]), step("renderer", ["src/b.ts"])],
+    });
     appendDriverEvent(root, 5, "report-accepted", { step: "events", files: ["src/a.ts"] }, "work");
     appendDriverEvent(root, 5, "report-accepted", { step: "renderer", files: ["src/b.ts", "test/b.test.ts"] }, "work");
     appendDriverEvent(root, 5, "landed", { commit: HEAD }, "land");
 
     const linked = render(root, {}, { stdout: "https://github.com/owner/repo.git" });
-    assert.match(linked, new RegExp(`href="https://github\\.com/owner/repo/commit/${HEAD}"><code>${HEAD}</code>`));
-    assert.match(linked, /<code>events<\/code><\/td><td><a href="https:\/\/github\.com\/owner\/repo\/blob\/[0-9a-f]{40}\/src\/a\.ts">/);
-    assert.match(linked, /<code>renderer<\/code><\/td><td><a href="[^"]+\/blob\/[0-9a-f]{40}\/src\/b\.ts">/);
-    assert.match(linked, /\/blob\/[0-9a-f]{40}\/test\/b\.test\.ts"/);
-    assert.ok(linked.indexOf("src/a.ts") < linked.indexOf("src/b.ts"), "files are in step order");
+    assert.ok(!linked.includes("<h2>Files</h2>"), "the files are the work plan's");
+    assert.match(linked, new RegExp(`<p>Landed <a href="https://github\\.com/owner/repo/commit/${HEAD}"><code>${HEAD}</code></a>\\.</p>\\n<table>`));
+    const diff = createHash("sha256").update("src/a.ts").digest("hex");
+    assert.ok(
+      linked.includes(`<td>Events</td><td><p>events</p></td><td><a href="https://github.com/owner/repo/commit/${HEAD}#diff-${diff}">`),
+      "a GitHub file link opens that file's diff on the commit page",
+    );
+    assert.ok(!linked.includes("src/declared.ts"), "a step that reported shows what it reported");
+    assert.match(linked, /<td>Renderer<\/td><td><p>renderer<\/p><\/td><td><a href="[^"]+"><span class="mono">src\/b\.ts<\/span><\/a><br><a href="[^"]+"><span class="mono">test\/b\.test\.ts/);
+    assert.ok(!linked.includes("files each step declared"), "a session with an event log says nothing more");
 
     const plain = render(root, {}, { stdout: "https://example.org/somewhere/repo.git" });
     assert.match(plain, new RegExp(`Landed <code>${HEAD}</code>`));
@@ -371,7 +382,7 @@ describe("one session's transcript", () => {
     assert.ok(!html.includes("Session Plan</h2>"), "no section for a session the plan does not name");
   });
 
-  it("lists an older session's declared files and the receipt's commit where there is no event log", () => {
+  it("shows an older session's declared files under the receipt's commit where there is no event log", () => {
     // Every session recorded before 3.22.0 has no events.jsonl, and its
     // plan and gate receipt still say what each step declared and where it landed.
     const root = tempDir("transcript-");
@@ -389,11 +400,13 @@ describe("one session's transcript", () => {
     write(join(driverDir(root, 5), "gate-receipt.json"), JSON.stringify({ landed_sha: HEAD }));
 
     const html = render(root, {}, { stdout: "https://github.com/owner/repo.git" });
-    assert.match(html, new RegExp(`href="https://github\\.com/owner/repo/commit/${HEAD}"><code>${HEAD}</code>`));
-    assert.match(html, /files each step declared/);
-    assert.match(html, /<code>events<\/code><\/td><td><a href="[^"]+\/blob\/[0-9a-f]{40}\/src\/a\.ts">/);
+    assert.match(
+      html,
+      new RegExp(`<p>Landed <a href="https://github\\.com/owner/repo/commit/${HEAD}"><code>${HEAD}</code></a>\\.</p>\\n<p>[^<]*files are what each step declared`),
+    );
+    assert.match(html, /<td>Events<\/td><td><p>events<\/p><\/td><td><a href="[^"]+#diff-[0-9a-f]{64}"><span class="mono">src\/a\.ts/);
+    assert.match(html, /<td>Abandoned<\/td>.*src\/gone\.ts<\/span><\/a><\/td>.*<td>no<\/td>/);
     assert.ok(html.indexOf("src/a.ts") < html.indexOf("src/b.ts"), "files are in step order");
-    assert.ok(!html.slice(html.indexOf("<h2>Files</h2>")).includes("src/gone.ts"), "a step that was not accepted is left out");
   });
 });
 

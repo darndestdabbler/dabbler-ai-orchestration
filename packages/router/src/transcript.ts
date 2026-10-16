@@ -28,6 +28,7 @@
 // terminal, a CSS class in a page. Written twice it would be two rules that
 // agreed on the day they were written.
 
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -877,20 +878,47 @@ function renderJobs(jobs: readonly JobReading[], secrets: readonly string[]): st
     .join("\n");
 }
 
-/** What each step was told, given and checked by, and whether it was accepted. */
-function renderWorkPlan(plan: DriverWorkPlan | null, run: DriverRun | null): string {
+/**
+ * What each step was told, given and checked by, and whether it was
+ * accepted, under the commit the session landed. A step's files are those
+ * its accepted reports named where the session has an event log, and those
+ * it declared otherwise. The hash is in text whatever the remote, because a
+ * link lasts as long as its host and the hash as long as the clone.
+ */
+function renderWorkPlan(
+  repoRoot: string,
+  sessionNumber: number,
+  plan: DriverWorkPlan | null,
+  run: DriverRun | null,
+  events: readonly DriverEvent[],
+): string {
   if (plan === null) return "";
+  const logged = events.length > 0;
+  const landed = logged ? lastLanded(events) : receiptLanded(repoRoot, sessionNumber);
+  const reported = logged ? reportedFiles(events) : new Map<string, string[]>();
+  const origin = landed ? runGit(repoRoot, ["remote", "get-url", "origin"]) : null;
+  const pages = origin !== null && origin.code === 0 ? commitPages(origin.stdout) : null;
+  const fileCell = (file: string): string =>
+    link(pages && landed ? pages.file(landed, file) : null, `<span class="mono">${escapeHtml(file)}</span>`);
   const accepted = new Set(run?.accepted_steps ?? []);
   const rows = plan.steps.map((step) => [
     escapeHtml(humanizeStepKey(step.id)),
     planMarkdownToHtml(step.ask),
-    step.files.map((file) => `<span class="mono">${escapeHtml(file)}</span>`).join("<br>"),
+    (reported.get(step.id) ?? step.files).map(fileCell).join("<br>"),
     step.checks.map((check) => `<code>${escapeHtml(check.argv.join(" "))}</code>`).join("<br>"),
     accepted.has(step.id) ? "yes" : "no",
   ]);
+  const commit = landed
+    ? `<p>Landed ${link(pages ? pages.commit(landed) : null, `<code>${escapeHtml(landed)}</code>`)}.</p>`
+    : "<p>not landed</p>";
+  const declared = logged
+    ? ""
+    : "<p>This session has no event log: the files are what each step declared, not what it changed.</p>";
   const nonGoals = (plan.non_goals ?? []).map((line) => `<li>${inlineMarkdown(line)}</li>`).join("");
   return [
     planMarkdownToHtml(plan.task),
+    commit,
+    declared,
     table(["Step", "Ask", "Files", "Checks", "Accepted"], rows),
     nonGoals === "" ? "" : `<p>Non-goals:</p>\n<ul>${nonGoals}</ul>`,
   ]
@@ -909,7 +937,7 @@ function renderStopBlock(run: DriverRun | null): string {
   );
 }
 
-/** Where a host shows a commit, and a file at it. */
+/** Where a host shows a commit, and one file's change in it. */
 interface CommitPages {
   readonly commit: (sha: string) => string;
   readonly file: (sha: string, path: string) => string;
@@ -927,7 +955,8 @@ function commitPages(remote: string): CommitPages | null {
     const base = `https://github.com/${github[1]}`;
     return {
       commit: (sha) => `${base}/commit/${sha}`,
-      file: (sha, path) => `${base}/blob/${sha}/${encodeURI(path)}`,
+      // GitHub anchors each file on a commit page at the sha256 of its path.
+      file: (sha, path) => `${base}/commit/${sha}#diff-${createHash("sha256").update(path).digest("hex")}`,
     };
   }
   const azure =
@@ -951,87 +980,38 @@ function link(href: string | null, body: string): string {
   return href === null ? body : `<a href="${escapeHtml(href)}">${body}</a>`;
 }
 
-/** The landed commit and each step's files, from whichever records the session wrote. */
-interface FilesReading {
-  readonly landed: string | undefined;
-  readonly files: readonly { readonly step: string; readonly file: string }[];
-  /** True where the files are what each step declared, not what it reported changing. */
-  readonly declared: boolean;
+/** The commit the last `landed` row names. */
+function lastLanded(events: readonly DriverEvent[]): string | undefined {
+  const commit = events.filter((event) => event.event === "landed").map((event) => text(fieldsOf(event)["commit"])).at(-1);
+  return commit === "" ? undefined : commit;
 }
 
-/**
- * A session recorded before the event log existed: the commit is the gate
- * receipt's, and the files are those the plan declared for each step
- * `run.json` lists as accepted, in plan order. Null with no plan.
- */
-function readDeclaredFiles(repoRoot: string, sessionNumber: number, run: DriverRun | null): FilesReading | null {
-  let plan: DriverWorkPlan | null;
-  try {
-    plan = readWorkPlan(repoRoot, sessionNumber);
-  } catch {
-    return null;
-  }
-  if (plan === null) return null;
-  let landed: string | undefined;
+/** A session recorded before the event log existed: the gate receipt's commit. */
+function receiptLanded(repoRoot: string, sessionNumber: number): string | undefined {
   try {
     const receipt = JSON.parse(
       readFileSync(join(driverDir(repoRoot, sessionNumber), "gate-receipt.json"), "utf8"),
     ) as Record<string, unknown>;
-    landed = typeof receipt["landed_sha"] === "string" && receipt["landed_sha"] !== "" ? receipt["landed_sha"] : undefined;
+    return typeof receipt["landed_sha"] === "string" && receipt["landed_sha"] !== "" ? receipt["landed_sha"] : undefined;
   } catch {
-    landed = undefined;
+    return undefined;
   }
-  const accepted = new Set(run?.accepted_steps ?? []);
-  const files = plan.steps
-    .filter((step) => accepted.has(step.id))
-    .flatMap((step) => step.files.map((file) => ({ step: step.id, file })));
-  return { landed, files, declared: true };
 }
 
-/** The commit the `landed` row names, and the files each `report-accepted` row named. */
-function readReportedFiles(events: readonly DriverEvent[]): FilesReading {
-  const landed = events.filter((event) => event.event === "landed").map((event) => text(fieldsOf(event)["commit"])).at(-1);
-  const files: { step: string; file: string }[] = [];
+/** The files each step's `report-accepted` rows named, once each, in order. */
+function reportedFiles(events: readonly DriverEvent[]): Map<string, string[]> {
+  const files = new Map<string, string[]>();
   for (const event of events) {
     if (event.event !== "report-accepted") continue;
     const fields = fieldsOf(event);
     const step = text(fields["step"]);
+    const named = files.get(step) ?? [];
     for (const file of Array.isArray(fields["files"]) ? (fields["files"] as unknown[]).map(text) : []) {
-      files.push({ step, file });
+      if (!named.includes(file)) named.push(file);
     }
+    files.set(step, named);
   }
-  return { landed, files, declared: false };
-}
-
-/**
- * What the session changed: the commit it landed, and the files each
- * accepted step named, in step order. The hash is in text whatever the
- * remote, because a link lasts as long as its host and the hash as long as
- * the clone.
- */
-function renderFiles(repoRoot: string, sessionNumber: number, events: readonly DriverEvent[], run: DriverRun | null): string {
-  const reading = events.length > 0 ? readReportedFiles(events) : readDeclaredFiles(repoRoot, sessionNumber, run);
-  if (reading === null) return "";
-  const { landed } = reading;
-  const origin = runGit(repoRoot, ["remote", "get-url", "origin"]);
-  const pages = origin.code === 0 && landed ? commitPages(origin.stdout) : null;
-  const seen = new Set<string>();
-  const rows: string[][] = [];
-  for (const { step, file } of reading.files) {
-    if (seen.has(`${step}\0${file}`)) continue;
-    seen.add(`${step}\0${file}`);
-    rows.push([
-      `<code>${escapeHtml(step)}</code>`,
-      link(pages && landed ? pages.file(landed, file) : null, `<span class="mono">${escapeHtml(file)}</span>`),
-    ]);
-  }
-  const commit = landed
-    ? `<p>Landed ${link(pages ? pages.commit(landed) : null, `<code>${escapeHtml(landed)}</code>`)}.</p>`
-    : "<p>not landed</p>";
-  const declared = reading.declared
-    ? "\n<p>This session has no event log: these are the files each step declared, not what it changed.</p>"
-    : "";
-  return `${commit}${declared}\n${table(["Step", "File"], rows)}`;
+  return files;
 }
 
 function headCommit(repoRoot: string): string {
@@ -1078,7 +1058,7 @@ export function renderSessionTranscript(
         `last phase ${toned("milestone", text(reading.run.phase))}, ` +
         `started ${escapeHtml(text(reading.run.started_at))}.</p>`,
     section("Session Plan", reading.planSection === null ? "" : planMarkdownToHtml(reading.planSection)),
-    section("Work Plan", renderWorkPlan(reading.workPlan, reading.run)),
+    section("Work Plan", renderWorkPlan(repoRoot, sessionNumber, reading.workPlan, reading.run, reading.events)),
     absent,
     section("Where it stopped", renderStopBlock(reading.run)),
     section(
@@ -1089,7 +1069,6 @@ export function renderSessionTranscript(
     ),
     section("Verification", renderRounds(reading.rounds, reading.events, secrets)),
     section("Test runs", renderTestRuns(reading.testRuns)),
-    section("Files", renderFiles(repoRoot, sessionNumber, reading.events, reading.run)),
     section("Jobs", renderJobs(reading.jobs, secrets)),
   ]
     .filter((part) => part !== "")

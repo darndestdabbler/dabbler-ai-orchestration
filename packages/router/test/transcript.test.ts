@@ -210,31 +210,42 @@ describe("one session's transcript", () => {
     }
   });
 
-  it("lists what a round found, in recorded order, scrubbed of keys", () => {
-    // A count says there were issues; only the descriptions say what they were.
+  it("answers each finding in its round's row, opening only a round still owed a fix", () => {
+    // A count says there were issues; only the subtable says what became of them.
     const root = repoWithASession();
     const key = "sk-ant-notarealkey-fedcba9876543210";
-    write(
-      roundsPath(root, 5),
-      `${JSON.stringify({
-        round: 1, phase: "full", verdict: "ISSUES_FOUND", blocking: true,
-        findings: [
-          { severity: "major", blocking: true, description: "the close <skips> the gate" },
-          { severity: "minor", blocking: false, description: `a key leaked: ${key}` },
-        ],
+    const round = (number: number, verdict: string, findings: unknown[]): string =>
+      JSON.stringify({
+        round: number, phase: "full", verdict, blocking: verdict === "ISSUES_FOUND", findings,
         reviewer_model: "gpt-5.6-sol", reviewer_provider: "openai", transport: "api",
         completion_tree: "abcdef1234567", recorded_at: "2026-10-16T09:30:00-04:00",
-      })}\n`,
+        ...(number > 1 ? { previous_tree: "abcdef1234567" } : {}),
+      });
+    write(
+      roundsPath(root, 5),
+      `${round(1, "ISSUES_FOUND", [
+        { severity: "major", blocking: true, description: "the close <skips> the gate" },
+        { severity: "major", blocking: true, description: `a key leaked: ${key}` },
+      ])}\n${round(2, "VERIFIED", [{ severity: "minor", blocking: false, description: "a word" }])}\n`,
     );
+    appendDriverEvent(root, 5, "dispositions-accepted", {
+      round: 1, fix: [0], reject: [1],
+      answers: [{ finding: 0, action: "fix" }, { finding: 1, action: "reject", reason: "out of scope" }],
+    }, "dispositions");
+    appendDriverEvent(root, 5, "report-accepted", {
+      seq: 3, step: "fix-round-1", files: ["src/close.ts"], notes: "the close runs the gate",
+    }, "fix");
 
     const previous = process.env["DABBLER_ANTHROPIC_API_KEY"];
     process.env["DABBLER_ANTHROPIC_API_KEY"] = key;
     try {
       const html = render(root);
-      assert.match(html, /Round 1 found/);
-      assert.match(html, /major<\/strong> <span class="bad">blocking<\/span> the close &lt;skips&gt; the gate/);
-      assert.match(html, /minor<\/strong> a key leaked:/);
-      assert.ok(html.indexOf("major<") < html.indexOf("minor<"), "findings out of recorded order");
+      assert.match(html, /<details open><summary>2 findings<\/summary>/);
+      assert.match(html, /<details><summary>1 finding<\/summary>/);
+      assert.match(html, /<span class="bad">blocking<\/span><\/td><td>the close &lt;skips&gt; the gate/);
+      assert.match(html, /fixed — the close runs the gate — \(src\/close\.ts\)/);
+      assert.match(html, /disputed — out of scope/);
+      assert.match(html, /a word<\/td><td>not answered/);
       assert.ok(!html.includes(key), "a provider key reached the page");
     } finally {
       if (previous === undefined) delete process.env["DABBLER_ANTHROPIC_API_KEY"];

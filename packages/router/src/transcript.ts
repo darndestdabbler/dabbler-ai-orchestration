@@ -516,6 +516,9 @@ th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(-
 th { color: var(--tone-muted); font-weight: 600; }
 details { margin: .5rem 0; }
 summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
 pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
 .stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
 .milestone { color: var(--tone-milestone); }
@@ -537,9 +540,10 @@ function clockOf(instant: string): string {
 }
 
 /** One framework line, painted by the same grammar the terminal paints it by. */
-function renderEvent(event: DriverEvent): string {
+function renderEvent(event: DriverEvent, secrets: readonly string[]): string {
+  // A report's notes and a dispute's reason are an engine's own words.
   const fields = Object.entries(event.fields ?? {}).map(
-    ([key, value]) => [key, typeof value === "string" ? value : JSON.stringify(value)] as const,
+    ([key, value]) => [key, scrub(typeof value === "string" ? value : JSON.stringify(value), secrets)] as const,
   );
   const asStrings = Object.fromEntries(fields);
   const painted = fields
@@ -558,11 +562,15 @@ function section(title: string, body: string): string {
   return body === "" ? "" : `<h2>${escapeHtml(title)}</h2>\n${body}`;
 }
 
-function table(headings: readonly string[], rows: readonly (readonly string[])[]): string {
+function table(
+  headings: readonly string[],
+  rows: readonly (readonly string[])[],
+  after: (index: number) => string = () => "",
+): string {
   if (rows.length === 0) return "";
   const head = headings.map((cell) => `<th>${escapeHtml(cell)}</th>`).join("");
   const body = rows
-    .map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`)
+    .map((row, index) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>${after(index)}`)
     .join("\n");
   return `<table>\n<tr>${head}</tr>\n${body}\n</table>`;
 }
@@ -571,39 +579,108 @@ function text(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
 }
 
+const ROUND_COLUMNS = ["Round", "Phase", "Verdict", "Reviewer", "Provider", "Transport", "Findings"];
+
+function fieldsOf(event: DriverEvent): Record<string, unknown> {
+  return (event.fields ?? {}) as Record<string, unknown>;
+}
+
 /**
- * What each round found, under the table that counts it.
+ * How the author answered one finding, read from the events of its round.
+ *
+ * `dispositions.json` is deleted once spent, so the events are the only
+ * record: the disposition, the `fix-round-N` step's report, and the
+ * adjudication the next round recorded, where there was one. Events
+ * written before they carried answers say nothing, and the page says so
+ * rather than reading that silence as "not answered".
+ */
+function findingResponse(
+  roundNumber: number,
+  index: number,
+  events: readonly DriverEvent[],
+  rounds: readonly Record<string, unknown>[],
+): string {
+  const answerable = events.some(
+    (event) =>
+      (event.event === "dispositions-accepted" && Array.isArray(fieldsOf(event)["answers"])) ||
+      (event.event === "report-accepted" && "notes" in fieldsOf(event)),
+  );
+  if (!answerable) return "not recorded";
+  const answers = events
+    .filter((event) => event.event === "dispositions-accepted" && Number(fieldsOf(event)["round"]) === roundNumber)
+    .flatMap((event) => (Array.isArray(fieldsOf(event)["answers"]) ? fieldsOf(event)["answers"] : []))
+    .filter((answer): answer is Record<string, unknown> => typeof answer === "object" && answer !== null);
+  const answer = answers.reverse().find((entry) => Number(entry["finding"]) === index);
+  if (answer === undefined) return "not answered";
+  if (answer["action"] === "fix") {
+    const report = events
+      .filter((event) => event.event === "report-accepted" && fieldsOf(event)["step"] === `fix-round-${roundNumber}`)
+      .map(fieldsOf)
+      .at(-1);
+    const notes = text(report?.["notes"]);
+    const files = Array.isArray(report?.["files"]) ? (report["files"] as unknown[]).map(text) : [];
+    return ["fixed", notes, files.length === 0 ? "" : `(${files.join(", ")})`].filter((part) => part !== "").join(" — ");
+  }
+  const adjudication = rounds.find(
+    (round) => round["type"] === "adjudication" && Number(round["round"]) === roundNumber + 1,
+  );
+  const outcome = (Array.isArray(adjudication?.["outcomes"]) ? (adjudication["outcomes"] as Record<string, unknown>[]) : [])
+    .find((entry) => Number(entry["finding_index"]) === index);
+  return [
+    "disputed",
+    text(answer["reason"]),
+    outcome === undefined ? "" : `${text(outcome["outcome"])}: ${text(outcome["reasons"])}`,
+  ]
+    .filter((part) => part !== "")
+    .join(" — ");
+}
+
+/**
+ * What a round found, and how each was answered, in the row under it.
  *
  * The count says there were issues; this is the one place a second
  * developer can read what they were. A description is a reviewer's own
- * words and may quote anything it read, so it is scrubbed as a job's
- * output is.
+ * words and may quote anything it read, so everything here is scrubbed as
+ * a job's output is.
  */
 function renderFindings(
+  round: Record<string, unknown>,
+  events: readonly DriverEvent[],
   rounds: readonly Record<string, unknown>[],
   secrets: readonly string[],
 ): string {
-  return rounds
-    .filter((round) => Array.isArray(round["findings"]) && round["findings"].length > 0)
-    .map((round) => {
-      const lines = (round["findings"] as Record<string, unknown>[]).map((finding) => {
-        const severity = text(finding["severity"]);
-        const blocking = finding["blocking"] === true ? ` ${toned("bad", "blocking")}` : "";
-        const description = escapeHtml(scrub(text(finding["description"]), secrets));
-        return `<li><strong>${escapeHtml(severity)}</strong>${blocking} ${description}</li>`;
-      });
-      return `<p>Round ${escapeHtml(text(round["round"]))} found:</p>\n<ul>${lines.join("\n")}</ul>`;
-    })
-    .join("\n");
+  const findings = round["findings"] as Record<string, unknown>[];
+  const rows = findings.map((finding, index) => {
+    const blocking = finding["blocking"] === true ? ` ${toned("bad", "blocking")}` : "";
+    const response = findingResponse(Number(round["round"]), index, events, rounds);
+    return [
+      escapeHtml(String(index)),
+      `<strong>${escapeHtml(text(finding["severity"]))}</strong>${blocking}`,
+      escapeHtml(scrub(text(finding["description"]), secrets)),
+      escapeHtml(scrub(response, secrets)),
+    ];
+  });
+  return (
+    `<tr class="findings"><td colspan="${ROUND_COLUMNS.length}">` +
+    `${table(["#", "Severity", "Finding", "Response"], rows)}</td></tr>`
+  );
 }
 
-function renderRounds(rounds: readonly Record<string, unknown>[], secrets: readonly string[]): string {
-  const findings = renderFindings(rounds, secrets);
+function renderRounds(
+  rounds: readonly Record<string, unknown>[],
+  events: readonly DriverEvent[],
+  secrets: readonly string[],
+): string {
+  const found = (round: Record<string, unknown>): number =>
+    Array.isArray(round["findings"]) ? round["findings"].length : 0;
   return table(
-    ["Round", "Phase", "Verdict", "Reviewer", "Provider", "Transport", "Findings"],
+    ROUND_COLUMNS,
     rounds.map((round) => {
       const verdict = text(round["verdict"]);
-      const count = Array.isArray(round["findings"]) ? round["findings"].length : 0;
+      const count = found(round);
+      // The toggle hides the row after it by the stylesheet alone; a round
+      // still owed a fix opens, a settled one does not.
+      const open = verdict === "ISSUES_FOUND" ? " open" : "";
       return [
         escapeHtml(text(round["round"])),
         escapeHtml(text(round["phase"])),
@@ -613,10 +690,13 @@ function renderRounds(rounds: readonly Record<string, unknown>[], secrets: reado
         escapeHtml(text(round["reviewer_model"] ?? round["verifier_model"])),
         escapeHtml(text(round["reviewer_provider"] ?? round["verifier_provider"])),
         escapeHtml(text(round["transport"])),
-        escapeHtml(String(count)),
+        count === 0
+          ? "0"
+          : `<details${open}><summary>${count} finding${count === 1 ? "" : "s"}</summary></details>`,
       ];
     }),
-  ) + (findings === "" ? "" : `\n${findings}`);
+    (index) => (found(rounds[index]) === 0 ? "" : renderFindings(rounds[index], events, rounds, secrets)),
+  );
 }
 
 function renderTestRuns(runs: ReturnType<typeof readRecords>): string {
@@ -721,9 +801,9 @@ export function renderSessionTranscript(
       "What the framework said",
       reading.events.length === 0
         ? ""
-        : `<div class="lines">${reading.events.map(renderEvent).join("\n")}</div>`,
+        : `<div class="lines">${reading.events.map((event) => renderEvent(event, secrets)).join("\n")}</div>`,
     ),
-    section("Verification", renderRounds(reading.rounds, secrets)),
+    section("Verification", renderRounds(reading.rounds, reading.events, secrets)),
     section("Test runs", renderTestRuns(reading.testRuns)),
     section("Steps accepted", steps === "" ? "" : `<p>${steps}</p>`),
     section("Jobs", renderJobs(reading.jobs, secrets)),

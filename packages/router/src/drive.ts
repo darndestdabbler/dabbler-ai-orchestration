@@ -916,6 +916,33 @@ export function gateSetBound(
   return `gates: ${failed.join(", ")}`;
 }
 
+/**
+ * The `dispositions-accepted` row. It carries each answer, reason and all,
+ * because `dispositions.json` is deleted once spent and this row is then
+ * the only record of how a finding was settled.
+ */
+export function dispositionsAcceptedFields(set: DriverDisposition): Record<string, unknown> {
+  return {
+    round: set.round,
+    fix: set.dispositions.filter((entry) => entry.action === "fix").map((entry) => entry.finding_index),
+    reject: set.dispositions.filter((entry) => entry.action === "reject").map((entry) => entry.finding_index),
+    answers: set.dispositions.map((entry) => ({
+      finding: entry.finding_index,
+      action: entry.action,
+      ...(entry.reason === undefined ? {} : { reason: entry.reason }),
+    })),
+  };
+}
+
+/** The `report-accepted` row: the report's notes are kept nowhere else. */
+export function reportAcceptedFields(
+  seq: number,
+  step: string,
+  report: DriverReport | null,
+): Record<string, unknown> {
+  return { seq, step, files: report?.files_changed, notes: report?.notes };
+}
+
 /** How a dispute reaches the ledger; the seam a test stands in for. */
 export type DisputeRecorder = (
   sessionsDir: string,
@@ -3002,7 +3029,7 @@ class Driver {
         };
         this.markProgress();
         this.setRejections(0);
-        this.log("report-accepted", { seq: instruction.seq, step: spec.id, files: report?.files_changed });
+        this.log("report-accepted", reportAcceptedFields(instruction.seq, spec.id, report));
         return;
       }
       reasons = judged;
@@ -3601,11 +3628,7 @@ class Driver {
       }
     }
     this.setRejections(0);
-    this.log("dispositions-accepted", {
-      round: roundNumber,
-      fix: set.dispositions.filter((entry) => entry.action === "fix").map((entry) => entry.finding_index),
-      reject: set.dispositions.filter((entry) => entry.action === "reject").map((entry) => entry.finding_index),
-    });
+    this.log("dispositions-accepted", dispositionsAcceptedFields(set));
 
     this.setPhase(set.dispositions.some((entry) => entry.action === "fix") ? "fix" : "verify");
   }

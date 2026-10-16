@@ -42,6 +42,8 @@ import {
   judgeSessionEnded,
   disputedFindingsBrief,
   dispositionRefusals,
+  dispositionsAcceptedFields,
+  reportAcceptedFields,
   idleInstruction,
   judgeRegistration,
   COMMIT_SUBJECT_WIDTH,
@@ -535,6 +537,31 @@ describe("the files a report stands for", () => {
     // The flag does not excuse a list: a flagged report that names files is judged on them.
     const flaggedAndNamed = report({ files_changed: ["src/widget.py"], files_from_diff: true });
     assert.deepEqual(reportedFiles(flaggedAndNamed, changed), ["src/widget.py"]);
+  });
+});
+
+describe("what the accepted rows keep of an answer", () => {
+  it("carries each disposition with its reason, and a report's notes", () => {
+    // dispositions.json is deleted once spent; these rows are what the transcript reads.
+    const fields = dispositionsAcceptedFields({
+      schema_version: 1, session_number: 1, seq: 7, round: 2, recorded_at: "2026-10-16T10:00:00-04:00",
+      dispositions: [
+        { finding_index: 0, action: "fix" },
+        { finding_index: 1, action: "reject", reason: "out of scope", evidence_paths: ["src/a.ts"] },
+      ],
+    });
+    assert.deepEqual(fields, {
+      round: 2,
+      fix: [0],
+      reject: [1],
+      answers: [
+        { finding: 0, action: "fix" },
+        { finding: 1, action: "reject", reason: "out of scope" },
+      ],
+    });
+    assert.deepEqual(reportAcceptedFields(4, "fix-round-2", report()), {
+      seq: 4, step: "fix-round-2", files: ["src/widget.py"], notes: "made it real",
+    });
   });
 });
 

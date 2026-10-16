@@ -295,7 +295,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 255 | A review is sized by what it reads | no | 2026-10-16 |
 | 256 | A passing job's omitted output says why it is omitted | no | 2026-10-16 |
 | 257 | A round that found issues says what they were | no | 2026-10-16 |
-| 258 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 258 | A finding's transcript says how it was answered | no | 2026-10-16 |
+| 259 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3196,3 +3197,9 @@ Make a transcript job line say why its output is absent. In packages/router/src/
 **Releasable: no.**
 
 Under a transcript's Verification table, list each round's findings in recorded order: the round number, then one line per finding with its severity, 'blocking' where it blocks, and its description, HTML-escaped and scrubbed of provider keys exactly as a job's output is. A round with no findings lists nothing. The change is confined to renderRounds in packages/router/src/transcript.ts (which gains the machine's secrets), with one test in transcript.test.ts covering a round recorded with two findings and a key in one description.
+
+### Session 258 — A finding's transcript says how it was answered
+
+**Releasable: no.**
+
+Make a session's transcript say how each verification finding was answered. In drive.ts the dispositions-accepted event gains the author's entries as {finding, action, reason} beside its fix and reject index lists, and report-accepted gains the report's notes; the field sets are built by two small exported functions so drive.test.ts can assert both rows carry them. In transcript.ts the findings list 257 put under the Verification table goes: a round with findings has its Findings cell become a native <details> toggle ('N findings'), followed by a row spanning every column with a subtable of #, Severity (with the blocking tag), Finding and Response. The Response is read from that round's events: 'fixed' with the fix-round-N step's notes and files, or 'disputed' with the reason and, where the next round is an adjudication that recorded an outcome for the finding, that outcome; a finding no disposition named reads 'not answered', and a round whose events carry no answer shape at all (recorded before this session) reads 'not recorded'. An ISSUES_FOUND round opens expanded and any other round with findings opens collapsed. Descriptions, reasons and notes are escaped and scrubbed of machine secrets.

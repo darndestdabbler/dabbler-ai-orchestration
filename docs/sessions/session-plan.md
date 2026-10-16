@@ -15428,7 +15428,7 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
 
-### Session 247 of 259: A session's transcript, rendered and committed
+### Session 247 of 260: A session's transcript, rendered and committed
 
 Scope: `packages/router` -- `schemas/events.schema.json` and
 `src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
@@ -15537,9 +15537,9 @@ Persisting the terminal's live scrollback. An index page over the
 transcripts, a search across them, or any reader of a transcript.
 Changing what the terminal shows.
 
-**Releasable.** Yes -- 259 publishes 3.22.0, after 253's walk.
+**Releasable.** Yes -- 260 publishes 3.22.0, after 253's walk.
 
-### Session 248 of 259: The record is written before the session is told it is done
+### Session 248 of 260: The record is written before the session is told it is done
 
 Scope: `packages/router` -- `src/drive.ts` (`phaseClose` and `phaseLog`:
 the order of the `done` instruction against the Log phase),
@@ -15595,9 +15595,9 @@ simply has none and the verb can render it on request. Any change to the
 renderer, the verb or the setting. Changing what selection means for any
 path other than the two named.
 
-**Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 259.
+**Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 260.
 
-### Session 249 of 259: A step is told which of its files are already there
+### Session 249 of 260: A step is told which of its files are already there
 
 Scope: `packages/router` -- `src/drive.ts` (`stepAsk` names the step's own
 files and reads the tree for each), `docs/driving-a-session.md`; tests in
@@ -15646,9 +15646,9 @@ file it removed -- that is the NEXT thing to try if clobbering survives
 this, and it begins as a logged observation so its false-positive rate is
 measured before it can refuse anything.
 
-**Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 259.
+**Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 260.
 
-### Session 250 of 259: A choice made in the Configuration is committed as it is made
+### Session 250 of 260: A choice made in the Configuration is committed as it is made
 
 Scope: `packages/router` -- `src/cli/configure.ts` (the write commits and
 pushes), `src/checks.ts` (`materialPaths` stops exempting the settings
@@ -15707,10 +15707,10 @@ with a session in flight leaves the file for the land and says so.
 `checks.test.ts`: the existing exemption test flips -- an uncommitted
 settings file counts before the declaration as it does at the close.
 
-**Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 259,
+**Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 260,
 after 253 walks it in survsys.
 
-### Session 251 of 259: The tests 250's run of record did not reach
+### Session 251 of 260: The tests 250's run of record did not reach
 
 Scope: `packages/router` -- `test/configuration.test.ts`,
 `test/projection.test.ts`, `test/session.test.ts`,
@@ -15766,10 +15766,10 @@ settled here by a fix session. Any change to the walkthrough list in
 
 **Tests.** None added. Twelve made true again, one deleted.
 
-**Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 259, after
+**Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 260, after
 253's walk.
 
-### Session 252 of 259: This repository's suites run whole at every close
+### Session 252 of 260: This repository's suites run whole at every close
 
 Scope: `packages/router` -- `src/checks.ts` (the suite key),
 `src/testEvidence.ts` (`runsWholeAtClose`), their tests;
@@ -15816,10 +15816,10 @@ other projects still record. Deleting the companion table.
 **Tests.** None added; one assertion in `testEvidence.test.ts`, one in
 `checks.test.ts`.
 
-**Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 259, after
+**Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 260, after
 253's walk.
 
-### Session 253 of 259: The transcript walked in a real repository first
+### Session 253 of 260: The transcript walked in a real repository first
 
 Scope: `docs/uat/uat-transcript.md` (new); `dabbler.yaml` only if the
 walk finds a selection rule the transcripts directory needs
@@ -15885,9 +15885,9 @@ drives survsys from its own Work Explorer, and the page says what to look
 for. Backfilling this repository. Any change to the renderer that the walk
 did not ask for.
 
-**Releasable.** No -- 259 publishes, on the operator's yes.
+**Releasable.** No -- 260 publishes, on the operator's yes.
 
-### Session 254 of 259: The two transcripts written by the renderer 253 fixed
+### Session 254 of 260: The two transcripts written by the renderer 253 fixed
 
 Scope: `docs/transcripts/session-252.html`, `docs/transcripts/session-253.html`
 
@@ -15907,9 +15907,9 @@ and no `exit ?` remains on either page.
 **Non-goals.** Any change to the renderer. Pages for sessions before 252.
 Publishing or tagging.
 
-**Releasable.** Yes -- with 247 to 253, as 3.22.0 in session 259.
+**Releasable.** Yes -- with 247 to 253, as 3.22.0 in session 260.
 
-### Session 255 of 259: A review is sized by what it reads
+### Session 255 of 260: A review is sized by what it reads
 
 Scope: `packages/router/src/facts.ts`, `packages/router/src/route.ts`
 
@@ -15947,9 +15947,9 @@ carries none). Raising or removing `AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS`.
 Any change to the renderer or to `isSessionRecordPath`. Excluding any
 other kind of generated file.
 
-**Releasable.** Yes -- with 247 to 254, as 3.22.0 in session 259.
+**Releasable.** Yes -- with 247 to 254, as 3.22.0 in session 260.
 
-### Session 256 of 259: A passing job's omitted output says why it is omitted
+### Session 256 of 260: A passing job's omitted output says why it is omitted
 
 Scope: `packages/router/src/transcript.ts` (`renderJobs`), tests in
 `transcript.test.ts`
@@ -15975,9 +15975,9 @@ an empty log reads `no output`.
 Re-rendering any page already committed. Any change to the setting, the
 verb, or the extension.
 
-**Releasable.** Yes -- with 247 to 255, as 3.22.0 in session 259.
+**Releasable.** Yes -- with 247 to 255, as 3.22.0 in session 260.
 
-### Session 257 of 259: A round that found issues says what they were
+### Session 257 of 260: A round that found issues says what they were
 
 Scope: `packages/router/src/transcript.ts` (`renderRounds`), tests in
 `transcript.test.ts`
@@ -16005,9 +16005,9 @@ into findings, though one finding is sometimes recorded as several
 fragments. Rendering markdown in a description. Re-rendering any page
 already committed.
 
-**Releasable.** Yes -- with 247 to 256 and 258, as 3.22.0 in session 259.
+**Releasable.** Yes -- with 247 to 256 and 258, as 3.22.0 in session 260.
 
-### Session 258 of 259: A finding's transcript says how it was answered
+### Session 258 of 260: A finding's transcript says how it was answered
 
 Scope: `packages/router/src/drive.ts` (two event rows),
 `packages/router/src/transcript.ts` (the findings 257 lists); tests in
@@ -16053,8 +16053,63 @@ already committed. Merging a finding the reviewer's output split into
 fragments: each fragment is its own row, as it is its own index. Any
 script on the page.
 
-**Releasable.** Yes -- with 247 to 257, as 3.22.0 in session 259.
+**Releasable.** Yes -- with 247 to 257, as 3.22.0 in session 260.
 
-### Session 259 of 259: Release 3.22.0 (release: 3.22.0)
+### Session 259 of 260: A run of record says how many tests it ran
 
-The framework publishes sessions 247 to 258 as 3.22.0 and nothing else.
+Scope: `packages/router/src/testOutput.ts` (two readers beside the two it
+has), `packages/router/src/transcript.ts` (`readSession`,
+`renderTestRuns`), `docs/uat/uat-transcript.md`; tests in
+`testOutput.test.ts` and `transcript.test.ts`
+
+**Why.** The Test runs table says a suite passed and how long it took,
+and nothing about what it ran: a reader has to open the job's log, or
+render with `--full`, to learn that 1,343 tests ran and 15 were skipped.
+The numbers are in the log's own tail for every runner the framework
+runs -- node:test's TAP summary, mocha's `N passing`, and the
+`project-passed pass= fail=` lines the router writes for dotnet and Maven
+-- and the outline carry drops them with the rest of a passing job's
+bytes.
+
+**Step 1 -- the reader reads the totals.** `testOutput.ts` gains a
+node:test reader (`# tests`, `# pass`, `# fail`, `# skipped`,
+`# cancelled`) and a mocha reader (`N passing`, `N failing`, `N pending`),
+and one function that reads a whole log through whichever reader its
+lines answer to and returns totals -- passed, failed, skipped -- or null
+where no reader recognised a summary. A view, as the two existing readers
+are: it never decides an outcome. Tests in `testOutput.test.ts`: each
+summary format yields its totals; a log with no summary yields null.
+
+**Step 2 -- the table carries them.** The Test runs table gains Passed,
+Failed and Skipped after Duration. Each row's totals are read from the
+job log named after its suite, `run-of-record-<suite>.log`, whether or
+not the carry put its bytes on the page, and only when the row's recorded
+time falls inside the job's start and end in its status file: a suite run
+twice in one session has one log, and the earlier row stays blank rather
+than borrowing the later run's numbers. Outcome stays, because it is the
+exit code's verdict and the counts are a reading: a build that never
+reached its tests, or a run whose tests were cancelled, is red with
+nothing or zero to count. Failed takes the bad tone when nonzero. A row
+whose log no reader knew shows blank cells. A test in
+`transcript.test.ts`: a passing final-full row whose output is not
+carried shows its totals, and a row with no summary shows none.
+
+**Step 3 -- the walk page knows the columns.** `docs/uat/uat-transcript.md`
+gains one check: a page rendered by this build shows the three counts on
+every final-full row, and a page rendered before it shows none. The VSIX
+the page names is packed from the trunk AFTER this session closes and
+installed with `--force`, as the page already says for 253; it is never
+built or installed inside the session, because the extension carries the
+router and an install under a running session swaps the code driving it.
+
+**Non-goals.** Recording counts in `test-runs.jsonl` or any record.
+Removing or changing the Outcome column. Changing what `outline` or
+`full` carries. Any change to the Jobs section. Re-rendering any page
+already committed. Any script on the page.
+
+**Releasable.** Yes -- with 247 to 258, as 3.22.0 in session 260, after
+the operator has walked the packed VSIX.
+
+### Session 260 of 260: Release 3.22.0 (release: 3.22.0)
+
+The framework publishes sessions 247 to 259 as 3.22.0 and nothing else.

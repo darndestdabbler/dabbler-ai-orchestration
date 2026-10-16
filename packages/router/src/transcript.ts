@@ -31,7 +31,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { readDriverEvents, readRun } from "./driver.ts";
+import { driverDir, readDriverEvents, readRun, readWorkPlan } from "./driver.ts";
 import { jobLogPath, jobStatusPath, jobsDir } from "./jobs.ts";
 import { runGit } from "./journal.ts";
 import { readRounds } from "./ledger.ts";
@@ -39,7 +39,7 @@ import { redact } from "./packaging.ts";
 import { readRecords, type TestRunRecord } from "./testEvidence.ts";
 import { totalsOf, type TestTotals } from "./testOutput.ts";
 import { VERSION } from "./version.ts";
-import type { DriverEvent, DriverRun } from "./generated/index.ts";
+import type { DriverEvent, DriverRun, DriverWorkPlan } from "./generated/index.ts";
 
 // --- The tone grammar ---------------------------------------------------------
 //
@@ -830,36 +830,87 @@ function link(href: string | null, body: string): string {
   return href === null ? body : `<a href="${escapeHtml(href)}">${body}</a>`;
 }
 
+/** The landed commit and each step's files, from whichever records the session wrote. */
+interface FilesReading {
+  readonly landed: string | undefined;
+  readonly files: readonly { readonly step: string; readonly file: string }[];
+  /** True where the files are what each step declared, not what it reported changing. */
+  readonly declared: boolean;
+}
+
+/**
+ * A session recorded before the event log existed: the commit is the gate
+ * receipt's, and the files are those the plan declared for each step
+ * `run.json` lists as accepted, in plan order. Null with no plan.
+ */
+function readDeclaredFiles(repoRoot: string, sessionNumber: number, run: DriverRun | null): FilesReading | null {
+  let plan: DriverWorkPlan | null;
+  try {
+    plan = readWorkPlan(repoRoot, sessionNumber);
+  } catch {
+    return null;
+  }
+  if (plan === null) return null;
+  let landed: string | undefined;
+  try {
+    const receipt = JSON.parse(
+      readFileSync(join(driverDir(repoRoot, sessionNumber), "gate-receipt.json"), "utf8"),
+    ) as Record<string, unknown>;
+    landed = typeof receipt["landed_sha"] === "string" && receipt["landed_sha"] !== "" ? receipt["landed_sha"] : undefined;
+  } catch {
+    landed = undefined;
+  }
+  const accepted = new Set(run?.accepted_steps ?? []);
+  const files = plan.steps
+    .filter((step) => accepted.has(step.id))
+    .flatMap((step) => step.files.map((file) => ({ step: step.id, file })));
+  return { landed, files, declared: true };
+}
+
+/** The commit the `landed` row names, and the files each `report-accepted` row named. */
+function readReportedFiles(events: readonly DriverEvent[]): FilesReading {
+  const landed = events.filter((event) => event.event === "landed").map((event) => text(fieldsOf(event)["commit"])).at(-1);
+  const files: { step: string; file: string }[] = [];
+  for (const event of events) {
+    if (event.event !== "report-accepted") continue;
+    const fields = fieldsOf(event);
+    const step = text(fields["step"]);
+    for (const file of Array.isArray(fields["files"]) ? (fields["files"] as unknown[]).map(text) : []) {
+      files.push({ step, file });
+    }
+  }
+  return { landed, files, declared: false };
+}
+
 /**
  * What the session changed: the commit it landed, and the files each
  * accepted step named, in step order. The hash is in text whatever the
  * remote, because a link lasts as long as its host and the hash as long as
  * the clone.
  */
-function renderFiles(repoRoot: string, events: readonly DriverEvent[]): string {
-  if (events.length === 0) return "";
-  const landed = events.filter((event) => event.event === "landed").map((event) => text(fieldsOf(event)["commit"])).at(-1);
+function renderFiles(repoRoot: string, sessionNumber: number, events: readonly DriverEvent[], run: DriverRun | null): string {
+  const reading = events.length > 0 ? readReportedFiles(events) : readDeclaredFiles(repoRoot, sessionNumber, run);
+  if (reading === null) return "";
+  const { landed } = reading;
   const origin = runGit(repoRoot, ["remote", "get-url", "origin"]);
   const pages = origin.code === 0 && landed ? commitPages(origin.stdout) : null;
   const seen = new Set<string>();
   const rows: string[][] = [];
-  for (const event of events) {
-    if (event.event !== "report-accepted") continue;
-    const fields = fieldsOf(event);
-    const step = text(fields["step"]);
-    for (const file of Array.isArray(fields["files"]) ? (fields["files"] as unknown[]).map(text) : []) {
-      if (seen.has(`${step}\0${file}`)) continue;
-      seen.add(`${step}\0${file}`);
-      rows.push([
-        `<code>${escapeHtml(step)}</code>`,
-        link(pages && landed ? pages.file(landed, file) : null, `<span class="mono">${escapeHtml(file)}</span>`),
-      ]);
-    }
+  for (const { step, file } of reading.files) {
+    if (seen.has(`${step}\0${file}`)) continue;
+    seen.add(`${step}\0${file}`);
+    rows.push([
+      `<code>${escapeHtml(step)}</code>`,
+      link(pages && landed ? pages.file(landed, file) : null, `<span class="mono">${escapeHtml(file)}</span>`),
+    ]);
   }
   const commit = landed
     ? `<p>Landed ${link(pages ? pages.commit(landed) : null, `<code>${escapeHtml(landed)}</code>`)}.</p>`
     : "<p>not landed</p>";
-  return `${commit}\n${table(["Step", "File"], rows)}`;
+  const declared = reading.declared
+    ? "\n<p>This session has no event log: these are the files each step declared, not what it changed.</p>"
+    : "";
+  return `${commit}${declared}\n${table(["Step", "File"], rows)}`;
 }
 
 function headCommit(repoRoot: string): string {
@@ -919,7 +970,7 @@ export function renderSessionTranscript(
     ),
     section("Verification", renderRounds(reading.rounds, reading.events, secrets)),
     section("Test runs", renderTestRuns(reading.testRuns)),
-    section("Files", renderFiles(repoRoot, reading.events)),
+    section("Files", renderFiles(repoRoot, sessionNumber, reading.events, reading.run)),
     section("Steps accepted", steps === "" ? "" : `<p>${steps}</p>`),
     section("Jobs", renderJobs(reading.jobs, secrets)),
   ]

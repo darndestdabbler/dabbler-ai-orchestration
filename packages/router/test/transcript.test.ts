@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
 import { transcriptVerb, parseTranscriptArgs } from "../src/cli/transcript.ts";
-import { appendDriverEvent, writeRun } from "../src/driver.ts";
+import { appendDriverEvent, driverDir, writeRun, writeWorkPlan } from "../src/driver.ts";
 import { jobLogPath, jobStatusPath } from "../src/jobs.ts";
 import { roundsPath } from "../src/ledger.ts";
 import { capture } from "../src/output.ts";
@@ -316,6 +316,31 @@ describe("one session's transcript", () => {
     assert.match(plain, new RegExp(`Landed <code>${HEAD}</code>`));
     assert.match(plain, /test\/b\.test\.ts/);
     assert.ok(!/<a href/.test(plain), "an unknown host gets no link");
+  });
+
+  it("lists an older session's declared files and the receipt's commit where there is no event log", () => {
+    // Every session recorded before 3.22.0 has no events.jsonl, and its
+    // plan and gate receipt still say what each step declared and where it landed.
+    const root = tempDir("transcript-");
+    writeRun(root, 5, {
+      schema_version: 1, session_number: 5, engine: "cli", phase: "close", seq: 4,
+      invocations: 0, max_invocations: 24, accepted_steps: ["events", "renderer"],
+      baseline_tree: null, stop: null,
+      started_at: "2026-10-16T09:00:00-04:00", updated_at: "2026-10-16T09:40:00-04:00",
+    });
+    const step = (id: string, files: string[]) => ({ id, ask: id, files, checks: [{ argv: ["node", "-v"] }] });
+    writeWorkPlan(root, 5, {
+      schema_version: 1, session_number: 5, task: "t", recorded_at: "2026-10-16T09:01:00-04:00",
+      steps: [step("events", ["src/a.ts"]), step("abandoned", ["src/gone.ts"]), step("renderer", ["src/b.ts"])],
+    });
+    write(join(driverDir(root, 5), "gate-receipt.json"), JSON.stringify({ landed_sha: HEAD }));
+
+    const html = render(root, {}, { stdout: "https://github.com/owner/repo.git" });
+    assert.match(html, new RegExp(`href="https://github\\.com/owner/repo/commit/${HEAD}"><code>${HEAD}</code>`));
+    assert.match(html, /files each step declared/);
+    assert.match(html, /<code>events<\/code><\/td><td><a href="[^"]+\/blob\/[0-9a-f]{40}\/src\/a\.ts">/);
+    assert.ok(html.indexOf("src/a.ts") < html.indexOf("src/b.ts"), "files are in step order");
+    assert.ok(!html.includes("src/gone.ts"), "a step that was not accepted is left out");
   });
 });
 

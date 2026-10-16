@@ -299,7 +299,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 259 | A run of record says how many tests it ran | no | 2026-10-16 |
 | 260 | A run's totals are read by the latest row, not by the job's end | no | 2026-10-16 |
 | 261 | The transcript lists the files a session changed | no | 2026-10-16 |
-| 262 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 262 | A session recorded before the event log still lists its files | no | 2026-10-16 |
+| 263 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3224,3 +3225,9 @@ Fix how the transcript reads a run of record's totals: readTotals in packages/ro
 **Releasable: no.**
 
 Put what a session changed on its transcript page. The `landed` row in drive.ts logs the full commit hash instead of the short one (both places it is written), and transcript.ts gains a Files section after Test runs: the landed commit (read from the last `landed` row, whatever length an older session wrote, or `not landed` where there is none) and one table of the files each accepted step named in its `report-accepted` row, with the step, in step order. Where the `origin` remote is a GitHub or Azure DevOps URL the commit links to the host's commit page and each file to that commit at the file; any other remote gets the hash in text and no link, and the hash is in text on every page.
+
+### Session 262 — A session recorded before the event log still lists its files
+
+**Releasable: no.**
+
+Make the transcript's Files section fall back to the records a session written before 3.22.0 left behind. Where a session has no event log, renderFiles takes the commit from gate-receipt.json's landed_sha (or says not landed) and the files from plan.json's steps that run.json lists as accepted, in step order, under a line saying these are the files each step declared rather than what it changed; links follow 261's rule for GitHub and Azure DevOps remotes. A session with neither an event log nor a plan keeps having no Files section. One test in transcript.test.ts covers a session with a plan, a receipt and no event log.

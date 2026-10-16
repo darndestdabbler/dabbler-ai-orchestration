@@ -302,7 +302,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 262 | A session recorded before the event log still lists its files | no | 2026-10-16 |
 | 263 | The transcript opens with the plan it ran under and the work plan it was given | no | 2026-10-16 |
 | 264 | The work plan carries the files a session changed, and the Files section goes | no | 2026-10-16 |
-| 265 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 265 | The transcript says what is missing in the section it is missing from | no | 2026-10-16 |
+| 266 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3245,3 +3246,9 @@ Open each session transcript with what the session was asked to do. A Session Pl
 **Releasable: no.**
 
 Fold the transcript's Files section into its Work Plan section and make a GitHub file link open that file's diff. In packages/router/src/transcript.ts the Work Plan section opens, above its table, with one line: `Landed <hash>`, the full hash in text linked to the host's commit page by commitPages, or `not landed`; where the session has no event log, a line under it says the files are what each step declared rather than what it changed. Each step's Files cell lists the files its report-accepted rows named where an event log exists, and its declared files otherwise or where the step has no accepted report; each file links to the host's file page where the remote is GitHub or Azure DevOps and the session landed, and is plain text otherwise. readReportedFiles and the gate-receipt reading feed this section; the Files section and its renderer are removed. commitPages's GitHub file link becomes `<base>/commit/<sha>#diff-<hex sha256 of the path>`; Azure DevOps's link stays. 261's and 262's tests in transcript.test.ts are rewritten to read the Work Plan's cells and the Landed line; no new test.
+
+### Session 265 — The transcript says what is missing in the section it is missing from
+
+**Releasable: no.**
+
+Remove the transcript's `This session left no:` box and say what is missing only where a reader can act on it. In packages/router/src/transcript.ts, readSession stops building the `absent` list and the page stops rendering the box; a missing plan section, work plan, run record, event log or job simply leaves its section off the page. The Verification section says `No verification round was recorded.` where there is no round, and `The verification record could not be read.` where rounds.jsonl would not read; the Test runs section says `No test run was recorded.` where there is none. The tests in transcript.test.ts that assert the box or its lines are rewritten to assert its absence and the two sections' sentences; no new test.

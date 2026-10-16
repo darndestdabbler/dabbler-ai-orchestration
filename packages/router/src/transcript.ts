@@ -246,15 +246,8 @@ interface SessionReading {
   readonly rounds: readonly Record<string, unknown>[];
   readonly testRuns: readonly TestRunReading[];
   readonly jobs: readonly JobReading[];
-  /**
-   * The records this session has none of, in the words a reader needs.
-   *
-   * SAID rather than inferred: a session with no rounds because it changed
-   * nothing and a session whose ledger was never written look identical
-   * from the outside, and a page that quietly omitted the section would be
-   * telling the reader the first when it might be the second.
-   */
-  readonly absent: readonly string[];
+  /** True where `rounds.jsonl` exists and would not read, which is not "no round". */
+  readonly roundsUnreadable: boolean;
 }
 
 /** Everything one session left behind, as much of it as there is. */
@@ -264,44 +257,29 @@ function readSession(
   carry: JobCarry,
   sessionsDir: string | undefined,
 ): SessionReading {
-  const absent: string[] = [];
   const planSection = sessionsDir === undefined ? null : readPlanSection(sessionsDir, sessionNumber);
-  if (planSection === null) absent.push("its section of the session plan");
   let workPlan: DriverWorkPlan | null;
   try {
     workPlan = readWorkPlan(repoRoot, sessionNumber);
   } catch {
     workPlan = null;
   }
-  if (workPlan === null) absent.push("a work plan");
   const run = readRun(repoRoot, sessionNumber);
-  if (run === null) absent.push("the run record (run.json)");
-
   const events = readDriverEvents(repoRoot, sessionNumber);
-  if (events.length === 0) {
-    absent.push(
-      "the framework's own lines (events.jsonl) -- every session before 3.22.0 has none",
-    );
-  }
 
   let rounds: Record<string, unknown>[] = [];
+  let roundsUnreadable = false;
   try {
     rounds = readRounds(repoRoot, sessionNumber);
   } catch {
-    absent.push("the verification rounds (rounds.jsonl): the file would not read");
-  }
-  if (rounds.length === 0 && !absent.some((line) => line.includes("rounds.jsonl"))) {
-    absent.push("any verification round");
+    roundsUnreadable = true;
   }
 
   const rows = readRecords(repoRoot).filter((row) => row.sessionNumber === sessionNumber);
   const testRuns = rows.map((row) => ({ row, totals: readTotals(repoRoot, sessionNumber, row, rows) }));
-  if (testRuns.length === 0) absent.push("any recorded test run");
-
   const jobs = readJobs(repoRoot, sessionNumber, carry);
-  if (jobs.length === 0) absent.push("any background job");
 
-  return { sessionNumber, planSection, workPlan, run, events, rounds, testRuns, jobs, absent };
+  return { sessionNumber, planSection, workPlan, run, events, rounds, testRuns, jobs, roundsUnreadable };
 }
 
 /** From the session's `###` heading to the next `###` heading or the end. */
@@ -641,8 +619,6 @@ main { max-width: 68rem; margin: 0 auto; }
 h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
 h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
 .stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
-.absent { background: var(--panel); border-left: 3px solid var(--tone-warn); padding: .6rem .9rem; margin: 1.25rem 0; }
-.absent ul { margin: .35rem 0 0; padding-left: 1.2rem; }
 .mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
 .lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
 .line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
@@ -1024,10 +1000,9 @@ function headCommit(repoRoot: string): string {
 /**
  * One session's transcript, as one self-contained HTML document.
  *
- * Never throws for a session that left little behind: what is missing is
- * listed on the page under its own heading, because a reader who cannot
- * tell "this session had no verification round" from "this session's ledger
- * is gone" has been told nothing by the omission.
+ * Never throws for a session that left little behind: a missing record
+ * leaves its section off, except a verification round and a test run,
+ * whose absence is news about the work and is said where they would be.
  */
 export function renderSessionTranscript(
   repoRoot: string,
@@ -1039,13 +1014,6 @@ export function renderSessionTranscript(
   const secrets = machineSecrets();
   const renderedAt = options.renderedAt ?? new Date().toISOString();
   const title = `Session ${String(sessionNumber).padStart(3, "0")} transcript`;
-
-  const absent =
-    reading.absent.length === 0
-      ? ""
-      : `<div class="absent">This session left no:\n<ul>${reading.absent
-          .map((line) => `<li>${escapeHtml(line)}</li>`)
-          .join("")}</ul></div>`;
 
   const body = [
     `<h1>${escapeHtml(title)}</h1>`,
@@ -1059,7 +1027,6 @@ export function renderSessionTranscript(
         `started ${escapeHtml(text(reading.run.started_at))}.</p>`,
     section("Session Plan", reading.planSection === null ? "" : planMarkdownToHtml(reading.planSection)),
     section("Work Plan", renderWorkPlan(repoRoot, sessionNumber, reading.workPlan, reading.run, reading.events)),
-    absent,
     section("Where it stopped", renderStopBlock(reading.run)),
     section(
       "What the framework said",
@@ -1067,8 +1034,20 @@ export function renderSessionTranscript(
         ? ""
         : `<div class="lines">${reading.events.map((event) => renderEvent(event, secrets)).join("\n")}</div>`,
     ),
-    section("Verification", renderRounds(reading.rounds, reading.events, secrets)),
-    section("Test runs", renderTestRuns(reading.testRuns)),
+    // The two absences a reader can act on are said in their own sections;
+    // a session without a verification round or a test run is news.
+    section(
+      "Verification",
+      reading.roundsUnreadable
+        ? "<p>The verification record could not be read.</p>"
+        : reading.rounds.length === 0
+          ? "<p>No verification round was recorded.</p>"
+          : renderRounds(reading.rounds, reading.events, secrets),
+    ),
+    section(
+      "Test runs",
+      reading.testRuns.length === 0 ? "<p>No test run was recorded.</p>" : renderTestRuns(reading.testRuns),
+    ),
     section("Jobs", renderJobs(reading.jobs, secrets)),
   ]
     .filter((part) => part !== "")

@@ -188,7 +188,6 @@ describe("one session's transcript", () => {
     assert.match(plan, /<td>Unused step<\/td><td><p>Never reached\.<\/p><\/td>.*<code>npm test<\/code><\/td><td>no<\/td>/);
     assert.match(plan, /<ul><li>Any script on the page<\/li><\/ul>/);
     assert.ok(!html.includes("Steps accepted"), "acceptance is the table's last column");
-    assert.ok(!html.includes("<li>a work plan</li>"), "a session with a plan is not missing one");
   });
 
   it("humanizeStepKey turns kebab and snake case into a sentence word", () => {
@@ -196,14 +195,14 @@ describe("one session's transcript", () => {
     assert.equal(humanizeStepKey("run_tests"), "Run tests");
   });
 
-  it("says what a session left none of rather than quietly omitting it", () => {
-    // A session with no verification round and a session whose ledger is
-    // gone look identical from outside. An omission tells the reader the
-    // first when it might be the second.
+  it("says in its own section that no round and no test run were recorded, and lists nothing else missing", () => {
+    // Only these two absences are news about the work; the framework's own
+    // file names mean nothing to a developer reading the page.
     const html = render(tempDir("transcript-bare-"));
-    assert.match(html, /This session left no/);
-    assert.match(html, /run record/);
-    assert.match(html, /verification round/);
+    assert.match(html, /<h2>Verification<\/h2>\n<p>No verification round was recorded\.<\/p>/);
+    assert.match(html, /<h2>Test runs<\/h2>\n<p>No test run was recorded\.<\/p>/);
+    assert.ok(!html.includes("This session left no"), "the box of missing records is gone");
+    assert.ok(!html.includes("run.json") && !html.includes("events.jsonl"), "no record is named by its file");
   });
 
   it("carries a failed job's bytes by default and a passing job's only on request", () => {
@@ -370,15 +369,13 @@ describe("one session's transcript", () => {
     assert.match(html, /<p><strong>Why\.<\/strong> Read <code>run\.json<\/code> -- and say so\.<\/p>/);
     assert.match(html, /<ul><li>one &lt;b&gt;item&lt;\/b&gt;<\/li><li>two<\/li><\/ul>/);
     assert.ok(!html.includes("Later work"), "the next session's section leaked in");
-    assert.ok(!html.includes("section of the session plan"), "a named session is not absent");
   });
 
-  it("lists the plan section as absent for a session the plan does not name", () => {
+  it("leaves the plan section off for a session the plan does not name", () => {
     const root = repoWithASession();
     const sessionsDir = join(root, "docs", "sessions");
     write(join(sessionsDir, "session-plan.md"), "### Session 6 of 6: Another\n\nLater work.\n");
     const html = render(root, { sessionsDir });
-    assert.match(html, /<li>its section of the session plan<\/li>/);
     assert.ok(!html.includes("Session Plan</h2>"), "no section for a session the plan does not name");
   });
 

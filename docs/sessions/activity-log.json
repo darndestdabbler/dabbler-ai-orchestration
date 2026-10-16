@@ -12616,6 +12616,13 @@
       "dateTime": "2026-10-16T13:12:50.267000-04:00",
       "task": "Remove the transcript's `This session left no:` box and say what is missing only where a reader can act on it. In packages/router/src/transcript.ts, readSession stops building the `absent` list and the page stops rendering the box; a missing plan section, work plan, run record, event log or job simply leaves its section off the page. The Verification section says `No verification round was recorded.` where there is no round, and `The verification record could not be read.` where rounds.jsonl would not read; the Test runs section says `No test run was recorded.` where there is none. The tests in transcript.test.ts that assert the box or its lines are rewritten to assert its absence and the two sections' sentences; no new test.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 266,
+      "dateTime": "2026-10-16T13:52:10.420000-04:00",
+      "task": "Make the transcript link the landed commit and no file. In packages/router/src/transcript.ts, commitPages returns only the host's commit page for GitHub and Azure DevOps; the per-file link and GitHub's sha256 diff anchor (and the node:crypto import) are removed, and every file in the Work Plan's Files column is plain text on every host. The `Landed <hash>` line above the table keeps its commit link. 264's assertions in transcript.test.ts are rewritten so a GitHub remote links the commit on the Landed line and no file is a link, in both the event-log and declared-files tests; no new test.",
+      "releasable": false
     }
   ]
 }

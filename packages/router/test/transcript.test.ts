@@ -6,7 +6,6 @@
 // a key never does, and that a session which left little behind SAYS so
 // rather than rendering a tidy page about nothing.
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
@@ -324,10 +323,10 @@ describe("one session's transcript", () => {
     assert.match(html, /the close refused: a gate was red/);
   });
 
-  it("puts the landed commit over the work plan and each step's reported files in its row, linked only where the host is known", () => {
-    // A reader who wants the diff had to find the commit in the change log
-    // and open it by hand. The hash stays in text: a link lasts as long as
-    // its host, the hash as long as the clone.
+  it("puts the landed commit over the work plan, linked only where the host is known, and each step's reported files in its row", () => {
+    // The hash stays in text: a link lasts as long as its host, the hash as
+    // long as the clone. No file is linked: GitHub renders a commit's diffs
+    // after the page loads, so an anchor at one file finds nothing.
     const root = repoWithASession();
     const step = (id: string, files: string[]) => ({ id, ask: id, files, checks: [{ argv: ["node", "-v"] }] });
     writeWorkPlan(root, 5, {
@@ -341,13 +340,10 @@ describe("one session's transcript", () => {
     const linked = render(root, {}, { stdout: "https://github.com/owner/repo.git" });
     assert.ok(!linked.includes("<h2>Files</h2>"), "the files are the work plan's");
     assert.match(linked, new RegExp(`<p>Landed <a href="https://github\\.com/owner/repo/commit/${HEAD}"><code>${HEAD}</code></a>\\.</p>\\n<table>`));
-    const diff = createHash("sha256").update("src/a.ts").digest("hex");
-    assert.ok(
-      linked.includes(`<td>Events</td><td><p>events</p></td><td><a href="https://github.com/owner/repo/commit/${HEAD}#diff-${diff}">`),
-      "a GitHub file link opens that file's diff on the commit page",
-    );
+    assert.equal(linked.split("<a href").length - 1, 1, "the commit is the one link");
+    assert.match(linked, /<td>Events<\/td><td><p>events<\/p><\/td><td><span class="mono">src\/a\.ts<\/span><\/td>/);
     assert.ok(!linked.includes("src/declared.ts"), "a step that reported shows what it reported");
-    assert.match(linked, /<td>Renderer<\/td><td><p>renderer<\/p><\/td><td><a href="[^"]+"><span class="mono">src\/b\.ts<\/span><\/a><br><a href="[^"]+"><span class="mono">test\/b\.test\.ts/);
+    assert.match(linked, /<td>Renderer<\/td><td><p>renderer<\/p><\/td><td><span class="mono">src\/b\.ts<\/span><br><span class="mono">test\/b\.test\.ts<\/span><\/td>/);
     assert.ok(!linked.includes("files each step declared"), "a session with an event log says nothing more");
 
     const plain = render(root, {}, { stdout: "https://example.org/somewhere/repo.git" });
@@ -401,8 +397,9 @@ describe("one session's transcript", () => {
       html,
       new RegExp(`<p>Landed <a href="https://github\\.com/owner/repo/commit/${HEAD}"><code>${HEAD}</code></a>\\.</p>\\n<p>[^<]*files are what each step declared`),
     );
-    assert.match(html, /<td>Events<\/td><td><p>events<\/p><\/td><td><a href="[^"]+#diff-[0-9a-f]{64}"><span class="mono">src\/a\.ts/);
-    assert.match(html, /<td>Abandoned<\/td>.*src\/gone\.ts<\/span><\/a><\/td>.*<td>no<\/td>/);
+    assert.equal(html.split("<a href").length - 1, 1, "the commit is the one link");
+    assert.match(html, /<td>Events<\/td><td><p>events<\/p><\/td><td><span class="mono">src\/a\.ts<\/span><\/td>/);
+    assert.match(html, /<td>Abandoned<\/td>.*src\/gone\.ts<\/span><\/td>.*<td>no<\/td>/);
     assert.ok(html.indexOf("src/a.ts") < html.indexOf("src/b.ts"), "files are in step order");
   });
 });

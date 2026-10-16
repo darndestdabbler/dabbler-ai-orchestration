@@ -303,7 +303,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 263 | The transcript opens with the plan it ran under and the work plan it was given | no | 2026-10-16 |
 | 264 | The work plan carries the files a session changed, and the Files section goes | no | 2026-10-16 |
 | 265 | The transcript says what is missing in the section it is missing from | no | 2026-10-16 |
-| 266 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 266 | The transcript links the commit, and no file | no | 2026-10-16 |
+| 267 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3252,3 +3253,9 @@ Fold the transcript's Files section into its Work Plan section and make a GitHub
 **Releasable: no.**
 
 Remove the transcript's `This session left no:` box and say what is missing only where a reader can act on it. In packages/router/src/transcript.ts, readSession stops building the `absent` list and the page stops rendering the box; a missing plan section, work plan, run record, event log or job simply leaves its section off the page. The Verification section says `No verification round was recorded.` where there is no round, and `The verification record could not be read.` where rounds.jsonl would not read; the Test runs section says `No test run was recorded.` where there is none. The tests in transcript.test.ts that assert the box or its lines are rewritten to assert its absence and the two sections' sentences; no new test.
+
+### Session 266 — The transcript links the commit, and no file
+
+**Releasable: no.**
+
+Make the transcript link the landed commit and no file. In packages/router/src/transcript.ts, commitPages returns only the host's commit page for GitHub and Azure DevOps; the per-file link and GitHub's sha256 diff anchor (and the node:crypto import) are removed, and every file in the Work Plan's Files column is plain text on every host. The `Landed <hash>` line above the table keeps its commit link. 264's assertions in transcript.test.ts are rewritten so a GitHub remote links the commit on the Landed line and no file is a link, in both the event-log and declared-files tests; no new test.

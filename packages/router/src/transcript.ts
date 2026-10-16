@@ -28,7 +28,6 @@
 // terminal, a CSS class in a page. Written twice it would be two rules that
 // agreed on the day they were written.
 
-import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -873,9 +872,8 @@ function renderWorkPlan(
   const landed = logged ? lastLanded(events) : receiptLanded(repoRoot, sessionNumber);
   const reported = logged ? reportedFiles(events) : new Map<string, string[]>();
   const origin = landed ? runGit(repoRoot, ["remote", "get-url", "origin"]) : null;
-  const pages = origin !== null && origin.code === 0 ? commitPages(origin.stdout) : null;
-  const fileCell = (file: string): string =>
-    link(pages && landed ? pages.file(landed, file) : null, `<span class="mono">${escapeHtml(file)}</span>`);
+  const page = landed && origin !== null && origin.code === 0 ? commitPage(origin.stdout, landed) : null;
+  const fileCell = (file: string): string => `<span class="mono">${escapeHtml(file)}</span>`;
   const accepted = new Set(run?.accepted_steps ?? []);
   const rows = plan.steps.map((step) => [
     escapeHtml(humanizeStepKey(step.id)),
@@ -885,7 +883,7 @@ function renderWorkPlan(
     accepted.has(step.id) ? "yes" : "no",
   ]);
   const commit = landed
-    ? `<p>Landed ${link(pages ? pages.commit(landed) : null, `<code>${escapeHtml(landed)}</code>`)}.</p>`
+    ? `<p>Landed ${link(page, `<code>${escapeHtml(landed)}</code>`)}.</p>`
     : "<p>not landed</p>";
   const declared = logged
     ? ""
@@ -913,28 +911,17 @@ function renderStopBlock(run: DriverRun | null): string {
   );
 }
 
-/** Where a host shows a commit, and one file's change in it. */
-interface CommitPages {
-  readonly commit: (sha: string) => string;
-  readonly file: (sha: string, path: string) => string;
-}
-
 /**
- * The web pages of `origin`'s commits, for GitHub and Azure DevOps; null for
+ * The web page of a commit on `origin`, for GitHub and Azure DevOps; null for
  * any other remote. Built from the host and the path alone, so a credential
- * written into the remote's URL never reaches the page.
+ * written into the remote's URL never reaches the page. No file is linked:
+ * GitHub renders a commit's diffs after the page loads, so an anchor at one
+ * file is looked for before it exists.
  */
-function commitPages(remote: string): CommitPages | null {
+function commitPage(remote: string, sha: string): string | null {
   const url = remote.trim().replace(/\.git$/, "");
   const github = /^(?:https:\/\/(?:[^@/]+@)?|ssh:\/\/git@|git@)github\.com[:/]([^/]+\/[^/]+)$/.exec(url);
-  if (github !== null) {
-    const base = `https://github.com/${github[1]}`;
-    return {
-      commit: (sha) => `${base}/commit/${sha}`,
-      // GitHub anchors each file on a commit page at the sha256 of its path.
-      file: (sha, path) => `${base}/commit/${sha}#diff-${createHash("sha256").update(path).digest("hex")}`,
-    };
-  }
+  if (github !== null) return `https://github.com/${github[1]}/commit/${sha}`;
   const azure =
     /^https:\/\/(?:[^@/]+@)?dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)$/.exec(url) ??
     /^(?:ssh:\/\/)?[^@/]+@ssh\.dev\.azure\.com:(?:22\/)?v3\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(url);
@@ -942,14 +929,7 @@ function commitPages(remote: string): CommitPages | null {
     /^https:\/\/(?:[^@/]+@)?([^./]+)\.visualstudio\.com\/(?:DefaultCollection\/)?([^/]+)\/_git\/([^/]+)$/.exec(url) ??
     /^(?:ssh:\/\/)?[^@/]+@vs-ssh\.visualstudio\.com:(?:22\/)?v3\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(url);
   const ado = azure ?? visualStudio;
-  if (ado !== null) {
-    const base = `https://dev.azure.com/${ado[1]}/${ado[2]}/_git/${ado[3]}`;
-    return {
-      commit: (sha) => `${base}/commit/${sha}`,
-      file: (sha, path) => `${base}/commit/${sha}?path=/${encodeURI(path)}`,
-    };
-  }
-  return null;
+  return ado === null ? null : `https://dev.azure.com/${ado[1]}/${ado[2]}/_git/${ado[3]}/commit/${sha}`;
 }
 
 function link(href: string | null, body: string): string {

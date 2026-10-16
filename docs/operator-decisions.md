@@ -107,6 +107,10 @@ deadlock twice (`docs/framework-issues-log.md`), and after consult round 15
    20-minute session, 120 seconds for a 40-minute one. Past that, the tests
    named after the changed files run, with the tests of the projects that
    depend on them. Tests are named after what they test.
+   *Amended 2026-10-16:* this repository runs its suites whole at every
+   close (`whole_at_close: true`, session 252), after sessions 247 and 250
+   each closed green on a selected run over tests that were red. Every
+   other project keeps the 5% rule.
 6. **Whole-suite runs at a large project's release** need no ruling of
    their own: releasing is the developer's setting (2).
 

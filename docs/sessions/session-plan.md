@@ -15428,7 +15428,7 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
 
-### Session 247 of 253: A session's transcript, rendered and committed
+### Session 247 of 254: A session's transcript, rendered and committed
 
 Scope: `packages/router` -- `schemas/events.schema.json` and
 `src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
@@ -15537,9 +15537,9 @@ Persisting the terminal's live scrollback. An index page over the
 transcripts, a search across them, or any reader of a transcript.
 Changing what the terminal shows.
 
-**Releasable.** Yes -- 253 publishes 3.22.0, after 252's walk.
+**Releasable.** Yes -- 254 publishes 3.22.0, after 253's walk.
 
-### Session 248 of 253: The record is written before the session is told it is done
+### Session 248 of 254: The record is written before the session is told it is done
 
 Scope: `packages/router` -- `src/drive.ts` (`phaseClose` and `phaseLog`:
 the order of the `done` instruction against the Log phase),
@@ -15595,9 +15595,9 @@ simply has none and the verb can render it on request. Any change to the
 renderer, the verb or the setting. Changing what selection means for any
 path other than the two named.
 
-**Releasable.** Yes -- with 247, 249, 250 and 251, as 3.22.0 in session 253.
+**Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 254.
 
-### Session 249 of 253: A step is told which of its files are already there
+### Session 249 of 254: A step is told which of its files are already there
 
 Scope: `packages/router` -- `src/drive.ts` (`stepAsk` names the step's own
 files and reads the tree for each), `docs/driving-a-session.md`; tests in
@@ -15646,9 +15646,9 @@ file it removed -- that is the NEXT thing to try if clobbering survives
 this, and it begins as a logged observation so its false-positive rate is
 measured before it can refuse anything.
 
-**Releasable.** Yes -- with 247, 248, 250 and 251, as 3.22.0 in session 253.
+**Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 254.
 
-### Session 250 of 253: A choice made in the Configuration is committed as it is made
+### Session 250 of 254: A choice made in the Configuration is committed as it is made
 
 Scope: `packages/router` -- `src/cli/configure.ts` (the write commits and
 pushes), `src/checks.ts` (`materialPaths` stops exempting the settings
@@ -15707,10 +15707,10 @@ with a session in flight leaves the file for the land and says so.
 `checks.test.ts`: the existing exemption test flips -- an uncommitted
 settings file counts before the declaration as it does at the close.
 
-**Releasable.** Yes -- with 247 to 249 and 251, as 3.22.0 in session 253,
-after 252 walks it in survsys.
+**Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 254,
+after 253 walks it in survsys.
 
-### Session 251 of 253: The tests 250's run of record did not reach
+### Session 251 of 254: The tests 250's run of record did not reach
 
 Scope: `packages/router` -- `test/configuration.test.ts`,
 `test/projection.test.ts`, `test/session.test.ts`,
@@ -15766,10 +15766,60 @@ settled here by a fix session. Any change to the walkthrough list in
 
 **Tests.** None added. Twelve made true again, one deleted.
 
-**Releasable.** Yes -- with 247 to 250, as 3.22.0 in session 253, after
-252's walk.
+**Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 254, after
+253's walk.
 
-### Session 252 of 253: The transcript walked in a real repository first
+### Session 252 of 254: This repository's suites run whole at every close
+
+Scope: `packages/router` -- `src/checks.ts` (the suite key),
+`src/testEvidence.ts` (`runsWholeAtClose`), their tests;
+`dabbler.yaml`; `README.md` and `docs/schema-reference.md` (the sentence
+that states the rule)
+
+**Why.** Twice in one week a session here closed VERIFIED on a selected
+run of record while tests it never ran were red: 247 (`walk-session.test.ts`)
+and 250 (twelve tests in four files). Each time the Test workflow found it
+and a fix session followed -- 248, 251. The selection is by name, and a test
+that exercises code through a file named after something else is reachable
+only by a whole run; 248 and 251 each added a hand-kept entry to the
+companion table in `scripts/suite.mjs`, which covers the two cases found
+and not the next. The release gate was never at risk: a release runs every
+suite whole and refuses a red one.
+
+The router suite's whole run takes about 72 seconds here, past the
+operator's 5% rule (operator-decisions, "Which tests run"), so the close
+selects. That rule stands for every other project; the operator ruled on
+2026-10-16 that THIS repository runs whole at every close, because a minute
+a session costs less than one fix session.
+
+**Step 1 -- the key.** A suite may declare `whole_at_close: true`.
+`checks.ts` accepts and loads it beside `runs_whole`, default false, and
+`runsWholeAtClose` answers whole for a suite that declares it, with the
+reason naming the key. One assertion joins the existing `runsWholeAtClose`
+test, and the existing suite-loading test in `checks.test.ts` reads the key.
+
+**Step 2 -- this repository's choice.** `dabbler.yaml` declares
+`whole_at_close: true` on `typescript`, `typescript-windows` and
+`extension`, with a comment naming the two sessions it answers. The
+companion table in `scripts/suite.mjs` stays: it still serves the per-step
+named tests, which select.
+
+**Step 3 -- the words.** The sentence in `README.md` and in
+`docs/schema-reference.md` that states the close's rule gains the key.
+
+**Non-goals.** Changing the 5% rule or its numbers for any project that
+does not declare the key. The release path (`wholeRunStandsForRelease`,
+`releaseTestsHold`), which already runs whole. The per-step named tests and
+pre-verification, which still select. The `final-targeted` stage, which
+other projects still record. Deleting the companion table.
+
+**Tests.** None added; one assertion in `testEvidence.test.ts`, one in
+`checks.test.ts`.
+
+**Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 254, after
+253's walk.
+
+### Session 253 of 254: The transcript walked in a real repository first
 
 Scope: `docs/uat/uat-transcript.md` (new); `dabbler.yaml` only if the
 walk finds a selection rule the transcripts directory needs
@@ -15835,8 +15885,8 @@ drives survsys from its own Work Explorer, and the page says what to look
 for. Backfilling this repository. Any change to the renderer that the walk
 did not ask for.
 
-**Releasable.** No -- 253 publishes, on the operator's yes.
+**Releasable.** No -- 254 publishes, on the operator's yes.
 
-### Session 253 of 253: Release 3.22.0 (release: 3.22.0)
+### Session 254 of 254: Release 3.22.0 (release: 3.22.0)
 
-The framework publishes sessions 247 to 252 as 3.22.0 and nothing else.
+The framework publishes sessions 247 to 253 as 3.22.0 and nothing else.

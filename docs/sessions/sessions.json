@@ -4969,9 +4969,9 @@
     {
       "number": 251,
       "title": "The tests 250's run of record did not reach",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T08:19:44.852000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T08:32:13.963000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

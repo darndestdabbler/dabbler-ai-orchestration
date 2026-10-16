@@ -15595,7 +15595,7 @@ simply has none and the verb can render it on request. Any change to the
 renderer, the verb or the setting. Changing what selection means for any
 path other than the two named.
 
-**Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 263.
+**Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 264.
 
 ### Session 249 of 264: A step is told which of its files are already there
 
@@ -15646,7 +15646,7 @@ file it removed -- that is the NEXT thing to try if clobbering survives
 this, and it begins as a logged observation so its false-positive rate is
 measured before it can refuse anything.
 
-**Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 263.
+**Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 264.
 
 ### Session 250 of 264: A choice made in the Configuration is committed as it is made
 
@@ -15707,7 +15707,7 @@ with a session in flight leaves the file for the land and says so.
 `checks.test.ts`: the existing exemption test flips -- an uncommitted
 settings file counts before the declaration as it does at the close.
 
-**Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 263,
+**Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 264,
 after 253 walks it in survsys.
 
 ### Session 251 of 264: The tests 250's run of record did not reach
@@ -15766,7 +15766,7 @@ settled here by a fix session. Any change to the walkthrough list in
 
 **Tests.** None added. Twelve made true again, one deleted.
 
-**Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 263, after
+**Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 264, after
 253's walk.
 
 ### Session 252 of 264: This repository's suites run whole at every close
@@ -15816,7 +15816,7 @@ other projects still record. Deleting the companion table.
 **Tests.** None added; one assertion in `testEvidence.test.ts`, one in
 `checks.test.ts`.
 
-**Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 263, after
+**Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 264, after
 253's walk.
 
 ### Session 253 of 264: The transcript walked in a real repository first
@@ -15907,7 +15907,7 @@ and no `exit ?` remains on either page.
 **Non-goals.** Any change to the renderer. Pages for sessions before 252.
 Publishing or tagging.
 
-**Releasable.** Yes -- with 247 to 253, as 3.22.0 in session 263.
+**Releasable.** Yes -- with 247 to 253, as 3.22.0 in session 264.
 
 ### Session 255 of 264: A review is sized by what it reads
 
@@ -15947,7 +15947,7 @@ carries none). Raising or removing `AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS`.
 Any change to the renderer or to `isSessionRecordPath`. Excluding any
 other kind of generated file.
 
-**Releasable.** Yes -- with 247 to 254, as 3.22.0 in session 263.
+**Releasable.** Yes -- with 247 to 254, as 3.22.0 in session 264.
 
 ### Session 256 of 264: A passing job's omitted output says why it is omitted
 
@@ -15975,7 +15975,7 @@ an empty log reads `no output`.
 Re-rendering any page already committed. Any change to the setting, the
 verb, or the extension.
 
-**Releasable.** Yes -- with 247 to 255, as 3.22.0 in session 263.
+**Releasable.** Yes -- with 247 to 255, as 3.22.0 in session 264.
 
 ### Session 257 of 264: A round that found issues says what they were
 
@@ -16005,7 +16005,7 @@ into findings, though one finding is sometimes recorded as several
 fragments. Rendering markdown in a description. Re-rendering any page
 already committed.
 
-**Releasable.** Yes -- with 247 to 256 and 258, as 3.22.0 in session 263.
+**Releasable.** Yes -- with 247 to 256 and 258, as 3.22.0 in session 264.
 
 ### Session 258 of 264: A finding's transcript says how it was answered
 
@@ -16053,7 +16053,7 @@ already committed. Merging a finding the reviewer's output split into
 fragments: each fragment is its own row, as it is its own index. Any
 script on the page.
 
-**Releasable.** Yes -- with 247 to 257, as 3.22.0 in session 263.
+**Releasable.** Yes -- with 247 to 257, as 3.22.0 in session 264.
 
 ### Session 259 of 264: A run of record says how many tests it ran
 
@@ -16107,7 +16107,7 @@ Removing or changing the Outcome column. Changing what `outline` or
 `full` carries. Any change to the Jobs section. Re-rendering any page
 already committed. Any script on the page.
 
-**Releasable.** Yes -- with 247 to 258, as 3.22.0 in session 263, after
+**Releasable.** Yes -- with 247 to 258, as 3.22.0 in session 264, after
 the operator has walked the packed VSIX.
 
 ### Session 260 of 264: A run's totals are read by the latest row, not by the job's end
@@ -16148,7 +16148,7 @@ never the installed one. Its three final-full rows carry their counts.
 job's bytes the carry leaves out. Pages for sessions before 259. Any
 change to how the record or the status file is stamped.
 
-**Releasable.** Yes -- with 247 to 259, as 3.22.0 in session 263, after
+**Releasable.** Yes -- with 247 to 259, as 3.22.0 in session 264, after
 the operator has walked the packed VSIX in survsys and seen session 11's
 row carry 33, 0 and 0.
 
@@ -16186,7 +16186,7 @@ itself changed at the land (state files), which the commit holds and
 the steps did not name. Re-rendering any page already committed. Any
 script on the page.
 
-**Releasable.** Yes -- with 247 to 260, as 3.22.0 in session 263.
+**Releasable.** Yes -- with 247 to 260, as 3.22.0 in session 264.
 
 ### Session 262 of 264: A session recorded before the event log still lists its files
 
@@ -16217,13 +16217,9 @@ leaves out a step that was not accepted.
 from git history or the commit itself. Any change to the record. Any
 script on the page.
 
-**Releasable.** Yes -- with 247 to 261, as 3.22.0 in session 263.
+**Releasable.** Yes -- with 247 to 261, as 3.22.0 in session 264.
 
-### Session 263 of 264: Release 3.22.0 (release: 3.22.0)
-
-The framework publishes sessions 247 to 262 as 3.22.0 and nothing else.
-
-### Session 264 of 264: The transcript opens with the plan it ran under and the work plan it was given
+### Session 263 of 264: The transcript opens with the plan it ran under and the work plan it was given
 
 Scope: `packages/router/src/transcript.ts` (two sections at the top of the
 page, the `Steps accepted` section folded into one of them, a renderer for
@@ -16293,4 +16289,8 @@ what the Work Explorer shows.
 **Tests.** Three in `transcript.test.ts` as named in the steps, and the
 moved `humanizeStepKey` test; the extension's suite loses the one it moved.
 
-**Releasable.** Yes -- 3.23.0, in a release session that follows it.
+**Releasable.** Yes -- with 247 to 262, as 3.22.0 in session 264.
+
+### Session 264 of 264: Release 3.22.0 (release: 3.22.0)
+
+The framework publishes sessions 247 to 263 as 3.22.0 and nothing else.

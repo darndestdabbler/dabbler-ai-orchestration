@@ -5045,7 +5045,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "fb60258396f24b8e9bfdeddbfe1933a9d6599697",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gemini-4-argon",
+        "verifierProvider": "google",
+        "transport": "api"
+      },
+      "frameworkVersion": "3.21.0",
+      "startCommit": "fb60258396f24b8e9bfdeddbfe1933a9d6599697"
+    },
+    {
+      "number": 255,
+      "title": "A review is sized by what it reads",
+      "status": "in-progress",
+      "startedAt": "2026-10-16T10:01:30.234000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "14761dc29b4cfd96e365a627541900b0cd0bd11c",
       "frameworkVersion": "3.21.0",
       "verification": {
         "rounds": 1,
@@ -5055,7 +5077,7 @@
       }
     },
     {
-      "number": 255,
+      "number": 256,
       "title": "Release 3.22.0 (release: 3.22.0)",
       "status": "not-started",
       "startedAt": null,

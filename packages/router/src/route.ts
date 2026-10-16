@@ -1275,7 +1275,13 @@ function buildPath(
           system_prompt: systemPrompt,
           user_message: userMessage,
         }),
-      modelConfig: () => ({}),
+      // The window only: the seat serves a vendor's model, and the smallest
+      // window that vendor serves is what its prompt is budgeted against.
+      // An unknown provider keeps the default.
+      modelConfig: (candidate) => {
+        const tokens = providerDefaults(config, candidate.provider)["max_context_tokens"];
+        return tokens === undefined ? {} : { max_context_tokens: tokens };
+      },
       // The CLI exposes no generation knobs.
       generationParams: () => ({}),
       // The seat is billed per request, not per token, and the CLI does its

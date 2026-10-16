@@ -29,11 +29,13 @@ import { dirname, join } from "node:path";
 import { SET_BOOKKEEPING_BASENAMES, shlexSplit } from "./checks.ts";
 import {
   hiddenSpawn,
+  MACHINE_DIRNAME,
   nowIso,
   repoRootFor,
   runGit,
   snapshotWorktreeTree,
   RUNS_DIRNAME,
+  TRANSCRIPTS_DIRNAME,
 } from "./journal.ts";
 import { LIFECYCLE_WRITTEN_FILES } from "./ledger.ts";
 import { dumps } from "./pythonJson.ts";
@@ -193,6 +195,14 @@ export function evidenceCharCap(): number {
 }
 
 /**
+ * The session-record directories, root-relative. A transcript page is
+ * generated after the close and nothing reads it back, so the reviewer is
+ * told it changed and never sent it: two regenerated pages outweighed the
+ * whole evidence cap.
+ */
+const SESSION_RECORD_DIRS: readonly string[] = [MACHINE_DIRNAME, TRANSCRIPTS_DIRNAME];
+
+/**
  * Depth-agnostic exclusions: the anchored form missed nested `tools/x/dist`.
  *
  * The lifecycle's own files are excluded too. They are the record of the
@@ -214,21 +224,35 @@ export function buildDiffPathspecs(
   for (const basename of LIFECYCLE_WRITTEN_FILES) {
     pathspecs.push(`:(exclude,glob)**/${basename}`);
   }
+  for (const dirname of SESSION_RECORD_DIRS) {
+    pathspecs.push(`:(exclude)${dirname}`);
+  }
   return pathspecs;
 }
 
-/** The lifecycle files this change touches, by path only. */
+/** The lifecycle files and session-record paths this change touches, by path only. */
 function trackedBookkeeping(repoRoot: string): string[] {
-  const result = runGit(repoRoot, [
+  const changed = runGit(repoRoot, [
     "diff",
     "--name-only",
     "-z",
     "HEAD",
     "--",
     ...LIFECYCLE_WRITTEN_FILES.map((name) => `**/${name}`),
+    ...SESSION_RECORD_DIRS,
   ]);
-  if (result.code !== 0) return [];
-  return result.stdout.split("\0").filter((path) => path !== "");
+  const added = runGit(repoRoot, [
+    "ls-files",
+    "--others",
+    "--exclude-standard",
+    "-z",
+    "--",
+    ...SESSION_RECORD_DIRS,
+  ]);
+  return [changed, added]
+    .filter((result) => result.code === 0)
+    .flatMap((result) => result.stdout.split("\0"))
+    .filter((path) => path !== "");
 }
 
 interface UntrackedContents {

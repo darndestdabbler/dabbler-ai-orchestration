@@ -292,7 +292,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 252 | This repository's suites run whole at every close | no | 2026-10-16 |
 | 253 | The transcript walked in a real repository first | no | 2026-10-16 |
 | 254 | The two transcripts written by the renderer 253 fixed | no | 2026-10-16 |
-| 255 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 255 | A review is sized by what it reads | no | 2026-10-16 |
+| 256 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3175,3 +3176,9 @@ Build the 3.22.0 candidate VSIX from the trunk and install it into this machine'
 **Releasable: no.**
 
 Re-render the two committed transcript pages for sessions 252 and 253, which were written by the renderer before 253's fix and show every job as `exit ?`. Delete docs/transcripts/session-252.html and docs/transcripts/session-253.html and run `dabbler transcript --from 252 --to 253` with the fixed router, so each job reads its real exit and no `exit ?` remains on either page.
+
+### Session 255 — A review is sized by what it reads
+
+**Releasable: no.**
+
+Size a review by what it reads. In packages/router/src/facts.ts, buildDiffPathspecs excludes the session-record directories (docs/transcripts and .dabbler) by their root-relative path, and a changed or new path under them is listed in the evidence's "Expected framework bookkeeping (paths only)" section, so the reviewer is told a transcript page changed without being sent its contents. In packages/router/src/route.ts, the copilot-cli seat path's modelConfig returns only the candidate provider's max_context_tokens from provider_defaults, so an OpenAI seat model's prompt budget is 272,000 tokens times 0.8 rather than the 200,000 fallback; a provider with no defaults keeps the 200,000 default, and no generation knob reaches the seat. One test in facts.test.ts and one in route.test.ts.

@@ -934,6 +934,17 @@ describe("dispatching over the seat", () => {
     assert.equal(row?.["session_number"], 3);
   });
 
+  it("budgets a seat model's prompt against its provider's window", async () => {
+    // Every seat model used to get the 200,000 fallback, so switching the
+    // reviewer to a vendor with a larger window changed nothing.
+    configOnDisk(makeConfig({ roles: { generator: { prefer: ["gpt-x"] } } }));
+    installFakeSeat(SEAT_ANSWER);
+    await assert.rejects(
+      () => route("x".repeat(272000 * 4), { role: "generator", transport: "copilot-cli" }),
+      /input budget of 217600 tokens/,
+    );
+  });
+
   it("raises a dispatch failure rather than returning empty content", async () => {
     configOnDisk();
     installFakeSeat("not json at all\n");

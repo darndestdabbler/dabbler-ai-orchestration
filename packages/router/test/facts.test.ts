@@ -18,6 +18,7 @@ import {
   STATUS_PASS,
   STATUS_UNKNOWN,
   appendFacts,
+  assembleEvidence,
   buildDiffPathspecs,
   changedLines,
   checkEvidenceCap,
@@ -31,7 +32,6 @@ import {
   redFactsRefusal,
 } from "../src/facts.ts";
 import { gitAnswers, tempDir } from "./support/answers.ts";
-
 const CAP_ENV = "AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS";
 
 describe("the diff pathspecs", () => {
@@ -46,6 +46,39 @@ describe("the diff pathspecs", () => {
     assert.ok(pathspecs.includes(":(exclude,glob)**/*.vsix"));
     assert.ok(!pathspecs.includes(":(exclude,glob)**/*.vsix/**"));
     assert.ok(DEFAULT_DIFF_EXCLUDES.includes(".dabbler"));
+  });
+});
+
+describe("the evidence", () => {
+  it("names a changed transcript page as bookkeeping and carries none of its contents", () => {
+    // git answers as it would for a tree with one regenerated page, one new
+    // page and one source change: the page's hunk is there only for a diff
+    // that did not exclude it.
+    const recordDir = (args: readonly string[]): boolean => args.includes("docs/transcripts");
+    const restore = gitAnswers([
+      [["status"], { stdout: " M docs/transcripts/session-1.html\n M src/a.ts" }],
+      [["diff", "--name-only"], { stdout: "docs/transcripts/session-1.html\0" }],
+      [(args) => args[0] === "ls-files" && recordDir(args), { stdout: "docs/transcripts/session-2.html\0" }],
+      [["ls-files"], { stdout: "" }],
+      [
+        ["diff"],
+        (args) => ({
+          stdout:
+            "+++ b/src/a.ts\n+two" +
+            (args.includes(":(exclude)docs/transcripts") ? "" : "\n+++ b/docs/transcripts/session-1.html\n+REGENERATED PAGE"),
+        }),
+      ],
+    ]);
+    try {
+      const evidence = assembleEvidence(tempDir(), "docs/sessions", 1);
+      const bookkeeping = evidence.split("#### Expected framework bookkeeping (paths only)")[1] ?? "";
+      assert.match(bookkeeping, /- docs\/transcripts\/session-1\.html/);
+      assert.match(bookkeeping, /- docs\/transcripts\/session-2\.html/);
+      assert.doesNotMatch(evidence, /REGENERATED PAGE/);
+      assert.match(evidence, /\+two/);
+    } finally {
+      restore();
+    }
   });
 });
 

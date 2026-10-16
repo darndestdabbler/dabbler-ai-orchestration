@@ -291,7 +291,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 251 | The tests 250's run of record did not reach | no | 2026-10-16 |
 | 252 | This repository's suites run whole at every close | no | 2026-10-16 |
 | 253 | The transcript walked in a real repository first | no | 2026-10-16 |
-| 254 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 254 | The two transcripts written by the renderer 253 fixed | no | 2026-10-16 |
+| 255 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3168,3 +3169,9 @@ Build the 3.22.0 candidate VSIX from the trunk and install it into this machine'
 **Amended after acceptance:**
 
 - 2026-10-16 — step 'render-findings': its files: The survsys render found every job's exit as '?': transcript.ts reads exitCode from jobs/<name>.status.json, which jobs.ts writes as exit, so every job renders red and carries its whole output. The walk's check 1 cannot pass over it; the fix is the one key the renderer reads and the test fixtures that wrote the wrong key. (claude-code (anthropic, claude-opus-5-5))
+
+### Session 254 — The two transcripts written by the renderer 253 fixed
+
+**Releasable: no.**
+
+Re-render the two committed transcript pages for sessions 252 and 253, which were written by the renderer before 253's fix and show every job as `exit ?`. Delete docs/transcripts/session-252.html and docs/transcripts/session-253.html and run `dabbler transcript --from 252 --to 253` with the fixed router, so each job reads its real exit and no `exit ?` remains on either page.

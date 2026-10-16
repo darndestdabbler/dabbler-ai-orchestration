@@ -5,5 +5,7 @@
   // the direct API deliberately, with `--transport api`.
   "dabbler.transport": "copilot-cli",
   "dabbler.authoringModel": "claude-opus-5-5",
-  "dabbler.reviewerTransport": "copilot-cli"
+  "dabbler.reviewerTransport": "api",
+  "dabbler.reviewerModel": "gemini-4-argon",
+  "dabbler.auxiliaryModel": "gpt-5.6-sol"
 }

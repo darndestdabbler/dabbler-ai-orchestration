@@ -5145,9 +5145,9 @@
     {
       "number": 259,
       "title": "A run of record says how many tests it ran",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T10:56:29.910000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T11:03:28.398000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

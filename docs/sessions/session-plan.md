@@ -15428,7 +15428,7 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
 
-### Session 247 of 254: A session's transcript, rendered and committed
+### Session 247 of 255: A session's transcript, rendered and committed
 
 Scope: `packages/router` -- `schemas/events.schema.json` and
 `src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
@@ -15537,9 +15537,9 @@ Persisting the terminal's live scrollback. An index page over the
 transcripts, a search across them, or any reader of a transcript.
 Changing what the terminal shows.
 
-**Releasable.** Yes -- 254 publishes 3.22.0, after 253's walk.
+**Releasable.** Yes -- 255 publishes 3.22.0, after 253's walk.
 
-### Session 248 of 254: The record is written before the session is told it is done
+### Session 248 of 255: The record is written before the session is told it is done
 
 Scope: `packages/router` -- `src/drive.ts` (`phaseClose` and `phaseLog`:
 the order of the `done` instruction against the Log phase),
@@ -15595,9 +15595,9 @@ simply has none and the verb can render it on request. Any change to the
 renderer, the verb or the setting. Changing what selection means for any
 path other than the two named.
 
-**Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 254.
+**Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 255.
 
-### Session 249 of 254: A step is told which of its files are already there
+### Session 249 of 255: A step is told which of its files are already there
 
 Scope: `packages/router` -- `src/drive.ts` (`stepAsk` names the step's own
 files and reads the tree for each), `docs/driving-a-session.md`; tests in
@@ -15646,9 +15646,9 @@ file it removed -- that is the NEXT thing to try if clobbering survives
 this, and it begins as a logged observation so its false-positive rate is
 measured before it can refuse anything.
 
-**Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 254.
+**Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 255.
 
-### Session 250 of 254: A choice made in the Configuration is committed as it is made
+### Session 250 of 255: A choice made in the Configuration is committed as it is made
 
 Scope: `packages/router` -- `src/cli/configure.ts` (the write commits and
 pushes), `src/checks.ts` (`materialPaths` stops exempting the settings
@@ -15707,10 +15707,10 @@ with a session in flight leaves the file for the land and says so.
 `checks.test.ts`: the existing exemption test flips -- an uncommitted
 settings file counts before the declaration as it does at the close.
 
-**Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 254,
+**Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 255,
 after 253 walks it in survsys.
 
-### Session 251 of 254: The tests 250's run of record did not reach
+### Session 251 of 255: The tests 250's run of record did not reach
 
 Scope: `packages/router` -- `test/configuration.test.ts`,
 `test/projection.test.ts`, `test/session.test.ts`,
@@ -15766,10 +15766,10 @@ settled here by a fix session. Any change to the walkthrough list in
 
 **Tests.** None added. Twelve made true again, one deleted.
 
-**Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 254, after
+**Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 255, after
 253's walk.
 
-### Session 252 of 254: This repository's suites run whole at every close
+### Session 252 of 255: This repository's suites run whole at every close
 
 Scope: `packages/router` -- `src/checks.ts` (the suite key),
 `src/testEvidence.ts` (`runsWholeAtClose`), their tests;
@@ -15816,10 +15816,10 @@ other projects still record. Deleting the companion table.
 **Tests.** None added; one assertion in `testEvidence.test.ts`, one in
 `checks.test.ts`.
 
-**Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 254, after
+**Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 255, after
 253's walk.
 
-### Session 253 of 254: The transcript walked in a real repository first
+### Session 253 of 255: The transcript walked in a real repository first
 
 Scope: `docs/uat/uat-transcript.md` (new); `dabbler.yaml` only if the
 walk finds a selection rule the transcripts directory needs
@@ -15885,8 +15885,30 @@ drives survsys from its own Work Explorer, and the page says what to look
 for. Backfilling this repository. Any change to the renderer that the walk
 did not ask for.
 
-**Releasable.** No -- 254 publishes, on the operator's yes.
+**Releasable.** No -- 255 publishes, on the operator's yes.
 
-### Session 254 of 254: Release 3.22.0 (release: 3.22.0)
+### Session 254 of 255: The two transcripts written by the renderer 253 fixed
 
-The framework publishes sessions 247 to 253 as 3.22.0 and nothing else.
+Scope: `docs/transcripts/session-252.html`, `docs/transcripts/session-253.html`
+
+**Why.** 253 found the renderer reading `exitCode` from a job's status
+file, which the job runner writes as `exit`, and fixed it. The two pages
+already committed were rendered by the extension installed before that
+fix, so every job on them reads `exit ?`, toned red, with its whole output
+carried. `dabbler transcript` leaves a page that exists exactly as it is,
+so the fix cannot repair them on its own, and 3.22.0 should not ship with
+its own history saying every job's exit is unknown.
+
+**Step 1 -- render them again.** Delete the two pages and run `dabbler
+transcript --from 252 --to 253` with the extension packed after 253's
+fix installed. Each job reads `exit 0` in green, or its real exit in red,
+and no `exit ?` remains on either page.
+
+**Non-goals.** Any change to the renderer. Pages for sessions before 252.
+Publishing or tagging.
+
+**Releasable.** Yes -- with 247 to 253, as 3.22.0 in session 255.
+
+### Session 255 of 255: Release 3.22.0 (release: 3.22.0)
+
+The framework publishes sessions 247 to 254 as 3.22.0 and nothing else.

@@ -15428,7 +15428,7 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
 
-### Session 247 of 248: A session's transcript, rendered and committed
+### Session 247 of 249: A session's transcript, rendered and committed
 
 Scope: `packages/router` -- `schemas/events.schema.json` and
 `src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
@@ -15511,6 +15511,21 @@ through the layers every other choice is read through: `off`, `outline`
 (the default) or `full`. A transcript is generated, never hand-edited,
 and nothing reads it back.
 
+**A transcript must not move a digest, and would.** `treeDigest` is
+`surfaceDigest` over `covers: [""]`, which matches every path that is not
+machine state and not session bookkeeping; it is stamped on every
+run-of-record row and read back by `wholeRunStandsForRelease` at a
+release. A transcript committed at the end of session N therefore moves
+the whole-tree digest AFTER the run of record it sits behind, and the next
+release reads a tree that no longer matches the row -- the shape AGENTS.md
+records for the deleted-tracked-file trap, and the shape of D134. So
+`docs/transcripts/` joins `.dabbler/` and the session's bookkeeping as a
+path the digests do not count: it is the RECORD of a session, never the
+WORK of one, which is the distinction `isMachineStatePath` already states.
+One predicate, named for what it decides, with the transcripts directory
+and the machine directory both answering to it -- not a second rule
+beside the first.
+
 **Step 5 -- the words.** `docs/driving-a-session.md` gains the Log phase
 and the verb; `docs/schema-reference.md` gains the event row; `AGENTS.md`
 says that the transcript travels and the ledger does not.
@@ -15522,8 +15537,52 @@ Persisting the terminal's live scrollback. An index page over the
 transcripts, a search across them, or any reader of a transcript.
 Changing what the terminal shows.
 
-**Releasable.** Yes -- 248 publishes 3.22.0.
+**Releasable.** Yes -- 249 publishes 3.22.0, after 248's walk.
 
-### Session 248 of 248: Release 3.22.0 (release: 3.22.0)
+### Session 248 of 249: The transcript walked in a real repository first
 
-The framework publishes session 247 as 3.22.0 and nothing else.
+Scope: `docs/uat/uat-transcript.md` (new); `dabbler.yaml` only if the
+walk finds a selection rule the transcripts directory needs
+
+**Why.** 3.22.0 reaches a developer with a dozen sessions of real work
+behind it, and the renderer will have been run against this repository's
+records alone. The operator has `../survsys` on this machine -- 56
+sessions planned, 23 complete -- which is the honest test: records written
+by a different project, a different language and a different shape of
+session. A defect found there costs a walk; the same defect found after
+3.22.0 is published costs every seat that installed it.
+
+**The VSIX is built and installed locally, and the release waits.** This
+session packs the extension and nothing else: no tag, no Marketplace, no
+feed. It is the pattern 3.17.0 followed -- built, installed with
+`--force`, walked, and published only on the operator's yes.
+
+**Step 1 -- the local build.** Pack the VSIX from the trunk and install
+it into this machine's VS Code with `--force`, because a same-version
+install over an existing one leaves the old extension in place and the
+walk then proves nothing about the new code.
+
+**Step 2 -- the walk page.** `docs/uat/uat-transcript.md`: copy-pasteable
+steps, each with what the operator should see. Render survsys's completed
+sessions with `dabbler transcript --from 1 --to 23 --out <dir>` WITHOUT
+`--commit` first, so the artifact is inspected before anything is written
+to that repository's history; open three of them, one with a failure in it
+and one with several verification rounds; then commit them and confirm the
+transcripts land in `docs/transcripts/` and nothing else moved. The page
+says plainly that survsys must have NO session in flight when the VSIX is
+installed: the extension carries the router, and replacing it under a
+running session swaps the code driving that session mid-run.
+
+**Step 3 -- what the walk found.** The findings go in the page beside the
+step that found them. A defect that stops the walk is fixed in this
+session; one that does not is recorded for the operator to schedule.
+
+**Non-goals.** Publishing anything. Tagging. Driving a session in survsys
+or changing its plan. Backfilling this repository. Any change to the
+renderer that the walk did not ask for.
+
+**Releasable.** No -- 249 publishes, on the operator's yes.
+
+### Session 249 of 249: Release 3.22.0 (release: 3.22.0)
+
+The framework publishes sessions 247 and 248 as 3.22.0 and nothing else.

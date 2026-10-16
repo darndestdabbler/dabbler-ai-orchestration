@@ -296,7 +296,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 256 | A passing job's omitted output says why it is omitted | no | 2026-10-16 |
 | 257 | A round that found issues says what they were | no | 2026-10-16 |
 | 258 | A finding's transcript says how it was answered | no | 2026-10-16 |
-| 259 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 259 | A run of record says how many tests it ran | no | 2026-10-16 |
+| 260 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3203,3 +3204,9 @@ Under a transcript's Verification table, list each round's findings in recorded 
 **Releasable: no.**
 
 Make a session's transcript say how each verification finding was answered. In drive.ts the dispositions-accepted event gains the author's entries as {finding, action, reason} beside its fix and reject index lists, and report-accepted gains the report's notes; the field sets are built by two small exported functions so drive.test.ts can assert both rows carry them. In transcript.ts the findings list 257 put under the Verification table goes: a round with findings has its Findings cell become a native <details> toggle ('N findings'), followed by a row spanning every column with a subtable of #, Severity (with the blocking tag), Finding and Response. The Response is read from that round's events: 'fixed' with the fix-round-N step's notes and files, or 'disputed' with the reason and, where the next round is an adjudication that recorded an outcome for the finding, that outcome; a finding no disposition named reads 'not answered', and a round whose events carry no answer shape at all (recorded before this session) reads 'not recorded'. An ISSUES_FOUND round opens expanded and any other round with findings opens collapsed. Descriptions, reasons and notes are escaped and scrubbed of machine secrets.
+
+### Session 259 — A run of record says how many tests it ran
+
+**Releasable: no.**
+
+Make a transcript's Test runs table say how many tests each run of record ran. testOutput.ts gains a node:test summary reader (# tests, # pass, # fail, # skipped, # cancelled) and a mocha summary reader (N passing, N failing, N pending), plus one exported function that reads a whole log through whichever reader its lines answer to -- those two, or the router's own project-passed/project-failed pass= fail= not_run= lines for dotnet and Maven -- and returns totals {passed, failed, skipped} or null where no summary was recognised; it is a view and never decides an outcome. In transcript.ts readSession pairs each test-run row with the job log named after its suite (run-of-record-<suite>.log) and reads its totals only when the row's recorded time falls inside that job's started_at..ended_at in its status file, whether or not the carry put the log's bytes on the page; renderTestRuns gains Passed, Failed and Skipped columns after Duration, Failed takes the bad tone when nonzero, and a row with no totals shows blank cells. Outcome stays. docs/uat/uat-transcript.md gains one check for the three counts on every final-full row of a page rendered by this build and none on a page rendered before it, packed from the trunk after the session closes and installed with --force.

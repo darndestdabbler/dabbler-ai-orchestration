@@ -5133,7 +5133,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "e7f5404c132da6b1f9d56b54ba98aa359fac3f55",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gemini-4-argon",
+        "verifierProvider": "google",
+        "transport": "api"
+      },
+      "frameworkVersion": "3.21.0",
+      "startCommit": "e7f5404c132da6b1f9d56b54ba98aa359fac3f55"
+    },
+    {
+      "number": 259,
+      "title": "A run of record says how many tests it ran",
+      "status": "in-progress",
+      "startedAt": "2026-10-16T10:56:29.910000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "c0402b7044244fb6a296dbf648f398cbed5ddc3c",
       "frameworkVersion": "3.21.0",
       "verification": {
         "rounds": 1,
@@ -5143,7 +5165,7 @@
       }
     },
     {
-      "number": 259,
+      "number": 260,
       "title": "Release 3.22.0 (release: 3.22.0)",
       "status": "not-started",
       "startedAt": null,

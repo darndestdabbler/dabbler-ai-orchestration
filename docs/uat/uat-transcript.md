@@ -8,8 +8,9 @@ anything from this repository; the release is session 254, on your yes.
 
 ## What you need
 
-- The local VSIX, packed from the trunk **after session 253 closed** (it
-  carries the transcript fix in Findings), installed with `--force`, and
+- The local VSIX, packed from the trunk **after session 259 closed** (it
+  carries 253's transcript fix in Findings and 259's test counts), never
+  from inside a session, installed with `--force`, and
   every VS Code window reloaded. From this repository:
 
   ```
@@ -81,6 +82,25 @@ Expect:
 - `git -C ../survsys status --short` is clean;
 - run the same command again: every page already exists and is left as it
   is, and no second commit is made.
+
+## Check 1a -- the test counts (259)
+
+**You --** in `D:/tmp/survsys-transcripts` (Check 1's render, made by this
+build), open any page whose *Test runs* table has a `final-full` row, and
+then this repository's own `docs/transcripts/session-258.html`, which was
+rendered and committed before 259.
+
+Expect:
+
+- on the new page, the Test runs table's headings read Suite, Stage,
+  Outcome, Duration, **Passed, Failed, Skipped**, Command, and every
+  `final-full` row has a number in all three -- even where its job's line
+  says `output not carried`; a nonzero Failed is red;
+- Outcome is still there and still says `passed` or `failed`;
+- a row whose log carried no summary the framework knows (a build that
+  failed before its tests) has the three cells blank, not `0`;
+- on `session-258.html`, no Passed, Failed or Skipped column: a page
+  already committed is never re-rendered.
 
 ## Check 2 -- the step instruction, read in passing (249)
 

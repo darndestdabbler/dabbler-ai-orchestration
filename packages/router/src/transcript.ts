@@ -32,11 +32,12 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { readDriverEvents, readRun } from "./driver.ts";
-import { jobsDir } from "./jobs.ts";
+import { jobLogPath, jobStatusPath, jobsDir } from "./jobs.ts";
 import { runGit } from "./journal.ts";
 import { readRounds } from "./ledger.ts";
 import { redact } from "./packaging.ts";
-import { readRecords } from "./testEvidence.ts";
+import { readRecords, type TestRunRecord } from "./testEvidence.ts";
+import { totalsOf, type TestTotals } from "./testOutput.ts";
 import { VERSION } from "./version.ts";
 import type { DriverEvent, DriverRun } from "./generated/index.ts";
 
@@ -214,12 +215,18 @@ interface JobReading {
   readonly output: string | null;
 }
 
+interface TestRunReading {
+  readonly row: TestRunRecord;
+  /** What the run's own log says it ran; null where nothing could be read. */
+  readonly totals: TestTotals | null;
+}
+
 interface SessionReading {
   readonly sessionNumber: number;
   readonly run: DriverRun | null;
   readonly events: readonly DriverEvent[];
   readonly rounds: readonly Record<string, unknown>[];
-  readonly testRuns: ReturnType<typeof readRecords>;
+  readonly testRuns: readonly TestRunReading[];
   readonly jobs: readonly JobReading[];
   /**
    * The records this session has none of, in the words a reader needs.
@@ -259,7 +266,9 @@ function readSession(
     absent.push("any verification round");
   }
 
-  const testRuns = readRecords(repoRoot).filter((row) => row.sessionNumber === sessionNumber);
+  const testRuns = readRecords(repoRoot)
+    .filter((row) => row.sessionNumber === sessionNumber)
+    .map((row) => ({ row, totals: readTotals(repoRoot, sessionNumber, row) }));
   if (testRuns.length === 0) absent.push("any recorded test run");
 
   const jobs = readJobs(repoRoot, sessionNumber, carry);
@@ -291,6 +300,27 @@ function readJobs(repoRoot: string, sessionNumber: number, carry: JobCarry): Job
     });
   }
   return jobs;
+}
+
+/**
+ * A run's totals, from the job log named after its suite -- whatever the
+ * carry put on the page. A suite run twice in one session has one log, the
+ * later run's, so a row is read only where it was recorded while that job
+ * ran; an earlier row stays blank rather than borrowing the later numbers.
+ */
+function readTotals(repoRoot: string, sessionNumber: number, row: TestRunRecord): TestTotals | null {
+  const job = `run of record: ${row.suite}`;
+  let status: Record<string, unknown>;
+  try {
+    status = JSON.parse(readFileSync(jobStatusPath(repoRoot, sessionNumber, job), "utf8")) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const at = Date.parse(row.recordedAt);
+  const started = Date.parse(String(status["started_at"]));
+  const ended = Date.parse(String(status["ended_at"]));
+  if (!(at >= started && at <= ended)) return null;
+  return totalsOf(readTextOrEmpty(jobLogPath(repoRoot, sessionNumber, job)));
 }
 
 function readJobExit(path: string): string {
@@ -699,14 +729,19 @@ function renderRounds(
   );
 }
 
-function renderTestRuns(runs: ReturnType<typeof readRecords>): string {
+// Outcome is the exit code's verdict and the counts are a reading: a build
+// that never reached its tests is red with nothing to count.
+function renderTestRuns(runs: readonly TestRunReading[]): string {
   return table(
-    ["Suite", "Stage", "Outcome", "Duration", "Command"],
-    runs.map((row) => [
+    ["Suite", "Stage", "Outcome", "Duration", "Passed", "Failed", "Skipped", "Command"],
+    runs.map(({ row, totals }) => [
       escapeHtml(row.suite),
       escapeHtml(row.stage),
       toned(fieldTone("tests", "outcome", row.outcome), row.outcome),
       escapeHtml(row.durationSeconds === null ? "" : `${Math.round(row.durationSeconds)}s`),
+      totals === null ? "" : String(totals.passed),
+      totals === null ? "" : totals.failed > 0 ? toned("bad", String(totals.failed)) : "0",
+      totals === null ? "" : String(totals.skipped),
       `<span class="mono">${escapeHtml(row.command)}</span>`,
     ]),
   );

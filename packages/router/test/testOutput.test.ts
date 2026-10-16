@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { dotnetReader, mavenReader, readerFor, said, type TestEvent } from "../src/testOutput.ts";
+import { dotnetReader, mavenReader, readerFor, said, totalsOf, type TestEvent } from "../src/testOutput.ts";
 
 function read(reader: (line: string) => TestEvent[], output: string): TestEvent[] {
   return output.split("\n").flatMap((line) => reader(line));
@@ -166,6 +166,57 @@ describe("which reader a suite's command gets", () => {
     assert.equal(readerFor("node scripts/suite.mjs container"), null);
     assert.equal(readerFor("dotnet build"), null);
     assert.equal(readerFor("npm test"), null);
+  });
+});
+
+// The tails of this repository's own runs of record (session 258) and of
+// the csv-parser-dotnet sample's (its session 4), lines dropped and never
+// reworded.
+const NODE_TAIL = `ok 392 - the window before a session declares
+  ---
+  duration_ms: 1.352913
+  type: 'suite'
+  ...
+1..392
+# tests 1344
+# suites 392
+# pass 1329
+# fail 0
+# cancelled 0
+# skipped 15
+# todo 0
+# duration_ms 67998.985397
+recorded typescript [final-full]: passed in 71s (timed here)`;
+
+const MOCHA_TAIL = `  workExplorerTreeModel: descriptorFor dispatch
+    ✔ every node kind resolves to a descriptor with a stable id
+
+
+  283 passing (9s)
+  2 pending
+  1 failing
+
+recorded extension [final-full]: passed in 17s (timed here)`;
+
+const PROJECT_LINES = `dabbler [11:26:05] project-passed project=CsvPeople.Deserializer.Tests pass=16 fail=0 not_run=0
+dabbler [11:26:05] project-passed project=CsvPeople.Console.Tests pass=4 fail=0 not_run=1
+dabbler [11:26:05] project-no-tests project=CsvPeople.Model.Tests`;
+
+describe("what a whole log says ran", () => {
+  it("is node:test's TAP tail", () => {
+    assert.deepEqual(totalsOf(NODE_TAIL), { passed: 1329, failed: 0, skipped: 15 });
+  });
+
+  it("is mocha's passing, failing and pending", () => {
+    assert.deepEqual(totalsOf(MOCHA_TAIL), { passed: 283, failed: 1, skipped: 2 });
+  });
+
+  it("is the router's own project lines for dotnet and Maven, summed", () => {
+    assert.deepEqual(totalsOf(PROJECT_LINES), { passed: 20, failed: 0, skipped: 1 });
+  });
+
+  it("is nothing where no reader recognised a summary", () => {
+    assert.equal(totalsOf("error CS1002: ; expected\nBuild FAILED.\n"), null);
   });
 });
 

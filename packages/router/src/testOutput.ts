@@ -151,6 +151,77 @@ export function mavenReader(): TestOutputReader {
   };
 }
 
+// --- a whole log's totals ------------------------------------------------------------
+
+/** How many tests a log says ran, by what became of them. */
+export interface TestTotals {
+  readonly passed: number;
+  readonly failed: number;
+  readonly skipped: number;
+}
+
+/** Reads one line of a finished log into a running sum; true where the line was a summary's. */
+type SummaryReader = (line: string, sum: { passed: number; failed: number; skipped: number }) => boolean;
+
+const NODE_SUMMARY = /^[#ℹ] (pass|fail|cancelled|skipped) (\d+)\s*$/;
+
+/** node:test's summary, TAP (`#`) or spec (`ℹ`). A cancelled test did not pass, so it is counted as failed. */
+function nodeSummaryReader(): SummaryReader {
+  return (line, sum) => {
+    const match = NODE_SUMMARY.exec(line);
+    if (match === null) return false;
+    const count = Number(match[2]);
+    if (match[1] === "pass") sum.passed += count;
+    else if (match[1] === "skipped") sum.skipped += count;
+    else sum.failed += count;
+    return true;
+  };
+}
+
+const MOCHA_SUMMARY = /^\s*(\d+) (passing|failing|pending)\b/;
+
+/** mocha's spec reporter: `N passing`, `N failing`, `N pending`. */
+function mochaSummaryReader(): SummaryReader {
+  return (line, sum) => {
+    const match = MOCHA_SUMMARY.exec(line);
+    if (match === null) return false;
+    const count = Number(match[1]);
+    if (match[2] === "passing") sum.passed += count;
+    else if (match[2] === "failing") sum.failed += count;
+    else sum.skipped += count;
+    return true;
+  };
+}
+
+/** The router's own per-project lines for dotnet and Maven, summed. */
+function projectSummaryReader(): SummaryReader {
+  // Not anchored: the router prefixes its own lines with its name and clock.
+  const summary = new RegExp(`\\b(?:${TESTS_PASSED}|${TESTS_FAILED}) .*\\bpass=(\\d+) fail=(\\d+) not_run=(\\d+)`);
+  return (line, sum) => {
+    const match = summary.exec(line);
+    if (match === null) return false;
+    sum.passed += Number(match[1]);
+    sum.failed += Number(match[2]);
+    sum.skipped += Number(match[3]);
+    return true;
+  };
+}
+
+/**
+ * What a whole log says ran, or null where no reader recognised a summary.
+ * A view, like the readers above: the exit code decides the outcome, and a
+ * build that never reached its tests is red with nothing here to count.
+ */
+export function totalsOf(log: string): TestTotals | null {
+  const readers = [nodeSummaryReader(), mochaSummaryReader(), projectSummaryReader()];
+  const sum = { passed: 0, failed: 0, skipped: 0 };
+  let recognised = false;
+  for (const line of log.split(/\r?\n/)) {
+    if (readers.some((reader) => reader(line, sum))) recognised = true;
+  }
+  return recognised ? sum : null;
+}
+
 // --- saying an event ----------------------------------------------------------------
 
 /** An event as the router says one: its name, and its `key=value` fields in order. */

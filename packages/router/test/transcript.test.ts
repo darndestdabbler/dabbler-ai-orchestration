@@ -190,6 +190,21 @@ describe("one session's transcript", () => {
     assert.match(full, /ten thousand green lines/);
   });
 
+  it("counts a run's tests from its own log, carried or not, and leaves a log with no summary blank", () => {
+    const root = repoWithASession();
+    const job = "run of record: typescript";
+    write(jobStatusPath(root, 5, job), JSON.stringify({
+      exit: 0, started_at: "2026-10-16T13:34:00.000Z", ended_at: "2026-10-16T13:36:00.000Z",
+    }));
+    write(jobLogPath(root, 5, job), "1..392\n# tests 1344\n# pass 1329\n# fail 0\n# cancelled 0\n# skipped 15\n");
+    const counted = render(root);
+    assert.ok(!counted.includes("# pass 1329"), "a passing run's bytes are not carried");
+    assert.match(counted, /41s<\/td><td>1329<\/td><td>0<\/td><td>15<\/td>/);
+
+    write(jobLogPath(root, 5, job), "error TS2304: Cannot find name 'x'.\n");
+    assert.match(render(root), /41s<\/td><td><\/td><td><\/td><td><\/td>/);
+  });
+
   it("scrubs a provider key out of a job's bytes before it is written down", () => {
     // D278 found three keys in plaintext in a job log. A transcript is the
     // one record of a run that is COMMITTED, so it scrubs before it writes.

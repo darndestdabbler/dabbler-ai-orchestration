@@ -4100,28 +4100,17 @@ class Driver {
       // read as one, and the rewind below keys on the refusal too.
       const refused = jobLogTail(this.repoRoot, this.sessionNumber, "publish");
       // A release session changed nothing and has no earlier phase to go
-      // back to: what refused it is fixed in a session of its own.
-      const waysOn =
-        ` A version is spent only by a push that succeeded. Cancel this release session ` +
-        `(\`dabbler session cancel ${sessionDisplayNumber(this.sessionNumber)} --reason "<why>"\`), then plan a ` +
-        "session that fixes this and a new release session after it.";
-
-      // Refused on an earlier phase's evidence: go back and make it, rather
-      // than stopping and handing the operator the five verbs the managed
-      // body says are not theirs to run. `gates.ts` states which phase makes
-      // which gate's evidence; this reads that, and states it nowhere.
-      //
-      // **A rewind is not a stop, and that is what has to be bounded here.**
-      // It throws nothing, so `stop_history` never sees it: a rewind that
-      // fixes nothing would come back to this line unchanged, rewind again,
-      // and go round for as long as anyone kept calling `next` -- paying for
-      // a verification round or a whole suite each time.
-      //
-      // So the run remembers what it has already gone back for: one rewind
-      // per distinct refusal. A refusal already in `rewinds` means going
-      // back did not fix it, and going back again would not either -- so the
-      // loop stops, with that refusal in the stop, where a person can see it. A refusal not in the list is a different problem, and going
-      // back for it is progress by the same definition the classifier reads.
+      // back to: what refused it is fixed in a session of its own -- except
+      // a branch only ahead of origin, which a push fixes, and a stopped run
+      // resumes in the phase it stopped in.
+      const failed = refused.split(/\r?\n/).filter((line) => line.trimStart().startsWith("✗"));
+      const onlyUnpushed = failed.length === 1 && /^\s*✗\s+pushed_to_remote\b/.test(failed[0]!);
+      const waysOn = onlyUnpushed
+        ? " Nothing was published and no version is spent. Push the branch (`git push`), then ask " +
+          "for the next instruction: the release resumes at publish."
+        : ` A version is spent only by a push that succeeded. Cancel this release session ` +
+          `(\`dabbler session cancel ${sessionDisplayNumber(this.sessionNumber)} --reason "<why>"\`), then plan a ` +
+          "session that fixes this and a new release session after it.";
       throw new Stop(
         "publish",
         `the packaging run did not publish: ${

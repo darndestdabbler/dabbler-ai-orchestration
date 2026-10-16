@@ -304,7 +304,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 264 | The work plan carries the files a session changed, and the Files section goes | no | 2026-10-16 |
 | 265 | The transcript says what is missing in the section it is missing from | no | 2026-10-16 |
 | 266 | The transcript links the commit, and no file | no | 2026-10-16 |
-| 267 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 267 | A rollback pushes its own commit, and a release refused over a push says push | no | 2026-10-16 |
+| 268 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3259,3 +3260,9 @@ Remove the transcript's `This session left no:` box and say what is missing only
 **Releasable: no.**
 
 Make the transcript link the landed commit and no file. In packages/router/src/transcript.ts, commitPages returns only the host's commit page for GitHub and Azure DevOps; the per-file link and GitHub's sha256 diff anchor (and the node:crypto import) are removed, and every file in the Work Plan's Files column is plain text on every host. The `Landed <hash>` line above the table keeps its commit link. 264's assertions in transcript.test.ts are rewritten so a GitHub remote links the commit on the Landed line and no file is a link, in both the event-log and declared-files tests; no new test.
+
+### Session 267 — A rollback pushes its own commit, and a release refused over a push says push
+
+**Releasable: no.**
+
+Make a rollback push its own record commit and make a release refused only over the push say push. In packages/router/src/session.ts the rollback pushes after its record commit wherever the branch has an upstream, whether or not it reverted a commit (today it pushes only when commits.length > 0, which left survsys's `Roll back to the start of session 29` commit unpushed and stopped its release at publish); a refused push is the same refusal as now, and the closing line says the record was pushed. In packages/router/src/drive.ts, phasePublish's stop, where the packaging refusal's only failed gate is pushed_to_remote, tells the person to push the branch (`git push`) and that the next instruction resumes the release at publish; every other refusal keeps today's ways on; the stale rewind comment above the stop is removed. In walk-session.test.ts the rollback test that reverts no commit asserts origin's branch is HEAD afterwards; no new test.

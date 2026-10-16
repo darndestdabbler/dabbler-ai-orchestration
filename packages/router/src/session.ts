@@ -3972,14 +3972,14 @@ export function rollback(sessionsDir: string, options: RollbackCliOptions): numb
       writeErr(`rollback: the repository was rolled back, but the record's commit failed: ${committed}\n`);
       return EXIT_GATE_FAILED;
     }
-    if (commits.length > 0) {
-      const upstream = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
-      if (upstream.code === 0) {
-        const pushed = runGit(repoRoot, ["push"]);
-        if (pushed.code !== 0) {
-          writeErr(`rollback: the reverts are committed, but git push failed: ${firstLine(pushed.stderr)}\n`);
-          return EXIT_GATE_FAILED;
-        }
+    // Pushed whether or not anything was reverted: the record's commit alone
+    // left unpushed is what the next release refuses over.
+    const upstream = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
+    if (upstream.code === 0) {
+      const pushed = runGit(repoRoot, ["push"]);
+      if (pushed.code !== 0) {
+        writeErr(`rollback: the rollback is committed, but git push failed: ${firstLine(pushed.stderr)}\n`);
+        return EXIT_GATE_FAILED;
       }
     }
     const span = through === target
@@ -3989,7 +3989,9 @@ export function rollback(sessionsDir: string, options: RollbackCliOptions): numb
     writeErr(
       `rollback: ${span} undone; the repository is back at ${anchor.slice(0, 12)}, where session ` +
         `${sessionDisplayNumber(target)} started: ` +
-        (commits.length === 0 ? "the working tree was reset" : `${commits.length} commit(s) were reverted and pushed`) +
+        (commits.length === 0
+          ? `the working tree was reset${upstream.code === 0 ? " and the record pushed" : ""}`
+          : `${commits.length} commit(s) were reverted${upstream.code === 0 ? " and pushed" : ""}`) +
         (discarded.length > 0 ? `, discarding ${previewPaths(discarded)}` : "") +
         `. ${superseded.length} run record(s) moved aside; ${dropped} test run record(s) dropped. ` +
         (safety !== null ? `Uncommitted work (${uncommitted.length} file(s)) is kept on branch ${safety}. ` : "") +

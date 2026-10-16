@@ -2014,7 +2014,7 @@ describe("a session rolled back to where it started", () => {
       Promise.resolve(rollback(sessionsDir, { reason: "the step plan guessed a package", engine: false, asOf: String(facts["head"]) })),
     );
     assert.equal(done.value, EXIT_OK, done.stderr);
-    assert.match(done.stderr, /rollback: session 002 undone; the repository is back at .{12}, where session 002 started: the working tree was reset, discarding/);
+    assert.match(done.stderr, /rollback: session 002 undone; the repository is back at .{12}, where session 002 started: the working tree was reset and the record pushed, discarding/);
     assert.match(done.stderr, /src\/extra\.py/);
     // Nothing is gone: the work no commit held is one commit on a safety branch.
     assert.match(done.stderr, /Uncommitted work \(2 file\(s\)\) is kept on branch dabbler\/rolled-back\/s2-/);
@@ -2041,6 +2041,8 @@ describe("a session rolled back to where it started", () => {
     assert.deepEqual(readRecords(repo).map((row) => row.sessionNumber), before.map((row) => row.sessionNumber));
     assert.match(readFileSync(join(sessionsDir, "project-work-plan.md"), "utf8"), /\*\*Rolled back:\*\*\n\n- \d{4}-\d{2}-\d{2} — session 2 — the step plan guessed a package \(operator\)/);
     assert.equal(gitOut(repo, "log", "--format=%s", `${anchor}..HEAD`).trim(), "Roll back to the start of session 2 of sessions");
+    // Nothing was reverted, and the record's commit is on origin all the same.
+    assert.equal(gitOut(repo, "rev-parse", "origin/main").trim(), gitOut(repo, "rev-parse", "HEAD").trim());
     assert.equal(gitOut(repo, "status", "--porcelain").trim(), "");
     assert.equal(gitOut(repo, "diff", "--name-only", anchor, "HEAD").trim().split("\n").sort().join(","), "docs/sessions/activity-log.json,docs/sessions/project-work-plan.md");
 

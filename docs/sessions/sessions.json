@@ -5189,9 +5189,9 @@
     {
       "number": 261,
       "title": "The transcript lists the files a session changed",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T12:02:37.505000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T12:09:28.652000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

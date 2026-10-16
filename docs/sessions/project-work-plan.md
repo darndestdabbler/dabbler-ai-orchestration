@@ -289,8 +289,9 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 249 | A step is told which of its files are already there | no | 2026-10-16 |
 | 250 | A choice made in the Configuration is committed as it is made | no | 2026-10-16 |
 | 251 | The tests 250's run of record did not reach | no | 2026-10-16 |
-| 252 | The transcript walked in a real repository first | — | not declared |
-| 253 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 252 | This repository's suites run whole at every close | no | 2026-10-16 |
+| 253 | The transcript walked in a real repository first | — | not declared |
+| 254 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3151,3 +3152,9 @@ Make a choice written to the checkout by `dabbler configure` (and so by the Conf
 **Releasable: no.**
 
 Make true again the twelve router tests that went red after session 250 made `configure` commit the settings file it writes: answer git's `status --porcelain -- .vscode/settings.json` question with an empty porcelain in the shared git answer tables of configuration.test.ts and projection.test.ts (one row per file); delete the session.test.ts test asserting that an uncommitted pane-written settings file does not stop Start, since that behaviour no longer exists; stop walk-session.test.ts seeding an uncommitted settings file before its start (and drop the land's assertion that the file is tracked), with a comment saying why; and add one entry to the COMPANIONS table in scripts/suite.mjs so a selection of configure.test.ts also runs configuration.test.ts and projection.test.ts.
+
+### Session 252 — This repository's suites run whole at every close
+
+**Releasable: no.**
+
+Add a suite key `whole_at_close: true` that makes the close run a suite whole regardless of the 5% rule, and declare it on this repository's three expensive suites. `checks.ts` adds the key to SUITE_FIELDS so both loaders accept it; `testEvidence.ts` loads it into SuiteSpec as `wholeAtClose` (default false) and `runsWholeAtClose` answers whole for a suite that declares it, with a reason naming the key. One assertion joins the existing `runsWholeAtClose` test, and the existing suite-loading test in `checks.test.ts` declares the key. `dabbler.yaml` declares it on `typescript`, `typescript-windows` and `extension` with a comment naming sessions 247 and 250, and the sentence in `README.md` and `docs/schema-reference.md` that states the close's rule gains the key.

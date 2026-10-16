@@ -95,8 +95,8 @@ const WHOLE_RUN_SESSIONS = 5;
 /**
  * Whether `suite` runs whole at the end of session `sessionNumber`, and why.
  *
- * Whole when it declares no `select`, when no earlier session recorded a
- * whole run of it, or when the last such run took no more than the longer of
+ * Whole when it declares `whole_at_close` or no `select`, when no earlier
+ * session recorded a whole run of it, or when the last such run took no more than the longer of
  * a minute and 5% of the median wall-clock time of the last five closed
  * sessions. The session's own runs are not read: a whole run it makes before
  * a release must not change, at the close, which run of record it owed.
@@ -107,6 +107,9 @@ export function runsWholeAtClose(
   sessionSeconds: readonly number[],
   sessionNumber: number | null,
 ): { readonly whole: boolean; readonly reason: string } {
+  if (suite.wholeAtClose === true) {
+    return { whole: true, reason: `${suite.name} declares whole_at_close` };
+  }
   if (suite.select === undefined) {
     return { whole: true, reason: `${suite.name} declares no select` };
   }
@@ -333,6 +336,12 @@ export interface SuiteSpec {
    */
   readonly requiredForClose?: boolean;
   readonly role?: SuiteRole;
+  /**
+   * The close runs this suite whole whatever its last whole run cost: a
+   * repository's answer where a test reaches code through a file named after
+   * something else, which only a whole run selects.
+   */
+  readonly wholeAtClose?: boolean;
 }
 
 /** The close's obligation, read through the one rule for the absent field. */
@@ -505,6 +514,7 @@ export function loadSuitesChecked(
       ...(typeof separator === "string" ? { selectSeparator: separator } : {}),
       requiredForClose: typeof required === "boolean" ? required : expensive,
       role,
+      ...(entry["whole_at_close"] === true ? { wholeAtClose: true } : {}),
     });
   });
   // A suite that is not expensive is never the run of record, and the

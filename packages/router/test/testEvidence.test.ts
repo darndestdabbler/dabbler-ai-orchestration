@@ -247,6 +247,7 @@ describe("whether a suite runs whole at the end of a session", () => {
     assert.equal(runsWholeAtClose(SELECTING, [whole(200, 8)], HOUR, 8).whole, true);
     assert.equal(runsWholeAtClose(SELECTING, [], HOUR, 8).whole, true);
     assert.equal(runsWholeAtClose(UNIT, [whole(200)], HOUR, 8).whole, true);
+    assert.deepEqual(runsWholeAtClose({ ...SELECTING, wholeAtClose: true }, [whole(200)], HOUR, 8), { whole: true, reason: "unit declares whole_at_close" });
   });
 
   it("reads the session in flight off the raw ledger rows, so the gate and the phase exclude the same session's own runs", () => {

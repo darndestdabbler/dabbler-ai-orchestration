@@ -175,7 +175,7 @@ describe("refusing a broken check declaration at load", () => {
   it("reads a suite as always required and a control as required by default", () => {
     const checks = loadChecks({
       testing: {
-        suites: [{ name: "unit", command: "pytest", covers: ["src/"] }],
+        suites: [{ name: "unit", command: "pytest", covers: ["src/"], whole_at_close: true }],
         controls: [
           { name: "lint", kind: "lint", argv: ["ruff"], covers: ["src/"] },
           { name: "types", kind: "typecheck", argv: ["mypy"], required: false, covers: [] },

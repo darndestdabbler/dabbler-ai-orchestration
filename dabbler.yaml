@@ -67,6 +67,12 @@ packaging:
 # evidence.
 testing:
   suites:
+    # Every suite here declares `whole_at_close`: the close runs it whole
+    # rather than selecting by name past the 5% rule. Sessions 247 and 250
+    # each closed VERIFIED on a selected run of record while tests it never
+    # ran were red -- tests that reach code through a file named after
+    # something else, which only a whole run selects. The operator ruled on
+    # 2026-10-16 that a minute a session costs less than a fix session.
     # The router's tests, rebuilt from session 83 on (session plan, "Why
     # sessions 83-88 exist"): Node's own runner over packages/router/test,
     # pure functions tested plainly and a handful of chained walkthroughs.
@@ -201,6 +207,7 @@ testing:
       test_glob: "copilot.test.ts"
       test_name: "{name}.test.ts"
       select: node scripts/suite.mjs host {paths}
+      whole_at_close: true
 
     - name: typescript
       command: node scripts/suite.mjs container
@@ -218,6 +225,7 @@ testing:
       test_glob: "*.test.ts"
       test_name: "{name}.test.ts"
       select: node scripts/suite.mjs container {paths}
+      whole_at_close: true
 
     # The VS Code extension. Declared in session 39 against D242, which
     # session 37 found by being the first session in a long while to change
@@ -272,6 +280,7 @@ testing:
       test_glob: "*.test.ts"
       test_name: "{name}.test.ts"
       select: node scripts/suite.mjs extension {paths}
+      whole_at_close: true
 
   # Deterministic controls — one entry per kind, from compile, typecheck,
   # lint, analyzer. A declared control runs before verification and its

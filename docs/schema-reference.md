@@ -583,17 +583,17 @@ declares `select`, the tests named after the files the step changed, and a
 red run refuses the step. A changed source file with no test named after it
 runs `selection.smoke` and is listed for the reviewer. At the end of a
 session a suite runs whole, recorded as `final-full`, unless it declares
-`select` and its last whole run in an earlier session took longer than both
-a minute and 5% of the median wall-clock time of the last five closed
-sessions; then it runs the tests the session's changes select plus every
-test under a project that references a changed project, recorded as
-`final-targeted` with the command that ran and the tests it selected, and
-the freshness gate and the land accept that record over the same tree. A
-releasing session runs whole every suite that ran targeted before it
-packages; a red whole run holds the release and the session closes with the
-failure on its record. Hand-written selection maps are no longer read. The
-loaded config records the file as `_project_config_path` (null when there is
-none).
+`select`, does not declare **`whole_at_close: true`**, and its last whole
+run in an earlier session took longer than both a minute and 5% of the
+median wall-clock time of the last five closed sessions; then it runs the
+tests the session's changes select plus every test under a project that
+references a changed project, recorded as `final-targeted` with the command
+that ran and the tests it selected, and the freshness gate and the land
+accept that record over the same tree. A releasing session runs whole every
+suite that ran targeted before it packages; a red whole run holds the release
+and the session closes with the failure on its record. Hand-written selection
+maps are no longer read. The loaded config records the file as
+`_project_config_path` (null when there is none).
 
 ## Config overlay — `local-overrides.yaml`
 

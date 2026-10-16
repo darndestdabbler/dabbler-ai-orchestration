@@ -12510,6 +12510,13 @@
       "dateTime": "2026-10-16T08:20:23.982000-04:00",
       "task": "Make true again the twelve router tests that went red after session 250 made `configure` commit the settings file it writes: answer git's `status --porcelain -- .vscode/settings.json` question with an empty porcelain in the shared git answer tables of configuration.test.ts and projection.test.ts (one row per file); delete the session.test.ts test asserting that an uncommitted pane-written settings file does not stop Start, since that behaviour no longer exists; stop walk-session.test.ts seeding an uncommitted settings file before its start (and drop the land's assertion that the file is tracked), with a comment saying why; and add one entry to the COMPANIONS table in scripts/suite.mjs so a selection of configure.test.ts also runs configuration.test.ts and projection.test.ts.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 252,
+      "dateTime": "2026-10-16T08:54:39.503000-04:00",
+      "task": "Add a suite key `whole_at_close: true` that makes the close run a suite whole regardless of the 5% rule, and declare it on this repository's three expensive suites. `checks.ts` adds the key to SUITE_FIELDS so both loaders accept it; `testEvidence.ts` loads it into SuiteSpec as `wholeAtClose` (default false) and `runsWholeAtClose` answers whole for a suite that declares it, with a reason naming the key. One assertion joins the existing `runsWholeAtClose` test, and the existing suite-loading test in `checks.test.ts` declares the key. `dabbler.yaml` declares it on `typescript`, `typescript-windows` and `extension` with a comment naming sessions 247 and 250, and the sentence in `README.md` and `docs/schema-reference.md` that states the close's rule gains the key.",
+      "releasable": false
     }
   ]
 }

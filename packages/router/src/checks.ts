@@ -61,7 +61,7 @@ export const CONTROL_KINDS: ReadonlySet<string> = new Set([
  */
 export const SUITE_FIELDS: ReadonlySet<string> = new Set([
   "name", "command", "argv", "covers", "cwd", "expensive", "small",
-  "timeout_seconds", "test_roots", "test_glob", "runs_whole",
+  "timeout_seconds", "test_roots", "test_glob", "runs_whole", "whole_at_close",
   // A suite's tests are named after what they test: `test_name` is the
   // basename a source file's tests take, `{name}` standing for its stem, and
   // `select` is the command that runs a selection of them.

@@ -117,13 +117,14 @@ tests named after the files the step changed; a changed source file with no
 test named after it is shown to the reviewer and refuses nothing. At the end
 of a session each expensive suite runs whole when its last whole run took no
 more than a minute or 5% of the median length of the last five closed
-sessions, whichever is longer; past that it runs the tests the session's
-changes select, plus every test of a project that references a changed one,
-recorded as `final-targeted`. A releasing session runs whole every suite that
-ran targeted before it packages; a red whole run holds the release, names the
-suite, and the session closes with the failure on its record. Hand-written
-selection maps are no longer read, and `smoke` still runs where a changed
-file has no test named after it.
+sessions, whichever is longer, or always when it declares `whole_at_close:
+true`; past that it runs the tests the session's changes select, plus every
+test of a project that references a changed one, recorded as
+`final-targeted`. A releasing session runs whole every suite that ran targeted
+before it packages; a red whole run holds the release, names the suite, and
+the session closes with the failure on its record. Hand-written selection maps
+are no longer read, and `smoke` still runs where a changed file has no test
+named after it.
 
 **A repository that declared modules keeps its files.** A `modules.yaml` under
 `docs/`, a `modules:` block in `dabbler.yaml` and a suite's `module` or

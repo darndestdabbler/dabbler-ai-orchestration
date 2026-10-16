@@ -15427,3 +15427,103 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 ### Session 246 of 246: Release 3.21.0 (release: 3.21.0)
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
+
+### Session 247 of 248: A session's transcript, rendered and committed
+
+Scope: `packages/router` -- `schemas/events.schema.json` and
+`src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
+appends as well as prints), new `src/transcript.ts` (the renderer) and
+`src/cli/transcript.ts`, `src/route.ts` (the `transcript` verb),
+`src/contracts/router.ts` and `src/inProcess.ts` (`transcript.render`),
+`src/config.ts` and `src/settings.ts` (`dabbler.transcript`),
+`src/driver.ts` (the Log phase after the close); the extension's
+`src/router/dabblerTerminal.ts` (the tone grammar moves to the router and
+is imported from it) and its `package.json` (the setting's contribution);
+`AGENTS.md`, `docs/driving-a-session.md`, `docs/schema-reference.md`;
+tests in `test/transcript.test.ts`, `test/drive.test.ts`,
+`test/schema.test.ts`, `test/config.test.ts` and
+`tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts`
+
+**Why.** The Dabbler Terminal is what a developer watches a session
+through, and it persists nothing: its scrollback is in memory, capped at
+four megabytes, and gone when the window closes. Everything it shows is
+reconstructed from records under `.dabbler/runs/`, which is gitignored
+whole and stays that way -- the rollback 244 shipped depends on nothing
+there being tracked. So a second developer who clones the repository can
+read what every session DECIDED, from the tracked decisions and change
+logs, and cannot see what any session LOOKED like. A consumer project has
+a developer a dozen sessions in who needs exactly that.
+
+The record travels as a rendered artifact rather than as the records
+themselves. Three advisors were asked and all three answered the same
+(2026-10-16): a self-contained HTML file per session, committed. The
+reason is the framework's own mortality -- a record only `dabbler` can
+parse is worth nothing the day `dabbler` is replaced, and an HTML file
+opens in any browser with no tooling at all. The repository already works
+this way: `decisions-log.md` is rendered from the activity log and is
+explicitly not a source.
+
+**Step 1 -- the framework's own lines become a record.** `drive.ts`'s
+`log` writes to stdout and nowhere else, so every framework line a
+developer read -- the phase it moved to, the step it accepted, the
+rejection and its reasons -- is ephemeral. `loop.log` held them for
+twelve sessions out of a hundred and eighty-two, and for none since 219.
+`log` now also appends to `.dabbler/runs/s<N>/driver/events.jsonl`: the
+event, its fields and its clock, one row each, schema'd and generated
+like every other record. It becomes the one place a framework line
+exists, so a transcript quotes rather than infers it, and the phase
+sequence falls out of the rows instead of being reconstructed from file
+times.
+
+**Step 2 -- the renderer.** `src/transcript.ts` reads one session's
+records and returns one self-contained HTML document: the events of step
+1, the verification rounds with their verdicts, reviewers and transports,
+the test runs with their commands and durations, the accepted steps, the
+stop where there is one, and each job's own bytes with its exit. A job's
+escapes become spans, so the runners' colour survives into the page --
+which is most of why the terminal is worth preserving at all. No script,
+no network, no CDN: inline CSS, both palettes under
+`prefers-color-scheme`, and the generator's version, the head commit and
+the time of rendering stamped on the page so a reader knows what made it.
+
+The tone grammar is not written twice. `lineTone`, `verdictTone`,
+`fieldTone` and `TONES` move out of the extension's `dabblerTerminal.ts`
+into the router, and the terminal imports them -- one implementation of
+the rule that decides what a line IS, with two renderers over it.
+Secrets are scrubbed through `packaging.ts`'s own `redact`, which is the
+single implementation of that rule too.
+
+**Step 3 -- the verb.** `dabbler transcript --from <N> --to <M>` renders
+every session in the range from records already on disk, so a developer a
+dozen sessions in gets a dozen transcripts. `--full` carries every job's
+output; the default carries the outline and the output of jobs that
+FAILED; `--out <dir>` says where they land; `--commit` commits them. A
+session whose records are missing or partial is rendered from what there
+is and says what was absent rather than inferring it, and an existing
+transcript is never overwritten.
+
+**Step 4 -- the Log phase.** After the close, the framework renders this
+session's transcript to `docs/transcripts/session-<N>.html` and commits
+it in a commit of its own -- a record describing a verified tree can only
+be committed after that tree is, which is why it is its own phase and not
+part of the close. `dabbler.transcript` decides what it carries, read
+through the layers every other choice is read through: `off`, `outline`
+(the default) or `full`. A transcript is generated, never hand-edited,
+and nothing reads it back.
+
+**Step 5 -- the words.** `docs/driving-a-session.md` gains the Log phase
+and the verb; `docs/schema-reference.md` gains the event row; `AGENTS.md`
+says that the transcript travels and the ledger does not.
+
+**Non-goals.** Making anything under `.dabbler/` tracked. Backfilling
+THIS repository's own sessions -- there are 182 of them, and `s60`'s job
+log is the file D278 found holding three provider keys in plaintext.
+Persisting the terminal's live scrollback. An index page over the
+transcripts, a search across them, or any reader of a transcript.
+Changing what the terminal shows.
+
+**Releasable.** Yes -- 248 publishes 3.22.0.
+
+### Session 248 of 248: Release 3.22.0 (release: 3.22.0)
+
+The framework publishes session 247 as 3.22.0 and nothing else.

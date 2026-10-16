@@ -5299,9 +5299,9 @@
     {
       "number": 266,
       "title": "The transcript links the commit, and no file",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T13:51:56.393000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T13:56:06.910000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

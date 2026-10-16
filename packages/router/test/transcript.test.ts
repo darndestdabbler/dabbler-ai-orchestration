@@ -176,11 +176,15 @@ describe("one session's transcript", () => {
     write(jobStatusPath(root, 5, "close"), JSON.stringify({ exit: 1 }));
     write(jobLogPath(root, 5, "run of record"), "ten thousand green lines\n");
     write(jobStatusPath(root, 5, "run of record"), JSON.stringify({ exit: 0 }));
+    write(jobLogPath(root, 5, "publish"), "");
+    write(jobStatusPath(root, 5, "publish"), JSON.stringify({ exit: 1 }));
 
     const outline = render(root);
     assert.match(outline, /it refused, and here is why/);
     assert.ok(!outline.includes("ten thousand green lines"), "a green run is megabytes saying so");
-    assert.match(outline, /output not carried/);
+    // A job left out says so and how to get it; an empty log is not "left out".
+    assert.match(outline, /passed -- output not carried; dabbler transcript --full carries it/);
+    assert.match(outline, /publish<\/strong> exit .*\(no output\)/);
 
     const full = render(root, { jobs: "all" });
     assert.match(full, /ten thousand green lines/);

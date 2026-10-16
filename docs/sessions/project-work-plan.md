@@ -293,7 +293,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 253 | The transcript walked in a real repository first | no | 2026-10-16 |
 | 254 | The two transcripts written by the renderer 253 fixed | no | 2026-10-16 |
 | 255 | A review is sized by what it reads | no | 2026-10-16 |
-| 256 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 256 | A passing job's omitted output says why it is omitted | no | 2026-10-16 |
+| 257 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3182,3 +3183,9 @@ Re-render the two committed transcript pages for sessions 252 and 253, which wer
 **Releasable: no.**
 
 Size a review by what it reads. In packages/router/src/facts.ts, buildDiffPathspecs excludes the session-record directories (docs/transcripts and .dabbler) by their root-relative path, and a changed or new path under them is listed in the evidence's "Expected framework bookkeeping (paths only)" section, so the reviewer is told a transcript page changed without being sent its contents. In packages/router/src/route.ts, the copilot-cli seat path's modelConfig returns only the candidate provider's max_context_tokens from provider_defaults, so an OpenAI seat model's prompt budget is 272,000 tokens times 0.8 rather than the 200,000 fallback; a provider with no defaults keeps the 200,000 default, and no generation knob reaches the seat. One test in facts.test.ts and one in route.test.ts.
+
+### Session 256 — A passing job's omitted output says why it is omitted
+
+**Releasable: no.**
+
+Make a transcript job line say why its output is absent. In packages/router/src/transcript.ts, readJobs records a job whose output the carry left out as null rather than an empty string, so renderJobs decides on whether the output was carried and not on whether it is empty: a passing job left out reads `(passed -- output not carried; dabbler transcript --full carries it)`, and a carried job whose log is empty reads `(no output)`. The existing test in transcript.test.ts is updated to assert the passing job's line names --full, and that a failed job with an empty log reads `no output`.

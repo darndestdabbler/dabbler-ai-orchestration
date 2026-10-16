@@ -210,7 +210,8 @@ export interface TranscriptOptions {
 interface JobReading {
   readonly name: string;
   readonly exit: string;
-  readonly output: string;
+  /** Null where the carry left the output out, which is not an empty log. */
+  readonly output: string | null;
 }
 
 interface SessionReading {
@@ -286,7 +287,7 @@ function readJobs(repoRoot: string, sessionNumber: number, carry: JobCarry): Job
     jobs.push({
       name,
       exit,
-      output: wanted ? readTextOrEmpty(join(dir, entry)) : "",
+      output: wanted ? readTextOrEmpty(join(dir, entry)) : null,
     });
   }
   return jobs;
@@ -611,8 +612,15 @@ function renderJobs(jobs: readonly JobReading[], secrets: readonly string[]): st
       const heading =
         `<strong>${escapeHtml(job.name)}</strong> ` +
         `exit ${toned(fieldTone("job-finished", "exit", job.exit), job.exit)}`;
+      // The label is where a reader meets the carry rule, so it names it.
+      if (job.output === null) {
+        return (
+          `<div>${heading} <span class="muted">(passed -- output not carried; ` +
+          `dabbler transcript --full carries it)</span></div>`
+        );
+      }
       if (job.output === "") {
-        return `<div>${heading} <span class="muted">(output not carried)</span></div>`;
+        return `<div>${heading} <span class="muted">(no output)</span></div>`;
       }
       return (
         `<details><summary>${heading}</summary>\n` +

@@ -305,7 +305,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 265 | The transcript says what is missing in the section it is missing from | no | 2026-10-16 |
 | 266 | The transcript links the commit, and no file | no | 2026-10-16 |
 | 267 | A rollback pushes its own commit, and a release refused over a push says push | no | 2026-10-16 |
-| 268 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 268 | The version goes to 3.22.0 | no | 2026-10-16 |
+| 269 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3266,3 +3267,9 @@ Make the transcript link the landed commit and no file. In packages/router/src/t
 **Releasable: no.**
 
 Make a rollback push its own record commit and make a release refused only over the push say push. In packages/router/src/session.ts the rollback pushes after its record commit wherever the branch has an upstream, whether or not it reverted a commit (today it pushes only when commits.length > 0, which left survsys's `Roll back to the start of session 29` commit unpushed and stopped its release at publish); a refused push is the same refusal as now, and the closing line says the record was pushed. In packages/router/src/drive.ts, phasePublish's stop, where the packaging refusal's only failed gate is pushed_to_remote, tells the person to push the branch (`git push`) and that the next instruction resumes the release at publish; every other refusal keeps today's ways on; the stale rewind comment above the stop is removed. In walk-session.test.ts the rollback test that reverts no commit asserts origin's branch is HEAD afterwards; no new test.
+
+### Session 268 — The version goes to 3.22.0
+
+**Releasable: no.**
+
+Set the repository's release version to 3.22.0 so session 269 can publish it: edit version.json to 3.22.0, run `npm run stamp:version` to write it into the router and extension manifests and the lockfile, and add a 3.22.0 section to the extension's CHANGELOG.md naming what sessions 247 to 267 changed for a developer (a session's transcript rendered and committed, configuration choices committed as made, suites run whole at every close in this repository, a rollback pushing its own commit, and the related fixes).

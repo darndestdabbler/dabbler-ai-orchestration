@@ -10,6 +10,64 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.22.0] — 2026-10-16
+
+**A session leaves a record a second developer can read.** Until now what a
+session did lived in the terminal it was watched in and in an untracked
+ledger. Every session now ends with one self-contained page,
+`docs/transcripts/session-<N>.html`, rendered from the framework's own
+records and committed after the close — the plan it ran under, the work it
+did, how each verification finding was answered, and how many tests each
+run of record ran. Alongside it: a choice made in the Configuration lands
+on the trunk as it is made, a rollback pushes its own commit, and a suite
+may declare that it runs whole at every close. Sessions 247 to 267.
+
+### Added
+
+- **Session transcripts.** After the close, a Log phase renders the
+  session's transcript and commits it on its own; `dabbler.transcript`
+  (`off`, `outline`, `full`) says what it carries, read through the same
+  layers as every other choice. The page opens with the session's section
+  of the session plan and its work plan — each step's ask, checks and the
+  files it changed, under the landed commit, linked to the commit page on
+  GitHub and Azure DevOps — then the verification rounds, each round's
+  findings with how the author answered them (fixed, disputed, and the
+  adjudication's outcome), and the test runs with their passed, failed and
+  skipped counts. Secrets are scrubbed; a passing job's output is carried
+  only under `full`, and the line says so. The framework's own terminal
+  lines are now also kept as `events.jsonl` under the run.
+- **`dabbler transcript --from <N> --to <M> [--full] [--out <dir>]
+  [--commit]`** renders sessions that ran before, from records already on
+  disk, never overwriting a page. A session recorded before the event log
+  still lists the files each step declared.
+- **`whole_at_close: true`** on a suite makes the close run it whole
+  whatever the share of the tree a session changed. This repository
+  declares it on its three suites.
+
+### Changed
+
+- **A choice made in the Configuration is committed as it is made.**
+  `dabbler configure` (and so the pane) commits the `.vscode/settings.json`
+  it writes, alone, and pushes where the branch tracks an upstream; with a
+  session in flight the file rides with that session instead. An
+  uncommitted settings file no longer stops a release at publish.
+- **A step's instruction names its declared files** and marks each as
+  existing or new, so an existing file is read before it is written.
+- **A session's record exists before it is told it is done**: `done` is
+  issued after the transcript is written, committed and pushed, and a
+  transcript still never stops a session.
+- **A review is sized by what it reads.** Transcript pages and run records
+  are listed to the reviewer by path rather than sent, and a seat model's
+  prompt budget is its provider's context window rather than a flat
+  200,000 tokens.
+
+### Fixed
+
+- **A rollback pushes its own commit**, whether or not it reverted one, so
+  a release after a rollback is no longer stopped at publish over an
+  unpushed record; a release refused only because the branch is not pushed
+  says `git push` and resumes at publish.
+
 ## [3.21.0] — 2026-10-05
 
 **Roll back to the start of any session that ran.** The reset 3.20.0 shipped

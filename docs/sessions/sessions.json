@@ -5321,9 +5321,9 @@
     {
       "number": 267,
       "title": "A rollback pushes its own commit, and a release refused over a push says push",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T14:02:17.397000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T14:09:50.416000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

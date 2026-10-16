@@ -15428,7 +15428,7 @@ modal. A rollback from the chat or a keybinding. Any change to the router.
 
 The framework publishes sessions 244 and 245 as 3.21.0 and nothing else.
 
-### Session 247 of 255: A session's transcript, rendered and committed
+### Session 247 of 256: A session's transcript, rendered and committed
 
 Scope: `packages/router` -- `schemas/events.schema.json` and
 `src/generated/events.ts` (a driver event row), `src/drive.ts` (`log`
@@ -15537,9 +15537,9 @@ Persisting the terminal's live scrollback. An index page over the
 transcripts, a search across them, or any reader of a transcript.
 Changing what the terminal shows.
 
-**Releasable.** Yes -- 255 publishes 3.22.0, after 253's walk.
+**Releasable.** Yes -- 256 publishes 3.22.0, after 253's walk.
 
-### Session 248 of 255: The record is written before the session is told it is done
+### Session 248 of 256: The record is written before the session is told it is done
 
 Scope: `packages/router` -- `src/drive.ts` (`phaseClose` and `phaseLog`:
 the order of the `done` instruction against the Log phase),
@@ -15595,9 +15595,9 @@ simply has none and the verb can render it on request. Any change to the
 renderer, the verb or the setting. Changing what selection means for any
 path other than the two named.
 
-**Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 255.
+**Releasable.** Yes -- with 247 and 249 to 252, as 3.22.0 in session 256.
 
-### Session 249 of 255: A step is told which of its files are already there
+### Session 249 of 256: A step is told which of its files are already there
 
 Scope: `packages/router` -- `src/drive.ts` (`stepAsk` names the step's own
 files and reads the tree for each), `docs/driving-a-session.md`; tests in
@@ -15646,9 +15646,9 @@ file it removed -- that is the NEXT thing to try if clobbering survives
 this, and it begins as a logged observation so its false-positive rate is
 measured before it can refuse anything.
 
-**Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 255.
+**Releasable.** Yes -- with 247, 248 and 250 to 252, as 3.22.0 in session 256.
 
-### Session 250 of 255: A choice made in the Configuration is committed as it is made
+### Session 250 of 256: A choice made in the Configuration is committed as it is made
 
 Scope: `packages/router` -- `src/cli/configure.ts` (the write commits and
 pushes), `src/checks.ts` (`materialPaths` stops exempting the settings
@@ -15707,10 +15707,10 @@ with a session in flight leaves the file for the land and says so.
 `checks.test.ts`: the existing exemption test flips -- an uncommitted
 settings file counts before the declaration as it does at the close.
 
-**Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 255,
+**Releasable.** Yes -- with 247 to 249, 251 and 252, as 3.22.0 in session 256,
 after 253 walks it in survsys.
 
-### Session 251 of 255: The tests 250's run of record did not reach
+### Session 251 of 256: The tests 250's run of record did not reach
 
 Scope: `packages/router` -- `test/configuration.test.ts`,
 `test/projection.test.ts`, `test/session.test.ts`,
@@ -15766,10 +15766,10 @@ settled here by a fix session. Any change to the walkthrough list in
 
 **Tests.** None added. Twelve made true again, one deleted.
 
-**Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 255, after
+**Releasable.** Yes -- with 247 to 250 and 252, as 3.22.0 in session 256, after
 253's walk.
 
-### Session 252 of 255: This repository's suites run whole at every close
+### Session 252 of 256: This repository's suites run whole at every close
 
 Scope: `packages/router` -- `src/checks.ts` (the suite key),
 `src/testEvidence.ts` (`runsWholeAtClose`), their tests;
@@ -15816,10 +15816,10 @@ other projects still record. Deleting the companion table.
 **Tests.** None added; one assertion in `testEvidence.test.ts`, one in
 `checks.test.ts`.
 
-**Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 255, after
+**Releasable.** Yes -- with 247 to 251, as 3.22.0 in session 256, after
 253's walk.
 
-### Session 253 of 255: The transcript walked in a real repository first
+### Session 253 of 256: The transcript walked in a real repository first
 
 Scope: `docs/uat/uat-transcript.md` (new); `dabbler.yaml` only if the
 walk finds a selection rule the transcripts directory needs
@@ -15885,9 +15885,9 @@ drives survsys from its own Work Explorer, and the page says what to look
 for. Backfilling this repository. Any change to the renderer that the walk
 did not ask for.
 
-**Releasable.** No -- 255 publishes, on the operator's yes.
+**Releasable.** No -- 256 publishes, on the operator's yes.
 
-### Session 254 of 255: The two transcripts written by the renderer 253 fixed
+### Session 254 of 256: The two transcripts written by the renderer 253 fixed
 
 Scope: `docs/transcripts/session-252.html`, `docs/transcripts/session-253.html`
 
@@ -15907,8 +15907,48 @@ and no `exit ?` remains on either page.
 **Non-goals.** Any change to the renderer. Pages for sessions before 252.
 Publishing or tagging.
 
-**Releasable.** Yes -- with 247 to 253, as 3.22.0 in session 255.
+**Releasable.** Yes -- with 247 to 253, as 3.22.0 in session 256.
 
-### Session 255 of 255: Release 3.22.0 (release: 3.22.0)
+### Session 255 of 256: A review is sized by what it reads
 
-The framework publishes sessions 247 to 254 as 3.22.0 and nothing else.
+Scope: `packages/router/src/facts.ts`, `packages/router/src/route.ts`
+
+**Why.** 254's verification stopped twice before any provider was reached.
+First the evidence bundle was 877,902 chars against a cap of 614,400; then,
+with the cap raised, the prompt was ~228,000 tokens against a budget of
+160,000. Both were the two regenerated transcript pages, carried whole in
+the diff. Nothing reads a transcript back, `isSessionRecordPath` already
+says it records a session rather than being the work of one, and the
+reviewer cannot judge 11,000 lines of generated HTML anyway: what proves
+such a page is the step's own check. Second, switching the Primary Reviewer
+from `gpt-5.6-terra` to `gpt-5.6-sol` on the seat changed nothing, because
+the seat path's `modelConfig` returns `{}` and `buildPrompt` falls back to
+200,000 tokens for every seat model, whatever its vendor. The direct-API
+path already reads `provider_defaults`, where `max_context_tokens` is the
+smallest window that provider serves.
+
+**Step 1 -- the record is named, not carried.** `buildDiffPathspecs`
+excludes the session-record directories (`docs/transcripts`, `.dabbler`)
+by their root-relative path, and a changed record path is listed in the
+evidence's "Expected framework bookkeeping (paths only)" section, so the
+reviewer is told the page changed without being sent its contents. A test
+in `facts.test.ts`: a changed transcript page is named and its contents
+are absent.
+
+**Step 2 -- a seat model's window is its provider's.** The seat path's
+`modelConfig` returns the candidate provider's `max_context_tokens` from
+`provider_defaults`, and nothing else, where the catalog names the
+provider; an unknown provider keeps the 200,000 default. No generation
+knob reaches the seat. A test in `route.test.ts`: an OpenAI seat model's
+budget is 272,000 tokens times 0.8.
+
+**Non-goals.** Reading a window from the seat itself (the ACP model list
+carries none). Raising or removing `AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS`.
+Any change to the renderer or to `isSessionRecordPath`. Excluding any
+other kind of generated file.
+
+**Releasable.** Yes -- with 247 to 254, as 3.22.0 in session 256.
+
+### Session 256 of 256: Release 3.22.0 (release: 3.22.0)
+
+The framework publishes sessions 247 to 255 as 3.22.0 and nothing else.

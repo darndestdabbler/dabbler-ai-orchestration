@@ -266,9 +266,8 @@ function readSession(
     absent.push("any verification round");
   }
 
-  const testRuns = readRecords(repoRoot)
-    .filter((row) => row.sessionNumber === sessionNumber)
-    .map((row) => ({ row, totals: readTotals(repoRoot, sessionNumber, row) }));
+  const rows = readRecords(repoRoot).filter((row) => row.sessionNumber === sessionNumber);
+  const testRuns = rows.map((row) => ({ row, totals: readTotals(repoRoot, sessionNumber, row, rows) }));
   if (testRuns.length === 0) absent.push("any recorded test run");
 
   const jobs = readJobs(repoRoot, sessionNumber, carry);
@@ -305,10 +304,19 @@ function readJobs(repoRoot: string, sessionNumber: number, carry: JobCarry): Job
 /**
  * A run's totals, from the job log named after its suite -- whatever the
  * carry put on the page. A suite run twice in one session has one log, the
- * later run's, so a row is read only where it was recorded while that job
- * ran; an earlier row stays blank rather than borrowing the later numbers.
+ * later run's, so only the suite's latest row reads it, and only where it was
+ * recorded after that job started; an earlier row stays blank rather than
+ * borrowing the later numbers. The job's end is no bound: the row is stamped
+ * by the child that ran the suite and the end by the runner that reaped it.
  */
-function readTotals(repoRoot: string, sessionNumber: number, row: TestRunRecord): TestTotals | null {
+function readTotals(
+  repoRoot: string,
+  sessionNumber: number,
+  row: TestRunRecord,
+  rows: readonly TestRunRecord[],
+): TestTotals | null {
+  const at = Date.parse(row.recordedAt);
+  if (rows.some((other) => other.suite === row.suite && Date.parse(other.recordedAt) > at)) return null;
   const job = `run of record: ${row.suite}`;
   let status: Record<string, unknown>;
   try {
@@ -316,10 +324,7 @@ function readTotals(repoRoot: string, sessionNumber: number, row: TestRunRecord)
   } catch {
     return null;
   }
-  const at = Date.parse(row.recordedAt);
-  const started = Date.parse(String(status["started_at"]));
-  const ended = Date.parse(String(status["ended_at"]));
-  if (!(at >= started && at <= ended)) return null;
+  if (!(at >= Date.parse(String(status["started_at"])))) return null;
   return totalsOf(readTextOrEmpty(jobLogPath(repoRoot, sessionNumber, job)));
 }
 

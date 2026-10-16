@@ -297,7 +297,9 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 257 | A round that found issues says what they were | no | 2026-10-16 |
 | 258 | A finding's transcript says how it was answered | no | 2026-10-16 |
 | 259 | A run of record says how many tests it ran | no | 2026-10-16 |
-| 260 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 260 | A run's totals are read by the latest row, not by the job's end | no | 2026-10-16 |
+| 261 | The transcript lists the files a session changed | — | not declared |
+| 262 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3210,3 +3212,9 @@ Make a session's transcript say how each verification finding was answered. In d
 **Releasable: no.**
 
 Make a transcript's Test runs table say how many tests each run of record ran. testOutput.ts gains a node:test summary reader (# tests, # pass, # fail, # skipped, # cancelled) and a mocha summary reader (N passing, N failing, N pending), plus one exported function that reads a whole log through whichever reader its lines answer to -- those two, or the router's own project-passed/project-failed pass= fail= not_run= lines for dotnet and Maven -- and returns totals {passed, failed, skipped} or null where no summary was recognised; it is a view and never decides an outcome. In transcript.ts readSession pairs each test-run row with the job log named after its suite (run-of-record-<suite>.log) and reads its totals only when the row's recorded time falls inside that job's started_at..ended_at in its status file, whether or not the carry put the log's bytes on the page; renderTestRuns gains Passed, Failed and Skipped columns after Duration, Failed takes the bad tone when nonzero, and a row with no totals shows blank cells. Outcome stays. docs/uat/uat-transcript.md gains one check for the three counts on every final-full row of a page rendered by this build and none on a page rendered before it, packed from the trunk after the session closes and installed with --force.
+
+### Session 260 — A run's totals are read by the latest row, not by the job's end
+
+**Releasable: no.**
+
+Fix how the transcript reads a run of record's totals: readTotals in packages/router/src/transcript.ts drops the job's ended_at edge and instead reads the suite's log only for the LATEST recorded row of that suite in the session, provided it was recorded at or after the job started; every earlier row stays blank. The transcript test is updated so a row recorded 2 ms after the job's end is read and an earlier row for the same suite is blank. Then docs/transcripts/session-259.html is deleted and rendered again with the router built from this tree, so its final-full rows carry their counts.

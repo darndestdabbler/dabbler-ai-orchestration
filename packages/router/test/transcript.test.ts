@@ -6,7 +6,7 @@
 // a key never does, and that a session which left little behind SAYS so
 // rather than rendering a tidy page about nothing.
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -193,13 +193,21 @@ describe("one session's transcript", () => {
   it("counts a run's tests from its own log, carried or not, and leaves a log with no summary blank", () => {
     const root = repoWithASession();
     const job = "run of record: typescript";
+    // The row is stamped by the child, the end by the runner that reaped it:
+    // the latest row reads the log even recorded 2 ms after the job's end.
     write(jobStatusPath(root, 5, job), JSON.stringify({
-      exit: 0, started_at: "2026-10-16T13:34:00.000Z", ended_at: "2026-10-16T13:36:00.000Z",
+      exit: 0, started_at: "2026-10-16T13:34:00.000Z", ended_at: "2026-10-16T13:34:59.998Z",
     }));
     write(jobLogPath(root, 5, job), "1..392\n# tests 1344\n# pass 1329\n# fail 0\n# cancelled 0\n# skipped 15\n");
+    appendFileSync(join(root, ".dabbler", "runs", "test-runs.jsonl"), `${JSON.stringify({
+      suite: "typescript", command: "node scripts/suite.mjs container", outcome: "failed",
+      surfaceDigest: "d1", recordedAt: "2026-10-16T09:34:30-04:00", stage: "final-full",
+      sessionNumber: 5, durationSeconds: 7,
+    })}\n`);
     const counted = render(root);
     assert.ok(!counted.includes("# pass 1329"), "a passing run's bytes are not carried");
     assert.match(counted, /41s<\/td><td>1329<\/td><td>0<\/td><td>15<\/td>/);
+    assert.match(counted, /7s<\/td><td><\/td><td><\/td><td><\/td>/, "an earlier row borrows the later numbers");
 
     write(jobLogPath(root, 5, job), "error TS2304: Cannot find name 'x'.\n");
     assert.match(render(root), /41s<\/td><td><\/td><td><\/td><td><\/td>/);

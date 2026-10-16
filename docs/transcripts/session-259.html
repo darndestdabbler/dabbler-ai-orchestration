@@ -52,6 +52,9 @@ th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(-
 th { color: var(--tone-muted); font-weight: 600; }
 details { margin: .5rem 0; }
 summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
 pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
 .stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
 .milestone { color: var(--tone-milestone); }
@@ -64,8 +67,8 @@ pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: 
 <body>
 <main>
 <h1>Session 259 transcript</h1>
-<p class="stamp">Rendered 2026-10-16T15:03:31.631Z by dabbler-ai-router 3.21.0 at 4618a8acf04f616b02d1f168b292a075b0efd4b6.</p>
-<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-16T10:56:37.309-04:00.</p>
+<p class="stamp">Rendered 2026-10-16T15:52:25.464Z by dabbler-ai-router 3.21.0 at 663d300b12cf6871a0556936e0bbc28ce55c13c0.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">complete</span>, started 2026-10-16T10:56:37.309-04:00.</p>
 <h2>What the framework said</h2>
 <div class="lines"><div class="line"><span class="at">[14:56:37]</span> <span class="muted">run-started</span> session=259 mode=pull</div>
 <div class="line"><span class="at">[14:56:37]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
@@ -110,18 +113,27 @@ pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: 
 <div class="line"><span class="at">[15:03:23]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
 <div class="line"><span class="at">[15:03:25]</span> <span class="muted">job-started</span> name=close pid=37912 log=.dabbler/runs/s259/driver/jobs/close.log</div>
 <div class="line"><span class="at">[15:03:31]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s259/driver/jobs/close.log</div>
-<div class="line"><span class="at">[15:03:31]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<div class="line"><span class="at">[15:03:31]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div>
+<div class="line"><span class="at">[15:03:31]</span> <span class="muted">transcript-committed</span> path=docs/transcripts/session-259.html carry=outline</div>
+<div class="line"><span class="at">[15:03:34]</span> <span class="muted">transcript-pushed</span> path=docs/transcripts/session-259.html</div>
+<div class="line"><span class="at">[15:03:34]</span> <span class="milestone">phase</span> phase=<span class="milestone">complete</span></div>
+<div class="line"><span class="at">[15:03:34]</span> <span class="muted">session-complete</span> session=259 invocations=0</div>
+<div class="line"><span class="at">[15:03:34]</span> <span class="muted">instruction-issued</span> seq=5 kind=done</div></div>
 <h2>Verification</h2>
 <table>
 <tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
-<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gemini-4-argon</td><td>google</td><td>api</td><td>2</td></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gemini-4-argon</td><td>google</td><td>api</td><td><details><summary>2 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** In `packages/router/test/testOutput.test.ts`, `NODE_TAIL` exercises `nodeSummaryReader()` only with `# fail 0` and `# cancelled 0`, so a regression that dropped `cancelled` or routed it to `skipped` instead of `failed` would still pass. A test starting with a node:test summary containing `# pass 10\n# fail 2\n# cancelled 1\n# skipped 3\n` and asserting `assert.deepEqual(totalsOf(log), { passed: 10, failed: 3, skipped: 3 })` would pin both nonzero `fail` and `cancelled` handling.</td><td>not recorded</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** In `packages/router/test/transcript.test.ts`, `&quot;counts a run's tests from its own log, carried or not, and leaves a log with no summary blank&quot;` only drives a row whose `recordedAt` falls inside `started_at..ended_at` and whose `failed` count is `0`. Two cases are not directly asserted in the diff: (1) with `jobStatusPath(root, 5, &quot;run of record: typescript&quot;)` set to `started_at: &quot;2026-10-16T14:00:00.000Z&quot;` and `ended_at: &quot;2026-10-16T14:02:00.000Z&quot;` (after the row's `recordedAt` of `13:35:00Z`) and a valid summary in `jobLogPath`, `render(root)` should still produce blank count cells (`41s&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;`) rather than borrowing the later run's numbers; and (2) with `# fail 2` in the log, `render(root)` should wrap the Failed cell in `&lt;span class=&quot;tone-bad&quot;&gt;2&lt;/span&gt;`.</td><td>not recorded</td></tr>
+</table></td></tr>
 </table>
 <h2>Test runs</h2>
 <table>
-<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Command</th></tr>
-<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
-<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>70s</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
-<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>52</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>70s</td><td>1334</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>283</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
 </table>
 <h2>Steps accepted</h2>
 <p><code>summary-readers</code>, <code>table-columns</code>, <code>walk-page</code></p>

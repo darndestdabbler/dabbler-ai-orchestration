@@ -97,16 +97,19 @@ describe("what a session would be run with", () => {
   ];
 
   /**
-   * The one git call this reading makes, answered.
+   * The git calls these readings make, answered.
    *
    * `loadConfig` asks git where the project root is, and the suite traps git
    * -- correctly, since a test that shelled out would read whatever
    * repository it happened to be run in. The answer is fed through the seam
    * the suite provides, and the root is the temp directory under test.
+   * `configure` also asks whether the settings file it wrote is uncommitted,
+   * and is told it is not, so it commits nothing.
    */
   function inRepository(root: string): () => void {
     const restore = gitAnswers([
       [["rev-parse", "--show-toplevel"], { stdout: root.split("\\").join("/") }],
+      [["status", "--porcelain", "--", ".vscode/settings.json"], { stdout: "" }],
     ]);
     resetProjectRootCache();
     return () => {

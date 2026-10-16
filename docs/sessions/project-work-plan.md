@@ -288,8 +288,9 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 248 | The record is written before the session is told it is done | no | 2026-10-16 |
 | 249 | A step is told which of its files are already there | no | 2026-10-16 |
 | 250 | A choice made in the Configuration is committed as it is made | no | 2026-10-16 |
-| 251 | The transcript walked in a real repository first | — | not declared |
-| 252 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 251 | The tests 250's run of record did not reach | no | 2026-10-16 |
+| 252 | The transcript walked in a real repository first | — | not declared |
+| 253 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3144,3 +3145,9 @@ Make a step's instruction name the step's own declared files and say, for each, 
 **Releasable: no.**
 
 Make a choice written to the checkout by `dabbler configure` (and so by the Configuration pane) land on the trunk as it is made. `configure` writes `.vscode/settings.json` as now and then, when the checkout is a git repository and no session is in flight in its sessions root, commits that one path alone with a message naming what was set and pushes where the branch tracks an upstream (the rule `commitChangesBeforeStart` applies); with a session in flight it leaves the file for the land and says so; a failed commit or push is reported in the output and refuses nothing; `--mine` writes no checkout file and commits nothing. `materialPaths` then stops exempting `.vscode/settings.json` before the declaration (the hook file's exemption stands), and `docs/driving-a-session.md` says when a choice lands on the trunk and when it rides with the session.
+
+### Session 251 — The tests 250's run of record did not reach
+
+**Releasable: no.**
+
+Make true again the twelve router tests that went red after session 250 made `configure` commit the settings file it writes: answer git's `status --porcelain -- .vscode/settings.json` question with an empty porcelain in the shared git answer tables of configuration.test.ts and projection.test.ts (one row per file); delete the session.test.ts test asserting that an uncommitted pane-written settings file does not stop Start, since that behaviour no longer exists; stop walk-session.test.ts seeding an uncommitted settings file before its start (and drop the land's assertion that the file is tracked), with a comment saying why; and add one entry to the COMPANIONS table in scripts/suite.mjs so a selection of configure.test.ts also runs configuration.test.ts and projection.test.ts.

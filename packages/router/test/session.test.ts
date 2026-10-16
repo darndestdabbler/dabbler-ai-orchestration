@@ -392,26 +392,6 @@ describe("what a start refuses before a session exists", () => {
     }
   });
 
-  it("registers with the settings file the pane wrote the only change in the tree", async () => {
-    // The tutorial's session 5 was refused over the one line the
-    // Configuration pane had just written, and `dabbler configure` -- the
-    // command another refusal named -- writes the same file.
-    const state = stateDir();
-    const settings = cleanRepoAnswers(state.repo, [
-      [["status", "--porcelain"], { stdout: " M .vscode/settings.json\n" }],
-    ]);
-    try {
-      const registered = await run(() =>
-        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
-      );
-      assert.equal(registered.code, EXIT_OK, registered.err);
-      assert.equal(readRawSessionState(state.sessionsDir) === null, false);
-    } finally {
-      settings();
-      state.restore();
-    }
-  });
-
   it("says in one line when the origin does not answer, and registers anyway", async () => {
     // The tutorial's origin was a hosting page's address, and the push at
     // the land was the first thing to meet it -- after all the work. With an

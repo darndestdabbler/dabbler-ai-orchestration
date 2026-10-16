@@ -149,11 +149,17 @@ function partition(mode, paths) {
  * file's tests by name, and the walk that drives a session end to end is
  * named after no file -- so a change to the phase machine (`drive.ts`,
  * `driver.ts`) was measured by a run that skipped the one suite that walks
- * it. This repository's rule, applied to what the selector hands over.
+ * it. Likewise the `configure` verb is exercised through the configuration
+ * and projection suites, named after other files. This repository's rule,
+ * applied to what the selector hands over.
  */
 const COMPANIONS = {
   "packages/router/test/drive.test.ts": ["packages/router/test/walk-session.test.ts"],
   "packages/router/test/driver.test.ts": ["packages/router/test/walk-session.test.ts"],
+  "packages/router/test/configure.test.ts": [
+    "packages/router/test/configuration.test.ts",
+    "packages/router/test/projection.test.ts",
+  ],
 };
 
 /** `paths` with each one's companions added once, in the order first named. */

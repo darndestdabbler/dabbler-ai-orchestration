@@ -80,6 +80,8 @@ function machine(): { root: string; restore: () => void } {
   for (const name of KEYS) process.env[name] = "k";
   const ungit = gitAnswers([
     [["rev-parse", "--show-toplevel"], { stdout: root.split("\\").join("/") }],
+    // `configure` commits the settings file it writes; nothing to commit here.
+    [["status", "--porcelain", "--", ".vscode/settings.json"], { stdout: "" }],
   ]);
   resetProjectRootCache();
   writeSettings(root, { [SETTING_TRANSPORT]: TRANSPORT_API });

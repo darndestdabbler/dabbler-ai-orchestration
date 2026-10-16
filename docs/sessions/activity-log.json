@@ -12503,6 +12503,13 @@
       "dateTime": "2026-10-16T05:47:43.474000-04:00",
       "task": "Make a choice written to the checkout by `dabbler configure` (and so by the Configuration pane) land on the trunk as it is made. `configure` writes `.vscode/settings.json` as now and then, when the checkout is a git repository and no session is in flight in its sessions root, commits that one path alone with a message naming what was set and pushes where the branch tracks an upstream (the rule `commitChangesBeforeStart` applies); with a session in flight it leaves the file for the land and says so; a failed commit or push is reported in the output and refuses nothing; `--mine` writes no checkout file and commits nothing. `materialPaths` then stops exempting `.vscode/settings.json` before the declaration (the hook file's exemption stands), and `docs/driving-a-session.md` says when a choice lands on the trunk and when it rides with the session.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 251,
+      "dateTime": "2026-10-16T08:20:23.982000-04:00",
+      "task": "Make true again the twelve router tests that went red after session 250 made `configure` commit the settings file it writes: answer git's `status --porcelain -- .vscode/settings.json` question with an empty porcelain in the shared git answer tables of configuration.test.ts and projection.test.ts (one row per file); delete the session.test.ts test asserting that an uncommitted pane-written settings file does not stop Start, since that behaviour no longer exists; stop walk-session.test.ts seeding an uncommitted settings file before its start (and drop the land's assertion that the file is tracked), with a comment saying why; and add one entry to the COMPANIONS table in scripts/suite.mjs so a selection of configure.test.ts also runs configuration.test.ts and projection.test.ts.",
+      "releasable": false
     }
   ]
 }

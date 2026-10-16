@@ -4957,7 +4957,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "ef920a1da07099d4de6c2cc5e83ad801e41ca546",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5.6-terra",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      },
+      "frameworkVersion": "3.21.0",
+      "startCommit": "ef920a1da07099d4de6c2cc5e83ad801e41ca546"
+    },
+    {
+      "number": 251,
+      "title": "The tests 250's run of record did not reach",
+      "status": "in-progress",
+      "startedAt": "2026-10-16T08:19:44.852000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "9faf8062fa6b10cdbccd884558c540c954802ef9",
       "frameworkVersion": "3.21.0",
       "verification": {
         "rounds": 1,
@@ -4967,7 +4989,7 @@
       }
     },
     {
-      "number": 251,
+      "number": 252,
       "title": "The transcript walked in a real repository first",
       "status": "not-started",
       "startedAt": null,
@@ -4976,7 +4998,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 252,
+      "number": 253,
       "title": "Release 3.22.0 (release: 3.22.0)",
       "status": "not-started",
       "startedAt": null,

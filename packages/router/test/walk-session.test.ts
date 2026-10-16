@@ -221,10 +221,8 @@ describe("one session, walked from next to done", () => {
     // Identity goes on `start` and nowhere else. `next` advances a session and
     // never creates one, so the flags an engine was launched with do not start
     // a second session when it re-runs its command line after `done`.
-    // A choice made in the Configuration pane just before is in the tree: it
-    // does not stop the start, and the land commits it with the work.
-    mkdirSync(join(repo, ".vscode"), { recursive: true });
-    writeFileSync(join(repo, ".vscode", "settings.json"), '{ "editor.tabSize": 2 }\n', "utf8");
+    // No settings file is seeded uncommitted: `configure` commits a choice as
+    // it is made, and one still uncommitted at Start is refused like any other.
     assert.equal(
       (await capture(() =>
         Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
@@ -441,7 +439,6 @@ describe("one session, walked from next to done", () => {
     // ahead of nothing -- it was pushed.
     assert.match(readFileSync(join(repo, "src", "widget.py"), "utf8"), /return 3/);
     assert.equal(gitOut(repo, "status", "--porcelain").trim(), "");
-    assert.equal(gitOut(repo, "ls-files", ".vscode/settings.json").trim(), ".vscode/settings.json");
     assert.equal(gitOut(repo, "rev-list", "--count", "@{upstream}..HEAD").trim(), "0");
 
     // The close: the session is complete, and its verdict is on the record.

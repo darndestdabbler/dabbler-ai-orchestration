@@ -5233,9 +5233,9 @@
     {
       "number": 263,
       "title": "The transcript opens with the plan it ran under and the work plan it was given",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T12:37:33.561000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T12:46:56.723000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

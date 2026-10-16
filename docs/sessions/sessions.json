@@ -5255,9 +5255,9 @@
     {
       "number": 264,
       "title": "The work plan carries the files a session changed, and the Files section goes",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T13:01:45.358000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T13:07:31.197000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

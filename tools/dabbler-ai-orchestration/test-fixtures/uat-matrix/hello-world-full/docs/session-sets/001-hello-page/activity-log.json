@@ -1,0 +1,61 @@
+{
+  "sessionSetName": "001-hello-page",
+  "createdDate": "2026-06-01T09:00:00-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/page",
+      "dateTime": "2026-06-01T09:20:00-04:00",
+      "description": "Created index.html with the #greeting mount point.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/greeting",
+      "dateTime": "2026-06-01T09:55:00-04:00",
+      "description": "js/hello.js renders the Hello, world! heading.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "extend-js-hello-js-to-append",
+      "dateTime": "2026-06-01T11:00:00-04:00",
+      "description": "Extend `js/hello.js` to append a formatted date line.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "style-the-date-line-distinctly",
+      "dateTime": "2026-06-01T11:00:00-04:00",
+      "description": "Style the date line distinctly from the heading.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "verify-the-date-renders-in-the",
+      "dateTime": "2026-06-01T11:00:00-04:00",
+      "description": "Verify the date renders in the operator's locale, and close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/date-stamp",
+      "dateTime": "2026-06-01T11:30:00-04:00",
+      "description": "Date-stamp line appended below the greeting.",
+      "status": "complete",
+      "routedApiCalls": []
+    }
+  ]
+}

@@ -5101,9 +5101,9 @@
     {
       "number": 257,
       "title": "A round that found issues says what they were",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T10:26:05.515000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T10:30:47.891000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

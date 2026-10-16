@@ -294,7 +294,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 254 | The two transcripts written by the renderer 253 fixed | no | 2026-10-16 |
 | 255 | A review is sized by what it reads | no | 2026-10-16 |
 | 256 | A passing job's omitted output says why it is omitted | no | 2026-10-16 |
-| 257 | Release 3.22.0 (release: 3.22.0) | — | not declared |
+| 257 | A round that found issues says what they were | no | 2026-10-16 |
+| 258 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3189,3 +3190,9 @@ Size a review by what it reads. In packages/router/src/facts.ts, buildDiffPathsp
 **Releasable: no.**
 
 Make a transcript job line say why its output is absent. In packages/router/src/transcript.ts, readJobs records a job whose output the carry left out as null rather than an empty string, so renderJobs decides on whether the output was carried and not on whether it is empty: a passing job left out reads `(passed -- output not carried; dabbler transcript --full carries it)`, and a carried job whose log is empty reads `(no output)`. The existing test in transcript.test.ts is updated to assert the passing job's line names --full, and that a failed job with an empty log reads `no output`.
+
+### Session 257 — A round that found issues says what they were
+
+**Releasable: no.**
+
+Under a transcript's Verification table, list each round's findings in recorded order: the round number, then one line per finding with its severity, 'blocking' where it blocks, and its description, HTML-escaped and scrubbed of provider keys exactly as a job's output is. A round with no findings lists nothing. The change is confined to renderRounds in packages/router/src/transcript.ts (which gains the machine's secrets), with one test in transcript.test.ts covering a round recorded with two findings and a key in one description.

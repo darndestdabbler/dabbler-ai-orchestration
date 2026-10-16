@@ -210,6 +210,38 @@ describe("one session's transcript", () => {
     }
   });
 
+  it("lists what a round found, in recorded order, scrubbed of keys", () => {
+    // A count says there were issues; only the descriptions say what they were.
+    const root = repoWithASession();
+    const key = "sk-ant-notarealkey-fedcba9876543210";
+    write(
+      roundsPath(root, 5),
+      `${JSON.stringify({
+        round: 1, phase: "full", verdict: "ISSUES_FOUND", blocking: true,
+        findings: [
+          { severity: "major", blocking: true, description: "the close <skips> the gate" },
+          { severity: "minor", blocking: false, description: `a key leaked: ${key}` },
+        ],
+        reviewer_model: "gpt-5.6-sol", reviewer_provider: "openai", transport: "api",
+        completion_tree: "abcdef1234567", recorded_at: "2026-10-16T09:30:00-04:00",
+      })}\n`,
+    );
+
+    const previous = process.env["DABBLER_ANTHROPIC_API_KEY"];
+    process.env["DABBLER_ANTHROPIC_API_KEY"] = key;
+    try {
+      const html = render(root);
+      assert.match(html, /Round 1 found/);
+      assert.match(html, /major<\/strong> <span class="bad">blocking<\/span> the close &lt;skips&gt; the gate/);
+      assert.match(html, /minor<\/strong> a key leaked:/);
+      assert.ok(html.indexOf("major<") < html.indexOf("minor<"), "findings out of recorded order");
+      assert.ok(!html.includes(key), "a provider key reached the page");
+    } finally {
+      if (previous === undefined) delete process.env["DABBLER_ANTHROPIC_API_KEY"];
+      else process.env["DABBLER_ANTHROPIC_API_KEY"] = previous;
+    }
+  });
+
   it("shows the stop where there is one", () => {
     const root = repoWithASession();
     writeRun(root, 5, {

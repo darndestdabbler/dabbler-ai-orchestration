@@ -571,12 +571,39 @@ function text(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
 }
 
-function renderRounds(rounds: readonly Record<string, unknown>[]): string {
+/**
+ * What each round found, under the table that counts it.
+ *
+ * The count says there were issues; this is the one place a second
+ * developer can read what they were. A description is a reviewer's own
+ * words and may quote anything it read, so it is scrubbed as a job's
+ * output is.
+ */
+function renderFindings(
+  rounds: readonly Record<string, unknown>[],
+  secrets: readonly string[],
+): string {
+  return rounds
+    .filter((round) => Array.isArray(round["findings"]) && round["findings"].length > 0)
+    .map((round) => {
+      const lines = (round["findings"] as Record<string, unknown>[]).map((finding) => {
+        const severity = text(finding["severity"]);
+        const blocking = finding["blocking"] === true ? ` ${toned("bad", "blocking")}` : "";
+        const description = escapeHtml(scrub(text(finding["description"]), secrets));
+        return `<li><strong>${escapeHtml(severity)}</strong>${blocking} ${description}</li>`;
+      });
+      return `<p>Round ${escapeHtml(text(round["round"]))} found:</p>\n<ul>${lines.join("\n")}</ul>`;
+    })
+    .join("\n");
+}
+
+function renderRounds(rounds: readonly Record<string, unknown>[], secrets: readonly string[]): string {
+  const findings = renderFindings(rounds, secrets);
   return table(
     ["Round", "Phase", "Verdict", "Reviewer", "Provider", "Transport", "Findings"],
     rounds.map((round) => {
       const verdict = text(round["verdict"]);
-      const findings = Array.isArray(round["findings"]) ? round["findings"].length : 0;
+      const count = Array.isArray(round["findings"]) ? round["findings"].length : 0;
       return [
         escapeHtml(text(round["round"])),
         escapeHtml(text(round["phase"])),
@@ -586,10 +613,10 @@ function renderRounds(rounds: readonly Record<string, unknown>[]): string {
         escapeHtml(text(round["reviewer_model"] ?? round["verifier_model"])),
         escapeHtml(text(round["reviewer_provider"] ?? round["verifier_provider"])),
         escapeHtml(text(round["transport"])),
-        escapeHtml(String(findings)),
+        escapeHtml(String(count)),
       ];
     }),
-  );
+  ) + (findings === "" ? "" : `\n${findings}`);
 }
 
 function renderTestRuns(runs: ReturnType<typeof readRecords>): string {
@@ -696,7 +723,7 @@ export function renderSessionTranscript(
         ? ""
         : `<div class="lines">${reading.events.map(renderEvent).join("\n")}</div>`,
     ),
-    section("Verification", renderRounds(reading.rounds)),
+    section("Verification", renderRounds(reading.rounds, secrets)),
     section("Test runs", renderTestRuns(reading.testRuns)),
     section("Steps accepted", steps === "" ? "" : `<p>${steps}</p>`),
     section("Jobs", renderJobs(reading.jobs, secrets)),

@@ -12553,6 +12553,13 @@
       "dateTime": "2026-10-16T10:19:18.651000-04:00",
       "task": "Make a transcript job line say why its output is absent. In packages/router/src/transcript.ts, readJobs records a job whose output the carry left out as null rather than an empty string, so renderJobs decides on whether the output was carried and not on whether it is empty: a passing job left out reads `(passed -- output not carried; dabbler transcript --full carries it)`, and a carried job whose log is empty reads `(no output)`. The existing test in transcript.test.ts is updated to assert the passing job's line names --full, and that a failed job with an empty log reads `no output`.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 257,
+      "dateTime": "2026-10-16T10:26:32.390000-04:00",
+      "task": "Under a transcript's Verification table, list each round's findings in recorded order: the round number, then one line per finding with its severity, 'blocking' where it blocks, and its description, HTML-escaped and scrubbed of provider keys exactly as a job's output is. A round with no findings lists nothing. The change is confined to renderRounds in packages/router/src/transcript.ts (which gains the machine's secrets), with one test in transcript.test.ts covering a round recorded with two findings and a key in one description.",
+      "releasable": false
     }
   ]
 }

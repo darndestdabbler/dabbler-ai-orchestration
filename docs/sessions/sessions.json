@@ -5079,9 +5079,9 @@
     {
       "number": 256,
       "title": "A passing job's omitted output says why it is omitted",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-16T10:18:45.741000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-16T10:22:56.987000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

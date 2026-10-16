@@ -286,7 +286,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 246 | Release 3.21.0 (release: 3.21.0) | yes | 2026-10-05 |
 | 247 | A session's transcript, rendered and committed | no | 2026-10-16 |
 | 248 | The record is written before the session is told it is done | no | 2026-10-16 |
-| 249 | A step is told which of its files are already there | — | not declared |
+| 249 | A step is told which of its files are already there | no | 2026-10-16 |
 | 250 | The transcript walked in a real repository first | — | not declared |
 | 251 | Release 3.22.0 (release: 3.22.0) | — | not declared |
 
@@ -3131,3 +3131,9 @@ Make the session's record exist before the session is told it is over. In packag
 **Amended after acceptance:**
 
 - 2026-10-16 — step 'walk-follows-phase-machine': its files: the walk showed the Log phase never ran: judgeSessionEnded read the loop's own close as a close made underneath it once the phase was log; the fix is one condition in drive.ts (claude-code (anthropic, claude-opus-5-5))
+
+### Session 249 — A step is told which of its files are already there
+
+**Releasable: no.**
+
+Make a step's instruction name the step's own declared files and say, for each, whether it already exists in the tree as the instruction is issued, with the sentence that an existing file is read before it is written. A small exported function in packages/router/src/drive.ts builds that line from the repository root and the step's declared files (a step that declared none says so); stepAsk appends it after the non-goals line, changing no existing sentence. drive.test.ts gains one test of that function, and docs/driving-a-session.md says what a step's instruction carries and why the existing-file mark is there.

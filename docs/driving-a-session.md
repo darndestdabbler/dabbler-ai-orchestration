@@ -274,7 +274,15 @@ dabbler [11:31:21] phase phase=work
 dabbler [11:31:22] instruction-issued seq=2 kind=step step=widget
 ```
 
-Every step's instruction repeats the plan's non-goals under its ask. A step
+A step's instruction carries, in order: the step's ask as the plan wrote
+it, the plan's non-goals, the files the step declared — each marked
+`exists` or `new`, read from the tree as the instruction is issued — the
+time-limit line for any test command, and how to report. The mark is
+there because an author that does not know a file already exists derives
+its path from prose, writes it fresh and replaces what was there; the
+step's checks then pass on the one new test it wrote. A file marked
+`exists` is read before it is written. The mark informs and refuses
+nothing; a step that declared no files says so. A step
 is answered with its status and a line of notes. `--files` may be left
 out, and the framework takes the step's files from what changed since the
 last accepted step, less what it wrote itself; named, they are exactly the

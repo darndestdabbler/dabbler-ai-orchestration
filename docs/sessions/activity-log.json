@@ -12489,6 +12489,13 @@
       "what": "step 'walk-follows-phase-machine': its files",
       "reason": "the walk showed the Log phase never ran: judgeSessionEnded read the loop's own close as a close made underneath it once the phase was log; the fix is one condition in drive.ts",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 249,
+      "dateTime": "2026-10-16T05:25:51.578000-04:00",
+      "task": "Make a step's instruction name the step's own declared files and say, for each, whether it already exists in the tree as the instruction is issued, with the sentence that an existing file is read before it is written. A small exported function in packages/router/src/drive.ts builds that line from the repository root and the step's declared files (a step that declared none says so); stepAsk appends it after the non-goals line, changing no existing sentence. drive.test.ts gains one test of that function, and docs/driving-a-session.md says what a step's instruction carries and why the existing-file mark is there.",
+      "releasable": false
     }
   ]
 }

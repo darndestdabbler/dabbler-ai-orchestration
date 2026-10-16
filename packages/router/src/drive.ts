@@ -1214,6 +1214,21 @@ class Rewound extends Error {
 }
 
 /** One step as the loop measures it: a plan step, or a fix round's own. */
+/**
+ * The step's declared files under its ask, each read from the tree as the
+ * instruction is issued. An author that derives a path from prose and does
+ * not know the file is there writes over it, and the step's checks still
+ * pass on what it wrote; the mark is the fact it was missing.
+ */
+export function stepFilesLine(repoRoot: string, files: readonly string[]): string {
+  if (files.length === 0) return "\n\nThis step declared no files.";
+  const marked = files.map((f) => `${f} (${existsSync(join(repoRoot, f)) ? "exists" : "new"})`);
+  return (
+    `\n\nThis step's declared files: ${marked.join("; ")}. ` +
+    "A file marked exists is already in the tree: read it before you write it, and change it rather than replace it."
+  );
+}
+
 export interface StepSpec {
   readonly id: string;
   readonly ask: string;
@@ -2837,6 +2852,7 @@ class Driver {
     return (
       spec.ask +
       this.nonGoalsLine() +
+      stepFilesLine(this.repoRoot, spec.files) +
       "\n\nEvery test command you run has a time limit, and a test never starts a build and " +
       "never waits on a process without a timeout." +
       "\n\nWhen the step is done, report with the answer command. --files may be left out: " +

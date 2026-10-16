@@ -64,6 +64,7 @@ import {
   suiteRetrySeconds,
   staleJobDisposition,
   stepChangedPaths,
+  stepFilesLine,
   unchangedStepFiles,
   checkFailedRefusal,
   CHECK_FAILED_WAYS,
@@ -534,6 +535,17 @@ describe("the files a report stands for", () => {
     // The flag does not excuse a list: a flagged report that names files is judged on them.
     const flaggedAndNamed = report({ files_changed: ["src/widget.py"], files_from_diff: true });
     assert.deepEqual(reportedFiles(flaggedAndNamed, changed), ["src/widget.py"]);
+  });
+});
+
+describe("the files a step's instruction names", () => {
+  it("marks each declared file as existing or new from the tree, and says so when none was declared", () => {
+    const root = tempDir();
+    seed(root, { "src/widget.ts": "export {};\n" });
+    const line = stepFilesLine(root, ["src/widget.ts", "test/widget.test.ts"]);
+    assert.match(line, /src\/widget\.ts \(exists\)/);
+    assert.match(line, /test\/widget\.test\.ts \(new\)/);
+    assert.match(stepFilesLine(root, []), /declared no files/);
   });
 });
 

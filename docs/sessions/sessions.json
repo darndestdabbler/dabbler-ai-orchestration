@@ -5389,23 +5389,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "34d447a85e16e06018d6f218b2d58d05f4365043",
-      "frameworkVersion": "3.21.0",
       "verification": {
         "rounds": 1,
         "verifierModel": "gemini-4-argon",
         "verifierProvider": "google",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "3.21.0",
+      "startCommit": "34d447a85e16e06018d6f218b2d58d05f4365043"
     },
     {
       "number": 271,
       "title": "Release 3.22.1 (release: 3.22.1)",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "status": "complete",
+      "startedAt": "2026-10-17T06:12:06.685000-04:00",
+      "completedAt": "2026-10-17T06:12:16.670000-04:00",
+      "orchestrator": {
+        "engine": "framework",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null,
+      "startCommit": "8fe23a2b9f23e64c444c03c7dc1e52c4e6dd2767",
+      "frameworkVersion": "3.21.0",
+      "noChange": true
     }
   ]
 }

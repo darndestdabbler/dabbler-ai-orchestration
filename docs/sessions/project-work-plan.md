@@ -308,7 +308,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 268 | The version goes to 3.22.0 | no | 2026-10-16 |
 | 269 | Release 3.22.0 (release: 3.22.0) | yes | 2026-10-16 |
 | 270 | The Configuration row names what each role runs on | no | 2026-10-17 |
-| 271 | Release 3.22.1 (release: 3.22.1) | — | not declared |
+| 271 | Release 3.22.1 (release: 3.22.1) | yes | 2026-10-17 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3287,3 +3287,9 @@ Release 3.22.0: the framework packs and publishes what is on the trunk.
 **Releasable: no.**
 
 Make the Solution Explorer's Configuration row name what each role actually runs on: its description becomes the authoring engine and the reviewing vehicle the Reviewing AI row shows (claude-code · api), no longer the machine's vehicle (configuration.transport.effective), with either part left out where it is unread. Update the configured() assertion in solutionTreeModel.test.ts to prove the row carries the reviewing vehicle and not the machine's, then bump version.json to 3.22.1, stamp the manifests with npm run stamp:version, and add the 3.22.1 changelog section.
+
+### Session 271 — Release 3.22.1 (release: 3.22.1)
+
+**Releasable: yes.**
+
+Release 3.22.1: the framework packs and publishes what is on the trunk.

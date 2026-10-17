@@ -10,6 +10,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.22.1] — 2026-10-17
+
+### Fixed
+
+- **The Configuration row names what each role runs on.** Its description
+  is the authoring engine and the reviewing vehicle the Reviewing AI row
+  shows — `claude-code · api` — and no longer the machine's vehicle, which
+  decides none of the rows beneath it. A repository whose machine default
+  is the Copilot seat read `claude-code · copilot-cli` there while nothing
+  ran on the seat. Session 270.
+
 ## [3.22.0] — 2026-10-16
 
 **A session leaves a record a second developer can read.** Until now what a

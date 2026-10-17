@@ -12644,6 +12644,13 @@
       "dateTime": "2026-10-16T16:08:53.274000-04:00",
       "task": "Release 3.22.0: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 270,
+      "dateTime": "2026-10-17T06:04:41.413000-04:00",
+      "task": "Make the Solution Explorer's Configuration row name what each role actually runs on: its description becomes the authoring engine and the reviewing vehicle the Reviewing AI row shows (claude-code \u00b7 api), no longer the machine's vehicle (configuration.transport.effective), with either part left out where it is unread. Update the configured() assertion in solutionTreeModel.test.ts to prove the row carries the reviewing vehicle and not the machine's, then bump version.json to 3.22.1, stamp the manifests with npm run stamp:version, and add the 3.22.1 changelog section.",
+      "releasable": false
     }
   ]
 }

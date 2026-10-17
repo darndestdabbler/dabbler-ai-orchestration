@@ -583,6 +583,12 @@ suite("solutionTreeModel: what a session is run with", () => {
       const section = descriptorFor(root, p);
       assert.strictEqual(section.expandable, true);
       assert.ok(section.description?.includes("claude-code"));
+      // The row names the engine and the reviewing vehicle; the machine's
+      // vehicle decides no row beneath it, so it is not named.
+      const seatMachine = configured({
+        transport: { effective: "copilot-cli", decidedBy: "transport.profile", layers: [] },
+      });
+      assert.strictEqual(descriptorFor(root, seatMachine).description, "claude-code · api");
 
       // Two participants, each naming a thing being configured rather than
       // the mechanism that configures it, and five leaves under them.

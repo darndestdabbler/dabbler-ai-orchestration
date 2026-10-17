@@ -1036,7 +1036,10 @@ export function descriptorFor(
       const config = configuration(p);
       const bits: string[] = [];
       if (config.engines?.chosen) bits.push(config.engines.chosen);
-      if (config.transport) bits.push(config.transport.effective);
+      // The reviewing vehicle, not the machine's: no row beneath this one is
+      // decided by the machine's, so naming it here named nothing that runs.
+      const reviewing = configVehicle(p, "reviewing")?.chosen;
+      if (reviewing) bits.push(reviewing);
       const stale = (config.records ?? []).filter((row) => row.stale).length;
       return {
         id: "configuration",

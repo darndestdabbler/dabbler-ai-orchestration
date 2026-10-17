@@ -16476,3 +16476,46 @@ reached every manifest.
 ### Session 269 of 269: Release 3.22.0 (release: 3.22.0)
 
 The framework publishes sessions 247 to 268 as 3.22.0 and nothing else.
+
+### Session 270 of 271: The Configuration row names what each role runs on
+
+Scope: `tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts`
+(the `configuration` case); `version.json` and the manifests `npm run
+stamp:version` writes; `tools/dabbler-ai-orchestration/CHANGELOG.md`; tests
+in `solutionTreeModel.test.ts`
+
+**Why.** The Configuration row in the Solution Explorer read `claude-code ·
+copilot-cli` in survsys and in this repository, where nothing runs on the
+Copilot seat. The row joins the engine with the machine's vehicle
+(`configuration.transport.effective`), and no row beneath it is decided by
+that value: the Authoring AI runs inside the engine's CLI, and both
+reviewers run on the reviewing vehicle (`dabbler.reviewerTransport`, `api`
+in both repositories), which outranks it. The machine's vehicle is the
+shipped `transport.profile: copilot-cli` in survsys and a
+`dabbler.transport` line in this checkout's settings. The shipped seat
+default is deliberate and stays; the row is what misleads.
+
+**Step 1 -- the row names the engine and the reviewing vehicle.** The
+Configuration row's description is the authoring engine and the reviewing
+vehicle the Reviewing AI row shows (`claude-code · api` in both
+repositories), and the machine's vehicle is not in it. Where either is
+unread, it is left out, as the engine is today.
+
+**Step 2 -- the version and the words.** `version.json` goes to 3.22.1 (a
+patch: one row's wording), stamped with `npm run stamp:version`, and the
+changelog gets the 3.22.1 section.
+
+**Non-goals.** The shipped `transport.profile`, which stays `copilot-cli`.
+This checkout's `dabbler.transport` setting. How any vehicle is resolved,
+or any row other than Configuration. `dabbler configuration explain`'s
+wording.
+
+**Tests.** In `solutionTreeModel.test.ts`, one assertion on the
+`configured()` projection: the Configuration row's description is the
+engine and the reviewing vehicle, and not the machine's. No new test.
+
+**Releasable.** Yes -- as 3.22.1 in session 271.
+
+### Session 271 of 271: Release 3.22.1 (release: 3.22.1)
+
+The framework publishes session 270 as 3.22.1 and nothing else.

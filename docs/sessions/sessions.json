@@ -5379,9 +5379,9 @@
     {
       "number": 270,
       "title": "The Configuration row names what each role runs on",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-17T06:03:48.306000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-17T06:09:20.021000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

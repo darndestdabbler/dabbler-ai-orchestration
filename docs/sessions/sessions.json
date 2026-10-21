@@ -5437,9 +5437,9 @@
     {
       "number": 273,
       "title": "A cancelled session gets its transcript, marked cancelled",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-21T12:11:42.986000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-21T12:30:49.161000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

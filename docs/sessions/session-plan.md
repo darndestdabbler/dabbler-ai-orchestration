@@ -16672,11 +16672,12 @@ rewinds to verify and the close names it.
 
 ### Session 275 of 278: The framework calls in the Mechanic without the person
 
-Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` setting
-through the four layers), `drive.ts` (engaging on a stop, the budget, the
-undone attempt, the hand-back), `engines.ts` (launching a fresh engine
-CLI), `cli/consult.ts` (the unattended mandate in the briefing); their
-tests
+Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` and
+`dabbler.mechanicModel` settings through the layers), `cli/configure.ts`
+and `dabbler configuration explain` (the Mechanic Model), `drive.ts`
+(engaging on a stop, the budget, the undone attempt, the hand-back),
+`engines.ts` (launching a fresh engine CLI on the Mechanic Model),
+`cli/consult.ts` (the unattended mandate in the briefing); their tests
 
 **Why.** The operator, 2026-10-21: the framework is the developer's chief
 of staff and the AI a consultant, and there should be situations where
@@ -16695,6 +16696,21 @@ walls that matter are the ones nobody did.
 layers as every other choice and committed with the checkout. `attended`
 is 274's behaviour; `off` names no Mechanic at all.
 
+**Step 1b -- the Mechanic Model is its own choice.** The developer's staff
+member, 2026-10-21: the Mechanic often needs a highly capable model even
+where the Authoring Model is a medium one, because it is called in exactly
+where the author got stuck. `dabbler.mechanicModel` is read through the
+same layers as `dabbler.authoringModel` -- a flag, this checkout's
+`.vscode/settings.json`, the machine's `preferences.json` -- and written
+by `dabbler configure --mechanic-model <model>`. The Mechanic runs on the
+authoring engine's CLI, so the model is one that engine accepts, and a
+choice the engine refuses is a stop naming the setting, as an Authoring
+Model's is. Unset, it is the Authoring Model, which meets the one
+criterion -- at least as capable as the author -- by being the author's.
+It may not be the session's Primary Model, for the rule that the
+Mechanic is never the Primary Reviewer. `dabbler configuration explain`
+names the layer that decided it.
+
 **Step 2 -- what it may not do.** The briefing's unattended mandate is a
 deny-list of the person's authority: cancel, rollback, close,
 hold-release; any change to the plan or what counts as done; a
@@ -16709,8 +16725,8 @@ Primary Reviewer and tested with the session's diff.
 
 **Step 3 -- the framework engages.** In an ordinary session, `unattended`,
 a stop the framework would hand to a person first launches a
-fresh-context engine CLI on the reviewer's configured model, never the
-author's live session. A funds stop (272) and a person's own interrupt are
+fresh-context engine CLI on the Mechanic Model, never the author's live
+session. A funds stop (272) and a person's own interrupt are
 handed straight to the person. Routine rejections stay the author's.
 
 **Step 4 -- the budget, and a failed attempt undone.** One attempt per
@@ -16729,8 +16745,10 @@ record and the review that exist. A Mechanic that calls a Mechanic.
 
 **Tests.** In `drive.test.ts`: an unattended stop engages and the session
 continues; a failed attempt restores the tree; the budget hands back; a
-funds stop is never engaged. In `config.test.ts`, the setting reads
-through the layers.
+funds stop is never engaged; the Mechanic is launched on the Mechanic
+Model, and on the Authoring Model where none is set. In `config.test.ts`,
+the two settings read through the layers, and a Mechanic Model equal to
+the Primary Model is refused.
 
 **Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 278.
 
@@ -16739,7 +16757,8 @@ through the layers.
 Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 (*Open a Mechanic*), `src/providers/ActionRegistry.ts`,
 `src/providers/solutionTreeModel.ts` (the Configuration row for
-`dabbler.mechanic`), the Work Explorer's stop and its funds wait,
+`dabbler.mechanic`; *Authoring Model* and *Mechanic Model* under
+Authoring AI), the Work Explorer's stop and its funds wait,
 `package.json`; their tests; a walk page `docs/uat/uat-mechanic.md`
 
 **Why.** 274 and 275 are the router's. A person meets them in the editor:
@@ -16748,11 +16767,16 @@ unattended authority, a memo the Mechanic left on a hand-back, and 272's
 wait for funds.
 
 **Step 1 -- Open a Mechanic.** The consult launcher, briefed with
-`--mechanic`, on the reviewer's configured model by default and any other
-from the *Different Models...* list, never the author's live session.
+`--mechanic`, on the Mechanic Model by default and any other from the
+*Different Models...* list, never the author's live session.
 
-**Step 2 -- the setting.** A Configuration row for `dabbler.mechanic`,
+**Step 2 -- the settings.** A Configuration row for `dabbler.mechanic`,
 written to the checkout's settings and committed as every choice is.
+Under **Authoring AI**, the row that read *Model* reads *Authoring Model*,
+and a *Mechanic Model* row sits below it: a fourth role in `ROLE_LABELS`,
+`ROLE_COMMANDS` and `ROLE_HELP`, set by `dabblerSolution.setMechanicModel`
+from the authoring engine's own model list, and reading "same as
+Authoring Model" while nothing is chosen.
 
 **Step 3 -- what a person reads.** A stopped session shows the Mechanic's
 memo where there is one, and a session waiting for funds reads "Waiting

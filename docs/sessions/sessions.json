@@ -5459,9 +5459,9 @@
     {
       "number": 274,
       "title": "The Mechanic, ported back to the router",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-21T12:44:07.826000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-21T13:01:20.791000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

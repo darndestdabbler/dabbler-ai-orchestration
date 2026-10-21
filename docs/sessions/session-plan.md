@@ -16520,7 +16520,7 @@ engine and the reviewing vehicle, and not the machine's. No new test.
 
 The framework publishes session 270 as 3.22.1 and nothing else.
 
-### Session 272 of 278: An API out of credits pauses for funds, and Continue resumes it
+### Session 272 of 279: An API out of credits pauses for funds, and Continue resumes it
 
 Scope: `packages/router/src/transports/api.ts` (the retry ladder),
 `packages/router/src/transports/copilot.ts` (the error classes),
@@ -16568,9 +16568,9 @@ vendors' shapes is not retried and is told apart from a rate limit. In
 `drive.test.ts`, a verification call refused for funds stops with the
 funds kind, and the next instruction after it resumes the phase.
 
-**Releasable.** Yes -- with 273 to 277, as 3.23.0 in session 278.
+**Releasable.** Yes -- with 273 to 278, as 3.23.0 in session 279.
 
-### Session 273 of 278: A cancelled session gets its transcript, marked cancelled
+### Session 273 of 279: A cancelled session gets its transcript, marked cancelled
 
 Scope: `packages/router/src/session.ts` (`cancel`, the rollback),
 `packages/router/src/transcript.ts` (the cancelled page),
@@ -16616,9 +16616,9 @@ started.
 cancelled; a rollback after it keeps the page. In `transcript.test.ts`,
 the cancelled banner carries the reason and the last phase.
 
-**Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 278.
+**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 274 of 278: The Mechanic, ported back to the router
+### Session 274 of 279: The Mechanic, ported back to the router
 
 Scope: `packages/router` -- `cli/consult.ts` (`--mechanic`), `drive.ts`
 (an intervention after the land rewinds to verify; the close lists
@@ -16660,17 +16660,17 @@ rewinds to verify, so the Primary Reviewer reviews the fix with the
 session's diff. The close lists every intervention, and every stop's ways
 on name `dabbler consult --mechanic`.
 
-**Non-goals.** Anything unattended (275). The extension (276). Release
-sessions (277). No new verb but the flag. No Mechanic that is the
+**Non-goals.** Anything unattended (275). The extension (277). Release
+sessions (278). No new verb but the flag. No Mechanic that is the
 session's Primary Reviewer.
 
 **Tests.** In `consult.test.ts`, the briefing carries the stop, the rules
 and the two instructions. In `drive.test.ts`, a fix after the land
 rewinds to verify and the close names it.
 
-**Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 278.
+**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 275 of 278: The framework calls in the Mechanic without the person
+### Session 275 of 279: The framework calls in the Mechanic without the person
 
 Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` and
 `dabbler.mechanicModel` settings through the layers), `cli/configure.ts`
@@ -16739,7 +16739,7 @@ stop: the cause and its evidence, what was tried, the line it reached,
 and one recommendation, with a plan amendment drafted where one is
 needed, for the person to approve.
 
-**Non-goals.** Release sessions (277). The extension (276). Any guard
+**Non-goals.** Release sessions (278). The extension (277). Any guard
 machinery around the Mechanic -- no hashing, no sandbox -- beyond the
 record and the review that exist. A Mechanic that calls a Mechanic.
 
@@ -16750,9 +16750,43 @@ Model, and on the Authoring Model where none is set. In `config.test.ts`,
 the two settings read through the layers, and a Mechanic Model equal to
 the Primary Model is refused.
 
-**Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 278.
+**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 276 of 278: Open a Mechanic, and what it did, in the extension
+### Session 276 of 279: `off` names no Mechanic, and the Mechanic is walked past its stop
+
+Scope: `packages/router` -- `driver.ts` (`renderStop`'s ways on),
+`config.ts` (the Mechanic's two readings); tests in `driver.test.ts`,
+`config.test.ts` and `walk-session.test.ts`
+
+**Why.** Session 275's round 1 left three minor findings standing, each
+true. A setting that says `off` and a stop that still offers
+`dabbler consult --mechanic` is the setting a person can see being
+ignored. `explainMechanic` and `explainMechanicModel` read a flag layer
+no verb supplies. And the walk where the Mechanic clears a stop proves the
+stop was lifted, not that the session got past it.
+
+**Step 1 -- `off` names no Mechanic.** With `dabbler.mechanic` set to
+`off`, a stop's ways on leave out *Open a Mechanic*; `attended` and
+`unattended` keep it where 274 put it. One test in `driver.test.ts`.
+
+**Step 2 -- no layer nobody reaches.** The flag layer comes out of both
+readings, leaving this checkout's `.vscode/settings.json` and the
+machine's `preferences.json`: removing it is simpler than adding a
+`--mechanic` flag to a verb nobody asked to carry one. `config.test.ts`
+loses its flag assertions.
+
+**Step 3 -- walked past the stop.** The walk where the Mechanic clears a
+verification stop runs the second round to a pass, and asserts the session
+leaves verify and the attempt is `cleared`.
+
+**Non-goals.** The extension (277). Any change to what the Mechanic may
+do, its budget, or its brief. A new verb or flag.
+
+**Tests.** As each step names; no new test file.
+
+**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
+
+### Session 277 of 279: Open a Mechanic, and what it did, in the extension
 
 Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 (*Open a Mechanic*), `src/providers/ActionRegistry.ts`,
@@ -16761,7 +16795,7 @@ Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 Authoring AI), the Work Explorer's stop and its funds wait,
 `package.json`; their tests; a walk page `docs/uat/uat-mechanic.md`
 
-**Why.** 274 and 275 are the router's. A person meets them in the editor:
+**Why.** 274 to 276 are the router's. A person meets them in the editor:
 a stop they open a Mechanic on themselves, the setting that grants the
 unattended authority, a memo the Mechanic left on a hand-back, and 272's
 wait for funds.
@@ -16792,9 +16826,9 @@ whose page says cancelled.
 **Tests.** One per command and row changed, in the test file named after
 each.
 
-**Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 278.
+**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 277 of 278: A failed release is diagnosed, and one caused outside the repository retries in place
+### Session 278 of 279: A failed release is diagnosed, and one caused outside the repository retries in place
 
 Scope: `packages/router/src/drive.ts` (`phasePublish`'s stop and ways
 on), `packages/router/src/cli/consult.ts` (the release briefing); tests in
@@ -16826,7 +16860,7 @@ and 273's page records it.
 (a minor: an out-of-credits pause, cancelled transcripts, the Mechanic
 attended and unattended, a diagnosed release), stamped with `npm run
 stamp:version`, and the changelog gets the 3.23.0 section naming what 272
-to 277 changed for a developer.
+to 278 changed for a developer.
 
 **Non-goals.** The AI packaging or publishing anything. An automatic
 retry of a publish. Any edit inside a release session.
@@ -16835,8 +16869,8 @@ retry of a publish. Any edit inside a release session.
 engages diagnose-only and leaves the tree as it was, and a stopped
 release resumes at publish. `npm run check:version` checks the stamp.
 
-**Releasable.** Yes -- with 272 to 276, as 3.23.0 in session 278.
+**Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 279.
 
-### Session 278 of 278: Release 3.23.0 (release: 3.23.0)
+### Session 279 of 279: Release 3.23.0 (release: 3.23.0)
 
-The framework publishes sessions 272 to 277 as 3.23.0 and nothing else.
+The framework publishes sessions 272 to 278 as 3.23.0 and nothing else.

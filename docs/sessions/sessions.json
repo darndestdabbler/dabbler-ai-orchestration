@@ -5481,9 +5481,9 @@
     {
       "number": 275,
       "title": "The framework calls in the Mechanic without the person",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-21T13:02:05.184000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-21T13:45:47.236000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

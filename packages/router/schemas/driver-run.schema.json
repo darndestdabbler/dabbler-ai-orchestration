@@ -182,6 +182,21 @@
       },
       "description": "The rewinds this run has already made: a later phase refused on an earlier phase's evidence, and the loop went back and remade it. Here for the same reason `stop_history` is, and it is NOT the same list -- a rewind is not a stop, throws nothing, and is therefore invisible to the deadlock classifier. One rewind per distinct refusal is the bound: a refusal already in this list means going back did not fix it, and the loop stops instead of remaking the same evidence forever."
     },
+    "interventions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["at", "phase", "reason", "files"],
+        "properties": {
+          "at": { "type": "string", "minLength": 1 },
+          "phase": { "type": "string", "minLength": 1, "description": "The phase after the land the fix was found in." },
+          "reason": { "type": "string", "minLength": 1, "description": "The heading of the fix's entry in the mechanic log." },
+          "files": { "type": "array", "items": { "type": "string" }, "description": "The paths the fix moved." }
+        }
+      },
+      "description": "Fixes a Mechanic made after the land, each taken as an intervention and sent back to verify so it is reviewed and landed like any change. Kept whole, not capped: the close lists every one."
+    },
     "suites_owed_elsewhere": {
       "type": "array",
       "items": {

@@ -311,7 +311,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 271 | Release 3.22.1 (release: 3.22.1) | yes | 2026-10-17 |
 | 272 | An API out of credits pauses for funds, and Continue resumes it | no | 2026-10-21 |
 | 273 | A cancelled session gets its transcript, marked cancelled | no | 2026-10-21 |
-| 274 | The Mechanic, ported back to the router | — | not declared |
+| 274 | The Mechanic, ported back to the router | no | 2026-10-21 |
 | 275 | The framework calls in the Mechanic without the person | — | not declared |
 | 276 | Open a Mechanic, and what it did, in the extension | — | not declared |
 | 277 | A failed release is diagnosed, and one caused outside the repository retries in place | — | not declared |
@@ -3317,3 +3317,9 @@ Give a cancelled session the same committed transcript page a closed one gets, m
 
 - 2026-10-21 — step 'cancel-writes-page': its files: two walk tests assert the cancel's commits since the start, and a cancel now adds the transcript's own commit (claude-code (anthropic, claude-opus-5-5))
 - 2026-10-21 — step 'rollback-keeps-page': its files: a rollback's reverts need a real repository, and real git is a walkthrough's (test/support/no-git.ts): the test belongs in walk-session.test.ts's rollback suite (claude-code (anthropic, claude-opus-5-5))
+
+### Session 274 — The Mechanic, ported back to the router
+
+**Releasable: no.**
+
+Port session 231's Mechanic back onto master's router, as a port onto today's code rather than a revert of e9caac09. `dabbler consult --mechanic` prints a briefing for a fresh AI instance: the stop in the framework's own words (rendered by renderStop) and the record rows it rests on (the latest verification round and packaging run), where the run record, job logs and transcripts are, the rules that keep the session restartable, the person's verbs it may only recommend, the verbs it may run once the person agrees, and its two instructions verbatim. A tracked `docs/sessions/mechanic-log.md` documents one entry per intervention. The drive loop takes a tree that moved after the land (gate-wait, publish, close) as an intervention only when the mechanic log carries a new entry, records it on the run (`interventions` in driver-run.schema.json and its generated type) and rewinds to verify so the Primary Reviewer reviews the fix with the session's diff; the session's completion lists every intervention. Every stop's ways on name `dabbler consult --mechanic`, ahead of cancelling, and the managed body in bootstrap/templates.ts (and this repo's AGENTS.md rendering of it) mentions `--mechanic`.

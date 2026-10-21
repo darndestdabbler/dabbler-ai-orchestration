@@ -154,6 +154,24 @@ export type DriverRun = {
     at: string;
   }[];
   /**
+   * Fixes a Mechanic made after the land, each taken as an intervention and sent back to verify so it is reviewed and landed like any change. Kept whole, not capped: the close lists every one.
+   */
+  interventions?: {
+    at: string;
+    /**
+     * The phase after the land the fix was found in.
+     */
+    phase: string;
+    /**
+     * The heading of the fix's entry in the mechanic log.
+     */
+    reason: string;
+    /**
+     * The paths the fix moved.
+     */
+    files: string[];
+  }[];
+  /**
    * Retired with the focused checkout: nothing writes or reads it now. Kept optional so a run recorded before the retirement is still read.
    */
   suites_owed_elsewhere?: {

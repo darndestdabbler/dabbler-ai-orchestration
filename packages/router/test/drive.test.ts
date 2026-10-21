@@ -68,6 +68,8 @@ import {
   staleJobDisposition,
   stepChangedPaths,
   stepFilesLine,
+  judgeIntervention,
+  interventionsClosing,
   unchangedStepFiles,
   checkFailedRefusal,
   CHECK_FAILED_WAYS,
@@ -743,6 +745,39 @@ describe("a check that fails", () => {
     assert.ok(!own.includes("declared by step"), own);
     const timedOut = checkFailedRefusal("widget", { argv: ["sleep"] }, { exitCode: null, treeMutated: true, output: "tick\n" });
     assert.match(timedOut, /-> exit none \(timed out\) \(the check changed the tree\)\ntick\n/);
+  });
+});
+
+describe("judgeIntervention", () => {
+  it("takes a fix after the land by its newest log entry, and refuses one with no entry", () => {
+    const log =
+      "# Mechanic log\n\n```markdown\n## Session <N> -- <the stop>\n```\n\n" +
+      "## Session 7 -- SQLite has no JPA dialect\n\n- **Diagnosis:** ...\n\n" +
+      "## Session 7 -- the plan now names H2\n";
+    const landed = "# Mechanic log\n\n## Session 7 -- SQLite has no JPA dialect\n";
+    assert.deepEqual(
+      judgeIntervention(["docs/sessions/session-plan.md", "docs/sessions/mechanic-log.md"], "docs/sessions", log, landed),
+      { reason: "Session 7 -- the plan now names H2" },
+    );
+    const noEntry = judgeIntervention(["pom.xml"], "docs/sessions", log, landed);
+    assert.ok("refusal" in noEntry && /docs\/sessions\/mechanic-log\.md/.test(noEntry.refusal));
+    // An entry the landed log already carries, edited, is not a new one.
+    const edited = judgeIntervention(["docs/sessions/mechanic-log.md"], "docs/sessions", `${landed}\n- **Diagnosis:** more\n`, landed);
+    assert.ok("refusal" in edited);
+    // The fenced shape is documentation, never an entry.
+    const onlyShape = judgeIntervention(["docs/sessions/mechanic-log.md"], "docs/sessions", "```\n## Session <N>\n```\n", null);
+    assert.ok("refusal" in onlyShape);
+  });
+});
+
+describe("interventionsClosing", () => {
+  it("names every fix the close took, and says nothing when it took none", () => {
+    assert.equal(interventionsClosing("7", undefined), "");
+    const closing = interventionsClosing("7", [
+      { at: "2026-10-21T12:00:00-04:00", phase: "publish", reason: "Session 7 -- the plan now names H2", files: ["pom.xml", "docs/sessions/mechanic-log.md"] },
+    ]);
+    assert.match(closing, /session 7 closed after 1 intervention\(s\)/);
+    assert.match(closing, /Session 7 -- the plan now names H2 \(in 'publish': pom\.xml, docs\/sessions\/mechanic-log\.md\)/);
   });
 });
 

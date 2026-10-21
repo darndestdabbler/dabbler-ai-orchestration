@@ -12688,6 +12688,13 @@
       "what": "step 'rollback-keeps-page': its files",
       "reason": "a rollback's reverts need a real repository, and real git is a walkthrough's (test/support/no-git.ts): the test belongs in walk-session.test.ts's rollback suite",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 274,
+      "dateTime": "2026-10-21T12:45:21.281000-04:00",
+      "task": "Port session 231's Mechanic back onto master's router, as a port onto today's code rather than a revert of e9caac09. `dabbler consult --mechanic` prints a briefing for a fresh AI instance: the stop in the framework's own words (rendered by renderStop) and the record rows it rests on (the latest verification round and packaging run), where the run record, job logs and transcripts are, the rules that keep the session restartable, the person's verbs it may only recommend, the verbs it may run once the person agrees, and its two instructions verbatim. A tracked `docs/sessions/mechanic-log.md` documents one entry per intervention. The drive loop takes a tree that moved after the land (gate-wait, publish, close) as an intervention only when the mechanic log carries a new entry, records it on the run (`interventions` in driver-run.schema.json and its generated type) and rewinds to verify so the Primary Reviewer reviews the fix with the session's diff; the session's completion lists every intervention. Every stop's ways on name `dabbler consult --mechanic`, ahead of cancelling, and the managed body in bootstrap/templates.ts (and this repo's AGENTS.md rendering of it) mentions `--mechanic`.",
+      "releasable": false
     }
   ]
 }

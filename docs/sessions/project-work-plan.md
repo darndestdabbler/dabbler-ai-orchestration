@@ -310,7 +310,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 270 | The Configuration row names what each role runs on | no | 2026-10-17 |
 | 271 | Release 3.22.1 (release: 3.22.1) | yes | 2026-10-17 |
 | 272 | An API out of credits pauses for funds, and Continue resumes it | no | 2026-10-21 |
-| 273 | A cancelled session gets its transcript, marked cancelled | — | not declared |
+| 273 | A cancelled session gets its transcript, marked cancelled | no | 2026-10-21 |
 | 274 | The Mechanic, ported back to the router | — | not declared |
 | 275 | The framework calls in the Mechanic without the person | — | not declared |
 | 276 | Open a Mechanic, and what it did, in the extension | — | not declared |
@@ -3306,3 +3306,14 @@ Release 3.22.1: the framework packs and publishes what is on the trunk.
 **Releasable: no.**
 
 Make an exhausted balance a pause rather than a failure. The API transport recognises a funds refusal from the provider's own words (OpenAI's insufficient_quota and credit_balance_exhausted, Anthropic's 'credit balance is too low', Google's 429 RESOURCE_EXHAUSTED only where its words name billing or depleted credits) and throws a FundsError at once, naming the vendor, the key's variable and where that vendor's balance is topped up, without spending a retry; a real rate limit and a timeout keep the ladder unchanged. The seat transport classifies the seat's exhausted AI credits as a class of its own ahead of the rate-limit class, and route() raises the same FundsError for it. `verify` exits with a new EXIT_FUNDS, writing 'waiting for funds: <vendor>' first, and is not retried by dispatchVerification. The driver maps that exit to a stop of the new kind 'funds' whose one way on is to add funds and ask for the next instruction -- the existing resume then re-enters the verification phase and makes the same call; no cancel or rollback is offered. The stop's rendering and the run's waiting line read 'waiting for funds: <vendor>', so `dabbler status` and the terminal show a wait rather than a failure.
+
+### Session 273 — A cancelled session gets its transcript, marked cancelled
+
+**Releasable: no.**
+
+Give a cancelled session the same committed transcript page a closed one gets, marked cancelled. renderSessionTranscript reads the session's own row from sessions.json and, when it is cancelled, opens the page with a CANCELLED banner carrying the reason, when, and the last phase the run reached (or that nothing ran) -- one rule, the same page otherwise, failed job output included. The write-commit of a page moves out of drive.ts's phaseLog into one transcript.ts function both callers use, with one replacement rule: a page on disk is kept, unless it is a cancelled page, which whatever is written next replaces. `session cancel` calls it after the cancelled state is committed, under the same dabbler.transcript setting, and pushes where there is an upstream; a page that fails to render, commit or push is said and the cancel stands. phaseLog calls it too, so a restored session that later closes renders its closed page over the cancelled one. A rollback whose reverts would delete a cancelled session's page restores that page from the pre-rollback HEAD and commits it with the rollback's own record.
+
+**Amended after acceptance:**
+
+- 2026-10-21 — step 'cancel-writes-page': its files: two walk tests assert the cancel's commits since the start, and a cancel now adds the transcript's own commit (claude-code (anthropic, claude-opus-5-5))
+- 2026-10-21 — step 'rollback-keeps-page': its files: a rollback's reverts need a real repository, and real git is a walkthrough's (test/support/no-git.ts): the test belongs in walk-session.test.ts's rollback suite (claude-code (anthropic, claude-opus-5-5))

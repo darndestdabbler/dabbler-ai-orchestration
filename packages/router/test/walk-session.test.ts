@@ -28,7 +28,7 @@ import { detectOutOfBandWrite } from "../src/evidence.ts";
 import { readRawSessionState, readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import { EXIT_OK, EXIT_USAGE, RELEASE_ENGINE, cancel, declare, holdRelease, interrupt, planAmend, report, rollback, start } from "../src/session.ts";
+import { EXIT_OK, EXIT_USAGE, RELEASE_ENGINE, cancel, declare, holdRelease, interrupt, planAmend, report, restore, rollback, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
 import { amendmentEntries, readTaskDeclaration } from "../src/writers.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
@@ -1192,9 +1192,10 @@ describe("a session cancelled underneath its loop", () => {
     assert.match(instruction.ask, /start no waiter/);
     // Not a stop: nothing offers a way on, and no waiter revives a loop over it.
     assert.equal(readRun(repo, 1)?.stop ?? null, null);
-    // Only the cancellation's own record was committed; the work is where it was.
+    // Only the cancellation's own record and its page were committed; the
+    // work is where it was.
     const log = gitOut(repo, "log", "--format=%s", headBefore + "..HEAD").trim();
-    assert.equal(log, "Cancel session 1 of sessions");
+    assert.equal(log, "Transcript for session 001\nCancel session 1 of sessions");
     assert.match(gitOut(repo, "status", "--porcelain"), / M src\/widget\.py/);
   });
 
@@ -1234,7 +1235,7 @@ describe("a session cancelled underneath its loop", () => {
     assert.equal(readRun(repo, 1)?.stop ?? null, null);
     assert.equal(
       gitOut(repo, "log", "--format=%s", headBefore + "..HEAD").trim(),
-      "Cancel session 1 of sessions",
+      "Transcript for session 001\nCancel session 1 of sessions",
     );
   });
 
@@ -2174,5 +2175,27 @@ describe("a session rolled back to where it started", () => {
     assert.equal(again.value, EXIT_OK, again.stderr);
     assert.equal(readSessionState(sessionsDir)?.["currentSession"], 1);
     assert.equal(rows()?.[0]?.["startCommit"], gitOut(repo, "rev-parse", "HEAD").trim());
+  });
+
+  it("keeps a cancelled page through a rollback to the start of that session", async () => {
+    // Cancelled, restored, then rolled back: the reverts would take the
+    // page's commit with them, and the page is the one record of the cancel.
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    assert.equal((await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })))).value, EXIT_OK);
+    const cancelled = await capture(() => Promise.resolve(cancel(sessionsDir, 1, { reason: "wrong objective", engine: false })));
+    assert.equal(cancelled.value, EXIT_OK, cancelled.stderr);
+    assert.equal((await capture(() => Promise.resolve(restore(sessionsDir, 1, { reason: "back" })))).value, EXIT_OK);
+    const rolled = await capture(() => Promise.resolve(rollback(sessionsDir, { reason: "start over", engine: false })));
+    assert.equal(rolled.value, EXIT_OK, rolled.stderr);
+    assert.match(
+      readFileSync(join(repo, "docs", "transcripts", "session-001.html"), "utf8"),
+      /CANCELLED[\s\S]*wrong objective/,
+    );
+    assert.match(gitOut(repo, "ls-files", "--", "docs/transcripts"), /session-001\.html/);
+    assert.equal(gitOut(repo, "status", "--porcelain", "--", "docs/transcripts").trim(), "");
   });
 });

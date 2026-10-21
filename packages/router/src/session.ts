@@ -52,8 +52,11 @@ import {
   sessionReviewerOf,
   withSessionReviewers,
   withSessionVehicle,
+  transcriptCarry,
   type RouterConfig,
+  type TranscriptCarry,
 } from "./config.ts";
+import { commitSessionTranscript, isCancelledPage } from "./transcript.ts";
 import {
   credentialStops,
   pastedKeyRefusal,
@@ -132,6 +135,7 @@ import {
   nowIso,
   platformNewlines,
   reconcileWithOrigin,
+  TRANSCRIPTS_DIRNAME,
   repoRootFor,
   runGit,
 } from "./journal.ts";
@@ -3469,13 +3473,21 @@ const CANCEL_COMMIT_BASENAMES: readonly string[] = [
 /**
  * Commit the cancellation's own record: those of the three files that exist
  * and are changed, by path, so anything else uncommitted -- staged or not --
- * is left exactly as it was. Nothing is pushed. Returns why the commit
+ * is left exactly as it was; `alsoRepoPaths` are other framework-written
+ * files the same commit carries. Nothing is pushed. Returns why the commit
  * failed, or null.
  */
-function commitFrameworkFiles(sessionsDir: string, message: string): string | null {
+function commitFrameworkFiles(
+  sessionsDir: string,
+  message: string,
+  alsoRepoPaths: readonly string[] = [],
+): string | null {
   const repoRoot = repoRootFor(sessionsDir);
   if (repoRoot === null) return null;
-  const paths = CANCEL_COMMIT_BASENAMES.map((name) => resolve(sessionsDir, name)).filter(isFile);
+  const paths = [
+    ...CANCEL_COMMIT_BASENAMES.map((name) => resolve(sessionsDir, name)),
+    ...alsoRepoPaths.map((path) => resolve(repoRoot, path)),
+  ].filter(isFile);
   if (paths.length === 0) return null;
   const changed = runGit(repoRoot, ["status", "--porcelain", "--", ...paths]);
   if (changed.code !== 0 || changed.stdout.trim() === "") return null;
@@ -3485,6 +3497,40 @@ function commitFrameworkFiles(sessionsDir: string, message: string): string | nu
     return committed.stderr.trim() || committed.stdout.trim();
   }
   return null;
+}
+
+/**
+ * The cancelled session's page, committed and pushed where there is an
+ * upstream. `.dabbler/runs/` is this machine's, so the page is the only
+ * record of a cancelled session anyone else can read -- and the failure that
+ * most needs reading is often the one that ended in a cancel. The record is
+ * already written, so whatever goes wrong here is said and never refuses it.
+ */
+function writeCancelledPage(sessionsDir: string, sessionNumber: number): void {
+  const repoRoot = repoRootFor(sessionsDir);
+  if (repoRoot === null) return;
+  let carry: TranscriptCarry;
+  try {
+    carry = transcriptCarry(repoRoot);
+  } catch (error) {
+    writeErr(`cancel: no transcript written: ${error instanceof Error ? error.message : String(error)}\n`);
+    return;
+  }
+  if (carry === "off") return;
+  const page = commitSessionTranscript(repoRoot, sessionNumber, {
+    jobs: carry === "full" ? "all" : "failed",
+    sessionsDir,
+  });
+  if (page.outcome === "kept") return;
+  if (page.outcome !== "committed") {
+    writeErr(`cancel: the session is cancelled, but its transcript was not committed: ${page.why}\n`);
+    return;
+  }
+  if (runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).code !== 0) return;
+  const pushed = runGit(repoRoot, ["push"]);
+  if (pushed.code !== 0) {
+    writeErr(`cancel: the transcript ${page.path} is committed, but git push failed: ${firstLine(pushed.stderr)}\n`);
+  }
 }
 
 export function cancel(
@@ -3556,6 +3602,7 @@ export function cancel(
       return EXIT_GATE_FAILED;
     }
     writeOut(`${dumps({ session: sessionNumber, status: STATUS_CANCELLED })}\n`);
+    writeCancelledPage(sessionsDir, sessionNumber);
     // Nothing is unwound, so what the session had changed is still in the
     // tree -- said here, where the person who cancelled is looking, rather
     // than found at the next start's refusal.
@@ -3944,6 +3991,13 @@ export function rollback(sessionsDir: string, options: RollbackCliOptions): numb
       writeErr(`rollback: refused -- untracked files could not be removed: ${firstLine(cleaned.stderr)}\n`);
       return EXIT_GATE_FAILED;
     }
+    // A cancelled session's page is the one record of it anyone else can
+    // read, and outlives the reverts that would otherwise take it: put back
+    // from the HEAD the rollback began at, and committed with its record.
+    const cancelledPages = runGit(repoRoot, ["ls-files", "--", TRANSCRIPTS_DIRNAME]).stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((path) => path !== "" && isCancelledPage(runGit(repoRoot, ["show", `${headNow}:${path}`]).stdout));
     if (commits.length > 0) {
       const reverted = runGit(repoRoot, ["revert", "--no-edit", `${anchor}..HEAD`]);
       if (reverted.code !== 0) {
@@ -3955,6 +4009,7 @@ export function rollback(sessionsDir: string, options: RollbackCliOptions): numb
         );
         return EXIT_GATE_FAILED;
       }
+      if (cancelledPages.length > 0) runGit(repoRoot, ["checkout", headNow, "--", ...cancelledPages]);
     }
     // The framework's own records: every undone session's run moved aside,
     // their test runs dropped, the restored ledger sanctioned, and the
@@ -3967,7 +4022,11 @@ export function rollback(sessionsDir: string, options: RollbackCliOptions): numb
     const dropped = dropSessionRecords(repoRoot, (sessionNumber) => sessionNumber >= target);
     recordStateWrite(sessionsDir, repoRoot);
     recordRollback(sessionsDir, { sessionNumber: target, through, reason: options.reason, by: "operator" });
-    const committed = commitFrameworkFiles(sessionsDir, `Roll back to the start of session ${target} of ${basename(sessionsDir)}`);
+    const committed = commitFrameworkFiles(
+      sessionsDir,
+      `Roll back to the start of session ${target} of ${basename(sessionsDir)}`,
+      cancelledPages,
+    );
     if (committed !== null) {
       writeErr(`rollback: the repository was rolled back, but the record's commit failed: ${committed}\n`);
       return EXIT_GATE_FAILED;

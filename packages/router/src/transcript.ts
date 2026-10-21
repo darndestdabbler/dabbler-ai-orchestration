@@ -28,16 +28,17 @@
 // terminal, a CSS class in a page. Written twice it would be two rules that
 // agreed on the day they were written.
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import { driverDir, readDriverEvents, readRun, readWorkPlan } from "./driver.ts";
 import { SESSION_PLAN_FILENAME } from "./evidence.ts";
 import { jobLogPath, jobStatusPath, jobsDir } from "./jobs.ts";
-import { runGit } from "./journal.ts";
+import { TRANSCRIPTS_DIRNAME, runGit } from "./journal.ts";
 import { readRounds } from "./ledger.ts";
 import { redact } from "./packaging.ts";
-import { SESSION_HEADING_RE } from "./progress.ts";
+import { SESSION_HEADING_RE, STATUS_CANCELLED, sessionDisplayNumber } from "./progress.ts";
+import { readRawSessionState } from "./sessionState.ts";
 import { readRecords, type TestRunRecord } from "./testEvidence.ts";
 import { totalsOf, type TestTotals } from "./testOutput.ts";
 import { VERSION } from "./version.ts";
@@ -631,7 +632,7 @@ td details { margin: 0; }
 tr:has(details:not([open])) + tr.findings { display: none; }
 tr.findings > td { padding: 0 0 .5rem 1.5rem; }
 pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
-.stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
 .milestone { color: var(--tone-milestone); }
 .good { color: var(--tone-good); }
 .warn { color: var(--tone-warn); }
@@ -900,6 +901,50 @@ function renderWorkPlan(
     .join("\n");
 }
 
+/**
+ * The opening element of a cancelled session's page. Its class is also how a
+ * page on disk is known to be a cancelled one (`isCancelledPage`), which is
+ * the one kind of page the next write replaces.
+ */
+const CANCELLED_BANNER_OPEN = '<div class="cancelled" id="cancelled">';
+
+/** Whether a page on disk is a cancelled session's. */
+export function isCancelledPage(html: string): boolean {
+  return html.includes(CANCELLED_BANNER_OPEN);
+}
+
+/** The session's own row of `sessions.json`, or null. */
+function readSessionRow(sessionsDir: string, sessionNumber: number): Record<string, unknown> | null {
+  let state: Record<string, unknown> | null;
+  try {
+    state = readRawSessionState(sessionsDir);
+  } catch {
+    return null;
+  }
+  const sessions = state?.["sessions"];
+  const row = (Array.isArray(sessions) ? sessions : []).find(
+    (entry: unknown) =>
+      typeof entry === "object" && entry !== null && (entry as Record<string, unknown>)["number"] === sessionNumber,
+  ) as Record<string, unknown> | undefined;
+  return row ?? null;
+}
+
+function renderCancelledBanner(row: Record<string, unknown> | null, run: DriverRun | null): string {
+  if (row === null || row["status"] !== STATUS_CANCELLED) return "";
+  const reason = text(row["cancelledReason"]).trim();
+  const at = text(row["cancelledAt"]).trim();
+  const reached =
+    run === null
+      ? "It was cancelled before anything ran."
+      : `The run had reached the ${toned("milestone", text(run.phase))} phase.`;
+  return (
+    `${CANCELLED_BANNER_OPEN}<strong>CANCELLED</strong>` +
+    (at === "" ? "" : ` <span class="at">at ${escapeHtml(at)}</span>`) +
+    `<div>${reason === "" ? "No reason was given." : escapeHtml(reason)}</div>` +
+    `<div>${reached}</div></div>`
+  );
+}
+
 function renderStopBlock(run: DriverRun | null): string {
   const stop = run?.stop ?? null;
   if (stop === null) return "";
@@ -994,9 +1039,11 @@ export function renderSessionTranscript(
   const secrets = machineSecrets();
   const renderedAt = options.renderedAt ?? new Date().toISOString();
   const title = `Session ${String(sessionNumber).padStart(3, "0")} transcript`;
+  const row = options.sessionsDir === undefined ? null : readSessionRow(options.sessionsDir, sessionNumber);
 
   const body = [
     `<h1>${escapeHtml(title)}</h1>`,
+    renderCancelledBanner(row, reading.run),
     `<p class="stamp">Rendered ${escapeHtml(renderedAt)} by dabbler-ai-router ${escapeHtml(
       VERSION,
     )} at ${escapeHtml(headCommit(repoRoot))}.</p>`,
@@ -1050,4 +1097,48 @@ ${body}
 </body>
 </html>
 `;
+}
+
+// --- Writing one session's page -----------------------------------------------
+
+/** What became of one session's page. */
+export type PageWrite =
+  | { readonly outcome: "kept"; readonly path: string }
+  | { readonly outcome: "committed"; readonly path: string }
+  | { readonly outcome: "uncommitted" | "failed"; readonly path: string; readonly why: string };
+
+/**
+ * Render one session's page into `docs/transcripts/` and commit it on its
+ * own, never pushed: both callers -- the Log phase after a close, and a
+ * cancel -- push in their own way. Never throws.
+ *
+ * A page on disk is kept, because it carries on its face the commit it was
+ * rendered at, and replacing it would describe one session under another's
+ * stamp -- unless it is a cancelled page. The session it describes has then
+ * left that state (restored, or cancelled again), and the page written now
+ * is the one that is true.
+ */
+export function commitSessionTranscript(
+  repoRoot: string,
+  sessionNumber: number,
+  options: { readonly jobs: JobCarry; readonly sessionsDir: string },
+): PageWrite {
+  const path = `${TRANSCRIPTS_DIRNAME}/${sessionTranscriptName(sessionNumber)}`;
+  const absolute = join(repoRoot, TRANSCRIPTS_DIRNAME, sessionTranscriptName(sessionNumber));
+  try {
+    if (existsSync(absolute) && !isCancelledPage(readFileSync(absolute, "utf8"))) {
+      return { outcome: "kept", path };
+    }
+    mkdirSync(dirname(absolute), { recursive: true });
+    writeFileSync(absolute, renderSessionTranscript(repoRoot, sessionNumber, options), "utf8");
+    const added = runGit(repoRoot, ["add", "--", path]);
+    const committed =
+      added.code === 0
+        ? runGit(repoRoot, ["commit", "-m", `Transcript for session ${sessionDisplayNumber(sessionNumber)}`, "--", path])
+        : added;
+    if (committed.code !== 0) return { outcome: "uncommitted", path, why: committed.stderr.trim() };
+    return { outcome: "committed", path };
+  } catch (error) {
+    return { outcome: "failed", path, why: error instanceof Error ? error.message : String(error) };
+  }
 }

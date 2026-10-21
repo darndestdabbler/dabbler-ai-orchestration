@@ -21,6 +21,7 @@ import {
   ansiToHtml,
   fieldTone,
   humanizeStepKey,
+  isCancelledPage,
   lineTone,
   renderSessionTranscript,
   verdictTone,
@@ -365,6 +366,28 @@ describe("one session's transcript", () => {
     assert.match(html, /<p><strong>Why\.<\/strong> Read <code>run\.json<\/code> -- and say so\.<\/p>/);
     assert.match(html, /<ul><li>one &lt;b&gt;item&lt;\/b&gt;<\/li><li>two<\/li><\/ul>/);
     assert.ok(!html.includes("Later work"), "the next session's section leaked in");
+  });
+
+  it("opens a cancelled session's page with a banner carrying the reason and the last phase", () => {
+    const root = repoWithASession();
+    const sessionsDir = join(root, "docs", "sessions");
+    write(
+      join(sessionsDir, "sessions.json"),
+      JSON.stringify({
+        sessions: [{
+          number: 5, status: "cancelled", cancelledReason: "the publish <failed>",
+          cancelledAt: "2026-10-16T09:55:00-04:00",
+        }],
+      }),
+    );
+    const html = render(root, { sessionsDir });
+    assert.ok(isCancelledPage(html));
+    const banner = html.slice(html.indexOf('class="cancelled"'), html.indexOf("<h2>"));
+    assert.match(banner, /CANCELLED/);
+    assert.match(banner, /the publish &lt;failed&gt;/);
+    assert.match(banner, /2026-10-16T09:55:00-04:00/);
+    assert.match(banner, /reached the <span class="milestone">close<\/span> phase/);
+    assert.ok(!isCancelledPage(render(root)), "a page with no cancelled row carries no banner");
   });
 
   it("leaves the plan section off for a session the plan does not name", () => {

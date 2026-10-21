@@ -93,7 +93,7 @@ import {
   renderStop,
   AMEND_CHECKS_COMMAND,
 } from "./driver.ts";
-import { renderSessionTranscript, sessionTranscriptName } from "./transcript.ts";
+import { commitSessionTranscript } from "./transcript.ts";
 import { SETTING_TRANSCRIPT } from "./settings.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
@@ -139,7 +139,6 @@ import {
   runGit,
   snapshotWorktreeTree,
   treeWithPaths,
-  TRANSCRIPTS_DIRNAME,
 } from "./journal.ts";
 import {
   LedgerError,
@@ -4276,44 +4275,19 @@ class Driver {
       this.setPhase("complete");
       return;
     }
-    const relative = `${TRANSCRIPTS_DIRNAME}/${sessionTranscriptName(this.sessionNumber)}`;
-    const path = join(this.repoRoot, TRANSCRIPTS_DIRNAME, sessionTranscriptName(this.sessionNumber));
-    // Never overwritten, and the rule is the verb's: a page on disk was
-    // rendered against a tree that is no longer HEAD and carries that
-    // commit on its face, so replacing it would describe one session under
-    // another's stamp. One rule, wherever a transcript is written.
-    if (existsSync(path)) {
-      this.log("transcript-kept", { path: relative, why: "a page is already there" });
-      this.setPhase("complete");
-      return;
-    }
-    try {
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(
-        path,
-        renderSessionTranscript(this.repoRoot, this.sessionNumber, {
-          jobs: carry === "full" ? "all" : "failed",
-          sessionsDir: this.sessionsDir,
-        }),
-        "utf8",
-      );
-      const added = runGit(this.repoRoot, ["add", "--", relative]);
-      const committed =
-        added.code === 0
-          ? runGit(this.repoRoot, [
-              "commit",
-              "-m",
-              `Transcript for session ${sessionDisplayNumber(this.sessionNumber)}`,
-              "--",
-              relative,
-            ])
-          : added;
-      if (committed.code !== 0) {
-        this.log("transcript-uncommitted", { path: relative, why: committed.stderr.trim() });
-        this.setPhase("complete");
-        return;
-      }
-      this.log("transcript-committed", { path: relative, carry });
+    // A page already there is kept, unless it is the cancelled page of a
+    // session that was restored and has now closed: one rule, wherever a
+    // transcript is written.
+    const page = commitSessionTranscript(this.repoRoot, this.sessionNumber, {
+      jobs: carry === "full" ? "all" : "failed",
+      sessionsDir: this.sessionsDir,
+    });
+    if (page.outcome === "kept") {
+      this.log("transcript-kept", { path: page.path, why: "a page is already there" });
+    } else if (page.outcome !== "committed") {
+      this.log(`transcript-${page.outcome}`, { path: page.path, why: page.why });
+    } else {
+      this.log("transcript-committed", { path: page.path, carry });
       // And PUSHED, which is the whole point of committing it. The land's
       // push is already done by the time this phase runs, so a transcript
       // left on this machine would sit here until some later session's push
@@ -4324,17 +4298,13 @@ class Driver {
       // so the Stop is caught and said instead.
       try {
         pushLanded(this.repoRoot);
-        this.log("transcript-pushed", { path: relative });
+        this.log("transcript-pushed", { path: page.path });
       } catch (error) {
         this.log("transcript-unpushed", {
-          path: relative,
+          path: page.path,
           why: error instanceof Error ? error.message : String(error),
         });
       }
-    } catch (error) {
-      this.log("transcript-failed", {
-        why: error instanceof Error ? error.message : String(error),
-      });
     }
     this.setPhase("complete");
   }

@@ -1364,10 +1364,45 @@ describe("cancelling and restoring through the verb", () => {
       // By pathspec, so nothing else staged rides along.
       assert.deepEqual(named(commit), THREE);
       assert.deepEqual(named(calls.find((args) => args[0] === "add")!), THREE);
-      // The unrelated change is never named, and nothing is pushed or unwound.
+      // The unrelated change is never named, and nothing is unwound; the
+      // transcript's own commit follows (its test is below), and with no
+      // upstream nothing is pushed.
       assert.ok(!calls.some((args) => args.some((arg) => arg.includes("widget.py"))), JSON.stringify(calls));
-      assert.deepEqual(calls.map((args) => args[0]), ["status", "add", "commit"]);
+      assert.deepEqual(calls.slice(0, 3).map((args) => args[0]), ["status", "add", "commit"]);
+      assert.ok(!calls.some((args) => args[0] === "push"), JSON.stringify(calls));
       assert.equal(readFileSync(join(repo, "src", "widget.py"), "utf8"), "def widget():\n    return 2\n");
+    } finally {
+      restoreGit();
+    }
+  });
+
+  it("commits a page that says cancelled, after the cancellation's own commit", async () => {
+    // `.dabbler/runs/` is this machine's: the page is the one record of a
+    // cancelled session a second developer can read.
+    const repo = tempDir("cancel-page-");
+    seed(repo, SEED);
+    const sessionsDir = join(repo, "docs", "sessions");
+    const calls: string[][] = [];
+    const restoreGit = cleanRepoAnswers(repo, [
+      [["rev-parse", "HEAD"], { stdout: "a".repeat(40) }],
+      [
+        (args) => ["add", "commit"].includes(args[0]!),
+        (args) => {
+          calls.push([...args]);
+          return {};
+        },
+      ],
+    ]);
+    try {
+      registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+      const result = await run(() => cancel(sessionsDir, 1, { reason: "the publish failed", force: true }));
+      assert.equal(result.code, EXIT_OK, result.err);
+      const page = readFileSync(join(repo, "docs", "transcripts", "session-001.html"), "utf8");
+      assert.match(page, /CANCELLED/);
+      assert.match(page, /the publish failed/);
+      const commits = calls.filter((args) => args[0] === "commit");
+      assert.equal(commits.at(-1)![commits.at(-1)!.indexOf("-m") + 1], "Transcript for session 001");
+      assert.deepEqual(commits.at(-1)!.slice(-1), ["docs/transcripts/session-001.html"]);
     } finally {
       restoreGit();
     }

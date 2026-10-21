@@ -297,10 +297,10 @@ export function mechanicExplainLines(repoRoot: string): string[] {
       lines.push(`${label}: refused -- ${error.message}`);
     }
   };
-  reading("Mechanic", () => explainMechanic(null, repoRoot), "the built-in default");
+  reading("Mechanic", () => explainMechanic(repoRoot), "the built-in default");
   reading(
     "Mechanic Model",
-    () => explainMechanicModel(null, repoRoot),
+    () => explainMechanicModel(repoRoot),
     "nobody -- the authoring model is unset too, so the engine's own default runs",
   );
   return lines;

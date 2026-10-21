@@ -854,6 +854,14 @@ describe("a stop, as a person reads it", () => {
     }
   });
 
+  it("names no Mechanic among the ways on when the Mechanic is set off", () => {
+    const stop = { kind: "verification" as const, reason: "The provider could not be reached.", at: "2026-10-21T12:00:00-04:00" };
+    const commands = (mechanic: string) =>
+      renderStop(stop, { session_number: 7, phase: "verify", engine: "cli", mechanic }).choices.map((choice) => choice.command);
+    assert.ok(!commands("off").includes("dabbler consult --mechanic"));
+    assert.ok(commands("attended").includes("dabbler consult --mechanic"));
+  });
+
   it("reads a funds stop as a wait, with carrying on its one way and no ending offered", () => {
     const stop = { kind: "funds" as const, reason: "waiting for funds: openai. Add funds at the billing page.", at: "2026-10-21T12:00:00-04:00" };
     const words = renderStop(stop, { session_number: 7, phase: "verify", engine: "cli" });

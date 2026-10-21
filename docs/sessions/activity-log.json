@@ -12718,6 +12718,21 @@
       "what": "step 'engage': its files",
       "reason": "The two tests that need a real checkout (a fix restored with git, a session carried on past a stop) cannot spawn git from drive.test.ts: the suite allows real git only in the walkthrough files, so they live in walk-session.test.ts beside the other driven-session walks; the pure budget test stays in drive.test.ts.",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 276,
+      "dateTime": "2026-10-21T14:07:34.585000-04:00",
+      "task": "Close session 275's three standing minor findings in packages/router. A stop's ways on stop naming `dabbler consult --mechanic` when this checkout's `dabbler.mechanic` reads `off` (renderStop stays pure: StopContext gains an optional mechanic mode, which the callers that hold a repository root -- the driver's stop rendering in drive.ts and the status row in progress.ts -- pass from the Mechanic's reading); `attended` and `unattended` keep it where 274 put it. explainMechanic and explainMechanicModel lose the flag layer no verb supplies, leaving the checkout's .vscode/settings.json and the machine's preferences.json, with their callers and config.test.ts updated. And the walk where the Mechanic clears a verification stop runs the second round to a pass and asserts the session leaves verify with the attempt `cleared`.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 276,
+      "dateTime": "2026-10-21T14:08:19.930000-04:00",
+      "what": "step 'off-names-no-mechanic': its files",
+      "reason": "the Mechanic's reading-or-default helper is needed by both drive.ts and progress.ts; progress.ts cannot import drive.ts (drive imports progress), so it lives beside explainMechanic in config.ts",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

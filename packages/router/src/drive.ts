@@ -57,6 +57,7 @@ import {
   explainMechanicModel,
   explainRoleModel,
   loadConfig,
+  mechanicModeOrDefault,
   verificationRoundCap,
   transcriptCarry,
   type TranscriptCarry,
@@ -1907,7 +1908,7 @@ class Driver {
     let model: string | null;
     let decidedBy: string | null;
     try {
-      mode = explainMechanic(null, this.repoRoot).transport;
+      mode = explainMechanic(this.repoRoot).transport;
       const release = releaseSessionVersion(this.sessionsDir, this.sessionNumber) !== null;
       const why = mechanicHandsBack({ kind: stop.kind, reason: stop.message }, mode, release, attempts);
       if (why !== null) {
@@ -1915,7 +1916,7 @@ class Driver {
         return { memo: null };
       }
       // Unset, the Authoring Model; where that is unset too, the model the session was started on.
-      const reading = explainMechanicModel(null, this.repoRoot, this.primaryModel());
+      const reading = explainMechanicModel(this.repoRoot, this.primaryModel());
       model = reading.transport || orchestratorOf(this.repoRoot).model;
       decidedBy = reading.decidedBy;
     } catch (error) {
@@ -4816,7 +4817,10 @@ class Driver {
       this.save();
       // The words are the router's one rendering of a stop, shared with the
       // status row and the terminal; what is on disk is the record above.
-      const words = renderStop(this.run.stop as NonNullable<DriverRun["stop"]>, this.run);
+      const words = renderStop(this.run.stop as NonNullable<DriverRun["stop"]>, {
+        ...this.run,
+        mechanic: mechanicModeOrDefault(this.repoRoot),
+      });
       // The whole rendering, ways on included. The command that met the
       // stop is the surface a person is already looking at, and printing
       // three of the four things it knows sent one operator to look for

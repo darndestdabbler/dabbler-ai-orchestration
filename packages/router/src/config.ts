@@ -1057,11 +1057,9 @@ export function explainAuthoringModel(
   ]);
 }
 
-/** The layers that may name the Mechanic's delegation and its model. */
-export const MECHANIC_SOURCE_FLAG = "--mechanic on this call";
+/** The layers that may name the Mechanic's delegation and its model: this checkout, then this machine. */
 export const MECHANIC_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_MECHANIC})`;
 export const MECHANIC_SOURCE_PREFERENCES = "preferences.json (mechanic)";
-export const MECHANIC_MODEL_SOURCE_FLAG = "--mechanic-model on this call";
 export const MECHANIC_MODEL_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_MECHANIC_MODEL})`;
 export const MECHANIC_MODEL_SOURCE_PREFERENCES = "preferences.json (mechanic_model)";
 
@@ -1075,10 +1073,9 @@ export type MechanicMode = (typeof MECHANIC_MODES)[number];
 export const MECHANIC_DEFAULT: MechanicMode = "unattended";
 
 /** The Mechanic's delegation in force, and every layer that named one. A value it does not know is refused. */
-export function explainMechanic(cliFlag?: string | null, root?: string | null): TransportReading {
+export function explainMechanic(root?: string | null): TransportReading {
   const checkout = root ?? projectRoot();
   const reading = explainChoice([
-    [MECHANIC_SOURCE_FLAG, cliFlag ?? null],
     [MECHANIC_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_MECHANIC] ?? null],
     [MECHANIC_SOURCE_PREFERENCES, personal(() => readPreferences().mechanic)],
   ]);
@@ -1090,6 +1087,16 @@ export function explainMechanic(cliFlag?: string | null, root?: string | null): 
   return { ...reading, transport: mode };
 }
 
+/** The Mechanic's delegation for a surface that only words a stop: a value it cannot read is the default. */
+export function mechanicModeOrDefault(root: string): string {
+  try {
+    return explainMechanic(root).transport;
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    return MECHANIC_DEFAULT;
+  }
+}
+
 /**
  * The Mechanic Model in force, and every layer that named one.
  *
@@ -1099,13 +1106,11 @@ export function explainMechanic(cliFlag?: string | null, root?: string | null): 
  * Reviewer's to review and nobody reviews their own fix.
  */
 export function explainMechanicModel(
-  cliFlag?: string | null,
   root?: string | null,
   primary?: string | null,
 ): TransportReading {
   const checkout = root ?? projectRoot();
   const named = explainChoice([
-    [MECHANIC_MODEL_SOURCE_FLAG, cliFlag ?? null],
     [MECHANIC_MODEL_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_MECHANIC_MODEL] ?? null],
     [MECHANIC_MODEL_SOURCE_PREFERENCES, personal(() => readPreferences().mechanic_model)],
   ]);
@@ -1162,8 +1167,6 @@ export function layerOfSource(source: string): Exclude<ChoiceLayer, "default"> |
     source === TRANSPORT_SOURCE_FLAG ||
     source === AUTHORING_MODEL_SOURCE_FLAG ||
     source === ENGINE_SOURCE_FLAG ||
-    source === MECHANIC_SOURCE_FLAG ||
-    source === MECHANIC_MODEL_SOURCE_FLAG ||
     source === REVIEWER_MODEL_SOURCE_SESSION ||
     source === AUXILIARY_MODEL_SOURCE_SESSION ||
     source === REVIEWING_SOURCE_SESSION

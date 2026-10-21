@@ -1375,6 +1375,8 @@ export interface StopContext {
   readonly phase: string;
   /** The adapter the run names. `cli` is the pull: the framework invokes no engine. */
   readonly engine?: string;
+  /** The Mechanic's delegation in force: `off` names no Mechanic among the ways on. */
+  readonly mechanic?: string;
 }
 
 /**
@@ -2029,11 +2031,11 @@ export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
   // Every stop's ways on name the Mechanic, ahead of ending the session
   // where ending it is one: stated here once rather than in every situation.
   // The wait for funds is not a stop and keeps its one way: nothing in the
-  // tree can pay for a round.
+  // tree can pay for a round. A Mechanic set `off` is named nowhere.
   const ending = new Set([cancelChoice().command, rollbackChoice().command]);
   const endAt = moves.findIndex((choice) => ending.has(choice.command));
   const choices =
-    stop.kind === "funds"
+    stop.kind === "funds" || run.mechanic === "off"
       ? moves
       : endAt === -1
         ? [...moves, MECHANIC_CHOICE]

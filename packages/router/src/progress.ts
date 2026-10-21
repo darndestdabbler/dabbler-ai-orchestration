@@ -21,7 +21,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { loadConfig, verificationRoundCap } from "./config.ts";
+import { loadConfig, mechanicModeOrDefault, verificationRoundCap } from "./config.ts";
 import {
   ACTIVITY_LOG_FILENAME,
   SESSION_PLAN_FILENAME,
@@ -1233,7 +1233,7 @@ export function buildTaskRows(
     // stderr and the terminal cannot word it differently -- and so the
     // command it names is the mode's, which a sentence written here once
     // got wrong for every pulled session.
-    const words = renderStop(driverStop, driverRun);
+    const words = renderStop(driverStop, { ...driverRun, mechanic: mechanicModeOrDefault(repoRoot) });
     const openIndex = phases.findIndex((phase) => phase.doneAt === null);
     if (openIndex >= 0) {
       phases[openIndex] = {

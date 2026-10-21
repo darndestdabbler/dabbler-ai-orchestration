@@ -21,7 +21,7 @@ import { driveSession, mechanicMemoPath, reportAndNext, sessionNext, setMechanic
 import { mailboxEngine, type EngineOutcome } from "../src/engines.ts";
 import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
 import { EXIT_CALL_FAILED } from "../src/contracts/exitCodes.ts";
-import { beginJobRecord, jobRecord, setJobStarter } from "../src/jobs.ts";
+import { beginJobRecord, jobRecord, setJobStarter, startJob } from "../src/jobs.ts";
 import { SETTING_AUTHORING_MODEL, SETTING_MECHANIC_MODEL, writeSettings } from "../src/settings.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { judgeSuiteDeclaration } from "../src/gates.ts";
@@ -2215,7 +2215,7 @@ describe("the Mechanic, called in without the person, on a real checkout", () =>
     launch: (act: (repo: string) => EngineOutcome | void) => void;
   } {
     const { repo, sessionsDir } = makeSandbox();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
     writeSettings(repo, settings);
     writeRun(repo, 1, {
       schema_version: 1, session_number: 1, engine: "claude-code", phase: "verify", seq: 2,
@@ -2223,13 +2223,16 @@ describe("the Mechanic, called in without the person, on a real checkout", () =>
       stop: null, lease_epoch: 1,
       started_at: "2026-10-21T10:00:00-04:00", updated_at: "2026-10-21T10:00:00-04:00",
     });
-    // Every round fails to reach its provider until the Mechanic's file is there.
+    // Every round fails to reach its provider until the Mechanic's file is
+    // there; from then on the round is the real one, run in this process.
     const unsetJob = setJobStarter((root, session, options) => {
-      const { log, status } = beginJobRecord(root, session, options.name);
-      if (!existsSync(join(root, "FIXED"))) {
-        writeFileSync(log, "verify: the provider could not be reached.\n");
-        writeFileSync(status, JSON.stringify({ exit: EXIT_CALL_FAILED, ended_at: new Date().toISOString() }));
+      if (existsSync(join(root, "FIXED"))) {
+        unsetJob();
+        return startJob(root, session, options);
       }
+      const { log, status } = beginJobRecord(root, session, options.name);
+      writeFileSync(log, "verify: the provider could not be reached.\n");
+      writeFileSync(status, JSON.stringify({ exit: EXIT_CALL_FAILED, ended_at: new Date().toISOString() }));
       return jobRecord(root, session, options, process.pid);
     });
     const launched: Array<readonly [string, string | null]> = [];
@@ -2252,7 +2255,9 @@ describe("the Mechanic, called in without the person, on a real checkout", () =>
     };
   }
 
-  it("engages on an unattended stop, on the Mechanic Model, and the session carries on", async () => {
+  it("engages on an unattended stop, on the Mechanic Model, and the session carries on past it", async () => {
+    setProviderKeys();
+    configure([VERIFIED]);
     const s = stoppedInVerify({ [SETTING_AUTHORING_MODEL]: "claude-sonnet-5-5", [SETTING_MECHANIC_MODEL]: "claude-opus-5-5" });
     try {
       s.launch((repo) => writeFileSync(join(repo, "FIXED"), "the provider is routed elsewhere\n"));
@@ -2268,6 +2273,14 @@ describe("the Mechanic, called in without the person, on a real checkout", () =>
       assert.equal(run.mechanic_attempts?.[0]?.kind, "verification");
       assert.deepEqual(run.mechanic_attempts?.[0]?.files, ["FIXED"]);
       assert.equal(run.stop_history?.at(-1)?.kind, "verification");
+      // The round after the fix passes, and the session leaves verify with the attempt cleared.
+      await settleJobs();
+      await capture(() => sessionNext(s.sessionsDir, {}));
+      const after = readRun(s.repo, 1)!;
+      assert.equal(after.phase, "run-of-record");
+      assert.equal(after.mechanic_attempts?.[0]?.outcome, "cleared");
+      // The run of record it started is settled here, so no walk after this one inherits it.
+      await settleJobs();
     } finally {
       s.restore();
     }

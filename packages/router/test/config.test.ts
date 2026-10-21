@@ -27,6 +27,7 @@ import {
   explainEngine,
   explainMechanic,
   explainMechanicModel,
+  mechanicModeOrDefault,
   explainReviewingTransport,
   explainRoleModel,
   explainTranscript,
@@ -846,23 +847,25 @@ describe("the Mechanic and its model, read through the layers", () => {
     try {
       // Nobody chose: the framework may call it in, on the author's own model.
       writeSettings(other, { [SETTING_AUTHORING_MODEL]: "claude-sonnet-5-5" });
-      assert.equal(explainMechanic(null, other).transport, "unattended");
-      assert.equal(explainMechanic(null, other).decidedBy, null);
-      assert.equal(explainMechanicModel(null, other).transport, "claude-sonnet-5-5");
+      assert.equal(explainMechanic(other).transport, "unattended");
+      assert.equal(explainMechanic(other).decidedBy, null);
+      assert.equal(explainMechanicModel(other).transport, "claude-sonnet-5-5");
 
       writePreferences({ mechanic: "attended", mechanicModel: "claude-opus-5-5" });
-      assert.equal(explainMechanic(null, other).transport, "attended");
-      assert.equal(explainMechanicModel(null, other).transport, "claude-opus-5-5");
-      assert.equal(keptIn(explainMechanicModel(null, other)), "machine");
+      assert.equal(explainMechanic(other).transport, "attended");
+      assert.equal(explainMechanicModel(other).transport, "claude-opus-5-5");
+      assert.equal(keptIn(explainMechanicModel(other)), "machine");
 
       writeSettings(mine, { [SETTING_MECHANIC]: "off", [SETTING_MECHANIC_MODEL]: "claude-fable-5-1" });
-      assert.equal(explainMechanic(null, mine).transport, "off");
-      assert.equal(keptIn(explainMechanic(null, mine)), "checkout");
-      assert.equal(explainMechanicModel(null, mine).transport, "claude-fable-5-1");
-      assert.equal(explainMechanic("unattended", mine).transport, "unattended");
+      assert.equal(explainMechanic(mine).transport, "off");
+      assert.equal(keptIn(explainMechanic(mine)), "checkout");
+      assert.equal(explainMechanicModel(mine).transport, "claude-fable-5-1");
+      assert.equal(mechanicModeOrDefault(mine), "off");
 
       writeSettings(mine, { [SETTING_MECHANIC]: "sometimes" });
-      assert.throws(() => explainMechanic(null, mine), /dabbler.mechanic.*must be one of/);
+      assert.throws(() => explainMechanic(mine), /dabbler.mechanic.*must be one of/);
+      // A surface that only words a stop reads a value it cannot use as the default.
+      assert.equal(mechanicModeOrDefault(mine), "unattended");
     } finally {
       writePreferences({ mechanic: "", mechanicModel: "" });
     }
@@ -871,8 +874,8 @@ describe("the Mechanic and its model, read through the layers", () => {
   it("refuses a Mechanic Model that is the session's Primary Model, naming the setting", () => {
     const root = tempDir("mechanic-primary-");
     writeSettings(root, { [SETTING_MECHANIC_MODEL]: "gpt-5.6-sol" });
-    assert.throws(() => explainMechanicModel(null, root, "gpt-5.6-sol"), /Primary Model.*dabbler.mechanicModel/);
-    assert.equal(explainMechanicModel(null, root, "claude-opus-5-5").transport, "gpt-5.6-sol");
+    assert.throws(() => explainMechanicModel(root, "gpt-5.6-sol"), /Primary Model.*dabbler.mechanicModel/);
+    assert.equal(explainMechanicModel(root, "claude-opus-5-5").transport, "gpt-5.6-sol");
   });
 });
 

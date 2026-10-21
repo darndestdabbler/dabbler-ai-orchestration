@@ -313,9 +313,10 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 273 | A cancelled session gets its transcript, marked cancelled | no | 2026-10-21 |
 | 274 | The Mechanic, ported back to the router | no | 2026-10-21 |
 | 275 | The framework calls in the Mechanic without the person | no | 2026-10-21 |
-| 276 | Open a Mechanic, and what it did, in the extension | — | not declared |
-| 277 | A failed release is diagnosed, and one caused outside the repository retries in place | — | not declared |
-| 278 | Release 3.23.0 (release: 3.23.0) | — | not declared |
+| 276 | `off` names no Mechanic, and the Mechanic is walked past its stop | no | 2026-10-21 |
+| 277 | Open a Mechanic, and what it did, in the extension | — | not declared |
+| 278 | A failed release is diagnosed, and one caused outside the repository retries in place | — | not declared |
+| 279 | Release 3.23.0 (release: 3.23.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3334,3 +3335,13 @@ Let the framework call in the Mechanic without the person. Two new choices read 
 
 - 2026-10-21 — step 'engage': its files: The suite's shared arming must stand in for the Mechanic's launch, as it does for the seat: otherwise any test that meets a stop under claude-code would spawn the real CLI. (claude-code (anthropic, claude-opus-5-5))
 - 2026-10-21 — step 'engage': its files: The two tests that need a real checkout (a fix restored with git, a session carried on past a stop) cannot spawn git from drive.test.ts: the suite allows real git only in the walkthrough files, so they live in walk-session.test.ts beside the other driven-session walks; the pure budget test stays in drive.test.ts. (claude-code (anthropic, claude-opus-5-5))
+
+### Session 276 — `off` names no Mechanic, and the Mechanic is walked past its stop
+
+**Releasable: no.**
+
+Close session 275's three standing minor findings in packages/router. A stop's ways on stop naming `dabbler consult --mechanic` when this checkout's `dabbler.mechanic` reads `off` (renderStop stays pure: StopContext gains an optional mechanic mode, which the callers that hold a repository root -- the driver's stop rendering in drive.ts and the status row in progress.ts -- pass from the Mechanic's reading); `attended` and `unattended` keep it where 274 put it. explainMechanic and explainMechanicModel lose the flag layer no verb supplies, leaving the checkout's .vscode/settings.json and the machine's preferences.json, with their callers and config.test.ts updated. And the walk where the Mechanic clears a verification stop runs the second round to a pass and asserts the session leaves verify with the attempt `cleared`.
+
+**Amended after acceptance:**
+
+- 2026-10-21 — step 'off-names-no-mechanic': its files: the Mechanic's reading-or-default helper is needed by both drive.ts and progress.ts; progress.ts cannot import drive.ts (drive imports progress), so it lives beside explainMechanic in config.ts (claude-code (anthropic, claude-opus-5-5))

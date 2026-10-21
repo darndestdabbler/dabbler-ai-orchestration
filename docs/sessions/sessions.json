@@ -5503,9 +5503,9 @@
     {
       "number": 276,
       "title": "`off` names no Mechanic, and the Mechanic is walked past its stop",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-21T14:06:02.246000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-21T14:23:54.913000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

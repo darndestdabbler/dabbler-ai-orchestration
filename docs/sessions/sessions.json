@@ -5547,9 +5547,9 @@
     {
       "number": 278,
       "title": "A failed release is diagnosed, and one caused outside the repository retries in place",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-21T15:12:54.894000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-21T15:23:32.316000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

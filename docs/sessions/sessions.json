@@ -5525,9 +5525,9 @@
     {
       "number": 277,
       "title": "Open a Mechanic, and what it did, in the extension",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-21T14:35:48.098000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-21T14:53:53.608000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

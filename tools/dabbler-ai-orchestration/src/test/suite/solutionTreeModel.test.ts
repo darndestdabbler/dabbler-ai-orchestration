@@ -562,6 +562,21 @@ suite("solutionTreeModel: what a session is run with", () => {
     };
   }
 
+  test("the Mechanic Model reads as the Authoring Model's until one is chosen", () => {
+    const row = (context = {}) => descriptorFor({ kind: "configRole", role: "mechanic" }, configured(), context);
+    assert.strictEqual(row().description, "same as Authoring Model");
+    assert.strictEqual(row({ mechanicModel: "claude-sonnet-5" }).description, "claude-sonnet-5");
+    assert.strictEqual(row().command, "dabblerSolution.setMechanicModel");
+  });
+
+  test("the Mechanic row says the delegation and what it means", () => {
+    const row = descriptorFor({ kind: "configMechanic" }, configured(), { mechanic: "attended" });
+    assert.strictEqual(row.description, "attended");
+    assert.ok(row.tooltip?.includes("you open it"), row.tooltip);
+    assert.strictEqual(row.command, "dabblerSolution.setMechanic");
+    assert.strictEqual(descriptorFor({ kind: "configMechanic" }, configured()).description, "not read");
+  });
+
   test("renders every row from the dated record, and derives nothing while it does", () => {
     // The claim is not only that the rows are right: it is that drawing them
     // costs a disk read the router already did. Two halves prove it. The
@@ -591,7 +606,7 @@ suite("solutionTreeModel: what a session is run with", () => {
       assert.strictEqual(descriptorFor(root, seatMachine).description, "claude-code · api");
 
       // Two participants, each naming a thing being configured rather than
-      // the mechanism that configures it, and five leaves under them.
+      // the mechanism that configures it, and seven leaves under them.
       const parents = childrenOf(root, p);
       assert.deepStrictEqual(
         parents.map((n) => descriptorFor(n, p).label),
@@ -601,7 +616,7 @@ suite("solutionTreeModel: what a session is run with", () => {
       const rendered = leaves.map((n) => descriptorFor(n, p));
       assert.deepStrictEqual(
         rendered.map((row) => row.label),
-        ["Vehicle", "Model", "Vehicle", "Primary Model", "Auxiliary Model"],
+        ["Vehicle", "Authoring Model", "Mechanic Model", "Mechanic", "Vehicle", "Primary Model", "Auxiliary Model"],
       );
       // Every leaf is a leaf: the section is two deep and no deeper.
       assert.ok(leaves.every((leaf) => childrenOf(leaf, p).length === 0));
@@ -698,7 +713,7 @@ suite("solutionTreeModel: what a session is run with", () => {
 
       // A vehicle a layer above is overriding says so; the value alone would
       // look exactly like one that is in force.
-      const reviewingVehicle = rendered[2];
+      const reviewingVehicle = rendered[4];
       assert.ok(reviewingVehicle?.description?.includes("api"));
       assert.ok(reviewingVehicle?.tooltip?.includes("roles.reviewer.transport"));
       assert.ok(
@@ -709,7 +724,7 @@ suite("solutionTreeModel: what a session is run with", () => {
       // Cross-provider is a LABEL now rather than a refusal: the row says
       // how this reviewer stands to the author, and says the price its own
       // source stated as a price rather than as a capability.
-      const primaryReviewer = rendered[3];
+      const primaryReviewer = rendered[5];
       assert.ok(primaryReviewer?.description?.includes("gpt-5.6-terra"));
       assert.ok(primaryReviewer?.tooltip?.includes("different provider"));
       assert.ok(primaryReviewer?.tooltip?.includes("PRICE and not a capability"));
@@ -733,7 +748,7 @@ suite("solutionTreeModel: what a session is run with", () => {
 
       // And the third voice, which is what this section never had: what it
       // is for, and what narrows it at the round, in the router's own words.
-      const auxiliary = rendered[4];
+      const auxiliary = rendered[6];
       assert.ok(auxiliary?.description?.includes("gemini-3.1-pro-preview"));
       assert.ok(auxiliary?.tooltip?.includes("disputed"), auxiliary?.tooltip);
       assert.ok(auxiliary?.tooltip?.includes("already reviewed a round"));

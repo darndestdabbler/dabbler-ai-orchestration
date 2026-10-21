@@ -144,6 +144,31 @@ suite("ActionRegistry: session actions", () => {
     assert.ok(!applicableSessionActions(idle, sessions[1]).map((a) => a.id).includes("dabblerSessionSets.stopSession"));
   });
 
+  test("Continue Session is offered only on a session waiting for funds", () => {
+    const waiting = (forWhat: string) =>
+      makeSession({
+        number: 2,
+        status: "in-progress",
+        waiting: { owner: "person", for: forWhat, since: "", by: null, lastProgress: "", says: "" },
+      });
+    const offered = (session: ReturnType<typeof makeSession>) =>
+      applicableSessionActions(makeRepository({ currentSession: 2, sessions: [session] }), session).map((a) => a.id);
+    assert.ok(offered(waiting("waiting for funds: anthropic.")).includes("dabblerSessionSets.continueSession"));
+    assert.ok(!offered(waiting("The tests failed.")).includes("dabblerSessionSets.continueSession"));
+  });
+
+  test("Open a Mechanic is offered on the session in flight, and on no other row", () => {
+    const sessions = [
+      makeSession({ number: 1, status: "complete" }),
+      makeSession({ number: 2, status: "in-progress" }),
+    ];
+    const running = makeRepository({ currentSession: 2, sessions });
+    const offered = (session: ReturnType<typeof makeSession>) =>
+      applicableSessionActions(running, session).map((a) => a.id);
+    assert.ok(offered(sessions[1]).includes("dabbler.openMechanic"));
+    assert.ok(!offered(sessions[0]).includes("dabbler.openMechanic"));
+  });
+
   test("Rollback to Start of This Session is offered on a session in flight or completed, and on no other row", () => {
     // The router rolls back to the start of a session that ran -- in flight
     // or completed -- and refuses a cancelled one (restore's) and one that

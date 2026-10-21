@@ -25,12 +25,13 @@
 // offering something the ledger will not honour.
 
 import * as vscode from "vscode";
-import type { Router } from "dabbler-ai-router";
+import { explainMechanic, explainMechanicModel, type Router } from "dabbler-ai-router";
 
 import { resolveRouterCli } from "../router/terminalShim";
 
 import {
   ENUMERATION_WORDS,
+  MECHANIC_MODES,
   providerRelationWord,
   REVIEWER_HELP,
 } from "../providers/solutionTreeModel";
@@ -53,6 +54,28 @@ import type {
 export function chosenEngineIn(projection: Projection | null | undefined): string | null {
   const chosen = projection?.configuration?.engines?.chosen;
   return chosen === undefined || chosen === null || chosen === "" ? null : chosen;
+}
+
+/**
+ * The Mechanic's delegation and the model someone chose for it, through the
+ * router's own reading. The model is null where no Mechanic layer named one,
+ * which is the Authoring Model's -- the reading falls to it, and the row says
+ * so rather than repeating it. Either is null where the reading refused.
+ */
+export function mechanicChoicesIn(root: string | undefined): { mechanic: string | null; mechanicModel: string | null } {
+  if (!root) return { mechanic: null, mechanicModel: null };
+  const read = <T>(reading: () => T): T | null => {
+    try {
+      return reading();
+    } catch {
+      return null;
+    }
+  };
+  const model = read(() => explainMechanicModel(root));
+  return {
+    mechanic: read(() => explainMechanic(root))?.transport ?? null,
+    mechanicModel: model !== null && (model.decidedBy ?? "").includes("mechanic") ? model.transport : null,
+  };
 }
 
 /** What a control needs of the editor, so the suite can drive one. */
@@ -246,6 +269,8 @@ async function write(
     authoringModel?: string;
     reviewerModel?: string;
     auxiliaryModel?: string;
+    mechanic?: string;
+    mechanicModel?: string;
     /** Keep it as this person's default rather than this checkout's. */
     mine?: boolean;
   },
@@ -538,6 +563,10 @@ export async function setRoleModel(
     await setAuthoringModel(router, target, refreshed, ui);
     return;
   }
+  if (which === "mechanic") {
+    await setMechanicModel(router, target, refreshed, ui);
+    return;
+  }
   const primary = which === "primaryReviewer";
   const role = target.projection?.configuration?.[which];
   // No vehicle question here: the Reviewing AI's Vehicle row is the one
@@ -585,6 +614,59 @@ export async function setRoleModel(
     ui,
     refreshed,
   );
+}
+
+/** The pick item that clears the Mechanic's own model. */
+export const SAME_AS_AUTHORING = "same as Authoring Model";
+
+/**
+ * The Mechanic Model: one of the authoring engine's own models, because the
+ * Mechanic is launched on that engine's CLI, or the Authoring Model's by
+ * clearing it.
+ */
+export async function setMechanicModel(
+  router: Pick<Router, "configure">,
+  target: ConfigurationTarget,
+  refreshed: () => void,
+  ui: ConfigurationUi = defaultConfigurationUi(),
+): Promise<void> {
+  const root = ui.workspaceRoot();
+  if (!root) return;
+  const role = target.projection?.configuration?.authoring;
+  const chosen = mechanicChoicesIn(root).mechanicModel;
+  const picked = await ui.pick(
+    [
+      { label: SAME_AS_AUTHORING, detail: chosen === null ? "what you chose" : undefined },
+      ...modelItems(role?.candidates ?? [], role?.provider, chosen),
+    ],
+    {
+      title: "Which model is the Mechanic launched on?",
+      placeHolder: "From the authoring engine's own list. Never the Primary Reviewer's model.",
+    },
+  );
+  if (!picked) return;
+  await write(router, root, { mechanicModel: picked.label === SAME_AS_AUTHORING ? "" : picked.label }, ui, refreshed);
+}
+
+/** Whether the framework may call in the Mechanic: `dabbler.mechanic`, this checkout's. */
+export async function setMechanic(
+  router: Pick<Router, "configure">,
+  refreshed: () => void,
+  ui: ConfigurationUi = defaultConfigurationUi(),
+): Promise<void> {
+  const root = ui.workspaceRoot();
+  if (!root) return;
+  const chosen = mechanicChoicesIn(root).mechanic;
+  const picked = await ui.pick(
+    MECHANIC_MODES.map((entry) => ({
+      label: entry.mode,
+      description: entry.means,
+      detail: entry.mode === chosen ? "what you chose" : undefined,
+    })),
+    { title: "May the framework call in the Mechanic on a stop?", placeHolder: "This repository's choice, committed with its settings." },
+  );
+  if (!picked) return;
+  await write(router, root, { mechanic: picked.label }, ui, refreshed);
 }
 
 /**

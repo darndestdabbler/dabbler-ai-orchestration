@@ -26,7 +26,7 @@ import {
   solutionConfiguration,
   userConfigurationDirs,
 } from "../router/host";
-import { chosenEngineIn } from "../commands/configurationCommands";
+import { chosenEngineIn, mechanicChoicesIn } from "../commands/configurationCommands";
 
 const PROJECTION_RELPATH = path.join(".dabbler", "solution", "solution.json");
 
@@ -282,6 +282,7 @@ export class SolutionTreeProvider
       // setting changed in the settings editor must not need a window
       // reload to reach the row that reports it.
       chosenEngine: chosenEngineIn(this.currentProjection()),
+      ...mechanicChoicesIn(this.workspaceRoot),
     });
 
     const item = new vscode.TreeItem(

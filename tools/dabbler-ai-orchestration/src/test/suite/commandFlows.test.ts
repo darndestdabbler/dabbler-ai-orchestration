@@ -32,6 +32,7 @@ import {
   engineTerminalFor,
   repositoryOf,
   runConsultWithAi,
+  runOpenMechanic,
   runStartSession,
 } from "../../commands/sessionCommands";
 import { ROUTER_VERSION } from "dabbler-ai-router";
@@ -41,6 +42,7 @@ import {
   storeCredential,
   KEEP_AS_MACHINE_DEFAULT,
   setAsMyDefault,
+  setMechanic,
   setReviewerTransport,
   setRoleModel,
   type ConfigurationUi,
@@ -699,6 +701,25 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(refused.errors.length, 1);
     assert.match(refused.errors[0], /does not know 'haiku'/);
     assert.strictEqual(refused.terminals.length, 0);
+  });
+
+  test("Open a Mechanic opens a terminal of its own on the Mechanic Model, briefed with --mechanic", async () => {
+    const claude = ENGINES[0];
+    const offeredFirst: string[] = [];
+    const run = driveUi({
+      configured: () => ({ picked: claude, model: "opus" }),
+      askModel: async (_root, _choice, chosen, purpose) => {
+        offeredFirst.push(chosen, String(purpose));
+        return chosen;
+      },
+    });
+    assert.strictEqual(await runOpenMechanic(makeRepository(), run.ui, () => "sonnet"), true);
+    assert.deepStrictEqual(offeredFirst, ["sonnet", "Open a Mechanic"]);
+    assert.strictEqual(run.terminals.length, 1);
+    const [cli] = run.terminals;
+    assert.match(cli.name, /^Mechanic/);
+    assert.ok(cli.args.includes("sonnet"), cli.args.join(" "));
+    assert.ok(cli.args.some((arg) => /dabbler consult --sessions-dir docs\/sessions --mechanic/.test(arg)), cli.args.join(" "));
   });
 
   test("passes a dated model id exactly as it was chosen", () => {
@@ -1617,6 +1638,43 @@ suite("the Configuration section's model pick", () => {
     assert.deepStrictEqual(configureOptions, [
       { repoRoot: "D:/ws", authoringModel: "claude-opus-5" },
     ]);
+  });
+
+  test("sets the Mechanic Model from the authoring engine's list, the Authoring Model's first", async () => {
+    const projection = {
+      solution: { name: "r", title: "r", multi: false, implicit: true, moduleCount: 1 },
+      modules: [],
+      configuration: {
+        authoring: {
+          role: "authoring",
+          provider: "anthropic",
+          chosen: null,
+          candidates: [model({ model: "claude-opus-5", provider: "anthropic" })],
+          excludes: [],
+          fellThrough: false,
+        },
+      },
+    } as unknown as Projection;
+    const { ui, offered } = capturingUi(true);
+    const { router, configureOptions } = fakeRouter(0, "written");
+    await setRoleModel(router, { node: { kind: "configRole", role: "mechanic" }, projection }, "mechanic", () => undefined, ui);
+    assert.deepStrictEqual(
+      offered.map((item) => item.label),
+      ["same as Authoring Model", "claude-opus-5"],
+    );
+    // Taking the first clears the Mechanic's own choice.
+    assert.deepStrictEqual(configureOptions, [{ repoRoot: "D:/ws", mechanicModel: "" }]);
+  });
+
+  test("sets the Mechanic delegation from its three modes", async () => {
+    const { ui, offered } = capturingUi(true);
+    const { router, configureOptions } = fakeRouter(0, "written");
+    await setMechanic(router, () => undefined, ui);
+    assert.deepStrictEqual(
+      offered.map((item) => item.label),
+      ["unattended", "attended", "off"],
+    );
+    assert.deepStrictEqual(configureOptions, [{ repoRoot: "D:/ws", mechanic: "unattended" }]);
   });
 
   test("reports the authoring model of a session in flight instead of offering to change it", async () => {

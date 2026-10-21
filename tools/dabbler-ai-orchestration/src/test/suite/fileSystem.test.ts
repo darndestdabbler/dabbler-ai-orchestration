@@ -3,6 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import {
   hasSessionsRoot,
+  readMechanicMemo,
   scanRepositories,
   sessionsDirOf,
 } from "../../utils/fileSystem";
@@ -106,5 +107,18 @@ suite("fileSystem: workspace scan", () => {
     setWorkspaceFolders([]);
     const scan = await scanRepositories(fakeCache({}));
     assert.deepStrictEqual(scan.repositories, []);
+  });
+});
+
+suite("fileSystem: the Mechanic's memo", () => {
+  test("reads the memo the router says it leaves, and nothing where there is none", () => {
+    const root = makeTempDir("dabbler-memo-");
+    try {
+      assert.strictEqual(readMechanicMemo(root, 4), null);
+      writeFileTree(root, { ".dabbler/scratch/mechanic-memo-s4.md": "  The cause, and what to decide.\n" });
+      assert.strictEqual(readMechanicMemo(root, 4), "The cause, and what to decide.");
+    } finally {
+      rmrf(root);
+    }
   });
 });

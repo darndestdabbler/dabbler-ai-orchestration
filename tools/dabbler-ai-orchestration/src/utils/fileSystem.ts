@@ -18,6 +18,7 @@ import type {
   ProgressProjectionRepository,
   ProgressProjectionSession as SessionRecord,
 } from "dabbler-ai-router";
+import { mechanicMemoPath } from "dabbler-ai-router";
 import { ProjectionCache, ProjectionResult } from "./projection";
 import { type Activity, currentActivity, uncollectedWords } from "../router/dabblerTerminal";
 
@@ -90,6 +91,11 @@ export interface SessionsRepository {
    * of the Explorer's own.
    */
   uncollected?: string | null;
+  /**
+   * The memo the Mechanic left on the session in flight, or null where it
+   * left none. Optional for the reason `activity` is.
+   */
+  mechanicMemo?: string | null;
   orchestrator: OrchestratorInfo | null;
   /**
    * The projection's sessions, with tasks populated on the in-flight
@@ -199,6 +205,16 @@ export function discoverRoots(): string[] {
   return order;
 }
 
+/** The Mechanic's memo on this session, where the router says it leaves one; null where there is none. */
+export function readMechanicMemo(root: string, sessionNumber: number): string | null {
+  try {
+    const memo = fs.readFileSync(path.join(root, mechanicMemoPath(sessionNumber)), "utf8").trim();
+    return memo === "" ? null : memo;
+  } catch {
+    return null;
+  }
+}
+
 function buildRepository(
   root: string,
   projection: ProjectionResult,
@@ -225,6 +241,7 @@ function buildRepository(
     possiblyStalled: p ? p.repository.possiblyStalled : false,
     activity: currentActivity(root),
     uncollected: uncollectedWords(root),
+    mechanicMemo: p?.repository.currentSession != null ? readMechanicMemo(root, p.repository.currentSession) : null,
     forceClosed: p ? p.repository.forceClosed : false,
     schemaVersionOnDisk: p ? p.repository.schemaVersionOnDisk : null,
     // A failed projection is not a fresh repository. "ledger" is what a

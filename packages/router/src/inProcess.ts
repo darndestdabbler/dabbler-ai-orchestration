@@ -548,6 +548,9 @@ export class InProcessRouter implements Router {
     optional(args, "--authoring-model", o.authoringModel);
     optional(args, "--reviewer-model", o.reviewerModel);
     optional(args, "--auxiliary-model", o.auxiliaryModel);
+    optional(args, "--mechanic", o.mechanic);
+    // Passed even when empty: an empty Mechanic Model is the clear.
+    if (o.mechanicModel !== undefined) args.push("--mechanic-model", o.mechanicModel);
     if (o.mine === true) args.push(MINE_FLAG);
     return this.text("configure", args, o.repoRoot);
   }

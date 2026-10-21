@@ -85,7 +85,28 @@ const isTheNextRow = (repository: SessionsRepository, session: SessionRecord): b
   repository.nextSession !== null &&
   session.number === repository.nextSession;
 
+/**
+ * Whose funds a session is waiting for, off the router's own wait sentence
+ * ("waiting for funds: <vendor>. ..."), or null where it is not that wait.
+ */
+export function fundsVendor(session: SessionRecord): string | null {
+  if (session.waiting?.owner !== "person") return null;
+  const said = /waiting for funds:\s*([^.]+)/i.exec(session.waiting.for);
+  return said === null ? null : said[1].trim();
+}
+
 export const SESSION_ACTIONS: SessionAction[] = [
+  {
+    id: "dabblerSessionSets.continueSession",
+    label: "Continue Session",
+    group: 899,
+    // A wait for funds is the person's, and its one way on is to carry on
+    // once the account is paid: the same start Start Session runs.
+    when: (repository, session) =>
+      repository.currentSession === session.number &&
+      session.status === "in-progress" &&
+      fundsVendor(session) !== null,
+  },
   {
     id: START_SESSION,
     label: "Start Session",
@@ -107,6 +128,14 @@ export const SESSION_ACTIONS: SessionAction[] = [
       repository.currentSession === session.number && session.status === "in-progress",
   },
   { id: CONSULT_WITH_AI, label: "Consult with AI", group: 904, when: () => true },
+  {
+    id: "dabbler.openMechanic",
+    label: "Open a Mechanic",
+    group: 906,
+    // The session a Mechanic would diagnose: the one in flight, stopped or not.
+    when: (repository, session) =>
+      repository.currentSession === session.number && session.status === "in-progress",
+  },
   {
     id: "dabblerSessionSets.cancel",
     label: "Cancel Session",

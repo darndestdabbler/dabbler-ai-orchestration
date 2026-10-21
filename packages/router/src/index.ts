@@ -128,6 +128,11 @@ export { COMMIT_CHANGES_FLAG, MERGE_ORIGIN_FLAG, UNDO_CHANGES_FLAG } from "./ses
 export { releaseSessionToStart } from "./session.ts";
 // Resume Session restarts the loop only when no heartbeat says one is driving.
 export { loopAlive } from "./drive.ts";
+// The Mechanic's delegation and model, each with the layer that decided it,
+// and where it leaves its memo: the Configuration rows and the stopped
+// session's tooltip read them through the router's one rule.
+export { explainMechanic, explainMechanicModel } from "./config.ts";
+export { mechanicMemoPath } from "./drive.ts";
 // Whether a waiter has read what a session is waiting on: the Dabbler
 // terminal says the wait, and the reading belongs to the router that
 // defines the beacon.

@@ -314,7 +314,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 274 | The Mechanic, ported back to the router | no | 2026-10-21 |
 | 275 | The framework calls in the Mechanic without the person | no | 2026-10-21 |
 | 276 | `off` names no Mechanic, and the Mechanic is walked past its stop | no | 2026-10-21 |
-| 277 | Open a Mechanic, and what it did, in the extension | — | not declared |
+| 277 | Open a Mechanic, and what it did, in the extension | no | 2026-10-21 |
 | 278 | A failed release is diagnosed, and one caused outside the repository retries in place | — | not declared |
 | 279 | Release 3.23.0 (release: 3.23.0) | — | not declared |
 
@@ -3345,3 +3345,14 @@ Close session 275's three standing minor findings in packages/router. A stop's w
 **Amended after acceptance:**
 
 - 2026-10-21 — step 'off-names-no-mechanic': its files: the Mechanic's reading-or-default helper is needed by both drive.ts and progress.ts; progress.ts cannot import drive.ts (drive imports progress), so it lives beside explainMechanic in config.ts (claude-code (anthropic, claude-opus-5-5))
+
+### Session 277 — Open a Mechanic, and what it did, in the extension
+
+**Releasable: no.**
+
+Bring the Mechanic (sessions 274-276) and the funds wait (272) into the VS Code extension. A person can Open a Mechanic from the Work Explorer: the consult launcher briefed with `dabbler consult --mechanic`, on the configured authoring engine, offered the Mechanic Model first and any other model of that engine's list, in a new terminal of its own and never the author's live session. Under Authoring AI in Configuration the row that read 'Model' reads 'Authoring Model', a 'Mechanic Model' row sits below it (a fourth role in ROLE_LABELS, ROLE_COMMANDS and ROLE_HELP, set by dabblerSolution.setMechanicModel from the authoring engine's own model list, reading 'same as Authoring Model' while nothing is chosen), and a 'Mechanic' row shows dabbler.mechanic (unattended, attended, off) set by dabblerSolution.setMechanic; both write through `dabbler configure`, which commits the checkout's settings as every choice is. A stopped session's tooltip carries the Mechanic's memo where one was left, and a session waiting for funds reads 'Waiting for funds: <vendor>' with a Continue Session action that resumes it the way Start does. The router is touched only as plumbing the extension cannot do without: the in-process configure passes the CLI's existing --mechanic and --mechanic-model through, and index.ts exports the existing explainMechanic, explainMechanicModel and mechanicMemoPath so the extension reads the setting and the memo path through the router's one rule rather than a copy. A walk page, docs/uat/uat-mechanic.md, walks the four cases on the Java sample.
+
+**Amended after acceptance:**
+
+- 2026-10-21 — step 'mechanic-settings-rows': its files: dabblerSolution.setMechanic is registered in extension.ts beside the other Configuration commands; the model rows register off ROLE_COMMANDS there too (claude-code (anthropic, claude-opus-5-5))
+- 2026-10-21 — step 'memo-and-funds-wait': its files: workExplorerTreeModel is pure (no fs): the memo is read where the repository is built, in fileSystem.ts buildRepository, and carried on SessionsRepository (claude-code (anthropic, claude-opus-5-5))

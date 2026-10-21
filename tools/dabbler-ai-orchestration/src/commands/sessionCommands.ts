@@ -37,7 +37,7 @@ import { launchDriver } from "../router/driveProcess";
 import { resolveRouterCli } from "../router/terminalShim";
 import { ensureDabblerTerminal, terminalLocation } from "../router/dabblerTerminal";
 import { asRepositoryNode, asSessionNode } from "./workExplorerTreeCommands";
-import { modelItems } from "./configurationCommands";
+import { mechanicChoicesIn, modelItems } from "./configurationCommands";
 import type { ConfigurationModel, ConfigurationRole } from "../providers/solutionTreeModel";
 
 /**
@@ -568,6 +568,29 @@ export function consultTerminalFor(
   );
 }
 
+/** How the model box is titled when a person opens a Mechanic. */
+export const MECHANIC_PURPOSE = "Open a Mechanic";
+
+/**
+ * The CLI Open a Mechanic opens: Start's construction, briefed with
+ * `dabbler consult --mechanic`, in a terminal of its own -- never the
+ * author's live session, which the Mechanic would be talking over.
+ */
+export function mechanicTerminalFor(
+  repository: SessionsRepository,
+  choice: EngineChoice,
+  model: string,
+): EngineTerminal | string {
+  const dir = SESSIONS_REL.replace(/\\/g, "/");
+  return engineTerminalFor(
+    repository,
+    choice,
+    model,
+    `Run \`dabbler consult --sessions-dir ${dir} --mechanic\` and do what the brief it prints says.`,
+    `Mechanic — ${choice.label} — ${repository.label}`,
+  );
+}
+
 export interface SessionRunUi {
   /**
    * What this repository's Configuration starts a session with, or the
@@ -1079,6 +1102,47 @@ export async function runConsultWithAi(
 }
 
 /**
+ * Open a Mechanic: the authoring engine's CLI, briefed to diagnose and fix
+ * what stopped the session. The Mechanic Model is offered first and any
+ * other of that engine's models may be taken; the same two refusals as
+ * Start apply, so a model the CLI would refuse opens nothing.
+ */
+export async function runOpenMechanic(
+  repository: SessionsRepository,
+  ui: SessionRunUi,
+  mechanicModel: (root: string) => string | null = (root) => mechanicChoicesIn(root).mechanicModel,
+): Promise<boolean> {
+  const configured = (ui.configured ?? configuredStart)(repository.root);
+  if ("message" in configured) {
+    ui.openConfiguration?.();
+    await ui.refuseWithWayOn(configured);
+    return false;
+  }
+  const { picked } = configured;
+  const model = await ui.askModel(
+    repository.root,
+    picked,
+    mechanicModel(repository.root) ?? configured.model,
+    MECHANIC_PURPOSE,
+  );
+  if (model === undefined) return false;
+  const impossible =
+    engineModelRefusal(repository, picked, model) ??
+    (await engineRefusesModel(ui, picked, model));
+  if (impossible !== null) {
+    ui.showErrorMessage(impossible);
+    return false;
+  }
+  const terminal = mechanicTerminalFor(repository, picked, model);
+  if (typeof terminal === "string") {
+    ui.showErrorMessage(terminal);
+    return false;
+  }
+  ui.openTerminal(terminal);
+  return true;
+}
+
+/**
  * Close the session, and show the gate rows.
  *
  * No decision is asked because none exists: the gates decide, and a refusal
@@ -1129,6 +1193,12 @@ export function registerSessionCommands(
       if (!repository) return;
       await runStartSession(repository, ui, undefined, true);
     }),
+    // A wait for funds, carried on once the account is paid: the same start.
+    vscode.commands.registerCommand("dabblerSessionSets.continueSession", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      await runStartSession(repository, ui);
+    }),
     vscode.commands.registerCommand("dabblerSessionSets.stopSession", async (arg: unknown) => {
       const repository = repositoryOf(arg);
       if (!repository) return;
@@ -1138,6 +1208,11 @@ export function registerSessionCommands(
       const repository = repositoryOf(arg);
       if (!repository) return;
       await runConsultWithAi(repository, ui, asSessionNode(arg)?.session.number);
+    }),
+    vscode.commands.registerCommand("dabbler.openMechanic", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      await runOpenMechanic(repository, ui);
     }),
     vscode.commands.registerCommand(
       "dabblerSessionSets.closeSession",

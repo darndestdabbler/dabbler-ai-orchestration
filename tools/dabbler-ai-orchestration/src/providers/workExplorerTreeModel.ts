@@ -35,6 +35,7 @@ import {
   RepositoryAction,
   SESSION_ACTIONS,
   SessionAction,
+  fundsVendor,
 } from "./ActionRegistry";
 import {
   ICON_FILES,
@@ -580,6 +581,16 @@ function sessionTooltip(node: SessionNode): string {
     const done = session.tasks.filter((t) => t.iconKey === "complete").length;
     lines.push("", `${done}/${session.tasks.length} tasks done`);
   }
+  // A stop the Mechanic worked and handed back: its memo is what the person
+  // reads next, so it is where they are already looking.
+  const memo = node.repository.mechanicMemo ?? null;
+  if (
+    memo !== null &&
+    node.repository.currentSession === session.number &&
+    session.waiting?.owner === "person"
+  ) {
+    lines.push("", "**The Mechanic's memo**", "", memo);
+  }
   return lines.join("\n");
 }
 
@@ -618,7 +629,9 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
     // those apart is the whole of what this row is for.
     description:
       session.status === "in-progress"
-        ? (session.waiting?.says ?? "in flight")
+        ? fundsVendor(session) !== null
+          ? `Waiting for funds: ${fundsVendor(session)}`
+          : (session.waiting?.says ?? "in flight")
         : session.status === "planned"
           ? "planned"
           : closeDateLabel(session.completedAt),

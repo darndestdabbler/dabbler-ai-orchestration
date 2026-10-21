@@ -52,6 +52,7 @@ import {
   storeCredential,
   chosenEngineIn,
   setAsMyDefault,
+  setMechanic,
   setEngine,
   setRoleModel,
   setReviewerTransport,
@@ -335,6 +336,9 @@ export function activate(context: vscode.ExtensionContext): void {
         { node, projection: solutionProvider.freshProjection() },
         () => solutionProvider.refresh(),
       ),
+    ),
+    vscode.commands.registerCommand("dabblerSolution.setMechanic", () =>
+      setMechanic(productionRouter(), () => solutionProvider.refresh()),
     ),
     vscode.commands.registerCommand("dabblerSolution.refreshRecord", (node?: SolutionNode) =>
       refreshRecord({ node, projection: solutionProvider.freshProjection() }, () =>

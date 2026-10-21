@@ -362,8 +362,8 @@ export type IconSpec = { id: string; tone?: "attention" | "done" | "muted" | "mi
 /** The two participants a session is run with: who writes, and who reviews. */
 export type ConfigParticipant = "authoring" | "reviewing";
 
-/** The three model rows, each a role the router resolves. */
-export type ConfigRoleName = "authoring" | "primaryReviewer" | "auxiliaryReviewer";
+/** The four model rows, each a role the router resolves. */
+export type ConfigRoleName = "authoring" | "mechanic" | "primaryReviewer" | "auxiliaryReviewer";
 
 export type SolutionNode =
   | { kind: "solution" }
@@ -387,6 +387,8 @@ export type SolutionNode =
   | { kind: "configParticipant"; who: ConfigParticipant }
   | { kind: "configVehicle"; who: ConfigParticipant }
   | { kind: "configRole"; role: ConfigRoleName }
+  // Whether the framework may call in the Mechanic on a stop: dabbler.mechanic.
+  | { kind: "configMechanic" }
   // Beside the participants rather than under one of them: a credential
   // belongs to a PROVIDER, and whichever participant happens to be on that
   // vendor uses it, so hanging it off a role would draw one fact twice.
@@ -436,7 +438,7 @@ function configuration(p: Projection): ProjectionConfiguration {
   return p.configuration ?? {};
 }
 
-function configRole(p: Projection, which: ConfigRoleName): ConfigurationRole | undefined {
+function configRole(p: Projection, which: Exclude<ConfigRoleName, "mechanic">): ConfigurationRole | undefined {
   return configuration(p)[which];
 }
 
@@ -520,7 +522,8 @@ export function providerRelationWord(
  * would be the second copy of a vocabulary.
  */
 export const ROLE_LABELS: Record<ConfigRoleName, string> = {
-  authoring: "Model",
+  authoring: "Authoring Model",
+  mechanic: "Mechanic Model",
   primaryReviewer: "Primary Model",
   auxiliaryReviewer: "Auxiliary Model",
 };
@@ -535,6 +538,7 @@ export const ROLE_LABELS: Record<ConfigRoleName, string> = {
  */
 export const ROLE_COMMANDS: Record<ConfigRoleName, string> = {
   authoring: "dabblerSolution.setAuthoringModel",
+  mechanic: "dabblerSolution.setMechanicModel",
   primaryReviewer: "dabblerSolution.setPrimaryReviewerModel",
   auxiliaryReviewer: "dabblerSolution.setAuxiliaryReviewerModel",
 };
@@ -543,6 +547,8 @@ export const ROLE_COMMANDS: Record<ConfigRoleName, string> = {
 export const ROLE_HELP: Record<ConfigRoleName, string> = {
   authoring:
     "The model the engine's own CLI is launched on. It is set here for the NEXT session; while a session is in flight this row reports what that session declared, because the ledger carries its identity from the moment it was registered.",
+  mechanic:
+    "The model the Mechanic is launched on, on the authoring engine's own CLI, when a stop is handed to it. Unset, it is the Authoring Model; it is never the Primary Reviewer's.",
   primaryReviewer:
     "The reviewer of record, never from the authoring model's vendor. A model from that vendor is still listed, marked as not usable while it authors, because the author is chosen at each Start. Its verdict blocks a close.",
   auxiliaryReviewer:
@@ -551,6 +557,7 @@ export const ROLE_HELP: Record<ConfigRoleName, string> = {
 
 const ROLE_ICONS: Record<ConfigRoleName, string> = {
   authoring: "edit",
+  mechanic: "tools",
   primaryReviewer: "verified",
   // The third voice at an impasse, which is a judgement and not a review.
   auxiliaryReviewer: "law",
@@ -749,7 +756,11 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
       const own: SolutionNode[] = [];
       if (configVehicle(p, node.who)) own.push({ kind: "configVehicle", who: node.who });
       if (node.who === "authoring") {
-        if (config.authoring) own.push({ kind: "configRole", role: "authoring" });
+        if (config.authoring) {
+          own.push({ kind: "configRole", role: "authoring" });
+          // The Mechanic is launched on the authoring engine, so it sits here.
+          own.push({ kind: "configRole", role: "mechanic" }, { kind: "configMechanic" });
+        }
         return own;
       }
       if (config.primaryReviewer) own.push({ kind: "configRole", role: "primaryReviewer" });
@@ -758,6 +769,7 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
     }
     case "configVehicle":
     case "configRole":
+    case "configMechanic":
     case "configCredential":
       return [];
     case "externalGroup":
@@ -835,7 +847,18 @@ export interface SolutionContext {
    * one. Null when nobody has chosen and the machine's own reading stands.
    */
   readonly chosenEngine?: string | null;
+  /** `dabbler.mechanic` as the router reads it, or null where it could not. */
+  readonly mechanic?: string | null;
+  /** The Mechanic Model someone chose, or null where it is the Authoring Model's. */
+  readonly mechanicModel?: string | null;
 }
+
+/** What each Mechanic delegation means, on its row and in its pick. */
+export const MECHANIC_MODES: ReadonlyArray<{ mode: string; means: string }> = [
+  { mode: "unattended", means: "the framework calls in the Mechanic on a stop without you" },
+  { mode: "attended", means: "a stop names the Mechanic among its ways on, and you open it" },
+  { mode: "off", means: "no Mechanic is named or called in" },
+];
 
 export function descriptorFor(
   node: SolutionNode,
@@ -1168,7 +1191,40 @@ export function descriptorFor(
         command: authoring ? "dabblerSolution.setEngine" : "dabblerSolution.setReviewerTransport",
       };
     }
+    case "configMechanic": {
+      const mode = context.mechanic ?? null;
+      const means = MECHANIC_MODES.find((entry) => entry.mode === mode)?.means;
+      return {
+        id: "config:mechanic",
+        label: "Mechanic",
+        description: mode ?? "not read",
+        tooltip: [
+          "Whether the framework may call in the Mechanic -- a fresh engine on the Mechanic Model -- when a session stops. It is this repository's choice, written to its .vscode/settings.json.",
+          means ? `${mode}: ${means}.` : "",
+        ]
+          .filter((line) => line !== "")
+          .join("\n\n"),
+        icon: { id: "shield", ...(mode === null ? { tone: "muted" as const } : {}) },
+        expandable: false,
+        contextValue: "dabblerConfigMechanic",
+        command: "dabblerSolution.setMechanic",
+      };
+    }
     case "configRole": {
+      if (node.role === "mechanic") {
+        // Not in the projection: the router reads it on demand, and unset it
+        // is the Authoring Model's, which is the one thing this row says then.
+        return {
+          id: "config:role:mechanic",
+          label: ROLE_LABELS.mechanic,
+          description: context.mechanicModel ?? "same as Authoring Model",
+          tooltip: ROLE_HELP.mechanic,
+          icon: { id: ROLE_ICONS.mechanic },
+          expandable: false,
+          contextValue: "dabblerConfigRole;mechanic",
+          command: ROLE_COMMANDS.mechanic,
+        };
+      }
       const role = configRole(p, node.role);
       const authoring = node.role === "authoring";
       const unlistedModel = role?.notListedBy ? (role.selected ?? role.chosen?.model ?? "") : null;

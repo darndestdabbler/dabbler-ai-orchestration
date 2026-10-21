@@ -553,6 +553,30 @@ suite("workExplorerTreeModel: session descriptor", () => {
     assert.strictEqual(queued.description, undefined);
   });
 
+  test("a session waiting for funds says whose, and a handed-back stop shows the Mechanic's memo", () => {
+    const waitingOn = (forWhat: string) => ({
+      owner: "person" as const,
+      for: forWhat,
+      since: "2026-10-21T10:00:00Z",
+      by: null,
+      lastProgress: "2026-10-21T10:00:00Z",
+      says: "waiting on you",
+    });
+    const funds = sessionDescriptor({
+      kind: "session",
+      repository: makeRepository({ currentSession: 1 }),
+      session: makeSession({ status: "in-progress", waiting: waitingOn("waiting for funds: openai.") }),
+    });
+    assert.strictEqual(funds.description, "Waiting for funds: openai");
+    const handedBack = sessionDescriptor({
+      kind: "session",
+      repository: makeRepository({ currentSession: 1, mechanicMemo: "The lockfile is stale; regenerate it." }),
+      session: makeSession({ status: "in-progress", waiting: waitingOn("The tests failed.") }),
+    });
+    assert.ok(handedBack.tooltip?.includes("The Mechanic's memo"), handedBack.tooltip);
+    assert.ok(handedBack.tooltip?.includes("The lockfile is stale"), handedBack.tooltip);
+  });
+
   test("a session with tasks is collapsible; without, a leaf", () => {
     const withSteps = sessionDescriptor({
       kind: "session",

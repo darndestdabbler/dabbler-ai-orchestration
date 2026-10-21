@@ -100,8 +100,18 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabblerSessionSets.continueSession",
+        "title": "Continue Session",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabblerSessionSets.stopSession",
         "title": "Stop Session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.openMechanic",
+        "title": "Open a Mechanic",
         "category": "Dabbler"
       },
       {
@@ -194,6 +204,18 @@
         "icon": "$(edit)"
       },
       {
+        "command": "dabblerSolution.setMechanicModel",
+        "title": "Set the Mechanic Model",
+        "category": "Dabbler",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "dabblerSolution.setMechanic",
+        "title": "Set the Mechanic Delegation",
+        "category": "Dabbler",
+        "icon": "$(edit)"
+      },
+      {
         "command": "dabblerSolution.setAsMyDefault",
         "title": "Keep as Machine Default",
         "category": "Dabbler",
@@ -260,11 +282,19 @@
           "when": "false"
         },
         {
+          "command": "dabblerSessionSets.continueSession",
+          "when": "false"
+        },
+        {
           "command": "dabblerSessionSets.stopSession",
           "when": "false"
         },
         {
           "command": "dabbler.consultWithAi",
+          "when": "false"
+        },
+        {
+          "command": "dabbler.openMechanic",
           "when": "false"
         },
         {
@@ -285,6 +315,14 @@
         },
         {
           "command": "dabblerSolution.setAuxiliaryReviewerModel",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.setMechanicModel",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.setMechanic",
           "when": "false"
         },
         {
@@ -338,6 +376,11 @@
           "group": "6_session@602"
         },
         {
+          "command": "dabblerSessionSets.continueSession",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-continueSession;/",
+          "group": "6_session@600"
+        },
+        {
           "command": "dabblerSessionSets.stopSession",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-stopSession;/",
           "group": "6_session@606"
@@ -346,6 +389,11 @@
           "command": "dabbler.consultWithAi",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-consultWithAi;/",
           "group": "6_session@605"
+        },
+        {
+          "command": "dabbler.openMechanic",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openMechanic;/",
+          "group": "6_session@607"
         },
         {
           "command": "dabblerSessionSets.cancel",
@@ -371,6 +419,16 @@
           "command": "dabblerSolution.setAuthoringModel",
           "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfig(Role|Participant);authoring$/",
           "group": "1_set@2"
+        },
+        {
+          "command": "dabblerSolution.setMechanicModel",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfig(Role;mechanic|Participant;authoring)$/",
+          "group": "1_set@3"
+        },
+        {
+          "command": "dabblerSolution.setMechanic",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerConfig(Mechanic|Participant;authoring)$/",
+          "group": "1_set@4"
         },
         {
           "command": "dabblerSolution.setReviewerTransport",

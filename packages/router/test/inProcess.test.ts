@@ -211,6 +211,14 @@ describe("the in-process router", () => {
     assert.match(result.message, /already cancelled/);
   });
 
+  it("configures the Mechanic, and the checkout's settings are what moved", async () => {
+    const { repo } = makeAnsweredSandbox();
+    const result = await createInProcessRouter().configure({ repoRoot: repo, mechanic: "attended", mechanicModel: "" });
+    assert.equal(result.ok, true, result.ok ? "" : result.message);
+    const settings = JSON.parse(readFileSync(join(repo, ".vscode", "settings.json"), "utf8")) as Record<string, unknown>;
+    assert.equal(settings["dabbler.mechanic"], "attended");
+  });
+
   it("bootstraps a project, which is the whole of first-run now", async () => {
     const { repo } = makeAnsweredSandbox();
     const result = await createInProcessRouter().bootstrap({ projectDir: repo });

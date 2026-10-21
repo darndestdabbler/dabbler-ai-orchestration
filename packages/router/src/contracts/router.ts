@@ -277,6 +277,10 @@ export interface ConfigureOptions extends RepositoryTarget {
    * selection it excludes stops that round rather than being substituted.
    */
   readonly auxiliaryModel?: string;
+  /** Whether the framework may call in the Mechanic: unattended, attended or off. */
+  readonly mechanic?: string;
+  /** The model the Mechanic is launched on; an empty value clears it. */
+  readonly mechanicModel?: string;
   /**
    * Keep the vehicle and the authoring model as THIS PERSON's default,
    * in the user-level preferences, rather than in this checkout's committed

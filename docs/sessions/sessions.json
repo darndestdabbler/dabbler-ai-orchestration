@@ -5415,9 +5415,9 @@
     {
       "number": 272,
       "title": "An API out of credits pauses for funds, and Continue resumes it",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-21T11:53:50.634000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-21T12:07:41.487000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

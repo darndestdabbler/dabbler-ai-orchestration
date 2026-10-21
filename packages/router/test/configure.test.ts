@@ -26,6 +26,8 @@ import {
   SETTING_AUXILIARY_MODEL,
   SETTING_AUTHORING_MODEL,
   SETTING_ENGINE,
+  SETTING_MECHANIC,
+  SETTING_MECHANIC_MODEL,
   SETTING_REVIEWER_MODEL,
   SETTING_REVIEWER_TRANSPORT,
   SETTING_TRANSPORT,
@@ -254,6 +256,29 @@ describe("where a choice made with configure is kept", () => {
       assert.equal(same.refusal, null);
       assert.equal(readPreferences().authoring_model, "claude-opus-5");
     } finally {
+      restore();
+    }
+  });
+
+  it("writes the Mechanic and its model, and refuses the Primary Reviewer's model or a word it does not know", () => {
+    const restore = machine();
+    try {
+      const root = tempDir("configure-mechanic-");
+      writePreferences({ engine: "claude-code" });
+      writeSettings(root, { [SETTING_TRANSPORT]: TRANSPORT_API, [SETTING_REVIEWER_MODEL]: "claude-haiku-4-5-20251001" });
+
+      const chosen = configure({ repoRoot: root, mechanic: "attended", mechanicModel: "claude-opus-5" });
+      assert.equal(chosen.refusal, null);
+      assert.equal(settingValue(root, SETTING_MECHANIC), "attended");
+      assert.equal(settingValue(root, SETTING_MECHANIC_MODEL), "claude-opus-5");
+
+      // The Mechanic's fix is the Primary Reviewer's to review.
+      const primary = configure({ repoRoot: root, mechanicModel: "claude-haiku-4-5-20251001" });
+      assert.match(String(primary.refusal), /Primary Reviewer/);
+      assert.equal(settingValue(root, SETTING_MECHANIC_MODEL), "claude-opus-5");
+      assert.match(String(configure({ repoRoot: root, mechanic: "sometimes" }).refusal), /unattended, attended, off/);
+    } finally {
+      writePreferences({ mechanic: "", mechanicModel: "" });
       restore();
     }
   });

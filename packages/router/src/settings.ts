@@ -58,6 +58,10 @@ export const SETTING_ENGINE = "dabbler.engine";
 export const SETTING_AUTHORING_MODEL = "dabbler.authoringModel";
 export const SETTING_REVIEWER_MODEL = "dabbler.reviewerModel";
 export const SETTING_AUXILIARY_MODEL = "dabbler.auxiliaryModel";
+/** Whether the framework may call in the Mechanic: `unattended`, `attended` or `off`. */
+export const SETTING_MECHANIC = "dabbler.mechanic";
+/** The model the Mechanic is launched on, on the authoring engine CLI; unset, the Authoring Model. */
+export const SETTING_MECHANIC_MODEL = "dabbler.mechanicModel";
 
 /**
  * What a session's committed transcript carries: `off`, `outline` or `full`.
@@ -98,6 +102,8 @@ export const SETTING_KEYS = [
   SETTING_AUTHORING_MODEL,
   SETTING_REVIEWER_MODEL,
   SETTING_AUXILIARY_MODEL,
+  SETTING_MECHANIC,
+  SETTING_MECHANIC_MODEL,
   SETTING_TRANSCRIPT,
   SETTING_CREDENTIAL_ANTHROPIC,
   SETTING_CREDENTIAL_OPENAI,

@@ -172,6 +172,48 @@ export type DriverRun = {
     files: string[];
   }[];
   /**
+   * Every time the framework called in the Mechanic without the person, oldest first. At most one per stop and two per session; kept whole, so the budget is read off the record.
+   */
+  mechanic_attempts?: Array<{
+    at: string;
+    /**
+     * The kind of the stop the Mechanic was called in on.
+     */
+    kind: string;
+    /**
+     * The stop's code, where it had one.
+     */
+    code?: string | null;
+    /**
+     * The stop's reason, as recorded: what makes it the same stop when it is met again.
+     */
+    reason: string;
+    /**
+     * The phase the stop stood in; the session leaving it is the fix clearing the stop.
+     */
+    phase: string;
+    /**
+     * The Mechanic Model it was launched on; null where the engine's own default ran.
+     */
+    model: string | null;
+    /**
+     * The working tree as it stood before the Mechanic started, which a failed attempt is restored to.
+     */
+    before_tree: string;
+    /**
+     * The paths the Mechanic moved.
+     */
+    files?: string[];
+    /**
+     * The step baseline before the Mechanic's fix moved it, which a failed attempt puts back.
+     */
+    baseline_before?: string | null;
+    /**
+     * open until the session moves past the stop (cleared) or the attempt runs out or the stop comes back (failed, and undone).
+     */
+    outcome: "open" | "cleared" | "failed";
+  }>;
+  /**
    * Retired with the focused checkout: nothing writes or reads it now. Kept optional so a run recorded before the retirement is still read.
    */
   suites_owed_elsewhere?: {

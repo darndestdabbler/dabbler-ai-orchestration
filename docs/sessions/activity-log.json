@@ -12695,6 +12695,29 @@
       "dateTime": "2026-10-21T12:45:21.281000-04:00",
       "task": "Port session 231's Mechanic back onto master's router, as a port onto today's code rather than a revert of e9caac09. `dabbler consult --mechanic` prints a briefing for a fresh AI instance: the stop in the framework's own words (rendered by renderStop) and the record rows it rests on (the latest verification round and packaging run), where the run record, job logs and transcripts are, the rules that keep the session restartable, the person's verbs it may only recommend, the verbs it may run once the person agrees, and its two instructions verbatim. A tracked `docs/sessions/mechanic-log.md` documents one entry per intervention. The drive loop takes a tree that moved after the land (gate-wait, publish, close) as an intervention only when the mechanic log carries a new entry, records it on the run (`interventions` in driver-run.schema.json and its generated type) and rewinds to verify so the Primary Reviewer reviews the fix with the session's diff; the session's completion lists every intervention. Every stop's ways on name `dabbler consult --mechanic`, ahead of cancelling, and the managed body in bootstrap/templates.ts (and this repo's AGENTS.md rendering of it) mentions `--mechanic`.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 275,
+      "dateTime": "2026-10-21T13:04:49.477000-04:00",
+      "task": "Let the framework call in the Mechanic without the person. Two new choices read through the same layers as every other (a flag, this checkout's .vscode/settings.json, the machine's preferences.json): `dabbler.mechanic` (`unattended` by default, `attended` = session 274's behaviour, `off` = no Mechanic named at all) and `dabbler.mechanicModel` (unset = the Authoring Model; refused when it equals the session's Primary Model), written by `dabbler configure --mechanic <mode>` / `--mechanic-model <model>` and named by `dabbler configuration explain`. `dabbler consult --mechanic` gains an unattended mandate: a deny-list of the person's authority (cancel, rollback, close, hold-release; the plan or what counts as done; a significant design choice or unapproved dependency; credentials, money or anything outside the repository; a weakened test or gate; the record or a verdict), the minimum fix with a stated reason why it keeps to the approved plan, a fix needing any of these diagnosed and handed back without an edit, and a memo written to a path the framework names. In the drive loop, under `unattended`, a stop that would go to a person (never a funds stop, never a person's interrupt, never on a release session) first launches a fresh-context engine CLI of the session's engine on the Mechanic Model (never resuming the author's conversation), with the brief as its prompt and a twenty-minute deadline; one attempt per stop and two per session, recorded on the run. The stop is lifted and the loop carries on; an attempt that runs out, or whose fix does not clear the stop (the next stop arrives before the phase moves on), has the tree restored to its snapshot from before the attempt with its diff kept in the loop log, and the person then gets the stop with the Mechanic's memo: cause and evidence, what was tried, the line it reached, one recommendation, and a drafted plan amendment where one is needed.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 275,
+      "dateTime": "2026-10-21T13:15:03.208000-04:00",
+      "what": "step 'engage': its files",
+      "reason": "The suite's shared arming must stand in for the Mechanic's launch, as it does for the seat: otherwise any test that meets a stop under claude-code would spawn the real CLI.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 275,
+      "dateTime": "2026-10-21T13:24:47.867000-04:00",
+      "what": "step 'engage': its files",
+      "reason": "The two tests that need a real checkout (a fix restored with git, a session carried on past a stop) cannot spawn git from drive.test.ts: the suite allows real git only in the walkthrough files, so they live in walk-session.test.ts beside the other driven-session walks; the pure budget test stays in drive.test.ts.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

@@ -17,6 +17,7 @@
 // writes; a refresh is asked for. A verb that enumerated a vendor to answer
 // "what could I choose" would charge a question for being asked.
 
+import { ConfigError, explainMechanic, explainMechanicModel, type TransportReading } from "../config.ts";
 import { repoRootFor } from "../journal.ts";
 import { configurationNode } from "../projection.ts";
 import { workingDirectory } from "../workdir.ts";
@@ -278,6 +279,33 @@ export function renderExplain(configuration: Node): string {
   return `${lines.join("\n")}\n`;
 }
 
+/**
+ * The Mechanic's delegation and its model, each with the layer that decided
+ * it. A model no layer names is the authoring model's reading, and said so.
+ */
+export function mechanicExplainLines(repoRoot: string): string[] {
+  const lines: string[] = [];
+  const reading = (label: string, read: () => TransportReading, unset: string): void => {
+    try {
+      const value = read();
+      lines.push(`${label}: ${value.transport || "nothing chosen"} (decided by ${value.decidedBy ?? unset})`);
+      value.layers.forEach((layer, index) => {
+        lines.push(`  ${index === 0 ? "decides" : "shadowed"}: ${layer.source} = ${layer.value}`);
+      });
+    } catch (error) {
+      if (!(error instanceof ConfigError)) throw error;
+      lines.push(`${label}: refused -- ${error.message}`);
+    }
+  };
+  reading("Mechanic", () => explainMechanic(null, repoRoot), "the built-in default");
+  reading(
+    "Mechanic Model",
+    () => explainMechanicModel(null, repoRoot),
+    "nobody -- the authoring model is unset too, so the engine's own default runs",
+  );
+  return lines;
+}
+
 export async function configurationVerb(argv: string[]): Promise<number> {
   if (argv.length === 0 || argv.includes("-h") || argv.includes("--help")) {
     writeOut(usage());
@@ -307,6 +335,10 @@ export async function configurationVerb(argv: string[]): Promise<number> {
   // Never throws: a configuration this router cannot load is a real state,
   // and it carries its own sentence saying how to fix it.
   const configuration = node(configurationNode(repoRoot));
-  writeOut(command === "options" ? renderOptions(configuration) : renderExplain(configuration));
+  writeOut(
+    command === "options"
+      ? renderOptions(configuration)
+      : `${renderExplain(configuration)}${mechanicExplainLines(repoRoot).join("\n")}\n`,
+  );
   return EXIT_OK;
 }

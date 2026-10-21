@@ -59,6 +59,8 @@ import {
   SETTING_AUTHORING_MODEL,
   SETTING_AUXILIARY_MODEL,
   SETTING_ENGINE,
+  SETTING_MECHANIC,
+  SETTING_MECHANIC_MODEL,
   SETTING_REVIEWER_MODEL,
   SETTING_REVIEWER_TRANSPORT,
   SETTING_TRANSCRIPT,
@@ -1055,6 +1057,70 @@ export function explainAuthoringModel(
   ]);
 }
 
+/** The layers that may name the Mechanic's delegation and its model. */
+export const MECHANIC_SOURCE_FLAG = "--mechanic on this call";
+export const MECHANIC_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_MECHANIC})`;
+export const MECHANIC_SOURCE_PREFERENCES = "preferences.json (mechanic)";
+export const MECHANIC_MODEL_SOURCE_FLAG = "--mechanic-model on this call";
+export const MECHANIC_MODEL_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_MECHANIC_MODEL})`;
+export const MECHANIC_MODEL_SOURCE_PREFERENCES = "preferences.json (mechanic_model)";
+
+/**
+ * Whether the framework may call in the Mechanic: `unattended` engages it on
+ * a stop without the person, `attended` only names it among a stop's ways
+ * on, `off` names no Mechanic at all.
+ */
+export const MECHANIC_MODES = ["unattended", "attended", "off"] as const;
+export type MechanicMode = (typeof MECHANIC_MODES)[number];
+export const MECHANIC_DEFAULT: MechanicMode = "unattended";
+
+/** The Mechanic's delegation in force, and every layer that named one. A value it does not know is refused. */
+export function explainMechanic(cliFlag?: string | null, root?: string | null): TransportReading {
+  const checkout = root ?? projectRoot();
+  const reading = explainChoice([
+    [MECHANIC_SOURCE_FLAG, cliFlag ?? null],
+    [MECHANIC_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_MECHANIC] ?? null],
+    [MECHANIC_SOURCE_PREFERENCES, personal(() => readPreferences().mechanic)],
+  ]);
+  if (reading.decidedBy === null) return { ...reading, transport: MECHANIC_DEFAULT };
+  const mode = reading.transport.toLowerCase();
+  if (!(MECHANIC_MODES as readonly string[]).includes(mode)) {
+    throw new ConfigError(`${reading.decidedBy} must be one of ${renderList(MECHANIC_MODES)}, got '${reading.transport}'`);
+  }
+  return { ...reading, transport: mode };
+}
+
+/**
+ * The Mechanic Model in force, and every layer that named one.
+ *
+ * Unset, it is the Authoring Model's reading: the one criterion -- at least
+ * as capable as the author -- is met by being the author's. It may never be
+ * the session's Primary Model, because the Mechanic's fix is the Primary
+ * Reviewer's to review and nobody reviews their own fix.
+ */
+export function explainMechanicModel(
+  cliFlag?: string | null,
+  root?: string | null,
+  primary?: string | null,
+): TransportReading {
+  const checkout = root ?? projectRoot();
+  const named = explainChoice([
+    [MECHANIC_MODEL_SOURCE_FLAG, cliFlag ?? null],
+    [MECHANIC_MODEL_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_MECHANIC_MODEL] ?? null],
+    [MECHANIC_MODEL_SOURCE_PREFERENCES, personal(() => readPreferences().mechanic_model)],
+  ]);
+  const reading = named.decidedBy === null ? explainAuthoringModel(null, checkout) : named;
+  const primaryModel = (primary ?? "").trim();
+  if (primaryModel !== "" && reading.transport === primaryModel) {
+    throw new ConfigError(
+      `the Mechanic Model '${primaryModel}' is this session's Primary Model, and the Mechanic is never the ` +
+        `Primary Reviewer: name another with ${SETTING_MECHANIC_MODEL} (dabbler configure --mechanic-model <model>)` +
+        (reading.decidedBy === null ? "" : `; it was decided by ${reading.decidedBy}`),
+    );
+  }
+  return reading;
+}
+
 /** Where a reviewing role's model, or the engine, can be named: a flag, this checkout, this machine. */
 export const REVIEWER_MODEL_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_REVIEWER_MODEL})`;
 export const AUXILIARY_MODEL_SOURCE_SETTINGS = `${SETTINGS_RELPATH} (${SETTING_AUXILIARY_MODEL})`;
@@ -1096,6 +1162,8 @@ export function layerOfSource(source: string): Exclude<ChoiceLayer, "default"> |
     source === TRANSPORT_SOURCE_FLAG ||
     source === AUTHORING_MODEL_SOURCE_FLAG ||
     source === ENGINE_SOURCE_FLAG ||
+    source === MECHANIC_SOURCE_FLAG ||
+    source === MECHANIC_MODEL_SOURCE_FLAG ||
     source === REVIEWER_MODEL_SOURCE_SESSION ||
     source === AUXILIARY_MODEL_SOURCE_SESSION ||
     source === REVIEWING_SOURCE_SESSION
@@ -1109,6 +1177,8 @@ export function layerOfSource(source: string): Exclude<ChoiceLayer, "default"> |
     source === REVIEWER_MODEL_SOURCE_SETTINGS ||
     source === AUXILIARY_MODEL_SOURCE_SETTINGS ||
     source === ENGINE_SOURCE_SETTINGS ||
+    source === MECHANIC_SOURCE_SETTINGS ||
+    source === MECHANIC_MODEL_SOURCE_SETTINGS ||
     source === TRANSCRIPT_SOURCE_SETTINGS
   ) {
     return "checkout";
@@ -1118,6 +1188,8 @@ export function layerOfSource(source: string): Exclude<ChoiceLayer, "default"> |
     source === REVIEWING_SOURCE_PREFERENCES ||
     source === AUTHORING_MODEL_SOURCE_PREFERENCES ||
     source === ENGINE_SOURCE_PREFERENCES ||
+    source === MECHANIC_SOURCE_PREFERENCES ||
+    source === MECHANIC_MODEL_SOURCE_PREFERENCES ||
     source === roleModelSourcePreferences("reviewer") ||
     source === roleModelSourcePreferences("auxiliary-reviewer")
   ) {
@@ -1529,6 +1601,9 @@ export interface ConfigurationChoice {
   /** The model each reviewing role is given here; "" clears it. */
   readonly reviewerModel?: string;
   readonly auxiliaryModel?: string;
+  /** Whether the framework may call in the Mechanic, and the model it runs on; "" clears each. */
+  readonly mechanic?: string;
+  readonly mechanicModel?: string;
   /** The provider whose credential this solution is naming. */
   readonly credentialProvider?: string;
   /** The credential's NAME, never its value; "" clears the reference. */
@@ -1577,6 +1652,14 @@ export function writeConfigurationChoice(
   if (choice.engine !== undefined) values[SETTING_ENGINE] = choice.engine.trim();
   if (choice.reviewerModel !== undefined) values[SETTING_REVIEWER_MODEL] = choice.reviewerModel.trim();
   if (choice.auxiliaryModel !== undefined) values[SETTING_AUXILIARY_MODEL] = choice.auxiliaryModel.trim();
+  if (choice.mechanic !== undefined) {
+    const mode = choice.mechanic.trim().toLowerCase();
+    if (mode !== "" && !(MECHANIC_MODES as readonly string[]).includes(mode)) {
+      throw new ConfigError(`${SETTING_MECHANIC} must be one of ${renderList(MECHANIC_MODES)}, got '${choice.mechanic}'`);
+    }
+    values[SETTING_MECHANIC] = mode;
+  }
+  if (choice.mechanicModel !== undefined) values[SETTING_MECHANIC_MODEL] = choice.mechanicModel.trim();
   // A NAME, and the writer never looks at whether this machine holds one:
   // whether a credential exists here is a question about this machine, and
   // a committed setting is a statement about the solution.

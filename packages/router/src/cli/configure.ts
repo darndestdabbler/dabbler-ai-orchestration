@@ -51,6 +51,7 @@ import { resolve } from "node:path";
 
 import {
   ConfigError,
+  MECHANIC_MODES,
   VALID_TRANSPORTS,
   explainReviewingTransport,
   explainAuthoringModel,
@@ -109,6 +110,7 @@ function usage(): string {
     "usage: dabbler configure [-h] [--engine E] [--transport T]",
     "                         [--reviewer-transport T] [--authoring-model M]",
     "                         [--reviewer-model M] [--auxiliary-model M]",
+    "                         [--mechanic MODE] [--mechanic-model M]",
     "                         [--credential PROVIDER=NAME]",
     `                         [${MINE_FLAG}] [--repo-root PATH]`,
     "",
@@ -141,6 +143,13 @@ function usage(): string {
     "                          model from the authoring vendor is accepted with",
     "                          a warning: review is cross-vendor, so a session",
     "                          with that author would not start",
+    "  --mechanic MODE         unattended | attended | off; whether the framework",
+    "                          calls in the Mechanic on a stop without you",
+    "                          (unattended, the default), only names it among",
+    "                          a stop's ways on (attended), or not at all (off)",
+    "  --mechanic-model M      the model the Mechanic is launched on, on the",
+    "                          authoring engine's CLI; never the Primary",
+    "                          Reviewer's. Unset, it is the authoring model",
     "  --auxiliary-model M     the model that adjudicates a disputed finding,",
     "                          named as the auxiliary role's own transport lists",
     "                          it. Checked by the same rule; the round excludes",
@@ -196,10 +205,20 @@ const WORDS: Record<string, string> = {
   engine: "engine",
   reviewerModel: "Primary Reviewer's model",
   auxiliaryModel: "Auxiliary Reviewer's model",
+  mechanic: "Mechanic delegation",
+  mechanicModel: "Mechanic Model",
 };
 
 /** Every choice a person makes here, by the name `configure` knows it by. */
-type ChoiceKey = "transport" | "reviewerTransport" | "authoringModel" | "engine" | "reviewerModel" | "auxiliaryModel";
+type ChoiceKey =
+  | "transport"
+  | "reviewerTransport"
+  | "authoringModel"
+  | "engine"
+  | "reviewerModel"
+  | "auxiliaryModel"
+  | "mechanic"
+  | "mechanicModel";
 
 /** The two choices the machine keeps as a role's selection rather than as a field of its own. */
 const ROLE_OF_CHOICE: Partial<Record<ChoiceKey, string>> = {
@@ -227,6 +246,8 @@ function machineHolds(held: Partial<Preferences>, key: ChoiceKey): string | null
   if (key === "transport") return held.transport ?? null;
   if (key === "reviewerTransport") return held.reviewer_transport ?? null;
   if (key === "authoringModel") return held.authoring_model ?? null;
+  if (key === "mechanic") return held.mechanic ?? null;
+  if (key === "mechanicModel") return held.mechanic_model ?? null;
   return held.engine ?? null;
 }
 
@@ -264,6 +285,10 @@ export interface ConfigureOptions {
   readonly reviewerModel?: string;
   /** The Auxiliary Reviewer's model: the third voice at a disputed impasse. */
   readonly auxiliaryModel?: string;
+  /** Whether the framework may call in the Mechanic: unattended, attended or off. */
+  readonly mechanic?: string;
+  /** The model the Mechanic is launched on, on the authoring engine's CLI; empty clears it. */
+  readonly mechanicModel?: string;
   /**
    * Keep the vehicle and the authoring model as THIS PERSON's default.
    *
@@ -510,9 +535,9 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   // which has anything to do with what the engine may be launched on. The
   // undeclared role is the whole enumeration in the order the transport
   // listed it, which is what "a model this machine could author with" means.
-  if (options.authoringModel !== undefined) {
-    const wanted = options.authoringModel.trim();
-    if (wanted !== "") {
+  // The Mechanic runs on the authoring engine's CLI, so its model is checked
+  // against the same list.
+  const engineListRefusal = (wanted: string): { modelId: string } | { refusal: string } => {
       // **The list the PANE offers, so the offer and the acceptance cannot
       // disagree.** `authoringNode` reads the ENGINE's own record and narrows
       // it to the providers that CLI can run, and a verb that checked some
@@ -529,7 +554,6 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
       const modelId = listed.find((id) => id === wanted) ?? null;
       if (modelId === null) {
         return {
-          ...empty,
           refusal:
             `'${wanted}' is not a model this engine's own list names. ` +
             `${namesOffered(listed)} The list is what this machine has read ` +
@@ -537,9 +561,41 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
             "bundled catalog and refuses what it does not know.",
         };
       }
-      named["authoringModel"] = modelId;
-    } else {
-      named["authoringModel"] = "";
+      return { modelId };
+  };
+  if (options.authoringModel !== undefined) {
+    const wanted = options.authoringModel.trim();
+    if (wanted === "") named["authoringModel"] = "";
+    else {
+      const checked = engineListRefusal(wanted);
+      if ("refusal" in checked) return { ...empty, refusal: checked.refusal };
+      named["authoringModel"] = checked.modelId;
+    }
+  }
+  if (options.mechanic !== undefined) {
+    const mode = options.mechanic.trim().toLowerCase();
+    if (mode !== "" && !(MECHANIC_MODES as readonly string[]).includes(mode)) {
+      return { ...empty, refusal: `'${options.mechanic}' is not a Mechanic delegation. It is one of: ${MECHANIC_MODES.join(", ")}.` };
+    }
+    named["mechanic"] = mode;
+  }
+  if (options.mechanicModel !== undefined) {
+    const wanted = options.mechanicModel.trim();
+    if (wanted === "") named["mechanicModel"] = "";
+    else {
+      const checked = engineListRefusal(wanted);
+      if ("refusal" in checked) return { ...empty, refusal: checked.refusal };
+      // The Mechanic is never the Primary Reviewer: its fix is that reviewer's to review.
+      const primary = named["reviewerModel"] ?? explainRoleModel(ROLE_PRIMARY_REVIEWER, options.repoRoot).transport;
+      if (primary !== "" && normalizeModelToken(primary) === normalizeModelToken(checked.modelId)) {
+        return {
+          ...empty,
+          refusal:
+            `'${checked.modelId}' is the Primary Reviewer's model, and the Mechanic is never the Primary ` +
+            "Reviewer: the fix it makes is that reviewer's to review. Choose a different model.",
+        };
+      }
+      named["mechanicModel"] = checked.modelId;
     }
   }
   // **Where the three checkout-level settings land.**
@@ -653,7 +709,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   // choice at a time, a machine whose default engine was Claude Code took a
   // Copilot repository"s model as its default model, and every repository
   // opened afterwards fell back to a pair no session could start on.
-  let unseededModel: string | null = null;
+  let unseededModel: readonly [ChoiceKey, string] | null = null;
   const besideItsEngine = (): boolean => {
     const stated = options.engine?.trim() ?? "";
     const machine = machineHolds(held, "engine") ?? (stated === "" ? null : stated);
@@ -669,8 +725,8 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     if (options.mine === true) return keepOnMachine();
     Object.assign(choice, { [key]: value });
     if (value === "" || machineHolds(held, key) !== null) return;
-    if (key === "authoringModel" && !besideItsEngine()) {
-      unseededModel = value;
+    if ((key === "authoringModel" || key === "mechanicModel") && !besideItsEngine()) {
+      unseededModel = [key, value];
       return;
     }
     keepOnMachine();
@@ -704,6 +760,8 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   // there is no second name for a model to be translated into on the way to
   // the file, which is the round trip `aliasFor` and `modelIdOf` existed for.
   if (named["reviewerModel"] !== undefined) settle("reviewerModel", named["reviewerModel"]);
+  if (named["mechanic"] !== undefined) settle("mechanic", named["mechanic"]);
+  if (named["mechanicModel"] !== undefined) settle("mechanicModel", named["mechanicModel"]);
   if (named["auxiliaryModel"] !== undefined) settle("auxiliaryModel", named["auxiliaryModel"]);
   const preferenceLines: string[] = [];
   // The machine's half, written as the one preferences write it is: one
@@ -728,7 +786,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   }
   if (unseededModel !== null) {
     preferenceLines.push(
-      `${PREFERENCES_FILENAME} names no ${WORDS["authoringModel"]} and still names none: '${unseededModel}' is a default only beside the ` +
+      `${PREFERENCES_FILENAME} names no ${WORDS[unseededModel[0]]} and still names none: '${unseededModel[1]}' is a default only beside the ` +
         "engine that runs it, and this machine's default engine is not this repository's. `--mine` makes it one anyway",
     );
   }
@@ -844,6 +902,8 @@ export async function configureVerb(argv: string[]): Promise<number> {
     "--authoring-model",
     "--reviewer-model",
     "--auxiliary-model",
+    "--mechanic",
+    "--mechanic-model",
     "--credential",
     "--repo-root",
   ];
@@ -891,6 +951,10 @@ export async function configureVerb(argv: string[]): Promise<number> {
       : {}),
     ...(values.has("--auxiliary-model")
       ? { auxiliaryModel: values.get("--auxiliary-model") as string }
+      : {}),
+    ...(values.has("--mechanic") ? { mechanic: values.get("--mechanic") as string } : {}),
+    ...(values.has("--mechanic-model")
+      ? { mechanicModel: values.get("--mechanic-model") as string }
       : {}),
     ...(values.has("--credential")
       ? { credential: values.get("--credential") as string }

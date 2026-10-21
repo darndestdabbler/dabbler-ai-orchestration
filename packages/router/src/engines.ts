@@ -66,6 +66,12 @@ export interface EngineInvocation {
    * because the most recent one can be somebody else's.
    */
   readonly resumeId: string | null;
+  /**
+   * What the engine is told in place of `enginePrompt(instructionPath)`: a
+   * fresh conversation brought in for something other than answering the
+   * instruction -- the Mechanic, briefed on a stop.
+   */
+  readonly prompt?: string;
   /** Aborted by the driver to end the invocation; the reason is the interrupt's. */
   readonly signal: AbortSignal;
   /**
@@ -987,7 +993,7 @@ export function builtInEngine(
   return {
     name: engine,
     invoke(invocation: EngineInvocation): Promise<EngineOutcome> {
-      const prompt = enginePrompt(invocation.instructionPath);
+      const prompt = invocation.prompt ?? enginePrompt(invocation.instructionPath);
       const argv = [program, ...leading, ...shape.argv({ resumeId: invocation.resumeId }, prompt)];
       const spawned = spawnOrFail(argv, invocation, shape.input === "stdin" ? "pipe" : "ignore");
       if (typeof spawned === "string") return Promise.resolve({ exitCode: null, error: spawned });

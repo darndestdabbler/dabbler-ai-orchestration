@@ -401,6 +401,19 @@ describe("driving a built-in engine", () => {
     }
   });
 
+  it("tells a fresh conversation the prompt it is given, in place of the instruction sentence", async () => {
+    const { engine, seenPath } = fakeClaude();
+    if (typeof engine === "string") throw new Error(engine);
+    try {
+      await engine.invoke(invocation({ first: true, prompt: "Read the Mechanic brief and unblock the session." }, []));
+      const seen = JSON.parse(readFileSync(seenPath, "utf8")) as { argv: string[]; prompt: string };
+      assert.equal(seen.prompt, "Read the Mechanic brief and unblock the session.");
+      assert.ok(!seen.argv.includes("--resume"));
+    } finally {
+      clearFakeEnv();
+    }
+  });
+
   it("reads a refused model off stderr, where the CLI exits 0 and says it went fine", async () => {
     // The whole of the defect, in one invocation. `claude` prints its marker
     // on STDERR, answers with an ordinary message, and exits 0 -- and its

@@ -70,6 +70,7 @@ import {
   stepFilesLine,
   judgeIntervention,
   interventionsClosing,
+  mechanicHandsBack,
   unchangedStepFiles,
   checkFailedRefusal,
   CHECK_FAILED_WAYS,
@@ -318,6 +319,26 @@ describe("a verification call refused for funds", () => {
     } finally {
       restore();
     }
+  });
+});
+
+describe("the Mechanic, called in without the person", () => {
+  it("hands back a funds wait, an interrupt, a release, and a spent budget without calling one", () => {
+    const stop = { kind: "verification", reason: "the round failed" };
+    const attempt = (outcome: "open" | "cleared" | "failed", reason = "an earlier stop") => ({
+      at: "2026-10-21T10:00:00-04:00", kind: "verification", reason, phase: "verify", model: null, before_tree: "abc", outcome,
+    });
+    assert.equal(mechanicHandsBack(stop, "unattended", false, []), null);
+    assert.match(String(mechanicHandsBack({ kind: "funds", reason: "no balance" }, "unattended", false, [])), /funds/);
+    assert.match(String(mechanicHandsBack({ kind: "interrupted", reason: "stop" }, "unattended", false, [])), /asked/);
+    assert.match(String(mechanicHandsBack(stop, "unattended", true, [])), /release/);
+    assert.match(String(mechanicHandsBack(stop, "attended", false, [])), /'attended'/);
+    assert.match(String(mechanicHandsBack(stop, "unattended", false, [attempt("open")])), /never calls a Mechanic/);
+    assert.match(String(mechanicHandsBack(stop, "unattended", false, [attempt("failed", "the round failed")])), /one attempt/);
+    assert.match(
+      String(mechanicHandsBack(stop, "unattended", false, [attempt("cleared"), attempt("cleared", "another")])),
+      /spent its 2 attempts/,
+    );
   });
 });
 

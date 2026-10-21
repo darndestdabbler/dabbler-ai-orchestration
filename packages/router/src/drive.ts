@@ -33,7 +33,7 @@
 // continues from the phase it reached.
 
 import { spawn } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
 import {
@@ -53,6 +53,9 @@ import {
   type RouterConfig,
   driverEngineOutput,
   driverInvocationCap,
+  explainMechanic,
+  explainMechanicModel,
+  explainRoleModel,
   loadConfig,
   verificationRoundCap,
   transcriptCarry,
@@ -66,6 +69,7 @@ import {
   REPORT_SCHEMA,
   WATCHER_OUTSTANDING,
   WORK_PLAN_SCHEMA,
+  driverDir,
   instructionPath,
   LOOP_STALE_MS,
   WAITER_IS_WHAT_IS_RUN,
@@ -94,8 +98,8 @@ import {
   AMEND_CHECKS_COMMAND,
 } from "./driver.ts";
 import { commitSessionTranscript } from "./transcript.ts";
-import { SETTING_TRANSCRIPT } from "./settings.ts";
-import { readRawSessionState } from "./sessionState.ts";
+import { SETTING_AUTHORING_MODEL, SETTING_MECHANIC_MODEL, SETTING_TRANSCRIPT } from "./settings.ts";
+import { namedReviewers, readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
 import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
@@ -129,7 +133,7 @@ import type {
 } from "./generated/index.ts";
 import { type Job, endJob, jobLogTail, jobStatusPath, pollJob, selfArgv, startJob } from "./jobs.ts";
 import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
-import { tryWriteProjection } from "./projection.ts";
+import { orchestratorOf, tryWriteProjection } from "./projection.ts";
 import {
   changedPathsBetween,
   headBranch,
@@ -393,6 +397,60 @@ export function interventionsClosing(session: string, interventions: DriverRun["
     `dabbler: session ${session} closed after ${rows.length} intervention(s):\n` +
     rows.map((row) => `  - ${row.reason} (in '${row.phase}': ${row.files.join(", ")})\n`).join("")
   );
+}
+
+/** One time the framework called in the Mechanic without the person. */
+type MechanicAttempt = NonNullable<DriverRun["mechanic_attempts"]>[number];
+
+/** How long one unattended Mechanic may work before its attempt is undone. */
+export const MECHANIC_DEADLINE_MS = 20 * 60 * 1000;
+
+/** How many times one session may call the Mechanic in; one stop gets one. */
+export const MECHANIC_ATTEMPTS_PER_SESSION = 2;
+
+/**
+ * Why this stop goes straight to the person, or null to call the Mechanic in
+ * first. A wait for funds and a person's own interrupt are the person's by
+ * what they are; a release is the person's by its session; and the budget is
+ * one attempt per stop, two per session, never a Mechanic calling a Mechanic.
+ */
+export function mechanicHandsBack(
+  stop: { readonly kind: string; readonly reason: string },
+  mode: string,
+  release: boolean,
+  attempts: readonly MechanicAttempt[],
+): string | null {
+  if (mode !== "unattended") return `dabbler.mechanic is '${mode}'`;
+  if (stop.kind === "funds") return "a wait for funds is the person's: nothing in the tree can pay for it";
+  if (stop.kind === "interrupted") return "a person asked the session to stop";
+  if (release) return "a release session is the person's";
+  if (attempts.some((attempt) => attempt.outcome === "open")) return "a Mechanic is already at work, and never calls a Mechanic";
+  if (attempts.some((attempt) => attempt.kind === stop.kind && attempt.reason === stop.reason)) {
+    return "this stop has had its one attempt";
+  }
+  if (attempts.length >= MECHANIC_ATTEMPTS_PER_SESSION) {
+    return `the session has spent its ${MECHANIC_ATTEMPTS_PER_SESSION} attempts`;
+  }
+  return null;
+}
+
+/** How a Mechanic is reached: the authoring engine's CLI, on a model. A test stands in for it. */
+type MechanicLauncher = (engine: string, model: string | null) => Engine | string;
+
+let launchMechanic: MechanicLauncher = (engine, model) => builtInEngine(engine, model);
+
+/** Stand in for the Mechanic's launch; returns the restore. */
+export function setMechanicLauncher(launcher: MechanicLauncher): () => void {
+  const held = launchMechanic;
+  launchMechanic = launcher;
+  return () => {
+    launchMechanic = held;
+  };
+}
+
+/** Where an unattended Mechanic leaves its memo for the person: untracked, and outside the record. */
+export function mechanicMemoPath(sessionNumber: number): string {
+  return `.dabbler/scratch/mechanic-memo-s${sessionNumber}.md`;
 }
 
 /**
@@ -1832,7 +1890,215 @@ class Driver {
     );
   }
 
+  /**
+   * Call the Mechanic in on a stop, before it becomes the person's: a fresh
+   * conversation of the authoring engine on the Mechanic Model, briefed with
+   * the unattended mandate. `resumed` is a stop lifted for the loop to go on;
+   * otherwise the stop is the person's, with the Mechanic's memo where one
+   * was written. An attempt still open when a stop arrives did not clear it,
+   * and is undone first.
+   */
+  private async callInTheMechanic(stop: Stop): Promise<{ readonly resumed: true } | { readonly memo: string | null }> {
+    const attempts = this.run.mechanic_attempts ?? [];
+    if (attempts.at(-1)?.outcome === "open") {
+      return { memo: this.undoMechanic(`the stop came back: ${firstSentence(stop.message)}`) };
+    }
+    let mode: string;
+    let model: string | null;
+    let decidedBy: string | null;
+    try {
+      mode = explainMechanic(null, this.repoRoot).transport;
+      const release = releaseSessionVersion(this.sessionsDir, this.sessionNumber) !== null;
+      const why = mechanicHandsBack({ kind: stop.kind, reason: stop.message }, mode, release, attempts);
+      if (why !== null) {
+        if (mode === "unattended") this.log("mechanic-not-called", { why });
+        return { memo: null };
+      }
+      // Unset, the Authoring Model; where that is unset too, the model the session was started on.
+      const reading = explainMechanicModel(null, this.repoRoot, this.primaryModel());
+      model = reading.transport || orchestratorOf(this.repoRoot).model;
+      decidedBy = reading.decidedBy;
+    } catch (error) {
+      if (!(error instanceof ConfigError)) throw error;
+      this.log("mechanic-not-called", { why: error.message });
+      return { memo: error.message };
+    }
+    const engine = launchMechanic(this.run.engine, model);
+    const before = snapshotWorktreeTree(this.repoRoot);
+    if (typeof engine === "string" || before === null) {
+      this.log("mechanic-not-called", { why: typeof engine === "string" ? engine : "could not snapshot the working tree" });
+      return { memo: null };
+    }
+    const memoRel = mechanicMemoPath(this.sessionNumber);
+    rmSync(join(this.repoRoot, memoRel), { force: true });
+    mkdirSync(dirname(join(this.repoRoot, memoRel)), { recursive: true });
+    // The brief is the router's own verb, so the Mechanic reads exactly what
+    // a person who opened one would, with the unattended mandate.
+    const brief = [...selfArgv(), "consult", "--mechanic", "--memo", memoRel, "--sessions-dir", this.sessionsDir]
+      .map((part) => (/\s/.test(part) ? `"${part}"` : part))
+      .join(" ");
+    const attempt: MechanicAttempt = {
+      at: nowIso(),
+      kind: stop.kind,
+      code: stop.code,
+      reason: stop.message,
+      phase: this.run.phase,
+      model,
+      before_tree: before,
+      // What a failed attempt puts the step baseline back to.
+      baseline_before: this.run.baseline_tree === null ? null : String(this.run.baseline_tree),
+      outcome: "open",
+    };
+    this.run = {
+      ...this.run,
+      mechanic_attempts: [...attempts, attempt],
+      waiting: this.waiting("job", "the Mechanic", new Date(Date.now() + MECHANIC_DEADLINE_MS).toISOString()),
+    };
+    this.save();
+    this.log("mechanic-called", { stop: stop.kind, model: model ?? "the engine's default" });
+    const transcript = join(driverDir(this.repoRoot, this.sessionNumber), `mechanic-${attempts.length + 1}.log`);
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort("the Mechanic's twenty minutes ran out"), MECHANIC_DEADLINE_MS);
+    let outcome: EngineOutcome;
+    try {
+      outcome = await engine.invoke({
+        instruction: readInstruction(this.repoRoot, this.sessionNumber) ?? ({} as DriverInstruction),
+        instructionPath: instructionPath(this.repoRoot, this.sessionNumber),
+        repoRoot: this.repoRoot,
+        sessionsDir: this.sessionsDir,
+        sessionNumber: this.sessionNumber,
+        invocation: attempts.length + 1,
+        first: true,
+        // Never the author's live conversation: a fresh context is the point.
+        resumeId: null,
+        prompt:
+          `You are the Mechanic, called in by the framework on a stopped session. Run ${brief} ` +
+          "and do what the brief it prints says; when the memo it asks for is written, exit.",
+        signal: controller.signal,
+        emit: (line: string) => appendFileSync(transcript, `${line}\n`, "utf8"),
+      });
+    } finally {
+      clearTimeout(deadline);
+    }
+    const after = snapshotWorktreeTree(this.repoRoot);
+    const files = after === null ? [] : (changedPathsBetween(this.repoRoot, before, after) ?? []);
+    this.run = {
+      ...this.run,
+      mechanic_attempts: (this.run.mechanic_attempts ?? []).map((row, index, all) =>
+        index === all.length - 1 ? { ...row, files } : row,
+      ),
+    };
+    // A model the engine's CLI refused is a choice a person made, said as the
+    // setting that made it, as an Authoring Model's refusal is.
+    if (outcome.refusedModel) {
+      const refusal =
+        `The engine refused the Mechanic Model '${outcome.refusedModel}', decided by ` +
+        `${decidedBy ?? `${SETTING_AUTHORING_MODEL}, which ${SETTING_MECHANIC_MODEL} falls back to`}. ` +
+        `Name one this engine accepts with \`dabbler configure --mechanic-model <model>\` (${SETTING_MECHANIC_MODEL}).`;
+      return { memo: this.undoMechanic("the engine refused its model", refusal) };
+    }
+    if (outcome.interrupted === true || outcome.error) {
+      return { memo: this.undoMechanic(outcome.error ? `it could not be run: ${outcome.error}` : "its twenty minutes ran out") };
+    }
+    if (files.length === 0) {
+      // Diagnosed and handed back without an edit: there is nothing to try.
+      this.run = { ...this.run, mechanic_attempts: this.closeMechanic("failed") };
+      this.save();
+      this.log("mechanic-handed-back", { stop: stop.kind });
+      return { memo: this.mechanicMemo() ?? this.memoInItsPlace(stop.kind, "it made no change and wrote no memo", []) };
+    }
+    // Inside a work phase the step is measured against the baseline, and
+    // the Mechanic's fix is not the step's: the baseline moves past it, as
+    // it does past the framework's own writes.
+    if (this.run.baseline_tree !== null && isWorkPhase(this.run.phase)) {
+      const moved = treeWithPaths(this.repoRoot, String(this.run.baseline_tree), files);
+      if (moved !== null) this.run = { ...this.run, baseline_tree: moved };
+    }
+    const afterRefusals = stop.kind === "rejected-thrice";
+    if (afterRefusals) this.answered = true;
+    this.run = {
+      ...this.run,
+      ...(afterRefusals ? { rejections: 0 } : {}),
+      stop: null,
+      resumed_from: { kind: stop.kind, at: attempt.at, step_id: this.currentStep, phase: this.run.phase },
+    };
+    this.save();
+    this.log("mechanic-fixed", { stop: stop.kind, files });
+    return { resumed: true };
+  }
+
+  /**
+   * The session moved past the stop the Mechanic was called in on -- a phase
+   * left, or a step accepted -- so its fix cleared it.
+   */
+  private mechanicCleared(): void {
+    if (!(this.run.mechanic_attempts ?? []).some((row) => row.outcome === "open")) return;
+    this.run = { ...this.run, mechanic_attempts: this.closeMechanic("cleared") };
+    this.log("mechanic-cleared");
+  }
+
+  /** The attempts with the open one closed as `outcome`. */
+  private closeMechanic(outcome: "cleared" | "failed"): MechanicAttempt[] {
+    return (this.run.mechanic_attempts ?? []).map((row) => (row.outcome === "open" ? { ...row, outcome } : row));
+  }
+
+  /**
+   * Undo the open attempt: its diff kept in the loop log, the paths it moved
+   * restored to what they were before it started. Only its own paths, so
+   * work the author did since is left as it is. Returns the memo.
+   */
+  private undoMechanic(why: string, lead: string | null = null): string | null {
+    const open = (this.run.mechanic_attempts ?? []).find((row) => row.outcome === "open");
+    if (open === undefined) return null;
+    const after = snapshotWorktreeTree(this.repoRoot);
+    const files = open.files ?? (after === null ? [] : (changedPathsBetween(this.repoRoot, open.before_tree, after) ?? []));
+    if (after !== null && files.length > 0) {
+      const diff = runGit(this.repoRoot, ["diff", "--no-ext-diff", open.before_tree, after, "--", ...files]);
+      this.log("mechanic-diff", { diff: diff.stdout });
+    }
+    for (const file of files) {
+      const held = runGit(this.repoRoot, ["cat-file", "-e", `${open.before_tree}:${file}`]).code === 0;
+      if (held) runGit(this.repoRoot, ["restore", `--source=${open.before_tree}`, "--worktree", "--", file]);
+      else rmSync(join(this.repoRoot, file), { force: true });
+    }
+    // The step baseline as it stood before the Mechanic moved it past its fix.
+    if (open.baseline_before !== undefined) this.run = { ...this.run, baseline_tree: open.baseline_before };
+    this.run = { ...this.run, mechanic_attempts: this.closeMechanic("failed") };
+    this.save();
+    this.log("mechanic-undone", { why, files });
+    const memo = this.mechanicMemo() ?? this.memoInItsPlace(open.kind, why, files);
+    return lead === null ? memo : `${lead}\n${memo}`;
+  }
+
+  /** What the person is told where the Mechanic wrote no memo: never nothing. */
+  private memoInItsPlace(kind: string, why: string, files: readonly string[]): string {
+    return (
+      `The Mechanic left no memo. Its attempt on this '${kind}' stop failed: ${why}. ` +
+      (files.length > 0 ? `What it changed was undone (${files.join(", ")}). ` : "It changed nothing. ") +
+      `Its transcript is under .dabbler/runs/s${this.sessionNumber}/driver/. Recommendation: take one of the ` +
+      "ways on below; this stop has had its attempt, so the framework will not call the Mechanic in on it again."
+    );
+  }
+
+  /** The memo the Mechanic left for the person, or null where it wrote none. */
+  private mechanicMemo(): string | null {
+    try {
+      const memo = readFileSync(join(this.repoRoot, mechanicMemoPath(this.sessionNumber)), "utf8").trim();
+      return memo === "" ? null : memo;
+    } catch {
+      return null;
+    }
+  }
+
+  /** The model this session's Primary Reviewer runs on, which the Mechanic may never be; "" where none resolves. */
+  private primaryModel(): string {
+    const session = namedReviewers(this.repoRoot, this.sessionNumber)["reviewer"] ?? null;
+    return explainRoleModel("reviewer", this.repoRoot, session).transport;
+  }
+
   private setPhase(phase: DriverRun["phase"]): void {
+    const open = (this.run.mechanic_attempts ?? []).find((row) => row.outcome === "open");
+    if (open !== undefined && open.phase !== phase) this.mechanicCleared();
     this.run = { ...this.run, phase };
     this.markProgress();
     this.save();
@@ -3119,6 +3385,7 @@ class Driver {
             : this.run.accepted_steps,
         };
         this.markProgress();
+        this.mechanicCleared();
         this.setRejections(0);
         this.log("report-accepted", reportAcceptedFields(instruction.seq, spec.id, report));
         return;
@@ -4539,6 +4806,14 @@ class Driver {
         resumed_from: null,
       };
       this.save();
+      // On the record first, because the Mechanic's brief is read from it.
+      const called = await this.callInTheMechanic(error);
+      if ("resumed" in called) return this.loop();
+      const memo = called.memo === null ? null : `The Mechanic's memo:\n${called.memo}`;
+      const brief = [error.brief, memo].filter((part) => part !== null && part !== "").join("\n\n");
+      // A Mechanic that worked and handed back leaves the wait the person's again.
+      this.run = { ...this.run, waiting: this.waiting("person", firstSentence(entry.reason), null) };
+      this.save();
       // The words are the router's one rendering of a stop, shared with the
       // status row and the terminal; what is on disk is the record above.
       const words = renderStop(this.run.stop as NonNullable<DriverRun["stop"]>, this.run);
@@ -4551,7 +4826,7 @@ class Driver {
           `${this.run.invocations} invocation(s).\n${words.happened}\n` +
           // The stop's own substance -- the findings a dispute stands over,
           // their grounds, what they cite -- printed where the person is.
-          (error.brief ? `\n${error.brief}\n\n` : "") +
+          (brief ? `\n${brief}\n\n` : "") +
           `${words.ended} ${words.next}${words.ways}\n`,
       );
       return EXIT_GATE_FAILED;

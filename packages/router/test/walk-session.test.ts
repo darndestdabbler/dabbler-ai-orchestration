@@ -17,9 +17,13 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
 import { CONFIG_ENV_VAR } from "../src/config.ts";
-import { driveSession, reportAndNext, sessionNext, type Engine } from "../src/drive.ts";
-import { mailboxEngine } from "../src/engines.ts";
+import { driveSession, mechanicMemoPath, reportAndNext, sessionNext, setMechanicLauncher, type Engine } from "../src/drive.ts";
+import { mailboxEngine, type EngineOutcome } from "../src/engines.ts";
 import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
+import { EXIT_CALL_FAILED } from "../src/contracts/exitCodes.ts";
+import { beginJobRecord, jobRecord, setJobStarter } from "../src/jobs.ts";
+import { SETTING_AUTHORING_MODEL, SETTING_MECHANIC_MODEL, writeSettings } from "../src/settings.ts";
+import { registerSessionStart } from "../src/writers.ts";
 import { judgeSuiteDeclaration } from "../src/gates.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
 import { appendPackaging, readPackaging, readRounds } from "../src/ledger.ts";
@@ -33,7 +37,7 @@ import { readRecords } from "../src/testEvidence.ts";
 import { amendmentEntries, readTaskDeclaration } from "../src/writers.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
 import { settleJobs, useInProcessJobs } from "./support/inProcessJobs.ts";
-import { git, gitOut, makeRepo } from "./support/repo.ts";
+import { git, gitOut, makeRepo, makeSandbox } from "./support/repo.ts";
 
 const NODE = process.execPath;
 const WIDGET_V3 = "def widget():\n    return 3\n";
@@ -2198,4 +2202,179 @@ describe("a session rolled back to where it started", () => {
     assert.match(gitOut(repo, "ls-files", "--", "docs/transcripts"), /session-001\.html/);
     assert.equal(gitOut(repo, "status", "--porcelain", "--", "docs/transcripts").trim(), "");
   });
+});
+
+describe("the Mechanic, called in without the person, on a real checkout", () => {
+  /** A real checkout stopped in verify, whose next round fails until `fixed()` says otherwise. */
+  function stoppedInVerify(settings: Record<string, string>): {
+    repo: string;
+    sessionsDir: string;
+    launched: Array<readonly [string, string | null]>;
+    prompts: string[];
+    restore: () => void;
+    launch: (act: (repo: string) => EngineOutcome | void) => void;
+  } {
+    const { repo, sessionsDir } = makeSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeSettings(repo, settings);
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "claude-code", phase: "verify", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: ["one"], baseline_tree: null,
+      stop: null, lease_epoch: 1,
+      started_at: "2026-10-21T10:00:00-04:00", updated_at: "2026-10-21T10:00:00-04:00",
+    });
+    // Every round fails to reach its provider until the Mechanic's file is there.
+    const unsetJob = setJobStarter((root, session, options) => {
+      const { log, status } = beginJobRecord(root, session, options.name);
+      if (!existsSync(join(root, "FIXED"))) {
+        writeFileSync(log, "verify: the provider could not be reached.\n");
+        writeFileSync(status, JSON.stringify({ exit: EXIT_CALL_FAILED, ended_at: new Date().toISOString() }));
+      }
+      return jobRecord(root, session, options, process.pid);
+    });
+    const launched: Array<readonly [string, string | null]> = [];
+    const prompts: string[] = [];
+    let act: (repo: string) => EngineOutcome | void = () => {};
+    const unsetMechanic = setMechanicLauncher((engine, model) => {
+      launched.push([engine, model]);
+      return {
+        name: "stand-in-mechanic",
+        invoke: (invocation) => {
+          prompts.push(invocation.prompt ?? "");
+          return Promise.resolve(act(repo) ?? { exitCode: 0 });
+        },
+      };
+    });
+    return {
+      repo, sessionsDir, launched, prompts,
+      launch: (next) => { act = next; },
+      restore: () => { unsetJob(); unsetMechanic(); },
+    };
+  }
+
+  it("engages on an unattended stop, on the Mechanic Model, and the session carries on", async () => {
+    const s = stoppedInVerify({ [SETTING_AUTHORING_MODEL]: "claude-sonnet-5-5", [SETTING_MECHANIC_MODEL]: "claude-opus-5-5" });
+    try {
+      s.launch((repo) => writeFileSync(join(repo, "FIXED"), "the provider is routed elsewhere\n"));
+      await capture(() => sessionNext(s.sessionsDir, {}));
+      assert.deepEqual(s.launched, [["claude-code", "claude-opus-5-5"]]);
+      // Briefed by the router's own verb, with the unattended mandate and where its memo goes.
+      assert.match(s.prompts[0] ?? "", /consult --mechanic --memo \.dabbler\/scratch\/mechanic-memo-s1\.md/);
+      const run = readRun(s.repo, 1)!;
+      // The stop was lifted and the round asked again; the attempt is on the record.
+      assert.equal(run.stop, null);
+      assert.equal(run.phase, "verify");
+      assert.equal(run.mechanic_attempts?.length, 1);
+      assert.equal(run.mechanic_attempts?.[0]?.kind, "verification");
+      assert.deepEqual(run.mechanic_attempts?.[0]?.files, ["FIXED"]);
+      assert.equal(run.stop_history?.at(-1)?.kind, "verification");
+    } finally {
+      s.restore();
+    }
+  });
+
+  it("undoes an attempt that did not clear the stop, launched on the Authoring Model where none is set, and hands back its memo", async () => {
+    const s = stoppedInVerify({ [SETTING_AUTHORING_MODEL]: "claude-sonnet-5-5" });
+    try {
+      s.launch((repo) => {
+        writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n");
+        writeFileSync(join(repo, "NOTES"), "a guess\n");
+        mkdirSync(join(repo, ".dabbler", "scratch"), { recursive: true });
+        writeFileSync(join(repo, mechanicMemoPath(1)), "The provider is down; recommend waiting.\n");
+      });
+      const driven = await capture(() => sessionNext(s.sessionsDir, {}));
+      assert.deepEqual(s.launched, [["claude-code", "claude-sonnet-5-5"]]);
+      // Restored to the tree it started from, its diff kept in the log.
+      assert.equal(readFileSync(join(s.repo, "src", "widget.py"), "utf8"), "def widget():\n    return 1\n");
+      assert.equal(existsSync(join(s.repo, "NOTES")), false);
+      const run = readRun(s.repo, 1)!;
+      assert.equal(run.stop?.kind, "verification");
+      assert.equal(run.mechanic_attempts?.[0]?.outcome, "failed");
+      assert.match(driven.stderr, /The Mechanic's memo:\r?\nThe provider is down; recommend waiting\./);
+      // The same stop has had its attempt: the next call hands it straight back.
+      await capture(() => sessionNext(s.sessionsDir, {}));
+      assert.equal(s.launched.length, 1);
+    } finally {
+      s.restore();
+    }
+  });
+
+  it("names the setting and its layer when the engine refuses the Mechanic Model", async () => {
+    const s = stoppedInVerify({ [SETTING_MECHANIC_MODEL]: "claude-opus-9" });
+    try {
+      s.launch(() => ({ exitCode: 0, refusedModel: "claude-opus-9" }));
+      const driven = await capture(() => sessionNext(s.sessionsDir, {}));
+      assert.match(
+        driven.stderr,
+        /refused the Mechanic Model 'claude-opus-9', decided by \.vscode.settings\.json \(dabbler\.mechanicModel\)/,
+      );
+      assert.equal(readRun(s.repo, 1)?.mechanic_attempts?.[0]?.outcome, "failed");
+    } finally {
+      s.restore();
+    }
+  });
+
+  it("hands back a memo of its own when an attempt runs out without writing one", async () => {
+    const s = stoppedInVerify({});
+    try {
+      s.launch((repo) => {
+        writeFileSync(join(repo, "NOTES"), "half a fix\n");
+        return { exitCode: null, interrupted: true };
+      });
+      const driven = await capture(() => sessionNext(s.sessionsDir, {}));
+      assert.equal(existsSync(join(s.repo, "NOTES")), false);
+      assert.match(driven.stderr, /The Mechanic left no memo\. Its attempt on this 'verification' stop failed: its twenty minutes ran out\./);
+      assert.match(driven.stderr, /What it changed was undone \(NOTES\)\. .*Recommendation:/);
+    } finally {
+      s.restore();
+    }
+  });
+
+  it("puts the author's work and the step baseline back as they were when a work-phase attempt is undone", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+    const unsetMechanic = setMechanicLauncher(() => ({
+      name: "stand-in-mechanic",
+      invoke: () => {
+        writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 3\n");
+        writeFileSync(join(repo, "NOTES"), "a guess\n");
+        return Promise.resolve({ exitCode: 0 });
+      },
+    }));
+    const blocked = (seq: number) =>
+      capture(() =>
+        Promise.resolve(
+          report(sessionsDir, { seq, stepId: "widget", status: "blocked", files: [], testsRun: null, notes: "cannot see why" }),
+        ),
+      );
+    try {
+      await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })));
+      const plan = await next(sessionsDir);
+      assert.equal(await answerPlan(sessionsDir, plan.instruction!.seq, PLAN), EXIT_OK);
+      const step = await next(sessionsDir);
+      assert.equal(step.instruction?.step_id, "widget");
+      const baseline = readRun(repo, 1)?.baseline_tree;
+      // The author's own work on the step, uncommitted, then a blocked report.
+      writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n");
+      await blocked(step.instruction!.seq);
+      const again = await next(sessionsDir);
+      assert.equal(readRun(repo, 1)?.mechanic_attempts?.[0]?.outcome, "open");
+      assert.notEqual(readRun(repo, 1)?.baseline_tree, baseline);
+      // The same stop comes back: the attempt is undone.
+      await blocked(again.instruction!.seq);
+      await next(sessionsDir);
+      assert.equal(readFileSync(join(repo, "src", "widget.py"), "utf8"), "def widget():\n    return 2\n");
+      assert.equal(existsSync(join(repo, "NOTES")), false);
+      const run = readRun(repo, 1)!;
+      assert.equal(run.mechanic_attempts?.[0]?.outcome, "failed");
+      assert.equal(run.baseline_tree, baseline);
+    } finally {
+      unsetMechanic();
+    }
+  });
+
 });

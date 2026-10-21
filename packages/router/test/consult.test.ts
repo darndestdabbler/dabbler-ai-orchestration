@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { consultBrief, mechanicBrief } from "../src/cli/consult.ts";
+import { UNATTENDED_DENIED, consultBrief, mechanicBrief } from "../src/cli/consult.ts";
 import { writeRun } from "../src/driver.ts";
 import { appendPackaging } from "../src/ledger.ts";
 import { registerSessionStart } from "../src/writers.ts";
@@ -108,5 +108,21 @@ describe("mechanicBrief", () => {
     // The two instructions, as the session plan states them.
     assert.ok(brief.includes("- Diagnose, recommend, and act only when the person agrees.\n"));
     assert.ok(brief.includes("- Make the minimum viable unblocking fix and record it in `docs/sessions/mechanic-log.md`.\n"));
+  });
+
+  it("called in unattended, carries the deny-list and the memo path, and asks for no consent", () => {
+    const { repo, sessionsDir } = repository();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      ...RUN,
+      phase: "work",
+      stop: { kind: "rejected-thrice", reason: "the step was refused three times", at: "2026-08-31T12:30:00-04:00" },
+    });
+    const brief = mechanicBrief(sessionsDir, { memoPath: ".dabbler/scratch/mechanic-memo-s1.md" });
+    for (const denied of UNATTENDED_DENIED) assert.ok(brief.includes(denied), denied);
+    assert.match(brief, /memo to `\.dabbler\/scratch\/mechanic-memo-s1\.md`/);
+    assert.match(brief, /keeps to the approved plan/);
+    assert.ok(!brief.includes("act only when the person agrees"));
+    assert.ok(!brief.includes("Once the person agrees"));
   });
 });

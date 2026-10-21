@@ -88,6 +88,10 @@ export interface Preferences {
    * published to everyone who opens it.
    */
   readonly authoring_model?: string;
+  /** This machine's default for whether the framework may call in the Mechanic. */
+  readonly mechanic?: string;
+  /** This machine's default Mechanic Model, where a checkout names none. */
+  readonly mechanic_model?: string;
   /**
    * The model a person chose for a role, by role, as a catalog id.
    *
@@ -184,6 +188,8 @@ export function readPreferences(path: string = currentPreferencesPath()): Prefer
   const transport = optionalString(parsed["transport"]);
   const reviewerTransport = optionalString(parsed["reviewer_transport"]);
   const authoringModel = optionalString(parsed["authoring_model"]);
+  const mechanic = optionalString(parsed["mechanic"]);
+  const mechanicModel = optionalString(parsed["mechanic_model"]);
   // One torn entry is one role unchosen, not the whole file lost: the
   // choices beside it are still choices this person made.
   const selected: Record<string, string> = {};
@@ -208,6 +214,8 @@ export function readPreferences(path: string = currentPreferencesPath()): Prefer
     ...(transport === undefined ? {} : { transport }),
     ...(reviewerTransport === undefined ? {} : { reviewer_transport: reviewerTransport }),
     ...(authoringModel === undefined ? {} : { authoring_model: authoringModel }),
+    ...(mechanic === undefined ? {} : { mechanic }),
+    ...(mechanicModel === undefined ? {} : { mechanic_model: mechanicModel }),
     ...(Object.keys(selected).length === 0 ? {} : { selected }),
     ...(Object.keys(credentials).length === 0 ? {} : { credentials }),
   };
@@ -223,6 +231,9 @@ export interface PreferenceChoice {
   readonly reviewerTransport?: string;
   /** This person's own authoring model; "" clears it. */
   readonly authoringModel?: string;
+  /** This person's own Mechanic delegation and Mechanic Model; "" clears each. */
+  readonly mechanic?: string;
+  readonly mechanicModel?: string;
   /** The role whose model is being chosen, with `""` clearing the choice. */
   readonly role?: string;
   readonly selected?: string;
@@ -256,6 +267,9 @@ export function writePreferences(
     choice.authoringModel === undefined
       ? held.authoring_model
       : optionalString(choice.authoringModel);
+  const mechanic = choice.mechanic === undefined ? held.mechanic : optionalString(choice.mechanic);
+  const mechanicModel =
+    choice.mechanicModel === undefined ? held.mechanic_model : optionalString(choice.mechanicModel);
   const selected: Record<string, string> = { ...(held.selected ?? {}) };
   if (choice.role !== undefined && choice.selected !== undefined) {
     const model = optionalString(choice.selected);
@@ -276,6 +290,8 @@ export function writePreferences(
     ...(transport === undefined ? {} : { transport }),
     ...(reviewerTransport === undefined ? {} : { reviewer_transport: reviewerTransport }),
     ...(authoringModel === undefined ? {} : { authoring_model: authoringModel }),
+    ...(mechanic === undefined ? {} : { mechanic }),
+    ...(mechanicModel === undefined ? {} : { mechanic_model: mechanicModel }),
     ...(Object.keys(selected).length === 0 ? {} : { selected }),
     ...(Object.keys(credentials).length === 0 ? {} : { credentials }),
   };

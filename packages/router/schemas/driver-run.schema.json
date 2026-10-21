@@ -197,6 +197,30 @@
       },
       "description": "Fixes a Mechanic made after the land, each taken as an intervention and sent back to verify so it is reviewed and landed like any change. Kept whole, not capped: the close lists every one."
     },
+    "mechanic_attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["at", "kind", "reason", "phase", "model", "before_tree", "outcome"],
+        "properties": {
+          "at": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "minLength": 1, "description": "The kind of the stop the Mechanic was called in on." },
+          "code": { "type": ["string", "null"], "description": "The stop's code, where it had one." },
+          "reason": { "type": "string", "description": "The stop's reason, as recorded: what makes it the same stop when it is met again." },
+          "phase": { "type": "string", "minLength": 1, "description": "The phase the stop stood in; the session leaving it is the fix clearing the stop." },
+          "model": { "type": ["string", "null"], "description": "The Mechanic Model it was launched on; null where the engine's own default ran." },
+          "before_tree": { "type": "string", "minLength": 1, "description": "The working tree as it stood before the Mechanic started, which a failed attempt is restored to." },
+          "files": { "type": "array", "items": { "type": "string" }, "description": "The paths the Mechanic moved." },
+          "baseline_before": { "type": ["string", "null"], "description": "The step baseline before the Mechanic's fix moved it, which a failed attempt puts back." },
+          "outcome": {
+            "enum": ["open", "cleared", "failed"],
+            "description": "open until the session moves past the stop (cleared) or the attempt runs out or the stop comes back (failed, and undone)."
+          }
+        }
+      },
+      "description": "Every time the framework called in the Mechanic without the person, oldest first. At most one per stop and two per session; kept whole, so the budget is read off the record."
+    },
     "suites_owed_elsewhere": {
       "type": "array",
       "items": {

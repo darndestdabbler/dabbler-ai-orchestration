@@ -21,6 +21,8 @@ import { ROLE_AUXILIARY_REVIEWER } from "../src/selection.ts";
 import {
   SETTING_AUTHORING_MODEL,
   SETTING_ENGINE,
+  SETTING_MECHANIC,
+  SETTING_MECHANIC_MODEL,
   SETTING_REVIEWER_MODEL,
   SETTING_CREDENTIAL_ANTHROPIC,
   SETTING_CREDENTIAL_OPENAI,
@@ -188,6 +190,25 @@ describe("what may be chosen, and what decided what is", () => {
       assert.match(line, /you chose it/);
     } finally {
       writeSettings(root, { [SETTING_AUTHORING_MODEL]: "" });
+      restore();
+    }
+  });
+
+  it("names the Mechanic and its model with the layer that decided each, the authoring model where none is named", async () => {
+    const { root, restore } = machine();
+    try {
+      writeSettings(root, { [SETTING_AUTHORING_MODEL]: "claude-opus-5" });
+      const unset = await capture(() => configurationVerb(["explain", "--repo-root", root]));
+      assert.equal(unset.value, 0, unset.stderr);
+      assert.match(unset.stdout, /^Mechanic: unattended \(decided by the built-in default\)/m);
+      assert.match(unset.stdout, /^Mechanic Model: claude-opus-5 \(decided by .*dabbler\.authoringModel/m);
+
+      writeSettings(root, { [SETTING_MECHANIC]: "attended", [SETTING_MECHANIC_MODEL]: "claude-fable-5-1" });
+      const set = await capture(() => configurationVerb(["explain", "--repo-root", root]));
+      assert.match(set.stdout, /^Mechanic: attended \(decided by .*dabbler\.mechanic\)/m);
+      assert.match(set.stdout, /^Mechanic Model: claude-fable-5-1 \(decided by .*dabbler\.mechanicModel/m);
+    } finally {
+      writeSettings(root, { [SETTING_AUTHORING_MODEL]: "", [SETTING_MECHANIC]: "", [SETTING_MECHANIC_MODEL]: "" });
       restore();
     }
   });

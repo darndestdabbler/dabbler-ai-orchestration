@@ -18,6 +18,7 @@ import { CATALOG_FILENAME, SOURCE_SEAT, catalogNow, setCatalogPath } from "../..
 import { PREFERENCES_FILENAME, setPreferencesPath } from "../../src/preferences.ts";
 import { CREDENTIALS_FILENAME, setCredentialsPath } from "../../src/credentials.ts";
 import { setSeatSource } from "../../src/discovery.ts";
+import { setMechanicLauncher } from "../../src/drive.ts";
 import { canonicalPath } from "../../src/journal.ts";
 import { setSessionUseReading, type assessSessionUse } from "../../src/session.ts";
 
@@ -160,6 +161,12 @@ setSeatSource(() =>
     reason: "this suite's machine has no seat",
   }),
 );
+
+// And no worker launches a real Mechanic. A stop under `unattended` -- the
+// default -- calls one in on the authoring engine's CLI, so a test that met
+// a stop under claude-code would spawn the operator's own `claude`. A test
+// about the Mechanic stands one in with `setMechanicLauncher`.
+setMechanicLauncher(() => "this suite launches no Mechanic unless a test stands one in");
 
 // And a session start does not read this machine's engine CLIs, keys or seat
 // to decide whether a session can run: a start test is about something else

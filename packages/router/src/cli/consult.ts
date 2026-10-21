@@ -33,7 +33,7 @@ const PROJECT_PLAN_FILENAME = "project-work-plan.md";
 
 function usage(): string {
   return [
-    "usage: dabbler consult [-h] [--sessions-dir SESSIONS_DIR] [--session N] [--mechanic]",
+    "usage: dabbler consult [-h] [--sessions-dir SESSIONS_DIR] [--session N] [--mechanic [--memo PATH]]",
     "",
     "Print the brief an AI opened to consult reads first. Changes nothing.",
     "",
@@ -46,6 +46,9 @@ function usage(): string {
     "  --mechanic            brief a fresh instance to unblock the session in",
     "                        flight: its stop, the record, the rules, and the",
     "                        Mechanic's instructions",
+    "  --memo PATH           with --mechanic: the framework called it in without",
+    "                        the person -- the unattended mandate, and the memo",
+    "                        it leaves at PATH for the person",
     "",
   ].join("\n");
 }
@@ -182,7 +185,59 @@ function recordRows(repoRoot: string, session: number): string[] {
  * the run record and rendered by the router's one rendering of a stop, so
  * the Mechanic reads what the author and the terminal were shown.
  */
-export function mechanicBrief(sessionsDir: string): string {
+/**
+ * What an unattended Mechanic may not do: the person's authority, as a
+ * deny-list rather than a list of problem kinds, because a list of kinds can
+ * only hold the walls somebody anticipated.
+ */
+export const UNATTENDED_DENIED = [
+  "cancel, rollback, close or hold-release the session",
+  "change the session plan or what counts as done",
+  "make a significant design choice or add a dependency the plan did not approve",
+  "touch credentials, spend money, or reach anything outside this repository",
+  "weaken a test or a gate",
+  "write the record or a verdict",
+] as const;
+
+/**
+ * The brief's licence. Attended, the person agrees before anything is done;
+ * unattended -- the framework called it in -- it fixes within the deny-list
+ * and hands back what it may not fix, always with a memo.
+ */
+function mandateLines(root: string, memoPath: string | null): string[] {
+  if (memoPath === null) {
+    return [
+      "- A person's verbs are theirs: recommend them and let the person type them -- " +
+        '`dabbler session hold-release --reason "<why>"`, `dabbler session cancel --force --reason "<why>"`.',
+      "- Once the person agrees you may run `dabbler verify reopen --rounds N --reason \"<why>\"`, " +
+        "`dabbler session plan amend ... --reason \"<why>\"`, and ordinary file edits.",
+      "- Commit nothing and push nothing: leave the fix and its log entry in the working tree. The framework takes " +
+        "an uncommitted change as the fix, has the Primary Reviewer review it with the session's diff, and lands it.",
+      "- When the fix is in, the person asks the author to run `dabbler session next`: the framework takes the change from there.",
+      "",
+      "## Your instructions",
+      ...mechanicInstructions(root).map((instruction) => `- ${instruction}`),
+    ];
+  }
+  return [
+    "- The framework called you in without the person, and the person's authority stays theirs. You may not:",
+    ...UNATTENDED_DENIED.map((denied) => `  - ${denied};`),
+    "- Anything else that gets the session moving again is yours to do, as the minimum. A fix that needs any of " +
+      "the above is diagnosed and handed back: make no edit, and say in the memo what the person must decide.",
+    "- Commit nothing and push nothing, and run no waiter: leave the fix and its log entry in the working tree. " +
+      "When you exit, the framework carries on; the Primary Reviewer reviews the fix with the session's diff, and " +
+      "a fix that does not clear the stop is undone.",
+    "",
+    "## Your instructions",
+    `- Make the minimum viable unblocking fix and record it in \`${root}/mechanic-log.md\`, with a stated reason ` +
+      "why it keeps to the approved plan.",
+    `- Always end by writing a memo to \`${memoPath}\` for the person: the cause and its evidence, what you tried, ` +
+      "the line it reached, and one recommendation -- with the `dabbler session plan amend ... --reason \"<why>\"` " +
+      "drafted for them to approve where the plan needs one.",
+  ];
+}
+
+export function mechanicBrief(sessionsDir: string, options: { memoPath?: string } = {}): string {
   const repoRoot = repoRootFromSessionsDir(sessionsDir);
   const root = (relative(repoRoot, sessionsDir) || ".").split("\\").join("/");
   const current = readSessionState(sessionsDir)?.["currentSession"];
@@ -238,16 +293,7 @@ export function mechanicBrief(sessionsDir: string): string {
     "## The rules that keep the session restartable",
     `- Never write under .dabbler/runs/, ${root}/sessions.json or any other record the router writes.`,
     "- Never weaken a gate, a verdict or a test so that it passes.",
-    "- A person's verbs are theirs: recommend them and let the person type them -- " +
-      '`dabbler session hold-release --reason "<why>"`, `dabbler session cancel --force --reason "<why>"`.',
-    "- Once the person agrees you may run `dabbler verify reopen --rounds N --reason \"<why>\"`, " +
-      "`dabbler session plan amend ... --reason \"<why>\"`, and ordinary file edits.",
-    "- Commit nothing and push nothing: leave the fix and its log entry in the working tree. The framework takes " +
-      "an uncommitted change as the fix, has the Primary Reviewer review it with the session's diff, and lands it.",
-    "- When the fix is in, the person asks the author to run `dabbler session next`: the framework takes the change from there.",
-    "",
-    "## Your instructions",
-    ...mechanicInstructions(root).map((instruction) => `- ${instruction}`),
+    ...mandateLines(root, options.memoPath ?? null),
     "- The minimum is the smallest change that lets the regular framework processes continue and keeps the " +
       "author's work successful as is, at least in large part; the entry says what was done and why.",
     "",
@@ -266,6 +312,7 @@ export async function consultVerb(argv: string[]): Promise<number> {
   let explicit: string | undefined;
   let session: number | undefined;
   let mechanic = false;
+  let memo: string | undefined;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--help" || token === "-h") {
@@ -276,13 +323,17 @@ export async function consultVerb(argv: string[]): Promise<number> {
       mechanic = true;
       continue;
     }
-    if (token === "--sessions-dir" || token === "--session") {
+    if (token === "--sessions-dir" || token === "--session" || token === "--memo") {
       const next = argv[index + 1];
       if (next === undefined || next.startsWith("--")) {
         writeErr(`dabbler consult: argument ${token}: expected one argument\n`);
         return EXIT_USAGE;
       }
       index += 1;
+      if (token === "--memo") {
+        memo = next;
+        continue;
+      }
       if (token === "--sessions-dir") {
         explicit = next;
         continue;
@@ -298,6 +349,11 @@ export async function consultVerb(argv: string[]): Promise<number> {
     return EXIT_USAGE;
   }
 
+  if (memo !== undefined && !mechanic) {
+    writeErr("dabbler consult: --memo is the unattended Mechanic's, and needs --mechanic\n");
+    return EXIT_USAGE;
+  }
+
   let sessionsDir: string;
   try {
     sessionsDir = resolveSessionsDir(explicit);
@@ -310,6 +366,6 @@ export async function consultVerb(argv: string[]): Promise<number> {
     writeErr(`consult: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
-  writeOut(mechanic ? mechanicBrief(sessionsDir) : consultBrief(sessionsDir, session));
+  writeOut(mechanic ? mechanicBrief(sessionsDir, memo === undefined ? {} : { memoPath: memo }) : consultBrief(sessionsDir, session));
   return EXIT_OK;
 }

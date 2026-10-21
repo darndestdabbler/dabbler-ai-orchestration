@@ -113,6 +113,8 @@ import {
   EXIT_USAGE,
   VerifyError,
 } from "./errors.ts";
+import { EXIT_FUNDS } from "../contracts/exitCodes.ts";
+import { FundsError } from "../transports/api.ts";
 import { buildTaskBlock, sliceCodePoints } from "./prompts.ts";
 import { undisputedBlockingIndices } from "./disputes.ts";
 
@@ -871,6 +873,12 @@ export async function runRound(
     if (error instanceof NoCandidateError) {
       writeErr(verificationUnavailable(sessionsDir, orchestrator.effectiveProvider, error));
       return EXIT_UNAVAILABLE;
+    }
+    // Last, so the driver's stop reads it first. Not retried: the same
+    // account answers the same way until a person funds it.
+    if (error instanceof FundsError) {
+      writeErr(`verify: nothing was written and no round was spent.\n${error.message}\n`);
+      return EXIT_FUNDS;
     }
     if (error instanceof RouterError) {
       // Twice, to the reviewer the operator chose. What is said is what

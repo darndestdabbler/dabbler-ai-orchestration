@@ -92,7 +92,8 @@ import {
   type RegistrationFacts,
   type StepSpec,
 } from "../src/drive.ts";
-import { jobStatusPath } from "../src/jobs.ts";
+import { beginJobRecord, jobRecord, jobStatusPath, setJobStarter } from "../src/jobs.ts";
+import { EXIT_FUNDS } from "../src/contracts/exitCodes.ts";
 import { rewindPhaseFor } from "../src/gates.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
@@ -281,6 +282,40 @@ describe("a verification stop's reason", () => {
     const tail = `dabbler: the 'reviewer' role fell past its preference order\n${refusal}`;
     assert.ok(refusalFirst(tail).startsWith(refusal));
     assert.equal(refusalFirst(""), "");
+  });
+});
+
+describe("a verification call refused for funds", () => {
+  it("stops as a wait for funds, and the next instruction makes the same call again", async () => {
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase: "verify", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: ["one"], baseline_tree: null,
+      stop: null, lease_epoch: 1,
+      started_at: "2026-10-21T10:00:00-04:00", updated_at: "2026-10-21T10:00:00-04:00",
+    });
+    // verify, as it answers an empty account: its own line last, and EXIT_FUNDS.
+    const started: string[] = [];
+    const restore = setJobStarter((root, session, options) => {
+      started.push(options.name);
+      const { log, status } = beginJobRecord(root, session, options.name);
+      writeFileSync(log, "verify: nothing was written and no round was spent.\nwaiting for funds: openai. Add funds.\n");
+      writeFileSync(status, JSON.stringify({ exit: EXIT_FUNDS, ended_at: new Date().toISOString() }));
+      return jobRecord(root, session, options, process.pid);
+    });
+    try {
+      await capture(() => sessionNext(sessionsDir, {}));
+      const stopped = readRun(repo, 1)!;
+      assert.equal(stopped.stop?.kind, "funds");
+      assert.match(stopped.stop?.reason ?? "", /^waiting for funds: openai/);
+      assert.equal(stopped.phase, "verify");
+
+      await capture(() => sessionNext(sessionsDir, {}));
+      assert.deepEqual(started, ["verification", "verification"]);
+    } finally {
+      restore();
+    }
   });
 });
 

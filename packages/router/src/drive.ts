@@ -191,6 +191,7 @@ import {
   EXIT_OK as VERIFY_OK,
   EXIT_UNRESOLVED,
 } from "./verify/errors.ts";
+import { EXIT_FUNDS } from "./contracts/exitCodes.ts";
 import {
   NO_ROUND_CAP_CLEAN,
   NO_ROUND_CAP_DISPUTED,
@@ -3497,6 +3498,13 @@ class Driver {
     // a refusal the driver can answer, and a stop that says which refusal
     // it was.
     const reason = refusalFirst(jobLogTail(this.repoRoot, this.sessionNumber, "verification"));
+
+    // An account with no funds is a wait, not a failure: the stop carries
+    // verify's own "waiting for funds" line first, and the resume re-enters
+    // this phase and makes the same call once the account is funded.
+    if (code === EXIT_FUNDS) {
+      throw new Stop("funds", reason || "waiting for funds: the reviewer's account has no balance left");
+    }
 
     // A reviewer that cannot be reached is said in the start's own sentence,
     // with the repair, rather than as a log tail or a model to choose.

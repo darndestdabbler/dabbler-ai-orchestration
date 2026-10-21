@@ -810,7 +810,8 @@ describe("a stop, as a person reads it", () => {
     // is working on it -- under the pull the framework cannot see the
     // engine, and a sentence that claimed otherwise would have a person
     // waiting on a process that is gone.
-    for (const kind of KINDS) {
+    // Funds is a wait with one answer, and has its own test below.
+    for (const kind of KINDS.filter((kind) => kind !== "funds")) {
       for (const engine of ["cli", "claude-code"]) {
         const stop = { kind, reason: "the widget is load-bearing", step_id: "widget" };
         const words = renderStop(stop, { session_number: 7, phase: "verify", engine });
@@ -847,6 +848,15 @@ describe("a stop, as a person reads it", () => {
         }
       }
     }
+  });
+
+  it("reads a funds stop as a wait, with carrying on its one way and no ending offered", () => {
+    const stop = { kind: "funds" as const, reason: "waiting for funds: openai. Add funds at the billing page.", at: "2026-10-21T12:00:00-04:00" };
+    const words = renderStop(stop, { session_number: 7, phase: "verify", engine: "cli" });
+    assert.equal(words.headline, "Session 007 waiting for funds");
+    assert.match(words.happened, /^Waiting for funds: openai\./);
+    assert.deepEqual(words.choices.map((choice) => choice.command), ["dabbler session next"]);
+    assert.doesNotMatch(words.text, /session cancel|session rollback|paused/);
   });
 
   it("says who acts as a field, and never says the engine might under the push", () => {

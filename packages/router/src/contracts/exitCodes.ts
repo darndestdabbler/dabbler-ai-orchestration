@@ -24,3 +24,9 @@ export const EXIT_BLOCKING = 4;
 export const EXIT_UNRESOLVED = 5;
 export const EXIT_CALL_FAILED = 6;
 export const EXIT_UNAVAILABLE = 7;
+/**
+ * The reviewer's account has no funds left. Nothing was asked and nothing
+ * was written; the same call answers once the account is funded, so this is
+ * a wait for a person and never a failed round.
+ */
+export const EXIT_FUNDS = 8;

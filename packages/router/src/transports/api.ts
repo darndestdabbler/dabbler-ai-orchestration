@@ -61,6 +61,52 @@ export class HttpStatusError extends Error {
 }
 export class HttpTimeoutError extends Error {}
 
+/** Where each vendor's balance is topped up, and the seat's. */
+const TOP_UP: Record<string, string> = {
+  anthropic: "https://console.anthropic.com/settings/billing",
+  google: "https://console.cloud.google.com/billing",
+  openai: "https://platform.openai.com/settings/organization/billing",
+  copilot: "https://github.com/settings/billing",
+};
+
+/**
+ * The account behind a call has no funds left. Not a transient fault: a
+ * retry spends minutes and changes nothing, so it is never retried, and it
+ * carries what a person needs to fund the account -- the vendor, the key's
+ * variable (or the seat), and where its balance is topped up.
+ */
+export class FundsError extends Error {
+  readonly vendor: string;
+  /** The key's environment variable, or null for the seat. */
+  readonly keyVariable: string | null;
+  readonly topUp: string;
+  readonly words: string;
+
+  constructor(vendor: string, keyVariable: string | null, words: string) {
+    const topUp = TOP_UP[vendor] ?? "the vendor's billing page";
+    super(
+      `waiting for funds: ${vendor}. The ${keyVariable === null ? "seat" : `account behind ${keyVariable}`} ` +
+        `has no balance left (${words}); add funds at ${topUp}, then ask for the next instruction.`,
+    );
+    this.name = "FundsError";
+    this.vendor = vendor;
+    this.keyVariable = keyVariable;
+    this.topUp = topUp;
+    this.words = words;
+  }
+}
+
+/**
+ * Whether a vendor's refusal is an exhausted balance, in its own words.
+ * Google answers a rate limit and a billing limit alike with 429
+ * RESOURCE_EXHAUSTED, so there only words naming billing or depleted credits
+ * are funds; its plain rate limit keeps its retries.
+ */
+export function isOutOfFunds(status: number, words: string): boolean {
+  if (/insufficient_quota|credit_balance_exhausted|credit balance is too low/i.test(words)) return true;
+  return status === 429 && /RESOURCE_EXHAUSTED/.test(words) && /billing|credits are depleted/i.test(words);
+}
+
 export type ProviderConfig = Record<string, unknown>;
 
 type ProviderCaller = (
@@ -285,6 +331,10 @@ export async function callModel(
         );
         attempt -= 1;
         continue;
+      }
+      if (error instanceof HttpStatusError && isOutOfFunds(error.status, error.words)) {
+        const variable = config["api_key_env"];
+        throw new FundsError(providerName, typeof variable === "string" ? variable : null, error.words);
       }
       if (!(error instanceof HttpStatusError || error instanceof HttpTimeoutError)) {
         throw error;

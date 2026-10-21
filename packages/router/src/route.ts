@@ -53,7 +53,7 @@ import {
   type RoleResolution,
 } from "./selection.ts";
 import { isOk, type APIResult } from "./transports/base.ts";
-import { DirectApiTransport } from "./transports/api.ts";
+import { DirectApiTransport, FundsError } from "./transports/api.ts";
 import {
   PROVIDER as OFFLINE_PROVIDER,
   OfflineTransport,
@@ -62,6 +62,7 @@ import {
 import { type CatalogModel } from "./catalog.ts";
 import {
   CopilotCliTransport,
+  ERROR_CLASS_FUNDS,
   REFRESH_COMMAND,
   explainRoleCandidates,
   resolveTransportTimeouts,
@@ -1141,6 +1142,9 @@ async function routeLive(
 
     if (!isOk(result)) {
       const stderrTail = String(result.metadata["stderr_tail"] ?? "");
+      if (result.metadata["error_class"] === ERROR_CLASS_FUNDS) {
+        throw new FundsError("copilot", null, stderrTail.slice(-300).trim());
+      }
       throw new DispatchError(
         `dispatch of '${current.model_id}' over ${transportName} ` +
           `failed: ${String(result.metadata["error_class"])} ` +

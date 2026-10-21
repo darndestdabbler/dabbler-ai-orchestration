@@ -1409,8 +1409,8 @@ export interface StopRendering {
   readonly actor: StopActor;
   /**
    * The ways on, best first -- the first is what the framework would
-   * choose. Never fewer than two: a
-   * question with one answer is a notification.
+   * choose. Never fewer than two: a question with one answer is a
+   * notification -- except the wait for funds, which is one.
    */
   readonly choices: readonly StopChoice[];
   /**
@@ -1602,6 +1602,19 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
       ),
       rollbackChoice(),
       cancelChoice(),
+    ],
+  },
+  // A wait, not a failure: one way on, because an empty account has one
+  // answer and nothing done so far is in question.
+  funds: {
+    what: "A provider refused the call because the account has no funds left; nothing done so far is lost.",
+    actor: "operator",
+    moves: (parts) => [
+      carryOn(
+        parts,
+        `Add funds, then carry on from '${parts.phase}'`,
+        "The same call is made again, at that provider's price; nothing already done is redone.",
+      ),
     ],
   },
   tests: {
@@ -1984,7 +1997,7 @@ export function renderAmendmentProposal(
  */
 export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
   const session = `Session ${String(run.session_number).padStart(3, "0")}`;
-  const headline = `${session} paused (${stop.kind})`;
+  const headline = stop.kind === "funds" ? `${session} waiting for funds` : `${session} paused (${stop.kind})`;
   const situation = situationFor(stop);
   const reason = asSentence(stop.reason);
   // The stop's own words first, the kind's sentence after: a toast shows

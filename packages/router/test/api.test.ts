@@ -1,9 +1,10 @@
 // The direct-API transport's answer to a generation setting the model refuses:
 // asked again without it, as many times as the vendor names one it was sent.
+// And to an exhausted balance: never retried, and told apart from a rate limit.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { callModel, setHttpSource, type ProviderConfig } from "../src/transports/api.ts";
+import { callModel, FundsError, setHttpSource, type ProviderConfig } from "../src/transports/api.ts";
 import { makeConfig, setProviderKeys } from "./support/answers.ts";
 
 const ANTHROPIC_OK = {
@@ -116,5 +117,38 @@ describe("callModel", () => {
       /HTTP 400/,
     );
     assert.ok(bodies.every((body) => "thinking" in body));
+  });
+
+  const providers = (): Record<string, ProviderConfig> =>
+    makeConfig()["providers"] as Record<string, ProviderConfig>;
+
+  for (const [vendor, model, error] of [
+    ["openai", "gpt-x", { code: "insufficient_quota", type: "insufficient_quota", message: "You exceeded your current quota." }],
+    ["openai", "gpt-x", { code: "credit_balance_exhausted", message: "Your credit balance is exhausted." }],
+    ["anthropic", "a-haiku", { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API." }],
+    ["google", "gemini-x", { code: 429, status: "RESOURCE_EXHAUSTED", message: "Your prepayment credits are depleted. Check your plan and billing details." }],
+  ] as const) {
+    it(`does not retry ${vendor}'s funds refusal and names it as funds`, async () => {
+      const status = vendor === "anthropic" ? 400 : 429;
+      const bodies = answerWith([status, { error }]);
+      await assert.rejects(
+        () => callModel(vendor, model, "s", "u", 100, providers()[vendor] as ProviderConfig),
+        (thrown: unknown) =>
+          thrown instanceof FundsError &&
+          thrown.vendor === vendor &&
+          thrown.message.startsWith(`waiting for funds: ${vendor}`),
+      );
+      assert.equal(bodies.length, 1);
+    });
+  }
+
+  it("still retries a Google rate limit, which shares the funds refusal's status", async () => {
+    const bodies = answerWith(
+      [429, { error: { code: 429, status: "RESOURCE_EXHAUSTED", message: "Resource has been exhausted (e.g. check quota)." } }],
+      [200, { candidates: [{ content: { parts: [{ text: "hello" }] }, finishReason: "STOP" }], usageMetadata: {} }],
+    );
+    const result = await callModel("google", "gemini-x", "s", "u", 100, providers()["google"] as ProviderConfig);
+    assert.equal(result.content, "hello");
+    assert.equal(bodies.length, 2);
   });
 });

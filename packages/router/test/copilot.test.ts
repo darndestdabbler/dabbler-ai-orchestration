@@ -17,6 +17,8 @@ import { type StandIn } from "../src/acp.ts";
 import { isOk, type APIResult } from "../src/transports/base.ts";
 import {
   CopilotCliTransport,
+  ERROR_CLASS_FUNDS,
+  ERROR_CLASS_QUOTA,
   HANDOFF_THRESHOLD_UTF16_UNITS,
   PREMIUM_SOURCE_IN_BAND,
   PREMIUM_SOURCE_USAGE_FILE,
@@ -348,6 +350,17 @@ describe("dispatching one turn through the seat", () => {
       }),
     );
     assert.equal(quota.metadata["reprobe_cli_version"], null);
+  });
+
+  it("gives the seat's spent AI credits a class of their own, apart from a rate limit", async () => {
+    const funds = await dispatch(
+      seatTransport({ spawner: spawnerFor(fakeProcess({ stderr: "You are out of AI credits.\n", exitCode: 1 })) }),
+    );
+    assert.equal(funds.metadata["error_class"], ERROR_CLASS_FUNDS);
+    const rate = await dispatch(
+      seatTransport({ spawner: spawnerFor(fakeProcess({ stderr: "rate limit exceeded (429)\n", exitCode: 1 })) }),
+    );
+    assert.equal(rate.metadata["error_class"], ERROR_CLASS_QUOTA);
   });
 
   it("classifies a spawn that never returns as a spawn timeout", async () => {

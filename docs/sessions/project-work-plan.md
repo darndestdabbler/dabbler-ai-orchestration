@@ -309,6 +309,13 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 269 | Release 3.22.0 (release: 3.22.0) | yes | 2026-10-16 |
 | 270 | The Configuration row names what each role runs on | no | 2026-10-17 |
 | 271 | Release 3.22.1 (release: 3.22.1) | yes | 2026-10-17 |
+| 272 | An API out of credits pauses for funds, and Continue resumes it | no | 2026-10-21 |
+| 273 | A cancelled session gets its transcript, marked cancelled | — | not declared |
+| 274 | The Mechanic, ported back to the router | — | not declared |
+| 275 | The framework calls in the Mechanic without the person | — | not declared |
+| 276 | Open a Mechanic, and what it did, in the extension | — | not declared |
+| 277 | A failed release is diagnosed, and one caused outside the repository retries in place | — | not declared |
+| 278 | Release 3.23.0 (release: 3.23.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3293,3 +3300,9 @@ Make the Solution Explorer's Configuration row name what each role actually runs
 **Releasable: yes.**
 
 Release 3.22.1: the framework packs and publishes what is on the trunk.
+
+### Session 272 — An API out of credits pauses for funds, and Continue resumes it
+
+**Releasable: no.**
+
+Make an exhausted balance a pause rather than a failure. The API transport recognises a funds refusal from the provider's own words (OpenAI's insufficient_quota and credit_balance_exhausted, Anthropic's 'credit balance is too low', Google's 429 RESOURCE_EXHAUSTED only where its words name billing or depleted credits) and throws a FundsError at once, naming the vendor, the key's variable and where that vendor's balance is topped up, without spending a retry; a real rate limit and a timeout keep the ladder unchanged. The seat transport classifies the seat's exhausted AI credits as a class of its own ahead of the rate-limit class, and route() raises the same FundsError for it. `verify` exits with a new EXIT_FUNDS, writing 'waiting for funds: <vendor>' first, and is not retried by dispatchVerification. The driver maps that exit to a stop of the new kind 'funds' whose one way on is to add funds and ask for the next instruction -- the existing resume then re-enters the verification phase and makes the same call; no cancel or rollback is offered. The stop's rendering and the run's waiting line read 'waiting for funds: <vendor>', so `dabbler status` and the terminal show a wait rather than a failure.

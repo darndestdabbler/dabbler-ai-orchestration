@@ -110,6 +110,8 @@ import { isOk, type APIResult, type DispatchRequest, type Transport } from "./ba
 export const ERROR_CLASS_INVALID_MODEL = "invalid-model";
 export const ERROR_CLASS_AUTH = "auth-class";
 export const ERROR_CLASS_QUOTA = "quota-rate-class";
+/** The seat's AI credits are spent: a wait for funds, never a rate limit. */
+export const ERROR_CLASS_FUNDS = "funds-class";
 export const ERROR_CLASS_GENERIC = "generic-unknown";
 export const ERROR_CLASS_SPAWN_TIMEOUT = "spawn-timeout";
 export const ERROR_CLASS_FIRST_BYTE_TIMEOUT = "first-byte-timeout";
@@ -136,6 +138,10 @@ const AUTH_SUBSTRINGS = [
   "401", "403", "not logged in",
 ];
 const QUOTA_SUBSTRINGS = ["rate limit", "quota", "429", "too many requests"];
+const FUNDS_SUBSTRINGS = [
+  "out of ai credits", "out of credits", "insufficient credits", "credits exhausted",
+  "credit balance", "402", "payment required",
+];
 const INVALID_MODEL_SUBSTRING = "from --model flag is not available";
 
 // The timeout contract lives with the shared shapes
@@ -444,6 +450,10 @@ export function validateAck(content: string, nonce: string): AckValidation {
 export function classifyStderr(stderrText: string): string {
   const lowered = stderrText.toLowerCase();
   if (lowered.includes(INVALID_MODEL_SUBSTRING)) return ERROR_CLASS_INVALID_MODEL;
+  // Ahead of auth and quota: a spent seat's words can name either.
+  if (FUNDS_SUBSTRINGS.some((substring) => lowered.includes(substring))) {
+    return ERROR_CLASS_FUNDS;
+  }
   if (AUTH_SUBSTRINGS.some((substring) => lowered.includes(substring))) {
     return ERROR_CLASS_AUTH;
   }

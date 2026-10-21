@@ -16519,3 +16519,300 @@ engine and the reviewing vehicle, and not the machine's. No new test.
 ### Session 271 of 271: Release 3.22.1 (release: 3.22.1)
 
 The framework publishes session 270 as 3.22.1 and nothing else.
+
+### Session 272 of 278: An API out of credits pauses for funds, and Continue resumes it
+
+Scope: `packages/router/src/transports/api.ts` (the retry ladder),
+`packages/router/src/transports/copilot.ts` (the error classes),
+`packages/router/src/drive.ts` (the stop and its ways on); tests in
+`api.test.ts`, `copilot.test.ts` and `drive.test.ts`
+
+**Why.** A developer using Dabbler on a real project, 2026-10-21: when an
+API runs out of credits the framework keeps trying and then fails, where it
+should pause so the developer can fund the account. Session 170 made the
+failure carry the provider's own words, so OpenAI's
+`credit_balance_exhausted` no longer reads as "HTTP 429 Too Many Requests",
+and that is all it changed: `callModel` retries every `HttpStatusError` up
+to `retry.max_retries` with backoff and then throws "API call failed after
+N attempts", and the seat transport files "quota" with the rate limits.
+An empty account is not a transient fault. Retrying it spends minutes,
+and the session ends in a failure a person has to read past to find a
+billing problem that one sentence could have named.
+
+**Step 1 -- out of funds is its own condition.** The API transport
+recognises an exhausted balance from the provider's own error -- OpenAI's
+`insufficient_quota` and `credit_balance_exhausted`, Anthropic's "credit
+balance is too low" -- and never retries it. Google answers both a rate
+limit and a billing limit with 429 `RESOURCE_EXHAUSTED`; only the billing
+case is funds, and a rate limit keeps its retries. The seat transport
+separates the seat's exhausted AI credits from a rate limit the same way.
+
+**Step 2 -- the session pauses.** A call refused for funds stops the run
+with a stop of its own kind, naming the vendor, the key's variable or the
+seat, and where that vendor's balance is topped up. Nothing done so far is
+lost, and the ways on are one: add funds, then ask for the next
+instruction, and the run resumes in the phase it stopped in, making the
+same call again. Cancel and rollback are not named.
+
+**Step 3 -- the words where a person reads them.** `dabbler status` and
+the stop's line in the terminal say "waiting for funds: <vendor>", so the
+pause reads as a wait and not as a failure.
+
+**Non-goals.** The Authoring AI's own billing: its CLI tells the person
+itself. Any balance check before a call, or any polling of a vendor's
+balance. Any change to how a real rate limit or a timeout is retried.
+
+**Tests.** In `api.test.ts`, a funds refusal from each of the three
+vendors' shapes is not retried and is told apart from a rate limit. In
+`copilot.test.ts`, the seat's credit exhaustion is its own class. In
+`drive.test.ts`, a verification call refused for funds stops with the
+funds kind, and the next instruction after it resumes the phase.
+
+**Releasable.** Yes -- with 273 to 277, as 3.23.0 in session 278.
+
+### Session 273 of 278: A cancelled session gets its transcript, marked cancelled
+
+Scope: `packages/router/src/session.ts` (`cancel`, the rollback),
+`packages/router/src/transcript.ts` (the cancelled page),
+`packages/router/src/drive.ts` (`phaseLog`, when a restored session
+closes); tests in `session.test.ts` and `transcript.test.ts`
+
+**Why.** The same developer: a cancelled session often had problems worth
+troubleshooting, sometimes in Dabbler itself, and cancelling leaves no
+record anyone else can read. The transcript is written only by the Log
+phase after a close; `cancel` marks the session cancelled, commits that,
+and stops. `.dabbler/runs/` is untracked and per-machine, so the page is
+the only record a second developer or a maintainer of this repository can
+see. A packaging failure makes it worse: the publish stop tells the person
+to cancel the release session, so the failure that most needs reading is
+the one that leaves nothing behind. `dabbler transcript --from N` already
+renders a cancelled session by hand, and nothing on the page says it was
+cancelled.
+
+**Step 1 -- cancel writes the page.** After the cancelled state is
+committed, `cancel` renders the session's transcript under the same
+`dabbler.transcript` setting the Log phase reads, commits it and pushes
+it. A page that fails to render, commit or push is said, and the cancel
+stands: the record is already written, and the page is never a reason to
+refuse it.
+
+**Step 2 -- the page says cancelled.** A cancelled session's page opens
+with a CANCELLED banner, the reason given, when, and the last phase the
+run reached, and the rest of the page is what it carries today, failed
+job output included. A session cancelled before anything ran gets the
+short page that says so -- one rule, no exception for an empty one.
+
+**Step 3 -- the page outlives what follows.** A rollback to the start of
+a cancelled session keeps its page. A cancelled session that is restored
+and later closes renders its closed page over the cancelled one -- the one
+case a page is replaced, because the session has left the state it
+describes.
+
+**Non-goals.** Any change to who may cancel. Any change to what cancel
+unwinds, which is nothing. A transcript for a session that was never
+started.
+
+**Tests.** In `session.test.ts`, a cancel commits a page that says
+cancelled; a rollback after it keeps the page. In `transcript.test.ts`,
+the cancelled banner carries the reason and the last phase.
+
+**Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 278.
+
+### Session 274 of 278: The Mechanic, ported back to the router
+
+Scope: `packages/router` -- `cli/consult.ts` (`--mechanic`), `drive.ts`
+(an intervention after the land rewinds to verify; the close lists
+interventions), `driver.ts` (every stop's ways on),
+`schemas/driver-run.schema.json` and its generated type,
+`bootstrap/templates.ts` (the managed body); their tests --
+`docs/sessions/mechanic-log.md`
+
+**Why.** Session 231 built the Mechanic and was cancelled after it landed
+so releases could be fixed first; its code is on branch `mechanic`, and
+`e9caac09` took it out of `master` (reverting that commit restores it).
+The developer's second request -- a packaging failure is very hard to
+troubleshoot because only the framework packages, so the framework should
+ask an AI for help when it hits a problem -- is the Mechanic's purpose:
+the baseline the operator set on 2026-09-22 is what a developer does when
+stuck, which is to open another chat and tell it to fix the repository so
+things can get going again. GPT Sol (`gpt-6.1-sol`) and Gemini Argon
+(`gemini-4-argon`), consulted 2026-10-21, both rejected handing packaging
+to the AI and both recommended this. Two hundred sessions have changed the
+code under it, so this is a port and not a revert.
+
+**Step 1 -- the briefing.** `dabbler consult --mechanic` as 231 specified
+it: the stop in the framework's own words and the record rows it rests
+on, where the transcripts and the job logs are, the rules that keep the
+session restartable, the person's verbs it may only recommend, the verbs
+it may run once the person agrees, and its two instructions verbatim --
+diagnose, recommend, and act only when the person agrees; make the
+minimum viable unblocking fix and record it in
+`docs/sessions/mechanic-log.md`.
+
+**Step 2 -- the log.** `docs/sessions/mechanic-log.md`, tracked, one
+entry per intervention: the session, the stop, the diagnosis, the files,
+why this was the minimum, and what a deterministic fix would be.
+
+**Step 3 -- the framework accepts the fix.** A session stopped at a step
+needs nothing new. A session stopped after the land reads the moved tree
+as an intervention, records it with the log's entry as its reason, and
+rewinds to verify, so the Primary Reviewer reviews the fix with the
+session's diff. The close lists every intervention, and every stop's ways
+on name `dabbler consult --mechanic`.
+
+**Non-goals.** Anything unattended (275). The extension (276). Release
+sessions (277). No new verb but the flag. No Mechanic that is the
+session's Primary Reviewer.
+
+**Tests.** In `consult.test.ts`, the briefing carries the stop, the rules
+and the two instructions. In `drive.test.ts`, a fix after the land
+rewinds to verify and the close names it.
+
+**Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 278.
+
+### Session 275 of 278: The framework calls in the Mechanic without the person
+
+Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` setting
+through the four layers), `drive.ts` (engaging on a stop, the budget, the
+undone attempt, the hand-back), `engines.ts` (launching a fresh engine
+CLI), `cli/consult.ts` (the unattended mandate in the briefing); their
+tests
+
+**Why.** The operator, 2026-10-21: the framework is the developer's chief
+of staff and the AI a consultant, and there should be situations where
+the chief of staff works directly with the consultant to troubleshoot
+without involving the CEO. Developers without Dabbler have this already,
+because nothing constrains their AI; the constraints stay, and the
+framework dictates what is allowable, so that the petty problems the
+framework and an AI can resolve between them never reach the developer.
+231's non-goal "no unattended Mechanic" is superseded. Sol and Argon both
+recommended bounding it by the person's AUTHORITY rather than by a list of
+problem kinds: a list can only hold problems someone anticipated, and the
+walls that matter are the ones nobody did.
+
+**Step 1 -- the delegation is a setting.** `dabbler.mechanic`:
+`unattended` (the default), `attended` or `off`, read through the same
+layers as every other choice and committed with the checkout. `attended`
+is 274's behaviour; `off` names no Mechanic at all.
+
+**Step 2 -- what it may not do.** The briefing's unattended mandate is a
+deny-list of the person's authority: cancel, rollback, close,
+hold-release; any change to the plan or what counts as done; a
+significant design choice or an unapproved dependency; credentials,
+money, or anything outside the repository; a weakened test or gate; the
+record or a verdict. Anything else that gets the session moving again is
+allowed, as the minimum, with a stated reason why the fix keeps to the
+approved plan. A fix needing any of these is diagnosed and handed back
+without an edit. The enforcement is what exists: the router alone writes
+the record and moves the lifecycle, and every fix is reviewed by the
+Primary Reviewer and tested with the session's diff.
+
+**Step 3 -- the framework engages.** In an ordinary session, `unattended`,
+a stop the framework would hand to a person first launches a
+fresh-context engine CLI on the reviewer's configured model, never the
+author's live session. A funds stop (272) and a person's own interrupt are
+handed straight to the person. Routine rejections stay the author's.
+
+**Step 4 -- the budget, and a failed attempt undone.** One attempt per
+stop, two per session, twenty minutes each. An attempt that runs out, or
+whose fix does not clear the stop, has the tree restored to what it was
+before the Mechanic started, with its diff kept in the log.
+
+**Step 5 -- the hand-back.** What reaches the person is a memo on the
+stop: the cause and its evidence, what was tried, the line it reached,
+and one recommendation, with a plan amendment drafted where one is
+needed, for the person to approve.
+
+**Non-goals.** Release sessions (277). The extension (276). Any guard
+machinery around the Mechanic -- no hashing, no sandbox -- beyond the
+record and the review that exist. A Mechanic that calls a Mechanic.
+
+**Tests.** In `drive.test.ts`: an unattended stop engages and the session
+continues; a failed attempt restores the tree; the budget hands back; a
+funds stop is never engaged. In `config.test.ts`, the setting reads
+through the layers.
+
+**Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 278.
+
+### Session 276 of 278: Open a Mechanic, and what it did, in the extension
+
+Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
+(*Open a Mechanic*), `src/providers/ActionRegistry.ts`,
+`src/providers/solutionTreeModel.ts` (the Configuration row for
+`dabbler.mechanic`), the Work Explorer's stop and its funds wait,
+`package.json`; their tests; a walk page `docs/uat/uat-mechanic.md`
+
+**Why.** 274 and 275 are the router's. A person meets them in the editor:
+a stop they open a Mechanic on themselves, the setting that grants the
+unattended authority, a memo the Mechanic left on a hand-back, and 272's
+wait for funds.
+
+**Step 1 -- Open a Mechanic.** The consult launcher, briefed with
+`--mechanic`, on the reviewer's configured model by default and any other
+from the *Different Models...* list, never the author's live session.
+
+**Step 2 -- the setting.** A Configuration row for `dabbler.mechanic`,
+written to the checkout's settings and committed as every choice is.
+
+**Step 3 -- what a person reads.** A stopped session shows the Mechanic's
+memo where there is one, and a session waiting for funds reads "Waiting
+for funds: <vendor>" with Continue.
+
+**Step 4 -- the walk.** `docs/uat/uat-mechanic.md`, copy-pasteable, on
+the Java sample: a stop the unattended Mechanic clears with no person; one
+it hands back with a memo; a funds pause resumed by Continue; a cancel
+whose page says cancelled.
+
+**Non-goals.** Any router change. A modal or a menu of proposals.
+
+**Tests.** One per command and row changed, in the test file named after
+each.
+
+**Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 278.
+
+### Session 277 of 278: A failed release is diagnosed, and one caused outside the repository retries in place
+
+Scope: `packages/router/src/drive.ts` (`phasePublish`'s stop and ways
+on), `packages/router/src/cli/consult.ts` (the release briefing); tests in
+`drive.test.ts`; `version.json` and the manifests `npm run stamp:version`
+writes; `tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The developer's packaging case. A refused publish stops with the
+tail of the job's log and tells the person to cancel and plan two
+sessions, whatever the cause -- an expired feed token included. A release
+session has no review step, so a Mechanic may not edit in one, but it can
+read the whole job log and say what went wrong before the person is
+asked anything.
+
+**Step 1 -- diagnosed without the person.** Under `unattended`, a refused
+publish engages the Mechanic diagnose-only: no edit, and the hand-back
+memo is what the person finds.
+
+**Step 2 -- a cause outside the repository retries in place.** Where the
+cause is outside the repository -- a credential, a login, a feed that was
+down -- the person fixes it and asks for the next instruction, and the
+release resumes at publish, as an unpushed branch does today.
+
+**Step 3 -- a cause in the code drafts the way on.** Where the code must
+change, the memo carries a drafted fix session and a new release session
+for the person to approve into the plan; the person cancels the release,
+and 273's page records it.
+
+**Step 4 -- the version and the words.** `version.json` goes to 3.23.0
+(a minor: an out-of-credits pause, cancelled transcripts, the Mechanic
+attended and unattended, a diagnosed release), stamped with `npm run
+stamp:version`, and the changelog gets the 3.23.0 section naming what 272
+to 277 changed for a developer.
+
+**Non-goals.** The AI packaging or publishing anything. An automatic
+retry of a publish. Any edit inside a release session.
+
+**Tests.** In `drive.test.ts`, a refused publish under `unattended`
+engages diagnose-only and leaves the tree as it was, and a stopped
+release resumes at publish. `npm run check:version` checks the stamp.
+
+**Releasable.** Yes -- with 272 to 276, as 3.23.0 in session 278.
+
+### Session 278 of 278: Release 3.23.0 (release: 3.23.0)
+
+The framework publishes sessions 272 to 277 as 3.23.0 and nothing else.

@@ -412,8 +412,9 @@ export const MECHANIC_ATTEMPTS_PER_SESSION = 2;
 /**
  * Why this stop goes straight to the person, or null to call the Mechanic in
  * first. A wait for funds and a person's own interrupt are the person's by
- * what they are; a release is the person's by its session; and the budget is
- * one attempt per stop, two per session, never a Mechanic calling a Mechanic.
+ * what they are; a release is the person's by its session, past a refused
+ * publish, which a Mechanic diagnoses without an edit; and the budget is one
+ * attempt per stop, two per session, never a Mechanic calling a Mechanic.
  */
 export function mechanicHandsBack(
   stop: { readonly kind: string; readonly reason: string },
@@ -424,7 +425,7 @@ export function mechanicHandsBack(
   if (mode !== "unattended") return `dabbler.mechanic is '${mode}'`;
   if (stop.kind === "funds") return "a wait for funds is the person's: nothing in the tree can pay for it";
   if (stop.kind === "interrupted") return "a person asked the session to stop";
-  if (release) return "a release session is the person's";
+  if (release && stop.kind !== "publish") return "a release session is the person's";
   if (attempts.some((attempt) => attempt.outcome === "open")) return "a Mechanic is already at work, and never calls a Mechanic";
   if (attempts.some((attempt) => attempt.kind === stop.kind && attempt.reason === stop.reason)) {
     return "this stop has had its one attempt";
@@ -1907,9 +1908,9 @@ class Driver {
     let mode: string;
     let model: string | null;
     let decidedBy: string | null;
+    const release = releaseSessionVersion(this.sessionsDir, this.sessionNumber) !== null;
     try {
       mode = explainMechanic(this.repoRoot).transport;
-      const release = releaseSessionVersion(this.sessionsDir, this.sessionNumber) !== null;
       const why = mechanicHandsBack({ kind: stop.kind, reason: stop.message }, mode, release, attempts);
       if (why !== null) {
         if (mode === "unattended") this.log("mechanic-not-called", { why });
@@ -2000,6 +2001,11 @@ class Driver {
     }
     if (outcome.interrupted === true || outcome.error) {
       return { memo: this.undoMechanic(outcome.error ? `it could not be run: ${outcome.error}` : "its twenty minutes ran out") };
+    }
+    // A release session has no review step to take a fix through: on a
+    // refused publish the Mechanic diagnoses, and anything it changed is undone.
+    if (release && files.length > 0) {
+      return { memo: this.undoMechanic("a release session takes no edit, the Mechanic's included") };
     }
     if (files.length === 0) {
       // Diagnosed and handed back without an edit: there is nothing to try.
@@ -4458,17 +4464,19 @@ class Driver {
       // read as one, and the rewind below keys on the refusal too.
       const refused = jobLogTail(this.repoRoot, this.sessionNumber, "publish");
       // A release session changed nothing and has no earlier phase to go
-      // back to: what refused it is fixed in a session of its own -- except
-      // a branch only ahead of origin, which a push fixes, and a stopped run
-      // resumes in the phase it stopped in.
+      // back to, and a stopped run resumes in the phase it stopped in: a
+      // cause outside the repository is fixed and the publish asked again,
+      // and only a cause in the code needs sessions of its own.
       const failed = refused.split(/\r?\n/).filter((line) => line.trimStart().startsWith("✗"));
       const onlyUnpushed = failed.length === 1 && /^\s*✗\s+pushed_to_remote\b/.test(failed[0]!);
       const waysOn = onlyUnpushed
         ? " Nothing was published and no version is spent. Push the branch (`git push`), then ask " +
           "for the next instruction: the release resumes at publish."
-        : ` A version is spent only by a push that succeeded. Cancel this release session ` +
+        : " A version is spent only by a push that succeeded. Where the cause is outside the repository -- a " +
+          "credential, a login, a feed that was down -- fix it, then ask for the next instruction: the release " +
+          "resumes at publish. Where the code must change, cancel this release session " +
           `(\`dabbler session cancel ${sessionDisplayNumber(this.sessionNumber)} --reason "<why>"\`), then plan a ` +
-          "session that fixes this and a new release session after it.";
+          "session that fixes it and a new release session after it.";
       throw new Stop(
         "publish",
         `the packaging run did not publish: ${

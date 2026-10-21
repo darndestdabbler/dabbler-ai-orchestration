@@ -5535,7 +5535,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "627fc09628ab86ac455d204e4c36285656800fe9",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5.6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "3.21.0",
+      "startCommit": "627fc09628ab86ac455d204e4c36285656800fe9"
+    },
+    {
+      "number": 278,
+      "title": "A failed release is diagnosed, and one caused outside the repository retries in place",
+      "status": "in-progress",
+      "startedAt": "2026-10-21T15:12:54.894000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "67b7d84261c8a19ebf1b7349d8ba7a59a1ae6246",
       "frameworkVersion": "3.21.0",
       "verification": {
         "rounds": 1,
@@ -5543,15 +5565,6 @@
         "verifierProvider": "openai",
         "transport": "api"
       }
-    },
-    {
-      "number": 278,
-      "title": "A failed release is diagnosed, and one caused outside the repository retries in place",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     },
     {
       "number": 279,

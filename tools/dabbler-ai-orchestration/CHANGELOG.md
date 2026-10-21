@@ -10,6 +10,59 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.23.0] — 2026-10-21
+
+**A stuck session asks an AI for help before it asks you.** When the
+framework stops, it now calls in a Mechanic — a fresh AI conversation on
+the authoring engine — to diagnose the stop and, where it can, make the
+smallest fix that gets the session moving. Problems the framework and an AI
+can settle between them no longer reach you; the ones that need your
+decision reach you with a memo saying what went wrong and what to do.
+
+### Added
+
+- **The Mechanic, attended and unattended.** `dabbler consult --mechanic`
+  briefs a fresh AI on a stopped session: the stop in the framework's own
+  words, the records it rests on, and what it may and may not do. Every fix
+  it makes is logged in `docs/sessions/mechanic-log.md`, reviewed by the
+  Primary Reviewer with the session's diff, and listed at the close.
+  `dabbler.mechanic` decides who calls it in: `unattended` (the default)
+  lets the framework call it in on a stop, within a deny-list of your
+  authority — it never cancels, rolls back, closes, changes the plan,
+  touches credentials or weakens a test; `attended` waits for you to open
+  one; `off` names none. One attempt per stop, two per session, twenty
+  minutes each, and an attempt that does not clear the stop is undone.
+  Sessions 274–276.
+- **A Mechanic Model of its own.** `dabbler.mechanicModel`, set with
+  `dabbler configure --mechanic-model <model>`, lets the Mechanic run on a
+  more capable model than the author; unset, it is the Authoring Model.
+  Session 275.
+- **In the extension.** *Open a Mechanic* on a stopped session, a
+  Configuration row for `dabbler.mechanic`, an *Authoring Model* and a
+  *Mechanic Model* row under Authoring AI, and the Mechanic's memo shown on
+  a stop. Session 277.
+- **A cancelled session gets its transcript.** Cancelling now renders,
+  commits and pushes `docs/transcripts/session-<N>.html`, opening with a
+  CANCELLED banner, the reason and the last phase reached — so the failure
+  that most needs reading is no longer the one that leaves nothing behind.
+  A rollback keeps the page. Session 273.
+
+### Changed
+
+- **An API out of credits pauses for funds.** An exhausted balance —
+  OpenAI's, Anthropic's, Google's billing limit, or the Copilot seat's AI
+  credits — is no longer retried as a rate limit and then failed. The
+  session pauses as "waiting for funds: <vendor>", naming where to top up;
+  add funds and ask for the next instruction (or press Continue), and it
+  makes the same call again. Session 272.
+- **A failed release is diagnosed.** A refused publish calls the Mechanic in
+  to read the publish job's whole log and say what went wrong, without
+  editing anything. A cause outside the repository — an expired feed
+  token, a login, a feed that was down — is fixed by you, and the next
+  instruction resumes the release at publish. A cause in the code comes
+  with a drafted fix session and a new release session for you to approve.
+  Session 278.
+
 ## [3.22.1] — 2026-10-17
 
 ### Fixed

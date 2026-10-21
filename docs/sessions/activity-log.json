@@ -12756,6 +12756,29 @@
       "what": "step 'memo-and-funds-wait': its files",
       "reason": "workExplorerTreeModel is pure (no fs): the memo is read where the repository is built, in fileSystem.ts buildRepository, and carried on SessionsRepository",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 278,
+      "dateTime": "2026-10-21T15:13:45.453000-04:00",
+      "task": "A refused publish is diagnosed before the person is asked, and a cause outside the repository is retried in place. Under dabbler.mechanic 'unattended', mechanicHandsBack lets a release session's 'publish' stop call the Mechanic in, and callInTheMechanic holds such an attempt to diagnose-only: any edit it makes is undone and the memo is handed to the person. The unattended Mechanic brief in consult.ts gains a release briefing: make no edit, read the publish job's whole log under .dabbler/runs/s<N>/jobs/, say whether the cause is outside the repository (a credential, a login, a feed that was down) or in the code, and for a code cause draft a fix session and a new release session for the person to approve into the plan. phasePublish's ways on say both: a cause outside the repository is fixed by the person, who asks for the next instruction and the release resumes at publish; a cause in the code is a cancel of this release plus the two drafted sessions. version.json goes to 3.23.0, stamped, and the changelog gets the 3.23.0 section for sessions 272 to 278.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 278,
+      "dateTime": "2026-10-21T15:16:44.199000-04:00",
+      "what": "step 'diagnose-only': its files",
+      "reason": "The diagnose-only test needs a real git checkout to show an edit undone; drive.test.ts answers git from a table, and the Mechanic's other loop tests live in walk-session.test.ts",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 278,
+      "dateTime": "2026-10-21T15:18:20.814000-04:00",
+      "what": "step 'publish-ways-on': its files",
+      "reason": "Resuming at publish is shown on a real checkout, in the walk test the diagnose-only step added; drive.test.ts answers git from a table and is unchanged",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

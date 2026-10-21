@@ -315,7 +315,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 275 | The framework calls in the Mechanic without the person | no | 2026-10-21 |
 | 276 | `off` names no Mechanic, and the Mechanic is walked past its stop | no | 2026-10-21 |
 | 277 | Open a Mechanic, and what it did, in the extension | no | 2026-10-21 |
-| 278 | A failed release is diagnosed, and one caused outside the repository retries in place | — | not declared |
+| 278 | A failed release is diagnosed, and one caused outside the repository retries in place | no | 2026-10-21 |
 | 279 | Release 3.23.0 (release: 3.23.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -3356,3 +3356,14 @@ Bring the Mechanic (sessions 274-276) and the funds wait (272) into the VS Code 
 
 - 2026-10-21 — step 'mechanic-settings-rows': its files: dabblerSolution.setMechanic is registered in extension.ts beside the other Configuration commands; the model rows register off ROLE_COMMANDS there too (claude-code (anthropic, claude-opus-5-5))
 - 2026-10-21 — step 'memo-and-funds-wait': its files: workExplorerTreeModel is pure (no fs): the memo is read where the repository is built, in fileSystem.ts buildRepository, and carried on SessionsRepository (claude-code (anthropic, claude-opus-5-5))
+
+### Session 278 — A failed release is diagnosed, and one caused outside the repository retries in place
+
+**Releasable: no.**
+
+A refused publish is diagnosed before the person is asked, and a cause outside the repository is retried in place. Under dabbler.mechanic 'unattended', mechanicHandsBack lets a release session's 'publish' stop call the Mechanic in, and callInTheMechanic holds such an attempt to diagnose-only: any edit it makes is undone and the memo is handed to the person. The unattended Mechanic brief in consult.ts gains a release briefing: make no edit, read the publish job's whole log under .dabbler/runs/s<N>/jobs/, say whether the cause is outside the repository (a credential, a login, a feed that was down) or in the code, and for a code cause draft a fix session and a new release session for the person to approve into the plan. phasePublish's ways on say both: a cause outside the repository is fixed by the person, who asks for the next instruction and the release resumes at publish; a cause in the code is a cancel of this release plus the two drafted sessions. version.json goes to 3.23.0, stamped, and the changelog gets the 3.23.0 section for sessions 272 to 278.
+
+**Amended after acceptance:**
+
+- 2026-10-21 — step 'diagnose-only': its files: The diagnose-only test needs a real git checkout to show an edit undone; drive.test.ts answers git from a table, and the Mechanic's other loop tests live in walk-session.test.ts (claude-code (anthropic, claude-opus-5-5))
+- 2026-10-21 — step 'publish-ways-on': its files: Resuming at publish is shown on a real checkout, in the walk test the diagnose-only step added; drive.test.ts answers git from a table and is unchanged (claude-code (anthropic, claude-opus-5-5))

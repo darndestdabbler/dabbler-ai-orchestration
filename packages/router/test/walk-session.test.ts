@@ -623,6 +623,55 @@ describe("a release session", () => {
     );
     await settleJobs();
   });
+
+  it("calls the Mechanic in on a refused publish to diagnose only, leaves the tree as it was, and resumes at publish", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(RELEASE_SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    // A pack the feed refuses, as an expired token is refused.
+    configure([], TESTING, {
+      packaging: { pack: { argv: [NODE, "-e", "console.error('feed: 401 Unauthorized'); process.exit(1)", "{output}", "{version}"] } },
+    });
+    await startRelease(sessionsDir);
+    const prompts: string[] = [];
+    const unsetMechanic = setMechanicLauncher(() => ({
+      name: "stand-in-mechanic",
+      invoke: (invocation) => {
+        prompts.push(invocation.prompt ?? "");
+        // An edit it may not make, beside the memo it must.
+        writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 9\n");
+        mkdirSync(join(repo, ".dabbler", "scratch"), { recursive: true });
+        writeFileSync(join(repo, mechanicMemoPath(1)), "Outside the repository: the feed token expired.\n");
+        return Promise.resolve({ exitCode: 0 });
+      },
+    }));
+    try {
+      let driven = await next(sessionsDir);
+      for (let call = 0; call < 6 && readRun(repo, 1)?.stop == null; call += 1) {
+        await settleJobs();
+        driven = await next(sessionsDir);
+      }
+      const run = readRun(repo, 1)!;
+      assert.equal(run.stop?.kind, "publish", driven.err);
+      assert.equal(prompts.length, 1);
+      assert.equal(run.mechanic_attempts?.[0]?.outcome, "failed");
+      assert.equal(readFileSync(join(repo, "src", "widget.py"), "utf8"), "def widget():\n    return 1\n");
+      assert.match(driven.err, /The Mechanic's memo:\r?\nOutside the repository: the feed token expired\./);
+      assert.match(driven.err, /fix it, then ask for the next instruction: the release resumes at publish/);
+      // The person fixes the feed; the next instruction resumes the release at publish.
+      configure([], TESTING, PACK);
+      await next(sessionsDir);
+      await settleJobs();
+      const resumed = await next(sessionsDir);
+      assert.equal(readPackaging(repo, 1).at(-1)?.["outcome"], "published", resumed.err);
+      assert.equal(prompts.length, 1);
+    } finally {
+      unsetMechanic();
+      await settleJobs();
+    }
+  });
 });
 
 describe("a pulled session whose framework jobs end inside the call", () => {

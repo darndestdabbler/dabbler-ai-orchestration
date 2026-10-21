@@ -200,6 +200,26 @@ export const UNATTENDED_DENIED = [
 ] as const;
 
 /**
+ * The licence of a Mechanic called in on a refused publish: a release
+ * session has no review step, so it diagnoses and edits nothing.
+ */
+function releaseMandateLines(runDir: string, memoPath: string): string[] {
+  return [
+    "- The framework called you in without the person on a refused publish. A release session has no review " +
+      "step, so you diagnose only: make no edit, write no mechanic-log entry, and run no packaging or publish " +
+      "-- anything you change is undone.",
+    "",
+    "## Your instructions",
+    `- Read the publish job's whole log, \`${runDir}/jobs/publish.log\`, and say what went wrong.`,
+    `- Always end by writing a memo to \`${memoPath}\` for the person: the cause and its evidence, and which of two it is.`,
+    "  - Outside the repository -- a credential, a login, a feed that was down: say what the person must fix; " +
+      "once it is fixed they ask for the next instruction, and the release resumes at publish.",
+    "  - In the code: draft a session that fixes it and a new release session after it, as session-plan " +
+      "sections, for the person to approve into the plan, and recommend cancelling this release session.",
+  ];
+}
+
+/**
  * The brief's licence. Attended, the person agrees before anything is done;
  * unattended -- the framework called it in -- it fixes within the deny-list
  * and hands back what it may not fix, always with a memo.
@@ -254,6 +274,10 @@ export function mechanicBrief(sessionsDir: string, options: { memoPath?: string 
   const run = readRun(repoRoot, current);
   const runDir = `.dabbler/runs/s${current}`;
   const stop: string[] = [];
+  const memoPath = options.memoPath ?? null;
+  // Only a release session publishes, so a publish stop is a release's.
+  const release = memoPath !== null && run?.stop?.kind === "publish";
+  const mandate = release ? releaseMandateLines(runDir, memoPath) : mandateLines(root, memoPath);
   if (run === null) {
     stop.push(`- Session ${current} has no run record yet: nothing has stopped it.`);
   } else if ((run.stop ?? null) === null) {
@@ -293,9 +317,13 @@ export function mechanicBrief(sessionsDir: string, options: { memoPath?: string 
     "## The rules that keep the session restartable",
     `- Never write under .dabbler/runs/, ${root}/sessions.json or any other record the router writes.`,
     "- Never weaken a gate, a verdict or a test so that it passes.",
-    ...mandateLines(root, options.memoPath ?? null),
-    "- The minimum is the smallest change that lets the regular framework processes continue and keeps the " +
-      "author's work successful as is, at least in large part; the entry says what was done and why.",
+    ...mandate,
+    ...(release
+      ? []
+      : [
+          "- The minimum is the smallest change that lets the regular framework processes continue and keeps the " +
+            "author's work successful as is, at least in large part; the entry says what was done and why.",
+        ]),
     "",
   ].join("\n");
 }

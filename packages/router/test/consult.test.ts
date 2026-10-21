@@ -125,4 +125,20 @@ describe("mechanicBrief", () => {
     assert.ok(!brief.includes("act only when the person agrees"));
     assert.ok(!brief.includes("Once the person agrees"));
   });
+
+  it("called in on a refused publish, diagnoses only, reads the whole job log and names both causes", () => {
+    const { repo, sessionsDir } = repository();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      ...RUN,
+      phase: "publish",
+      stop: { kind: "publish", reason: "the packaging run did not publish: 401", at: "2026-08-31T12:30:00-04:00" },
+    });
+    const brief = mechanicBrief(sessionsDir, { memoPath: ".dabbler/scratch/mechanic-memo-s1.md" });
+    assert.match(brief, /make no edit, write no mechanic-log entry/);
+    assert.match(brief, /`\.dabbler\/runs\/s1\/jobs\/publish\.log`/);
+    assert.match(brief, /the release resumes at publish/);
+    assert.match(brief, /new release session/);
+    assert.ok(!brief.includes("minimum viable unblocking fix"));
+  });
 });

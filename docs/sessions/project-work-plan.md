@@ -316,7 +316,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 276 | `off` names no Mechanic, and the Mechanic is walked past its stop | no | 2026-10-21 |
 | 277 | Open a Mechanic, and what it did, in the extension | no | 2026-10-21 |
 | 278 | A failed release is diagnosed, and one caused outside the repository retries in place | no | 2026-10-21 |
-| 279 | Release 3.23.0 (release: 3.23.0) | — | not declared |
+| 279 | Release 3.23.0 (release: 3.23.0) | yes | 2026-10-24 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3367,3 +3367,9 @@ A refused publish is diagnosed before the person is asked, and a cause outside t
 
 - 2026-10-21 — step 'diagnose-only': its files: The diagnose-only test needs a real git checkout to show an edit undone; drive.test.ts answers git from a table, and the Mechanic's other loop tests live in walk-session.test.ts (claude-code (anthropic, claude-opus-5-5))
 - 2026-10-21 — step 'publish-ways-on': its files: Resuming at publish is shown on a real checkout, in the walk test the diagnose-only step added; drive.test.ts answers git from a table and is unchanged (claude-code (anthropic, claude-opus-5-5))
+
+### Session 279 — Release 3.23.0 (release: 3.23.0)
+
+**Releasable: yes.**
+
+Release 3.23.0: the framework packs and publishes what is on the trunk.

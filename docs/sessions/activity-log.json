@@ -12779,6 +12779,13 @@
       "what": "step 'publish-ways-on': its files",
       "reason": "Resuming at publish is shown on a real checkout, in the walk test the diagnose-only step added; drive.test.ts answers git from a table and is unchanged",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 279,
+      "dateTime": "2026-10-24T06:32:59.659000-04:00",
+      "task": "Release 3.23.0: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

@@ -5583,9 +5583,9 @@
     {
       "number": 280,
       "title": "Open a Mechanic on a Copilot session in flight",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-26T12:21:09.347000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-26T12:27:15.243000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

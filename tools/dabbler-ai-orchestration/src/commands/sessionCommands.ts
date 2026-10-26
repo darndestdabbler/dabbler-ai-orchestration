@@ -1106,23 +1106,31 @@ export async function runConsultWithAi(
  * what stopped the session. The Mechanic Model is offered first and any
  * other of that engine's models may be taken; the same two refusals as
  * Start apply, so a model the CLI would refuse opens nothing.
+ *
+ * The engine and model are the session's own, as `session start` declared
+ * them, and never Start's: it is offered only on a session in flight, where
+ * the Authoring Model row REPORTS that session's model and refuses a change,
+ * so Start's refusal for want of one would be a dead end every time.
  */
 export async function runOpenMechanic(
   repository: SessionsRepository,
   ui: SessionRunUi,
   mechanicModel: (root: string) => string | null = (root) => mechanicChoicesIn(root).mechanicModel,
 ): Promise<boolean> {
-  const configured = (ui.configured ?? configuredStart)(repository.root);
-  if ("message" in configured) {
-    ui.openConfiguration?.();
-    await ui.refuseWithWayOn(configured);
+  const authoring = (
+    (ui.configurationFor ?? solutionConfiguration)(repository.root, {}) as {
+      authoring?: { engine?: string | null; chosen?: { model?: string } | null };
+    } | null
+  )?.authoring;
+  const picked = ENGINES.find((choice) => choice.engine === authoring?.engine);
+  if (picked === undefined) {
+    ui.showErrorMessage("No session in flight names an engine to open a Mechanic on, so nothing was opened.");
     return false;
   }
-  const { picked } = configured;
   const model = await ui.askModel(
     repository.root,
     picked,
-    mechanicModel(repository.root) ?? configured.model,
+    mechanicModel(repository.root) ?? authoring?.chosen?.model ?? "",
     MECHANIC_PURPOSE,
   );
   if (model === undefined) return false;

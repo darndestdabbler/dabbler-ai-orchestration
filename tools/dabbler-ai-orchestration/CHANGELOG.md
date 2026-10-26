@@ -10,6 +10,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.23.1] — 2026-10-26
+
+### Fixed
+
+- **Open a Mechanic works on a Copilot session in flight.** It refused with
+  "GitHub Copilot needs a model and neither this repository nor this
+  machine names one", and its *Choose the Model* button refused in turn,
+  because a session in flight reports its own model rather than one chosen
+  for the next. The Mechanic now opens on the engine and model the session
+  declared at its start, offering the Mechanic Model first where one is
+  set. Session 280.
+
 ## [3.23.0] — 2026-10-21
 
 **A stuck session asks an AI for help before it asks you.** When the

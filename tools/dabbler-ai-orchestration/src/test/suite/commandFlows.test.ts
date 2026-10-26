@@ -707,7 +707,7 @@ suite("Start opens the person's own CLI", () => {
     const claude = ENGINES[0];
     const offeredFirst: string[] = [];
     const run = driveUi({
-      configured: () => ({ picked: claude, model: "opus" }),
+      configurationFor: () => ({ authoring: { engine: claude.engine, declaredAtStart: false, chosen: { model: "opus" } } }),
       askModel: async (_root, _choice, chosen, purpose) => {
         offeredFirst.push(chosen, String(purpose));
         return chosen;
@@ -720,6 +720,31 @@ suite("Start opens the person's own CLI", () => {
     assert.match(cli.name, /^Mechanic/);
     assert.ok(cli.args.includes("sonnet"), cli.args.join(" "));
     assert.ok(cli.args.some((arg) => /dabbler consult --sessions-dir docs\/sessions --mechanic/.test(arg)), cli.args.join(" "));
+  });
+
+  test("Open a Mechanic on a Copilot session in flight offers the model it declared, and refuses nothing", async () => {
+    // The row REPORTS the declared model and the repository names none of its
+    // own: Start's question would refuse here, and its way on is a row that
+    // refuses every change while the session is in flight.
+    const offeredFirst: string[] = [];
+    const run = driveUi({
+      configured: () => { throw new Error("Start's question is not this command's"); },
+      configurationFor: () => ({
+        engines: { chosen: null },
+        authoring: { engine: "copilot", declaredAtStart: true, chosen: { model: "gpt-5-6-luna" } },
+      }),
+      askModel: async (_root, choice, chosen) => {
+        offeredFirst.push(choice.engine, chosen);
+        return chosen;
+      },
+    });
+    assert.strictEqual(await runOpenMechanic(makeRepository(), run.ui, () => null), true);
+    assert.deepStrictEqual(offeredFirst, ["copilot", "gpt-5-6-luna"]);
+    assert.deepStrictEqual(run.refusals, []);
+    assert.deepStrictEqual(run.errors, []);
+    assert.strictEqual(run.terminals.length, 1);
+    assert.strictEqual(run.terminals[0].program, "copilot");
+    assert.ok(run.terminals[0].args.includes("gpt-5-6-luna"), run.terminals[0].args.join(" "));
   });
 
   test("passes a dated model id exactly as it was chosen", () => {

@@ -317,6 +317,11 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 277 | Open a Mechanic, and what it did, in the extension | no | 2026-10-21 |
 | 278 | A failed release is diagnosed, and one caused outside the repository retries in place | no | 2026-10-21 |
 | 279 | Release 3.23.0 (release: 3.23.0) | yes | 2026-10-24 |
+| 280 | Open a Mechanic on a Copilot session in flight | no | 2026-10-26 |
+| 281 | Release 3.23.1 (release: 3.23.1) | — | not declared |
+| 282 | An existing remote or folder is a starting point | — | not declared |
+| 283 | The planning session reads the code already there | — | not declared |
+| 284 | Release 3.24.0 (release: 3.24.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3373,3 +3378,9 @@ A refused publish is diagnosed before the person is asked, and a cause outside t
 **Releasable: yes.**
 
 Release 3.23.0: the framework packs and publishes what is on the trunk.
+
+### Session 280 — Open a Mechanic on a Copilot session in flight
+
+**Releasable: no.**
+
+Open a Mechanic stops asking Start's question. runOpenMechanic reads the repository's configuration once and takes the authoring role's engine and declared model -- the engine and model the session in flight declared at `session start` -- instead of calling configuredStart, so a Copilot session in flight, whose Authoring Model row reports its declared model and whose repository names none of its own, is no longer refused with a Choose the Model button that refuses in turn. The model offered first is the Mechanic Model, else that declared model, the router's order; an empty model for an engine that requires one is refused by the checks that already follow the pick. The version goes to 3.23.1, stamped with `npm run stamp:version`, and the changelog gains a 3.23.1 section with the fix under Fixed.

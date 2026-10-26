@@ -5664,11 +5664,14 @@
     {
       "number": 284,
       "title": "Release 3.24.0 (release: 3.24.0)",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "duplicate session",
+      "cancelledAt": "2026-10-26T14:27:20-04:00"
     }
   ]
 }

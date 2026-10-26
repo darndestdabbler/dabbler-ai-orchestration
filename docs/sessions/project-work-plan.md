@@ -320,7 +320,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 280 | Open a Mechanic on a Copilot session in flight | no | 2026-10-26 |
 | 281 | An existing remote or folder is a starting point | no | 2026-10-26 |
 | 282 | The planning session reads the code already there | no | 2026-10-26 |
-| 283 | Release 3.24.0 (release: 3.24.0) | — | not declared |
+| 283 | Release 3.24.0 (release: 3.24.0) | yes | 2026-10-26 |
 | 284 | Release 3.24.0 (release: 3.24.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -3402,3 +3402,9 @@ An existing remote or folder becomes a starting point instead of a refusal. A ho
 **Releasable: no.**
 
 Make a planning session read the code already in a repository. A new `existingBuildFiles(root)` in bootstrap/detect.ts names the solution and build files at the root (*.sln, *.slnx, *.csproj, *.fsproj, pom.xml, build.gradle, build.gradle.kts) -- the same files the dotnet, Maven and Gradle detectors already read. The bootstrap session plan becomes `bootstrapPlan(existing)` in templates.ts: over a blank repository it returns exactly the text BOOTSTRAP_PLAN carries today; over an existing solution session 1's brief names those files and asks the engine to read the structure, say in the plan whether it suits the module-per-folder layout and what does not, and plan the first sessions as alignment (Dabbler's documents, suites and module boundaries fitted to the projects that exist) before any feature work, and session 2's skeleton paragraph says the first session adopts the existing solution and adds only what the plan names that is missing. scaffoldBootstrapSessions passes the files it finds. PLAN_PROMPT and DECOMPOSITION_PROMPT get the same rule in words that read correctly for either case. The driver's plan ask names the detected files, beside the existing suite-gap sentence, and nothing for a repository without them. version.json goes to 3.24.0, stamped, and the changelog gains a 3.24.0 section naming what 281 and 282 changed for a developer, above 280's 3.23.1.
+
+### Session 283 — Release 3.24.0 (release: 3.24.0)
+
+**Releasable: yes.**
+
+Release 3.24.0: the framework packs and publishes what is on the trunk.

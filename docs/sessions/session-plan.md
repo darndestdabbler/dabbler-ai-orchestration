@@ -16520,7 +16520,7 @@ engine and the reviewing vehicle, and not the machine's. No new test.
 
 The framework publishes session 270 as 3.22.1 and nothing else.
 
-### Session 272 of 281: An API out of credits pauses for funds, and Continue resumes it
+### Session 272 of 284: An API out of credits pauses for funds, and Continue resumes it
 
 Scope: `packages/router/src/transports/api.ts` (the retry ladder),
 `packages/router/src/transports/copilot.ts` (the error classes),
@@ -16570,7 +16570,7 @@ funds kind, and the next instruction after it resumes the phase.
 
 **Releasable.** Yes -- with 273 to 278, as 3.23.0 in session 279.
 
-### Session 273 of 281: A cancelled session gets its transcript, marked cancelled
+### Session 273 of 284: A cancelled session gets its transcript, marked cancelled
 
 Scope: `packages/router/src/session.ts` (`cancel`, the rollback),
 `packages/router/src/transcript.ts` (the cancelled page),
@@ -16618,7 +16618,7 @@ the cancelled banner carries the reason and the last phase.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 274 of 281: The Mechanic, ported back to the router
+### Session 274 of 284: The Mechanic, ported back to the router
 
 Scope: `packages/router` -- `cli/consult.ts` (`--mechanic`), `drive.ts`
 (an intervention after the land rewinds to verify; the close lists
@@ -16670,7 +16670,7 @@ rewinds to verify and the close names it.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 275 of 281: The framework calls in the Mechanic without the person
+### Session 275 of 284: The framework calls in the Mechanic without the person
 
 Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` and
 `dabbler.mechanicModel` settings through the layers), `cli/configure.ts`
@@ -16752,7 +16752,7 @@ the Primary Model is refused.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 276 of 281: `off` names no Mechanic, and the Mechanic is walked past its stop
+### Session 276 of 284: `off` names no Mechanic, and the Mechanic is walked past its stop
 
 Scope: `packages/router` -- `driver.ts` (`renderStop`'s ways on),
 `config.ts` (the Mechanic's two readings); tests in `driver.test.ts`,
@@ -16786,7 +16786,7 @@ do, its budget, or its brief. A new verb or flag.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 277 of 281: Open a Mechanic, and what it did, in the extension
+### Session 277 of 284: Open a Mechanic, and what it did, in the extension
 
 Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 (*Open a Mechanic*), `src/providers/ActionRegistry.ts`,
@@ -16828,7 +16828,7 @@ each.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 278 of 281: A failed release is diagnosed, and one caused outside the repository retries in place
+### Session 278 of 284: A failed release is diagnosed, and one caused outside the repository retries in place
 
 Scope: `packages/router/src/drive.ts` (`phasePublish`'s stop and ways
 on), `packages/router/src/cli/consult.ts` (the release briefing); tests in
@@ -16871,11 +16871,11 @@ release resumes at publish. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 279.
 
-### Session 279 of 281: Release 3.23.0 (release: 3.23.0)
+### Session 279 of 284: Release 3.23.0 (release: 3.23.0)
 
 The framework publishes sessions 272 to 278 as 3.23.0 and nothing else.
 
-### Session 280 of 281: Open a Mechanic on a Copilot session in flight
+### Session 280 of 284: Open a Mechanic on a Copilot session in flight
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
 (`runOpenMechanic`); its test in `commandFlows.test.ts`; `version.json` and
@@ -16925,6 +16925,107 @@ stamp.
 
 **Releasable.** Yes -- as 3.23.1 in session 281.
 
-### Session 281 of 281: Release 3.23.1 (release: 3.23.1)
+### Session 281 of 284: Release 3.23.1 (release: 3.23.1)
 
 The framework publishes session 280 as 3.23.1 and nothing else.
+
+### Session 282 of 284: An existing remote or folder is a starting point
+
+Scope: `tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts`
+(Set Up New Project: the remote prompt, the remote read before bootstrap,
+files already in the folder), `packages/router/src/journal.ts`
+(`isPlaceholderTree`), `packages/router/src/session.ts` (the first
+session's refusals and their wording); their tests
+
+**Why.** The operator, 2026-10-26: a developer beginning a project has to
+arrange an exact set of conditions -- a clean remote, no project folder --
+and the framework should accommodate the early stages instead. The
+guardrails are for an AI at work, not for a repository's starting state.
+Measured the same day, the framework refuses less than it seems to and says
+it worse: the remote prompt asks for "an empty repository" and checks
+nothing; a remote holding real code fails bootstrap's first push with "push
+it yourself", and session 1 refuses until a person picks *Merge and Start*,
+told it "may be work -- yours or someone else's"; a host's README is merged
+silently, but a README beside a `.gitignore` or a LICENSE -- what most hosts
+create -- is refused as work; and files the developer already put in the
+folder are left uncommitted by bootstrap, so session 1 refuses on them and
+offers *Undo the Changes*, which deletes them.
+
+**Step 1 -- a remote with files is pulled, on one question.** Set Up New
+Project reads the remote before bootstrap. Empty, nothing changes. Holding
+files, the person is told what is there and offered *Pull it and start
+from it*: into a new or empty folder it is a clone -- one history, no merge
+-- and into a folder that already holds files it is the merge `--merge-origin`
+makes today, asked once here rather than refused at session 1. The prompt
+asks for the repository's URL, empty or not.
+
+**Step 2 -- a host's starter files are not work.** `isPlaceholderTree`
+accepts a README, a `.gitignore`, a LICENSE and a `.gitattributes`, so a new
+repository a host created merges at the first start without a question.
+
+**Step 3 -- files already in the folder are the starting point.** Set Up
+New Project, finding files it did not write, asks once whether to commit
+them as the project's starting point. At session 1, the uncommitted-files
+refusal offers *Commit them as the starting point* first; *Undo* stays,
+second, for files that were never meant to be there.
+
+**Non-goals.** A remote is never overwritten or force-pushed. Nothing is
+merged or committed without the person's one answer. Any change to sessions
+after the first.
+
+**Tests.** One per changed behaviour -- Set Up New Project's in
+`commandFlows.test.ts`, where its flow is tested today, the router's in
+`journal.test.ts` and `session.test.ts`: a remote with files is offered a pull and a new folder clones
+it; a host's starter files are a placeholder; files in the folder are
+offered as the starting point and nothing is deleted.
+
+**Releasable.** Yes -- with 283, as 3.24.0 in session 284.
+
+### Session 283 of 284: The planning session reads the code already there
+
+Scope: `packages/router/src/bootstrap/templates.ts` (`BOOTSTRAP_PLAN`,
+`PLAN_PROMPT`, `DECOMPOSITION_PROMPT`), `packages/router/src/drive.ts`
+(`planAsk`); their tests; `version.json` and the manifests `npm run
+stamp:version` writes; `tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The same request: existing work that needs to come onto Dabbler
+should be welcomed, and a planning session should read it. Bootstrap
+already detects a .NET solution or a Maven or Gradle build and declares its
+suites from it, but session 1's brief never mentions existing code, tells
+the engine not to look past the brief, and plans a first "skeleton"
+session that writes the solution file and every project -- over the ones
+already there.
+
+**Step 1 -- the brief surveys what exists.** Where the repository already
+holds a solution (`.sln`, `.csproj`) or a build (`pom.xml`,
+`build.gradle`), session 1's brief and the plan ask tell the engine to read
+its structure, say in the plan whether it suits the framework's
+module-per-folder layout and what does not, and plan the first sessions as
+alignment -- Dabbler's documents, suites and module boundaries fitted to
+the projects that exist -- before any feature work.
+
+**Step 2 -- the skeleton is for a blank repository.** The decomposition
+prompt's "the first numbered session writes the solution file and every
+project" applies where there is none; over an existing solution the first
+session adopts it, and adds only what the plan names that is missing.
+
+**Step 3 -- the version and the words.** `version.json` goes to 3.24.0 (a
+minor: new behaviour for a project's start), stamped with `npm run
+stamp:version`, and the changelog gets a 3.24.0 section naming what 282 and
+283 changed for a developer.
+
+**Non-goals.** Restructuring existing code without the person's approval of
+the plan. Any language beyond the ecosystems `detectEcosystems` already
+knows. Any change to a blank repository's plan.
+
+**Tests.** In `templates.test.ts` (new: nothing tests the templates
+today), the brief over an existing solution asks
+for the survey and alignment, and over a blank repository is unchanged. In
+`drive.test.ts`, the plan ask names the detected structure. `npm run
+check:version` checks the stamp.
+
+**Releasable.** Yes -- with 282, as 3.24.0 in session 284.
+
+### Session 284 of 284: Release 3.24.0 (release: 3.24.0)
+
+The framework publishes sessions 282 and 283 as 3.24.0 and nothing else.

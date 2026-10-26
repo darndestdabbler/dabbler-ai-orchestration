@@ -16520,7 +16520,7 @@ engine and the reviewing vehicle, and not the machine's. No new test.
 
 The framework publishes session 270 as 3.22.1 and nothing else.
 
-### Session 272 of 280: An API out of credits pauses for funds, and Continue resumes it
+### Session 272 of 281: An API out of credits pauses for funds, and Continue resumes it
 
 Scope: `packages/router/src/transports/api.ts` (the retry ladder),
 `packages/router/src/transports/copilot.ts` (the error classes),
@@ -16568,9 +16568,9 @@ vendors' shapes is not retried and is told apart from a rate limit. In
 `drive.test.ts`, a verification call refused for funds stops with the
 funds kind, and the next instruction after it resumes the phase.
 
-**Releasable.** Yes -- with 273 to 278, as 3.23.0 in session 280.
+**Releasable.** Yes -- with 273 to 278, as 3.23.0 in session 279.
 
-### Session 273 of 280: A cancelled session gets its transcript, marked cancelled
+### Session 273 of 281: A cancelled session gets its transcript, marked cancelled
 
 Scope: `packages/router/src/session.ts` (`cancel`, the rollback),
 `packages/router/src/transcript.ts` (the cancelled page),
@@ -16616,9 +16616,9 @@ started.
 cancelled; a rollback after it keeps the page. In `transcript.test.ts`,
 the cancelled banner carries the reason and the last phase.
 
-**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 280.
+**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 274 of 280: The Mechanic, ported back to the router
+### Session 274 of 281: The Mechanic, ported back to the router
 
 Scope: `packages/router` -- `cli/consult.ts` (`--mechanic`), `drive.ts`
 (an intervention after the land rewinds to verify; the close lists
@@ -16668,9 +16668,9 @@ session's Primary Reviewer.
 and the two instructions. In `drive.test.ts`, a fix after the land
 rewinds to verify and the close names it.
 
-**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 280.
+**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 275 of 280: The framework calls in the Mechanic without the person
+### Session 275 of 281: The framework calls in the Mechanic without the person
 
 Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` and
 `dabbler.mechanicModel` settings through the layers), `cli/configure.ts`
@@ -16750,9 +16750,9 @@ Model, and on the Authoring Model where none is set. In `config.test.ts`,
 the two settings read through the layers, and a Mechanic Model equal to
 the Primary Model is refused.
 
-**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 280.
+**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 276 of 280: `off` names no Mechanic, and the Mechanic is walked past its stop
+### Session 276 of 281: `off` names no Mechanic, and the Mechanic is walked past its stop
 
 Scope: `packages/router` -- `driver.ts` (`renderStop`'s ways on),
 `config.ts` (the Mechanic's two readings); tests in `driver.test.ts`,
@@ -16784,9 +16784,9 @@ do, its budget, or its brief. A new verb or flag.
 
 **Tests.** As each step names; no new test file.
 
-**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 280.
+**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 277 of 280: Open a Mechanic, and what it did, in the extension
+### Session 277 of 281: Open a Mechanic, and what it did, in the extension
 
 Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 (*Open a Mechanic*), `src/providers/ActionRegistry.ts`,
@@ -16826,9 +16826,9 @@ whose page says cancelled.
 **Tests.** One per command and row changed, in the test file named after
 each.
 
-**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 280.
+**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 278 of 280: A failed release is diagnosed, and one caused outside the repository retries in place
+### Session 278 of 281: A failed release is diagnosed, and one caused outside the repository retries in place
 
 Scope: `packages/router/src/drive.ts` (`phasePublish`'s stop and ways
 on), `packages/router/src/cli/consult.ts` (the release briefing); tests in
@@ -16869,12 +16869,18 @@ retry of a publish. Any edit inside a release session.
 engages diagnose-only and leaves the tree as it was, and a stopped
 release resumes at publish. `npm run check:version` checks the stamp.
 
-**Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 280.
+**Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 279.
 
-### Session 279 of 280: Open a Mechanic on a Copilot session in flight
+### Session 279 of 281: Release 3.23.0 (release: 3.23.0)
+
+The framework publishes sessions 272 to 278 as 3.23.0 and nothing else.
+
+### Session 280 of 281: Open a Mechanic on a Copilot session in flight
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
-(`runOpenMechanic`); its test in `commandFlows.test.ts`
+(`runOpenMechanic`); its test in `commandFlows.test.ts`; `version.json` and
+the manifests `npm run stamp:version` writes;
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
 
 **Why.** The operator, 2026-10-26: with Copilot as the authoring vehicle,
 *Open a Mechanic* refuses with "GitHub Copilot needs a model and neither
@@ -16902,6 +16908,11 @@ refusal nor its *Choose the Model* way on is reached from here; an empty
 answer for an engine that requires a model is refused by the checks that
 already follow the pick.
 
+**Step 2 -- the version and the words.** `version.json` goes to 3.23.1 (a
+patch: a fix to what 3.23.0 shipped), stamped with `npm run
+stamp:version`, and the changelog gets a 3.23.1 section with this fix
+under Fixed.
+
 **Non-goals.** Any router change. Any change to Start Session, to what
 `configuredStart` refuses, or to the Authoring Model row's in-flight
 report. A new setting.
@@ -16909,10 +16920,11 @@ report. A new setting.
 **Tests.** In `commandFlows.test.ts`, a Copilot session in flight, whose
 Configuration reports its declared model and names no Authoring Model of
 its own, opens a Mechanic whose pick offers the declared model first; the
-existing Mechanic test is confirmed.
+existing Mechanic test is confirmed. `npm run check:version` checks the
+stamp.
 
-**Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 280.
+**Releasable.** Yes -- as 3.23.1 in session 281.
 
-### Session 280 of 280: Release 3.23.0 (release: 3.23.0)
+### Session 281 of 281: Release 3.23.1 (release: 3.23.1)
 
-The framework publishes sessions 272 to 279 as 3.23.0 and nothing else.
+The framework publishes session 280 as 3.23.1 and nothing else.

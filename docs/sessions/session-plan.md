@@ -16871,40 +16871,45 @@ release resumes at publish. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 280.
 
-### Session 279 of 280: Open a Mechanic on a Copilot session whose repository names no model
+### Session 279 of 280: Open a Mechanic on a Copilot session in flight
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
 (`runOpenMechanic`); its test in `commandFlows.test.ts`
 
 **Why.** The operator, 2026-10-26: with Copilot as the authoring vehicle,
-*Open a Mechanic* on the session in flight refuses with "GitHub Copilot
-needs a model and neither this repository nor this machine names one, so
-nothing was started." `runOpenMechanic` gates on `configuredStart`, Start's
-own question -- what would a NEW session start with? -- and refuses on its
-answer before the model pick it is about to show. Copilot is the one engine
-whose model is required, so a session started with *Start Session with
-Different Models*, or outside VS Code with `--model`, has a model on the
-ledger and none in the Configuration, and its Mechanic can never be opened.
-The router already answers the right question for the unattended Mechanic:
-the session's own engine, on the Mechanic Model, else the Authoring Model,
-else the model the session was registered with.
+*Open a Mechanic* refuses with "GitHub Copilot needs a model and neither
+this repository nor this machine names one, so nothing was started", and
+its *Choose the Model* button answers "The session in flight declared
+'<model>' at `session start` ... Close the session to choose what the next
+one authors with." A dead end, on every Copilot session in flight:
+`runOpenMechanic` gates on `configuredStart`, Start's question -- what would
+a NEW session start with? -- and while a session is in flight the
+Configuration's authoring row REPORTS that session's declared model, so
+`authoringModelIn` answers "" by design. Copilot is the one engine whose
+model is required, so the gate always refuses; and its way on is the
+Authoring Model row, which refuses every change while a session is in
+flight. *Open a Mechanic* is offered only on the session in flight, so the
+refusal and its button are never right there. The router already answers
+the right question for the unattended Mechanic: the session's own engine,
+on the Mechanic Model, else the Authoring Model, else the model the
+session declared at its start.
 
 **Step 1 -- the session's engine and model, not Start's.** `runOpenMechanic`
-takes the engine the session in flight was registered with, and offers
-first the Mechanic Model, else the Authoring Model, else the session's
-registered model -- the router's order. A missing Authoring Model is no
-refusal: the model pick is shown, and an empty answer for an engine that
-requires a model is refused by the checks that already follow it. Only a
-session with no registered engine and a Configuration naming none still
-refuses, and that refusal names the *Authoring Model* row by its name.
+takes the engine and the model the session in flight declared at `session
+start`, and offers first the Mechanic Model, else that declared model --
+the router's order. It does not call `configuredStart`, so neither its
+refusal nor its *Choose the Model* way on is reached from here; an empty
+answer for an engine that requires a model is refused by the checks that
+already follow the pick.
 
-**Non-goals.** Any router change. Any change to Start Session or to what
-`configuredStart` refuses. A new setting.
+**Non-goals.** Any router change. Any change to Start Session, to what
+`configuredStart` refuses, or to the Authoring Model row's in-flight
+report. A new setting.
 
-**Tests.** In `commandFlows.test.ts`, a Copilot session registered with a
-model, in a repository naming no Authoring Model, opens a Mechanic whose
-pick offers the registered model first; the existing Mechanic test is
-confirmed.
+**Tests.** In `commandFlows.test.ts`, a Copilot session in flight, whose
+Configuration reports its declared model and names no Authoring Model of
+its own, opens a Mechanic whose pick offers the declared model first; the
+existing Mechanic test is confirmed.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 280.
 

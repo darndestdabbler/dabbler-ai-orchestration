@@ -20,6 +20,7 @@ import {
   detectEcosystems,
   ensureCommitGuard,
   ensureGitignore,
+  existingBuildFiles,
   removeGeminiInstructions,
   renderProjectConfig,
   scaffoldBootstrapSessions,
@@ -657,6 +658,26 @@ describe("what a repository declares about its tests", () => {
     const project = tempDir("bootstrap-");
     seed(project, { "Acme.csproj": "<Project/>\n" });
     assert.equal(detectEcosystems(project)[0]?.key, "dotnet");
+  });
+
+  it("names the solution and build files at the root, and nothing else", () => {
+    const project = tempDir("bootstrap-");
+    seed(project, {
+      "pom.xml": "<project/>\n",
+      "Acme.sln": "\n",
+      "README.md": "# Acme\n",
+      "package.json": "{}\n",
+      "service/build.gradle": "\n",
+    });
+    assert.deepEqual(existingBuildFiles(project), ["Acme.sln", "pom.xml"]);
+  });
+
+  it("scaffolds a setup plan fitted to the solution already there", () => {
+    const project = tempDir("bootstrap-");
+    seed(project, { "Acme.csproj": "<Project/>\n" });
+    const text = readFileSync(scaffoldBootstrapSessions(project)[0] as string, "utf8");
+    assert.match(text, /`Acme\.csproj`/);
+    assert.match(text, /adopts the solution already there/);
   });
 });
 

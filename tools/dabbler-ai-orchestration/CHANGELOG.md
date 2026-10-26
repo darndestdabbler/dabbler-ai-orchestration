@@ -10,6 +10,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.24.0] — 2026-10-26
+
+**Existing work is welcome.** A project no longer has to begin from a clean
+remote and an empty folder: what is already there becomes the starting
+point, and the planning session reads the code it finds instead of
+planning a skeleton over it.
+
+### Added
+
+- **A remote or folder that already holds files is a starting point.** Set
+  Up New Project reads the repository's URL before bootstrap; when it holds
+  branches it says what is there and offers *Pull it and start from it* —
+  a clone into an empty folder, a merge into one that already holds files
+  — and declining writes nothing. Files already in the folder are offered,
+  once, as the project's starting commit. From a terminal the same answers
+  are `dabbler bootstrap --from-origin` and `--commit-existing`. Session 281.
+- **The planning session reads an existing solution.** Where the
+  repository's root already holds a .NET solution or project, a `pom.xml`
+  or a `build.gradle`, session 1's brief names those files and asks for
+  their structure to be read, for the plan to say whether it suits the
+  framework's module-per-folder layout and what does not, and for the first
+  sessions to align Dabbler's documents, suites and module boundaries with
+  the projects that exist before any feature work. The first numbered
+  session adopts that solution and adds only what is missing instead of
+  writing a skeleton over it, and every session's plan ask names the files.
+  A blank repository's plan is unchanged. Session 282.
+
+### Changed
+
+- **A host's starter files are not work.** A README beside a `.gitignore`,
+  a LICENSE or a `.gitattributes` — what most hosts create — is merged as a
+  placeholder without asking, and the refusal for anything more says what
+  it found. At session 1, files left uncommitted are offered *Commit them as
+  the starting point* first, ahead of *Undo the Changes*. Session 281.
+
 ## [3.23.1] — 2026-10-26
 
 ### Fixed

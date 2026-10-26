@@ -34,7 +34,7 @@ import { readText } from "../textfile.ts";
 import { EXIT_BLOCKING } from "../contracts/exitCodes.ts";
 import {
   AGENTS_TAIL,
-  BOOTSTRAP_PLAN,
+  bootstrapPlan,
   CLAUDE_TAIL,
   HOOK_MARKER,
   IGNORE_RULE,
@@ -44,13 +44,15 @@ import {
   PRE_COMMIT_HOOK,
   SHARED_BODY,
 } from "./templates.ts";
+import { existingBuildFiles } from "./detect.ts";
 
 export * from "./templates.ts";
 export * from "./detect.ts";
 
 /**
  * Scaffold the two setup sessions into a repository that has no session plan
- * at all; return the written path.
+ * at all, fitted to the solution or build already at its root; return the
+ * written path.
  *
  * A repository that already has a plan has its own numbering and its own
  * history, so nothing is written and nothing is ever overwritten.
@@ -60,7 +62,7 @@ export function scaffoldBootstrapSessions(projectDir: string): string[] {
   const plan = join(root, SESSION_PLAN_FILENAME);
   if (existsSync(plan)) return [];
   mkdirSync(root, { recursive: true });
-  writeFileSync(plan, BOOTSTRAP_PLAN, "utf8");
+  writeFileSync(plan, bootstrapPlan(existingBuildFiles(projectDir)), "utf8");
   return [plan];
 }
 

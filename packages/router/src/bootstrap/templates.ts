@@ -259,7 +259,17 @@ export const PLAN_PROMPT =
   "parent `pom.xml` -- and reaches a sibling by project reference: a\n" +
   "`<ProjectReference>` for .NET, a dependency at `${project.version}` for\n" +
   "Maven. Who depends on a module is read from those references, never\n" +
-  "written. The first numbered session, the skeleton, writes the projects.\n" +
+  "written. In a repository with no solution or build yet, the first\n" +
+  "numbered session, the skeleton, writes the projects.\n" +
+  "\n" +
+  "Where the repository already holds a solution or build at its root (a\n" +
+  "`.sln`, a `.csproj`, a `pom.xml`, a `build.gradle`), read its structure\n" +
+  "before planning: say in the plan whether it suits this module-per-folder\n" +
+  "layout and what does not, and plan the first sessions as alignment --\n" +
+  "Dabbler's documents, suites and module boundaries fitted to the projects\n" +
+  "that exist -- before any feature work. The first numbered session adopts\n" +
+  "that solution and adds only what the plan names that is missing.\n" +
+  "Restructuring existing code is the operator's to approve with the plan.\n" +
   "\n" +
   "This session writes the plan and nothing else: it creates, edits or\n" +
   "deletes no code, project, build file, test, `dabbler.yaml` suite or\n" +
@@ -306,7 +316,11 @@ export const DECOMPOSITION_PROMPT =
   "  `forkedProcessTimeoutInSeconds` -- so every later run inherits it,\n" +
   "  and adds the architecture test the plan requires -- where only the API\n" +
   "  tier may reach the database, that rule. Later sessions fill the modules\n" +
-  "  in and never re-create what the skeleton made.\n" +
+  "  in and never re-create what the skeleton made. The skeleton is for a\n" +
+  "  repository with no solution or build yet: where one already exists, the\n" +
+  "  first numbered session adopts it instead, adding only the projects,\n" +
+  "  references, suite and architecture test the plan names that are\n" +
+  "  missing, and no session re-creates a project that exists.\n" +
   "- **Packaging and releases are sessions of their own:** where the plan\n" +
   "  names *Handoff artifacts*, plan one packaging session -- early, with\n" +
   "  project files only, or later -- that writes the `packaging:` block in\n" +
@@ -343,8 +357,73 @@ export const DECOMPOSITION_PROMPT =
 
 /**
  * The two setup sessions, written only into a repository with no plan.
+ *
+ * `existing` is the solution and build files already at the root. Empty, the
+ * first numbered session is the skeleton that writes them; named, the plan is
+ * fitted to them and the first session adopts them, because a skeleton
+ * written over a solution that exists re-creates its projects.
  */
-export const BOOTSTRAP_PLAN =
+export function bootstrapPlan(existing: readonly string[]): string {
+  const adopting = existing.length > 0;
+  return (
+    BOOTSTRAP_PLAN_BRIEF +
+    (adopting ? existingSurvey(existing) : "") +
+    BOOTSTRAP_PLAN_PROJECTS +
+    (adopting ? FIRST_SESSION_ADOPTS : FIRST_SESSION_SKELETON) +
+    BOOTSTRAP_PLAN_DECOMPOSITION +
+    (adopting ? ADOPTION_SESSION : SKELETON_SESSION) +
+    BOOTSTRAP_PLAN_TAIL +
+    (adopting ? "starting with the session that adopts the solution.\n" : "starting with the skeleton session.\n") +
+    BOOTSTRAP_PLAN_END
+  );
+}
+
+function existingSurvey(existing: readonly string[]): string {
+  return (
+    "   This repository already holds a solution or build at its root:\n" +
+    `   ${existing.map((name) => `\`${name}\``).join(", ")}. Read its structure before\n` +
+    "   planning -- the projects, their references and their tests -- and\n" +
+    "   say in the plan whether it suits the framework's module-per-folder\n" +
+    "   layout, a project each reaching a sibling by project reference, and\n" +
+    "   what does not. Plan the first sessions as alignment: Dabbler's\n" +
+    "   documents, suites and module boundaries fitted to the projects that\n" +
+    "   exist, before any feature work. Restructuring existing code is the\n" +
+    "   person's to approve with the plan.\n"
+  );
+}
+
+const FIRST_SESSION_SKELETON =
+  "   `${project.version}`. The first numbered session, the skeleton, writes\n" +
+  "   the projects.\n";
+
+const FIRST_SESSION_ADOPTS =
+  "   `${project.version}`. The first numbered session adopts the solution\n" +
+  "   already there and adds only what the plan names that is missing.\n";
+
+const SKELETON_SESSION =
+  "   The first numbered session is the skeleton. For .NET it writes the\n" +
+  "   solution file and every project the plan names, with their\n" +
+  "   references; for Maven or Gradle, the parent build and every module.\n" +
+  "   Either way it declares the test suite in `dabbler.yaml` under\n" +
+  "   `testing.suites`, even before any tests exist, with `expensive: true`\n" +
+  "   where its run is the run of record and a hang limit in its command --\n" +
+  "   `dotnet test --blame-hang-timeout 5m`, or Surefire's\n" +
+  "   `forkedProcessTimeoutInSeconds` -- so every later run inherits it,\n" +
+  "   and adds the architecture test the plan requires -- where only the\n" +
+  "   API tier may reach the database, that rule. Later sessions fill the\n" +
+  "   modules in and never re-create what the skeleton made.\n";
+
+const ADOPTION_SESSION =
+  "   The first numbered session adopts the solution already there rather\n" +
+  "   than writing a skeleton over it: it adds only the projects, references\n" +
+  "   and architecture test the plan names that are missing, and makes sure\n" +
+  "   `dabbler.yaml` declares the test suite under `testing.suites`, with\n" +
+  "   `expensive: true` where its run is the run of record and a hang limit\n" +
+  "   in its command -- `dotnet test --blame-hang-timeout 5m`, or\n" +
+  "   Surefire's `forkedProcessTimeoutInSeconds`. No session re-creates a\n" +
+  "   project that exists.\n";
+
+const BOOTSTRAP_PLAN_BRIEF =
   "# Session plan\n" +
   "\n" +
   "> **Purpose:** the numbered sessions this repository runs, in order. The\n" +
@@ -388,13 +467,15 @@ export const BOOTSTRAP_PLAN =
   "   is a fine answer, and most small solutions are one; and the phases or\n" +
   "   feature areas with their key deliverables, each scoped to a handful of\n" +
   "   focused AI sessions. A repository that already has\n" +
-  "   `docs/planning/project-plan.md` amends that file instead.\n" +
+  "   `docs/planning/project-plan.md` amends that file instead.\n";
+
+const BOOTSTRAP_PLAN_PROJECTS =
   "3. Where the plan has several modules, say in it how each is a project:\n" +
   "   a `.csproj` listed in the root solution file for .NET, or a Maven module\n" +
   "   listed in the parent `pom.xml`, each reaching a sibling by project\n" +
-  "   reference -- a `<ProjectReference>`, or a dependency at\n" +
-  "   `${project.version}`. The first numbered session, the skeleton, writes\n" +
-  "   the projects.\n" +
+  "   reference -- a `<ProjectReference>`, or a dependency at\n";
+
+const BOOTSTRAP_PLAN_DECOMPOSITION =
   "4. Cross-provider verification.\n" +
   "5. Full test suite, recorded as the run of record.\n" +
   "6. Close-out.\n" +
@@ -427,18 +508,9 @@ export const BOOTSTRAP_PLAN =
   "   means. Order sessions so earlier ones unblock later ones — a module\n" +
   "   before the modules that depend on it — and keep at most ~3 work steps\n" +
   "   per session.\n" +
-  "\n" +
-  "   The first numbered session is the skeleton. For .NET it writes the\n" +
-  "   solution file and every project the plan names, with their\n" +
-  "   references; for Maven or Gradle, the parent build and every module.\n" +
-  "   Either way it declares the test suite in `dabbler.yaml` under\n" +
-  "   `testing.suites`, even before any tests exist, with `expensive: true`\n" +
-  "   where its run is the run of record and a hang limit in its command --\n" +
-  "   `dotnet test --blame-hang-timeout 5m`, or Surefire's\n" +
-  "   `forkedProcessTimeoutInSeconds` -- so every later run inherits it,\n" +
-  "   and adds the architecture test the plan requires -- where only the\n" +
-  "   API tier may reach the database, that rule. Later sessions fill the\n" +
-  "   modules in and never re-create what the skeleton made.\n" +
+  "\n";
+
+const BOOTSTRAP_PLAN_TAIL =
   "\n" +
   "   Packaging and releases are sessions of their own. Where the plan\n" +
   "   names *Handoff artifacts*, plan one packaging session -- early, with\n" +
@@ -455,8 +527,9 @@ export const BOOTSTRAP_PLAN =
   "deletes no code, project, build file, test, `dabbler.yaml` suite or\n" +
   "packaging.\n" +
   "\n" +
-  "**Creates:** the numbered session list the rest of this repository runs,\n" +
-  "starting with the skeleton session.\n" +
+  "**Creates:** the numbered session list the rest of this repository runs,\n";
+
+const BOOTSTRAP_PLAN_END =
   "\n" +
   "> Do NOT hand-author `sessions.json`. The first `session start`\n" +
   "> bootstraps it from this plan — state files are the writers' job.\n";

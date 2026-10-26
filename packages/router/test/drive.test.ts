@@ -67,6 +67,7 @@ import {
   suiteRetrySeconds,
   staleJobDisposition,
   stepChangedPaths,
+  existingStructureLine,
   stepFilesLine,
   judgeIntervention,
   interventionsClosing,
@@ -623,6 +624,16 @@ describe("what the accepted rows keep of an answer", () => {
     assert.deepEqual(reportAcceptedFields(4, "fix-round-2", report()), {
       seq: 4, step: "fix-round-2", files: ["src/widget.py"], notes: "made it real",
     });
+  });
+});
+
+describe("the structure a plan ask names", () => {
+  it("names the solution and build files at the root, and nothing where there are none", () => {
+    const root = tempDir();
+    assert.equal(existingStructureLine(root), "");
+    seed(root, { "Acme.sln": "\n", "Acme.Api.csproj": "<Project/>\n" });
+    assert.match(existingStructureLine(root), /at its root: Acme\.Api\.csproj, Acme\.sln\./);
+    assert.match(existingStructureLine(root), /never re-creating one/);
   });
 });
 

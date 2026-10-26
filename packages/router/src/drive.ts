@@ -103,7 +103,7 @@ import { SETTING_AUTHORING_MODEL, SETTING_MECHANIC_MODEL, SETTING_TRANSCRIPT } f
 import { namedReviewers, readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
 import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
-import { detectEcosystems } from "./bootstrap/detect.ts";
+import { detectEcosystems, existingBuildFiles } from "./bootstrap/detect.ts";
 import { ensureRootFiles, ignoreBuildOutput } from "./ecosystem.ts";
 import { readProjectGraph } from "./projectGraph.ts";
 import { BUILT_IN_ENGINES, builtInEngine, engineAliases, mailboxEngine } from "./engines.ts";
@@ -1354,6 +1354,20 @@ class Rewound extends Error {
     super(`the run was sent back to '${to}'`);
     this.name = "Rewound";
   }
+}
+
+/**
+ * One sentence, only where the repository's root already holds a solution or
+ * build: the plan is fitted to the projects there, never written over them.
+ */
+export function existingStructureLine(repoRoot: string): string {
+  const files = existingBuildFiles(repoRoot);
+  if (files.length === 0) return "";
+  return (
+    `This repository already holds a solution or build at its root: ${files.join(", ")}. Read ` +
+    "that structure and plan against the projects that exist: adopt them and add only what " +
+    "this session names that is missing, never re-creating one.\n"
+  );
 }
 
 /** One step as the loop measures it: a plan step, or a fix round's own. */
@@ -3017,6 +3031,7 @@ class Driver {
       "confirmed, and a removed one takes its tests with it; the framework runs them after each " +
       "step's checks.\n" +
       SIBLING_REFERENCE +
+      existingStructureLine(this.repoRoot) +
       this.suiteGap() +
       "One member is optional and is left out of a single-repository session:\n" +
       '  repositories  other repositories of this SOLUTION the plan needs to exist: [{"id": ' +

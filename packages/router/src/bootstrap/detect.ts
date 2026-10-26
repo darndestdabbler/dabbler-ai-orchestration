@@ -241,6 +241,21 @@ export function detectEcosystems(projectDir: string): Ecosystem[] {
   return found;
 }
 
+/** The solution and build files the .NET, Maven and Gradle detectors read. */
+const BUILD_FILE = /^(.+\.(sln|slnx|csproj|fsproj)|pom\.xml|build\.gradle(\.kts)?)$/;
+
+/**
+ * The solution and build files already at the repository root, by name: the
+ * code a planning session is to read and fit, rather than re-create.
+ */
+export function existingBuildFiles(projectDir: string): string[] {
+  try {
+    return readdirSync(projectDir).filter((entry) => BUILD_FILE.test(entry)).sort();
+  } catch {
+    return [];
+  }
+}
+
 function suiteBlock(eco: Ecosystem): string {
   const lines = [
     `    - name: ${eco.key}`,

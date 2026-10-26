@@ -16520,7 +16520,7 @@ engine and the reviewing vehicle, and not the machine's. No new test.
 
 The framework publishes session 270 as 3.22.1 and nothing else.
 
-### Session 272 of 284: An API out of credits pauses for funds, and Continue resumes it
+### Session 272 of 283: An API out of credits pauses for funds, and Continue resumes it
 
 Scope: `packages/router/src/transports/api.ts` (the retry ladder),
 `packages/router/src/transports/copilot.ts` (the error classes),
@@ -16570,7 +16570,7 @@ funds kind, and the next instruction after it resumes the phase.
 
 **Releasable.** Yes -- with 273 to 278, as 3.23.0 in session 279.
 
-### Session 273 of 284: A cancelled session gets its transcript, marked cancelled
+### Session 273 of 283: A cancelled session gets its transcript, marked cancelled
 
 Scope: `packages/router/src/session.ts` (`cancel`, the rollback),
 `packages/router/src/transcript.ts` (the cancelled page),
@@ -16618,7 +16618,7 @@ the cancelled banner carries the reason and the last phase.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 274 of 284: The Mechanic, ported back to the router
+### Session 274 of 283: The Mechanic, ported back to the router
 
 Scope: `packages/router` -- `cli/consult.ts` (`--mechanic`), `drive.ts`
 (an intervention after the land rewinds to verify; the close lists
@@ -16670,7 +16670,7 @@ rewinds to verify and the close names it.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 275 of 284: The framework calls in the Mechanic without the person
+### Session 275 of 283: The framework calls in the Mechanic without the person
 
 Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` and
 `dabbler.mechanicModel` settings through the layers), `cli/configure.ts`
@@ -16752,7 +16752,7 @@ the Primary Model is refused.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 276 of 284: `off` names no Mechanic, and the Mechanic is walked past its stop
+### Session 276 of 283: `off` names no Mechanic, and the Mechanic is walked past its stop
 
 Scope: `packages/router` -- `driver.ts` (`renderStop`'s ways on),
 `config.ts` (the Mechanic's two readings); tests in `driver.test.ts`,
@@ -16786,7 +16786,7 @@ do, its budget, or its brief. A new verb or flag.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 277 of 284: Open a Mechanic, and what it did, in the extension
+### Session 277 of 283: Open a Mechanic, and what it did, in the extension
 
 Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 (*Open a Mechanic*), `src/providers/ActionRegistry.ts`,
@@ -16828,7 +16828,7 @@ each.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 278 of 284: A failed release is diagnosed, and one caused outside the repository retries in place
+### Session 278 of 283: A failed release is diagnosed, and one caused outside the repository retries in place
 
 Scope: `packages/router/src/drive.ts` (`phasePublish`'s stop and ways
 on), `packages/router/src/cli/consult.ts` (the release briefing); tests in
@@ -16871,11 +16871,11 @@ release resumes at publish. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 279.
 
-### Session 279 of 284: Release 3.23.0 (release: 3.23.0)
+### Session 279 of 283: Release 3.23.0 (release: 3.23.0)
 
 The framework publishes sessions 272 to 278 as 3.23.0 and nothing else.
 
-### Session 280 of 284: Open a Mechanic on a Copilot session in flight
+### Session 280 of 283: Open a Mechanic on a Copilot session in flight
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
 (`runOpenMechanic`); its test in `commandFlows.test.ts`; `version.json` and
@@ -16923,13 +16923,10 @@ its own, opens a Mechanic whose pick offers the declared model first; the
 existing Mechanic test is confirmed. `npm run check:version` checks the
 stamp.
 
-**Releasable.** Yes -- as 3.23.1 in session 281.
+**Releasable.** Yes -- with 281 and 282, as 3.24.0 in session 283; 3.23.1
+is never published on its own.
 
-### Session 281 of 284: Release 3.23.1 (release: 3.23.1)
-
-The framework publishes session 280 as 3.23.1 and nothing else.
-
-### Session 282 of 284: An existing remote or folder is a starting point
+### Session 281 of 283: An existing remote or folder is a starting point
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts`
 (Set Up New Project: the remote prompt, the remote read before bootstrap,
@@ -16979,9 +16976,9 @@ after the first.
 it; a host's starter files are a placeholder; files in the folder are
 offered as the starting point and nothing is deleted.
 
-**Releasable.** Yes -- with 283, as 3.24.0 in session 284.
+**Releasable.** Yes -- with 280 and 282, as 3.24.0 in session 283.
 
-### Session 283 of 284: The planning session reads the code already there
+### Session 282 of 283: The planning session reads the code already there
 
 Scope: `packages/router/src/bootstrap/templates.ts` (`BOOTSTRAP_PLAN`,
 `PLAN_PROMPT`, `DECOMPOSITION_PROMPT`), `packages/router/src/drive.ts`
@@ -17011,8 +17008,8 @@ session adopts it, and adds only what the plan names that is missing.
 
 **Step 3 -- the version and the words.** `version.json` goes to 3.24.0 (a
 minor: new behaviour for a project's start), stamped with `npm run
-stamp:version`, and the changelog gets a 3.24.0 section naming what 282 and
-283 changed for a developer.
+stamp:version`, and the changelog gets a 3.24.0 section naming what 281 and
+282 changed for a developer; 280's 3.23.1 section stays beneath it.
 
 **Non-goals.** Restructuring existing code without the person's approval of
 the plan. Any language beyond the ecosystems `detectEcosystems` already
@@ -17024,8 +17021,8 @@ for the survey and alignment, and over a blank repository is unchanged. In
 `drive.test.ts`, the plan ask names the detected structure. `npm run
 check:version` checks the stamp.
 
-**Releasable.** Yes -- with 282, as 3.24.0 in session 284.
+**Releasable.** Yes -- with 280 and 281, as 3.24.0 in session 283.
 
-### Session 284 of 284: Release 3.24.0 (release: 3.24.0)
+### Session 283 of 283: Release 3.24.0 (release: 3.24.0)
 
-The framework publishes sessions 282 and 283 as 3.24.0 and nothing else.
+The framework publishes sessions 280, 281 and 282 as 3.24.0 and nothing else.

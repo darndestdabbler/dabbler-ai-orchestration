@@ -5605,9 +5605,9 @@
     {
       "number": 281,
       "title": "An existing remote or folder is a starting point",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-26T12:32:56.448000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-26T12:52:21.598000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

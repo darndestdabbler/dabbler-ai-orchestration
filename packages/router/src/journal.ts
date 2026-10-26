@@ -314,25 +314,32 @@ export function haveCommonHistory(repoRoot: string, left: string, right: string)
 /** What `reconcileWithOrigin` did: a line to print, and the files it held back from merging. */
 export interface OriginReconciliation {
   readonly line: string | null;
-  /** Set when origin's branch shares no history with this one and holds more than a README. */
+  /** Set when origin's branch shares no history with this one and holds more than a host's starter files. */
   readonly held: { readonly remote: string; readonly files: readonly string[] } | null;
 }
 
-/** A host's "initialise with a README" commit: nothing but the README, which is safe to merge unasked. */
+/**
+ * A host's initial commit: a README, a .gitignore, a LICENSE, a
+ * .gitattributes at the root and nothing else -- what a new repository is
+ * created with, and safe to merge unasked.
+ */
 function isPlaceholderTree(files: readonly string[]): boolean {
-  return files.length > 0 && files.every((file) => /^readme\.md$/i.test(file));
+  return (
+    files.length > 0 &&
+    files.every((file) => /^(readme(\.[^/]+)?|license(\.[^/]+)?|\.gitignore|\.gitattributes)$/i.test(file))
+  );
 }
 
 /**
  * Bring this branch level with origin's branch of the same name, before work
  * starts on it.
  *
- * A host that initialised the repository with a README holds a commit this
- * checkout has never had, so the first push is refused and nothing sets the
- * upstream -- and every push after it, the land's included, fails the same
- * way after the work is done. A history that shares an ancestor is
+ * A host that initialised the repository with starter files holds a commit
+ * this checkout has never had, so the first push is refused and nothing sets
+ * the upstream -- and every push after it, the land's included, fails the
+ * same way after the work is done. A history that shares an ancestor is
  * fast-forwarded. One that shares none is merged unasked only when origin
- * holds nothing but the README (on a clash this checkout's README wins: the
+ * holds nothing but starter files (on a clash this checkout's copy wins: the
  * host's is a placeholder); anything more is the operator's work or someone
  * else's, so it is held and named until `allowUnrelated` says to merge it.
  * The upstream is set whenever origin has the branch, so a bare `git push`
@@ -413,7 +420,7 @@ export function reconcileWithOrigin(
   track();
   return {
     line: placeholder
-      ? `merged ${remote}, the host's initial README commit, so this branch can be pushed.`
+      ? `merged ${remote}, the host's starter files, so this branch can be pushed.`
       : `merged ${remote} (${files.length} file(s); where a file was on both sides, this checkout's copy was kept).`,
     held: null,
   };

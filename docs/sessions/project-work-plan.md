@@ -318,9 +318,9 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 278 | A failed release is diagnosed, and one caused outside the repository retries in place | no | 2026-10-21 |
 | 279 | Release 3.23.0 (release: 3.23.0) | yes | 2026-10-24 |
 | 280 | Open a Mechanic on a Copilot session in flight | no | 2026-10-26 |
-| 281 | Release 3.23.1 (release: 3.23.1) | — | not declared |
-| 282 | An existing remote or folder is a starting point | — | not declared |
-| 283 | The planning session reads the code already there | — | not declared |
+| 281 | An existing remote or folder is a starting point | no | 2026-10-26 |
+| 282 | The planning session reads the code already there | — | not declared |
+| 283 | Release 3.24.0 (release: 3.24.0) | — | not declared |
 | 284 | Release 3.24.0 (release: 3.24.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -3384,3 +3384,15 @@ Release 3.23.0: the framework packs and publishes what is on the trunk.
 **Releasable: no.**
 
 Open a Mechanic stops asking Start's question. runOpenMechanic reads the repository's configuration once and takes the authoring role's engine and declared model -- the engine and model the session in flight declared at `session start` -- instead of calling configuredStart, so a Copilot session in flight, whose Authoring Model row reports its declared model and whose repository names none of its own, is no longer refused with a Choose the Model button that refuses in turn. The model offered first is the Mechanic Model, else that declared model, the router's order; an empty model for an engine that requires one is refused by the checks that already follow the pick. The version goes to 3.23.1, stamped with `npm run stamp:version`, and the changelog gains a 3.23.1 section with the fix under Fixed.
+
+### Session 281 — An existing remote or folder is a starting point
+
+**Releasable: no.**
+
+An existing remote or folder becomes a starting point instead of a refusal. A host's starter files -- a README, a .gitignore, a LICENSE, a .gitattributes -- count as a placeholder that `reconcileWithOrigin` merges unasked, and the refusal for anything more says so. `dabbler bootstrap` gains two answers a person gives once: `--from-origin`, which in a folder with no commits and no files adopts origin's default branch (one history, as a clone would be) and in a folder that already holds files merges origin's branch with `reconcileWithOrigin(allowUnrelated: true)` before the first push; and `--commit-existing`, which commits the files already in the folder as the project's starting point before the scaffold is written. Set Up New Project asks for the repository's URL, empty or not, reads it with `git ls-remote` before bootstrap, and when it holds branches says what is there and offers *Pull it and start from it* (declining writes nothing); finding files it did not write, it asks once whether to commit them as the starting point. At session 1 the uncommitted-files refusal offers *Commit them as the starting point* first and *Undo the Changes* second.
+
+**Amended after acceptance:**
+
+- 2026-10-26 — step 'starter-files-are-placeholders': its files: reconcileWithOrigin's tests already live in walk-bootstrap.test.ts and one asserted the old wording; extending that test in place is one test per behaviour, where a journal.test.ts copy would duplicate it (claude-code (anthropic, claude-opus-5-5))
+- 2026-10-26 — step 'bootstrap-from-origin-and-starting-point': its files: bootstrap.test.ts answers git from a table; tests that need a real origin and a real commit are walk-bootstrap.test.ts's, beside the reconcile tests they extend (claude-code (anthropic, claude-opus-5-5))
+- 2026-10-26 — step 'session-1-starting-point': its files: the extension labels its commit by the router's STARTING_POINT phrase, exported from the package index beside the start's flags so the wording has one source (claude-code (anthropic, claude-opus-5-5))

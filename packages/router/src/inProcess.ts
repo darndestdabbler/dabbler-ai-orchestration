@@ -560,6 +560,8 @@ export class InProcessRouter implements Router {
     optional(args, "--repo-name", o.repoName);
     optional(args, "--remote", o.remote);
     optional(args, "--transport", o.transport);
+    if (o.fromOrigin === true) args.push("--from-origin");
+    if (o.commitExisting === true) args.push("--commit-existing");
     return this.text("bootstrap", args, o.projectDir);
   }
 }

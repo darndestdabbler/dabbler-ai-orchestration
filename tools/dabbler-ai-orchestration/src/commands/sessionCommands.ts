@@ -26,6 +26,7 @@ import {
   COMMIT_CHANGES_FLAG,
   ENUMERATION_CLI_ALIASES,
   MERGE_ORIGIN_FLAG,
+  STARTING_POINT,
   UNDO_CHANGES_FLAG,
   preflightRefusedModel,
   releaseSessionToStart,
@@ -1035,7 +1036,8 @@ export async function runStartSession(
   // to do, once the person has said which.
   if (registered.code !== 0 && registered.output.includes(COMMIT_CHANGES_FLAG)) {
     const refusal = registered.output.split("\n").find((line) => line.startsWith("start: refused -- ")) ?? "";
-    const commit = "Commit and Push";
+    // At session 1 they are most likely what the project began from.
+    const commit = registered.output.includes(STARTING_POINT) ? "Commit them as the starting point" : "Commit and Push";
     const undo = "Undo the Changes";
     const answer = await ui.choose(
       `${refusal.replace(/^start: refused -- /, "")}\n\n${commit} commits these files and pushes them. ` +

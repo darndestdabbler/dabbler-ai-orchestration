@@ -749,6 +749,15 @@ const UNCOMMITTED_CHANGES_NEXT =
   `start: next -- a person runs the same start with ${COMMIT_CHANGES_FLAG} to commit and push them, or with ` +
   `${UNDO_CHANGES_FLAG} to undo them (a copy of each file is kept outside the repository).`;
 
+/** How session 1 names the files already in a new project, which the Start offer reads to label its commit. */
+export const STARTING_POINT = "the project's starting point";
+
+/** At session 1, files nobody committed are what the project began from, more likely than leavings. */
+const STARTING_POINT_NEXT =
+  `start: next -- these are likely ${STARTING_POINT}: a person runs the same start with ${COMMIT_CHANGES_FLAG} ` +
+  `to commit them as ${STARTING_POINT}, or with ${UNDO_CHANGES_FLAG} to undo them (a copy of each file is kept ` +
+  "outside the repository).";
+
 /**
  * The refusal an engine meets at either answer. On 2026-10-02 an engine
  * answered `--commit-changes` at a start and a cancelled session's
@@ -770,7 +779,8 @@ function changesAnswerRefusal(flag: string): string {
 function commitChangesBeforeStart(repoRoot: string, number: number, paths: readonly string[]): string | null {
   const added = runGit(repoRoot, ["add", "--", ...paths]);
   if (added.code !== 0) return `git add failed: ${firstLine(added.stderr)}`;
-  const committed = runGit(repoRoot, ["commit", "-m", `Commit changes made before session ${number} started`]);
+  const message = number === 1 ? "Starting point" : `Commit changes made before session ${number} started`;
+  const committed = runGit(repoRoot, ["commit", "-m", message]);
   if (committed.code !== 0) return `git commit failed: ${firstLine(committed.stderr || committed.stdout)}`;
   const upstream = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
   if (upstream.code !== 0) return null;
@@ -839,7 +849,7 @@ export function originHoldsWorkRefusal(held: { readonly remote: string; readonly
   const shown = held.files.slice(0, 10).join(", ");
   return (
     `${held.remote} shares no history with this checkout and holds ${held.files.length} file(s) it has never had: ` +
-    `${shown}${held.files.length > 10 ? ", and more" : ""}. That is more than a host's initial README, so it may ` +
+    `${shown}${held.files.length > 10 ? ", and more" : ""}. That is more than a host's starter files, so it may ` +
     "be work -- yours or someone else's -- and nothing was merged or registered. To merge it into this branch " +
     "(where a file is on both sides, this checkout's copy is kept) and start, run the same start with " +
     `${MERGE_ORIGIN_FLAG}.`
@@ -1744,7 +1754,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
           writeOut(`start: undid ${begun.paths.length} change(s); a copy of each file is in ${folder}\n`);
         } else {
           writeErr(`start: refused -- ${workBegunRefusal(requested, begun.paths)}\n`);
-          writeErr(`${UNCOMMITTED_CHANGES_NEXT}\n`);
+          writeErr(`${requested === 1 ? STARTING_POINT_NEXT : UNCOMMITTED_CHANGES_NEXT}\n`);
           return EXIT_USAGE;
         }
       }

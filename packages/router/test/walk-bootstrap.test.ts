@@ -290,17 +290,75 @@ describe("a branch brought level with an origin the host created", () => {
     return repo;
   }
 
-  it("merges a host's README-only initial commit unasked, keeps this README, and leaves the branch pushable", () => {
-    const repo = unrelatedOrigin({ "README.md": "# placeholder\n" });
+  it("merges a host's starter files unasked, keeps this README, and leaves the branch pushable", () => {
+    const repo = unrelatedOrigin({
+      "README.md": "# placeholder\n",
+      ".gitignore": "bin/\n",
+      ".gitattributes": "* text=auto\n",
+      LICENSE: "MIT\n",
+    });
     const result = reconcileWithOrigin(repo, { allowUnrelated: false });
     assert.equal(result.held, null);
-    assert.match(result.line ?? "", /initial README/);
+    assert.match(result.line ?? "", /starter files/);
+    assert.match(readFileSync(join(repo, "LICENSE"), "utf8"), /^MIT\r?\n$/);
     assert.equal(gitOut(repo, "rev-parse", "--abbrev-ref", "@{u}"), "origin/main");
     assert.match(readFileSync(join(repo, "README.md"), "utf8"), /^# ours\r?\n$/);
     git(repo, "push", "-q");
   });
 
-  it("holds an unrelated origin carrying more than a README and names its files, until told to merge", () => {
+  it("starts an empty folder from origin's history with --from-origin, the scaffold on top and no merge", async () => {
+    const seed = scratchDir("from-seed-");
+    const bare = join(scratchDir("from-bare-"), "origin.git");
+    writeFiles(seed, { "app.txt": "theirs\n" });
+    git(seed, "init", "-q", "-b", "main");
+    git(seed, "add", "-A");
+    git(seed, "commit", "-q", "-m", "their work");
+    git(seed, "init", "-q", "--bare", "-b", "main", bare);
+    git(seed, "push", "-q", bare, "main");
+    const folder = scratchDir("from-");
+
+    const setup = await capture(() => bootstrapVerb(["--project-dir", folder, "--remote", bare, "--from-origin"]));
+    assert.equal(setup.value, 0, setup.stderr);
+    assert.match(readFileSync(join(folder, "app.txt"), "utf8"), /^theirs\r?\n$/);
+    assert.equal(gitOut(folder, "rev-list", "--merges", "HEAD"), "");
+    assert.match(gitOut(folder, "log", "--format=%s"), /^Set up Dabbler\r?\ntheir work$/);
+    assert.equal(gitOut(folder, "rev-parse", "HEAD"), gitOut(folder, "rev-parse", "origin/main"));
+  });
+
+  it("merges origin's default branch into a folder with files on another branch name and a remote it already had", async () => {
+    const seed = scratchDir("into-seed-");
+    const bare = join(scratchDir("into-bare-"), "origin.git");
+    writeFiles(seed, { "app.txt": "theirs\n" });
+    git(seed, "init", "-q", "-b", "main");
+    git(seed, "add", "-A");
+    git(seed, "commit", "-q", "-m", "their work");
+    git(seed, "init", "-q", "--bare", "-b", "main", bare);
+    git(seed, "push", "-q", bare, "main");
+    const folder = scratchDir("into-");
+    writeFiles(folder, { "notes.txt": "mine\n" });
+    git(folder, "init", "-q", "-b", "master");
+    git(folder, "remote", "add", "origin", bare);
+
+    const setup = await capture(() => bootstrapVerb(["--project-dir", folder, "--from-origin", "--commit-existing"]));
+    assert.equal(setup.value, 0, setup.stderr);
+    assert.equal(gitOut(folder, "symbolic-ref", "--short", "HEAD"), "main");
+    git(folder, "merge-base", "--is-ancestor", "origin/main", "HEAD");
+    assert.match(readFileSync(join(folder, "app.txt"), "utf8"), /^theirs\r?\n$/);
+    assert.match(readFileSync(join(folder, "notes.txt"), "utf8"), /^mine\r?\n$/);
+  });
+
+  it("commits the files already in the folder as the starting point with --commit-existing, leaving the tree clean", async () => {
+    const folder = scratchDir("existing-");
+    writeFiles(folder, { "notes.txt": "mine\n", "src/a.txt": "a\n" });
+    git(folder, "--version");
+
+    const setup = await capture(() => bootstrapVerb(["--project-dir", folder, "--commit-existing"]));
+    assert.equal(setup.value, 0, setup.stderr);
+    assert.match(gitOut(folder, "log", "--format=%s"), /Starting point$/);
+    assert.equal(gitOut(folder, "status", "--porcelain"), "");
+  });
+
+  it("holds an unrelated origin carrying more than starter files and names its files, until told to merge", () => {
     const repo = unrelatedOrigin({ "README.md": "# theirs\n", "src/lib.txt": "theirs\n" });
     const head = gitOut(repo, "rev-parse", "HEAD");
     const held = reconcileWithOrigin(repo, { allowUnrelated: false });

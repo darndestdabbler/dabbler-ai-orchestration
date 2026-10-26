@@ -215,6 +215,12 @@ suite("set up new project", () => {
       newFolder?: string;
       offerFolder?: boolean;
       remote?: string;
+      /** Branches the remote holds; absent, the remote is not read. */
+      remoteBranches?: string[];
+      /** Files already in the folder; absent, the folder is not read. */
+      existing?: string[];
+      /** Offer actions answered by name, before `choose`. */
+      accept?: string[];
     } = {},
   ): {
     ui: SetUpProjectUi;
@@ -236,9 +242,9 @@ suite("set up new project", () => {
     const ui: SetUpProjectUi = {
       showInformationMessage: (m: string) => infos.push(m),
       showErrorMessage: (m: string) => errors.push(m),
-      offer: (message: string) => {
+      offer: (message: string, ...actions: string[]) => {
         offers.push(message);
-        return Promise.resolve(options.choose);
+        return Promise.resolve(actions.find((action) => options.accept?.includes(action)) ?? options.choose);
       },
       workspaceRoot: () => root,
       startSession: (root: string) => {
@@ -261,6 +267,8 @@ suite("set up new project", () => {
     // flow that only works when a remote is given would be a required step
     // wearing an optional one's clothes.
     ui.askRemote = () => Promise.resolve(options.remote);
+    if (options.remoteBranches !== undefined) ui.readRemote = () => Promise.resolve(options.remoteBranches ?? null);
+    if (options.existing !== undefined) ui.existingFiles = () => Promise.resolve(options.existing ?? []);
     if (!options.noGit) {
       ui.initRepository = () => {
         inits += 1;
@@ -320,6 +328,41 @@ suite("set up new project", () => {
     const second = fakeRouter(0);
     assert.strictEqual(await runSetUpProjectFlow(skipped.ui, second.router), true);
     assert.strictEqual(second.bootstrapOptions[0].remote, undefined);
+  });
+
+  test("offers to pull a remote that holds files, and a new folder's bootstrap starts from it", async () => {
+    const { ui, offers } = setUpUi(undefined, {
+      newFolder: "D:\\fresh",
+      remote: "https://example.invalid/p.git",
+      remoteBranches: ["main"],
+      accept: ["Pull it and start from it"],
+    });
+    const fake = fakeRouter(0);
+    assert.strictEqual(await runSetUpProjectFlow(ui, fake.router), true);
+    assert.ok(offers[0].includes("main") && offers[0].includes("as a clone would"), offers[0]);
+    assert.strictEqual(fake.bootstrapOptions[0].fromOrigin, true);
+  });
+
+  test("declining the pull writes nothing", async () => {
+    const { ui } = setUpUi("D:\\ws", {
+      remote: "https://example.invalid/p.git",
+      remoteBranches: ["main"],
+      choose: "Cancel",
+    });
+    assert.strictEqual(await runSetUpProjectFlow(ui, unusableRouter()), false);
+  });
+
+  test("offers the folder's own files as the starting point, and commits them only on yes", async () => {
+    const yes = setUpUi("D:\\ws", { existing: ["notes.txt"], accept: ["Commit them as the starting point"] });
+    const committed = fakeRouter(0);
+    assert.strictEqual(await runSetUpProjectFlow(yes.ui, committed.router), true);
+    assert.ok(yes.offers[0].includes("notes.txt"), yes.offers[0]);
+    assert.strictEqual(committed.bootstrapOptions[0].commitExisting, true);
+
+    const no = setUpUi("D:\\ws", { existing: ["notes.txt"] });
+    const left = fakeRouter(0);
+    assert.strictEqual(await runSetUpProjectFlow(no.ui, left.router), true);
+    assert.strictEqual(left.bootstrapOptions[0].commitExisting, undefined);
   });
 
   test("opens a folder it created before offering anything about it", async () => {
@@ -675,6 +718,23 @@ suite("Start opens the person's own CLI", () => {
       assert.deepStrictEqual(register.calls[1].slice(-1), [flag]);
       assert.strictEqual(chosen.terminals.length, 1);
     }
+  });
+
+  test("at session 1 the files already there are offered as the starting point first, and choosing it deletes nothing", async () => {
+    const refusal =
+      "start: refused -- You can't start a session while there are new or changed files that haven't been committed: notes.txt.\n" +
+      "start: next -- these are likely the project's starting point: a person runs the same start with --commit-changes " +
+      "to commit them as the project's starting point, or with --undo-changes to undo them.";
+    const register = (async (_root: string, args: readonly string[]) => {
+      register.calls.push([...args]);
+      return args.some((arg) => arg.endsWith("-changes")) ? { code: 0, output: "" } : { code: 2, output: refusal };
+    }) as SessionRegistrar & { calls: string[][] };
+    register.calls = [];
+    const offered: string[][] = [];
+    const run = driveUi({ choose: async (_message, actions) => { offered.push([...actions]); return actions[0]; } });
+    assert.strictEqual(await runStartSession(makeRepository(), run.ui, register, true), true);
+    assert.deepStrictEqual(offered[0], ["Commit them as the starting point", "Undo the Changes"]);
+    assert.deepStrictEqual(register.calls[1].slice(-1), ["--commit-changes"]);
   });
 
   test("Consult with AI opens the chosen CLI with the chosen model and the consult sentence, and registers nothing", async () => {

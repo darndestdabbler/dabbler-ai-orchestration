@@ -15,7 +15,7 @@
 // checkout's own `.vscode/settings.json`, which is where a choice about a
 // checkout belongs: committed, visible, and one command from changed.
 
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -75,6 +75,13 @@ function usage(): string {
     "                        project without one cannot close its first",
     "                        session. An existing remote is left exactly as",
     "                        it is.",
+    "  --from-origin         start from what origin already holds: into a",
+    "                        folder with no commit and no files, check out",
+    "                        origin's default branch; otherwise merge origin's",
+    "                        branch before the first push. Never a force-push.",
+    "  --commit-existing     commit the files already in the folder as the",
+    "                        project's starting point, before anything is",
+    "                        written.",
     "  --transport {" + CHOICES.join(",") + "}",
     `                        how a provider is reached from this checkout,`,
     `                        written to ${SETTINGS_RELPATH}. Nothing outside`,
@@ -87,12 +94,19 @@ function usage(): string {
 }
 
 const VALUE_FLAGS = new Set(["--project-dir", "--repo-name", "--remote", "--transport"]);
-const BARE_FLAGS = new Set(["--print-plan-prompt", "--print-decomposition-prompt"]);
+const BARE_FLAGS = new Set([
+  "--print-plan-prompt",
+  "--print-decomposition-prompt",
+  "--from-origin",
+  "--commit-existing",
+]);
 
 interface Parsed {
   readonly projectDir: string;
   readonly repoName: string | null;
   readonly remote: string | null;
+  readonly fromOrigin: boolean;
+  readonly commitExisting: boolean;
   readonly printPlanPrompt: boolean;
   readonly printDecompositionPrompt: boolean;
   readonly transport: string | null;
@@ -124,6 +138,8 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     projectDir: values.get("--project-dir") ?? ".",
     repoName: values.get("--repo-name") ?? null,
     remote: values.get("--remote") ?? null,
+    fromOrigin: flags.has("--from-origin"),
+    commitExisting: flags.has("--commit-existing"),
     printPlanPrompt: flags.has("--print-plan-prompt"),
     printDecompositionPrompt: flags.has("--print-decomposition-prompt"),
     transport: values.get("--transport") ?? null,
@@ -229,6 +245,18 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
       `bootstrap: could not record the remote (${remote.error}). The project is ` +
         "still set up; add it yourself before the first close, which pushes.\n",
     );
+  }
+
+  // The two answers a person gave Set Up New Project, acted on before
+  // anything is written: a folder with nothing in it takes origin's history
+  // as a clone would, any other is put on origin's default branch so the
+  // merge below brings that branch in, and the folder's own files become
+  // the first commit.
+  const fromOrigin = parsed.fromOrigin ? startFromOrigin(project) : null;
+  if (fromOrigin?.line) writeOut(`bootstrap: ${fromOrigin.line}\n`);
+  if (parsed.commitExisting) {
+    const started = commitStartingPoint(project);
+    if (started) writeOut(`bootstrap: ${started}\n`);
   }
 
   // Every path bootstrap itself writes, so it can commit exactly those and
@@ -411,6 +439,14 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
         "sit uncommitted.\n",
     );
   }
+  // A folder that already had files merges origin's branch, as the person
+  // said to, whether this run recorded the remote or found it; on a clash
+  // this checkout's copy is kept.
+  if (fromOrigin !== null && !fromOrigin.adopted) {
+    const root = repoRootFor(project);
+    const merged = root === null ? null : reconcileWithOrigin(root, { allowUnrelated: true });
+    if (merged?.line) writeOut(`bootstrap: ${merged.line}\n`);
+  }
   // The upstream, once there is a commit to carry it. A rejected push is
   // reported and is not fatal: the remote is recorded either way, and a
   // half-configured remote an operator can finish beats a set-up that died
@@ -544,6 +580,59 @@ function addOrigin(
     return { added: false, note: "", error: added.stderr.trim() || "git remote add failed" };
   }
   return { added: true, note: `recorded origin ${url}`, error: "" };
+}
+
+/**
+ * Commit every file already in the project folder -- and nothing outside it,
+ * where the folder is inside a larger repository -- as the project's
+ * starting point. Answers the line to print, or "" when there was nothing.
+ */
+function commitStartingPoint(projectDir: string): string {
+  const root = repoRootFor(projectDir);
+  if (root === null) return "";
+  const scope = repoRelativePath(root, projectDir) || ".";
+  const added = runGit(root, ["add", "-A", "--", scope]);
+  if (added.code !== 0) return `could not commit the starting point (${added.stderr.trim() || "git add failed"})`;
+  if (runGit(root, ["diff", "--cached", "--quiet", "--", scope]).code === 0) return "";
+  const committed = runGit(root, ["commit", "-q", "-m", "Starting point", "--", scope]);
+  return committed.code === 0
+    ? "committed the files already in the folder as the project's starting point."
+    : `could not commit the starting point (${committed.stderr.trim() || "git commit failed"})`;
+}
+
+/**
+ * Start from origin's default branch. Where this folder has no commit and no
+ * file of its own it is checked out, tracking origin: one history, as a
+ * clone would have, and nothing merged (`adopted`). Anywhere else this
+ * branch takes origin's default branch's name, so the merge that follows
+ * brings THAT branch in and the push lands on it.
+ */
+function startFromOrigin(projectDir: string): { readonly line: string; readonly adopted: boolean } {
+  const root = repoRootFor(projectDir);
+  const branch = root === null ? null : remoteDefaultBranch(root);
+  if (root === null || branch === null) return { line: "", adopted: false };
+  const born = runGit(root, ["rev-parse", "-q", "--verify", "HEAD"]).code === 0;
+  if (!born && !readdirSync(root).some((entry) => entry !== ".git")) {
+    const fetched = runGit(root, ["fetch", "-q", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`]);
+    const checked =
+      fetched.code === 0 ? runGit(root, ["checkout", "-q", "-B", branch, "--track", `origin/${branch}`]) : fetched;
+    return checked.code === 0
+      ? { line: `checked out origin's ${branch}; the project starts from its history.`, adopted: true }
+      : { line: `could not check out origin's ${branch} (${checked.stderr.trim() || "git failed"})`, adopted: false };
+  }
+  const current = runGit(root, ["symbolic-ref", "--short", "HEAD"]).stdout.trim();
+  if (current === branch) return { line: "", adopted: false };
+  const renamed = born
+    ? runGit(root, ["branch", "-m", branch])
+    : runGit(root, ["symbolic-ref", "HEAD", `refs/heads/${branch}`]);
+  return {
+    line:
+      renamed.code === 0
+        ? `this branch is now '${branch}', origin's default, so origin's work is merged into it.`
+        : `could not take origin's branch name '${branch}' (${renamed.stderr.trim() || "git failed"}); ` +
+          `origin's '${current}' is merged if it has one.`,
+    adopted: false,
+  };
 }
 
 /** Push the checked-out branch with an upstream, so a bare `git push` works after. */

@@ -122,7 +122,7 @@ export { ENUMERATION_CLI_ALIASES } from "./projection.ts";
 export { preflightRefusedModel } from "./engines.ts";
 // Start Session asks the person before a start merges an origin branch that
 // shares no history with the checkout, and re-runs the start with this.
-export { COMMIT_CHANGES_FLAG, MERGE_ORIGIN_FLAG, UNDO_CHANGES_FLAG } from "./session.ts";
+export { COMMIT_CHANGES_FLAG, MERGE_ORIGIN_FLAG, STARTING_POINT, UNDO_CHANGES_FLAG } from "./session.ts";
 // Whether the session a start would register is a release session: Start
 // Session then opens no engine CLI, and asks nothing.
 export { releaseSessionToStart } from "./session.ts";

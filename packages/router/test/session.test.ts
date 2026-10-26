@@ -75,6 +75,7 @@ import {
   restore,
   reviewingVehicleRefusal,
   setSessionUseReading,
+  STARTING_POINT,
   start,
   steppedOverLines,
   type SequenceFacts,
@@ -298,6 +299,8 @@ describe("what a start refuses before a session exists", () => {
       assert.notEqual(refused.code, EXIT_OK);
       assert.ok(refused.err.includes(`start: refused -- ${workBegunRefusal(1, [".vscode/launch.json"])}`), refused.err);
       assert.match(refused.err, /--commit-changes .*--undo-changes/);
+      // Session 1's leavings are a new project's own files, and it says so.
+      assert.ok(refused.err.includes(STARTING_POINT), refused.err);
       assert.equal(readRawSessionState(state.sessionsDir), null);
     } finally {
       dirty();
@@ -354,7 +357,8 @@ describe("what a start refuses before a session exists", () => {
       );
       assert.equal(started.code, EXIT_OK, started.err);
       assert.ok(calls.some((args) => args.join(" ") === "add -- src/widget.py notes.txt"), JSON.stringify(calls));
-      assert.ok(calls.some((args) => args[0] === "commit" && /before session 1 started/.test(String(args[2]))));
+      // Session 1's are what the project began from, and the commit says so.
+      assert.ok(calls.some((args) => args[0] === "commit" && String(args[2]) === "Starting point"));
       assert.ok(calls.some((args) => args[0] === "push"));
       assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
     } finally {

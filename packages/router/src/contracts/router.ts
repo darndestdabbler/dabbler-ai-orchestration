@@ -345,6 +345,10 @@ export interface BootstrapOptions {
    * up without one, local-only until a remote is added.
    */
   readonly remote?: string;
+  /** Start from what origin already holds, as the person answered: checked out into an empty folder, merged otherwise. */
+  readonly fromOrigin?: boolean;
+  /** Commit the files already in the folder as the project's starting point, as the person answered. */
+  readonly commitExisting?: boolean;
 }
 
 /**

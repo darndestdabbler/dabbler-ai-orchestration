@@ -19,13 +19,17 @@
 // writes and commits the scaffold, and the flow offers to start session 1
 // rather than describing how.
 
+import * as cp from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+import { promisify } from "util";
 import * as vscode from "vscode";
 import type { Router } from "dabbler-ai-router";
 import type { SessionsRepository } from "../utils/fileSystem";
 import { productionRouter } from "../router/host";
 import { defaultSessionRunUi, runStartSession } from "./sessionCommands";
+
+const execFile = promisify(cp.execFile);
 
 export interface SetUpProjectUi {
   showInformationMessage: (message: string) => unknown;
@@ -51,6 +55,10 @@ export interface SetUpProjectUi {
    * remote is added, and the push gate says so at every close.
    */
   askRemote?: () => Promise<string | undefined>;
+  /** The remote's branch names, read before anything is written; null when it cannot be read. */
+  readRemote?: (url: string) => Promise<string[] | null>;
+  /** Files in the folder that nothing has committed: the starting point a person may already have. */
+  existingFiles?: (root: string) => Promise<string[]>;
   /** Start session 1 in the project just prepared. */
   startSession?: (root: string) => Promise<unknown>;
   openFolder?: (root: string) => Thenable<unknown>;
@@ -101,6 +109,8 @@ function defaultUi(pending?: PendingStartStore): SetUpProjectUi {
     initRepository: initWithVsCodeGit,
     chooseNewProjectFolder: chooseNewProjectFolder,
     askRemote: askRemote,
+    readRemote: readRemote,
+    existingFiles: existingFiles,
     startSession: startSessionIn,
     openFolder: (root) =>
       vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(root)),
@@ -141,6 +151,40 @@ export async function runSetUpProjectFlow(
   // insists.
   const remote = ui.askRemote ? ((await ui.askRemote()) ?? "").trim() : "";
 
+  // What is already there is a starting point, asked about once here rather
+  // than refused at session 1. Each is the person's one answer; declining
+  // the pull writes nothing, because a remote is never overwritten.
+  const existing = !created && ui.existingFiles ? await ui.existingFiles(root) : [];
+  let fromOrigin = false;
+  const branches = remote && ui.readRemote ? await ui.readRemote(remote) : null;
+  if (branches !== null && branches.length > 0) {
+    const pull = "Pull it and start from it";
+    const choice = await ui.offer?.(
+      `Dabbler: ${remote} already holds ${branches.length === 1 ? "a branch" : `${branches.length} branches`} ` +
+        `(${branches.join(", ")}). ` +
+        (existing.length > 0
+          ? "Its default branch is merged with this folder's files, and where a file is on both sides this folder's copy is kept."
+          : "The project starts from its history, as a clone would.") +
+        " Nothing on the remote is overwritten.",
+      pull,
+      "Cancel",
+    );
+    if (choice !== pull) return false;
+    fromOrigin = true;
+  }
+  let commitExisting = false;
+  if (existing.length > 0 && ui.offer) {
+    const keep = "Commit them as the starting point";
+    const shown = existing.slice(0, 5).join(", ") + (existing.length > 5 ? ", and more" : "");
+    const choice = await ui.offer(
+      `Dabbler: this folder already holds ${existing.length} file(s) nothing has committed: ${shown}. ` +
+        "Commit them as the project's starting point? Left as they are, session 1 asks again.",
+      keep,
+      "Leave them",
+    );
+    commitExisting = choice === keep;
+  }
+
   // No transport, deliberately. Setting up one project is not a statement
   // about how it routes: the project's own configuration decides, and this
   // click has no answer to contribute. `bootstrap` used to persist a
@@ -150,7 +194,12 @@ export async function runSetUpProjectFlow(
   // a later `dabbler configure` set. A person who wants a transport for this
   // checkout sets it on the Configuration pane, or runs `dabbler configure
   // --transport <x>` and means it.
-  const options = { projectDir: root, ...(remote ? { remote } : {}) };
+  const options = {
+    projectDir: root,
+    ...(remote ? { remote } : {}),
+    ...(fromOrigin ? { fromOrigin } : {}),
+    ...(commitExisting ? { commitExisting } : {}),
+  };
   let result = await router.bootstrap(options);
   if (!result.ok && ui.initRepository) {
     // `bootstrap` refuses a directory that is not a git repository. That is
@@ -307,12 +356,46 @@ async function askRemote(): Promise<string | undefined> {
   return vscode.window.showInputBox({
     title: "New Dabbler project — where does it push? (optional)",
     prompt:
-      "The URL of an empty repository, recorded as `origin` and pushed to. " +
-      "The close pushes there. " +
+      "The repository's URL, empty or not, recorded as `origin` and pushed to. " +
+      "One that already holds files is offered as the starting point. " +
       "Leave blank to set up without one.",
     placeHolder: "https://github.com/you/your-project.git",
     ignoreFocusOut: true,
   });
+}
+
+/** No credential prompt and a bound: a question nobody sees would hold the command open. */
+const QUIET_GIT = {
+  env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" },
+  timeout: 60_000,
+  windowsHide: true,
+};
+
+async function readRemote(url: string): Promise<string[] | null> {
+  try {
+    const { stdout } = await execFile("git", ["ls-remote", "--heads", url], QUIET_GIT);
+    return stdout
+      .split("\n")
+      .map((line) => /\trefs\/heads\/(.+)$/.exec(line.trim())?.[1])
+      .filter((branch): branch is string => branch !== undefined);
+  } catch {
+    return null;
+  }
+}
+
+async function existingFiles(root: string): Promise<string[]> {
+  if (!fs.existsSync(path.join(root, ".git"))) {
+    return fs.readdirSync(root).filter((entry) => entry !== ".git");
+  }
+  try {
+    const { stdout } = await execFile("git", ["status", "--porcelain"], { ...QUIET_GIT, cwd: root });
+    return stdout
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) => line.slice(3));
+  } catch {
+    return [];
+  }
 }
 
 async function chooseNewProjectFolder(): Promise<string | undefined> {

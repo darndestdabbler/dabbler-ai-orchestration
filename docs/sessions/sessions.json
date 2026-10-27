@@ -5733,9 +5733,9 @@
     {
       "number": 288,
       "title": "The landed tree is the verified tree, and a failed run of record can be re-run",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-27T08:35:10.624000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-27T08:57:42.916000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

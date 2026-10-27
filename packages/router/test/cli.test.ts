@@ -316,7 +316,6 @@ describe("dabbler session, the whole surface", () => {
 
   it("takes the plan prose inline or from a file, and never both", async () => {
     const { sessionsDir } = makeAnsweredSandbox();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const both = await run(() =>
       sessionVerb(["plan", "--body", "a", "--body-file", "b", "--sessions-dir", sessionsDir]),
     );

@@ -1428,10 +1428,9 @@ describe("cancelling and restoring through the verb", () => {
 // --- The plan prose -----------------------------------------------------------
 
 describe("recording the plan prose", () => {
-  it("renders the work plan around the prose it was handed", async () => {
+  it("renders the work plan around the prose it was handed when no session is in progress", async () => {
     const state = stateDir();
     try {
-      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
       const result = await run(() =>
         plan(state.sessionsDir, { body: "Two sessions, then stop." }),
       );
@@ -1440,6 +1439,19 @@ describe("recording the plan prose", () => {
         readFileSync(join(state.sessionsDir, "project-work-plan.md"), "utf8"),
         /Two sessions, then stop\./,
       );
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("refuses while a session is in progress, naming it", async () => {
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 3, { engine: "claude-code" });
+      const result = await run(() => plan(state.sessionsDir, { body: "Undeliverable after all." }));
+      assert.equal(result.code, EXIT_USAGE);
+      assert.match(result.err, /session 3 is in progress/);
+      assert.ok(!existsSync(join(state.sessionsDir, "project-work-plan.md")));
     } finally {
       state.restore();
     }

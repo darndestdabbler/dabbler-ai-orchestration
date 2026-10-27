@@ -3,6 +3,7 @@
 // auto-verification template. Files in a temp directory where a citation
 // has to resolve; no git.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -116,6 +117,27 @@ describe("the task block a round opens with", () => {
     });
     const block = buildTaskBlock(sessionsDir, 1, 1, [], null, repo);
     assert.ok(block.includes("Task: Make the widget real.") && block.includes("- A second widget."));
+  });
+
+  it("tells the reviewer of a session with a work plan that the session plan outranks it", () => {
+    // A downstream session declared "no new Domain model fields" against a
+    // plan that required ~64 of them, and nothing said which one governed.
+    const repo = tempDir();
+    seed(repo, { "docs/sessions/session-plan.md": "### Session 1 of 1: First things\n1. Build the widget.\n" });
+    const sessionsDir = join(repo, "docs", "sessions");
+    writeWorkPlan(repo, 1, {
+      schema_version: 1,
+      session_number: 1,
+      task: "Make the widget real.",
+      non_goals: ["The widget itself."],
+      recorded_at: "2026-10-27T05:00:00-04:00",
+      steps: [{ id: "widget", ask: "Make it.", files: ["src/w.ts"], checks: [{ argv: ["true"] }] }],
+    });
+    const template = readFileSync(join(import.meta.dirname, "..", "prompt-templates", "verification.md"), "utf8");
+    const prompt = buildVerificationPrompt(template, buildTaskBlock(sessionsDir, 1, 1, [], null, repo), "code-review", "done");
+    assert.ok(prompt.includes("- The widget itself."), prompt);
+    assert.match(prompt, /A non-goal that excludes, narrows or defers something the session plan requires of this session is itself a blocking \*\*Completeness\*\* finding/);
+    assert.match(prompt, /Deferral is acceptable only to a later session the plan names/);
   });
 
   it("carries a dropped non-goal with its reason, so the round judges the reason", () => {

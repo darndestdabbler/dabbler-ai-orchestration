@@ -3012,7 +3012,7 @@ class Driver {
       "(for example .dabbler/scratch/plan.json), then run the answer command. The file " +
       "carries exactly these members and no other:\n" +
       "  task        one paragraph: what this session will do -- it becomes the declaration\n" +
-      "  non_goals   a list of at least one: what this session will NOT do -- the exclusions its section of the session plan states, or the nearest concrete boundary of the task where it states none. An engine that cannot name one has not understood the scope; the reviewer holds the work to the list\n" +
+      "  non_goals   a list of at least one: what this session will NOT do -- the exclusions its section of the session plan states, or the nearest concrete boundary of the task where it states none. An engine that cannot name one has not understood the scope; the reviewer holds the work to the list. A non-goal may not exclude what the session's section requires, and may defer work only to a later session the plan names: the session plan outranks this list, and the reviewer reads one that cuts required work as missing work\n" +
       '  steps       an ordered list; each step is {"id": "<lowercase-slug>", "ask": "<what ' +
       'to do, in words>", "files": ["<every repository-relative file the step creates or ' +
       'changes>"], "checks": [{"argv": ["<program>", "<argument>", ...]}]}\n' +

@@ -322,6 +322,9 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 282 | The planning session reads the code already there | no | 2026-10-26 |
 | 283 | Release 3.24.0 (release: 3.24.0) | yes | 2026-10-26 |
 | 284 | Release 3.24.0 (release: 3.24.0) | — | not declared |
+| 285 | The session plan outranks the author's own plan | no | 2026-10-27 |
+| 286 | Three tooling fixes from the field | — | not declared |
+| 287 | Release 3.25.0 (release: 3.25.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3408,3 +3411,9 @@ Make a planning session read the code already in a repository. A new `existingBu
 **Releasable: yes.**
 
 Release 3.24.0: the framework packs and publishes what is on the trunk.
+
+### Session 285 — The session plan outranks the author's own plan
+
+**Releasable: no.**
+
+Make the session plan outrank the author's own work plan, for both roles, and stop the project plan moving mid-session. The reviewer's prompt (verification.md) states once, under Completeness, that the session plan's section and the documents it cites are the requirement and the work plan's task and non-goals are the author's reading of it: a non-goal that excludes, narrows or defers required work is itself a blocking Completeness finding, and deferral is acceptable only to a later session the plan names. Under The tests in the diff, one sentence makes a test or golden file weakened or rewritten in place to pass, or a stated number scaled down without a recorded decision, a Completeness finding. planAsk's non_goals line tells the author the same rule. `dabbler session plan` refuses while a session is in flight, naming it. Each change carries one test.

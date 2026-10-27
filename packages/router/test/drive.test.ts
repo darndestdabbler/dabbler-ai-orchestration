@@ -1429,6 +1429,19 @@ describe("the framework's own lines, printed and written down", () => {
   });
 });
 
+describe("the plan ask's rule for a non-goal", () => {
+  it("says a non-goal may not cut required work, and defers only to a session the plan names", async () => {
+    const { sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+
+    const asked = await capture(() => sessionNext(sessionsDir, {}));
+
+    const ask = String(JSON.parse(asked.stdout).ask);
+    assert.match(ask, /A non-goal may not exclude what the session's section requires/);
+    assert.match(ask, /defer work only to a later session the plan names/);
+  });
+});
+
 describe("the Log phase, which records the session it cannot stop", () => {
   /** A sandbox whose run stands at the Log phase, with the close already done. */
   function atTheLogPhase(): { repo: string; sessionsDir: string } {

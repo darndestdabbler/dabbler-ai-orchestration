@@ -2634,6 +2634,18 @@ export function plan(sessionsDir: string, options: PlanCliOptions): number {
     writeErr(`plan: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
+  // A downstream author, in a fix round, rewrote the project plan to call a
+  // blocking requirement "undeliverable" and cited the rewritten file in the
+  // dispute that cleared it. The plan a session is held to does not move
+  // while that session runs.
+  const current = inFlightSession(sessionsDir);
+  if (current !== null) {
+    writeErr(
+      `plan: refused -- session ${current} is in progress, and the plan it is held to does not ` +
+        "move under it. The plan is recorded before the next start, or by a person after a cancel.\n",
+    );
+    return EXIT_USAGE;
+  }
   let text: string;
   try {
     text = readBody(options.body, options.bodyFile);

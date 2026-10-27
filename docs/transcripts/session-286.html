@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 286 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 286 transcript</h1>
+<p class="stamp">Rendered 2026-10-27T12:17:56.621Z by dabbler-ai-router 3.23.0 at a44eb4d4ee2b37cabba846b06cb1a2da9a58dea2.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-27T08:08:26.738-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 286 of 287: Three tooling fixes from the field</h3>
+<p>Scope: <code>packages/router/src/session.ts</code> (<code>start</code>'s registration), <code>packages/router/src/ecosystem.ts</code> (<code>BUILD_OUTPUT</code>), <code>packages/router/src/drive.ts</code> (<code>unchangedStepFiles</code>); their tests; <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes; <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> The same field report found three defects that cost the downstream project rejections or a false record, each verified in this source on 2026-10-27. <code>sessions.json</code> recorded <code>provider: openai</code> beside <code>model: claude-sonnet-5</code> for all 16 sessions, because <code>start</code> resolves the provider from the model and then registers the raw <code>--provider</code> flag instead. <code>dotnet test</code> writes <code>TestResults/</code> (a <code>--blame-hang</code> dump) and Coverlet writes <code>coverage.json</code> inside a test project; neither is ignored, so a step's check &quot;changed the tree&quot; (session 10) and a hang dump cost two of three refusals (session 7). And a step declaring <code>Migrations/0002_X.cs</code> logs <code>step-file-unchanged</code> when EF Core writes <code>Migrations/&lt;timestamp&gt;_0002_X.cs</code> (sessions 7, 12, 16).</p>
+<p><strong>Step 1 -- the resolved provider is the one recorded.</strong> <code>start</code> passes the provider it resolved to <code>registerSessionStart</code>, so <code>sessions.json</code> and <code>change-log.md</code> name the same vendor.</p>
+<p><strong>Step 2 -- .NET test output is build output.</strong> <code>BUILD_OUTPUT.dotnet</code> adds <code>TestResults/</code>, <code>coverage*.json</code> and <code>coverage*.xml</code>.</p>
+<p><strong>Step 3 -- a timestamped migration satisfies its declared name.</strong> <code>unchangedStepFiles</code> treats a declared <code>dir/&lt;Name&gt;.cs</code> as changed when the tree changed <code>dir/&lt;14 digits&gt;_&lt;Name&gt;.cs</code>.</p>
+<p><strong>Step 4 -- the version and the words.</strong> <code>version.json</code> goes to 3.25.0 (a minor: the reviewer's rule and the plan refusal are new behaviour), stamped with <code>npm run stamp:version</code>, and the changelog gets a 3.25.0 section naming what 285 and 286 changed for a developer.</p>
+<p><strong>Non-goals.</strong> De-duplicating the change log's verification blocks (a second block for a re-verified session is true). Dependency scope for languages other than Python. Any generated-file pattern beyond EF Core's migration prefix.</p>
+<p><strong>Tests.</strong> In <code>session.test.ts</code>, a start whose <code>--provider</code> disagrees with the model's vendor records the resolved one. In <code>ecosystem.test.ts</code>, the .NET rules carry the three patterns. In <code>drive.test.ts</code>, a timestamped migration satisfies its declared file. <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes -- with 285, as 3.25.0 in session 287.</p>
+<h2>Work Plan</h2>
+<p>Fix three tooling defects from the field report and set the version to 3.25.0. First, <code>start</code> registers the provider it resolved from the model (<code>authorProvider</code>), not the raw <code>--provider</code> flag, so <code>sessions.json</code> and <code>change-log.md</code> name the same vendor. Second, <code>BUILD_OUTPUT.dotnet</code> adds <code>TestResults/</code>, <code>coverage*.json</code> and <code>coverage*.xml</code>, so .NET test output is ignored like other build output. Third, <code>unchangedStepFiles</code> counts a declared <code>dir/&lt;Name&gt;.cs</code> as changed when the tree changed <code>dir/&lt;14 digits&gt;_&lt;Name&gt;.cs</code>, which is the name EF Core gives a migration. Each fix gets one test in the test file named after its source file. Last, <code>version.json</code> goes to 3.25.0, stamped with <code>npm run stamp:version</code>, and the extension changelog gets a 3.25.0 section covering what sessions 285 and 286 changed.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/9ff5f744f42ef1f8165fc46ad4f9ff73a02c33e1"><code>9ff5f744f42ef1f8165fc46ad4f9ff73a02c33e1</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Resolved provider</td><td><p>In <code>start</code> (packages/router/src/session.ts), pass the provider resolved from the identity (<code>authorProvider</code>) to <code>registerSessionStart</code> instead of <code>identity.provider</code>. Add a test to session.test.ts: a start whose <code>--provider</code> disagrees with the model's vendor records the resolved provider.</p></td><td><span class="mono">packages/router/src/session.ts</span><br><span class="mono">packages/router/test/session.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Dotnet test output</td><td><p>Add <code>TestResults/</code>, <code>coverage*.json</code> and <code>coverage*.xml</code> to <code>BUILD_OUTPUT.dotnet</code> in packages/router/src/ecosystem.ts and update its comment. Add a test to ecosystem.test.ts showing the .NET rules include the three patterns.</p></td><td><span class="mono">packages/router/src/ecosystem.ts</span><br><span class="mono">packages/router/test/ecosystem.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Timestamped migration</td><td><p>In <code>unchangedStepFiles</code> (packages/router/src/drive.ts), count a declared <code>dir/&lt;Name&gt;.cs</code> as changed when the changed list or the reported files contain <code>dir/&lt;14 digits&gt;_&lt;Name&gt;.cs</code>. Add a test to drive.test.ts: a timestamped migration satisfies its declared file.</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/drive.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Version and changelog</td><td><p>Set version.json to 3.25.0 and run <code>npm run stamp:version</code>. Add a 3.25.0 section to tools/dabbler-ai-orchestration/CHANGELOG.md saying what sessions 285 and 286 changed for a developer.</p></td><td><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>De-duplicating the change log's verification blocks</li><li>Dependency scope for languages other than Python</li><li>Any generated-file pattern beyond EF Core's migration timestamp prefix</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[12:08:26]</span> <span class="muted">run-started</span> session=286 mode=pull</div>
+<div class="line"><span class="at">[12:08:26]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[12:09:13]</span> <span class="muted">run-resumed</span> session=286 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[12:09:13]</span> <span class="muted">plan-accepted</span> steps=[&quot;resolved-provider&quot;,&quot;dotnet-test-output&quot;,&quot;timestamped-migration&quot;,&quot;version-and-changelog&quot;] non_goals=3</div>
+<div class="line"><span class="at">[12:09:13]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[12:09:13]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=resolved-provider</div>
+<div class="line"><span class="at">[12:11:31]</span> <span class="muted">run-resumed</span> session=286 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:11:36]</span> <span class="muted">check-passed</span> step=resolved-provider argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[12:11:42]</span> <span class="muted">named-tests-passed</span> step=resolved-provider suite=typescript command=node scripts/suite.mjs container packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[12:11:42]</span> <span class="muted">report-accepted</span> seq=2 step=resolved-provider files=[&quot;packages/router/src/session.ts&quot;,&quot;packages/router/test/session.test.ts&quot;] notes=start records the provider resolved from the model; the call's provider is resolved before the clash check so a continuation repeating the flags is not refused</div>
+<div class="line"><span class="at">[12:11:42]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=dotnet-test-output</div>
+<div class="line"><span class="at">[12:12:30]</span> <span class="muted">run-resumed</span> session=286 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:12:35]</span> <span class="muted">check-passed</span> step=dotnet-test-output argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[12:12:39]</span> <span class="muted">named-tests-passed</span> step=dotnet-test-output suite=typescript command=node scripts/suite.mjs container packages/router/test/ecosystem.test.ts</div>
+<div class="line"><span class="at">[12:12:40]</span> <span class="muted">report-accepted</span> seq=3 step=dotnet-test-output files=[&quot;packages/router/src/ecosystem.ts&quot;,&quot;packages/router/test/ecosystem.test.ts&quot;] notes=BUILD_OUTPUT.dotnet ignores TestResults/, coverage*.json and coverage*.xml</div>
+<div class="line"><span class="at">[12:12:40]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=timestamped-migration</div>
+<div class="line"><span class="at">[12:13:18]</span> <span class="muted">run-resumed</span> session=286 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:13:23]</span> <span class="muted">check-passed</span> step=timestamped-migration argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[12:14:13]</span> <span class="muted">named-tests-passed</span> step=timestamped-migration suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[12:14:13]</span> <span class="muted">report-accepted</span> seq=4 step=timestamped-migration files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;] notes=a declared dir/&lt;Name&gt;.cs is satisfied by dir/&lt;14 digits&gt;_&lt;Name&gt;.cs</div>
+<div class="line"><span class="at">[12:14:13]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=version-and-changelog</div>
+<div class="line"><span class="at">[12:14:43]</span> <span class="muted">run-resumed</span> session=286 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:14:46]</span> <span class="muted">check-passed</span> step=version-and-changelog argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[12:14:46]</span> <span class="muted">report-accepted</span> seq=5 step=version-and-changelog files=[&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version 3.25.0 stamped; changelog 3.25.0 covers sessions 285 and 286</div>
+<div class="line"><span class="at">[12:14:46]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[12:14:47]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[12:14:47]</span> <span class="muted">job-started</span> name=verification pid=37700 log=.dabbler/runs/s286/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[12:16:15]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s286/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[12:16:15]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[12:16:15]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[12:16:15]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[12:16:15]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=31436 log=.dabbler/runs/s286/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[12:16:18]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s286/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[12:16:18]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[12:16:18]</span> <span class="muted">job-started</span> name=run of record: typescript pid=6864 log=.dabbler/runs/s286/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[12:17:29]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s286/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[12:17:29]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[12:17:29]</span> <span class="muted">job-started</span> name=run of record: extension pid=46460 log=.dabbler/runs/s286/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[12:17:45]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s286/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[12:17:45]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[12:17:50]</span> <span class="muted">landed</span> commit=9ff5f744f42ef1f8165fc46ad4f9ff73a02c33e1</div>
+<div class="line"><span class="at">[12:17:50]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[12:17:50]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[12:17:50]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[12:17:50]</span> <span class="muted">job-started</span> name=close pid=53080 log=.dabbler/runs/s286/driver/jobs/close.log</div>
+<div class="line"><span class="at">[12:17:56]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s286/driver/jobs/close.log</div>
+<div class="line"><span class="at">[12:17:56]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td>0</td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>70s</td><td>1386</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>296</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

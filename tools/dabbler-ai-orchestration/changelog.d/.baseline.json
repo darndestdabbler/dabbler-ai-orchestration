@@ -1,0 +1,14 @@
+{
+  "note": "Folded into the rendered CHANGELOG.md at release time. The pending corpus is empty by design until the next contribution.",
+  "target": "extension",
+  "rendered": "tools/dabbler-ai-orchestration/CHANGELOG.md",
+  "partitionedAt": "2026-08-13T12:31:38.951088-04:00",
+  "fragmentHeadingLevel": 3,
+  "partitionSha256": "77b8de43ff8d7148534713e75e1662713541f73a445610e9808703ecf7a14293",
+  "partitionPendingSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "originalSha256": "cd61498accf499d205cc113a13a4ad29da47a3c7ec88dac3e5e3577ebd3bcf3d",
+  "originalBytes": 245449,
+  "fragments": [],
+  "restampedAt": "2026-08-15T09:11:20.210253-04:00",
+  "foldedAt": "2026-08-15T07:26:12.286103-04:00"
+}

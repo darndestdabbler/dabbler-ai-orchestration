@@ -12852,6 +12852,13 @@
       "dateTime": "2026-10-27T08:09:13.364000-04:00",
       "task": "Fix three tooling defects from the field report and set the version to 3.25.0. First, `start` registers the provider it resolved from the model (`authorProvider`), not the raw `--provider` flag, so `sessions.json` and `change-log.md` name the same vendor. Second, `BUILD_OUTPUT.dotnet` adds `TestResults/`, `coverage*.json` and `coverage*.xml`, so .NET test output is ignored like other build output. Third, `unchangedStepFiles` counts a declared `dir/<Name>.cs` as changed when the tree changed `dir/<14 digits>_<Name>.cs`, which is the name EF Core gives a migration. Each fix gets one test in the test file named after its source file. Last, `version.json` goes to 3.25.0, stamped with `npm run stamp:version`, and the extension changelog gets a 3.25.0 section covering what sessions 285 and 286 changed.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 287,
+      "dateTime": "2026-10-27T08:32:41.732000-04:00",
+      "task": "Release 3.25.0: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

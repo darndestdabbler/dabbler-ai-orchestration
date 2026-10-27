@@ -5707,18 +5707,60 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "f0961844edf7e1d4122a53062d0d51ca7d9082f6",
-      "frameworkVersion": "3.23.0",
       "verification": {
         "rounds": 1,
         "verifierModel": "gpt-5.6-sol",
         "verifierProvider": "openai",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "3.23.0",
+      "startCommit": "f0961844edf7e1d4122a53062d0d51ca7d9082f6"
     },
     {
       "number": 287,
       "title": "Release 3.25.0 (release: 3.25.0)",
+      "status": "complete",
+      "startedAt": "2026-10-27T08:32:41.139000-04:00",
+      "completedAt": "2026-10-27T08:34:14.726000-04:00",
+      "orchestrator": {
+        "engine": "framework",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null,
+      "startCommit": "170985e53eb89ba300b15cda341c1163f096754f",
+      "frameworkVersion": "3.23.0",
+      "noChange": true
+    },
+    {
+      "number": 288,
+      "title": "The landed tree is the verified tree, and a failed run of record can be re-run",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 289,
+      "title": "A round sees what earlier rounds asked",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 290,
+      "title": "Packaging and the Mechanic, from the field",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 291,
+      "title": "Release 3.26.0 (release: 3.26.0)",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

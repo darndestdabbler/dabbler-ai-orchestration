@@ -324,7 +324,11 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 284 | Release 3.24.0 (release: 3.24.0) | — | not declared |
 | 285 | The session plan outranks the author's own plan | no | 2026-10-27 |
 | 286 | Three tooling fixes from the field | no | 2026-10-27 |
-| 287 | Release 3.25.0 (release: 3.25.0) | — | not declared |
+| 287 | Release 3.25.0 (release: 3.25.0) | yes | 2026-10-27 |
+| 288 | The landed tree is the verified tree, and a failed run of record can be re-run | — | not declared |
+| 289 | A round sees what earlier rounds asked | — | not declared |
+| 290 | Packaging and the Mechanic, from the field | — | not declared |
+| 291 | Release 3.26.0 (release: 3.26.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3423,3 +3427,9 @@ Make the session plan outrank the author's own work plan, for both roles, and st
 **Releasable: no.**
 
 Fix three tooling defects from the field report and set the version to 3.25.0. First, `start` registers the provider it resolved from the model (`authorProvider`), not the raw `--provider` flag, so `sessions.json` and `change-log.md` name the same vendor. Second, `BUILD_OUTPUT.dotnet` adds `TestResults/`, `coverage*.json` and `coverage*.xml`, so .NET test output is ignored like other build output. Third, `unchangedStepFiles` counts a declared `dir/<Name>.cs` as changed when the tree changed `dir/<14 digits>_<Name>.cs`, which is the name EF Core gives a migration. Each fix gets one test in the test file named after its source file. Last, `version.json` goes to 3.25.0, stamped with `npm run stamp:version`, and the extension changelog gets a 3.25.0 section covering what sessions 285 and 286 changed.
+
+### Session 287 — Release 3.25.0 (release: 3.25.0)
+
+**Releasable: yes.**
+
+Release 3.25.0: the framework packs and publishes what is on the trunk.

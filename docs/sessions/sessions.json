@@ -5755,9 +5755,9 @@
     {
       "number": 289,
       "title": "A round sees what earlier rounds asked",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-27T09:00:30.945000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-27T09:09:01.619000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

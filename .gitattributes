@@ -1,0 +1,14 @@
+# Line endings are declared, because a control compares generated files
+# byte for byte and a checkout setting must not be able to fail it.
+#
+# Every text file in this repository is stored LF in the index. Without
+# this file, `core.autocrlf=true` -- the default on Windows, and what
+# `windows-latest` runs with -- writes CRLF into the working tree on
+# checkout, while the schema generator renders LF. `npm run check:types`
+# then reports all 31 generated modules as no longer matching the schemas,
+# which is true of not one of them. That failure is the first step of the
+# router CI job, so typecheck, lint, the router suite and the bundles did
+# not run behind it for weeks.
+#
+# `text=auto` still lets git detect binaries and leave them alone.
+* text=auto eol=lf

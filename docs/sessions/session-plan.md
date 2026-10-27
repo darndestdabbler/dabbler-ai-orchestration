@@ -16520,7 +16520,7 @@ engine and the reviewing vehicle, and not the machine's. No new test.
 
 The framework publishes session 270 as 3.22.1 and nothing else.
 
-### Session 272 of 291: An API out of credits pauses for funds, and Continue resumes it
+### Session 272 of 294: An API out of credits pauses for funds, and Continue resumes it
 
 Scope: `packages/router/src/transports/api.ts` (the retry ladder),
 `packages/router/src/transports/copilot.ts` (the error classes),
@@ -16570,7 +16570,7 @@ funds kind, and the next instruction after it resumes the phase.
 
 **Releasable.** Yes -- with 273 to 278, as 3.23.0 in session 279.
 
-### Session 273 of 291: A cancelled session gets its transcript, marked cancelled
+### Session 273 of 294: A cancelled session gets its transcript, marked cancelled
 
 Scope: `packages/router/src/session.ts` (`cancel`, the rollback),
 `packages/router/src/transcript.ts` (the cancelled page),
@@ -16618,7 +16618,7 @@ the cancelled banner carries the reason and the last phase.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 274 of 291: The Mechanic, ported back to the router
+### Session 274 of 294: The Mechanic, ported back to the router
 
 Scope: `packages/router` -- `cli/consult.ts` (`--mechanic`), `drive.ts`
 (an intervention after the land rewinds to verify; the close lists
@@ -16670,7 +16670,7 @@ rewinds to verify and the close names it.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 275 of 291: The framework calls in the Mechanic without the person
+### Session 275 of 294: The framework calls in the Mechanic without the person
 
 Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` and
 `dabbler.mechanicModel` settings through the layers), `cli/configure.ts`
@@ -16752,7 +16752,7 @@ the Primary Model is refused.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 276 of 291: `off` names no Mechanic, and the Mechanic is walked past its stop
+### Session 276 of 294: `off` names no Mechanic, and the Mechanic is walked past its stop
 
 Scope: `packages/router` -- `driver.ts` (`renderStop`'s ways on),
 `config.ts` (the Mechanic's two readings); tests in `driver.test.ts`,
@@ -16786,7 +16786,7 @@ do, its budget, or its brief. A new verb or flag.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 277 of 291: Open a Mechanic, and what it did, in the extension
+### Session 277 of 294: Open a Mechanic, and what it did, in the extension
 
 Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 (*Open a Mechanic*), `src/providers/ActionRegistry.ts`,
@@ -16828,7 +16828,7 @@ each.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 278 of 291: A failed release is diagnosed, and one caused outside the repository retries in place
+### Session 278 of 294: A failed release is diagnosed, and one caused outside the repository retries in place
 
 Scope: `packages/router/src/drive.ts` (`phasePublish`'s stop and ways
 on), `packages/router/src/cli/consult.ts` (the release briefing); tests in
@@ -16871,11 +16871,11 @@ release resumes at publish. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 279.
 
-### Session 279 of 291: Release 3.23.0 (release: 3.23.0)
+### Session 279 of 294: Release 3.23.0 (release: 3.23.0)
 
 The framework publishes sessions 272 to 278 as 3.23.0 and nothing else.
 
-### Session 280 of 291: Open a Mechanic on a Copilot session in flight
+### Session 280 of 294: Open a Mechanic on a Copilot session in flight
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
 (`runOpenMechanic`); its test in `commandFlows.test.ts`; `version.json` and
@@ -16926,7 +16926,7 @@ stamp.
 **Releasable.** Yes -- with 281 and 282, as 3.24.0 in session 283; 3.23.1
 is never published on its own.
 
-### Session 281 of 291: An existing remote or folder is a starting point
+### Session 281 of 294: An existing remote or folder is a starting point
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts`
 (Set Up New Project: the remote prompt, the remote read before bootstrap,
@@ -16978,7 +16978,7 @@ offered as the starting point and nothing is deleted.
 
 **Releasable.** Yes -- with 280 and 282, as 3.24.0 in session 283.
 
-### Session 282 of 291: The planning session reads the code already there
+### Session 282 of 294: The planning session reads the code already there
 
 Scope: `packages/router/src/bootstrap/templates.ts` (`BOOTSTRAP_PLAN`,
 `PLAN_PROMPT`, `DECOMPOSITION_PROMPT`), `packages/router/src/drive.ts`
@@ -17023,11 +17023,11 @@ check:version` checks the stamp.
 
 **Releasable.** Yes -- with 280 and 281, as 3.24.0 in session 283.
 
-### Session 283 of 291: Release 3.24.0 (release: 3.24.0)
+### Session 283 of 294: Release 3.24.0 (release: 3.24.0)
 
 The framework publishes sessions 280, 281 and 282 as 3.24.0 and nothing else.
 
-### Session 285 of 291: The session plan outranks the author's own plan
+### Session 285 of 294: The session plan outranks the author's own plan
 
 Scope: `packages/router/prompt-templates/verification.md` (Completeness,
 Scope and simplicity, the tests in the diff), `packages/router/src/drive.ts`
@@ -17091,7 +17091,7 @@ while a session is in progress and accepted when none is.
 
 **Releasable.** Yes -- with 286, as 3.25.0 in session 287.
 
-### Session 286 of 291: Three tooling fixes from the field
+### Session 286 of 294: Three tooling fixes from the field
 
 Scope: `packages/router/src/session.ts` (`start`'s registration),
 `packages/router/src/ecosystem.ts` (`BUILD_OUTPUT`),
@@ -17140,11 +17140,11 @@ stamp.
 
 **Releasable.** Yes -- with 285, as 3.25.0 in session 287.
 
-### Session 287 of 291: Release 3.25.0 (release: 3.25.0)
+### Session 287 of 294: Release 3.25.0 (release: 3.25.0)
 
 The framework publishes sessions 285 and 286 as 3.25.0 and nothing else.
 
-### Session 288 of 291: The landed tree is the verified tree, and a failed run of record can be re-run
+### Session 288 of 294: The landed tree is the verified tree, and a failed run of record can be re-run
 
 Scope: `packages/router/src/land.ts` (`judgeLandReadiness`),
 `packages/router/src/drive.ts` (`landFacts`, `phaseLand`,
@@ -17196,7 +17196,7 @@ still goes through verification.
 
 **Releasable.** Yes -- with 289 and 290, as 3.26.0 in session 291.
 
-### Session 289 of 291: A round sees what earlier rounds asked
+### Session 289 of 294: A round sees what earlier rounds asked
 
 Scope: `packages/router/src/verify/rounds.ts` (the finding a round
 records), `packages/router/src/verify/prompts.ts` (`priorFindingsBlock`),
@@ -17242,7 +17242,7 @@ cap.
 
 **Releasable.** Yes -- with 288 and 290, as 3.26.0 in session 291.
 
-### Session 290 of 291: Packaging and the Mechanic, from the field
+### Session 290 of 294: Packaging and the Mechanic, from the field
 
 Scope: `packages/router/src/packaging.ts` (`runStep`, the rehearsal),
 `packages/router/src/cli/` (the `packaging` verb's options),
@@ -17292,6 +17292,125 @@ checks the stamp.
 
 **Releasable.** Yes -- with 288 and 289, as 3.26.0 in session 291.
 
-### Session 291 of 291: Release 3.26.0 (release: 3.26.0)
+### Session 291 of 294: Release 3.26.0 (release: 3.26.0)
 
 The framework publishes sessions 288, 289 and 290 as 3.26.0 and nothing else.
+
+### Session 292 of 294: .NET build output is ignored from the first project
+
+Scope: `packages/router/src/projectGraph.ts` (`solutionProjects`,
+`readProjectGraph`), `packages/router/src/ecosystem.ts`
+(`ignoreBuildOutput`, `ensureIgnoreRules`), `packages/router/src/facts.ts`
+(the evidence cap's refusal), `packages/router/src/gates.ts` and
+`packages/router/src/evidence.ts` (the refusal when the state-writes ledger
+is absent); their tests
+
+**Why.** A staff member's .NET 10 sample (dave-csv-parser-test, router
+3.22.1, claude-haiku-4.5 on the Copilot seat) ended session 4 wedged, and a
+field report traced it, checked against this source and reviewed by GPT-5.6
+Sol on 2026-10-27, to one detection bug. On .NET 10 `dotnet new sln` writes
+an empty `.slnx`; `solutionProjects` returns `[]` rather than null, so
+`listed ?? buildFilesIn(root)` never scans for the `.csproj` files, the
+repository reads as no ecosystem, and `bin/` and `obj/` were never ignored.
+The review bundle then inlined 667 build files and went over the cap; the
+cap's refusal said "split the session or raise
+AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS"; the operator raised it, and 680 build
+files landed on `main`. Once tracked, `.gitignore` cannot help: every later
+build changed tracked files, checks failed as having changed the tree,
+session 4's bundle was 1.39M chars, and the run of record regenerated 1,165
+files after round 7 verified a tree without them, so the close refused. The
+Authoring AI then committed by hand and deleted `.dabbler/`, and the close
+now refuses with "no sanctioned-writer record exists for sessions.json
+(state-writes ledger absent)", naming no way forward.
+
+**Step 1 -- an empty solution does not hide the projects.** A solution file
+that lists no projects falls back to the `.csproj` scan; where a `.sln` and
+a `.slnx` both stand at the root, the one that lists projects is read.
+
+**Step 2 -- the framework's ignore rules are enforced, not only written.**
+Whenever the framework ensures its build-output rules -- not only when it
+first writes the line -- files those rules match that are already tracked
+are untracked and left on disk. The deletions land with the session, as the
+`.gitignore` line does. Nothing a person wrote in `.gitignore` is
+interpreted.
+
+**Step 3 -- the cap's refusal says what is large.** It names the largest
+contributors to the bundle and points at `.gitignore` before the
+environment variable.
+
+**Step 4 -- an absent ledger names the way out.** The close's refusal says
+the run records are gone and that the way forward is a person's `dabbler
+session rollback`. The gate itself is unchanged: `sessions.json` matching a
+commit is never taken as a sanctioned write.
+
+**Non-goals.** Build directories in the review bundle's excludes (a second
+copy of the ignore rule, and a global `bin` hides real source elsewhere).
+Reconstructing the ledger. `MSB1011` handling for two solution files. Any
+change to a Mechanic.
+
+**Tests.** In `projectGraph.test.ts`, an empty `.slnx` beside `.csproj`
+files reads as .NET, and of a `.sln` and a `.slnx` the one listing projects
+is read. In `ecosystem.test.ts`, tracked `bin/` output is untracked when the
+rule already stands. In `facts.test.ts`, the cap's refusal names the largest
+file. In `gates.test.ts`, an absent ledger's refusal names rollback.
+
+**Releasable.** Yes -- with 293, as 3.27.0 in session 294.
+
+### Session 293 of 294: Small defects from the field
+
+Scope: `packages/router/src/gates.ts` (`sessionChangedNothing`),
+`packages/router/src/drive.ts` (the step baseline, the check-failed and
+named-tests refusals), `packages/router/src/driver.ts` (`amendPlanStep`),
+`packages/router/src/checks.ts` (`judgeCheckPrograms`),
+`packages/router/src/bootstrap/templates.ts` (`BOOTSTRAP_PLAN`); their
+tests; `version.json` and the manifests `npm run stamp:version` writes;
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The same report. Session 1 looped no-change, close, land, verify,
+and crashed on an empty bundle, because "this session changed nothing" and
+the close's working-tree gate are two different rules. Files the author
+wrote between the plan's acceptance and step 1 were absorbed into a baseline
+taken lazily, and step 1 was refused for naming them. A check whose program
+could not start was reported as "exit none (timed out)". `plan amend` saves
+checks the plan phase would have refused. And the bootstrap plan lists
+"Cross-provider verification", "Full test suite" and "Close-out" as items
+4-6 beside the author's own, so Haiku planned them as steps with `dabbler
+noop` checks -- accepted because any `dabbler` argv passes.
+
+**Step 1 -- "changed nothing" is the close's rule.** `sessionChangedNothing`
+reads `materialWorktreeChanges`, so a session the close would land is never
+sent past verification.
+
+**Step 2 -- the step baseline is taken at plan acceptance,** when the tree
+is known clean.
+
+**Step 3 -- "failed to start" is not "timed out".** A check whose program
+did not spawn says so.
+
+**Step 4 -- one judge for check programs.** `plan amend` runs
+`judgeCheckPrograms`, and a `dabbler` check names a verb the CLI has, read
+from the CLI's own verb table.
+
+**Step 5 -- the template says what is the framework's, and the version.**
+`BOOTSTRAP_PLAN` marks verification, the run of record and the close as the
+framework's, not steps to plan. `version.json` goes to 3.27.0 (a minor: the
+untracking and the stricter judge are new behaviour), stamped with `npm run
+stamp:version`, and the changelog gets a 3.27.0 section naming what 292 and
+293 changed for a developer.
+
+**Non-goals.** Refusing POSIX tools in checks on Windows. Any reviewer
+severity rule for cross-session ordering.
+
+**Tests.** In `gates.test.ts`, an uncommitted `session-plan.md` is a change.
+In `drive.test.ts`, a file written before step 1 is not in its baseline, and
+a program that cannot spawn is reported as failing to start. In
+`driver.test.ts`, an amended check naming a missing program is refused. In
+`checks.test.ts`, `dabbler noop` is refused. In `templates.test.ts`, the
+bootstrap plan marks the framework's items. `npm run check:version` checks
+the stamp.
+
+**Releasable.** Yes -- with 292, as 3.27.0 in session 294.
+
+### Session 294 of 294: Release 3.27.0 (release: 3.27.0)
+
+The framework publishes sessions 292 and 293 as 3.27.0 and nothing else.

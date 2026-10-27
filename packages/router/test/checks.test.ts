@@ -496,6 +496,15 @@ describe("a check the machine cannot run, judged with the plan", () => {
     assert.deepEqual(judgeCheckPrograms({ steps: [{ id: "c" }] }), []);
   });
 
+  it("refuses a `dabbler` check naming a verb the CLI does not have, such as `dabbler noop`", () => {
+    // Any `dabbler` argv passed, and a planner wrote `dabbler noop` as the
+    // check of steps that were the framework's own.
+    const reasons = judgeCheckPrograms({ steps: [step("d", ["dabbler", "noop"], ["dabbler", "version"])] });
+    assert.equal(reasons.length, 1);
+    assert.match(String(reasons[0]), /step 'd' declares a check naming 'noop', which is not a `dabbler` verb/);
+    assert.match(String(reasons[0]), /session, status/);
+  });
+
   it("asks the filesystem about a program named by path, as a spawn does", () => {
     const root = tempDir("program-");
     const tool = join(root, "tool");

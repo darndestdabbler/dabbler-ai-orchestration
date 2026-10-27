@@ -1462,6 +1462,21 @@ export const CHECK_FAILED_WAYS =
   "with the reason in --notes.";
 
 /**
+ * Where the tree stood when the plan was accepted, read after the
+ * declaration, the last thing acceptance writes. A HEAD still at `plan_head`
+ * when the steps are done means none of them committed anything, and
+ * `baseline_tree` is what step 1 is measured against: taken here, where the
+ * tree is known clean, a file the author writes before step 1 is step 1's.
+ */
+export function acceptanceMarks(repoRoot: string): { plan_head: string | null; baseline_tree: string | null } {
+  const head = runGit(repoRoot, ["rev-parse", "HEAD"]);
+  return {
+    plan_head: head.code === 0 ? head.stdout.trim() : null,
+    baseline_tree: snapshotWorktreeTree(repoRoot),
+  };
+}
+
+/**
  * The refusal one failed check makes, naming the step that declared it
  * where that is not the step being answered. Pure: the facts of the run in,
  * the words out.
@@ -1469,17 +1484,27 @@ export const CHECK_FAILED_WAYS =
 export function checkFailedRefusal(
   stepId: string,
   check: { readonly argv: readonly string[]; readonly owner?: string },
-  run: { readonly exitCode: number | null; readonly treeMutated: boolean; readonly output: string },
+  run: { readonly exitCode: number | null; readonly timedOut: boolean; readonly treeMutated: boolean; readonly output: string },
 ): string {
   const owner = check.owner !== undefined && check.owner !== stepId ? ` (declared by step '${check.owner}')` : "";
   return refusal(
     RULE.checkFailed,
-    `check failed: ${check.argv.join(" ")} -> exit ${run.exitCode === null ? "none (timed out)" : run.exitCode}` +
+    `check failed: ${check.argv.join(" ")} -> ${exitWords(run)}` +
       owner +
       (run.treeMutated ? " (the check changed the tree)" : "") +
       (run.output.trim() ? `\n${tail(run.output)}` : "") +
       `\n${CHECK_FAILED_WAYS}`,
   );
+}
+
+/**
+ * How a check run ended. No exit code without a timeout is a program that
+ * never started -- a missing binary, a command line past the ceiling -- and
+ * calling that a timeout sent authors looking for a slow test.
+ */
+function exitWords(run: { readonly exitCode: number | null; readonly timedOut: boolean }): string {
+  if (run.timedOut) return "exit none (timed out)";
+  return run.exitCode === null ? "exit none (failed to start)" : `exit ${run.exitCode}`;
 }
 
 function clock(): string {
@@ -3218,11 +3243,9 @@ class Driver {
         );
       }
     }
-    // After the declaration, which is the last thing acceptance writes: a
-    // HEAD still at this commit when the steps are done means none of them
-    // committed anything.
-    const head = runGit(this.repoRoot, ["rev-parse", "HEAD"]);
-    this.run = { ...this.run, plan_head: head.code === 0 ? head.stdout.trim() : null };
+    const marks = acceptanceMarks(this.repoRoot);
+    if (marks.baseline_tree === null) throw new Stop("engine", "could not snapshot the working tree");
+    this.run = { ...this.run, ...marks };
     this.setPhase(PHASE_WORK);
   }
 
@@ -3413,6 +3436,7 @@ class Driver {
   }
 
   private async askForStep(spec: StepSpec): Promise<void> {
+    // A run accepted before the baseline was taken at acceptance has none.
     if (this.run.baseline_tree === null) {
       const tree = snapshotWorktreeTree(this.repoRoot);
       if (tree === null) throw new Stop("engine", "could not snapshot the working tree");
@@ -3568,7 +3592,7 @@ class Driver {
         reasons.push(
           refusal(
             RULE.checkFailed,
-            `named tests failed: ${command} -> exit ${run.exitCode === null ? "none (timed out)" : run.exitCode}` +
+            `named tests failed: ${command} -> ${exitWords(run)}` +
               (run.treeMutated ? " (the run changed the tree)" : "") +
               (run.output.trim() ? `\n${tail(run.output)}` : ""),
           ),

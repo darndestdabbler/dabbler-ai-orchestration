@@ -50,7 +50,6 @@ import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
 import { readRun } from "./driver.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
-import { changeIsEmpty } from "./facts.ts";
 import {
   repoRelativePath,
   repoRootFor,
@@ -914,7 +913,7 @@ export interface NoChangeFacts {
   readonly planHead: string | null;
   /** The commit HEAD is at now, or null. */
   readonly head: string | null;
-  /** Whether the working tree differs from HEAD in nothing but the framework's own files. */
+  /** Whether the working tree holds no work by the close's rule, `materialWorktreeChanges`. */
   readonly empty: boolean;
 }
 
@@ -956,7 +955,17 @@ export function readNoChangeFacts(sessionsDir: string): NoChangeFacts {
   const headRun = runGit(root, ["rev-parse", "HEAD"]);
   const head = headRun.code === 0 ? headRun.stdout.trim() : null;
   if (head !== planHead) return { rounds, planHead, head, empty: false };
-  return { rounds, planHead, head, empty: changeIsEmpty(root) };
+  return { rounds, planHead, head, empty: addsNothing(materialWorktreeChanges(sessionsDir)) };
+}
+
+/**
+ * The tree holds nothing the close would land. "Changed nothing" and the
+ * close's working-tree gate are one rule: where they differed, a session the
+ * close refused to land was sent past verification as empty, and looped.
+ * An unreadable tree is not an empty one.
+ */
+export function addsNothing(changes: WorktreeChanges): boolean {
+  return changes.error === "" && changes.paths.length === 0;
 }
 
 /** The in-flight session changed nothing, by `judgeNoChange`. */

@@ -10,6 +10,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.27.0] — 2026-10-27
+
+**Build output stays out, and small stops say what happened.** A first
+session on a downstream .NET project committed its `bin/` and `obj/`
+output, looped between verification and the close, and reported checks
+that never started as timeouts. This release fixes those.
+
+### Changed
+
+- **The framework untracks what its own ignore rules match.** When it
+  writes its `.gitignore` rules it also removes already-tracked files those
+  rules match from the index, leaving them on disk, and the removals land
+  with the session. Session 292.
+- **A `dabbler` check must name a real verb.** A plan or a `plan amend`
+  whose check names a verb the `dabbler` command does not have, such as
+  `dabbler noop`, is refused. `plan amend` now applies the same check-program
+  rules the plan phase does. Session 293.
+- **The bootstrap plan does not list the framework's work as steps.**
+  Cross-provider verification, the run of record and the close are named
+  as the framework's, so a planner no longer writes them as steps.
+  Session 293.
+- **The evidence cap names what filled it.** The refusal lists the largest
+  files in the bundle and says to ignore build output in `.gitignore`
+  before raising `AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS`. Session 292.
+
+### Fixed
+
+- **An empty solution file is not the solution.** A root `.slnx` or `.sln`
+  that lists no projects falls back to the `.csproj` scan, so the project is
+  detected as .NET and its build output is ignored from the first session.
+  Where both stand at the root, the one that lists projects is read.
+  Session 292.
+- **"Changed nothing" uses the close's rule.** A session with uncommitted
+  work, such as an edited `session-plan.md`, is no longer passed through
+  verification as unchanged and then refused by the close. Session 293.
+- **Step 1 is measured from plan acceptance.** The step baseline is taken
+  when the plan is accepted, so files written before step 1 count as step
+  1's work and are not refused when the report names them. Session 293.
+- **A check that could not start says so.** A program that could not be
+  run is reported as `exit none (failed to start)`, not as a timeout.
+  Session 293.
+- **The close names a lost run record.** When the state-writes ledger is
+  missing, the refusal says the run records are gone and that the way
+  forward is a person's `dabbler session rollback`. Session 292.
+
 ## [3.26.0] — 2026-10-27
 
 **Stops with a way forward.** A field report on a downstream .NET project

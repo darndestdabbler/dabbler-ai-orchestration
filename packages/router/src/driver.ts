@@ -33,6 +33,7 @@ import type {
   DriverWorkPlan,
   Triage,
 } from "./generated/index.ts";
+import { judgeCheckPrograms } from "./checks.ts";
 import { MACHINE_DIRNAME, runGit } from "./journal.ts";
 import {
   LedgerError,
@@ -761,6 +762,9 @@ export function amendPlanStep(
     ...(input.files === null ? {} : { files: [...input.files] }),
     ...(input.checks === null ? {} : { checks: input.checks.map((check) => ({ argv: [...check.argv] })) }),
   };
+  // The plan phase's own judge: an amendment is not a way around it.
+  const refused = input.checks === null ? [] : judgeCheckPrograms({ steps: [after] });
+  if (refused.length > 0) throw new LedgerError(refused.join("\n"));
   const amended = writeWorkPlan(repoRoot, sessionNumber, {
     ...plan,
     steps: plan.steps.map((step) => (step.id === input.stepId ? after : step)),

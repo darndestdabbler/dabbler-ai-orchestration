@@ -35,6 +35,7 @@ import {
   REGISTER_IDLE,
   REGISTER_REFUSE_START,
   REGISTER_START,
+  acceptanceMarks,
   afterRunOfRecordFix,
   alreadyRewoundFor,
   closedAsk,
@@ -101,6 +102,7 @@ import {
 import { beginJobRecord, jobRecord, jobStatusPath, setJobStarter } from "../src/jobs.ts";
 import { EXIT_FUNDS } from "../src/contracts/exitCodes.ts";
 import { rewindPhaseFor } from "../src/gates.ts";
+import { snapshotWorktreeTree } from "../src/journal.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
 import { gitAnswers, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
@@ -776,13 +778,26 @@ describe("whether the report names what the tree moved", () => {
   });
 });
 
+describe("the step baseline, taken at plan acceptance", () => {
+  it("leaves a file written before step 1 out of the baseline, so step 1 is measured against it", () => {
+    // Taken lazily before step 1, the baseline absorbed what the author wrote
+    // after the plan was accepted, and step 1 was refused for naming it.
+    const { repo } = makeAnsweredSandbox();
+    const marks = acceptanceMarks(repo);
+    assert.match(marks.plan_head ?? "", /^[0-9a-f]{40}$/);
+    assert.equal(marks.baseline_tree, snapshotWorktreeTree(repo));
+    writeFileSync(join(repo, "early.txt"), "written before step 1\n");
+    assert.notEqual(snapshotWorktreeTree(repo), marks.baseline_tree);
+  });
+});
+
 describe("a check that fails", () => {
   it("names the step that declared it when that is another step, and ends with the way past a wrong check", () => {
     // The fix round runs every plan step's checks. An engine whose fix
     // outgrew a check an earlier step declared diagnosed exactly that and,
     // with no verb named, cancelled the session (2026-10-02). The refusal
     // says whose check it was and how a wrong one is amended.
-    const run = { exitCode: 1, treeMutated: false, output: "" };
+    const run = { exitCode: 1, timedOut: false, treeMutated: false, output: "" };
     const inherited = checkFailedRefusal("fix-round-1", { argv: ["grep", "ArchUnitNET", "x.csproj"], owner: "add-architecture-test" }, run);
     assert.match(inherited, /^\[check-failed\] check failed: grep ArchUnitNET x.csproj -> exit 1 \(declared by step 'add-architecture-test'\)/);
     assert.ok(inherited.endsWith(CHECK_FAILED_WAYS), inherited);
@@ -790,8 +805,19 @@ describe("a check that fails", () => {
     assert.match(CHECK_FAILED_WAYS, /--status blocked/);
     const own = checkFailedRefusal("add-architecture-test", { argv: ["grep", "ArchUnitNET", "x.csproj"], owner: "add-architecture-test" }, run);
     assert.ok(!own.includes("declared by step"), own);
-    const timedOut = checkFailedRefusal("widget", { argv: ["sleep"] }, { exitCode: null, treeMutated: true, output: "tick\n" });
+    const timedOut = checkFailedRefusal("widget", { argv: ["sleep"] }, { exitCode: null, timedOut: true, treeMutated: true, output: "tick\n" });
     assert.match(timedOut, /-> exit none \(timed out\) \(the check changed the tree\)\ntick\n/);
+  });
+
+  it("says a program that could not spawn failed to start, not that it timed out", () => {
+    const unstarted = checkFailedRefusal("widget", { argv: ["no-such-program"] }, {
+      exitCode: null,
+      timedOut: false,
+      treeMutated: false,
+      output: "no-such-program could not be executed: spawn no-such-program ENOENT",
+    });
+    assert.match(unstarted, /-> exit none \(failed to start\)\n.*ENOENT/);
+    assert.ok(!unstarted.includes("timed out"), unstarted);
   });
 });
 

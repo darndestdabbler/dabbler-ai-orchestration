@@ -37,6 +37,7 @@ import { join } from "node:path";
 import { hiddenSpawn, isSessionRecordPath, snapshotWorktreeTree } from "./journal.ts";
 import { LIFECYCLE_WRITTEN_FILES } from "./ledger.ts";
 import { pythonRepr } from "./pythonJson.ts";
+import { VERBS, findVerb } from "./contracts/verbs.ts";
 
 export const STAGE_TARGETED = "targeted";
 export const STAGE_FINAL_FULL = "final-full";
@@ -1669,6 +1670,17 @@ export function judgeCheckPrograms(
   for (const step of plan.steps) {
     for (const check of step.checks ?? []) {
       const program = check.argv[0] ?? "";
+      if (program === ALWAYS_A_PROGRAM) {
+        // Any `dabbler` argv used to pass, so `dabbler noop` stood in for a
+        // check and proved nothing. The verb is read from the CLI's own table.
+        const verb = check.argv[1] ?? "";
+        if (findVerb(verb) !== undefined) continue;
+        reasons.push(
+          `step '${step.id}' declares a check naming ${pythonRepr(verb)}, which is not a ` +
+            `\`dabbler\` verb; its verbs are ${VERBS.map((spec) => spec.verb).join(", ")}.`,
+        );
+        continue;
+      }
       if (programIsRunnable(program)) continue;
       reasons.push(
         `step '${step.id}' declares a check this machine cannot run: a check is a program ` +

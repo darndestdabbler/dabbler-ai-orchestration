@@ -335,9 +335,9 @@ export const DECOMPOSITION_PROMPT =
   "  declares. Numbers are never reused and never renumbered, including for\n" +
   "  cancelled sessions.\n" +
   "- **Layout:** one `### Session <N>: <title>` heading per session, and its\n" +
-  "  steps as a top-level ordered list. Step 1 registers the session; the last\n" +
-  "  steps are cross-provider verification, the complete suite once against\n" +
-  "  the verified tree, and close-out; the middle steps are the work. The\n" +
+  "  steps as a top-level ordered list. Step 1 registers the session and the\n" +
+  "  rest are the work. Cross-provider verification, the run of record and\n" +
+  "  the close are the framework's, never steps to plan. The\n" +
   "  only tests that run before the round are each step's own checks; never\n" +
   "  write a step that says \"run the tests\" without saying which run it\n" +
   "  means.\n" +
@@ -476,10 +476,19 @@ const BOOTSTRAP_PLAN_PROJECTS =
   "   listed in the parent `pom.xml`, each reaching a sibling by project\n" +
   "   reference -- a `<ProjectReference>`, or a dependency at\n";
 
+/**
+ * What follows every session's work without being planned. Listed as items
+ * beside the author's, a planner wrote them as steps with `dabbler noop`
+ * checks.
+ */
+const FRAMEWORK_STEPS =
+  "\n" +
+  "The framework then verifies the work cross-provider, runs the suites as\n" +
+  "the run of record and closes the session. These are the framework's,\n" +
+  "not steps to plan.\n";
+
 const BOOTSTRAP_PLAN_DECOMPOSITION =
-  "4. Cross-provider verification.\n" +
-  "5. Full test suite, recorded as the run of record.\n" +
-  "6. Close-out.\n" +
+  FRAMEWORK_STEPS +
   "\n" +
   "This session writes the plan and nothing else: it creates, edits or\n" +
   "deletes no code, project, build file, test, `dabbler.yaml` suite or\n" +
@@ -502,9 +511,9 @@ const BOOTSTRAP_PLAN_DECOMPOSITION =
   "   session is a focused unit of\n" +
   "   work one AI coding session can complete: one\n" +
   "   `### Session <N>: <title>` heading, and its steps as a top-level\n" +
-  "   ordered list. Step 1 registers the session; the last steps are\n" +
-  "   cross-provider verification, the complete suite once against the\n" +
-  "   verified tree, and close-out; the middle steps are the work. Never\n" +
+  "   ordered list. Step 1 registers the session and the rest are the\n" +
+  "   work: cross-provider verification, the run of record and the close\n" +
+  "   are the framework's, never steps to plan. Never\n" +
   "   write a step that says \"run the tests\" without saying which run it\n" +
   "   means. Order sessions so earlier ones unblock later ones — a module\n" +
   "   before the modules that depend on it — and keep at most ~3 work steps\n" +
@@ -521,9 +530,7 @@ const BOOTSTRAP_PLAN_TAIL =
   "   session with no steps, headed `### Session <N>: Release <version> (release:\n" +
   "   <version>)`; propose its version -- patch, minor or major by what the\n" +
   "   sessions it releases change -- for the person to approve with the plan.\n" +
-  "4. Cross-provider verification.\n" +
-  "5. Full test suite, recorded as the run of record.\n" +
-  "6. Close-out.\n" +
+  FRAMEWORK_STEPS +
   "\n" +
   "This session writes the plan and nothing else: it creates, edits or\n" +
   "deletes no code, project, build file, test, `dabbler.yaml` suite or\n" +

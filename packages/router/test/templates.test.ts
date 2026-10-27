@@ -27,6 +27,16 @@ describe("bootstrapPlan", () => {
     assert.match(text, /The first numbered session, the skeleton, writes\s+the projects/);
     assert.doesNotMatch(text, /already holds a solution|alignment|adopts/);
   });
+
+  it("marks verification, the run of record and the close as the framework's, not as items to plan", () => {
+    // Numbered beside the author's items, a planner made them steps with
+    // `dabbler noop` checks.
+    const text = bootstrapPlan([]);
+    assert.doesNotMatch(text, /^\d+\. (Cross-provider verification|Full test suite|Close-out)/m);
+    for (const session of text.split("### Session 2:")) {
+      assert.match(session, /The framework then verifies the work cross-provider, runs the suites as\s+the run of record and closes the session\. These are the framework's,\s+not steps to plan\./);
+    }
+  });
 });
 
 describe("PLAN_PROMPT", () => {

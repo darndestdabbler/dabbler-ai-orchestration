@@ -20,11 +20,13 @@ import {
   WATCHER_OUTSTANDING,
   WATCHER_QUIET,
   progressResumed,
+  amendPlanStep,
   dropNonGoal,
   readAmendments,
   readDispositions,
   readReport,
   readWatcher,
+  readWorkPlan,
   renderAmendmentProposal,
   renderStop,
   renderUncollected,
@@ -278,6 +280,24 @@ describe("the four answer schemas", () => {
       );
       assert.equal(emptied.non_goals, undefined);
       assert.equal(emptied.dropped_non_goals?.length, 2);
+    } finally {
+      restore();
+    }
+  });
+
+  it("amendPlanStep refuses an amended check naming a program this machine does not have", () => {
+    // The plan phase refuses such a check; an amendment saved it anyway.
+    const { repo, restore } = runDir();
+    try {
+      writeWorkPlan(repo, 1, PLAN);
+      const amend = (argv: string[]) =>
+        amendPlanStep(repo, 1, { stepId: "widget", files: null, checks: [{ argv }], reason: "why", by: "claude-code" }, [], "t");
+      assert.throws(
+        () => amend(["definitely-not-a-program-here", "x"]),
+        (error: unknown) => error instanceof LedgerError && /is not a program here/.test(error.message),
+      );
+      assert.deepEqual(readWorkPlan(repo, 1)?.steps[0]?.checks, PLAN.steps[0]?.checks);
+      assert.deepEqual(amend(["node", "-e", "0"]).steps[0]?.checks, [{ argv: ["node", "-e", "0"] }]);
     } finally {
       restore();
     }

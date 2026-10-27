@@ -16,6 +16,7 @@ import {
   classifyPushFailure,
   judgeFreshness,
   judgeLatestRound,
+  addsNothing,
   judgeNoChange,
   judgePackagingRecord,
   judgePushState,
@@ -448,5 +449,13 @@ describe("a session that changed nothing: the judge over its facts", () => {
     assert.equal(judgeNoChange(facts({ planHead: null, head: null })), false);
     // A tree that differs from HEAD is a change about to be made.
     assert.equal(judgeNoChange(facts({ empty: false })), false);
+  });
+
+  it("addsNothing: an uncommitted session-plan.md is a change, by the close's rule", () => {
+    const tree = (porcelain: string) =>
+      addsNothing(judgeWorktree({ root: "/r", porcelain, error: "", setRel: SESSIONS }, SESSIONS));
+    assert.equal(tree(" M docs/sessions/session-plan.md\n"), false);
+    assert.equal(tree(" M docs/sessions/sessions.json\n"), true);
+    assert.equal(addsNothing({ paths: [], error: "git status failed: boom" }), false);
   });
 });

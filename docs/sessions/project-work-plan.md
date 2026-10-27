@@ -331,7 +331,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 291 | Release 3.26.0 (release: 3.26.0) | yes | 2026-10-27 |
 | 292 | .NET build output is ignored from the first project | no | 2026-10-27 |
 | 293 | Small defects from the field | no | 2026-10-27 |
-| 294 | Release 3.27.0 (release: 3.27.0) | — | not declared |
+| 294 | Release 3.27.0 (release: 3.27.0) | yes | 2026-10-27 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3480,3 +3480,9 @@ Fix the .NET detection bug that let build output reach a repository, and make th
 **Releasable: no.**
 
 Fix five small defects from the field report and set the version to 3.27.0. "This session changed nothing" reads the close's own rule: readNoChangeFacts decides `empty` from materialWorktreeChanges, so a session whose tree the close would land is never sent past verification (gates.ts). The step baseline is snapshotted when the plan is accepted, where the tree is known clean, instead of lazily before step 1 (drive.ts). A check or a named-tests run whose program did not spawn is reported as failing to start, not as "exit none (timed out)" (drive.ts). `plan amend` runs judgeCheckPrograms on the amended plan and refuses what it refuses (driver.ts), and judgeCheckPrograms refuses a `dabbler` check whose first argument is not a verb in the CLI's verb table (checks.ts). BOOTSTRAP_PLAN marks cross-provider verification, the run of record and the close as the framework's rather than steps to plan (bootstrap/templates.ts). version.json goes to 3.27.0, stamped with `npm run stamp:version`, and the changelog gains a 3.27.0 section naming what sessions 292 and 293 changed for a developer.
+
+### Session 294 — Release 3.27.0 (release: 3.27.0)
+
+**Releasable: yes.**
+
+Release 3.27.0: the framework packs and publishes what is on the trunk.

@@ -5835,9 +5835,9 @@
     {
       "number": 293,
       "title": "Small defects from the field",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-27T12:21:50.354000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-27T12:52:05.950000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

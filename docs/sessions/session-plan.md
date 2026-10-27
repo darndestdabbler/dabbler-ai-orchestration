@@ -16520,7 +16520,7 @@ engine and the reviewing vehicle, and not the machine's. No new test.
 
 The framework publishes session 270 as 3.22.1 and nothing else.
 
-### Session 272 of 287: An API out of credits pauses for funds, and Continue resumes it
+### Session 272 of 291: An API out of credits pauses for funds, and Continue resumes it
 
 Scope: `packages/router/src/transports/api.ts` (the retry ladder),
 `packages/router/src/transports/copilot.ts` (the error classes),
@@ -16570,7 +16570,7 @@ funds kind, and the next instruction after it resumes the phase.
 
 **Releasable.** Yes -- with 273 to 278, as 3.23.0 in session 279.
 
-### Session 273 of 287: A cancelled session gets its transcript, marked cancelled
+### Session 273 of 291: A cancelled session gets its transcript, marked cancelled
 
 Scope: `packages/router/src/session.ts` (`cancel`, the rollback),
 `packages/router/src/transcript.ts` (the cancelled page),
@@ -16618,7 +16618,7 @@ the cancelled banner carries the reason and the last phase.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 274 of 287: The Mechanic, ported back to the router
+### Session 274 of 291: The Mechanic, ported back to the router
 
 Scope: `packages/router` -- `cli/consult.ts` (`--mechanic`), `drive.ts`
 (an intervention after the land rewinds to verify; the close lists
@@ -16670,7 +16670,7 @@ rewinds to verify and the close names it.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 275 of 287: The framework calls in the Mechanic without the person
+### Session 275 of 291: The framework calls in the Mechanic without the person
 
 Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` and
 `dabbler.mechanicModel` settings through the layers), `cli/configure.ts`
@@ -16752,7 +16752,7 @@ the Primary Model is refused.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 276 of 287: `off` names no Mechanic, and the Mechanic is walked past its stop
+### Session 276 of 291: `off` names no Mechanic, and the Mechanic is walked past its stop
 
 Scope: `packages/router` -- `driver.ts` (`renderStop`'s ways on),
 `config.ts` (the Mechanic's two readings); tests in `driver.test.ts`,
@@ -16786,7 +16786,7 @@ do, its budget, or its brief. A new verb or flag.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 277 of 287: Open a Mechanic, and what it did, in the extension
+### Session 277 of 291: Open a Mechanic, and what it did, in the extension
 
 Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 (*Open a Mechanic*), `src/providers/ActionRegistry.ts`,
@@ -16828,7 +16828,7 @@ each.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 278 of 287: A failed release is diagnosed, and one caused outside the repository retries in place
+### Session 278 of 291: A failed release is diagnosed, and one caused outside the repository retries in place
 
 Scope: `packages/router/src/drive.ts` (`phasePublish`'s stop and ways
 on), `packages/router/src/cli/consult.ts` (the release briefing); tests in
@@ -16871,11 +16871,11 @@ release resumes at publish. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 279.
 
-### Session 279 of 287: Release 3.23.0 (release: 3.23.0)
+### Session 279 of 291: Release 3.23.0 (release: 3.23.0)
 
 The framework publishes sessions 272 to 278 as 3.23.0 and nothing else.
 
-### Session 280 of 287: Open a Mechanic on a Copilot session in flight
+### Session 280 of 291: Open a Mechanic on a Copilot session in flight
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
 (`runOpenMechanic`); its test in `commandFlows.test.ts`; `version.json` and
@@ -16926,7 +16926,7 @@ stamp.
 **Releasable.** Yes -- with 281 and 282, as 3.24.0 in session 283; 3.23.1
 is never published on its own.
 
-### Session 281 of 287: An existing remote or folder is a starting point
+### Session 281 of 291: An existing remote or folder is a starting point
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts`
 (Set Up New Project: the remote prompt, the remote read before bootstrap,
@@ -16978,7 +16978,7 @@ offered as the starting point and nothing is deleted.
 
 **Releasable.** Yes -- with 280 and 282, as 3.24.0 in session 283.
 
-### Session 282 of 287: The planning session reads the code already there
+### Session 282 of 291: The planning session reads the code already there
 
 Scope: `packages/router/src/bootstrap/templates.ts` (`BOOTSTRAP_PLAN`,
 `PLAN_PROMPT`, `DECOMPOSITION_PROMPT`), `packages/router/src/drive.ts`
@@ -17023,11 +17023,11 @@ check:version` checks the stamp.
 
 **Releasable.** Yes -- with 280 and 281, as 3.24.0 in session 283.
 
-### Session 283 of 287: Release 3.24.0 (release: 3.24.0)
+### Session 283 of 291: Release 3.24.0 (release: 3.24.0)
 
 The framework publishes sessions 280, 281 and 282 as 3.24.0 and nothing else.
 
-### Session 285 of 287: The session plan outranks the author's own plan
+### Session 285 of 291: The session plan outranks the author's own plan
 
 Scope: `packages/router/prompt-templates/verification.md` (Completeness,
 Scope and simplicity, the tests in the diff), `packages/router/src/drive.ts`
@@ -17091,7 +17091,7 @@ while a session is in progress and accepted when none is.
 
 **Releasable.** Yes -- with 286, as 3.25.0 in session 287.
 
-### Session 286 of 287: Three tooling fixes from the field
+### Session 286 of 291: Three tooling fixes from the field
 
 Scope: `packages/router/src/session.ts` (`start`'s registration),
 `packages/router/src/ecosystem.ts` (`BUILD_OUTPUT`),
@@ -17140,6 +17140,158 @@ stamp.
 
 **Releasable.** Yes -- with 285, as 3.25.0 in session 287.
 
-### Session 287 of 287: Release 3.25.0 (release: 3.25.0)
+### Session 287 of 291: Release 3.25.0 (release: 3.25.0)
 
 The framework publishes sessions 285 and 286 as 3.25.0 and nothing else.
+
+### Session 288 of 291: The landed tree is the verified tree, and a failed run of record can be re-run
+
+Scope: `packages/router/src/land.ts` (`judgeLandReadiness`),
+`packages/router/src/drive.ts` (`landFacts`, `phaseLand`,
+`phaseRunOfRecord`, the `fix-run-of-record` step), the verification task
+block in `packages/router/src/verify/prompts.ts`; their tests
+
+**Why.** A second field report, on CT.DPH Syndromic-Surveillance-V2 (69
+sessions on 3.22.1-3.24.0), checked against this source and reviewed by
+GPT-5.6 Sol on 2026-10-27, found two stops with no clean way forward.
+First, `judgeLandReadiness` names the paths moved since the verified tree
+and never judges them: a file that appears after the round and before the
+run of record finishes is in the run's digest, so the land commits and
+pushes it unverified, the close's `verification_clean` then fails and
+rewinds to verify, and a second commit for the same session lands
+(sessions 40 and 64 -- an operator's logo dropped in mid-run, a
+`__pycache__`). Second, a failed run of record always synthesises
+`fix-run-of-record`, which asks for a change: five of seven failures there
+were flaky or pre-existing tests unrelated to the session, a
+documentation-only session had to edit a test to get out, and the next
+round raised that edit as a blocking scope finding (sessions 33, 44).
+
+**Step 1 -- measure.** Record, in a test, what a `fix-run-of-record`
+answered with no change does today: whether a verification round opens and
+whether the suite runs again. The steps below are written against that
+measurement, not against the report's description of it.
+
+**Step 2 -- the land judges what moved.** `judgeLandReadiness` refuses when
+any path other than the session's own records moved since the verified
+tree, naming the paths, and the driver returns to verification before `git
+add` -- so nothing unverified is committed or pushed, and no second commit
+for the session lands.
+
+**Step 3 -- a no-change answer re-runs the suite.** When `fix-run-of-record`
+is answered with no change and the tree is still the verified tree, the run
+of record runs again without a verification round.
+
+**Step 4 -- the next round is told why.** A round that follows a failed run
+of record is told which suite failed and that the framework asked for the
+fix. It is not told the edit is excused.
+
+**Non-goals.** A retry count. Waiving a red suite by an operator's decision
+-- that is a hand-written verdict on the run of record. Any change to the
+close's gates.
+
+**Tests.** In `land.test.ts`, a path moved since the verified tree refuses
+the land and names it. In `drive.test.ts`, a no-change answer over the
+verified tree runs the suite again and opens no round; a changed answer
+still goes through verification.
+
+**Releasable.** Yes -- with 289 and 290, as 3.26.0 in session 291.
+
+### Session 289 of 291: A round sees what earlier rounds asked
+
+Scope: `packages/router/src/verify/rounds.ts` (the finding a round
+records), `packages/router/src/verify/prompts.ts` (`priorFindingsBlock`),
+`packages/router/prompt-templates/verification.md` (the tests in the diff),
+`packages/router/src/drive.ts` (the dispositions ask); their tests
+
+**Why.** The same report. Session 21 took seven rounds swinging between
+demands that each round could defend on its own terms; round 6 deleted
+round 5's code and round 7 passed round 4's. The prompt makes an
+**Acceptance criterion** mandatory on every finding -- the closed question
+that settles whether it is fixed -- and the round record does not store it,
+so no later round ever sees what an earlier one asked for. Separately, every
+Dashboard test stubbed the API client while the shipped `appsettings.json`
+had an empty `BaseUrl`, so every page returned 500 in real use and a person
+found it; session 50 tested six new fields on EF InMemory with a partial
+raw-SQL seed. And the dispositions ask calls a citation's range optional
+while a file over 16,384 bytes without one is refused (two refusals,
+sessions 33 and 57).
+
+**Step 1 -- the criterion is stored and shown.** The round records each
+finding's acceptance criterion, and `priorFindingsBlock` shows it to later
+rounds beside the finding.
+
+**Step 2 -- the real path, once.** One sentence under *The tests in the
+diff*: where every test replaces a boundary -- an in-memory database, a
+stubbed client, a partial seed -- the reviewer asks for evidence that the
+shipped configuration and the real path are exercised at least once.
+
+**Step 3 -- guard tests are named.** 285's sentence on tests edited to pass
+names an allow-list, scan or contract test changed in the same diff as the
+thing it guards. No second rule.
+
+**Step 4 -- the dispute ask states the cap.** A cited file over 16,384 bytes
+is cited as `path:START-END`.
+
+**Non-goals.** Retrofitting earlier round records. A new gate or severity. A
+rule of its own for security tests.
+
+**Tests.** In `rounds.test.ts`, a finding's acceptance criterion is stored.
+In `prompts.test.ts`, it is shown to the next round, and the prompt carries
+the real-path sentence. In `drive.test.ts`, the dispositions ask names the
+cap.
+
+**Releasable.** Yes -- with 288 and 290, as 3.26.0 in session 291.
+
+### Session 290 of 291: Packaging and the Mechanic, from the field
+
+Scope: `packages/router/src/packaging.ts` (`runStep`, the rehearsal),
+`packages/router/src/cli/` (the `packaging` verb's options),
+`packages/router/src/drive.ts` (`callInTheMechanic`, `mechanicHandsBack`),
+the packaging-session guidance; their tests; `version.json` and the
+manifests `npm run stamp:version` writes;
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The same report. A release whose pack exited 0 crashed because
+`runStep` removes its scratch folder with no retry and no catch, and .NET
+build servers that inherited `TEMP` still held files in it (`EPERM`,
+session 27). `packaging --dry-run` runs nothing, so a packaging session
+passed and the next release failed at once on `NETSDK1152` (sessions 9 and
+10); four release sessions were cancelled in all. And the unattended
+Mechanic is launched on the run's engine, which under the pull loop is the
+literal `cli`, so it logged "no built-in command for 'cli'" and was never
+called (session 62) -- for a `provider-unreachable` stop that a retry, not
+a code edit, was the recovery for.
+
+**Step 1 -- cleanup never fails a pack.** `runStep` retries removing its
+scratch folder, then warns with the path left behind instead of throwing.
+
+**Step 2 -- `dabbler packaging --rehearse`.** Runs `pack.argv` into a
+scratch output, pushes nothing and files nothing. The guidance for a
+packaging session names it as that session's check; `--dry-run` is
+unchanged.
+
+**Step 3 -- the Mechanic on the session's engine.** Launched on the
+session's declared engine, not the pull loop's `cli`. A
+`provider-unreachable` stop hands back.
+
+**Step 4 -- the version and the words.** `version.json` goes to 3.26.0 (a
+minor: the land refusal, the re-run and `--rehearse` are new behaviour),
+stamped with `npm run stamp:version`, and the changelog gets a 3.26.0
+section naming what 288, 289 and 290 changed for a developer.
+
+**Non-goals.** .NET-specific environment tuning in the packaging child. Any
+change to `--dry-run`. `{output}` quoting inside `cmd /c` (not reproduced; a
+script is the answer). A `findstr` refusal. A non-interactive environment
+variable for applications.
+
+**Tests.** In `packaging.test.ts`, a cleanup that fails warns and the pack's
+result stands; `--rehearse` runs the pack and pushes nothing. In
+`drive.test.ts`, a pull-loop session's Mechanic launches on its declared
+engine, and `provider-unreachable` hands back. `npm run check:version`
+checks the stamp.
+
+**Releasable.** Yes -- with 288 and 289, as 3.26.0 in session 291.
+
+### Session 291 of 291: Release 3.26.0 (release: 3.26.0)
+
+The framework publishes sessions 288, 289 and 290 as 3.26.0 and nothing else.

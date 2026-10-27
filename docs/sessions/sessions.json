@@ -5813,9 +5813,9 @@
     {
       "number": 292,
       "title": ".NET build output is ignored from the first project",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-27T11:25:03.195000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-27T11:48:16.725000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

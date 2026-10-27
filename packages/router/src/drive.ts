@@ -450,11 +450,12 @@ export const MECHANIC_ATTEMPTS_PER_SESSION = 2;
  * Why this stop goes straight to the person, or null to call the Mechanic in
  * first. A wait for funds and a person's own interrupt are the person's by
  * what they are; a release is the person's by its session, past a refused
- * publish, which a Mechanic diagnoses without an edit; and the budget is one
+ * publish, which a Mechanic diagnoses without an edit; an unreachable
+ * provider is retried, and an edit cannot reach it; and the budget is one
  * attempt per stop, two per session, never a Mechanic calling a Mechanic.
  */
 export function mechanicHandsBack(
-  stop: { readonly kind: string; readonly reason: string },
+  stop: { readonly kind: string; readonly code?: string | null; readonly reason: string },
   mode: string,
   release: boolean,
   attempts: readonly MechanicAttempt[],
@@ -462,6 +463,7 @@ export function mechanicHandsBack(
   if (mode !== "unattended") return `dabbler.mechanic is '${mode}'`;
   if (stop.kind === "funds") return "a wait for funds is the person's: nothing in the tree can pay for it";
   if (stop.kind === "interrupted") return "a person asked the session to stop";
+  if (stop.code === "provider-unreachable") return "an unreachable provider is retried: nothing in the tree reaches it";
   if (release && stop.kind !== "publish") return "a release session is the person's";
   if (attempts.some((attempt) => attempt.outcome === "open")) return "a Mechanic is already at work, and never calls a Mechanic";
   if (attempts.some((attempt) => attempt.kind === stop.kind && attempt.reason === stop.reason)) {
@@ -1973,7 +1975,7 @@ class Driver {
     const release = releaseSessionVersion(this.sessionsDir, this.sessionNumber) !== null;
     try {
       mode = explainMechanic(this.repoRoot).transport;
-      const why = mechanicHandsBack({ kind: stop.kind, reason: stop.message }, mode, release, attempts);
+      const why = mechanicHandsBack({ kind: stop.kind, code: stop.code, reason: stop.message }, mode, release, attempts);
       if (why !== null) {
         if (mode === "unattended") this.log("mechanic-not-called", { why });
         return { memo: null };
@@ -1987,7 +1989,15 @@ class Driver {
       this.log("mechanic-not-called", { why: error.message });
       return { memo: error.message };
     }
-    const engine = launchMechanic(this.run.engine, model);
+    // The engine this session declared at its start: under the pull loop the
+    // run's own engine is the literal `cli`, which no built-in command runs.
+    let declared: string | null = null;
+    try {
+      declared = resolveSessionOrchestratorIdentity(this.sessionsDir, this.sessionNumber).engine;
+    } catch {
+      // An identity that cannot be read leaves the run's engine to name it.
+    }
+    const engine = launchMechanic(declared ?? this.run.engine, model);
     const before = snapshotWorktreeTree(this.repoRoot);
     if (typeof engine === "string" || before === null) {
       this.log("mechanic-not-called", { why: typeof engine === "string" ? engine : "could not snapshot the working tree" });

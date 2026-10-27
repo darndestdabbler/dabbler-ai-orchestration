@@ -3,7 +3,8 @@
 //
 // Only a session that declared itself releasable at step (a) may publish, and
 // only after the evidence for (a) through (e) exists. `--dry-run` shows the
-// gates and stops: it is a rehearsal, so it is never filed.
+// gates and stops: it is a rehearsal, so it is never filed. `--rehearse` runs
+// the pack itself into a scratch output, and pushes and files nothing.
 
 import { detectPackaging } from "../bootstrap/detect.ts";
 import { loadConfig } from "../config.ts";
@@ -12,12 +13,15 @@ import { renderGateRow } from "../gates.ts";
 import { packagingPath, readPackaging } from "../ledger.ts";
 import {
   type PackagingRun,
+  type Rehearsal,
   PackagingConfigError,
   PackagingError,
   feedTakesCredential,
   loadDeclaration,
   packageSession,
   record,
+  rehearsalPassed,
+  rehearsePack,
   runAsRecord,
   runIsPublished,
 } from "../packaging.ts";
@@ -31,7 +35,7 @@ const EXIT_USAGE = 2;
 
 function usage(): string {
   return [
-    "usage: dabbler packaging [-h] [--sessions-dir SESSIONS_DIR] [--dry-run]",
+    "usage: dabbler packaging [-h] [--sessions-dir SESSIONS_DIR] [--dry-run] [--rehearse]",
     "                         [--show-record] [--json] [--version VERSION]",
     "",
     "`--version` is the release's version, substituted for `{version}` in the",
@@ -48,16 +52,22 @@ function usage(): string {
     "when the declaration loads -- in a session that may not publish too, so",
     "a plan check can name it.",
     "",
+    "`--rehearse` runs the declared pack into a scratch output and pushes",
+    "nothing and files nothing, in any session: it exits 0 when the pack",
+    "exits 0, makes a file and leaves the repository as it found it. It is",
+    "the check a packaging session names.",
+    "",
   ].join("\n");
 }
 
 const VALUE_FLAGS = new Set(["--sessions-dir", "--version"]);
-const BARE_FLAGS = new Set(["--dry-run", "--show-record", "--json"]);
+const BARE_FLAGS = new Set(["--dry-run", "--rehearse", "--show-record", "--json"]);
 
 interface Parsed {
   readonly sessionsDir?: string;
   readonly version?: string;
   readonly dryRun: boolean;
+  readonly rehearse: boolean;
   readonly showRecord: boolean;
   readonly json: boolean;
 }
@@ -65,6 +75,7 @@ interface Parsed {
 function parseArgs(argv: readonly string[]): Parsed | string {
   const values = new Map<string, string>();
   let dryRun = false;
+  let rehearse = false;
   let showRecord = false;
   let json = false;
   for (let index = 0; index < argv.length; index += 1) {
@@ -74,6 +85,7 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     if (BARE_FLAGS.has(name)) {
       if (equals !== -1) return `argument ${name}: ignored explicit argument`;
       if (name === "--dry-run") dryRun = true;
+      else if (name === "--rehearse") rehearse = true;
       else if (name === "--show-record") showRecord = true;
       else json = true;
       continue;
@@ -88,7 +100,10 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     values.set(name, next);
     index += 1;
   }
-  return { sessionsDir: values.get("--sessions-dir"), version: values.get("--version"), dryRun, showRecord, json };
+  // A dry run runs nothing, and a rehearsal runs the pack: asked for both,
+  // neither promise can be kept.
+  if (dryRun && rehearse) return "argument --rehearse: not allowed with argument --dry-run";
+  return { sessionsDir: values.get("--sessions-dir"), version: values.get("--version"), dryRun, rehearse, showRecord, json };
 }
 
 /**
@@ -248,6 +263,36 @@ function showRecorded(sessionsDir: string, json: boolean): number {
   return EXIT_OK;
 }
 
+/** A rehearsal as the verb prints it: what ran, what it made, and on a failure what the pack said. */
+function renderRehearsal(rehearsal: Rehearsal): string {
+  const passed = rehearsalPassed(rehearsal);
+  const lines = [`packaging: rehearsal ${passed ? "passed" : "failed"}; nothing was pushed or filed`];
+  const step = rehearsal.step;
+  if (step !== null) {
+    const code = step.timedOut ? "timed out" : `exit ${step.exitCode}`;
+    lines.push(`  ${step.step}: ${code} — ${step.command}`);
+  }
+  if (rehearsal.artifacts.length > 0) lines.push(`  artifacts: ${rehearsal.artifacts.join(", ")}`);
+  if (rehearsal.reason) lines.push(`  ${rehearsal.reason}`);
+  if (!passed && step !== null && step.output.trim() !== "") lines.push("", step.output.trimEnd());
+  return lines.join("\n");
+}
+
+function rehearse(sessionsDir: string, version: string | null): number {
+  let rehearsal: Rehearsal;
+  try {
+    rehearsal = rehearsePack(sessionsDir, { version });
+  } catch (error) {
+    if (error instanceof PackagingError || error instanceof PackagingConfigError) {
+      writeErr(`packaging: ${error.message}\n`);
+      return EXIT_ERROR;
+    }
+    throw error;
+  }
+  writeOut(renderRehearsal(rehearsal) + "\n");
+  return rehearsalPassed(rehearsal) ? EXIT_OK : EXIT_ERROR;
+}
+
 export async function packagingVerb(argv: string[]): Promise<number> {
   if (argv.includes("-h") || argv.includes("--help")) {
     writeOut(usage());
@@ -262,6 +307,7 @@ export async function packagingVerb(argv: string[]): Promise<number> {
   const sessionsDir = resolveSessionsDir(parsed.sessionsDir);
 
   if (parsed.showRecord) return showRecorded(sessionsDir, parsed.json);
+  if (parsed.rehearse) return rehearse(sessionsDir, parsed.version ?? null);
 
   let run: PackagingRun;
   try {

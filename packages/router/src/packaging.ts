@@ -670,6 +670,27 @@ function trimZeros(text: string): string {
   return text.includes(".") ? text.replace(/\.?0+$/, "") : text;
 }
 
+/** Remove a step's scratch folder; null when it is gone, else why it is not. */
+type ScratchRemover = (path: string) => string | null;
+
+let removeScratch: ScratchRemover = (path) => {
+  try {
+    rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+};
+
+/** Stand in for the scratch folder's removal; returns the restore. */
+export function setScratchRemover(remover: ScratchRemover): () => void {
+  const held = removeScratch;
+  removeScratch = remover;
+  return () => {
+    removeScratch = held;
+  };
+}
+
 export interface RunStepOptions {
   readonly cwd: string;
   readonly timeoutSeconds: number;
@@ -725,7 +746,11 @@ export function runStep(
       output = merged;
     }
   } finally {
-    rmSync(scratch, { recursive: true, force: true });
+    // The command's result is already decided. A build server that inherited
+    // this TEMP can still hold files in it, and that is a folder left behind,
+    // never a failed pack.
+    const why = removeScratch(scratch);
+    if (why !== null) output += `\n[warning: the scratch folder ${scratch} was left behind: ${why}]`;
   }
   return {
     step,
@@ -1329,6 +1354,75 @@ export function packageSession(
   // Narrowed here rather than above: the guard proves a declared credential
   // resolved, and an undeclared one is the empty string by construction.
   return execute(root, sessionNumber, declaration, secretValue ?? "", gates, options.version ?? null);
+}
+
+/** What a rehearsal of the pack did: its one step, the files it made, and why it failed, if it did. */
+export interface Rehearsal {
+  readonly step: StepRun | null;
+  readonly artifacts: readonly string[];
+  readonly reason: string;
+}
+
+/** A rehearsal that passed: the pack exited 0, made a file, and left the tree alone. */
+export function rehearsalPassed(rehearsal: Rehearsal): boolean {
+  return rehearsal.reason === "" && rehearsal.step !== null && stepIsGreen(rehearsal.step);
+}
+
+/**
+ * Run the declared pack into a scratch output, push nothing and file nothing.
+ *
+ * `--dry-run` runs no command, so a packaging session it passed could hand
+ * the next release a pack that fails at once. This runs the one command a
+ * packaging session writes, in any session, releasable or not.
+ */
+export function rehearsePack(
+  sessionsDir: string,
+  options: { readonly config?: RouterConfig | null; readonly version?: string | null } = {},
+): Rehearsal {
+  const root = repoRootFor(sessionsDir);
+  if (root === null) {
+    throw new PackagingError(`not inside a git repository: ${sessionsDir}`);
+  }
+  const config = options.config ?? loadConfig(undefined, root);
+  const sessionNumber = currentSession(sessionsDir);
+  const module = sessionNumber === null ? null : moduleOfSession(sessionsDir, sessionNumber);
+  const failed = (reason: string, step: StepRun | null = null): Rehearsal => ({ step, artifacts: [], reason });
+  if (loadTagRelease(config, module) !== null) {
+    return failed("the declaration is a tag release, which runs no pack; `--dry-run` proves its block.");
+  }
+  const declaration = loadDeclaration(config, module);
+  if (declaration === null) return failed("dabbler.yaml declares no `packaging:` block to rehearse.");
+  const version = String(options.version ?? canonicalVersion(root) ?? "").trim();
+  if (declaration.pack.usesVersion && version === "") {
+    return failed(`the pack names ${PLACEHOLDER_VERSION} and neither --version nor version.json gives one.`);
+  }
+  const output = mkdtempSync(join(tmpdir(), "dabbler-rehearsal-"));
+  try {
+    const before = snapshotWorktreeTree(root);
+    const argv = substitute(declaration.pack.argv, {
+      [PLACEHOLDER_OUTPUT]: output,
+      ...(version === "" ? {} : { [PLACEHOLDER_VERSION]: version }),
+    });
+    const step = runStep(STEP_PACK, argv, argv, {
+      cwd: declaration.pack.cwd ? join(root, declaration.pack.cwd) : root,
+      timeoutSeconds: declaration.pack.timeoutSeconds,
+    });
+    // What it made is reported whether or not it passed: a pack that wrote
+    // half its output and then failed says where it stopped.
+    const artifacts = artifactsIn(output);
+    if (!stepIsGreen(step)) return { step, artifacts, reason: "" };
+    if (snapshotWorktreeTree(root) !== before) {
+      return {
+        step,
+        artifacts,
+        reason: "the pack changed the repository while it ran, and a real publish would refuse it.",
+      };
+    }
+    if (artifacts.length === 0) return failed("the pack exited 0 and produced no file.", step);
+    return { step, artifacts, reason: "" };
+  } finally {
+    removeScratch(output);
+  }
 }
 
 /**

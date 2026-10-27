@@ -10,6 +10,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.26.0] — 2026-10-27
+
+**Stops with a way forward.** A field report on a downstream .NET project
+found stops around the run of record, verification rounds that could not
+see what earlier rounds had asked for, and release and Mechanic failures.
+This release fixes them.
+
+### Added
+
+- **`dabbler packaging --rehearse`.** Runs the declared pack into a scratch
+  output, pushes nothing and files nothing, and exits 0 only when the pack
+  exits 0, makes a file and leaves the repository unchanged. A packaging
+  session names it as its check, so a pack that fails is found there and
+  not by the next release. `--dry-run` is unchanged. Session 290.
+
+### Changed
+
+- **The land refuses a tree that moved after verification.** A path other
+  than the session's own records that changed after the verified tree, such
+  as a file dropped in while the suite ran or a `__pycache__`, now sends the
+  session back to verification before anything is committed. Nothing
+  unverified is pushed, and a session no longer lands twice. Session 288.
+- **A failed run of record can be re-run.** Answer `fix-run-of-record` with
+  no change over the verified tree, and the suite runs again without a
+  verification round, so a flaky or pre-existing failure no longer forces an
+  edit. The round after a failed run of record is told which suite failed
+  and that the framework asked for the fix. Session 288.
+- **A round sees what earlier rounds asked.** Each finding's acceptance
+  criterion is stored with the round and shown to later rounds beside the
+  finding, so rounds stop swinging between demands. Session 289.
+- **The reviewer asks for the real path once.** Where every test replaces a
+  boundary (an in-memory database, a stubbed client, a partial seed), the
+  reviewer asks for evidence that the shipped configuration and the real
+  path run at least once. A guard test (allow-list, scan or contract)
+  changed in the same diff as the thing it guards counts as a test edited
+  to pass. Session 289.
+- **An unreachable provider goes to the person.** The unattended Mechanic
+  is no longer called in on a `provider-unreachable` stop, because a retry
+  recovers it and an edit cannot. Session 290.
+
+### Fixed
+
+- **A pack's cleanup never fails the pack.** The pack retries removing its
+  scratch folder. If a .NET build server still holds files there, the pack
+  warns with the path left behind and keeps its result instead of crashing
+  with `EPERM`. Session 290.
+- **The unattended Mechanic launches.** It runs on the engine the session
+  declared at its start. Before this fix it ran on the pull loop's `cli`,
+  which no built-in command runs, so it was never called. Session 290.
+- **The dispositions ask states the citation cap.** A cited file over
+  16,384 bytes is cited as `path:START-END`. Session 289.
+
 ## [3.25.0] — 2026-10-27
 
 **The session plan is the requirement.** The author's own work plan is a

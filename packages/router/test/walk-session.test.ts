@@ -20,7 +20,7 @@ import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { driveSession, mechanicMemoPath, reportAndNext, sessionNext, setMechanicLauncher, type Engine } from "../src/drive.ts";
 import { mailboxEngine, type EngineOutcome } from "../src/engines.ts";
 import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
-import { EXIT_CALL_FAILED } from "../src/contracts/exitCodes.ts";
+import { EXIT_UNAVAILABLE } from "../src/contracts/exitCodes.ts";
 import { beginJobRecord, jobRecord, setJobStarter, startJob } from "../src/jobs.ts";
 import { SETTING_AUTHORING_MODEL, SETTING_MECHANIC_MODEL, writeSettings } from "../src/settings.ts";
 import { registerSessionStart } from "../src/writers.ts";
@@ -2335,21 +2335,22 @@ describe("the Mechanic, called in without the person, on a real checkout", () =>
     registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
     writeSettings(repo, settings);
     writeRun(repo, 1, {
-      schema_version: 1, session_number: 1, engine: "claude-code", phase: "verify", seq: 2,
+      schema_version: 1, session_number: 1, engine: "cli", phase: "verify", seq: 2,
       invocations: 0, max_invocations: 24, accepted_steps: ["one"], baseline_tree: null,
       stop: null, lease_epoch: 1,
       started_at: "2026-10-21T10:00:00-04:00", updated_at: "2026-10-21T10:00:00-04:00",
     });
-    // Every round fails to reach its provider until the Mechanic's file is
-    // there; from then on the round is the real one, run in this process.
+    // Every round gives no verdict until the Mechanic's file is there; from
+    // then on the round is the real one, run in this process. The run's engine
+    // is the pull loop's `cli`, and the Mechanic launches on the declared one.
     const unsetJob = setJobStarter((root, session, options) => {
       if (existsSync(join(root, "FIXED"))) {
         unsetJob();
         return startJob(root, session, options);
       }
       const { log, status } = beginJobRecord(root, session, options.name);
-      writeFileSync(log, "verify: the provider could not be reached.\n");
-      writeFileSync(status, JSON.stringify({ exit: EXIT_CALL_FAILED, ended_at: new Date().toISOString() }));
+      writeFileSync(log, "verify: no reviewer gave a verdict.\n");
+      writeFileSync(status, JSON.stringify({ exit: EXIT_UNAVAILABLE, ended_at: new Date().toISOString() }));
       return jobRecord(root, session, options, process.pid);
     });
     const launched: Array<readonly [string, string | null]> = [];

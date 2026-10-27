@@ -327,7 +327,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 287 | Release 3.25.0 (release: 3.25.0) | yes | 2026-10-27 |
 | 288 | The landed tree is the verified tree, and a failed run of record can be re-run | no | 2026-10-27 |
 | 289 | A round sees what earlier rounds asked | no | 2026-10-27 |
-| 290 | Packaging and the Mechanic, from the field | — | not declared |
+| 290 | Packaging and the Mechanic, from the field | no | 2026-10-27 |
 | 291 | Release 3.26.0 (release: 3.26.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -3445,3 +3445,13 @@ Close two stops a field report found around the run of record. First, measure in
 **Releasable: no.**
 
 Make a verification round see what earlier rounds asked. The verdict parser reads each finding's Acceptance criterion line, the round record stores it beside the failure scenario, and priorFindingsBlock shows it to later rounds under the finding. The verification prompt's section on the tests in the diff gains one sentence asking, where every test replaces a boundary (an in-memory database, a stubbed client, a partial seed), for evidence that the shipped configuration and the real path are exercised at least once; and its existing sentence on tests edited to pass names an allow-list, scan or contract test changed in the same diff as the thing it guards. The dispositions ask states that a cited file over 16,384 bytes is cited as path:START-END.
+
+### Session 290 — Packaging and the Mechanic, from the field
+
+**Releasable: no.**
+
+Fix three packaging and Mechanic defects from the field, then stamp 3.26.0. runStep in packaging.ts retries removing its scratch folder and, when it still cannot, warns with the path left behind instead of throwing, so a pack that exited 0 keeps its result. `dabbler packaging --rehearse` runs the declared pack.argv into a scratch output, reports its exit and what it produced, pushes nothing and files nothing; the packaging-session guidance in the bootstrap templates names it as that session's check, and --dry-run is unchanged. The unattended Mechanic is launched on the session's declared engine (the in-flight ledger row's engine) rather than the pull loop's literal 'cli', and mechanicHandsBack hands a provider-unreachable stop back to the person, because a retry rather than an edit is its recovery. Finally version.json goes to 3.26.0, stamped into the manifests by npm run stamp:version, and the extension changelog gets a 3.26.0 section naming what sessions 288, 289 and 290 changed for a developer.
+
+**Amended after acceptance:**
+
+- 2026-10-27 — step 'mechanic-on-the-sessions-engine': its files: The Mechanic's on-a-real-checkout fixture stopped on provider-unreachable, which now hands back; it now stops on no-verdict, and its run engine is the pull loop's cli so its existing launch assertion proves the declared engine is used (claude-code (anthropic, claude-opus-5-5))

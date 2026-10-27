@@ -31,12 +31,16 @@ import {
   packageSession,
   record,
   redact,
+  rehearsalPassed,
+  rehearsePack,
   runAsRecord,
   runStep,
+  setScratchRemover,
   taggedCommit,
   type PackagingRun,
 } from "../src/packaging.ts";
-import { renderRun } from "../src/cli/packaging.ts";
+import { packagingVerb, renderRun } from "../src/cli/packaging.ts";
+import { capture } from "../src/output.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
 import { EARLIER_COMMIT, makeAnsweredSandbox, makeConfig, tempDir } from "./support/answers.ts";
 
@@ -673,6 +677,20 @@ describe("the publication", () => {
     assert.equal(run.steps[0]?.exitCode, null);
     assert.match(String(run.steps[0]?.output), /could not start/);
   });
+
+  it("warns when its scratch folder cannot be removed, and the pack's result stands", () => {
+    // A .NET build server that inherited TEMP still holds files in it.
+    const restore = setScratchRemover(() => "EPERM: operation not permitted");
+    try {
+      const argv = [process.execPath, "-e", "console.log('packed')"];
+      const step = runStep("pack", argv, argv, { cwd: process.cwd(), timeoutSeconds: 30 });
+      assert.equal(step.exitCode, 0);
+      assert.match(step.output, /packed/);
+      assert.match(step.output, /warning: the scratch folder .*dabbler-package-.* was left behind: EPERM/);
+    } finally {
+      restore();
+    }
+  });
 });
 
 // --- The credential -------------------------------------------------------------
@@ -772,6 +790,36 @@ describe("the record", () => {
     const attempted = packageSession(sessionsDir, { config: packagingConfig(pushLog) });
     assert.equal(attempted.declared, false);
     assert.equal(existsSync(pushLog), false);
+  });
+});
+
+describe("a rehearsal of the pack", () => {
+  it("runs the pack into a scratch output, pushes nothing and files nothing", () => {
+    // `--dry-run` runs nothing, so a packaging session it passed handed the
+    // next release a pack that failed at once on NETSDK1152.
+    const { repo, sessionsDir, pushLog } = publishable();
+    const rehearsal = rehearsePack(sessionsDir, { config: packagingConfig(pushLog) });
+    assert.equal(rehearsalPassed(rehearsal), true);
+    assert.equal(rehearsal.step?.exitCode, 0);
+    assert.deepEqual(rehearsal.artifacts, ["thing-1.0.nupkg"]);
+    assert.equal(existsSync(pushLog), false);
+    assert.equal(existsSync(packagingPath(repo, 1)), false);
+    assert.equal(existsSync(packageOutputDir(repo, 1)), false);
+
+    // A pack that wrote part of its output and failed says what it made.
+    const partial = `${PACK_SRC}process.exit(3);`;
+    const broken = rehearsePack(sessionsDir, {
+      config: packagingConfig(pushLog, { packArgv: [process.execPath, "-e", partial, "{output}", "partial.nupkg"] }),
+    });
+    assert.equal(rehearsalPassed(broken), false);
+    assert.equal(broken.step?.exitCode, 3);
+    assert.deepEqual(broken.artifacts, ["partial.nupkg"]);
+  });
+
+  it("refuses --rehearse beside --dry-run, which runs nothing", async () => {
+    const asked = await capture(() => packagingVerb(["--dry-run", "--rehearse"]));
+    assert.equal(asked.value, 2);
+    assert.match(asked.stderr, /--rehearse: not allowed with argument --dry-run/);
   });
 });
 

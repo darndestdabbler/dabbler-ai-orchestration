@@ -326,7 +326,7 @@ describe("a verification call refused for funds", () => {
 });
 
 describe("the Mechanic, called in without the person", () => {
-  it("hands back a funds wait, an interrupt, a release past its publish, and a spent budget without calling one", () => {
+  it("hands back a funds wait, an interrupt, an unreachable provider, a release past its publish, and a spent budget without calling one", () => {
     const stop = { kind: "verification", reason: "the round failed" };
     const attempt = (outcome: "open" | "cleared" | "failed", reason = "an earlier stop") => ({
       at: "2026-10-21T10:00:00-04:00", kind: "verification", reason, phase: "verify", model: null, before_tree: "abc", outcome,
@@ -334,6 +334,11 @@ describe("the Mechanic, called in without the person", () => {
     assert.equal(mechanicHandsBack(stop, "unattended", false, []), null);
     assert.match(String(mechanicHandsBack({ kind: "funds", reason: "no balance" }, "unattended", false, [])), /funds/);
     assert.match(String(mechanicHandsBack({ kind: "interrupted", reason: "stop" }, "unattended", false, [])), /asked/);
+    // A retry, not an edit, is what recovers an unreachable provider.
+    assert.match(
+      String(mechanicHandsBack({ ...stop, code: "provider-unreachable" }, "unattended", false, [])),
+      /unreachable provider is retried/,
+    );
     assert.match(String(mechanicHandsBack(stop, "unattended", true, [])), /release/);
     // A refused publish is the one release stop a Mechanic is called in on, to diagnose.
     assert.equal(mechanicHandsBack({ kind: "publish", reason: "401" }, "unattended", true, []), null);

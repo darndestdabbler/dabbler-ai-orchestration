@@ -324,8 +324,9 @@ export const DECOMPOSITION_PROMPT =
   "- **Packaging and releases are sessions of their own:** where the plan\n" +
   "  names *Handoff artifacts*, plan one packaging session -- early, with\n" +
   "  project files only, or later -- that writes the `packaging:` block in\n" +
-  "  `dabbler.yaml` and does nothing else; no other session writes it. A\n" +
-  "  release is a session with no steps, headed `### Session <N>: Release\n" +
+  "  `dabbler.yaml` and does nothing else; no other session writes it. Its\n" +
+  "  check is `dabbler packaging --rehearse`, which runs the pack and pushes\n" +
+  "  nothing. A release is a session with no steps, headed `### Session <N>: Release\n" +
   "  <version> (release: <version>)`: the framework packs and publishes what\n" +
   "  is on the trunk, with no AI work, no tests of its own and no review.\n" +
   "  Propose its version -- patch, minor or major by what the sessions it\n" +
@@ -515,8 +516,9 @@ const BOOTSTRAP_PLAN_TAIL =
   "   Packaging and releases are sessions of their own. Where the plan\n" +
   "   names *Handoff artifacts*, plan one packaging session -- early, with\n" +
   "   project files only, or later -- that writes the `packaging:` block in\n" +
-  "   `dabbler.yaml` and does nothing else. A release is a session with no\n" +
-  "   steps, headed `### Session <N>: Release <version> (release:\n" +
+  "   `dabbler.yaml` and does nothing else; its check is `dabbler packaging\n" +
+  "   --rehearse`, which runs the pack and pushes nothing. A release is a\n" +
+  "   session with no steps, headed `### Session <N>: Release <version> (release:\n" +
   "   <version>)`; propose its version -- patch, minor or major by what the\n" +
   "   sessions it releases change -- for the person to approve with the plan.\n" +
   "4. Cross-provider verification.\n" +
@@ -631,7 +633,8 @@ export const PROJECT_CONFIG_PACKAGING =
   "# to no feed today. A feed that is a folder on disk -- a drive path, a UNC\n" +
   "# path or file:// -- takes no credential: leave `secret` out, and the push\n" +
   "# runs without one. `dabbler packaging --dry-run` rehearses the block and\n" +
-  "# exits 0 when it loads, in a session that may not publish too.\n" +
+  "# exits 0 when it loads, in a session that may not publish too;\n" +
+  "# `dabbler packaging --rehearse` runs the pack and pushes nothing.\n" +
   "#\n" +
   "#   packaging:\n" +
   "#     pack:\n" +

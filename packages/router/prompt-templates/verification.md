@@ -66,6 +66,8 @@ Where a behaviour is untested or a case is missing, **name the case, not the gap
 - the **input** — what it drives, concretely enough to type,
 - the **expectation** — the result it should assert, and what today's code would do instead.
 
+Where every test of a behaviour replaces a boundary — an in-memory database, a stubbed client, a partial seed — ask for evidence that the shipped configuration and the real path are exercised at least once.
+
 "This needs more coverage" is not a case and is not useful; "with `AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS` unset and a diff of N chars, `assembleEvidence` should return the widest render, and nothing asserts which width it picked" is.
 
 Two boundaries, and they are not negotiable:
@@ -73,7 +75,7 @@ Two boundaries, and they are not negotiable:
 1. **Scope: only the tests visible in the diff.** You cannot see the rest of the suite, so a proposal about a test file that is not in front of you is a proposal about a file you have not read. If you suspect a case is covered elsewhere and cannot tell, say that rather than asserting it is missing.
 2. **Destination: NITS, and they are non-blocking.** A case somebody *could also* have written is an improvement, not a defect: it goes under **NITS**, it never changes the verdict to ISSUES FOUND, and it never justifies another remediation round. This is not a new grade and does not touch the severity rubric.
 
-The line between the two, drawn explicitly so an assessment is not laundered into a blocker: a test **this session's own task promised and did not deliver** is a missing spec-promised deliverable and stays an **Issue** under **Completeness**, exactly as it is now, gated by the same "so what?" test as any other Issue. So is a test the work did not leave alone: an existing test or golden file weakened or rewritten in place to make the change pass, or a number the session plan states (a count, a size, a real dependency) scaled down without a recorded decision, is a **Completeness** finding. Everything else you notice about the tests — a thinner assertion, an untested branch, a case worth adding — is a **Nit**, however right you are about it.
+The line between the two, drawn explicitly so an assessment is not laundered into a blocker: a test **this session's own task promised and did not deliver** is a missing spec-promised deliverable and stays an **Issue** under **Completeness**, exactly as it is now, gated by the same "so what?" test as any other Issue. So is a test the work did not leave alone: an existing test or golden file weakened or rewritten in place to make the change pass — an allow-list, scan or contract test changed in the same diff as the thing it guards among them — or a number the session plan states (a count, a size, a real dependency) scaled down without a recorded decision, is a **Completeness** finding. Everything else you notice about the tests — a thinner assertion, an untested branch, a case worth adding — is a **Nit**, however right you are about it.
 
 ### Materiality — the "so what?" gate
 

@@ -302,6 +302,38 @@ export function reportedInputTokens(
   return metadata["input_tokens_reported"] === false ? null : tokens;
 }
 
+/**
+ * The findings a round records. The acceptance criterion is kept so a later
+ * round is shown what an earlier one asked for, rather than re-deciding it.
+ */
+export function findingRows(
+  issues: readonly Finding[],
+  blockingIssues: readonly Finding[],
+): Row[] {
+  return issues.map((issue) => {
+    const finding: Row = {
+      description: sliceCodePoints(String(issue.description ?? ""), 2000),
+      severity: normalizeSeverity(issue.severity),
+    };
+    // Carry the optional fields without inventing values.
+    if (issue.category) {
+      finding["category"] = sliceCodePoints(String(issue.category), 1000);
+    }
+    if (issue.failureScenario) {
+      finding["failureScenario"] = sliceCodePoints(String(issue.failureScenario), 1000);
+    }
+    if (issue.acceptanceCriterion) {
+      finding["acceptanceCriterion"] = sliceCodePoints(String(issue.acceptanceCriterion), 1000);
+    }
+    if (issue.evidencePaths && issue.evidencePaths.length > 0) {
+      finding["evidencePaths"] = [...issue.evidencePaths].slice(0, 20);
+    }
+    finding["blocking"] = blockingIssues.includes(issue);
+    finding["section"] = issue.section === "nits" ? "nits" : "body";
+    return finding;
+  });
+}
+
 export function blockingFindings(row: Row): Row[] {
   const findings = Array.isArray(row["findings"]) ? (row["findings"] as Row[]) : [];
   return findings.filter((finding) => finding["blocking"] !== false);
@@ -934,28 +966,7 @@ export async function runRound(
 
   const [verdict, issues] = parseVerificationResponse(result.content);
   const classification = classifyBlocking(verdict, issues);
-  const findings: Row[] = issues.map((issue) => ({
-    description: sliceCodePoints(String(issue.description ?? ""), 2000),
-    severity: normalizeSeverity(issue.severity),
-  }));
-  // Carry the optional fields without inventing values.
-  issues.forEach((issue, index) => {
-    const finding = findings[index] as Row;
-    if (issue.category) {
-      finding["category"] = sliceCodePoints(String(issue.category), 1000);
-    }
-    if (issue.failureScenario) {
-      finding["failureScenario"] = sliceCodePoints(
-        String(issue.failureScenario),
-        1000,
-      );
-    }
-    if (issue.evidencePaths && issue.evidencePaths.length > 0) {
-      finding["evidencePaths"] = [...issue.evidencePaths].slice(0, 20);
-    }
-    finding["blocking"] = classification.blockingIssues.includes(issue);
-    finding["section"] = issue.section === "nits" ? "nits" : "body";
-  });
+  const findings = findingRows(issues, classification.blockingIssues);
 
   const completionTree = snapshotWorktreeTree(repoRoot);
   if (completionTree === null) {

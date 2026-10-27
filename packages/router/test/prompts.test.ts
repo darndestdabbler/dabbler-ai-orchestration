@@ -74,6 +74,12 @@ describe("the prior-findings block", () => {
     assert.equal(priorFindingsBlock([]), "");
   });
 
+  it("shows a later round what an earlier one asked for", () => {
+    const rounds = [{ round: 1, verdict: "ISSUES_FOUND", findings: [{ severity: "major", description: "the widget is wrong", acceptanceCriterion: "does the widget print 3?" }] }];
+    const block = priorFindingsBlock(rounds);
+    assert.ok(block.includes("- [major] the widget is wrong\n  - Acceptance criterion: does the widget print 3?"));
+  });
+
   it("carries a pending rebuttal and its evidence beside the finding, and tells the verifier not to re-adjudicate a settled one", () => {
     const repo = tempDir();
     seed(repo, { "cite.py": "the line\n" });
@@ -138,6 +144,7 @@ describe("the task block a round opens with", () => {
     assert.ok(prompt.includes("- The widget itself."), prompt);
     assert.match(prompt, /A non-goal that excludes, narrows or defers something the session plan requires of this session is itself a blocking \*\*Completeness\*\* finding/);
     assert.match(prompt, /Deferral is acceptable only to a later session the plan names/);
+    assert.match(prompt, /replaces a boundary — an in-memory database, a stubbed client, a partial seed — ask for evidence that the shipped configuration and the real path are exercised at least once/);
   });
 
   it("carries a dropped non-goal with its reason, so the round judges the reason", () => {

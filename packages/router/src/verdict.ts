@@ -63,6 +63,7 @@ export interface Finding {
   category?: string;
   severity?: string;
   failureScenario?: string;
+  acceptanceCriterion?: string;
   evidencePaths?: string[];
   section?: string;
   [field: string]: unknown;
@@ -101,6 +102,7 @@ const BULLET_LINE = /^[ \t]*(?:[-*+•]|\d+[.)])[ \t]+(.*)$/;
 const CATEGORY = /Category[\s*:.\-_]*([^\n*]+)/i;
 const SEVERITY = /Severity[\s*:.\-_]*(Critical|Major|Minor)/i;
 const FAILURE_SCENARIO = /Failure[\s*_-]*scenario[\s*:.\-_]*([^\n]+)/i;
+const ACCEPTANCE_CRITERION = /Acceptance[\s*_-]*criterion[\s*:.\-_]*([^\n]+)/i;
 const EVIDENCE_PATHS = /Evidence[\s*_-]*paths?[\s*:.\-_]*([^\n]+)/i;
 
 /**
@@ -235,6 +237,8 @@ function issueFromText(block: string, description: string): Finding {
   if (severity) issue.severity = severity[1].trim().toLowerCase();
   const scenario = FAILURE_SCENARIO.exec(block);
   if (scenario) issue.failureScenario = scenario[1].trim();
+  const criterion = ACCEPTANCE_CRITERION.exec(block);
+  if (criterion) issue.acceptanceCriterion = criterion[1].trim();
   const paths = EVIDENCE_PATHS.exec(block);
   if (paths) {
     const parsed = parseEvidencePaths(paths[1]);

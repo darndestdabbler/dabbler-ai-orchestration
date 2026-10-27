@@ -190,6 +190,7 @@ import {
   treeDigest,
 } from "./testEvidence.ts";
 import { judgeDisputeEvidence, recordDispute } from "./verify/disputes.ts";
+import { DISPUTE_EVIDENCE_INLINE_CAP } from "./verify/prompts.ts";
 import {
   EXIT_BLOCKING,
   EXIT_CALL_FAILED,
@@ -355,6 +356,25 @@ export function stepChangedPaths(diff: readonly string[], sessionsRel: string): 
 
 /** The step a red run of record asks for. */
 const RUN_OF_RECORD_FIX = "fix-run-of-record";
+
+/**
+ * The ask for a round's dispositions. It states the inline cap, because a
+ * bare cite of a file over it is refused.
+ */
+export function dispositionAsk(round: number): string {
+  return (
+    `Verification round ${round} found what is listed under \`reasons\`, numbered. Answer ` +
+    "with a disposition for every finding marked blocking (and any other you choose), as " +
+    "JSON written to a file outside the tracked tree, then run the answer command. The " +
+    'file carries exactly: {"dispositions": [{"finding_index": <number>, "action": "fix"} ' +
+    'or {"finding_index": <number>, "action": "reject", "reason": "<why the finding is ' +
+    'wrong>", "evidence_paths": ["<repository-relative path, or path:START-END>"]}]}. ' +
+    `A cited file over ${DISPUTE_EVIDENCE_INLINE_CAP.toLocaleString("en-US")} bytes is cited ` +
+    "as path:START-END. A reject becomes a dispute the next round must engage, and a " +
+    "dispute without evidence is refused. Change no file now: the fixes are asked for as a " +
+    "step after your answer."
+  );
+}
 
 /**
  * Where an accepted fix of a red run of record goes. A tree that is still
@@ -3974,19 +3994,6 @@ class Driver {
     }
   }
 
-  private dispositionAsk(round: number): string {
-    return (
-      `Verification round ${round} found what is listed under \`reasons\`, numbered. Answer ` +
-      "with a disposition for every finding marked blocking (and any other you choose), as " +
-      "JSON written to a file outside the tracked tree, then run the answer command. The " +
-      'file carries exactly: {"dispositions": [{"finding_index": <number>, "action": "fix"} ' +
-      'or {"finding_index": <number>, "action": "reject", "reason": "<why the finding is ' +
-      'wrong>", "evidence_paths": ["<repository-relative path, optionally path:START-END>"]}]}. ' +
-      "A reject becomes a dispute the next round must engage, and a dispute without evidence " +
-      "is refused. Change no file now: the fixes are asked for as a step after your answer."
-    );
-  }
-
   private async phaseDispositions(): Promise<void> {
     const round = latestRound(this.repoRoot, this.sessionNumber);
     if (round === null || round["blocking"] !== true) {
@@ -4010,7 +4017,7 @@ class Driver {
       const instruction = await this.converse({
         kind: "rejection",
         round: roundNumber,
-        ask: this.dispositionAsk(roundNumber),
+        ask: dispositionAsk(roundNumber),
         reasons: [
           ...findings.map((finding, index) => describeFinding(index, finding)),
           ...refusals,

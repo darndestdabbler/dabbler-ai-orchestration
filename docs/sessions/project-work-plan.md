@@ -326,7 +326,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 286 | Three tooling fixes from the field | no | 2026-10-27 |
 | 287 | Release 3.25.0 (release: 3.25.0) | yes | 2026-10-27 |
 | 288 | The landed tree is the verified tree, and a failed run of record can be re-run | no | 2026-10-27 |
-| 289 | A round sees what earlier rounds asked | — | not declared |
+| 289 | A round sees what earlier rounds asked | no | 2026-10-27 |
 | 290 | Packaging and the Mechanic, from the field | — | not declared |
 | 291 | Release 3.26.0 (release: 3.26.0) | — | not declared |
 
@@ -3439,3 +3439,9 @@ Release 3.25.0: the framework packs and publishes what is on the trunk.
 **Releasable: no.**
 
 Close two stops a field report found around the run of record. First, measure in a test what a `fix-run-of-record` answered with no change does today (whether a round opens, whether the suite runs again). Then `judgeLandReadiness` judges the paths moved since the verified tree instead of only naming them: any moved path other than the session's own records refuses the land, naming them, and `phaseLand` sends the run back to verification before `git add`, so nothing unverified is committed or pushed. Then a `fix-run-of-record` answered with no change, over a tree that is still the verified tree, goes straight back to the run of record instead of `preverify`, so the suite runs again without a verification round; a changed answer still goes through verification. Last, a verification round that follows a failed run of record is told, in its task block, which suite failed and with what command, and that the framework asked for the fix -- without being told the edit is excused.
+
+### Session 289 — A round sees what earlier rounds asked
+
+**Releasable: no.**
+
+Make a verification round see what earlier rounds asked. The verdict parser reads each finding's Acceptance criterion line, the round record stores it beside the failure scenario, and priorFindingsBlock shows it to later rounds under the finding. The verification prompt's section on the tests in the diff gains one sentence asking, where every test replaces a boundary (an in-memory database, a stubbed client, a partial seed), for evidence that the shipped configuration and the real path are exercised at least once; and its existing sentence on tests edited to pass names an allow-list, scan or contract test changed in the same diff as the thing it guards. The dispositions ask states that a cited file over 16,384 bytes is cited as path:START-END.

@@ -22,6 +22,7 @@ const ISSUE_BLOCK = `ISSUES FOUND
   - **Severity:** Major
   - **Evidence paths:** ai_router/gates.py:42, ai_router/session.py
   - **Failure scenario:** every close on a v3 set fails
+  - **Acceptance criterion:** does closing a v3 set exit 0?
 - **Issue 2:** typo in the report header
   - **Severity:** Minor
 `;
@@ -53,6 +54,7 @@ describe("verdict parsing", () => {
     assert.equal(issues[0].severity, "major");
     assert.equal(issues[0].category, "Correctness");
     assert.match(String(issues[0].failureScenario), /^every close/);
+    assert.equal(issues[0].acceptanceCriterion, "does closing a v3 set exit 0?");
     assert.ok(issues[0].evidencePaths?.includes("ai_router/gates.py"));
     assert.equal(issues[1].severity, "minor");
   });

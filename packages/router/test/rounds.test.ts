@@ -12,6 +12,7 @@ import {
   blockingFindings,
   dispatchVerification,
   droppedParams,
+  findingRows,
   noRoundReason,
   reportedInputTokens,
   runOfRecordLines,
@@ -127,6 +128,17 @@ describe("what a round says it cost", () => {
     assert.throws(() =>
       appendRound(repo, 7, { ...base, premium_requests: "fourteen" }),
     );
+  });
+});
+
+describe("the findings a round records", () => {
+  it("stores each finding's acceptance criterion, and invents none", () => {
+    const asked = { description: "d", severity: "major", acceptanceCriterion: "does it exit 0?" };
+    const silent = { description: "e", severity: "minor" };
+    const [first, second] = findingRows([asked, silent], [asked]);
+    assert.equal(first?.["acceptanceCriterion"], "does it exit 0?");
+    assert.equal(first?.["blocking"], true);
+    assert.equal("acceptanceCriterion" in (second ?? {}), false);
   });
 });
 

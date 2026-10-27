@@ -231,6 +231,10 @@ export function priorFindingsBlock(
       if (scenario) {
         lines.push(`  - Failure scenario: ${sliceCodePoints(String(scenario), 300)}`);
       }
+      const criterion = finding["acceptanceCriterion"];
+      if (criterion) {
+        lines.push(`  - Acceptance criterion: ${sliceCodePoints(String(criterion), 300)}`);
+      }
       if (dispute) {
         lines.push(
           "  - Orchestrator's rebuttal (grounds): " + String(dispute["grounds"]),

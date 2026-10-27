@@ -84,6 +84,7 @@ import {
   waitingForInstruction,
   gateSetBound,
   recordDisputesFor,
+  dispositionAsk,
   jobDeadlineSeconds,
   jobDurations,
   jobIsADeadlineRetry,
@@ -504,6 +505,12 @@ describe("a stop the framework can cure", () => {
     assert.equal(written.refusals.length, 1);
     assert.match(String(written.refusals[0]), /finding 1 was refused \(exit 2\)/);
     assert.match(String(written.refusals[0]), /over the inline cap/);
+  });
+
+  it("asks for dispositions naming the inline cap a bare cite is refused over", () => {
+    // Sessions 33 and 57 were refused twice each: the ask called the range
+    // optional, and the ledger refused a large file cited without one.
+    assert.match(dispositionAsk(2), /A cited file over 16,384 bytes is cited as path:START-END/);
   });
 });
 

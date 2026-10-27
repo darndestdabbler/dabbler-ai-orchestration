@@ -328,7 +328,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 288 | The landed tree is the verified tree, and a failed run of record can be re-run | no | 2026-10-27 |
 | 289 | A round sees what earlier rounds asked | no | 2026-10-27 |
 | 290 | Packaging and the Mechanic, from the field | no | 2026-10-27 |
-| 291 | Release 3.26.0 (release: 3.26.0) | — | not declared |
+| 291 | Release 3.26.0 (release: 3.26.0) | yes | 2026-10-27 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3455,3 +3455,9 @@ Fix three packaging and Mechanic defects from the field, then stamp 3.26.0. runS
 **Amended after acceptance:**
 
 - 2026-10-27 — step 'mechanic-on-the-sessions-engine': its files: The Mechanic's on-a-real-checkout fixture stopped on provider-unreachable, which now hands back; it now stops on no-verdict, and its run engine is the pull loop's cli so its existing launch assertion proves the declared engine is used (claude-code (anthropic, claude-opus-5-5))
+
+### Session 291 — Release 3.26.0 (release: 3.26.0)
+
+**Releasable: yes.**
+
+Release 3.26.0: the framework packs and publishes what is on the trunk.

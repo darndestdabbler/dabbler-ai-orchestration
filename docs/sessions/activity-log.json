@@ -12888,6 +12888,13 @@
       "what": "step 'mechanic-on-the-sessions-engine': its files",
       "reason": "The Mechanic's on-a-real-checkout fixture stopped on provider-unreachable, which now hands back; it now stops on no-verdict, and its run engine is the pull loop's cli so its existing launch assertion proves the declared engine is used",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 291,
+      "dateTime": "2026-10-27T09:44:32.278000-04:00",
+      "task": "Release 3.26.0: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

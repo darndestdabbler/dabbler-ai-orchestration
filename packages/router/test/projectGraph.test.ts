@@ -48,6 +48,29 @@ describe("the project graph", () => {
     assert.deepEqual(usedBy(graph, "Csv.Model"), ["Csv.Api", "Csv.Tests"]);
   });
 
+  it("scans for the projects when the solution file lists none", () => {
+    const root = tempDir("graph-empty-slnx-");
+    seed(root, {
+      "Csv.slnx": "<Solution>\n</Solution>\n",
+      "src/Csv/Csv.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>\n',
+    });
+    const graph = readProjectGraph(root);
+    assert.equal(graph.ecosystem, "dotnet");
+    assert.deepEqual(graph.projects.map((project) => project.path), ["src/Csv/Csv.csproj"]);
+  });
+
+  it("reads the solution file that lists projects when a .sln and a .slnx both stand", () => {
+    const root = tempDir("graph-two-solutions-");
+    seed(root, {
+      "Csv.slnx": "<Solution>\n</Solution>\n",
+      "Csv.sln": 'Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Csv", "src\\Csv\\Csv.csproj", "{1}"\nEndProject\n',
+      "src/Csv/Csv.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>\n',
+      // Not in the listing solution, so not in the solution.
+      "scratch/Stray/Stray.csproj": "<Project />\n",
+    });
+    assert.deepEqual(readProjectGraph(root).projects.map((project) => project.path), ["src/Csv/Csv.csproj"]);
+  });
+
   it("reads a Maven parent's two modules, the sibling dependency and the Spring Boot service", () => {
     const root = tempDir("graph-maven-");
     const parent = "  <parent><groupId>com.example</groupId><artifactId>csv-parent</artifactId><version>0.1.0</version></parent>\n";

@@ -504,11 +504,30 @@ export function checkEvidenceCap(rendered: string): void {
   // UTF-16 units, so an astral character would be charged twice.
   const length = [...rendered].length;
   if (length > cap) {
+    const largest = largestFiles(rendered);
     throw new EvidenceTooLargeError(
-      `evidence bundle is ${length} chars (cap ${cap}). Split ` +
+      `evidence bundle is ${length} chars (cap ${cap}).` +
+        (largest.length === 0 ? "" : ` Largest: ${largest.join(", ")}.`) +
+        " Build output belongs in .gitignore, and untracked (git rm --cached) " +
+        "where it was committed; only where the work itself is this large, split " +
         "the session or raise AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS.",
     );
   }
+}
+
+/** The files that take most of a bundle, by the chars of their diff or inlined contents. */
+function largestFiles(rendered: string, count = 5): string[] {
+  const sizes = new Map<string, number>();
+  let current: string | null = null;
+  for (const line of rendered.split("\n")) {
+    const header = /^diff --git a\/(.+?) b\//.exec(line) ?? /^\*\*(.+)\*\*$/.exec(line);
+    if (header) current = header[1] as string;
+    if (current !== null) sizes.set(current, (sizes.get(current) ?? 0) + line.length + 1);
+  }
+  return [...sizes]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, count)
+    .map(([path, size]) => `${path} (${size} chars)`);
 }
 
 // --- Changed lines ----------------------------------------------------------

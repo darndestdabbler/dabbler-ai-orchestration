@@ -573,6 +573,16 @@ export function recordStateWrite(sessionsDir: string, repoRoot?: string | null):
  * is itself a finding: absence is the signature a fully-simulated session
  * leaves.
  */
+/**
+ * The close's refusal where the run records are gone. Nothing rebuilds them,
+ * and a state file matching a commit is not a sanctioned write, so the one
+ * forward exit is a person's rollback.
+ */
+export const LEDGER_ABSENT =
+  `no sanctioned-writer record exists for ${STATE_FILENAME} (state-writes ledger absent): ` +
+  "this session's run records under .dabbler/ are gone, and nothing can rebuild them. " +
+  "The way forward is a person's: dabbler session rollback --reason \"<why>\", or Rollback to Start of This Session in the Work Explorer";
+
 export function detectOutOfBandWrite(
   sessionsDir: string,
   repoRoot?: string | null,
@@ -589,10 +599,7 @@ export function detectOutOfBandWrite(
     text = readFileSync(stateWritesPath(root), "utf8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return requireRecord
-        ? `no sanctioned-writer record exists for ${STATE_FILENAME} ` +
-            "(state-writes ledger absent)"
-        : null;
+      return requireRecord ? LEDGER_ABSENT : null;
     }
     return `state-writes ledger unreadable (${String(error)})`;
   }

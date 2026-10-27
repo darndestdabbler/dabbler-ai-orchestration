@@ -9,7 +9,7 @@ import { describe, it } from "node:test";
 
 import { ensureRootFiles, ignoreBuildOutput, javaReleaseOf, setJavaSource } from "../src/ecosystem.ts";
 import { readProjectGraph } from "../src/projectGraph.ts";
-import { seed, tempDir } from "./support/answers.ts";
+import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 
 describe("the Maven root files", () => {
   /** Two Maven modules and no parent POM yet: the model, and the reports depending on it. */
@@ -176,11 +176,41 @@ describe("the build output a step's check writes", () => {
     });
     const graph = readProjectGraph(root);
     assert.equal(ensureRootFiles(root, graph), null);
-    assert.deepEqual(ignoreBuildOutput(root, graph), [".gitignore"]);
+    assert.deepEqual(ignoreBuildOutput(root, graph).changed, [".gitignore"]);
     assert.match(readFileSync(join(root, ".gitignore"), "utf8"), /^target\/$/m);
     // `mvn package` with the shade plugin writes this beside the module's POM.
     assert.match(readFileSync(join(root, ".gitignore"), "utf8"), /^dependency-reduced-pom\.xml$/m);
-    assert.deepEqual(ignoreBuildOutput(root, graph), []);
+    assert.deepEqual(ignoreBuildOutput(root, graph), { changed: [], untracked: [] });
+  });
+
+  it("is untracked where it was already committed and the rule already stands, and stays on disk", () => {
+    // dave-csv-parser-test: 680 build files landed before bin/ was ignored,
+    // and once tracked, the rule could not help.
+    const root = tempDir("dotnet-tracked-");
+    seed(root, {
+      ".git/HEAD": "ref: refs/heads/main\n",
+      ".gitignore": "# mine\nbuild/\nbin/\nobj/\nTestResults/\ncoverage*.json\ncoverage*.xml\n",
+      "src/Csv/Csv.csproj": "<Project />\n",
+    });
+    const asked: string[][] = [];
+    const restore = gitAnswers([
+      [["ls-files"], (args) => (asked.push([...args]), { stdout: "src/Csv/bin/Debug/Csv.dll\0src/Csv/obj/project.assets.json\0" })],
+      [["rm", "--cached"], (args) => (asked.push([...args]), {})],
+    ]);
+    try {
+      const ignored = ignoreBuildOutput(root, readProjectGraph(root));
+      assert.deepEqual(ignored, {
+        changed: [],
+        untracked: ["src/Csv/bin/Debug/Csv.dll", "src/Csv/obj/project.assets.json"],
+      });
+    } finally {
+      restore();
+    }
+    // Matched by the framework's own rules alone, never the person's
+    // `build/`; untracked from the index, which leaves the files on disk.
+    assert.ok(asked[0]?.includes("--exclude=bin/") && !asked[0].includes("--exclude=build/"), asked[0]?.join(" "));
+    assert.ok(!asked[0]?.includes("--exclude-standard"));
+    assert.deepEqual(asked[1]?.slice(0, 3), ["rm", "--cached", "-q"]);
   });
 
   it("includes what `dotnet test` and Coverlet write inside a test project", () => {
@@ -188,7 +218,7 @@ describe("the build output a step's check writes", () => {
     // made a step's own check change the tree it was measuring.
     const root = tempDir("dotnet-");
     seed(root, { "tests/CsvTests/CsvTests.csproj": "<Project />\n" });
-    assert.deepEqual(ignoreBuildOutput(root, readProjectGraph(root)), [".gitignore"]);
+    assert.deepEqual(ignoreBuildOutput(root, readProjectGraph(root)).changed, [".gitignore"]);
     const ignore = readFileSync(join(root, ".gitignore"), "utf8");
     for (const rule of [/^TestResults\/$/m, /^coverage\*\.json$/m, /^coverage\*\.xml$/m]) assert.match(ignore, rule);
   });

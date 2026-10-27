@@ -3616,17 +3616,17 @@ class Driver {
   private writeRootFiles(): void {
     const graph = readProjectGraph(this.repoRoot);
     const written = ensureRootFiles(this.repoRoot, graph);
-    const wrote = [
-      ...new Set([...(written?.written ?? []), ...(written?.changed ?? []), ...ignoreBuildOutput(this.repoRoot, graph)]),
-    ];
-    if (wrote.length === 0) return;
+    const ignored = ignoreBuildOutput(this.repoRoot, graph);
+    const wrote = [...new Set([...(written?.written ?? []), ...(written?.changed ?? []), ...ignored.changed])];
+    const untracked = [...new Set([...(written?.untracked ?? []), ...ignored.untracked])];
+    if (wrote.length === 0 && untracked.length === 0) return;
     const tree =
       this.run.baseline_tree === null
         ? snapshotWorktreeTree(this.repoRoot)
-        : treeWithPaths(this.repoRoot, String(this.run.baseline_tree), wrote);
+        : treeWithPaths(this.repoRoot, String(this.run.baseline_tree), wrote, untracked);
     if (tree !== null) this.run = { ...this.run, baseline_tree: tree };
     this.save();
-    this.log("root-files", { wrote });
+    this.log("root-files", untracked.length === 0 ? { wrote } : { wrote, untracked: untracked.length });
   }
 
   // --- the framework's own long work -----------------------------------------

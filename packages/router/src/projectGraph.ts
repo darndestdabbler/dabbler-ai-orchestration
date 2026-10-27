@@ -68,29 +68,36 @@ function rootNames(root: string): string[] {
 
 // --- .NET ---------------------------------------------------------------------
 
-/** The projects a root solution file lists, as absolute paths, or null where the root has none. */
+function slnxProjects(root: string, name: string): string[] {
+  return (elementsOf(join(root, name)) ?? [])
+    .filter((element) => element.name === "Project" && element.attributes["Path"])
+    .map((element) => resolve(root, posix(element.attributes["Path"] as string)));
+}
+
+function slnProjects(root: string, name: string): string[] {
+  let text = "";
+  try {
+    text = readText(join(root, name));
+  } catch {
+    return [];
+  }
+  return [...text.matchAll(/^Project\("[^"]*"\)\s*=\s*"[^"]*",\s*"([^"]+\.csproj)"/gim)].map((match) =>
+    resolve(root, posix(match[1] as string)),
+  );
+}
+
+/**
+ * The projects the first root solution file that lists any names, as absolute
+ * paths, or null where none does. An empty solution is what `dotnet new sln`
+ * writes, and reading it as "no projects" hid every `.csproj` beside it.
+ */
 function solutionProjects(root: string): string[] | null {
   const names = rootNames(root);
-  const slnx = names.find((name) => name.toLowerCase().endsWith(".slnx"));
-  if (slnx !== undefined) {
-    const elements = elementsOf(join(root, slnx)) ?? [];
-    return elements
-      .filter((element) => element.name === "Project" && element.attributes["Path"])
-      .map((element) => resolve(root, posix(element.attributes["Path"] as string)));
-  }
-  const sln = names.find((name) => name.toLowerCase().endsWith(".sln"));
-  if (sln !== undefined) {
-    let text = "";
-    try {
-      text = readText(join(root, sln));
-    } catch {
-      return [];
-    }
-    return [...text.matchAll(/^Project\("[^"]*"\)\s*=\s*"[^"]*",\s*"([^"]+\.csproj)"/gim)].map((match) =>
-      resolve(root, posix(match[1] as string)),
-    );
-  }
-  return null;
+  const lists = [
+    ...names.filter((name) => name.toLowerCase().endsWith(".slnx")).map((name) => slnxProjects(root, name)),
+    ...names.filter((name) => name.toLowerCase().endsWith(".sln")).map((name) => slnProjects(root, name)),
+  ];
+  return lists.find((projects) => projects.length > 0) ?? null;
 }
 
 function dotnetKind(elements: readonly XmlElement[]): ProjectKind {

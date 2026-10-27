@@ -12895,6 +12895,21 @@
       "dateTime": "2026-10-27T09:44:32.278000-04:00",
       "task": "Release 3.26.0: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 292,
+      "dateTime": "2026-10-27T11:26:08.911000-04:00",
+      "task": "Fix the .NET detection bug that let build output reach a repository, and make the stops it caused say what to do. An empty root solution file (.slnx or .sln listing no projects) falls back to the .csproj scan, and where both a .sln and a .slnx stand at the root the one that lists projects is read (projectGraph.ts). Whenever the framework ensures its own ignore rules it also untracks already-tracked files those rules match, leaving them on disk, so the deletions land with the session as the .gitignore line does (ecosystem.ts). The evidence cap's refusal names the largest contributors to the bundle and points at .gitignore before the environment variable (facts.ts). The close's refusal for an absent state-writes ledger says the run records are gone and that the way forward is a person's `dabbler session rollback`; the gate itself is unchanged (evidence.ts, surfaced through gates.ts).",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 292,
+      "dateTime": "2026-10-27T11:28:08.060000-04:00",
+      "what": "step 'enforce-ignore-rules': its files",
+      "reason": "The tree snapshot starts from HEAD, so a file untracked only in the index stayed in every snapshot and a check still changed it; the snapshot must start from the index the land commits, and the step baseline must drop the untracked paths.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

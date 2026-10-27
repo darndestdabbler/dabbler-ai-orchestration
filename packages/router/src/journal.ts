@@ -21,11 +21,15 @@
 import { spawnSync } from "node:child_process";
 import {
   closeSync,
+  copyFileSync,
+  existsSync,
   mkdirSync,
   realpathSync,
   openSync,
   renameSync,
   rmSync,
+  statSync,
+  utimesSync,
   writeFileSync,
   writeSync,
   fsyncSync,
@@ -157,6 +161,26 @@ export function runGit(
     stdout: stripNewlines(result.stdout as string),
     stderr: result.stderr,
   };
+}
+
+/**
+ * One git call over `paths`, handed over in a file rather than as arguments:
+ * a build's output runs to a thousand paths, which is past what one Windows
+ * command line holds.
+ */
+export function runGitOnPaths(
+  repoRoot: string,
+  args: readonly string[],
+  paths: readonly string[],
+  options: RunGitOptions = {},
+): GitResult {
+  const listPath = join(tmpdir(), `dabbler-pathspec-${uniqueSuffix()}`);
+  writeFileSync(listPath, paths.join("\0"), "utf8");
+  try {
+    return runGit(repoRoot, [...args, `--pathspec-from-file=${listPath}`, "--pathspec-file-nul"], options);
+  } finally {
+    rmSync(listPath, { force: true });
+  }
 }
 
 /** The same call, answering with the exact bytes git wrote. */
@@ -587,7 +611,17 @@ function snapshotWorktreeTreeOnce(repoRoot: string): string | null {
   const tempIndex = join(tmpdir(), `dabbler-verify-index-${uniqueSuffix()}`);
   const env = { GIT_INDEX_FILE: tempIndex };
   try {
-    if (runGit(repoRoot, ["read-tree", "HEAD"], { env }).code !== 0) {
+    // From the index, which is what the land commits: a file untracked there
+    // but still in HEAD is gone from the session's tree, not kept by HEAD. A
+    // linked worktree's `.git` is a file, and there HEAD is the start.
+    const indexPath = join(repoRoot, ".git", "index");
+    if (existsSync(indexPath)) {
+      copyFileSync(indexPath, tempIndex);
+      // Git trusts an entry's stat data only when the file is older than the
+      // index; a copy stamped now would hide an edit made in the same second.
+      const { atime, mtime } = statSync(indexPath);
+      utimesSync(tempIndex, atime, mtime);
+    } else if (runGit(repoRoot, ["read-tree", "HEAD"], { env }).code !== 0) {
       if (runGit(repoRoot, ["read-tree", "--empty"], { env }).code !== 0) {
         return null;
       }
@@ -609,16 +643,28 @@ function snapshotWorktreeTreeOnce(repoRoot: string): string | null {
 }
 
 /**
- * `tree` with `paths` taken from the working tree, or null when git refuses:
- * a baseline moved past the files the framework wrote and past nothing else,
- * so a step is still measured against everything it changed itself.
+ * `tree` with `paths` taken from the working tree and `removed` dropped, or
+ * null when git refuses: a baseline moved past the files the framework wrote
+ * and untracked and past nothing else, so a step is still measured against
+ * everything it changed itself.
  */
-export function treeWithPaths(repoRoot: string, tree: string, paths: readonly string[]): string | null {
+export function treeWithPaths(
+  repoRoot: string,
+  tree: string,
+  paths: readonly string[],
+  removed: readonly string[] = [],
+): string | null {
   const tempIndex = join(tmpdir(), `dabbler-verify-index-${uniqueSuffix()}`);
   const env = { GIT_INDEX_FILE: tempIndex };
   try {
     if (runGit(repoRoot, ["read-tree", tree], { env }).code !== 0) return null;
-    if (runGit(repoRoot, ["add", "--", ...paths], { env }).code !== 0) return null;
+    if (paths.length > 0 && runGit(repoRoot, ["add", "--", ...paths], { env }).code !== 0) return null;
+    if (
+      removed.length > 0 &&
+      runGitOnPaths(repoRoot, ["rm", "--cached", "-q", "--ignore-unmatch"], removed, { env }).code !== 0
+    ) {
+      return null;
+    }
     const written = runGit(repoRoot, ["write-tree"], { env });
     return written.code === 0 && written.stdout ? written.stdout : null;
   } finally {

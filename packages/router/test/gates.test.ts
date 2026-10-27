@@ -31,6 +31,7 @@ import {
   type PushFacts,
   type VerificationFacts,
 } from "../src/gates.ts";
+import { LEDGER_ABSENT } from "../src/evidence.ts";
 import { type SuiteLoadResult, type SuiteSpec, freshnessVerdict } from "../src/testEvidence.ts";
 
 const SESSIONS = "docs/sessions";
@@ -171,6 +172,8 @@ describe("verification_clean: the rounds, then the tree", () => {
     });
     assert.equal(judgeVerification(facts({ root: null }), SESSIONS)[1], "not inside a git repository: docs/sessions");
     assert.match(judgeVerification(facts({ outOfBand: "sessions.json edited" }), SESSIONS)[1], /^session-state integrity: sessions\.json edited\./);
+    // Run records deleted by hand: no forward exit but a person's rollback, and the refusal says so.
+    assert.match(judgeVerification(facts({ outOfBand: LEDGER_ABSENT }), SESSIONS)[1], /ledger absent.*dabbler session rollback/);
     assert.equal(judgeVerification(facts({ current: null }), SESSIONS)[1], "no session is in flight under docs/sessions");
     assert.match(judgeVerification(facts({ rounds: null, ledgerError: "bad row" }), SESSIONS)[1], /unreadable or invalid \(bad row\)/);
     assert.match(judgeVerification(facts({ rounds: [] }), SESSIONS)[1], /no verification round is recorded/);

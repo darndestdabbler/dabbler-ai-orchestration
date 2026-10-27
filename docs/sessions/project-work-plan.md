@@ -329,6 +329,9 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 289 | A round sees what earlier rounds asked | no | 2026-10-27 |
 | 290 | Packaging and the Mechanic, from the field | no | 2026-10-27 |
 | 291 | Release 3.26.0 (release: 3.26.0) | yes | 2026-10-27 |
+| 292 | .NET build output is ignored from the first project | no | 2026-10-27 |
+| 293 | Small defects from the field | — | not declared |
+| 294 | Release 3.27.0 (release: 3.27.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3461,3 +3464,13 @@ Fix three packaging and Mechanic defects from the field, then stamp 3.26.0. runS
 **Releasable: yes.**
 
 Release 3.26.0: the framework packs and publishes what is on the trunk.
+
+### Session 292 — .NET build output is ignored from the first project
+
+**Releasable: no.**
+
+Fix the .NET detection bug that let build output reach a repository, and make the stops it caused say what to do. An empty root solution file (.slnx or .sln listing no projects) falls back to the .csproj scan, and where both a .sln and a .slnx stand at the root the one that lists projects is read (projectGraph.ts). Whenever the framework ensures its own ignore rules it also untracks already-tracked files those rules match, leaving them on disk, so the deletions land with the session as the .gitignore line does (ecosystem.ts). The evidence cap's refusal names the largest contributors to the bundle and points at .gitignore before the environment variable (facts.ts). The close's refusal for an absent state-writes ledger says the run records are gone and that the way forward is a person's `dabbler session rollback`; the gate itself is unchanged (evidence.ts, surfaced through gates.ts).
+
+**Amended after acceptance:**
+
+- 2026-10-27 — step 'enforce-ignore-rules': its files: The tree snapshot starts from HEAD, so a file untracked only in the index stayed in every snapshot and a check still changed it; the snapshot must start from the index the land commits, and the step baseline must drop the untracked paths. (claude-code (anthropic, claude-opus-5-5))

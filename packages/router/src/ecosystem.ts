@@ -16,6 +16,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { runGit, runGitOnPaths } from "./journal.ts";
 import type { ProjectGraph } from "./projectGraph.ts";
 
 export type EcosystemKey = "dotnet" | "maven";
@@ -32,6 +33,8 @@ export interface ScaffoldResult {
    * claim about who owns it.
    */
   readonly changed?: readonly string[];
+  /** Tracked files the framework's ignore rules match, untracked and left on disk. */
+  readonly untracked?: readonly string[];
   /** Anything the scaffold could not place and says so about. */
   readonly notes: readonly string[];
 }
@@ -70,14 +73,15 @@ const BUILD_OUTPUT: Readonly<Record<string, readonly [readonly string[], string]
  * Ignore what the ecosystem's build writes inside the repository, for a
  * solution of any size and whoever wrote its root build files. A step's own
  * check builds, and output nothing ignores is a check that changed the tree it
- * was measuring. `.gitignore` when it gained a line, else nothing.
+ * was measuring. `.gitignore` when it gained a line, and the tracked output
+ * the rules untracked.
  */
-export function ignoreBuildOutput(root: string, graph: ProjectGraph): string[] {
+export function ignoreBuildOutput(root: string, graph: ProjectGraph): { changed: string[]; untracked: string[] } {
   const output = graph.ecosystem === null ? undefined : BUILD_OUTPUT[graph.ecosystem];
-  if (output === undefined) return [];
-  const result = { written: [] as string[], skipped: [] as string[], changed: [] as string[] };
+  if (output === undefined) return { changed: [], untracked: [] };
+  const result = { written: [] as string[], skipped: [] as string[], changed: [] as string[], untracked: [] as string[] };
   ensureIgnoreRules(root, output[0], output[1], result);
-  return [...result.written, ...result.changed];
+  return { changed: [...result.written, ...result.changed], untracked: result.untracked };
 }
 
 function posix(path: string): string {
@@ -95,12 +99,17 @@ function posix(path: string): string {
  * the time a second module is declared -- so write-once meant these rules
  * were never written at all, which is exactly how they were measured
  * missing on the second walk of the Java walkthrough.
+ *
+ * A rule is enforced, not only written: `.gitignore` cannot untrack a file
+ * already committed, and tracked build output is a tree every build changes.
+ * The files these rules alone match are untracked and left on disk; what a
+ * person wrote in `.gitignore` is not read.
  */
 function ensureIgnoreRules(
   root: string,
   rules: readonly string[],
   why: string,
-  result: { written: string[]; skipped: string[]; changed: string[] },
+  result: { written: string[]; skipped: string[]; changed: string[]; untracked?: string[] },
 ): void {
   const path = join(root, ".gitignore");
   const existing = existsSync(path) ? readFileSync(path, "utf8") : null;
@@ -111,14 +120,20 @@ function ensureIgnoreRules(
   const missing = rules.filter((rule) => !lines.includes(rule));
   if (missing.length === 0) {
     result.skipped.push(".gitignore");
-    return;
+  } else {
+    const separator = existing === null || existing === "" ? "" : existing.endsWith("\n") ? "\n" : "\n\n";
+    writeFileSync(path, `${existing ?? ""}${separator}${why}\n${missing.join("\n")}\n`, "utf8");
+    // Created, or somebody else's file that gained a line. The second is the
+    // ordinary case -- bootstrap writes `.gitignore` before any module is
+    // declared -- and calling it "wrote" would misreport the normal path.
+    (existing === null ? result.written : result.changed).push(".gitignore");
   }
-  const separator = existing === null || existing === "" ? "" : existing.endsWith("\n") ? "\n" : "\n\n";
-  writeFileSync(path, `${existing ?? ""}${separator}${why}\n${missing.join("\n")}\n`, "utf8");
-  // Created, or somebody else's file that gained a line. The second is the
-  // ordinary case -- bootstrap writes `.gitignore` before any module is
-  // declared -- and calling it "wrote" would misreport the normal path.
-  (existing === null ? result.written : result.changed).push(".gitignore");
+  if (!existsSync(join(root, ".git"))) return;
+  const tracked = runGit(root,["ls-files", "-z", "-c", "-i", ...rules.map((rule) => `--exclude=${rule}`)]);
+  const matched = tracked.code === 0 ? tracked.stdout.split("\0").filter((file) => file !== "") : [];
+  if (matched.length > 0 && runGitOnPaths(root, ["rm", "--cached", "-q"], matched).code === 0) {
+    result.untracked?.push(...matched);
+  }
 }
 
 function writeIfAbsent(root: string, rel: string, text: string, result: { written: string[]; skipped: string[] }): void {
@@ -153,6 +168,7 @@ function rootFilesDotnet(root: string, graph: ProjectGraph): ScaffoldResult {
     written: [] as string[],
     skipped: [] as string[],
     changed: [] as string[],
+    untracked: [] as string[],
     notes: [] as string[],
   };
   writeIfAbsent(
@@ -300,6 +316,7 @@ function rootFilesMaven(root: string, graph: ProjectGraph): ScaffoldResult {
     written: [] as string[],
     skipped: [] as string[],
     changed: [] as string[],
+    untracked: [] as string[],
     notes: [] as string[],
   };
   const moduleDirs: string[] = [];

@@ -83,11 +83,17 @@ describe("the evidence", () => {
 });
 
 describe("the evidence cap", () => {
-  it("refuses over the cap and names the variable that raises it, and falls back when the variable is not an integer", () => {
+  it("refuses over the cap naming the largest files and .gitignore before the variable that raises it, and falls back when the variable is not an integer", () => {
     process.env[CAP_ENV] = "10";
     try {
       assert.throws(() => checkEvidenceCap("x".repeat(11)), EvidenceTooLargeError);
       assert.throws(() => checkEvidenceCap("x".repeat(11)), /evidence bundle is 11 chars \(cap 10\)/);
+      // The refusal names what is large, and .gitignore before the variable.
+      const bundle =
+        "diff --git a/src/Parser.cs b/src/Parser.cs\n+small\n" +
+        "\n**src/bin/Debug/Csv.deps.json**\n```\n" + "y".repeat(40) + "\n```\n";
+      assert.throws(() => checkEvidenceCap(bundle), /Largest: src\/bin\/Debug\/Csv\.deps\.json \(\d+ chars\), src\/Parser\.cs/);
+      assert.throws(() => checkEvidenceCap(bundle), /\.gitignore.*AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS/s);
       process.env[CAP_ENV] = "600k";
       assert.doesNotThrow(() => checkEvidenceCap("x".repeat(1000)));
     } finally {

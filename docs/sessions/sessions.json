@@ -5675,9 +5675,9 @@
     {
       "number": 285,
       "title": "The session plan outranks the author's own plan",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-27T07:30:47.530000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-27T07:40:11.870000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

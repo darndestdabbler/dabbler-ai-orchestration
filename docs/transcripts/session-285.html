@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 285 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 285 transcript</h1>
+<p class="stamp">Rendered 2026-10-27T11:40:15.381Z by dabbler-ai-router 3.23.0 at 28de5581ad2f7684797e5e7d5f159c5e35948e77.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-27T07:30:57.989-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 285 of 287: The session plan outranks the author's own plan</h3>
+<p>Scope: <code>packages/router/prompt-templates/verification.md</code> (Completeness, Scope and simplicity, the tests in the diff), <code>packages/router/src/drive.ts</code> (<code>planAsk</code>'s <code>non_goals</code> line), <code>packages/router/src/session.ts</code> (the <code>plan</code> subcommand); their tests</p>
+<p><strong>Why.</strong> A field report on a downstream .NET project (CT.DPH Syndromic-Surveillance, sessions 1-16, all VERIFIED), checked against this source and reviewed by GPT-5.6 Sol on 2026-10-27, found two causes behind most of what went wrong. First, the author's own work plan quietly cut required scope and nothing told the reviewer the session plan outranks it: session 11 declared a non-goal of &quot;no new Domain model fields&quot; against a session plan that required mapping ~64 of them; sessions 10-15 each deferred production wiring to &quot;a later session&quot; that the plan never names, so after the last reconciliation session nothing in <code>Program.cs</code> reads, parses, maps or persists a message; session 16 exempted 6 of 11 metric columns in a non-goal. The prompt today holds the work to its non-goals (work INSIDE one is blocking) and says nothing about a non-goal that removes required work. Second, in session 6 the author ran <code>dabbler session plan</code> during a fix round, rewrote the project plan to call a blocking requirement &quot;undeliverable&quot;, and cited the rewritten file in the dispute that cleared it -- <code>recordProjectPlan</code> has no guard. The same report showed quantitative criteria scaled down (1,000 kills to 30, 1M messages to 100k in memory) and existing golden files rewritten in place to make tests pass.</p>
+<p><strong>Step 1 -- one precedence rule for the reviewer.</strong> <code>verification.md</code> states it once, under Completeness: the session plan's section, and the documents it cites, are the requirement; the work plan's task and non-goals are the author's own reading of it. A non-goal that excludes, narrows or defers something the session plan requires of this session is itself a blocking Completeness finding, beside the missing work. Deferral is acceptable only to a later session the plan names as owning it. The non-goal rule under Scope and simplicity is unchanged: it still governs work done beyond the task.</p>
+<p><strong>Step 2 -- the tests are not edited to pass.</strong> One sentence under *The tests in the diff*: an existing test or golden file weakened or rewritten in place to make the change pass, or a number the session plan states (a count, a size, a real dependency) scaled down without a recorded decision, is a Completeness finding.</p>
+<p><strong>Step 3 -- the author is told the same rule.</strong> <code>planAsk</code>'s <code>non_goals</code> line adds that a non-goal may not exclude what the session's section requires, and may defer work only to a later session the plan names. One rule, read by both roles.</p>
+<p><strong>Step 4 -- the project plan does not move mid-session.</strong> <code>dabbler session plan</code> refuses while a session is in progress, naming the session and saying the plan is recorded before the next start, or by a person after a cancel. Cites the session 6 incident in its comment.</p>
+<p><strong>Non-goals.</strong> A review of the work plan before the work starts. A <code>spec_deviations</code> field or any sign-off machinery. A schema-parity check or any other new gate. Widening the verifier's telemetry scope (it constrains no read). Any change to how a non-goal is dropped.</p>
+<p><strong>Tests.</strong> In <code>prompts.test.ts</code>, the reviewer's prompt for a session with a work plan carries the precedence rule. In <code>drive.test.ts</code>, the plan ask carries the deferral rule. In <code>session.test.ts</code>, <code>session plan</code> is refused while a session is in progress and accepted when none is.</p>
+<p><strong>Releasable.</strong> Yes -- with 286, as 3.25.0 in session 287.</p>
+<h2>Work Plan</h2>
+<p>Make the session plan outrank the author's own work plan, for both roles, and stop the project plan moving mid-session. The reviewer's prompt (verification.md) states once, under Completeness, that the session plan's section and the documents it cites are the requirement and the work plan's task and non-goals are the author's reading of it: a non-goal that excludes, narrows or defers required work is itself a blocking Completeness finding, and deferral is acceptable only to a later session the plan names. Under The tests in the diff, one sentence makes a test or golden file weakened or rewritten in place to pass, or a stated number scaled down without a recorded decision, a Completeness finding. planAsk's non_goals line tells the author the same rule. <code>dabbler session plan</code> refuses while a session is in flight, naming it. Each change carries one test.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/809d533b094f15bba46ce50f1dc9c3ddf5169636"><code>809d533b094f15bba46ce50f1dc9c3ddf5169636</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Reviewer precedence</td><td><p>In packages/router/prompt-templates/verification.md, add the precedence rule under Completeness (session plan section and cited documents are the requirement; a non-goal that excludes, narrows or defers required work is a blocking Completeness finding beside the missing work; deferral only to a later session the plan names), and one sentence under The tests in the diff (a test or golden file weakened or rewritten in place to pass, or a number the session plan states scaled down without a recorded decision, is a Completeness finding). In packages/router/test/prompts.test.ts, assert the reviewer's prompt for a session with a work plan carries the precedence rule.</p></td><td><span class="mono">packages/router/prompt-templates/verification.md</span><br><span class="mono">packages/router/test/prompts.test.ts</span></td><td><code>node --test packages/router/test/prompts.test.ts</code></td><td>yes</td></tr>
+<tr><td>Author deferral rule</td><td><p>In packages/router/src/drive.ts, extend planAsk's non_goals line: a non-goal may not exclude what the session's section requires, and may defer work only to a later session the plan names. In packages/router/test/drive.test.ts, assert the plan ask carries the deferral rule.</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/drive.test.ts</span></td><td><code>node --test packages/router/test/drive.test.ts</code></td><td>yes</td></tr>
+<tr><td>Plan refuses in flight</td><td><p>In packages/router/src/session.ts, make the <code>plan</code> subcommand refuse while a session is in flight (inFlightSession), naming the session and saying the plan is recorded before the next start, or by a person after a cancel; the comment cites the downstream session-6 incident (a fix round rewrote the project plan to call a blocking requirement undeliverable and the dispute cited it). In packages/router/test/session.test.ts, assert it is refused while a session is in progress and accepted when none is (updating the existing recording test, which registers a start first).</p></td><td><span class="mono">packages/router/src/session.ts</span><br><span class="mono">packages/router/test/session.test.ts</span></td><td><code>node --test packages/router/test/session.test.ts</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>A review of the work plan before the work starts.</li><li>A spec_deviations field or any sign-off machinery.</li><li>A schema-parity check or any other new gate.</li><li>Widening the verifier's telemetry scope.</li><li>Any change to how a non-goal is dropped.</li><li>Any change to the non-goal rule under Scope and simplicity, which still governs work beyond the task.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[11:30:58]</span> <span class="muted">run-started</span> session=285 mode=pull</div>
+<div class="line"><span class="at">[11:30:58]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[11:32:02]</span> <span class="muted">run-resumed</span> session=285 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[11:32:02]</span> <span class="muted">plan-accepted</span> steps=[&quot;reviewer-precedence&quot;,&quot;author-deferral-rule&quot;,&quot;plan-refuses-in-flight&quot;] non_goals=6</div>
+<div class="line"><span class="at">[11:32:03]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[11:32:03]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=reviewer-precedence</div>
+<div class="line"><span class="at">[11:32:58]</span> <span class="muted">run-resumed</span> session=285 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[11:33:00]</span> <span class="muted">check-passed</span> step=reviewer-precedence argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/prompts.test.ts&quot;]</div>
+<div class="line"><span class="at">[11:33:05]</span> <span class="muted">named-tests-passed</span> step=reviewer-precedence suite=typescript command=node scripts/suite.mjs container packages/router/test/prompts.test.ts</div>
+<div class="line"><span class="at">[11:33:05]</span> <span class="muted">report-accepted</span> seq=2 step=reviewer-precedence files=[&quot;packages/router/prompt-templates/verification.md&quot;,&quot;packages/router/test/prompts.test.ts&quot;] notes=Precedence rule under Completeness, tests-not-edited-to-pass sentence, prompt test</div>
+<div class="line"><span class="at">[11:33:05]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=author-deferral-rule</div>
+<div class="line"><span class="at">[11:33:27]</span> <span class="muted">run-resumed</span> session=285 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[11:33:30]</span> <span class="muted">check-passed</span> step=author-deferral-rule argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/drive.test.ts&quot;]</div>
+<div class="line"><span class="at">[11:34:18]</span> <span class="muted">named-tests-passed</span> step=author-deferral-rule suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[11:34:19]</span> <span class="muted">report-accepted</span> seq=3 step=author-deferral-rule files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;] notes=planAsk non_goals line carries the deferral rule; drive test asserts it</div>
+<div class="line"><span class="at">[11:34:19]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=plan-refuses-in-flight</div>
+<div class="line"><span class="at">[11:34:48]</span> <span class="muted">run-resumed</span> session=285 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[11:34:53]</span> <span class="muted">check-passed</span> step=plan-refuses-in-flight argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/session.test.ts&quot;]</div>
+<div class="line"><span class="at">[11:34:58]</span> <span class="muted">named-tests-passed</span> step=plan-refuses-in-flight suite=typescript command=node scripts/suite.mjs container packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[11:34:59]</span> <span class="muted">report-accepted</span> seq=4 step=plan-refuses-in-flight files=[&quot;packages/router/src/session.ts&quot;,&quot;packages/router/test/session.test.ts&quot;] notes=session plan refuses while a session is in flight, naming it; tests for refused and accepted</div>
+<div class="line"><span class="at">[11:34:59]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[11:35:00]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[11:35:00]</span> <span class="muted">job-started</span> name=verification pid=19416 log=.dabbler/runs/s285/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[11:36:12]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s285/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[11:36:12]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[11:36:12]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[11:36:12]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[11:36:12]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=24756 log=.dabbler/runs/s285/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[11:36:15]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s285/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[11:36:15]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[11:36:15]</span> <span class="muted">job-started</span> name=run of record: typescript pid=23236 log=.dabbler/runs/s285/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[11:37:23]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="bad">1</span> log=.dabbler/runs/s285/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[11:37:23]</span> <span class="muted">tests-failed</span> command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[11:37:23]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=fix-run-of-record</div>
+<div class="line"><span class="at">[11:37:51]</span> <span class="muted">run-resumed</span> session=285 phase=<span class="milestone">run-of-record</span> mode=pull</div>
+<div class="line"><span class="at">[11:37:54]</span> <span class="muted">check-passed</span> step=fix-run-of-record argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/prompts.test.ts&quot;] owner=reviewer-precedence</div>
+<div class="line"><span class="at">[11:37:55]</span> <span class="muted">check-passed</span> step=fix-run-of-record argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/drive.test.ts&quot;] owner=author-deferral-rule</div>
+<div class="line"><span class="at">[11:37:58]</span> <span class="muted">check-passed</span> step=fix-run-of-record argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/session.test.ts&quot;] owner=plan-refuses-in-flight</div>
+<div class="line"><span class="at">[11:38:03]</span> <span class="muted">named-tests-passed</span> step=fix-run-of-record suite=typescript command=node scripts/suite.mjs container packages/router/test/cli.test.ts</div>
+<div class="line"><span class="at">[11:38:03]</span> <span class="muted">report-accepted</span> seq=5 step=fix-run-of-record files=[&quot;packages/router/test/cli.test.ts&quot;] notes=cli plan-prose test registered a session first; plan now refuses in flight, so the test records with none in progress</div>
+<div class="line"><span class="at">[11:38:03]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[11:38:04]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[11:38:04]</span> <span class="muted">job-started</span> name=verification pid=50280 log=.dabbler/runs/s285/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[11:38:37]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s285/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[11:38:37]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[11:38:37]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[11:38:38]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[11:38:38]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=28668 log=.dabbler/runs/s285/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[11:38:39]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s285/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[11:38:40]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[11:38:40]</span> <span class="muted">job-started</span> name=run of record: typescript pid=48412 log=.dabbler/runs/s285/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[11:39:48]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s285/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[11:39:48]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[11:39:48]</span> <span class="muted">job-started</span> name=run of record: extension pid=32772 log=.dabbler/runs/s285/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[11:40:05]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s285/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[11:40:05]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[11:40:08]</span> <span class="muted">landed</span> commit=809d533b094f15bba46ce50f1dc9c3ddf5169636</div>
+<div class="line"><span class="at">[11:40:08]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[11:40:09]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[11:40:09]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[11:40:09]</span> <span class="muted">job-started</span> name=close pid=25044 log=.dabbler/runs/s285/driver/jobs/close.log</div>
+<div class="line"><span class="at">[11:40:15]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s285/driver/jobs/close.log</div>
+<div class="line"><span class="at">[11:40:15]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>2 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>The in-flight check occurs before acquiring the lifecycle lock, leaving a TOCTOU race: a session can start after `inFlightSession()` returns `null` but before `plan()` acquires the lock, allowing the project plan to change mid-session.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>The work plan says each change carries a test, but the added prompt test does not assert the new tests/golden-files/scaled-number rule. Removing that sentence from `verification.md` would leave the added test passing.</td><td>not answered</td></tr>
+</table></td></tr>
+<tr><td>2</td><td>fix-delta</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>2 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** The TOCTOU race persists in `packages/router/src/session.ts`: the in-flight check still occurs before the lifecycle lock, and this delta changes only `packages/router/test/cli.test.ts`. A concurrent session can start between the check and lock acquisition. Move or repeat the check under the lock.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** The promised prompt test remains incomplete in `packages/router/test/prompts.test.ts`: nothing in this delta adds an assertion for the new existing-test/golden-file/scaled-number rule. Add an assertion that would fail if that sentence were removed from `verification.md`.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td></td><td></td><td></td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="bad">failed</span></td><td>67s</td><td></td><td></td><td></td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>67s</td><td>1383</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>296</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

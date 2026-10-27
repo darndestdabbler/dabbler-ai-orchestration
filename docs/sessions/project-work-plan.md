@@ -325,7 +325,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 285 | The session plan outranks the author's own plan | no | 2026-10-27 |
 | 286 | Three tooling fixes from the field | no | 2026-10-27 |
 | 287 | Release 3.25.0 (release: 3.25.0) | yes | 2026-10-27 |
-| 288 | The landed tree is the verified tree, and a failed run of record can be re-run | — | not declared |
+| 288 | The landed tree is the verified tree, and a failed run of record can be re-run | no | 2026-10-27 |
 | 289 | A round sees what earlier rounds asked | — | not declared |
 | 290 | Packaging and the Mechanic, from the field | — | not declared |
 | 291 | Release 3.26.0 (release: 3.26.0) | — | not declared |
@@ -3433,3 +3433,9 @@ Fix three tooling defects from the field report and set the version to 3.25.0. F
 **Releasable: yes.**
 
 Release 3.25.0: the framework packs and publishes what is on the trunk.
+
+### Session 288 — The landed tree is the verified tree, and a failed run of record can be re-run
+
+**Releasable: no.**
+
+Close two stops a field report found around the run of record. First, measure in a test what a `fix-run-of-record` answered with no change does today (whether a round opens, whether the suite runs again). Then `judgeLandReadiness` judges the paths moved since the verified tree instead of only naming them: any moved path other than the session's own records refuses the land, naming them, and `phaseLand` sends the run back to verification before `git add`, so nothing unverified is committed or pushed. Then a `fix-run-of-record` answered with no change, over a tree that is still the verified tree, goes straight back to the run of record instead of `preverify`, so the suite runs again without a verification round; a changed answer still goes through verification. Last, a verification round that follows a failed run of record is told, in its task block, which suite failed and with what command, and that the framework asked for the fix -- without being told the edit is excused.

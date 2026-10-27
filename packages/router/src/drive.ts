@@ -353,6 +353,23 @@ export function stepChangedPaths(diff: readonly string[], sessionsRel: string): 
   });
 }
 
+/** The step a red run of record asks for. */
+const RUN_OF_RECORD_FIX = "fix-run-of-record";
+
+/**
+ * Where an accepted fix of a red run of record goes. A tree that is still
+ * the verified tree has nothing for a round to review -- the suite was red
+ * for a reason outside the session's work -- so the suite runs again; a tree
+ * that moved goes where the fix asked, through verification. Pure: the
+ * paths moved since the verified tree in, null when that is unknown.
+ */
+export function afterRunOfRecordFix(
+  moved: readonly string[] | null,
+  then: DriverRun["phase"],
+): DriverRun["phase"] {
+  return moved !== null && moved.length === 0 ? "run-of-record" : then;
+}
+
 /** The Mechanic's log, under the sessions root: tracked, so its entry rides in the diff beside the fix. */
 export const MECHANIC_LOG_FILENAME = "mechanic-log.md";
 
@@ -3304,7 +3321,7 @@ class Driver {
     await this.runStep({ id, ask, files: [], checks: this.allPlanChecks(), fromPlan: false });
     this.run = { ...this.run, pending_step: null };
     this.save();
-    this.setPhase(then);
+    this.setPhase(id === RUN_OF_RECORD_FIX ? afterRunOfRecordFix(this.movedSinceVerified(), then) : then);
   }
 
   /**
@@ -4113,7 +4130,7 @@ class Driver {
       if (declared !== null && !declared[0]) {
         this.log("run-of-record-undeclared", { reason: declared[1] });
         await this.runSynthesisedStep(
-          "fix-run-of-record",
+          RUN_OF_RECORD_FIX,
           `The run of record has nothing to run: ${declared[1]}. The framework will run ` +
             "every step's checks, verification and the suite again.",
           "preverify",
@@ -4173,11 +4190,13 @@ class Driver {
       this.log("tests-failed", { command: suite.command });
       const failed = readRecords(this.repoRoot).filter((row) => row.suite === suite.name && row.stage === stage).at(-1);
       await this.runSynthesisedStep(
-        "fix-run-of-record",
+        RUN_OF_RECORD_FIX,
         `The run of record failed: \`${failed?.command || suite.command}\`, the ` +
           `${owed.whole ? "complete" : "targeted"} ${suite.name} suite ` +
           "against the verified tree. Fix the cause. The framework will run every step's " +
-          "checks, verification and the suite again.",
+          "checks, verification and the suite again. Where the cause is not in the tree " +
+          "-- a flaky test, something outside the repository -- answer with no change, " +
+          "and the suite runs again without a verification round.",
         "preverify",
       );
       return;
@@ -4230,18 +4249,26 @@ class Driver {
         surfaceNow: surfaceDigest(this.repoRoot, suite.covers, { sessionsDir: this.sessionsDir }),
       };
     });
-    let moved: string[] | null = null;
-    const round = latestRound(this.repoRoot, this.sessionNumber);
-    const verifiedTree = typeof round?.["completion_tree"] === "string" ? round["completion_tree"] : null;
-    const now = snapshotWorktreeTree(this.repoRoot);
-    if (verifiedTree !== null && now !== null) {
-      moved = changedPathsBetween(this.repoRoot, verifiedTree, now);
-    }
     return {
       treeNow: treeDigest(this.repoRoot, { sessionsDir: this.sessionsDir }),
       suites,
-      moved,
+      moved: this.movedSinceVerified(),
     };
+  }
+
+  /**
+   * The paths that moved since the tree the latest round verified, the
+   * session's bookkeeping left out; null when no round verified a tree or
+   * the diff could not be taken.
+   */
+  private movedSinceVerified(): string[] | null {
+    const round = latestRound(this.repoRoot, this.sessionNumber);
+    const verifiedTree = typeof round?.["completion_tree"] === "string" ? round["completion_tree"] : null;
+    if (verifiedTree === null) return null;
+    const now = snapshotWorktreeTree(this.repoRoot);
+    if (now === null) return null;
+    const diff = changedPathsBetween(this.repoRoot, verifiedTree, now);
+    return diff === null ? null : stepChangedPaths(diff, repoRelativePath(this.repoRoot, this.sessionsDir));
   }
 
   private phaseLand(): void {
@@ -4255,20 +4282,20 @@ class Driver {
       typeof row?.["title"] === "string" ? (row["title"] as string) : null,
       this.requirePlan().task,
     );
-    // Tested bytes are the landed bytes: judged before anything is added or
-    // committed, and refused by name -- the suite whose run the tree moved
-    // after, and the paths that moved.
+    // Tested bytes are the landed bytes, and verified bytes too: judged
+    // before anything is added or committed, and refused by name -- the
+    // paths that moved, and the suite whose run the tree moved after.
     const refusal = judgeLandReadiness(this.landFacts());
     if (refusal !== null) {
-      // The phase that remakes this evidence is not in doubt: the run of
-      // record is what tests the tree about to land, and a tree that moved
-      // after it is a suite to run again rather than a person to fetch.
-      // Bounded like every rewind -- the same refusal twice is a loop.
+      // A path no round saw goes back to verification, which is followed by
+      // the run of record; a tree a round saw but the suite did not is a
+      // suite to run again rather than a person to fetch. Bounded like every
+      // rewind -- the same refusal twice is a loop.
       this.rewindOrStop(
-        "run-of-record",
-        `land: ${refusal}`,
+        refusal.rewindTo,
+        `land: ${refusal.reason}`,
         "land",
-        `the tree is not the tree the run of record tested: ${refusal}`,
+        `the tree is not the tree that was verified and tested: ${refusal.reason}`,
       );
       return;
     }

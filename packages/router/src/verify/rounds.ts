@@ -115,7 +115,7 @@ import {
 } from "./errors.ts";
 import { EXIT_FUNDS } from "../contracts/exitCodes.ts";
 import { FundsError } from "../transports/api.ts";
-import { buildTaskBlock, sliceCodePoints } from "./prompts.ts";
+import { type FailedRunOfRecord, buildTaskBlock, sliceCodePoints } from "./prompts.ts";
 import { undisputedBlockingIndices } from "./disputes.ts";
 
 /**
@@ -439,6 +439,30 @@ export const DRIVER_RUNS_THE_REST = "The driver runs the rest.";
  * into a job log that the managed body tells the engine to read was four
  * sessions' worth of engines told to run verbs the pull forbids.
  */
+/**
+ * The latest run of record of this session that failed after the previous
+ * round was recorded, or null: what a round that follows it is told.
+ */
+async function failedRunOfRecordSince(
+  repoRoot: string,
+  sessionNumber: number,
+  previous: Row | null,
+): Promise<FailedRunOfRecord | null> {
+  const since = previous === null ? Number.NaN : Date.parse(String(previous["recorded_at"] ?? ""));
+  if (Number.isNaN(since)) return null;
+  const { OUTCOME_FAILED, STAGE_FINAL_FULL, STAGE_FINAL_TARGETED, readRecords } = await import("../testEvidence.ts");
+  const failed = readRecords(repoRoot)
+    .filter(
+      (row) =>
+        row.sessionNumber === sessionNumber &&
+        (row.stage === STAGE_FINAL_FULL || row.stage === STAGE_FINAL_TARGETED) &&
+        row.outcome === OUTCOME_FAILED &&
+        Date.parse(row.recordedAt) > since,
+    )
+    .at(-1);
+  return failed === undefined ? null : { suite: failed.suite, command: failed.command };
+}
+
 export async function runOfRecordLines(
   sessionsDir: string,
   config: RouterConfig,
@@ -784,6 +808,7 @@ export async function runRound(
   const selection = loadSelectionConfig(config).config;
   // Shown to the reviewer, never judged here.
   const untested = selectTests(repoRoot, changed, selection).unknownPaths;
+  const failedRunOfRecord = await failedRunOfRecordSince(repoRoot, current, priorRounds.at(-1) ?? null);
 
   // A code review round grants no write. The tests phase of spec 3.c.ii is
   // where the verifier authors tests, and a surface offered in every round
@@ -841,6 +866,7 @@ export async function runRound(
       repoRoot,
       grant,
       untested,
+      failedRunOfRecord,
     ),
     "session-verification",
     evidence,

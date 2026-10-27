@@ -1039,6 +1039,74 @@ describe("a red run of record, fixed, verified again, then run again", () => {
     assert.equal(session?.["status"], "complete");
     assert.equal(session?.["verificationVerdict"], "VERIFIED");
   });
+
+  it("answered with no change, over a suite red once and green after, runs the suite again and opens no second round", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    // Red the first time it runs and green after: a flaky test, which no
+    // change to the session's work can fix. The marker is ignored, so the
+    // tree does not move when it is written.
+    const repo = makeRepo(
+      {
+        ...SEED,
+        "tests/flaky.mjs":
+          "import { existsSync, mkdirSync, writeFileSync } from 'node:fs';\n" +
+          "if (existsSync('.dabbler/flaky-once')) process.exit(0);\n" +
+          "mkdirSync('.dabbler', { recursive: true });\n" +
+          "writeFileSync('.dabbler/flaky-once', '');\n" +
+          "process.exit(1);\n",
+      },
+      { origin: true },
+    );
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED, VERIFIED], {
+      ...TESTING,
+      suites: TESTING.suites.map((suite) =>
+        suite.name === "unit" ? { ...suite, command: "node tests/flaky.mjs" } : suite,
+      ),
+    });
+    await capture(() =>
+      Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
+    );
+    const plan = await next(sessionsDir);
+    assert.equal(await answerPlan(sessionsDir, plan.instruction?.seq ?? 0, PLAN), EXIT_OK);
+    const step = await next(sessionsDir);
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+    assert.equal(
+      (await answerStep(sessionsDir, step.instruction?.seq ?? 0, "widget", ["src/widget.py"])).code,
+      EXIT_OK,
+    );
+
+    const unitRuns = (): number =>
+      readRecords(repo).filter((row) => row.suite === "unit" && row.stage === "final-full").length;
+    const walk = async (until: (instruction: DriverInstruction) => boolean): Promise<DriverInstruction> => {
+      const deadline = Date.now() + 180_000;
+      for (;;) {
+        const move = await next(sessionsDir);
+        const instruction = move.instruction;
+        if (instruction === null) assert.fail(`next printed no instruction (exit ${move.code}); stderr:\n${move.err}`);
+        if (until(instruction)) return instruction;
+        if (instruction.kind !== "wait") assert.fail(`the framework asked for ${instruction.kind} ${String(instruction.step_id)}`);
+        if (Date.now() > deadline) assert.fail("the framework's own jobs never finished");
+        await settleJobs();
+      }
+    };
+
+    const fix = await walk((instruction) => instruction.kind === "step");
+    assert.equal(fix.step_id, "fix-run-of-record");
+    assert.equal(readRounds(repo, 1).length, 1);
+    assert.equal(unitRuns(), 1);
+
+    // Answered with nothing changed.
+    assert.equal((await answerStep(sessionsDir, fix.seq, "fix-run-of-record", [])).code, EXIT_OK);
+    const done = await walk((instruction) => instruction.kind === "done");
+    assert.equal(done.kind, "done");
+    // Nothing for a round to review: the suite ran again, and green, with no
+    // second round. Before, an unchanged tree opened round 2 anyway.
+    assert.equal(readRounds(repo, 1).length, 1);
+    assert.equal(unitRuns(), 2);
+  });
 });
 
 describe("a session paused, then moving again", () => {

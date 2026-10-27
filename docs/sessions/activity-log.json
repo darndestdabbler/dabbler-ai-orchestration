@@ -12859,6 +12859,13 @@
       "dateTime": "2026-10-27T08:32:41.732000-04:00",
       "task": "Release 3.25.0: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 288,
+      "dateTime": "2026-10-27T08:36:21.569000-04:00",
+      "task": "Close two stops a field report found around the run of record. First, measure in a test what a `fix-run-of-record` answered with no change does today (whether a round opens, whether the suite runs again). Then `judgeLandReadiness` judges the paths moved since the verified tree instead of only naming them: any moved path other than the session's own records refuses the land, naming them, and `phaseLand` sends the run back to verification before `git add`, so nothing unverified is committed or pushed. Then a `fix-run-of-record` answered with no change, over a tree that is still the verified tree, goes straight back to the run of record instead of `preverify`, so the suite runs again without a verification round; a changed answer still goes through verification. Last, a verification round that follows a failed run of record is told, in its task block, which suite failed and with what command, and that the framework asked for the fix -- without being told the edit is excused.",
+      "releasable": false
     }
   ]
 }

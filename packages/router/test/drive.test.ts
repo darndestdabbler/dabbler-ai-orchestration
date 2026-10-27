@@ -35,6 +35,7 @@ import {
   REGISTER_IDLE,
   REGISTER_REFUSE_START,
   REGISTER_START,
+  afterRunOfRecordFix,
   alreadyRewoundFor,
   closedAsk,
   sessionNext,
@@ -812,6 +813,14 @@ describe("interventionsClosing", () => {
     ]);
     assert.match(closing, /session 7 closed after 1 intervention\(s\)/);
     assert.match(closing, /Session 7 -- the plan now names H2 \(in 'publish': pom\.xml, docs\/sessions\/mechanic-log\.md\)/);
+  });
+});
+
+describe("afterRunOfRecordFix", () => {
+  it("runs the suite again over the verified tree, and sends a moved or unmeasured tree through verification", () => {
+    assert.equal(afterRunOfRecordFix([], "preverify"), "run-of-record");
+    assert.equal(afterRunOfRecordFix(["src/widget.py"], "preverify"), "preverify");
+    assert.equal(afterRunOfRecordFix(null, "preverify"), "preverify");
   });
 });
 

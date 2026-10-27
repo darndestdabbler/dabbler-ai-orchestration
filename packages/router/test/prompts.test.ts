@@ -209,6 +209,16 @@ describe("the task block a round opens with", () => {
     assert.ok(block.includes("no test named after them") && block.includes("- src/widget.py"));
     assert.ok(!buildTaskBlock(sessionsDir, 1, 1, [], null, repo, null, []).includes("no test named after them"));
   });
+
+  it("says which run of record failed after the previous round and that the framework asked for the fix, and nothing when none did", () => {
+    const repo = tempDir();
+    seed(repo, { "docs/sessions/session-plan.md": "### Session 1 of 1: First things\n1. Build the widget.\n" });
+    const sessionsDir = join(repo, "docs", "sessions");
+    const block = buildTaskBlock(sessionsDir, 1, 2, [], null, repo, null, [], { suite: "unit", command: "npm test" });
+    assert.ok(block.includes("The unit suite failed its run of record (`npm test`)"));
+    assert.ok(block.includes("the framework asked the author to fix the cause"));
+    assert.ok(!buildTaskBlock(sessionsDir, 1, 2, [], null, repo).includes("run of record failed"));
+  });
 });
 
 describe("the adjudicator's brief", () => {

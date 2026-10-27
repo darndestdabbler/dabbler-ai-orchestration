@@ -2,9 +2,12 @@
 // land, and nothing else does.
 //
 // The judgment here is pure -- facts in, a refusal out -- so the land and
-// its tests read one rule. The land asks two things of the tree it is about
-// to commit: that every suite it owes has a green run of record taken
-// against exactly this tree, and that nothing it owes went stale.
+// its tests read one rule. The land asks three things of the tree it is
+// about to commit: that nothing in it moved since the tree a round verified,
+// that every suite it owes has a green run of record taken against exactly
+// this tree, and that nothing it owes went stale.
+
+import { isSessionRecordPath } from "./journal.ts";
 
 export class LandError extends Error {
   constructor(message: string) {
@@ -33,10 +36,26 @@ export interface LandFacts {
   readonly treeNow: string | null;
   readonly suites: readonly LandSuiteFact[];
   /**
-   * The paths that moved since the verified tree; null when the diff could
-   * not be taken. Named in the refusal, never judged: the digests judge.
+   * The paths that moved since the verified tree, the session's bookkeeping
+   * left out; null when there is no verified tree or the diff could not be
+   * taken. Any of them that is not a session record was never reviewed.
    */
   readonly moved: readonly string[] | null;
+}
+
+/**
+ * Why the land must not happen, and the phase that cures it. A path that
+ * moved since the verified tree goes back to verification, because what
+ * lands must be what a round saw; a suite's reasons go back to the run of
+ * record.
+ */
+export interface LandRefusal {
+  readonly reason: string;
+  readonly rewindTo: "verify" | "run-of-record";
+}
+
+function namePaths(paths: readonly string[]): string {
+  return paths.slice(0, 8).join(", ") + (paths.length > 8 ? ` (+${paths.length - 8} more)` : "");
 }
 
 /**
@@ -44,17 +63,21 @@ export interface LandFacts {
  * because a land refused for one reason and refused again for the next is
  * two trips for one fact.
  */
-export function judgeLandReadiness(facts: LandFacts): string | null {
+export function judgeLandReadiness(facts: LandFacts): LandRefusal | null {
   const reasons: string[] = [];
   if (facts.treeNow === null) {
-    return "the tree could not be digested (failing closed)";
+    return { reason: "the tree could not be digested (failing closed)", rewindTo: "run-of-record" };
+  }
+  const unverified = (facts.moved ?? []).filter((path) => !isSessionRecordPath(path));
+  if (unverified.length > 0) {
+    reasons.push(`moved since the verified tree, and never reviewed: ${namePaths(unverified)}`);
   }
   const movedText =
     facts.moved === null
       ? "the paths that moved could not be measured"
       : facts.moved.length === 0
         ? "no path could be named"
-        : facts.moved.slice(0, 8).join(", ") + (facts.moved.length > 8 ? ` (+${facts.moved.length - 8} more)` : "");
+        : namePaths(facts.moved);
   for (const suite of facts.suites) {
     if (suite.latest === null) {
       reasons.push(`${suite.name} has no run of record`);
@@ -75,5 +98,6 @@ export function judgeLandReadiness(facts: LandFacts): string | null {
       );
     }
   }
-  return reasons.length === 0 ? null : reasons.join("; ");
+  if (reasons.length === 0) return null;
+  return { reason: reasons.join("; "), rewindTo: unverified.length > 0 ? "verify" : "run-of-record" };
 }

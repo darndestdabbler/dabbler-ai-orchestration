@@ -348,6 +348,28 @@ export function untestedBlock(untested: readonly string[]): string {
   ].join("\n");
 }
 
+/** A run of record that failed after the previous round: its suite and command. */
+export interface FailedRunOfRecord {
+  readonly suite: string;
+  readonly command: string;
+}
+
+/**
+ * Why the tree moved after a verified round: the run of record failed and
+ * the framework asked for the fix. The reviewer judges that fix like any
+ * change -- knowing why it was made is not the same as excusing it.
+ */
+export function runOfRecordBlock(failed: FailedRunOfRecord | null): string {
+  if (failed === null) return "";
+  return [
+    "#### The run of record failed after the previous round",
+    "",
+    `The ${failed.suite} suite failed its run of record (\`${failed.command}\`) against the ` +
+      "tree the previous round verified, and the framework asked the author to fix the " +
+      "cause. What changed since that round includes that fix.",
+  ].join("\n");
+}
+
 export function buildTaskBlock(
   sessionsDir: string,
   sessionNumber: number,
@@ -357,6 +379,7 @@ export function buildTaskBlock(
   repoRoot: string | null = null,
   grant: AgencyGrant | null = null,
   untested: readonly string[] = [],
+  failedRunOfRecord: FailedRunOfRecord | null = null,
 ): string {
   const parts: string[] = [];
   const prior = priorFindingsBlock(priorRounds, disputes, repoRoot);
@@ -373,6 +396,8 @@ export function buildTaskBlock(
   if (decisions) parts.push(decisions);
   const gap = untestedBlock(untested);
   if (gap) parts.push(gap);
+  const failed = runOfRecordBlock(failedRunOfRecord);
+  if (failed) parts.push(failed);
   const brief = grant !== null ? briefing(grant) : "";
   if (brief) parts.push(brief);
   return parts.join("\n\n");

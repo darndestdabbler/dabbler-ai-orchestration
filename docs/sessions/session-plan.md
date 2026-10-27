@@ -16520,7 +16520,7 @@ engine and the reviewing vehicle, and not the machine's. No new test.
 
 The framework publishes session 270 as 3.22.1 and nothing else.
 
-### Session 272 of 283: An API out of credits pauses for funds, and Continue resumes it
+### Session 272 of 287: An API out of credits pauses for funds, and Continue resumes it
 
 Scope: `packages/router/src/transports/api.ts` (the retry ladder),
 `packages/router/src/transports/copilot.ts` (the error classes),
@@ -16570,7 +16570,7 @@ funds kind, and the next instruction after it resumes the phase.
 
 **Releasable.** Yes -- with 273 to 278, as 3.23.0 in session 279.
 
-### Session 273 of 283: A cancelled session gets its transcript, marked cancelled
+### Session 273 of 287: A cancelled session gets its transcript, marked cancelled
 
 Scope: `packages/router/src/session.ts` (`cancel`, the rollback),
 `packages/router/src/transcript.ts` (the cancelled page),
@@ -16618,7 +16618,7 @@ the cancelled banner carries the reason and the last phase.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 274 of 283: The Mechanic, ported back to the router
+### Session 274 of 287: The Mechanic, ported back to the router
 
 Scope: `packages/router` -- `cli/consult.ts` (`--mechanic`), `drive.ts`
 (an intervention after the land rewinds to verify; the close lists
@@ -16670,7 +16670,7 @@ rewinds to verify and the close names it.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 275 of 283: The framework calls in the Mechanic without the person
+### Session 275 of 287: The framework calls in the Mechanic without the person
 
 Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` and
 `dabbler.mechanicModel` settings through the layers), `cli/configure.ts`
@@ -16752,7 +16752,7 @@ the Primary Model is refused.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 276 of 283: `off` names no Mechanic, and the Mechanic is walked past its stop
+### Session 276 of 287: `off` names no Mechanic, and the Mechanic is walked past its stop
 
 Scope: `packages/router` -- `driver.ts` (`renderStop`'s ways on),
 `config.ts` (the Mechanic's two readings); tests in `driver.test.ts`,
@@ -16786,7 +16786,7 @@ do, its budget, or its brief. A new verb or flag.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 277 of 283: Open a Mechanic, and what it did, in the extension
+### Session 277 of 287: Open a Mechanic, and what it did, in the extension
 
 Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 (*Open a Mechanic*), `src/providers/ActionRegistry.ts`,
@@ -16828,7 +16828,7 @@ each.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 278 of 283: A failed release is diagnosed, and one caused outside the repository retries in place
+### Session 278 of 287: A failed release is diagnosed, and one caused outside the repository retries in place
 
 Scope: `packages/router/src/drive.ts` (`phasePublish`'s stop and ways
 on), `packages/router/src/cli/consult.ts` (the release briefing); tests in
@@ -16871,11 +16871,11 @@ release resumes at publish. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 279.
 
-### Session 279 of 283: Release 3.23.0 (release: 3.23.0)
+### Session 279 of 287: Release 3.23.0 (release: 3.23.0)
 
 The framework publishes sessions 272 to 278 as 3.23.0 and nothing else.
 
-### Session 280 of 283: Open a Mechanic on a Copilot session in flight
+### Session 280 of 287: Open a Mechanic on a Copilot session in flight
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
 (`runOpenMechanic`); its test in `commandFlows.test.ts`; `version.json` and
@@ -16926,7 +16926,7 @@ stamp.
 **Releasable.** Yes -- with 281 and 282, as 3.24.0 in session 283; 3.23.1
 is never published on its own.
 
-### Session 281 of 283: An existing remote or folder is a starting point
+### Session 281 of 287: An existing remote or folder is a starting point
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts`
 (Set Up New Project: the remote prompt, the remote read before bootstrap,
@@ -16978,7 +16978,7 @@ offered as the starting point and nothing is deleted.
 
 **Releasable.** Yes -- with 280 and 282, as 3.24.0 in session 283.
 
-### Session 282 of 283: The planning session reads the code already there
+### Session 282 of 287: The planning session reads the code already there
 
 Scope: `packages/router/src/bootstrap/templates.ts` (`BOOTSTRAP_PLAN`,
 `PLAN_PROMPT`, `DECOMPOSITION_PROMPT`), `packages/router/src/drive.ts`
@@ -17023,6 +17023,123 @@ check:version` checks the stamp.
 
 **Releasable.** Yes -- with 280 and 281, as 3.24.0 in session 283.
 
-### Session 283 of 283: Release 3.24.0 (release: 3.24.0)
+### Session 283 of 287: Release 3.24.0 (release: 3.24.0)
 
 The framework publishes sessions 280, 281 and 282 as 3.24.0 and nothing else.
+
+### Session 285 of 287: The session plan outranks the author's own plan
+
+Scope: `packages/router/prompt-templates/verification.md` (Completeness,
+Scope and simplicity, the tests in the diff), `packages/router/src/drive.ts`
+(`planAsk`'s `non_goals` line), `packages/router/src/session.ts` (the `plan`
+subcommand); their tests
+
+**Why.** A field report on a downstream .NET project (CT.DPH
+Syndromic-Surveillance, sessions 1-16, all VERIFIED), checked against this
+source and reviewed by GPT-5.6 Sol on 2026-10-27, found two causes behind
+most of what went wrong. First, the author's own work plan quietly cut
+required scope and nothing told the reviewer the session plan outranks it:
+session 11 declared a non-goal of "no new Domain model fields" against a
+session plan that required mapping ~64 of them; sessions 10-15 each deferred
+production wiring to "a later session" that the plan never names, so after
+the last reconciliation session nothing in `Program.cs` reads, parses, maps
+or persists a message; session 16 exempted 6 of 11 metric columns in a
+non-goal. The prompt today holds the work to its non-goals (work INSIDE one
+is blocking) and says nothing about a non-goal that removes required work.
+Second, in session 6 the author ran `dabbler session plan` during a fix
+round, rewrote the project plan to call a blocking requirement
+"undeliverable", and cited the rewritten file in the dispute that cleared
+it -- `recordProjectPlan` has no guard. The same report showed quantitative
+criteria scaled down (1,000 kills to 30, 1M messages to 100k in memory) and
+existing golden files rewritten in place to make tests pass.
+
+**Step 1 -- one precedence rule for the reviewer.** `verification.md`
+states it once, under Completeness: the session plan's section, and the
+documents it cites, are the requirement; the work plan's task and non-goals
+are the author's own reading of it. A non-goal that excludes, narrows or
+defers something the session plan requires of this session is itself a
+blocking Completeness finding, beside the missing work. Deferral is
+acceptable only to a later session the plan names as owning it. The
+non-goal rule under Scope and simplicity is unchanged: it still governs work
+done beyond the task.
+
+**Step 2 -- the tests are not edited to pass.** One sentence under *The
+tests in the diff*: an existing test or golden file weakened or rewritten in
+place to make the change pass, or a number the session plan states (a
+count, a size, a real dependency) scaled down without a recorded decision,
+is a Completeness finding.
+
+**Step 3 -- the author is told the same rule.** `planAsk`'s `non_goals` line
+adds that a non-goal may not exclude what the session's section requires,
+and may defer work only to a later session the plan names. One rule, read by
+both roles.
+
+**Step 4 -- the project plan does not move mid-session.** `dabbler session
+plan` refuses while a session is in progress, naming the session and
+saying the plan is recorded before the next start, or by a person after a
+cancel. Cites the session 6 incident in its comment.
+
+**Non-goals.** A review of the work plan before the work starts. A
+`spec_deviations` field or any sign-off machinery. A schema-parity check or
+any other new gate. Widening the verifier's telemetry scope (it constrains
+no read). Any change to how a non-goal is dropped.
+
+**Tests.** In `prompts.test.ts`, the reviewer's prompt for a session with a
+work plan carries the precedence rule. In `drive.test.ts`, the plan ask
+carries the deferral rule. In `session.test.ts`, `session plan` is refused
+while a session is in progress and accepted when none is.
+
+**Releasable.** Yes -- with 286, as 3.25.0 in session 287.
+
+### Session 286 of 287: Three tooling fixes from the field
+
+Scope: `packages/router/src/session.ts` (`start`'s registration),
+`packages/router/src/ecosystem.ts` (`BUILD_OUTPUT`),
+`packages/router/src/drive.ts` (`unchangedStepFiles`); their tests;
+`version.json` and the manifests `npm run stamp:version` writes;
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The same field report found three defects that cost the downstream
+project rejections or a false record, each verified in this source on
+2026-10-27. `sessions.json` recorded `provider: openai` beside `model:
+claude-sonnet-5` for all 16 sessions, because `start` resolves the provider
+from the model and then registers the raw `--provider` flag instead.
+`dotnet test` writes `TestResults/` (a `--blame-hang` dump) and Coverlet
+writes `coverage.json` inside a test project; neither is ignored, so a
+step's check "changed the tree" (session 10) and a hang dump cost two of
+three refusals (session 7). And a step declaring
+`Migrations/0002_X.cs` logs `step-file-unchanged` when EF Core writes
+`Migrations/<timestamp>_0002_X.cs` (sessions 7, 12, 16).
+
+**Step 1 -- the resolved provider is the one recorded.** `start` passes the
+provider it resolved to `registerSessionStart`, so `sessions.json` and
+`change-log.md` name the same vendor.
+
+**Step 2 -- .NET test output is build output.** `BUILD_OUTPUT.dotnet` adds
+`TestResults/`, `coverage*.json` and `coverage*.xml`.
+
+**Step 3 -- a timestamped migration satisfies its declared name.**
+`unchangedStepFiles` treats a declared `dir/<Name>.cs` as changed when the
+tree changed `dir/<14 digits>_<Name>.cs`.
+
+**Step 4 -- the version and the words.** `version.json` goes to 3.25.0 (a
+minor: the reviewer's rule and the plan refusal are new behaviour), stamped
+with `npm run stamp:version`, and the changelog gets a 3.25.0 section naming
+what 285 and 286 changed for a developer.
+
+**Non-goals.** De-duplicating the change log's verification blocks (a second
+block for a re-verified session is true). Dependency scope for languages
+other than Python. Any generated-file pattern beyond EF Core's migration
+prefix.
+
+**Tests.** In `session.test.ts`, a start whose `--provider` disagrees with
+the model's vendor records the resolved one. In `ecosystem.test.ts`, the
+.NET rules carry the three patterns. In `drive.test.ts`, a timestamped
+migration satisfies its declared file. `npm run check:version` checks the
+stamp.
+
+**Releasable.** Yes -- with 285, as 3.25.0 in session 287.
+
+### Session 287 of 287: Release 3.25.0 (release: 3.25.0)
+
+The framework publishes sessions 285 and 286 as 3.25.0 and nothing else.

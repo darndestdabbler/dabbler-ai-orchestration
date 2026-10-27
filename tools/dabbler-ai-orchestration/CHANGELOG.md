@@ -10,6 +10,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.25.0] — 2026-10-27
+
+**The session plan is the requirement.** The author's own work plan is a
+reading of it, and the reviewer now holds the two apart. Three tooling
+defects a downstream .NET project hit are fixed alongside.
+
+### Changed
+
+- **A non-goal may not cut what the session plan requires.** The Primary
+  Reviewer is told that the session plan's section, and the documents it
+  cites, outrank the work plan's task and non-goals. A non-goal that
+  excludes, narrows or defers required work is a blocking Completeness
+  finding, unless it defers to a later session the plan names. The author's
+  plan ask states the same rule. Session 285.
+- **Tests are not edited to pass.** An existing test or golden file rewritten
+  in place to make the change pass, or a number the session plan states
+  scaled down without a recorded decision, is a Completeness finding.
+  Session 285.
+- **`dabbler session plan` refuses while a session is in progress.** The
+  project plan can no longer be rewritten mid-session and then cited in a
+  dispute. Record it before the next start, or after a cancel. Session 285.
+
+### Fixed
+
+- **The provider recorded is the model's vendor.** `session start` with a
+  `--provider` that disagrees with the model now records the provider the
+  model resolves to, so `sessions.json` and `change-log.md` name the same
+  vendor. Session 286.
+- **.NET test output is ignored as build output.** `TestResults/` (a
+  `--blame-hang` dump), `coverage*.json` and `coverage*.xml` join `bin/`
+  and `obj/` in `.gitignore`, so running `dotnet test` in a step's check no
+  longer changes the tree the check is measuring. Session 286.
+- **An EF Core migration satisfies its declared name.** A step declaring
+  `Migrations/0002_X.cs` no longer logs `step-file-unchanged` when EF Core
+  writes `Migrations/<timestamp>_0002_X.cs`. Session 286.
+
 ## [3.24.0] — 2026-10-26
 
 **Existing work is welcome.** A project no longer has to begin from a clean

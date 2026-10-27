@@ -56,7 +56,10 @@ export function ensureRootFiles(root: string, graph: ProjectGraph): ScaffoldResu
 
 /** What a build writes inside the projects it builds, by ecosystem, with the line that says why it is ignored. */
 const BUILD_OUTPUT: Readonly<Record<string, readonly [readonly string[], string]>> = {
-  dotnet: [["bin/", "obj/"], "# MSBuild's own output, which lands inside the project it built."],
+  dotnet: [
+    ["bin/", "obj/", "TestResults/", "coverage*.json", "coverage*.xml"],
+    "# MSBuild's own output, and what `dotnet test` and Coverlet write, which land inside the project they ran in.",
+  ],
   maven: [
     ["target/", "dependency-reduced-pom.xml"],
     "# Maven's own output, which lands inside the module it built, and the shade plugin's reduced POM beside it.",

@@ -854,6 +854,14 @@ describe("what belongs to a step and what does not", () => {
       [],
     );
   });
+
+  it("counts a timestamped migration as its declared file", () => {
+    // EF Core writes Migrations/<timestamp>_0002_X.cs for a declared Migrations/0002_X.cs.
+    const spec = { ...SPEC, files: ["Data/Migrations/0002_AddRows.cs"] };
+    const empty = report({ files_changed: [] });
+    assert.deepEqual(unchangedStepFiles(spec, empty, ["Data/Migrations/20261027120000_0002_AddRows.cs"]), []);
+    assert.deepEqual(unchangedStepFiles(spec, empty, ["Data/Migrations/2026_0002_AddRows.cs"]), spec.files);
+  });
 });
 
 describe("what a running job of another name means", () => {

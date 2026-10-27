@@ -624,15 +624,26 @@ export function judgeReportFiles(
  * a must-include while naming it failed the unchanged rule. A declared file
  * that DID change and is missing from the report is still refused, and the
  * step's checks remain the gate on the work itself.
+ *
+ * A declared `dir/<Name>.cs` is also satisfied by `dir/<14 digits>_<Name>.cs`:
+ * EF Core prefixes the migration it writes with a timestamp no plan can know.
  */
 export function unchangedStepFiles(
   spec: StepSpec,
   report: DriverReport,
   changed: readonly string[],
 ): string[] {
-  return spec.files.filter(
-    (file) => !report.files_changed.includes(file) && !changed.includes(file),
-  );
+  const touched = [...report.files_changed, ...changed];
+  return spec.files.filter((file) => {
+    const slash = file.lastIndexOf("/") + 1;
+    const dir = file.slice(0, slash);
+    const name = file.slice(slash);
+    return !touched.some(
+      (path) =>
+        path === file ||
+        (name.endsWith(".cs") && path.startsWith(dir) && /^\d{14}_/.test(path.slice(dir.length)) && path.slice(dir.length + 15) === name),
+    );
+  });
 }
 /**
  * The local executor's receipt: the same record the candidate mode writes,

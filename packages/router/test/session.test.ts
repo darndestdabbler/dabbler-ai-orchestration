@@ -875,6 +875,49 @@ describe("registering a session", () => {
     }
   });
 
+  it("records the provider resolved from the model, not the one the flag named", async () => {
+    // The field's sessions.json carried `provider: openai` beside a Claude
+    // model for sixteen sessions, while the change log named Anthropic.
+    const state = stateDir();
+    const every = ["DABBLER_ANTHROPIC_API_KEY", "DABBLER_OPENAI_API_KEY", "DABBLER_GEMINI_API_KEY"];
+    const held = every.map((name) => [name, process.env[name]] as const);
+    for (const name of every) delete process.env[name];
+    process.env["DABBLER_ANTHROPIC_API_KEY"] = "k";
+    try {
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic"] },
+        models: [
+          {
+            id: "claude-opus-5",
+            provider: "anthropic",
+            provider_source: "vendor-endpoint",
+            display_name: "claude-opus-5",
+            enabled: true,
+            price_category: null,
+            cost: null,
+            listed_at: "2026-09-11T00:00:00Z",
+          },
+        ],
+        retired: [],
+      });
+      const asking = { engine: "claude-code", provider: "openai", model: "claude-opus-5", refresh: async () => [] };
+      const started = await run(() => start(state.sessionsDir, asking));
+      assert.equal(started.code, EXIT_OK, started.err);
+      assert.equal((sessionOf(state.sessionsDir)["orchestrator"] as Record<string, unknown>)["provider"], "anthropic");
+      // A pull repeats the same flags, and the label it repeats is not a clash.
+      const continued = await run(() => start(state.sessionsDir, asking));
+      assert.equal(continued.code, EXIT_OK, continued.err);
+    } finally {
+      for (const [name, value] of held) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+      state.restore();
+    }
+  });
+
   it("continues silently under the identity on the record, twice over", async () => {
     // A pull sends the identity on every registering call, and an idempotent
     // path has to stay idempotent.

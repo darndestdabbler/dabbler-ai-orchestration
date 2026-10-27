@@ -35,6 +35,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 
 import {
   IdentityResolutionError,
+  resolveModelProvider,
   resolveOrchestratorIdentity,
 } from "./identity.ts";
 import { GEMINI_RETIRED, engineAliases, installedEngines } from "./engines.ts";
@@ -1632,6 +1633,11 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     // never read it would otherwise refuse a seat's model the refresh is about
     // to record, and tell the operator to run the refresh by hand.
     for (const line of await (options.refresh ?? refreshDiscovery)()) writeOut(`${line}\n`);
+    // The model names its vendor, so a --provider that disagrees is a label
+    // and not a contradiction: the vendor is what is compared and recorded,
+    // and a continuation repeating the same flags is not refused for it.
+    const vendor = resolveModelProvider(identity.model ?? (statedField(recordedIdentity(inFlight), "model") || null));
+    if (vendor !== null) identity = { ...identity, provider: vendor };
     try {
       loadConfig(undefined, checkout);
       // **A MODEL somebody chose that its role cannot actually be.**
@@ -1785,7 +1791,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     }
     registerSessionStart(sessionsDir, requested, {
       engine: identity.engine,
-      provider: identity.provider,
+      provider: authorProvider,
       model: identity.model,
       effort: identity.effort,
       totalSessions: options.totalSessions,

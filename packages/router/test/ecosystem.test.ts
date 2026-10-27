@@ -182,4 +182,14 @@ describe("the build output a step's check writes", () => {
     assert.match(readFileSync(join(root, ".gitignore"), "utf8"), /^dependency-reduced-pom\.xml$/m);
     assert.deepEqual(ignoreBuildOutput(root, graph), []);
   });
+
+  it("includes what `dotnet test` and Coverlet write inside a test project", () => {
+    // A `--blame-hang` dump under TestResults/ and Coverlet's coverage.json
+    // made a step's own check change the tree it was measuring.
+    const root = tempDir("dotnet-");
+    seed(root, { "tests/CsvTests/CsvTests.csproj": "<Project />\n" });
+    assert.deepEqual(ignoreBuildOutput(root, readProjectGraph(root)), [".gitignore"]);
+    const ignore = readFileSync(join(root, ".gitignore"), "utf8");
+    for (const rule of [/^TestResults\/$/m, /^coverage\*\.json$/m, /^coverage\*\.xml$/m]) assert.match(ignore, rule);
+  });
 });

@@ -10,6 +10,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.28.0] — 2026-10-30
+
+**Fewer dead ends from the field.** A downstream report on a .NET project
+found a release whose Mechanic could not be reached, checks refused for
+what an earlier check did, a red full test run retried four times without
+a change, and a pack that broke eleven sessions before the release that
+first ran it. This release fixes those.
+
+### Changed
+
+- **The Mechanic can be called in on a release session.** A release
+  session names no engine of its own, so the Mechanic, Open a Mechanic and
+  the Configuration pane now use the repository's configured engine and
+  model. Where none is configured, the stop names `dabbler configure
+  --engine` or `--mechanic-model`. Session 295.
+- **A check is judged on what it changed.** Each of a step's checks is
+  measured against the tree the check before it left, so a read-only check
+  after one that writes files is no longer refused for the earlier one's
+  changes. A refused check names up to five paths it moved. Session 296.
+- **`dabbler session rebaseline --path <file>`** moves the step's baseline
+  over the named files only. A refusal for a file a report left out prints
+  that command, or says to delete the file if it is scratch. Rebaselining
+  the whole tree is refused while the stopped step's own files are among
+  the uncommitted changes. Session 296.
+- **A setting chosen during a session is not counted as the step's work.**
+  `dabbler configure` run while a session is in flight no longer puts
+  `.vscode/settings.json` into the current step's changed files, unless the
+  step declares that file. Session 296.
+- **.NET test files are found wherever a test project sits.** Bootstrap
+  declares the repository root as the .NET test root. Suites already
+  declared are not rewritten. Session 296.
+- **A red run of record stops after two fixes that change nothing.** A
+  fix that changes no file runs the suite again, which is right once, for a
+  flaky test or a process holding a lock. The second such fix in a row now
+  stops the run with a `tests` stop the Mechanic can take, naming the
+  failing tests, instead of running the suite a third time. A fix that
+  changes a file resets the count. Session 297.
+- **A release starts only on a pack that works.** Starting a release
+  session now runs the declared pack into a scratch folder first. If it
+  fails, the start is refused with the pack's last lines, and its whole
+  output is kept in `.dabbler/release-rehearsal.log`. Nothing is
+  registered, so no release number is spent. Tag releases run no pack and
+  are not rehearsed. Session 297.
+
 ## [3.27.0] — 2026-10-27
 
 **Build output stays out, and small stops say what happened.** A first

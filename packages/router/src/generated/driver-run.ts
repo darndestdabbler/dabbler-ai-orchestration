@@ -279,6 +279,10 @@ export type DriverRun = {
    */
   preverify_heals?: number;
   /**
+   * How many accepted fixes of a red run of record in a row moved nothing in the tree. A no-change fix runs the suite again, which is right once for a cause outside the tree -- a lock a stray process held, a flaky test -- and a loop after that: at two the run stops instead of running the suite a third time. Any fix that moves the tree resets it. Absent is zero.
+   */
+  no_change_fixes?: number;
+  /**
    * Which driver holds this run. Every process that resumes the loop takes the lease by writing epoch+1 before its first move, and every later save is compare-and-swap against the disk: a save whose in-memory epoch is behind the file's is a stale attempt -- on 2026-09-02 two drivers wrote one run and phases were skipped silently -- and it stops instead of advancing state. Absent on records from before the fence; read as epoch 1.
    */
   lease_epoch?: number;

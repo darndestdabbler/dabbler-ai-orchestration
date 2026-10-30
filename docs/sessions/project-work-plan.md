@@ -334,7 +334,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 294 | Release 3.27.0 (release: 3.27.0) | yes | 2026-10-27 |
 | 295 | The Mechanic on a release session | no | 2026-10-30 |
 | 296 | A check is judged on what it changed | no | 2026-10-30 |
-| 297 | A failure seen early, not repeated late | — | not declared |
+| 297 | A failure seen early, not repeated late | no | 2026-10-30 |
 | 298 | Release 3.28.0 (release: 3.28.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -3506,3 +3506,13 @@ Judge each step check on what it changed. executeCheck already returns the tree 
 **Amended after acceptance:**
 
 - 2026-10-30 — step 'check-own-reference': its files: walk-session.test.ts asserts the changed-tree refusal's wording, which now names the moved path (claude-code (anthropic, claude-opus-5-5))
+
+### Session 297 — A failure seen early, not repeated late
+
+**Releasable: no.**
+
+Stop a red run of record from looping on no-change fixes, and start a release only on a pack that works. The driver run gains a no_change_fixes count (schema and generated type): afterRunOfRecordFix takes the count and returns the next phase and the new count -- a fix that moved the tree resets it and goes where it asked, a no-change fix increments it and runs the suite again, and the second consecutive no-change fix stops the run with a `tests` stop (which the Mechanic can take) naming the suite and the failing tests read from its run-of-record job log, instead of running the suite a third time. The fix-run-of-record ask says a no-change answer is for a cause outside the tree and that the second one stops. judgeReleasePreflight gains a rehearsal fact and refuses a release whose pack rehearsal fails, with the pack's last lines and the path of a log holding its whole output; releasePreflight runs rehearsePack only for a declared pack (never for a tag release) and only after the three cheap questions pass, and a refused start registers nothing. version.json goes to 3.28.0, stamped into the manifests with `npm run stamp:version`, and the changelog gets a 3.28.0 section naming what sessions 295, 296 and 297 changed for a developer.
+
+**Amended after acceptance:**
+
+- 2026-10-30 — step 'rehearse-at-release-start': its files: The Mechanic-on-a-refused-publish walk test simulated a feed refusal with a pack that always fails; the start now rehearses the pack, so the test starts on a working pack and switches to the refusing one after the start. (claude-code (anthropic, claude-opus-5-5))

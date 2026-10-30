@@ -134,7 +134,8 @@ import type {
   DriverRun,
   DriverWorkPlan,
 } from "./generated/index.ts";
-import { type Job, endJob, jobLogTail, jobStatusPath, pollJob, selfArgv, startJob } from "./jobs.ts";
+import { type Job, endJob, jobLogPath, jobLogTail, jobStatusPath, pollJob, selfArgv, startJob } from "./jobs.ts";
+import { TEST_FAILURE } from "./testOutput.ts";
 import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
 import { orchestratorOf, tryWriteProjection } from "./projection.ts";
 import {
@@ -379,18 +380,34 @@ export function dispositionAsk(round: number): string {
   );
 }
 
+/** How many fixes of a red run of record in a row may change nothing before the run stops. */
+export const NO_CHANGE_FIXES_BOUND = 2;
+
 /**
- * Where an accepted fix of a red run of record goes. A tree that is still
- * the verified tree has nothing for a round to review -- the suite was red
- * for a reason outside the session's work -- so the suite runs again; a tree
- * that moved goes where the fix asked, through verification. Pure: the
- * paths moved since the verified tree in, null when that is unknown.
+ * Where an accepted fix of a red run of record goes, and the count of
+ * no-change fixes after it. A tree that is still the verified tree has
+ * nothing for a round to review -- the suite was red for a reason outside
+ * the session's work -- so the suite runs again, once: the second such fix
+ * in a row is `stop`, because a third run of an unchanged tree is a loop. A
+ * tree that moved, or one that could not be measured, goes where the fix
+ * asked, through verification, and resets the count. Pure: the paths moved
+ * since the verified tree in, null when that is unknown.
  */
 export function afterRunOfRecordFix(
   moved: readonly string[] | null,
   then: DriverRun["phase"],
-): DriverRun["phase"] {
-  return moved !== null && moved.length === 0 ? "run-of-record" : then;
+  noChangeFixes: number,
+): { readonly phase: DriverRun["phase"] | "stop"; readonly noChangeFixes: number } {
+  if (moved === null || moved.length > 0) return { phase: then, noChangeFixes: 0 };
+  const count = noChangeFixes + 1;
+  return { phase: count >= NO_CHANGE_FIXES_BOUND ? "stop" : "run-of-record", noChangeFixes: count };
+}
+
+/** The tests a run-of-record job's log says failed, in order, each once. */
+export function failingTestsIn(log: string): string[] {
+  const named = new RegExp(`\\b${TEST_FAILURE} test=(\\S+)`);
+  const tests = log.split(/\r?\n/).flatMap((line) => named.exec(line)?.[1] ?? []);
+  return [...new Set(tests)];
 }
 
 /** The Mechanic's log, under the sessions root: tracked, so its entry rides in the diff beside the fix. */
@@ -3422,7 +3439,45 @@ class Driver {
     await this.runStep({ id, ask, files: [], checks: this.allPlanChecks(), fromPlan: false });
     this.run = { ...this.run, pending_step: null };
     this.save();
-    this.setPhase(id === RUN_OF_RECORD_FIX ? afterRunOfRecordFix(this.movedSinceVerified(), then) : then);
+    if (id !== RUN_OF_RECORD_FIX) {
+      this.setPhase(then);
+      return;
+    }
+    const after = afterRunOfRecordFix(this.movedSinceVerified(), then, this.run.no_change_fixes ?? 0);
+    this.run = { ...this.run, no_change_fixes: after.noChangeFixes };
+    this.save();
+    if (after.phase === "stop") throw this.unchangedRedStop();
+    this.setPhase(after.phase);
+  }
+
+  /**
+   * The stop a red run of record meets after the bound of fixes that changed
+   * nothing: the suite that is red and the tests its last run said failed.
+   * The reason stays the same each time the impasse is met; where the tests
+   * are, the log, rides in the brief.
+   */
+  private unchangedRedStop(): Stop {
+    const records = readRecords(this.repoRoot);
+    const red = this.expensiveSuites().filter((suite) => {
+      const latest = records
+        .filter((row) => row.suite === suite.name && (row.stage === STAGE_FINAL_FULL || row.stage === STAGE_FINAL_TARGETED))
+        .at(-1);
+      return latest !== undefined && latest.outcome !== OUTCOME_PASSED;
+    });
+    const named = red.map((suite) => {
+      const log = jobLogPath(this.repoRoot, this.sessionNumber, `run of record: ${suite.name}`);
+      const tests = existsSync(log) ? failingTestsIn(readFileSync(log, "utf8")) : [];
+      return { suite: suite.name, tests, log: repoRelativePath(this.repoRoot, log) };
+    });
+    const failing = named.flatMap((entry) => entry.tests);
+    return new Stop(
+      "tests",
+      `the run of record for ${named.map((entry) => entry.suite).join(", ") || "the suite"} stayed red after ` +
+        `${NO_CHANGE_FIXES_BOUND} fixes in a row that changed nothing, so it is not run a third time` +
+        (failing.length > 0 ? `; failing: ${failing.slice(0, 10).join(", ")}${failing.length > 10 ? ` and ${failing.length - 10} more` : ""}` : ""),
+      null,
+      named.length > 0 ? `The suite's own output: ${named.map((entry) => entry.log).join(", ")}.` : null,
+    );
   }
 
   /**
@@ -4276,9 +4331,10 @@ class Driver {
         `The run of record failed: \`${failed?.command || suite.command}\`, the ` +
           `${owed.whole ? "complete" : "targeted"} ${suite.name} suite ` +
           "against the verified tree. Fix the cause. The framework will run every step's " +
-          "checks, verification and the suite again. Where the cause is not in the tree " +
-          "-- a flaky test, something outside the repository -- answer with no change, " +
-          "and the suite runs again without a verification round.",
+          "checks, verification and the suite again. Answer with no change only where the " +
+          "cause is outside the tree -- a flaky test, a process holding a lock -- and the " +
+          "suite runs again without a verification round; the second no-change answer in a " +
+          "row stops the run instead.",
         "preverify",
       );
       return;

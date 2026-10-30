@@ -37,6 +37,7 @@ import {
   REGISTER_START,
   acceptanceMarks,
   afterRunOfRecordFix,
+  failingTestsIn,
   alreadyRewoundFor,
   closedAsk,
   sessionNext,
@@ -884,10 +885,27 @@ describe("interventionsClosing", () => {
 });
 
 describe("afterRunOfRecordFix", () => {
-  it("runs the suite again over the verified tree, and sends a moved or unmeasured tree through verification", () => {
-    assert.equal(afterRunOfRecordFix([], "preverify"), "run-of-record");
-    assert.equal(afterRunOfRecordFix(["src/widget.py"], "preverify"), "preverify");
-    assert.equal(afterRunOfRecordFix(null, "preverify"), "preverify");
+  it("runs the suite again over the verified tree once, and stops at the second no-change fix in a row", () => {
+    assert.deepEqual(afterRunOfRecordFix([], "preverify", 0), { phase: "run-of-record", noChangeFixes: 1 });
+    assert.deepEqual(afterRunOfRecordFix([], "preverify", 1), { phase: "stop", noChangeFixes: 2 });
+  });
+
+  it("sends a moved or unmeasured tree through verification and resets the count", () => {
+    assert.deepEqual(afterRunOfRecordFix(["src/widget.py"], "preverify", 1), { phase: "preverify", noChangeFixes: 0 });
+    assert.deepEqual(afterRunOfRecordFix(null, "preverify", 1), { phase: "preverify", noChangeFixes: 0 });
+  });
+});
+
+describe("failingTestsIn", () => {
+  it("names each test the run's log says failed, once", () => {
+    const log = [
+      "dabbler [13:00:01] project-running project=Widgets.Tests",
+      "dabbler [13:00:09] test-failed test=Widgets.Tests.Spins message=expected 1",
+      "dabbler [13:00:09] test-failed test=Widgets.Tests.Stops",
+      "dabbler [13:00:09] test-failed test=Widgets.Tests.Spins",
+    ].join("\n");
+    assert.deepEqual(failingTestsIn(log), ["Widgets.Tests.Spins", "Widgets.Tests.Stops"]);
+    assert.deepEqual(failingTestsIn("npm ERR! Test failed."), []);
   });
 });
 

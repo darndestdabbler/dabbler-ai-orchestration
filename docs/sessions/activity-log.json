@@ -12946,6 +12946,21 @@
       "what": "step 'check-own-reference': its files",
       "reason": "walk-session.test.ts asserts the changed-tree refusal's wording, which now names the moved path",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 297,
+      "dateTime": "2026-10-30T13:03:06.443000-04:00",
+      "task": "Stop a red run of record from looping on no-change fixes, and start a release only on a pack that works. The driver run gains a no_change_fixes count (schema and generated type): afterRunOfRecordFix takes the count and returns the next phase and the new count -- a fix that moved the tree resets it and goes where it asked, a no-change fix increments it and runs the suite again, and the second consecutive no-change fix stops the run with a `tests` stop (which the Mechanic can take) naming the suite and the failing tests read from its run-of-record job log, instead of running the suite a third time. The fix-run-of-record ask says a no-change answer is for a cause outside the tree and that the second one stops. judgeReleasePreflight gains a rehearsal fact and refuses a release whose pack rehearsal fails, with the pack's last lines and the path of a log holding its whole output; releasePreflight runs rehearsePack only for a declared pack (never for a tag release) and only after the three cheap questions pass, and a refused start registers nothing. version.json goes to 3.28.0, stamped into the manifests with `npm run stamp:version`, and the changelog gets a 3.28.0 section naming what sessions 295, 296 and 297 changed for a developer.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 297,
+      "dateTime": "2026-10-30T13:15:13.285000-04:00",
+      "what": "step 'rehearse-at-release-start': its files",
+      "reason": "The Mechanic-on-a-refused-publish walk test simulated a feed refusal with a pack that always fails; the start now rehearses the pack, so the test starts on a working pack and switches to the refusing one after the start.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

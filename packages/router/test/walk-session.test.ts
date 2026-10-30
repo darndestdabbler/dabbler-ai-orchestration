@@ -632,11 +632,13 @@ describe("a release session", () => {
     const settings = { [SETTING_ENGINE]: "claude-code", [SETTING_AUTHORING_MODEL]: "claude-sonnet-5-5" };
     const repo = makeRepo({ ...RELEASE_SEED, ".vscode/settings.json": JSON.stringify(settings) }, { origin: true });
     const sessionsDir = join(repo, "docs", "sessions");
-    // A pack the feed refuses, as an expired token is refused.
+    // A pack that works at the start, and that the feed refuses at the
+    // publish, as a token that expired in between is refused.
+    configure([], TESTING, PACK);
+    await startRelease(sessionsDir);
     configure([], TESTING, {
       packaging: { pack: { argv: [NODE, "-e", "console.error('feed: 401 Unauthorized'); process.exit(1)", "{output}", "{version}"] } },
     });
-    await startRelease(sessionsDir);
     const prompts: string[] = [];
     const launched: Array<readonly [string, string | null]> = [];
     const unsetMechanic = setMechanicLauncher((engine, model) => {

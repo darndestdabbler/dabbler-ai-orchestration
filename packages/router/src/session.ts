@@ -29,6 +29,7 @@ import {
   statSync,
   unlinkSync,
   utimesSync,
+  writeFileSync,
   writeSync,
 } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -129,7 +130,15 @@ import {
   runGates,
   sessionChangedNothing,
 } from "./gates.ts";
-import { PackagingConfigError, canonicalVersion, loadDeclaration, loadTagRelease, releaseVersion } from "./packaging.ts";
+import {
+  PackagingConfigError,
+  canonicalVersion,
+  loadDeclaration,
+  loadTagRelease,
+  rehearsalPassed,
+  rehearsePack,
+  releaseVersion,
+} from "./packaging.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { removeStopGate } from "./bootstrap/index.ts";
 import { dropSessionRecords, isSessionBookkeeping } from "./testEvidence.ts";
@@ -1360,12 +1369,21 @@ export interface ReleaseFacts {
   readonly unverified: readonly number[];
   /** What the version file says, where the version is kept in one; null where it is not. */
   readonly versionFile: { readonly path: string; readonly version: string | null; readonly reason: string } | null;
+  /** What the declared pack did, run into scratch; null where nothing was rehearsed. */
+  readonly rehearsal: { readonly passed: boolean; readonly tail: string; readonly log: string } | null;
 }
+
+/** Where a release start keeps the whole output of the pack it rehearsed, repository-relative. */
+export const RELEASE_REHEARSAL_LOG = ".dabbler/release-rehearsal.log";
+
+/** How many of the pack's last lines a refused start shows. */
+const REHEARSAL_TAIL_LINES = 15;
 
 /**
  * Why session `number`, a release of `version`, cannot start, with its way
- * forward -- or null. Three questions and no fourth: nothing here probes a
- * feed or a credential, which only a real push can answer.
+ * forward -- or null. Four questions and no fifth: the pack is run, and
+ * nothing here probes a feed or a credential, which only a real push can
+ * answer.
  */
 export function judgeReleasePreflight(number: number, version: string, facts: ReleaseFacts): string | null {
   const shown = sessionDisplayNumber(number);
@@ -1391,7 +1409,31 @@ export function judgeReleasePreflight(number: number, version: string, facts: Re
       `release: plan one before session ${shown} that sets ${file.path} to ${version}, or change the version in the heading.`
     );
   }
+  const rehearsal = facts.rehearsal;
+  if (rehearsal !== null && !rehearsal.passed) {
+    return (
+      `session ${shown} releases ${version}, and the declared pack failed when it was rehearsed, so the release ` +
+      `would fail at its publish. Nothing was registered. The pack's last lines:\n${rehearsal.tail}\n` +
+      `Its whole output is in ${rehearsal.log}. Plan a session before session ${shown} that fixes the pack.`
+    );
+  }
   return null;
+}
+
+/**
+ * Run the declared pack into scratch, its whole output kept in
+ * `RELEASE_REHEARSAL_LOG`. Null for a tag release, which runs no pack.
+ */
+export function rehearseRelease(sessionsDir: string, version: string): ReleaseFacts["rehearsal"] {
+  const root = repoRootFromSessionsDir(sessionsDir);
+  if (loadTagRelease(loadConfig(undefined, root), null) !== null) return null;
+  const rehearsal = rehearsePack(sessionsDir, { version });
+  const output = rehearsal.step?.output.trimEnd() ?? "";
+  const said = [rehearsal.step?.command ?? "", output, rehearsal.reason].filter((part) => part !== "");
+  mkdirSync(join(root, ".dabbler"), { recursive: true });
+  writeFileSync(join(root, RELEASE_REHEARSAL_LOG), said.join("\n") + "\n", "utf8");
+  const tail = [...output.split(/\r?\n/).slice(-REHEARSAL_TAIL_LINES), rehearsal.reason].filter((line) => line !== "");
+  return { passed: rehearsalPassed(rehearsal), tail: tail.join("\n"), log: RELEASE_REHEARSAL_LOG };
 }
 
 /** Read the facts a release session's start is judged on. */
@@ -1425,13 +1467,20 @@ export function readReleaseFacts(sessionsDir: string, number: number): ReleaseFa
   } else if (existsSync(join(root, "version.json"))) {
     versionFile = { path: "version.json", version: canonicalVersion(root), reason: "it declares no x.y.z version" };
   }
-  return { packagingDeclared, unverified, versionFile };
+  return { packagingDeclared, unverified, versionFile, rehearsal: null };
 }
 
-/** The refusal a release session's start meets, or null; an unreadable fact is a refusal in its own words. */
+/**
+ * The refusal a release session's start meets, or null; an unreadable fact
+ * is a refusal in its own words. The pack, the one expensive question, is
+ * rehearsed only once the others pass.
+ */
 export function releasePreflight(sessionsDir: string, number: number, version: string): string | null {
   try {
-    return judgeReleasePreflight(number, version, readReleaseFacts(sessionsDir, number));
+    const facts = readReleaseFacts(sessionsDir, number);
+    const refused = judgeReleasePreflight(number, version, facts);
+    if (refused !== null) return refused;
+    return judgeReleasePreflight(number, version, { ...facts, rehearsal: rehearseRelease(sessionsDir, version) });
   } catch (error) {
     return `the release could not be checked: ${error instanceof Error ? error.message : String(error)}`;
   }

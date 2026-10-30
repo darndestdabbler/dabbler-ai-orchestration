@@ -1741,6 +1741,7 @@ describe("what a release session's start refuses", () => {
     packagingDeclared: true,
     unverified: [],
     versionFile: { path: "version.json", version: "2.0.0", reason: "" },
+    rehearsal: null,
   };
 
   it("starts a release whose packaging is declared, whose sessions verified and whose version file agrees", () => {
@@ -1762,6 +1763,41 @@ describe("what a release session's start refuses", () => {
       String(judgeReleasePreflight(7, "2.0.1", CLEAR)),
       /version\.json says 2\.0\.0, and session 007 releases 2\.0\.1.*plan one before session 007/,
     );
+  });
+
+  it("refuses a release whose pack failed its rehearsal, with the pack's last lines and its log", () => {
+    const failed = { passed: false, tail: "pack.ps1: unexpected token '//'", log: ".dabbler/release-rehearsal.log" };
+    const refused = String(judgeReleasePreflight(7, "2.0.0", { ...CLEAR, rehearsal: failed }));
+    assert.match(refused, /the declared pack failed when it was rehearsed/);
+    assert.match(refused, /unexpected token '\/\/'/);
+    assert.match(refused, /\.dabbler\/release-rehearsal\.log.*Plan a session before session 007 that fixes the pack/s);
+    assert.equal(judgeReleasePreflight(7, "2.0.0", { ...CLEAR, rehearsal: { ...failed, passed: true } }), null);
+  });
+
+  it("refuses the start of a release whose pack fails, and registers nothing", async () => {
+    const state = stateDir();
+    try {
+      writeFileSync(join(state.sessionsDir, "session-plan.md"), "### Session 1 of 1: Release 1.0.0 (release: 1.0.0)\n", "utf8");
+      const node = JSON.stringify(process.execPath);
+      const yaml = join(state.repo, "dabbler.yaml");
+      writeFileSync(
+        yaml,
+        readFileSync(yaml, "utf8") +
+          "\npackaging:\n  pack:\n" +
+          `    argv: [${node}, "-e", "console.error('appsettings.json: comment not allowed'); process.exit(3)", "{output}"]\n` +
+          `  push:\n    argv: [${node}, "-e", "process.exit(0)", "{artifact}", "{feed}", "{secret}"]\n` +
+          "    feed: https://example.invalid/feed\n    secret: DABBLER_TEST_FEED_PAT\n",
+        "utf8",
+      );
+      const refused = await run(() => start(state.sessionsDir, { engine: "claude-code" }));
+      assert.equal(refused.code, EXIT_USAGE, refused.err);
+      assert.match(refused.err, /the declared pack failed when it was rehearsed/);
+      assert.match(refused.err, /appsettings\.json: comment not allowed/);
+      assert.match(readFileSync(join(state.repo, ".dabbler", "release-rehearsal.log"), "utf8"), /comment not allowed/);
+      assert.equal(readRawSessionState(state.sessionsDir)?.["currentSession"] ?? null, null);
+    } finally {
+      state.restore();
+    }
   });
 });
 

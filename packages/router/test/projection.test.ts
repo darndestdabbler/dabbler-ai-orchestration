@@ -17,7 +17,9 @@ import {
 import { configure } from "../src/cli/configure.ts";
 import {
   ENUMERATION_CLI_ALIASES,
+  RELEASE_ENGINE,
   configurationNode,
+  orchestratorOf,
   project,
   writeProjection,
 } from "../src/projection.ts";
@@ -31,7 +33,7 @@ import { seatLadder } from "../src/route.ts";
 import { setSeatIdentity } from "../src/transports/copilot.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 import { TRANSPORT_COPILOT_CLI, loadConfig, resetProjectRootCache } from "../src/config.ts";
-import { SETTING_REVIEWER_TRANSPORT, SETTING_TRANSPORT, writeSettings } from "../src/settings.ts";
+import { SETTING_AUTHORING_MODEL, SETTING_ENGINE, SETTING_REVIEWER_TRANSPORT, SETTING_TRANSPORT, writeSettings } from "../src/settings.ts";
 
 describe("the solution projection", () => {
   it("projects a .slnx repository's projects with their kinds, dependsOn and usedBy, and writes where the Explorer reads", () => {
@@ -88,6 +90,26 @@ function catalogModelRow(id: string, provider: string): CatalogModel {
     listed_at: "2026-09-11T00:00:00Z",
   };
 }
+
+describe("orchestratorOf", () => {
+  it("reads a release in flight as the newest authoring session before it", () => {
+    const root = tempDir("orchestrator-");
+    mkdirSync(join(root, "docs", "sessions"), { recursive: true });
+    writeFileSync(
+      join(root, "docs", "sessions", "sessions.json"),
+      JSON.stringify({
+        schemaVersion: 5,
+        sessions: [
+          { number: 1, status: "complete", orchestrator: { engine: "copilot", model: "gpt-5.6-sol", provider: "openai" } },
+          { number: 2, status: "complete", orchestrator: { engine: "claude-code", model: "claude-opus-5-5", provider: "anthropic" } },
+          { number: 3, status: "in-progress", orchestrator: { engine: RELEASE_ENGINE } },
+        ],
+      }),
+      "utf8",
+    );
+    assert.deepEqual(orchestratorOf(root), { engine: "claude-code", model: "claude-opus-5-5", provider: "anthropic" });
+  });
+});
 
 describe("what a session would be run with", () => {
   const KEYS = [
@@ -1137,6 +1159,47 @@ describe("what a session would be run with", () => {
       );
     } finally {
       writePreferences({ engine: "" });
+      withoutOverlay(root);
+      ungit();
+      restore();
+    }
+  });
+
+  it("reads a release in flight as nothing in flight, so the configured author answers", () => {
+    const root = tempDir("configuration-");
+    const restore = onApi(root);
+    const ungit = inRepository(root);
+    try {
+      writeBlock(TRANSPORT_API, {
+        refreshed_at: "2026-09-11T00:00:00Z",
+        source: SOURCE_API,
+        scope: { providers: ["anthropic", "google", "openai"] },
+        models: [catalogModelRow("claude-sonnet-5-5", "anthropic"), catalogModelRow("gpt-5.6-sol", "openai")],
+        retired: [],
+      });
+      withoutOverlay(root);
+      writeSettings(root, { [SETTING_ENGINE]: "claude-code", [SETTING_AUTHORING_MODEL]: "claude-sonnet-5-5" });
+      mkdirSync(join(root, "docs", "sessions"), { recursive: true });
+      writeFileSync(
+        join(root, "docs", "sessions", "sessions.json"),
+        JSON.stringify({
+          schemaVersion: 5,
+          sessions: [
+            { number: 1, status: "complete", orchestrator: { engine: "copilot", model: "gpt-5.6-sol", provider: "openai" } },
+            { number: 2, status: "in-progress", orchestrator: { engine: RELEASE_ENGINE } },
+          ],
+        }),
+        "utf8",
+      );
+      const authoring = configurationNode(root)["authoring"] as Role & {
+        engine: string | null;
+        declaredAtStart: boolean;
+      };
+      assert.equal(authoring.engine, "claude-code");
+      assert.equal(authoring.chosen?.model, "claude-sonnet-5-5");
+      assert.equal(authoring.declaredAtStart, false);
+    } finally {
+      writeSettings(root, { [SETTING_ENGINE]: "", [SETTING_AUTHORING_MODEL]: "" });
       withoutOverlay(root);
       ungit();
       restore();

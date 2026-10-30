@@ -464,16 +464,21 @@ export const AUTHORING_LIST_IS_A_SUGGESTION =
  */
 export const ROLE_EVERY_MODEL = "every-model";
 
+/** The engine a release session is registered under: no AI runs it. */
+export const RELEASE_ENGINE = "framework";
+
 /**
  * The orchestrator as the ledger records it: the engine that is running this
- * session and the model it declared at `session start`.
+ * session and the model it declared at `session start`. A release is run by no
+ * AI, so its author is the newest earlier session's, which is who a Mechanic
+ * on it is launched as when nothing is configured.
  *
  * Read rather than resolved. Nothing here picks an authoring model, because
  * nothing in this framework does: a person names it when they register the
  * session, and every surface that appeared to choose one was offering
  * something the ledger would not honour.
  */
-export function orchestratorOf(root: string): {
+export function orchestratorOf(root: string, release: "author" | "none" = "author"): {
   engine: string | null;
   model: string | null;
   /**
@@ -500,13 +505,22 @@ export function orchestratorOf(root: string): {
     // Found by driving the pane, where a fixture's finished session named
     // an engine nothing could narrow by and every model was offered to
     // Claude Code.
-    const row = sessions.find((entry) => entry["status"] === "in-progress");
-    const block: Node =
-      row !== undefined && typeof row["orchestrator"] === "object" && row["orchestrator"] !== null
-        ? (row["orchestrator"] as Node)
-        : {};
     const text = (value: unknown): string | null =>
       typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+    const blockOf = (entry: Node | undefined): Node =>
+      entry !== undefined && typeof entry["orchestrator"] === "object" && entry["orchestrator"] !== null
+        ? (entry["orchestrator"] as Node)
+        : {};
+    const at = sessions.findIndex((entry) => entry["status"] === "in-progress");
+    let block = blockOf(sessions[at]);
+    if (text(block["engine"]) === RELEASE_ENGINE) {
+      const earlier = sessions
+        .slice(0, at)
+        .reverse()
+        .map(blockOf)
+        .find((entry) => text(entry["engine"]) !== null && text(entry["engine"]) !== RELEASE_ENGINE);
+      block = release === "author" ? (earlier ?? {}) : {};
+    }
     return {
       engine: text(block["engine"]),
       model: text(block["model"]),
@@ -553,7 +567,9 @@ export function authoringNode(
    */
   forModel: string | null = null,
 ): Node {
-  const { engine: inFlight, model, provider: declaredProvider } = orchestratorOf(root);
+  // A release in flight declares nothing, so the configuration answers as it
+  // does when no session is in flight.
+  const { engine: inFlight, model, provider: declaredProvider } = orchestratorOf(root, "none");
   // **The ledger, and where the ledger is silent, the preference.**
   //
   // The ledger names an engine once a session has started here, so a
@@ -753,7 +769,7 @@ function enginePreferenceReason(choice: TransportReading): string {
 function engineVehicleNode(root: string): Node {
   const reading = installedEngines();
   const present = reading.engines.filter((entry) => entry.path !== null);
-  const inFlight = orchestratorOf(root).engine;
+  const inFlight = orchestratorOf(root, "none").engine;
   const choice = explainEngine(null, root);
   const preferred = choice.transport || null;
   return {

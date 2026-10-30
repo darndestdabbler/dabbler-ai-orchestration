@@ -332,6 +332,10 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 292 | .NET build output is ignored from the first project | no | 2026-10-27 |
 | 293 | Small defects from the field | no | 2026-10-27 |
 | 294 | Release 3.27.0 (release: 3.27.0) | yes | 2026-10-27 |
+| 295 | The Mechanic on a release session | no | 2026-10-30 |
+| 296 | A check is judged on what it changed | — | not declared |
+| 297 | A failure seen early, not repeated late | — | not declared |
+| 298 | Release 3.28.0 (release: 3.28.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3486,3 +3490,9 @@ Fix five small defects from the field report and set the version to 3.27.0. "Thi
 **Releasable: yes.**
 
 Release 3.27.0: the framework packs and publishes what is on the trunk.
+
+### Session 295 — The Mechanic on a release session
+
+**Releasable: no.**
+
+Make the Mechanic reachable on a release session, whose row registers orchestrator {engine: "framework"} (RELEASE_ENGINE) with no model. orchestratorOf (projection.ts) reads an in-flight row whose engine is RELEASE_ENGINE as naming no engine and no model, and takes engine, model and provider from the newest earlier session row that names a real engine; so authoringNode, the Configuration pane and Open a Mechanic (runOpenMechanic) fall through to the repository's configured engine as they do when nothing is in flight. callInTheMechanic (drive.ts) launches on the session's declared engine when it is set and is not RELEASE_ENGINE, otherwise on the configured engine (explainEngine), otherwise on orchestratorOf's engine, and only last on the run's own engine; the model stays explainMechanicModel's, then orchestratorOf's. Where no engine or no model resolves, mechanic-not-called names `dabbler configure --engine <engine>` or `dabbler configure --mechanic-model <model>` instead of --engine-argv. Tests: the refused-publish walk captures the launcher's (engine, model) and asserts the configured engine and model; projection.test.ts shows a release in flight reading as the newest authoring row; commandFlows.test.ts shows Open a Mechanic on a release in flight opening on the configured engine.

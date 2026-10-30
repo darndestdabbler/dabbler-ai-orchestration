@@ -53,6 +53,7 @@ import {
   type RouterConfig,
   driverEngineOutput,
   driverInvocationCap,
+  explainEngine,
   explainMechanic,
   explainMechanicModel,
   explainRoleModel,
@@ -162,6 +163,7 @@ import {
   EXIT_GATE_FAILED,
   EXIT_OK,
   EXIT_USAGE,
+  RELEASE_ENGINE,
   declare,
   liveLoopSession,
   extractSpecExcerpt,
@@ -1997,6 +1999,8 @@ class Driver {
     let mode: string;
     let model: string | null;
     let decidedBy: string | null;
+    let configured: string | null;
+    const author = orchestratorOf(this.repoRoot);
     const release = releaseSessionVersion(this.sessionsDir, this.sessionNumber) !== null;
     try {
       mode = explainMechanic(this.repoRoot).transport;
@@ -2007,22 +2011,30 @@ class Driver {
       }
       // Unset, the Authoring Model; where that is unset too, the model the session was started on.
       const reading = explainMechanicModel(this.repoRoot, this.primaryModel());
-      model = reading.transport || orchestratorOf(this.repoRoot).model;
+      model = reading.transport || author.model;
       decidedBy = reading.decidedBy;
+      configured = explainEngine(null, this.repoRoot).transport || null;
     } catch (error) {
       if (!(error instanceof ConfigError)) throw error;
       this.log("mechanic-not-called", { why: error.message });
       return { memo: error.message };
     }
-    // The engine this session declared at its start: under the pull loop the
-    // run's own engine is the literal `cli`, which no built-in command runs.
+    // The engine this session declared at its start, unless it is a release,
+    // which no AI runs; then the configured engine; then the newest author's.
+    // The run's own engine is last: under the pull loop it is the literal
+    // `cli`, which no built-in command runs.
     let declared: string | null = null;
     try {
       declared = resolveSessionOrchestratorIdentity(this.sessionsDir, this.sessionNumber).engine;
     } catch {
-      // An identity that cannot be read leaves the run's engine to name it.
+      // An identity that cannot be read leaves the configuration to name it.
     }
-    const engine = launchMechanic(declared ?? this.run.engine, model);
+    const named = (declared === RELEASE_ENGINE ? null : declared) ?? configured ?? author.engine ?? this.run.engine;
+    if (!(BUILT_IN_ENGINES as readonly string[]).includes(named)) {
+      this.log("mechanic-not-called", { why: "no authoring engine resolves: dabbler configure --engine <engine>" });
+      return { memo: null };
+    }
+    const engine = launchMechanic(named, model);
     const before = snapshotWorktreeTree(this.repoRoot);
     if (typeof engine === "string" || before === null) {
       this.log("mechanic-not-called", { why: typeof engine === "string" ? engine : "could not snapshot the working tree" });

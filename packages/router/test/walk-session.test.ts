@@ -22,7 +22,7 @@ import { mailboxEngine, type EngineOutcome } from "../src/engines.ts";
 import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
 import { EXIT_UNAVAILABLE } from "../src/contracts/exitCodes.ts";
 import { beginJobRecord, jobRecord, setJobStarter, startJob } from "../src/jobs.ts";
-import { SETTING_AUTHORING_MODEL, SETTING_MECHANIC_MODEL, writeSettings } from "../src/settings.ts";
+import { SETTING_AUTHORING_MODEL, SETTING_ENGINE, SETTING_MECHANIC_MODEL, writeSettings } from "../src/settings.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { judgeSuiteDeclaration } from "../src/gates.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
@@ -628,7 +628,9 @@ describe("a release session", () => {
     setProviderKeys();
     resetRouter();
     resetRuntimeMode();
-    const repo = makeRepo(RELEASE_SEED, { origin: true });
+    // The release names no engine, so the Mechanic is the configured author.
+    const settings = { [SETTING_ENGINE]: "claude-code", [SETTING_AUTHORING_MODEL]: "claude-sonnet-5-5" };
+    const repo = makeRepo({ ...RELEASE_SEED, ".vscode/settings.json": JSON.stringify(settings) }, { origin: true });
     const sessionsDir = join(repo, "docs", "sessions");
     // A pack the feed refuses, as an expired token is refused.
     configure([], TESTING, {
@@ -636,17 +638,21 @@ describe("a release session", () => {
     });
     await startRelease(sessionsDir);
     const prompts: string[] = [];
-    const unsetMechanic = setMechanicLauncher(() => ({
-      name: "stand-in-mechanic",
-      invoke: (invocation) => {
-        prompts.push(invocation.prompt ?? "");
-        // An edit it may not make, beside the memo it must.
-        writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 9\n");
-        mkdirSync(join(repo, ".dabbler", "scratch"), { recursive: true });
-        writeFileSync(join(repo, mechanicMemoPath(1)), "Outside the repository: the feed token expired.\n");
-        return Promise.resolve({ exitCode: 0 });
-      },
-    }));
+    const launched: Array<readonly [string, string | null]> = [];
+    const unsetMechanic = setMechanicLauncher((engine, model) => {
+      launched.push([engine, model]);
+      return {
+        name: "stand-in-mechanic",
+        invoke: (invocation) => {
+          prompts.push(invocation.prompt ?? "");
+          // An edit it may not make, beside the memo it must.
+          writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 9\n");
+          mkdirSync(join(repo, ".dabbler", "scratch"), { recursive: true });
+          writeFileSync(join(repo, mechanicMemoPath(1)), "Outside the repository: the feed token expired.\n");
+          return Promise.resolve({ exitCode: 0 });
+        },
+      };
+    });
     try {
       let driven = await next(sessionsDir);
       for (let call = 0; call < 6 && readRun(repo, 1)?.stop == null; call += 1) {
@@ -656,6 +662,7 @@ describe("a release session", () => {
       const run = readRun(repo, 1)!;
       assert.equal(run.stop?.kind, "publish", driven.err);
       assert.equal(prompts.length, 1);
+      assert.deepEqual(launched, [["claude-code", "claude-sonnet-5-5"]]);
       assert.equal(run.mechanic_attempts?.[0]?.outcome, "failed");
       assert.equal(readFileSync(join(repo, "src", "widget.py"), "utf8"), "def widget():\n    return 1\n");
       assert.match(driven.err, /The Mechanic's memo:\r?\nOutside the repository: the feed token expired\./);

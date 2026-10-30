@@ -115,6 +115,7 @@ import { ROLE_AUXILIARY_REVIEWER, ROLE_PRIMARY_REVIEWER } from "./selection.ts";
 import { seatModels } from "./transports/copilot.ts";
 import {
   ENUMERATION_CLI_ALIASES,
+  RELEASE_ENGINE,
   configurationNode,
 } from "./projection.ts";
 import { isFrameworkInstalledPath, materialPaths } from "./checks.ts";
@@ -1456,8 +1457,7 @@ export function releaseSessionToStart(
   return version === null ? null : { number: boundary.requested, version };
 }
 
-/** The engine a release session is registered under: no AI runs it. */
-export const RELEASE_ENGINE = "framework";
+export { RELEASE_ENGINE };
 
 /**
  * Register a release session: no engine, no model and no reviewer is asked

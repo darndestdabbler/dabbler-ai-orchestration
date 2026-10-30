@@ -12924,6 +12924,13 @@
       "dateTime": "2026-10-27T12:55:29.167000-04:00",
       "task": "Release 3.27.0: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 295,
+      "dateTime": "2026-10-30T10:44:41.602000-04:00",
+      "task": "Make the Mechanic reachable on a release session, whose row registers orchestrator {engine: \"framework\"} (RELEASE_ENGINE) with no model. orchestratorOf (projection.ts) reads an in-flight row whose engine is RELEASE_ENGINE as naming no engine and no model, and takes engine, model and provider from the newest earlier session row that names a real engine; so authoringNode, the Configuration pane and Open a Mechanic (runOpenMechanic) fall through to the repository's configured engine as they do when nothing is in flight. callInTheMechanic (drive.ts) launches on the session's declared engine when it is set and is not RELEASE_ENGINE, otherwise on the configured engine (explainEngine), otherwise on orchestratorOf's engine, and only last on the run's own engine; the model stays explainMechanicModel's, then orchestratorOf's. Where no engine or no model resolves, mechanic-not-called names `dabbler configure --engine <engine>` or `dabbler configure --mechanic-model <model>` instead of --engine-argv. Tests: the refused-publish walk captures the launcher's (engine, model) and asserts the configured engine and model; projection.test.ts shows a release in flight reading as the newest authoring row; commandFlows.test.ts shows Open a Mechanic on a release in flight opening on the configured engine.",
+      "releasable": false
     }
   ]
 }

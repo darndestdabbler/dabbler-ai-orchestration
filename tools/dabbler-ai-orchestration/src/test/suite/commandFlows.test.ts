@@ -807,6 +807,39 @@ suite("Start opens the person's own CLI", () => {
     assert.ok(run.terminals[0].args.includes("gpt-5-6-luna"), run.terminals[0].args.join(" "));
   });
 
+  test("Open a Mechanic on a release in flight opens on the configured engine", async () => {
+    // A release registers the engine `framework`, which no CLI runs: the
+    // reading falls through to the repository's own engine, not the one the
+    // session before it ran on.
+    const root = makeTempDir("mechanic-release-");
+    try {
+      writeFileTree(root, {
+        "docs/sessions/sessions.json": JSON.stringify({
+          schemaVersion: 5,
+          sessions: [
+            { number: 1, status: "complete", orchestrator: { engine: "copilot", model: "gpt-5.6-sol", provider: "openai" } },
+            { number: 2, status: "in-progress", orchestrator: { engine: "framework" } },
+          ],
+        }),
+        ".vscode/settings.json": JSON.stringify({ "dabbler.engine": "claude-code", "dabbler.authoringModel": "sonnet" }),
+      });
+      const offered: string[] = [];
+      const run = driveUi({
+        askModel: async (_root, choice, chosen) => {
+          offered.push(choice.engine, chosen);
+          return chosen;
+        },
+      });
+      assert.strictEqual(await runOpenMechanic(makeRepository({ root }), run.ui, () => null), true, run.errors.join("\n"));
+      assert.deepStrictEqual(offered, ["claude-code", "sonnet"]);
+      assert.deepStrictEqual(run.errors, []);
+      assert.strictEqual(run.terminals.length, 1);
+      assert.strictEqual(run.terminals[0].program, "claude");
+    } finally {
+      rmrf(root);
+    }
+  });
+
   test("passes a dated model id exactly as it was chosen", () => {
     // `normalizeModelToken` drops the date suffix, and the date suffix is
     // what makes a pin a pin: generalising `claude-opus-5-20260901` here

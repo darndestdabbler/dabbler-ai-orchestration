@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 267 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 267 transcript</h1>
+<p class="stamp">Rendered 2026-10-16T18:09:53.432Z by dabbler-ai-router 3.21.0 at 5fa7bfa392b1c15f221a6886a70320b0c0621f94.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-16T14:02:21.738-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 267 of 268: A rollback pushes its own commit, and a release refused over a push says push</h3>
+<p>Scope: <code>packages/router/src/session.ts</code> (the rollback's push), <code>packages/router/src/drive.ts</code> (<code>phasePublish</code>'s ways on); tests in <code>walk-session.test.ts</code></p>
+<p><strong>Why.</strong> survsys's release session 29 stopped at publish: <code>pushed_to_remote: branch 'master' is 1 commit(s) ahead of origin/master</code>. The commit was the rollback's own, <code>Roll back to the start of session 29 of sessions</code>, made that morning. The rollback commits its record and pushes only when it reverted a commit (<code>if (commits.length &gt; 0)</code>), so a rollback of a session that had landed nothing leaves its record commit on the machine, and the next release refuses over it. The stop then told the person to cancel the release session, plan a session that fixes it and plan a new release -- three sessions for one <code>git push</code>. A stopped run resumes in the phase it stopped in, so pushing and asking again is the whole way on. The comment above that stop still describes a rewind the publish phase has not made since session 232.</p>
+<p><strong>Step 1 -- the rollback pushes what it committed.</strong> Wherever the rollback's record commit was made and the branch has an upstream, it is pushed, whether or not any commit was reverted; a refused push is the same refusal it is now. The closing line says the record was pushed.</p>
+<p><strong>Step 2 -- a release refused only over the push says push.</strong> Where the packaging refusal's only failed gate is <code>pushed_to_remote</code>, the stop's ways on say to push the branch (<code>git push</code>) and that the next instruction resumes the release at publish; every other refusal keeps today's ways on. The stale rewind comment above the stop is removed.</p>
+<p><strong>Non-goals.</strong> The publish phase pushing anything itself. Any rewind for a release session. Any other gate, refusal or stop. Any change to what the rollback reverts, resets or keeps.</p>
+<p><strong>Tests.</strong> In <code>walk-session.test.ts</code>, the rollback test that reverts no commit asserts origin's branch is HEAD after it. The publish wording has no test of its own today and gets none: one sentence chosen by one condition. No new test.</p>
+<p><strong>Releasable.</strong> Yes -- with 247 to 266, as 3.22.0 in session 268.</p>
+<h2>Work Plan</h2>
+<p>Make a rollback push its own record commit and make a release refused only over the push say push. In packages/router/src/session.ts the rollback pushes after its record commit wherever the branch has an upstream, whether or not it reverted a commit (today it pushes only when commits.length &gt; 0, which left survsys's <code>Roll back to the start of session 29</code> commit unpushed and stopped its release at publish); a refused push is the same refusal as now, and the closing line says the record was pushed. In packages/router/src/drive.ts, phasePublish's stop, where the packaging refusal's only failed gate is pushed_to_remote, tells the person to push the branch (<code>git push</code>) and that the next instruction resumes the release at publish; every other refusal keeps today's ways on; the stale rewind comment above the stop is removed. In walk-session.test.ts the rollback test that reverts no commit asserts origin's branch is HEAD afterwards; no new test.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/33e55bfbcaf5c1f76f77c403b6e696a3ac6c879b"><code>33e55bfbcaf5c1f76f77c403b6e696a3ac6c879b</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Rollback pushes its commit</td><td><p>In packages/router/src/session.ts, after the rollback's commitFrameworkFiles, push whenever the branch has an upstream (drop the <code>commits.length &gt; 0</code> condition around the push), keeping the same refusal text on a failed push; the closing stderr line says the record was pushed (for the no-revert case: 'the working tree was reset and the record pushed'). In packages/router/test/walk-session.test.ts, in the rollback test that reverts no commit (makeRepo with origin, around the <code>the working tree was reset</code> assertion), update that assertion for the new wording and assert <code>origin/main</code> equals HEAD after the rollback.</p></td><td><span class="mono">packages/router/src/session.ts</span><br><span class="mono">packages/router/test/walk-session.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>node --test --test-name-pattern roll packages/router/test/walk-session.test.ts</code></td><td>yes</td></tr>
+<tr><td>Publish push refusal says push</td><td><p>In packages/router/src/drive.ts phasePublish, when the publish job's refusal names <code>pushed_to_remote</code> as its only failed gate (read from the same log tail the stop quotes: a <code>✗</code> row for pushed_to_remote and no other <code>✗</code> row), the ways on say: push the branch (<code>git push</code>), then ask for the next instruction, which resumes the release at publish -- nothing was published and no version spent. Every other refusal keeps today's cancel-and-replan ways on. Remove the stale comment above the stop that describes a rewind the publish phase no longer makes.</p></td><td><span class="mono">packages/router/src/drive.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>The publish phase pushing anything itself</li><li>Any rewind for a release session</li><li>Any other gate, refusal or stop</li><li>Any change to what the rollback reverts, resets or keeps</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[18:02:21]</span> <span class="muted">run-started</span> session=267 mode=pull</div>
+<div class="line"><span class="at">[18:02:21]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[18:02:35]</span> <span class="muted">run-resumed</span> session=267 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[18:02:35]</span> <span class="muted">plan-accepted</span> steps=[&quot;rollback-pushes-its-commit&quot;,&quot;publish-push-refusal-says-push&quot;] non_goals=4</div>
+<div class="line"><span class="at">[18:02:35]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[18:02:36]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=rollback-pushes-its-commit</div>
+<div class="line"><span class="at">[18:03:36]</span> <span class="muted">run-resumed</span> session=267 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:03:41]</span> <span class="muted">check-passed</span> step=rollback-pushes-its-commit argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[18:04:15]</span> <span class="muted">check-passed</span> step=rollback-pushes-its-commit argv=[&quot;node&quot;,&quot;--test&quot;,&quot;--test-name-pattern&quot;,&quot;roll&quot;,&quot;packages/router/test/walk-session.test.ts&quot;]</div>
+<div class="line"><span class="at">[18:05:06]</span> <span class="muted">named-tests-passed</span> step=rollback-pushes-its-commit suite=typescript command=node scripts/suite.mjs container packages/router/test/session.test.ts packages/router/test/walk-session.test.ts</div>
+<div class="line"><span class="at">[18:05:07]</span> <span class="muted">report-accepted</span> seq=2 step=rollback-pushes-its-commit files=[&quot;packages/router/src/session.ts&quot;,&quot;packages/router/test/walk-session.test.ts&quot;] notes=rollback pushes its record commit whenever the branch has an upstream, reverted commits or not</div>
+<div class="line"><span class="at">[18:05:07]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=publish-push-refusal-says-push</div>
+<div class="line"><span class="at">[18:05:29]</span> <span class="muted">run-resumed</span> session=267 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:05:34]</span> <span class="muted">check-passed</span> step=publish-push-refusal-says-push argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[18:06:24]</span> <span class="muted">named-tests-passed</span> step=publish-push-refusal-says-push suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[18:06:24]</span> <span class="muted">report-accepted</span> seq=3 step=publish-push-refusal-says-push files=[&quot;packages/router/src/drive.ts&quot;] notes=a publish refused only over pushed_to_remote says push and resume; other refusals unchanged; stale rewind comment removed</div>
+<div class="line"><span class="at">[18:06:24]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[18:06:26]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[18:06:27]</span> <span class="muted">job-started</span> name=verification pid=32944 log=.dabbler/runs/s267/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[18:08:02]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s267/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[18:08:02]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[18:08:02]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[18:08:02]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[18:08:03]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=31124 log=.dabbler/runs/s267/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[18:08:06]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s267/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[18:08:07]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[18:08:08]</span> <span class="muted">job-started</span> name=run of record: typescript pid=24572 log=.dabbler/runs/s267/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[18:09:22]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s267/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[18:09:22]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[18:09:24]</span> <span class="muted">job-started</span> name=run of record: extension pid=42528 log=.dabbler/runs/s267/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[18:09:42]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s267/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[18:09:42]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[18:09:45]</span> <span class="muted">landed</span> commit=33e55bfbcaf5c1f76f77c403b6e696a3ac6c879b</div>
+<div class="line"><span class="at">[18:09:45]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[18:09:45]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[18:09:45]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[18:09:47]</span> <span class="muted">job-started</span> name=close pid=36356 log=.dabbler/runs/s267/driver/jobs/close.log</div>
+<div class="line"><span class="at">[18:09:53]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s267/driver/jobs/close.log</div>
+<div class="line"><span class="at">[18:09:53]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gemini-4-argon</td><td>google</td><td>api</td><td><details><summary>4 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** In `packages/router/test/walk-session.test.ts` (within the diff visible here; may be covered elsewhere in the file), the zero-revert rollback path is tested only when the push succeeds against an upstream. Two cases in `rollback` (`packages/router/src/session.ts`) are not exercised in the visible hunk:</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Refused push on a zero-revert rollback:** starting from the same session 2 state in `&quot;a session rolled back to where it started&quot;` (no landed session commits, `origin/main` configured) after advancing `origin/main` by one commit directly in the bare origin repo so a fast-forward push is rejected, calling `rollback(sessionsDir, { reason: &quot;the step plan guessed a package&quot;, engine: false, asOf: String(facts[&quot;head&quot;]) })` should return `EXIT_GATE_FAILED` with stderr matching `/rollback: the rollback is committed, but git push failed:/`.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Zero-revert rollback without an upstream:** starting from a repository created with `{ origin: false }` and an in-flight session with uncommitted work and `commits === 0`, calling `rollback(...)` should return `EXIT_OK` and write `&quot;the working tree was reset, discarding&quot;` (omitting `&quot; and the record pushed&quot;`).</td><td>not answered</td></tr>
+<tr><td>3</td><td><strong>minor</strong></td><td>**Nit:** In `packages/router/src/drive.ts` at lines 4099–4100, the comment immediately above `const refused = jobLogTail(...)` still ends with `and the rewind below keys on the refusal too`, referencing the removed rewind logic.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>52</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>72s</td><td>1341</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>282</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

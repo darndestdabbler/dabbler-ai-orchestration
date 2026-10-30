@@ -5893,9 +5893,9 @@
     {
       "number": 296,
       "title": "A check is judged on what it changed",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-30T12:21:27.520000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-30T12:41:57.261000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

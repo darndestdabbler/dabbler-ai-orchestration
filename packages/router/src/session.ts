@@ -89,6 +89,7 @@ import {
   readInstruction,
   readRepairs,
   readRun,
+  readWorkPlan,
   recordRepair,
   WAITER_IS_WHAT_IS_RUN,
   loopAlive,
@@ -140,6 +141,7 @@ import {
   TRANSCRIPTS_DIRNAME,
   repoRootFor,
   runGit,
+  treeWithPaths,
 } from "./journal.ts";
 import {
   LedgerError,
@@ -2494,11 +2496,17 @@ export interface RebaselineCliOptions {
   readonly reason: string;
   readonly by?: string | null;
   readonly sessionNumber?: number | null;
+  /** The repair's paths, when it is not the whole tree. */
+  readonly paths?: readonly string[];
 }
 
 /**
  * Report a repair made while the run was stopped, and move the baseline the
- * next report is measured against.
+ * next report is measured against -- over the paths named, or, with none
+ * named, over the whole tree. The whole tree is refused while the stopped
+ * step's own files are among what moved: it would record the author's
+ * uncommitted work as repaired outside a step, and the step would then be
+ * re-reported with nothing in it.
  *
  * There is a state the driven lifecycle reaches and had no edge out of:
  * *halted, being repaired*. A stop is answered by a person; the answer is
@@ -2591,16 +2599,36 @@ export function rebaseline(sessionsDir: string, options: RebaselineCliOptions): 
     return EXIT_BOUNDARY;
   }
 
-  const tree = snapshotWorktreeTree(repoRoot);
-  if (tree === null) {
+  const now = snapshotWorktreeTree(repoRoot);
+  if (now === null) {
     writeErr("rebaseline: refused -- git could not snapshot the working tree.\n");
     return EXIT_GATE_FAILED;
   }
-  const paths = repairedPaths(
-    repoRoot,
-    sessionsDir,
-    run.baseline_tree ? (changedPathsBetween(repoRoot, run.baseline_tree, tree) ?? []) : [],
-  );
+  const changed = run.baseline_tree ? (changedPathsBetween(repoRoot, run.baseline_tree, now) ?? []) : [];
+  const named = (options.paths ?? []).map((path) => path.split("\\").join("/"));
+  let tree: string | null = now;
+  if (named.length === 0) {
+    const stepId = run.stop.step_id ?? null;
+    const stepFiles = readWorkPlan(repoRoot, target)?.steps.find((step) => step.id === stepId)?.files ?? [];
+    const held = changed.filter((path) => stepFiles.includes(path));
+    if (held.length > 0) {
+      writeErr(
+        `rebaseline: refused -- step '${stepId}' has uncommitted changes to ${held.join(", ")}, ` +
+          "which moving the whole baseline would record as repaired outside it. Name the " +
+          'repair instead: `dabbler session rebaseline --path <file> --reason "<what was repaired>"`.\n',
+      );
+      return EXIT_BOUNDARY;
+    }
+  } else if (run.baseline_tree) {
+    const present = named.filter((path) => existsSync(join(repoRoot, path)));
+    const gone = named.filter((path) => !present.includes(path));
+    tree = treeWithPaths(repoRoot, run.baseline_tree, present, gone);
+  }
+  if (tree === null) {
+    writeErr("rebaseline: refused -- git could not move the baseline over the paths named.\n");
+    return EXIT_GATE_FAILED;
+  }
+  const paths = repairedPaths(repoRoot, sessionsDir, named.length > 0 ? named : changed);
   const by = (options.by ?? "").trim() || "the operator";
 
   let row;

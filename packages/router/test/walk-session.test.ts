@@ -2053,7 +2053,7 @@ describe("a session-plan.md edit while a session is in progress", () => {
     assert.match(refusals[0].join(" "), /\[files-changed-omits\].*session-plan\.md/s);
     // Mid-step: the check's tree moved, so the checks prove nothing. It is the
     // step's third refusal, so it is the stop's own reason.
-    assert.match(String(readRun(repo, 1)?.stop?.reason), /\[check-failed\].*\(the check changed the tree\)/s);
+    assert.match(String(readRun(repo, 1)?.stop?.reason), /\[check-failed\].*\(the check changed the tree: docs\/sessions\/session-plan\.md\)/s);
   });
 });
 

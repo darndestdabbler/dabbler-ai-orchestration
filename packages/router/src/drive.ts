@@ -37,6 +37,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSyn
 import { dirname, join, relative } from "node:path";
 
 import {
+  type CheckRun,
   checkRunGreen,
   judgeCheckPrograms,
   loadSelectionConfig,
@@ -648,8 +649,9 @@ export function judgeReportFiles(
       refusal(
         RULE.filesChangedOmits,
         `files_changed omits '${file}', which the tree changed. If it was repaired while ` +
-          "the run was stopped, it belongs to no step: `dabbler session rebaseline " +
-          '--reason "<what was repaired>"` records it and moves the baseline',
+          `the run was stopped, it belongs to no step: \`dabbler session rebaseline --path ${file} ` +
+          '--reason "<what was repaired>"` records it and moves the baseline over it alone ' +
+          "-- or delete it, if it is scratch",
       ),
     );
   }
@@ -1480,23 +1482,57 @@ export function acceptanceMarks(repoRoot: string): { plan_head: string | null; b
 
 /**
  * The refusal one failed check makes, naming the step that declared it
- * where that is not the step being answered. Pure: the facts of the run in,
- * the words out.
+ * where that is not the step being answered, and the paths it moved where it
+ * moved the tree: without them the author cannot tell what to stop writing.
+ * Pure: the facts of the run in, the words out.
  */
 export function checkFailedRefusal(
   stepId: string,
   check: { readonly argv: readonly string[]; readonly owner?: string },
   run: { readonly exitCode: number | null; readonly timedOut: boolean; readonly treeMutated: boolean; readonly output: string },
+  moved: readonly string[] = [],
 ): string {
   const owner = check.owner !== undefined && check.owner !== stepId ? ` (declared by step '${check.owner}')` : "";
+  const shown = moved.slice(0, 5).join(", ");
+  const more = moved.length > 5 ? ` and ${moved.length - 5} more` : "";
   return refusal(
     RULE.checkFailed,
     `check failed: ${check.argv.join(" ")} -> ${exitWords(run)}` +
       owner +
-      (run.treeMutated ? " (the check changed the tree)" : "") +
+      (run.treeMutated ? ` (the check changed the tree${shown ? `: ${shown}${more}` : ""})` : "") +
       (run.output.trim() ? `\n${tail(run.output)}` : "") +
       `\n${CHECK_FAILED_WAYS}`,
   );
+}
+
+/**
+ * A step's checks in order, each against the tree the one before it ended
+ * on: a check is judged on what IT changed, so a read-only check after one
+ * that wrote a file passes, and `moved` names what the writer wrote.
+ */
+export async function runStepChecks(
+  repoRoot: string,
+  stepId: string,
+  checks: StepSpec["checks"],
+  reference: string,
+  config: RouterConfig,
+): Promise<{ check: StepSpec["checks"][number]; run: CheckRun; moved: string[] }[]> {
+  const results: { check: StepSpec["checks"][number]; run: CheckRun; moved: string[] }[] = [];
+  let tree = reference;
+  for (const [index, check] of checks.entries()) {
+    const argv = [...check.argv];
+    const declared = makeCheck({ name: `${stepId} check ${index + 1}`, argv, kind: "control" });
+    const run = await executeCheck(repoRoot, declared, argv.join(" "), {
+      stage: "driver",
+      treeDigest: tree,
+      timeoutSeconds: timeoutFor(declared, config),
+    });
+    const after = run.postTreeDigest ?? tree;
+    const moved = run.treeMutated ? (changedPathsBetween(repoRoot, tree, after) ?? []) : [];
+    results.push({ check, run, moved });
+    tree = after;
+  }
+  return results;
 }
 
 /**
@@ -3559,20 +3595,13 @@ class Driver {
       return [refusal(RULE.configMalformed, configurationRefusal(error))];
     }
 
-    for (const [index, check] of spec.checks.entries()) {
-      const argv = [...check.argv];
-      const declared = makeCheck({ name: `${spec.id} check ${index + 1}`, argv, kind: "control" });
-      const run = await executeCheck(this.repoRoot, declared, argv.join(" "), {
-        stage: "driver",
-        treeDigest: current,
-        timeoutSeconds: timeoutFor(declared, config),
-      });
+    for (const { check, run, moved } of await runStepChecks(this.repoRoot, spec.id, spec.checks, current, config)) {
       const green = checkRunGreen(run);
       // The log event and the rule are the same fact, so they are the same
       // string: a log line saying one thing while the refusal says another
       // is two names for one failure.
-      this.log(green ? "check-passed" : RULE.checkFailed, { step: spec.id, argv, ...(check.owner ? { owner: check.owner } : {}) });
-      if (!green) reasons.push(checkFailedRefusal(spec.id, check, run));
+      this.log(green ? "check-passed" : RULE.checkFailed, { step: spec.id, argv: [...check.argv], ...(check.owner ? { owner: check.owner } : {}) });
+      if (!green) reasons.push(checkFailedRefusal(spec.id, check, run, moved));
     }
     if (reasons.length === 0) reasons.push(...(await this.namedTestRefusals(spec.id, changed, current, config)));
     return reasons;

@@ -175,6 +175,9 @@ const OPTIONS: Record<string, readonly string[]> = {
   ],
   rebaseline: [
     "  --reason TEXT            required: what was repaired while the loop was halted",
+    "  --path FILE              repeatable: move the baseline over these paths alone;",
+    "                           left out, over the whole tree -- refused while the",
+    "                           stopped step's own files are uncommitted",
     "  --by WHO                 who made it; defaults to the operator",
   ],
   report: [
@@ -287,6 +290,8 @@ interface Parsed {
   readonly values: Map<string, string>;
   readonly switches: Set<string>;
   readonly positional: string[];
+  /** Every `--path`, in order: the one flag that repeats. */
+  readonly paths: string[];
 }
 
 /**
@@ -342,6 +347,7 @@ function parseArgs(argv: readonly string[]): Parsed | string {
   const values = new Map<string, string>();
   const switches = new Set<string>();
   const positional: string[] = [];
+  const paths: string[] = [];
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (!token.startsWith("--")) {
@@ -353,7 +359,8 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     if (retired !== undefined) return retired;
     if (equals !== -1) {
       const flag = token.slice(0, equals);
-      values.set(flag, token.slice(equals + 1));
+      if (flag === "--path") paths.push(token.slice(equals + 1));
+      else values.set(flag, token.slice(equals + 1));
       continue;
     }
     if (SWITCHES.has(token)) {
@@ -364,10 +371,11 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     if (next === undefined || next.startsWith("--")) {
       return `argument ${token}: expected one argument`;
     }
-    values.set(token, next);
+    if (token === "--path") paths.push(next);
+    else values.set(token, next);
     index += 1;
   }
-  return { values, switches, positional };
+  return { values, switches, positional, paths };
 }
 
 function integer(raw: string | undefined, flag: string): number | null | string {
@@ -740,7 +748,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       );
       return EXIT_USAGE;
     }
-    return rebaseline(sessionsDir, { reason, by: values.get("--by") ?? null, sessionNumber });
+    return rebaseline(sessionsDir, { reason, by: values.get("--by") ?? null, sessionNumber, paths: parsed.paths });
   }
 
   if (subcommand === "report") {

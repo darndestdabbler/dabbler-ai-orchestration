@@ -64,7 +64,9 @@ import {
 } from "../config.ts";
 import { BUILT_IN_ENGINES } from "../engines.ts";
 import { sessionsDirFor } from "../evidence.ts";
-import { repoRootFor, runGit } from "../journal.ts";
+import { repoRootFor, runGit, treeWithPaths } from "../journal.ts";
+import { readRun, readWorkPlan, writeRun } from "../driver.ts";
+import { LedgerError } from "../ledger.ts";
 import { readRawSessionState } from "../sessionState.ts";
 import { configuredModelRefusal } from "../session.ts";
 import {
@@ -865,6 +867,7 @@ function commitChoice(repoRoot: string, keys: readonly string[]): string | null 
   const path = SETTINGS_RELPATH.split("\\").join("/");
   const inFlight = inFlightSessions(readRawSessionState(sessionsDirFor(repoRoot)));
   if (inFlight.length > 0) {
+    for (const label of inFlight) advanceBaselineOver(repoRoot, Number(label.replace("session ", "")), path);
     return `${path} is left for ${inFlight.join(", ")} to commit when it lands`;
   }
   if (runGit(repoRoot, ["status", "--porcelain", "--", path]).stdout === "") return null;
@@ -883,6 +886,27 @@ function commitChoice(repoRoot: string, keys: readonly string[]): string | null 
   return pushed.code === 0
     ? `${path} is committed and pushed`
     : `${path} is committed, but git push failed (${firstLine(pushed.stderr)})`;
+}
+
+/**
+ * Move a driven run's step baseline over the settings file a choice just
+ * wrote, so the step in flight is not refused for a file it did not write --
+ * unless that step declares the file, and is then judged on it like any other.
+ */
+function advanceBaselineOver(repoRoot: string, sessionNumber: number, path: string): void {
+  let run;
+  try {
+    run = readRun(repoRoot, sessionNumber);
+  } catch (error) {
+    if (error instanceof LedgerError) return;
+    throw error;
+  }
+  if (run === null || !run.baseline_tree) return;
+  const accepted = run.accepted_steps;
+  const step = readWorkPlan(repoRoot, sessionNumber)?.steps.find((candidate) => !accepted.includes(candidate.id));
+  if (step?.files.includes(path)) return;
+  const tree = treeWithPaths(repoRoot, run.baseline_tree, [path]);
+  if (tree !== null) writeRun(repoRoot, sessionNumber, { ...run, baseline_tree: tree });
 }
 
 function firstLine(text: string): string {

@@ -76,6 +76,7 @@ import {
   mechanicHandsBack,
   unchangedStepFiles,
   checkFailedRefusal,
+  runStepChecks,
   CHECK_FAILED_WAYS,
   noLoopMessage,
   reviveLoop,
@@ -103,6 +104,8 @@ import { beginJobRecord, jobRecord, jobStatusPath, setJobStarter } from "../src/
 import { EXIT_FUNDS } from "../src/contracts/exitCodes.ts";
 import { rewindPhaseFor } from "../src/gates.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
+import { checkRunGreen } from "../src/checks.ts";
+import type { RouterConfig } from "../src/config.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
 import { gitAnswers, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
@@ -807,6 +810,32 @@ describe("a check that fails", () => {
     assert.ok(!own.includes("declared by step"), own);
     const timedOut = checkFailedRefusal("widget", { argv: ["sleep"] }, { exitCode: null, timedOut: true, treeMutated: true, output: "tick\n" });
     assert.match(timedOut, /-> exit none \(timed out\) \(the check changed the tree\)\ntick\n/);
+  });
+
+  it("is judged on what it changed: a read-only check after a writer passes, and the writer's refusal names its path", async () => {
+    // Session 80 of a field report: the sixth of twelve checks wrote a file,
+    // and the six read-only checks after it were all refused for it.
+    const repo = tempDir("checks-");
+    const restore = gitAnswers([
+      [["read-tree"], {}],
+      [["add"], {}],
+      [["rm"], {}],
+      [["write-tree"], () => ({ stdout: existsSync(join(repo, "made.txt")) ? "tree-after" : "tree-before" })],
+      [["diff", "--name-only"], (args) => ({ stdout: args.includes("tree-after") ? "made.txt\0" : "" })],
+    ]);
+    try {
+      const config = { run_policy: { check_timeout_seconds: 60 } } as unknown as RouterConfig;
+      const results = await runStepChecks(repo, "widget", [
+        { argv: ["node", "-e", "require('fs').writeFileSync('made.txt', 'x')"] },
+        { argv: ["node", "-e", ""] },
+      ], "tree-before", config);
+      assert.equal(checkRunGreen(results[0].run), false);
+      assert.equal(checkRunGreen(results[1].run), true);
+      const refused = checkFailedRefusal("widget", results[0].check, results[0].run, results[0].moved);
+      assert.match(refused, /\(the check changed the tree: made\.txt\)/);
+    } finally {
+      restore();
+    }
   });
 
   it("says a program that could not spawn failed to start, not that it timed out", () => {

@@ -7,12 +7,13 @@
 // from a table -- no checkout, no process. The close is the whole pipeline
 // and belongs to walk-session.test.ts.
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { capture } from "../src/output.ts";
-import { platformNewlines } from "../src/journal.ts";
+import { changedPathsBetween, platformNewlines, snapshotWorktreeTree } from "../src/journal.ts";
 import { checkPublishedWhenReleasable } from "../src/gates.ts";
 import { appendPackaging } from "../src/ledger.ts";
 import {
@@ -68,6 +69,7 @@ import {
   interrupt,
   personIsPresent,
   plan,
+  rebaseline,
   repairedPaths,
   report,
   judgeRollback,
@@ -80,7 +82,7 @@ import {
   steppedOverLines,
   type SequenceFacts,
 } from "../src/session.ts";
-import { loopPath, readInstruction, readReport, recordRepair, writeInstruction, writeRun } from "../src/driver.ts";
+import { loopPath, readInstruction, readRepairs, readReport, readRun, recordRepair, writeInstruction, writeRun } from "../src/driver.ts";
 import {
   amendmentEntries,
   readTaskDeclaration,
@@ -1202,6 +1204,80 @@ describe("a repair made while the run was stopped", () => {
       assert.deepEqual(repaired, ["src/widget.ts", "tests/widget.test.ts"]);
     } finally {
       state.restore();
+    }
+  });
+});
+
+describe("rebaseline --path", () => {
+  it("moves the baseline over the repair alone, leaving the stopped step's uncommitted file in its diff", async () => {
+    // A field report's session 80: the whole-tree rebaseline the refusal
+    // recommended recorded the author's own step files as repaired, and the
+    // step was re-reported with nothing in it.
+    const repo = tempDir("rebaseline-");
+    seed(repo, SEED);
+    const disk = (): Map<string, string> => {
+      const files = new Map<string, string>();
+      const walk = (dir: string): void => {
+        for (const entry of readdirSync(join(repo, dir), { withFileTypes: true })) {
+          const rel = dir ? `${dir}/${entry.name}` : entry.name;
+          if (rel === ".git" || rel === ".dabbler") continue;
+          if (entry.isDirectory()) walk(rel);
+          else files.set(rel, readFileSync(join(repo, rel), "utf8"));
+        }
+      };
+      walk("");
+      return files;
+    };
+    // Git as trees of path -> content: enough to tell which paths a baseline holds.
+    const trees = new Map<string, Map<string, string>>([["HEAD", disk()]]);
+    let index = new Map<string, string>();
+    const writeTree = (): string => {
+      const id = createHash("sha1").update(JSON.stringify([...index].sort())).digest("hex");
+      trees.set(id, new Map(index));
+      return id;
+    };
+    const restore = cleanRepoAnswers(repo, [
+      [["read-tree"], (args) => ((index = new Map(trees.get(String(args[1])) ?? [])), {})],
+      [["add", "-A"], () => ((index = disk()), {})],
+      [["add", "--"], (args) => {
+        for (const path of args.slice(2)) index.set(path, readFileSync(join(repo, path), "utf8"));
+        return {};
+      }],
+      [["rm"], (args) => (args.forEach((path) => index.delete(path)), {})],
+      [["write-tree"], () => ({ stdout: writeTree() })],
+      [["diff", "--name-only"], (args) => {
+        const [a, b] = [trees.get(String(args[4]))!, trees.get(String(args[5]))!];
+        const paths = [...new Set([...a.keys(), ...b.keys()])].filter((path) => a.get(path) !== b.get(path));
+        return { stdout: paths.sort().map((path) => `${path}\0`).join("") };
+      }],
+    ]);
+    try {
+      const sessionsDir = join(repo, "docs", "sessions");
+      registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+      writeRun(repo, 1, {
+        schema_version: 1,
+        session_number: 1,
+        engine: "claude-code",
+        phase: "work",
+        seq: 2,
+        invocations: 0,
+        max_invocations: 24,
+        accepted_steps: [] as string[],
+        baseline_tree: snapshotWorktreeTree(repo),
+        stop: { kind: "rejected-thrice", reason: "omits", class: "first", step_id: "widget", at: "2026-10-30T10:00:00-04:00" },
+        started_at: "2026-10-30T09:00:00-04:00",
+        updated_at: "2026-10-30T10:00:00-04:00",
+      });
+      writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n");
+      writeFileSync(join(repo, "repaired.txt"), "the repair\n");
+
+      const moved = await run(() => rebaseline(sessionsDir, { reason: "out-of-band commit", paths: ["repaired.txt"] }));
+      assert.equal(moved.code, EXIT_OK, moved.err);
+      const baseline = String(readRun(repo, 1)?.baseline_tree);
+      assert.deepEqual(changedPathsBetween(repo, baseline, String(snapshotWorktreeTree(repo))), ["src/widget.py"]);
+      assert.deepEqual(readRepairs(repo, 1).map((row) => row["paths"]), [["repaired.txt"]]);
+    } finally {
+      restore();
     }
   });
 });

@@ -333,7 +333,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 293 | Small defects from the field | no | 2026-10-27 |
 | 294 | Release 3.27.0 (release: 3.27.0) | yes | 2026-10-27 |
 | 295 | The Mechanic on a release session | no | 2026-10-30 |
-| 296 | A check is judged on what it changed | — | not declared |
+| 296 | A check is judged on what it changed | no | 2026-10-30 |
 | 297 | A failure seen early, not repeated late | — | not declared |
 | 298 | Release 3.28.0 (release: 3.28.0) | — | not declared |
 
@@ -3496,3 +3496,13 @@ Release 3.27.0: the framework packs and publishes what is on the trunk.
 **Releasable: no.**
 
 Make the Mechanic reachable on a release session, whose row registers orchestrator {engine: "framework"} (RELEASE_ENGINE) with no model. orchestratorOf (projection.ts) reads an in-flight row whose engine is RELEASE_ENGINE as naming no engine and no model, and takes engine, model and provider from the newest earlier session row that names a real engine; so authoringNode, the Configuration pane and Open a Mechanic (runOpenMechanic) fall through to the repository's configured engine as they do when nothing is in flight. callInTheMechanic (drive.ts) launches on the session's declared engine when it is set and is not RELEASE_ENGINE, otherwise on the configured engine (explainEngine), otherwise on orchestratorOf's engine, and only last on the run's own engine; the model stays explainMechanicModel's, then orchestratorOf's. Where no engine or no model resolves, mechanic-not-called names `dabbler configure --engine <engine>` or `dabbler configure --mechanic-model <model>` instead of --engine-argv. Tests: the refused-publish walk captures the launcher's (engine, model) and asserts the configured engine and model; projection.test.ts shows a release in flight reading as the newest authoring row; commandFlows.test.ts shows Open a Mechanic on a release in flight opening on the configured engine.
+
+### Session 296 — A check is judged on what it changed
+
+**Releasable: no.**
+
+Judge each step check on what it changed. executeCheck already returns the tree it ended on (postTreeDigest); judge passes it to the next check as that check's reference, so a read-only check after a mutating one passes, and checkFailedRefusal names up to five paths that moved (from changedPathsBetween) and how many more. `dabbler session rebaseline` gains a repeatable --path that moves the baseline over those paths alone with treeWithPaths; the omits refusal prints that exact command for the file it names, or says to delete it if it is scratch; the whole-tree form stays and is refused while files the stopped step declares are among the uncommitted changes, naming the --path form. When commitChoice leaves .vscode/settings.json for an in-flight run to commit, it advances that run's step baseline over the file with treeWithPaths, unless the step in flight declares the file itself. detectDotnet declares test_roots ["."] so *Tests.cs is claimed wherever a test project sits; suites already declared are not rewritten.
+
+**Amended after acceptance:**
+
+- 2026-10-30 — step 'check-own-reference': its files: walk-session.test.ts asserts the changed-tree refusal's wording, which now names the moved path (claude-code (anthropic, claude-opus-5-5))

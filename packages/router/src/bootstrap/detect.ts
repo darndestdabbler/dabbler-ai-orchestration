@@ -146,7 +146,9 @@ function detectGradle(root: string): Ecosystem | null {
 
 /**
  * `dotnet test` is the SDK's own test entry point, and it resolves the
- * solution or project in the directory it runs in.
+ * solution or project in the directory it runs in. A solution's test
+ * projects sit wherever it puts them -- `X.Tests/` beside `X/` as often as
+ * under `tests/` -- so its test root is the solution's own.
  */
 function detectDotnet(root: string): Ecosystem | null {
   const patterns = ["*.sln", "*.slnx", "*.csproj", "*.fsproj"];
@@ -155,7 +157,7 @@ function detectDotnet(root: string): Ecosystem | null {
     key: "dotnet",
     command: "dotnet test",
     runsWhole: false,
-    testRoots: ["tests"],
+    testRoots: ["."],
     testGlob: "*Tests.cs",
     testName: "{name}Tests.cs",
     select: "dotnet test --filter {names}",

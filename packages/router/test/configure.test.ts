@@ -19,6 +19,7 @@ import {
 } from "../src/catalog.ts";
 import { configure } from "../src/cli/configure.ts";
 import { resetProjectRootCache } from "../src/config.ts";
+import { readRun, writeRun } from "../src/driver.ts";
 import { readPreferences, writePreferences } from "../src/preferences.ts";
 import { configurationNode } from "../src/projection.ts";
 import { ROLE_AUXILIARY_REVIEWER, ROLE_PRIMARY_REVIEWER } from "../src/selection.ts";
@@ -317,6 +318,49 @@ describe("where a choice made with configure is kept", () => {
       assert.ok(!calls.some((args) => ["add", "commit", "push"].includes(args[0] as string)));
     } finally {
       restore();
+      writePreferences({ engine: "" });
+    }
+  });
+
+  // A field report: a configure made mid-run to recover from an unreachable
+  // provider left the file for the land, and the next step was refused for
+  // omitting it.
+  it("moves the run's step baseline over the file, so the step in flight is not measured on it", () => {
+    const [BASE, MOVED] = ["a".repeat(40), "b".repeat(40)];
+    const root = tempDir("configure-baseline-");
+    seed(root, {
+      "docs/sessions/sessions.json": JSON.stringify({ sessions: [{ number: 7, status: "in-progress" }] }),
+    });
+    writeRun(root, 7, {
+      schema_version: 1,
+      session_number: 7,
+      engine: "claude-code",
+      phase: "work",
+      seq: 3,
+      invocations: 1,
+      max_invocations: 24,
+      accepted_steps: [] as string[],
+      baseline_tree: BASE,
+      stop: null,
+      started_at: "2026-10-30T09:00:00-04:00",
+      updated_at: "2026-10-30T09:00:00-04:00",
+    });
+    const staged: string[][] = [];
+    const restore = gitAnswers([
+      [["rev-parse", "--show-toplevel"], { stdout: root.split("\\").join("/") }],
+      [["read-tree"], (args) => (args[1] === BASE ? {} : { code: 128 })],
+      [["add", "--"], (args) => (staged.push(args.slice(2)), {})],
+      [["write-tree"], { stdout: MOVED }],
+      [() => true, { code: 128, stderr: "not a git repository" }],
+    ]);
+    resetProjectRootCache();
+    try {
+      assert.equal(configure({ repoRoot: root, engine: "claude-code" }).refusal, null);
+      assert.deepEqual(staged, [[".vscode/settings.json"]]);
+      assert.equal(readRun(root, 7)?.baseline_tree, MOVED);
+    } finally {
+      restore();
+      resetProjectRootCache();
       writePreferences({ engine: "" });
     }
   });

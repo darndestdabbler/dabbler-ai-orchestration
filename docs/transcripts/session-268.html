@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 268 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 268 transcript</h1>
+<p class="stamp">Rendered 2026-10-16T20:08:38.192Z by dabbler-ai-router 3.21.0 at ace57476f5ab66715de7af41a1d2bfd856558389.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-16T16:04:26.324-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 268 of 269: The version goes to 3.22.0</h3>
+<p>Scope: <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes; <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> Session 268 was planned as the release, and its start refused: <code>version.json says 3.21.0, and session 268 releases 3.22.0. The version is bumped by an ordinary session, never by a release</code>. Every earlier release had its bump ride in the last ordinary session before it -- 245 set 3.21.0 for 246 -- and none of 247 to 267 did, so the release had nothing to publish under its heading.</p>
+<p><strong>Step 1 -- the version and the words.</strong> <code>version.json</code> goes to 3.22.0 (a minor: a session's transcript is rendered and committed, a rollback pushes its own commit, and this repository's suites run whole at every close), stamped with <code>npm run stamp:version</code>, and the changelog gets the 3.22.0 section naming what 247 to 267 changed for a developer.</p>
+<p><strong>Non-goals.</strong> Any change to code, a test, or the release check that refused. Publishing, which is session 269's.</p>
+<p><strong>Tests.</strong> None. <code>npm run check:version</code> is the check that the stamp reached every manifest.</p>
+<p><strong>Releasable.</strong> Yes -- with 247 to 267, as 3.22.0 in session 269.</p>
+<h2>Work Plan</h2>
+<p>Set the repository's release version to 3.22.0 so session 269 can publish it: edit version.json to 3.22.0, run <code>npm run stamp:version</code> to write it into the router and extension manifests and the lockfile, and add a 3.22.0 section to the extension's CHANGELOG.md naming what sessions 247 to 267 changed for a developer (a session's transcript rendered and committed, configuration choices committed as made, suites run whole at every close in this repository, a rollback pushing its own commit, and the related fixes).</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/8dcbde3f4dbae12005506995be3604f3376a9504"><code>8dcbde3f4dbae12005506995be3604f3376a9504</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Version and changelog</td><td><p>Set version.json to 3.22.0, run npm run stamp:version to stamp the router manifest, the extension manifest and package-lock.json, and add a [3.22.0] section to tools/dabbler-ai-orchestration/CHANGELOG.md naming what sessions 247 to 267 changed for a developer.</p></td><td><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>node packages/router/scripts/run-ts.mjs packages/router/scripts/stamp-version.ts --check</code><br><code>node -e const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');process.exit(t.includes('## [3.22.0]')?0:1)</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Any change to code, a test, or the release check that refused session 268's start as a release</li><li>Publishing, tagging or packaging 3.22.0, which is session 269's</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[20:04:26]</span> <span class="muted">run-started</span> session=268 mode=pull</div>
+<div class="line"><span class="at">[20:04:26]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[20:04:47]</span> <span class="muted">run-resumed</span> session=268 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[20:04:47]</span> <span class="muted">plan-accepted</span> steps=[&quot;version-and-changelog&quot;] non_goals=2</div>
+<div class="line"><span class="at">[20:04:47]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[20:04:47]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=version-and-changelog</div>
+<div class="line"><span class="at">[20:05:12]</span> <span class="muted">run-resumed</span> session=268 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[20:05:15]</span> <span class="muted">check-passed</span> step=version-and-changelog argv=[&quot;node&quot;,&quot;packages/router/scripts/run-ts.mjs&quot;,&quot;packages/router/scripts/stamp-version.ts&quot;,&quot;--check&quot;]</div>
+<div class="line"><span class="at">[20:05:15]</span> <span class="muted">check-passed</span> step=version-and-changelog argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');process.exit(t.includes('## [3.22.0]')?0:1)&quot;]</div>
+<div class="line"><span class="at">[20:05:15]</span> <span class="muted">report-accepted</span> seq=2 step=version-and-changelog files=[&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version.json set to 3.22.0 and stamped into both manifests and the lockfile; CHANGELOG gains the 3.22.0 section for 247-267</div>
+<div class="line"><span class="at">[20:05:15]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[20:05:17]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[20:05:18]</span> <span class="muted">job-started</span> name=verification pid=43344 log=.dabbler/runs/s268/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[20:06:10]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s268/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[20:06:10]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[20:06:10]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[20:06:10]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[20:06:12]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=43084 log=.dabbler/runs/s268/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[20:06:15]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s268/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[20:06:15]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[20:06:16]</span> <span class="muted">job-started</span> name=run of record: typescript pid=46420 log=.dabbler/runs/s268/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[20:08:06]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s268/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[20:08:06]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[20:08:07]</span> <span class="muted">job-started</span> name=run of record: extension pid=15508 log=.dabbler/runs/s268/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[20:08:26]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s268/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[20:08:26]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[20:08:30]</span> <span class="muted">landed</span> commit=8dcbde3f4dbae12005506995be3604f3376a9504</div>
+<div class="line"><span class="at">[20:08:30]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[20:08:30]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[20:08:30]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[20:08:31]</span> <span class="muted">job-started</span> name=close pid=48300 log=.dabbler/runs/s268/driver/jobs/close.log</div>
+<div class="line"><span class="at">[20:08:38]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s268/driver/jobs/close.log</div>
+<div class="line"><span class="at">[20:08:38]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gemini-4-argon</td><td>google</td><td>api</td><td>0</td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>52</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>108s</td><td>1341</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>17s</td><td>282</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

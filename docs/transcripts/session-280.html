@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 280 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 280 transcript</h1>
+<p class="stamp">Rendered 2026-10-26T16:27:18.523Z by dabbler-ai-router 3.23.0 at 85145c3c9e8163535403d723816808400285fac2.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-26T12:21:20.897-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 280 of 284: Open a Mechanic on a Copilot session in flight</h3>
+<p>Scope: <code>tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts</code> (<code>runOpenMechanic</code>); its test in <code>commandFlows.test.ts</code>; <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes; <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> The operator, 2026-10-26: with Copilot as the authoring vehicle, *Open a Mechanic* refuses with &quot;GitHub Copilot needs a model and neither this repository nor this machine names one, so nothing was started&quot;, and its *Choose the Model* button answers &quot;The session in flight declared '&lt;model&gt;' at <code>session start</code> ... Close the session to choose what the next one authors with.&quot; A dead end, on every Copilot session in flight: <code>runOpenMechanic</code> gates on <code>configuredStart</code>, Start's question -- what would a NEW session start with? -- and while a session is in flight the Configuration's authoring row REPORTS that session's declared model, so <code>authoringModelIn</code> answers &quot;&quot; by design. Copilot is the one engine whose model is required, so the gate always refuses; and its way on is the Authoring Model row, which refuses every change while a session is in flight. *Open a Mechanic* is offered only on the session in flight, so the refusal and its button are never right there. The router already answers the right question for the unattended Mechanic: the session's own engine, on the Mechanic Model, else the Authoring Model, else the model the session declared at its start.</p>
+<p><strong>Step 1 -- the session's engine and model, not Start's.</strong> <code>runOpenMechanic</code> takes the engine and the model the session in flight declared at <code>session start</code>, and offers first the Mechanic Model, else that declared model -- the router's order. It does not call <code>configuredStart</code>, so neither its refusal nor its *Choose the Model* way on is reached from here; an empty answer for an engine that requires a model is refused by the checks that already follow the pick.</p>
+<p><strong>Step 2 -- the version and the words.</strong> <code>version.json</code> goes to 3.23.1 (a patch: a fix to what 3.23.0 shipped), stamped with <code>npm run stamp:version</code>, and the changelog gets a 3.23.1 section with this fix under Fixed.</p>
+<p><strong>Non-goals.</strong> Any router change. Any change to Start Session, to what <code>configuredStart</code> refuses, or to the Authoring Model row's in-flight report. A new setting.</p>
+<p><strong>Tests.</strong> In <code>commandFlows.test.ts</code>, a Copilot session in flight, whose Configuration reports its declared model and names no Authoring Model of its own, opens a Mechanic whose pick offers the declared model first; the existing Mechanic test is confirmed. <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes -- as 3.23.1 in session 281.</p>
+<h2>Work Plan</h2>
+<p>Open a Mechanic stops asking Start's question. runOpenMechanic reads the repository's configuration once and takes the authoring role's engine and declared model -- the engine and model the session in flight declared at <code>session start</code> -- instead of calling configuredStart, so a Copilot session in flight, whose Authoring Model row reports its declared model and whose repository names none of its own, is no longer refused with a Choose the Model button that refuses in turn. The model offered first is the Mechanic Model, else that declared model, the router's order; an empty model for an engine that requires one is refused by the checks that already follow the pick. The version goes to 3.23.1, stamped with <code>npm run stamp:version</code>, and the changelog gains a 3.23.1 section with the fix under Fixed.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/3a3855625de8ef49c52a86d703249097a1f181d5"><code>3a3855625de8ef49c52a86d703249097a1f181d5</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Mechanic takes the sessions author</td><td><p>In tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts, make runOpenMechanic read the configuration through the existing <code>configurationFor</code> seam (solutionConfiguration in production), take the engine from the authoring role's <code>engine</code> and the model from its <code>chosen.model</code> regardless of <code>declaredAtStart</code>, and offer the Mechanic Model first, else that declared model. It no longer calls configuredStart; where the reading names no known engine it shows an error and opens nothing. In commandFlows.test.ts, update the existing Mechanic test to the new seam and add a test: a Copilot session in flight whose reading reports its declared model (declaredAtStart true) and names no Mechanic Model opens a Mechanic whose pick offers the declared model first, and nothing is refused.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</span></td><td><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code></td><td>yes</td></tr>
+<tr><td>Version 3 23 1</td><td><p>Set version.json to 3.23.1, run <code>npm run stamp:version</code> to write the manifests, and add a 3.23.1 section to tools/dabbler-ai-orchestration/CHANGELOG.md with this fix under Fixed.</p></td><td><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Any router change.</li><li>Any change to Start Session, to what configuredStart refuses, or to the Authoring Model row's in-flight report.</li><li>A new setting.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[16:21:20]</span> <span class="muted">run-started</span> session=280 mode=pull</div>
+<div class="line"><span class="at">[16:21:20]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[16:23:06]</span> <span class="muted">run-resumed</span> session=280 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[16:23:06]</span> <span class="muted">plan-accepted</span> steps=[&quot;mechanic-takes-the-sessions-author&quot;,&quot;version-3-23-1&quot;] non_goals=3</div>
+<div class="line"><span class="at">[16:23:06]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[16:23:07]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=mechanic-takes-the-sessions-author</div>
+<div class="line"><span class="at">[16:24:00]</span> <span class="muted">run-resumed</span> session=280 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:24:05]</span> <span class="muted">check-passed</span> step=mechanic-takes-the-sessions-author argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[16:24:11]</span> <span class="muted">named-tests-passed</span> step=mechanic-takes-the-sessions-author suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[16:24:19]</span> <span class="muted">named-tests-passed</span> step=mechanic-takes-the-sessions-author suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</div>
+<div class="line"><span class="at">[16:24:19]</span> <span class="muted">report-accepted</span> seq=2 step=mechanic-takes-the-sessions-author files=[&quot;tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts&quot;] notes=runOpenMechanic takes the authoring role's engine and declared model from the configuration reading instead of configuredStart; new test for a Copilot session in flight</div>
+<div class="line"><span class="at">[16:24:19]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=version-3-23-1</div>
+<div class="line"><span class="at">[16:24:37]</span> <span class="muted">run-resumed</span> session=280 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:24:40]</span> <span class="muted">check-passed</span> step=version-3-23-1 argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[16:24:41]</span> <span class="muted">report-accepted</span> seq=3 step=version-3-23-1 files=[&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version 3.23.1 stamped into three manifests; changelog 3.23.1 section with the fix under Fixed</div>
+<div class="line"><span class="at">[16:24:41]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[16:24:42]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[16:24:42]</span> <span class="muted">job-started</span> name=verification pid=9372 log=.dabbler/runs/s280/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:25:35]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s280/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:25:35]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[16:25:35]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[16:25:35]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[16:25:35]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=44004 log=.dabbler/runs/s280/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:25:37]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s280/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:25:37]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[16:25:37]</span> <span class="muted">job-started</span> name=run of record: typescript pid=36432 log=.dabbler/runs/s280/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:26:51]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s280/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:26:51]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[16:26:51]</span> <span class="muted">job-started</span> name=run of record: extension pid=7040 log=.dabbler/runs/s280/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[16:27:08]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s280/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[16:27:08]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[16:27:12]</span> <span class="muted">landed</span> commit=3a3855625de8ef49c52a86d703249097a1f181d5</div>
+<div class="line"><span class="at">[16:27:12]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[16:27:12]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[16:27:12]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[16:27:12]</span> <span class="muted">job-started</span> name=close pid=9568 log=.dabbler/runs/s280/driver/jobs/close.log</div>
+<div class="line"><span class="at">[16:27:18]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s280/driver/jobs/close.log</div>
+<div class="line"><span class="at">[16:27:18]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>1 finding</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** A useful additional case would start with an in-flight Copilot session whose declared model is empty and no Mechanic Model is configured, return `&quot;&quot;` from `askModel`, and assert that `runOpenMechanic` returns `false`, reports the existing required-model refusal, and opens no terminal. The current code appears to handle this through `engineModelRefusal`, but the visible Mechanic tests do not pin that claimed behavior.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>73s</td><td>1370</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>15s</td><td>292</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

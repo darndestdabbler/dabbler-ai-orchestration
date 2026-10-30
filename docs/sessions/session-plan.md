@@ -16520,7 +16520,7 @@ engine and the reviewing vehicle, and not the machine's. No new test.
 
 The framework publishes session 270 as 3.22.1 and nothing else.
 
-### Session 272 of 294: An API out of credits pauses for funds, and Continue resumes it
+### Session 272 of 298: An API out of credits pauses for funds, and Continue resumes it
 
 Scope: `packages/router/src/transports/api.ts` (the retry ladder),
 `packages/router/src/transports/copilot.ts` (the error classes),
@@ -16570,7 +16570,7 @@ funds kind, and the next instruction after it resumes the phase.
 
 **Releasable.** Yes -- with 273 to 278, as 3.23.0 in session 279.
 
-### Session 273 of 294: A cancelled session gets its transcript, marked cancelled
+### Session 273 of 298: A cancelled session gets its transcript, marked cancelled
 
 Scope: `packages/router/src/session.ts` (`cancel`, the rollback),
 `packages/router/src/transcript.ts` (the cancelled page),
@@ -16618,7 +16618,7 @@ the cancelled banner carries the reason and the last phase.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 274 of 294: The Mechanic, ported back to the router
+### Session 274 of 298: The Mechanic, ported back to the router
 
 Scope: `packages/router` -- `cli/consult.ts` (`--mechanic`), `drive.ts`
 (an intervention after the land rewinds to verify; the close lists
@@ -16670,7 +16670,7 @@ rewinds to verify and the close names it.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 275 of 294: The framework calls in the Mechanic without the person
+### Session 275 of 298: The framework calls in the Mechanic without the person
 
 Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` and
 `dabbler.mechanicModel` settings through the layers), `cli/configure.ts`
@@ -16752,7 +16752,7 @@ the Primary Model is refused.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 276 of 294: `off` names no Mechanic, and the Mechanic is walked past its stop
+### Session 276 of 298: `off` names no Mechanic, and the Mechanic is walked past its stop
 
 Scope: `packages/router` -- `driver.ts` (`renderStop`'s ways on),
 `config.ts` (the Mechanic's two readings); tests in `driver.test.ts`,
@@ -16786,7 +16786,7 @@ do, its budget, or its brief. A new verb or flag.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 277 of 294: Open a Mechanic, and what it did, in the extension
+### Session 277 of 298: Open a Mechanic, and what it did, in the extension
 
 Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 (*Open a Mechanic*), `src/providers/ActionRegistry.ts`,
@@ -16828,7 +16828,7 @@ each.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 278 of 294: A failed release is diagnosed, and one caused outside the repository retries in place
+### Session 278 of 298: A failed release is diagnosed, and one caused outside the repository retries in place
 
 Scope: `packages/router/src/drive.ts` (`phasePublish`'s stop and ways
 on), `packages/router/src/cli/consult.ts` (the release briefing); tests in
@@ -16871,11 +16871,11 @@ release resumes at publish. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 279.
 
-### Session 279 of 294: Release 3.23.0 (release: 3.23.0)
+### Session 279 of 298: Release 3.23.0 (release: 3.23.0)
 
 The framework publishes sessions 272 to 278 as 3.23.0 and nothing else.
 
-### Session 280 of 294: Open a Mechanic on a Copilot session in flight
+### Session 280 of 298: Open a Mechanic on a Copilot session in flight
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
 (`runOpenMechanic`); its test in `commandFlows.test.ts`; `version.json` and
@@ -16926,7 +16926,7 @@ stamp.
 **Releasable.** Yes -- with 281 and 282, as 3.24.0 in session 283; 3.23.1
 is never published on its own.
 
-### Session 281 of 294: An existing remote or folder is a starting point
+### Session 281 of 298: An existing remote or folder is a starting point
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts`
 (Set Up New Project: the remote prompt, the remote read before bootstrap,
@@ -16978,7 +16978,7 @@ offered as the starting point and nothing is deleted.
 
 **Releasable.** Yes -- with 280 and 282, as 3.24.0 in session 283.
 
-### Session 282 of 294: The planning session reads the code already there
+### Session 282 of 298: The planning session reads the code already there
 
 Scope: `packages/router/src/bootstrap/templates.ts` (`BOOTSTRAP_PLAN`,
 `PLAN_PROMPT`, `DECOMPOSITION_PROMPT`), `packages/router/src/drive.ts`
@@ -17023,11 +17023,11 @@ check:version` checks the stamp.
 
 **Releasable.** Yes -- with 280 and 281, as 3.24.0 in session 283.
 
-### Session 283 of 294: Release 3.24.0 (release: 3.24.0)
+### Session 283 of 298: Release 3.24.0 (release: 3.24.0)
 
 The framework publishes sessions 280, 281 and 282 as 3.24.0 and nothing else.
 
-### Session 285 of 294: The session plan outranks the author's own plan
+### Session 285 of 298: The session plan outranks the author's own plan
 
 Scope: `packages/router/prompt-templates/verification.md` (Completeness,
 Scope and simplicity, the tests in the diff), `packages/router/src/drive.ts`
@@ -17091,7 +17091,7 @@ while a session is in progress and accepted when none is.
 
 **Releasable.** Yes -- with 286, as 3.25.0 in session 287.
 
-### Session 286 of 294: Three tooling fixes from the field
+### Session 286 of 298: Three tooling fixes from the field
 
 Scope: `packages/router/src/session.ts` (`start`'s registration),
 `packages/router/src/ecosystem.ts` (`BUILD_OUTPUT`),
@@ -17140,11 +17140,11 @@ stamp.
 
 **Releasable.** Yes -- with 285, as 3.25.0 in session 287.
 
-### Session 287 of 294: Release 3.25.0 (release: 3.25.0)
+### Session 287 of 298: Release 3.25.0 (release: 3.25.0)
 
 The framework publishes sessions 285 and 286 as 3.25.0 and nothing else.
 
-### Session 288 of 294: The landed tree is the verified tree, and a failed run of record can be re-run
+### Session 288 of 298: The landed tree is the verified tree, and a failed run of record can be re-run
 
 Scope: `packages/router/src/land.ts` (`judgeLandReadiness`),
 `packages/router/src/drive.ts` (`landFacts`, `phaseLand`,
@@ -17196,7 +17196,7 @@ still goes through verification.
 
 **Releasable.** Yes -- with 289 and 290, as 3.26.0 in session 291.
 
-### Session 289 of 294: A round sees what earlier rounds asked
+### Session 289 of 298: A round sees what earlier rounds asked
 
 Scope: `packages/router/src/verify/rounds.ts` (the finding a round
 records), `packages/router/src/verify/prompts.ts` (`priorFindingsBlock`),
@@ -17242,7 +17242,7 @@ cap.
 
 **Releasable.** Yes -- with 288 and 290, as 3.26.0 in session 291.
 
-### Session 290 of 294: Packaging and the Mechanic, from the field
+### Session 290 of 298: Packaging and the Mechanic, from the field
 
 Scope: `packages/router/src/packaging.ts` (`runStep`, the rehearsal),
 `packages/router/src/cli/` (the `packaging` verb's options),
@@ -17292,11 +17292,11 @@ checks the stamp.
 
 **Releasable.** Yes -- with 288 and 289, as 3.26.0 in session 291.
 
-### Session 291 of 294: Release 3.26.0 (release: 3.26.0)
+### Session 291 of 298: Release 3.26.0 (release: 3.26.0)
 
 The framework publishes sessions 288, 289 and 290 as 3.26.0 and nothing else.
 
-### Session 292 of 294: .NET build output is ignored from the first project
+### Session 292 of 298: .NET build output is ignored from the first project
 
 Scope: `packages/router/src/projectGraph.ts` (`solutionProjects`,
 `readProjectGraph`), `packages/router/src/ecosystem.ts`
@@ -17356,7 +17356,7 @@ file. In `gates.test.ts`, an absent ledger's refusal names rollback.
 
 **Releasable.** Yes -- with 293, as 3.27.0 in session 294.
 
-### Session 293 of 294: Small defects from the field
+### Session 293 of 298: Small defects from the field
 
 Scope: `packages/router/src/gates.ts` (`sessionChangedNothing`),
 `packages/router/src/drive.ts` (the step baseline, the check-failed and
@@ -17411,6 +17411,173 @@ the stamp.
 
 **Releasable.** Yes -- with 292, as 3.27.0 in session 294.
 
-### Session 294 of 294: Release 3.27.0 (release: 3.27.0)
+### Session 294 of 298: Release 3.27.0 (release: 3.27.0)
 
 The framework publishes sessions 292 and 293 as 3.27.0 and nothing else.
+
+### Session 295 of 298: The Mechanic on a release session
+
+Scope: `packages/router/src/projection.ts` (`orchestratorOf`,
+`authoringNode`), `packages/router/src/drive.ts` (`callInTheMechanic`),
+`tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
+(`runOpenMechanic`); their tests
+
+**Why.** A field report on CT.DPH.Syndromic-Surveillance-V2 (sessions 75-99,
+router 3.24.0-3.27.0, dated 2026-10-30, checked against this source on
+master) traced the one cancelled session in 25, Release 1.7.0 (session 91).
+Its `publish` stop is the one stop on a release that `mechanicHandsBack` lets
+the Mechanic take, and the Mechanic could not be reached by either road. A
+release registers `orchestrator: {engine: "framework"}` (`RELEASE_ENGINE`),
+with no model and no provider. Unattended, `resolveSessionOrchestratorIdentity`
+throws on that block, the `catch` leaves the run's engine to name it, the pull
+loop's `cli`, and the transcript says `mechanic-not-called why=no built-in
+command for 'cli'`; had it not thrown, `framework` fails the same way.
+Attended, `orchestratorOf` returns `engine: "framework"` for the release in
+flight, `authoringNode`'s `forEngine ?? inFlight ?? explainEngine(...)` takes
+it over the configured engine, and **Open a Mechanic** refuses with "No
+session in flight names an engine". Session 290 fixed the pull loop's `cli`
+for an ordinary session; a release was never in its reach. The release-publish
+test in `walk-session.test.ts` installs a launcher that ignores `(engine,
+model)`, so it passed with `("cli", null)`.
+
+**Step 1 -- a release names no authoring engine.** `orchestratorOf` reads a
+row whose engine is `RELEASE_ENGINE` as naming no engine and no model, and
+takes them from the newest earlier row that does. `authoringNode`, the
+Configuration pane and **Open a Mechanic** then fall through to the
+repository's configured engine, as they do when nothing is in flight.
+
+**Step 2 -- the unattended Mechanic launches on an engine that exists.**
+`callInTheMechanic` launches on the session's declared engine when it is set
+and is not `RELEASE_ENGINE`; otherwise on the configured engine
+(`explainEngine`); otherwise on what `orchestratorOf` now returns; and only
+last on the run's own engine. The model is `explainMechanicModel`'s, then
+`orchestratorOf`'s.
+
+**Step 3 -- a Mechanic that still cannot launch says what to set.** When no
+engine or no model resolves, `mechanic-not-called` names `dabbler configure
+--engine` or `--mechanic-model`, rather than `--engine-argv`, which no
+developer runs.
+
+**Non-goals.** Recording an authoring engine on a release row. Any change to
+what a release's stops hand back. Adding `codex` to the extension's engines.
+
+**Tests.** In `walk-session.test.ts`, the refused-publish test captures the
+launcher's `(engine, model)` and asserts the configured engine and its model.
+In `projection.test.ts`, a release in flight reads as the newest authoring row.
+In the extension's `sessionCommands` tests, **Open a Mechanic** on a release
+in flight opens on the configured engine.
+
+**Releasable.** Yes -- with 296 and 297, as 3.28.0 in session 298.
+
+### Session 296 of 298: A check is judged on what it changed
+
+Scope: `packages/router/src/drive.ts` (`judge`, `checkFailedRefusal`, the
+files-changed-omits refusal), `packages/router/src/checks.ts`
+(`executeCheck`), `packages/router/src/session.ts` (`rebaseline`),
+`packages/router/src/cli/configure.ts` (`commitChoice`),
+`packages/router/src/bootstrap/detect.ts` (`detectDotnet`); their tests
+
+**Why.** The same report. In session 80 the sixth of twelve checks changed
+the tree, and the six after it, among them `ConvertFrom-Json | Out-Null` and
+`findstr`, all failed "(the check changed the tree)": `judge` snapshots the
+tree once, before the loop, and `executeCheck` compares every check against
+that one snapshot. The refusal names no path, so the author cannot tell what
+moved. The same session's out-of-band planning commit landed in a step's
+diff; three omits refusals stopped it, and the `dabbler session rebaseline`
+that the refusal recommends moved the baseline over the whole tree, so the
+author's own uncommitted step files were recorded as "repaired outside a
+step" and the step re-reported `files=[]`. A `dabbler configure` made mid-run
+to recover from `provider-unreachable` left `.vscode/settings.json`
+uncommitted, by design, and the next step was refused for omitting it.
+Separately, `detectDotnet` declares `test_roots: ["tests"]`, so a solution
+whose test projects sit at its root (`X.Tests/`) gets named tests selected for
+none of them, and its regressions surface only at the run of record.
+
+**Step 1 -- each check against the tree it started on.** `executeCheck`
+returns the tree it ended on, and `judge` passes that to the next check as
+its reference, so a read-only check after a mutating one passes.
+
+**Step 2 -- the refusal names what moved.** "(the check changed the tree)"
+names up to five paths from `changedPathsBetween`, and says how many more.
+
+**Step 3 -- `rebaseline --path`.** `dabbler session rebaseline` takes a
+repeatable `--path` and moves the baseline over those paths alone with
+`treeWithPaths`. The omits refusal prints the exact command for the paths it
+names, and adds "or delete it, if it is scratch". The whole-tree form stays,
+and is refused while the step in flight has uncommitted changes.
+
+**Step 4 -- a configuration change is not the step's.** When `commitChoice`
+leaves `.vscode/settings.json` for a run in flight to commit, it advances that
+run's step baseline over the file, as `treeWithPaths` does for the root files.
+A step that edits the file itself is still judged on it.
+
+**Step 5 -- .NET test roots are the solution's.** `detectDotnet` declares
+`test_roots: ["."]`, so `*Tests.cs` is claimed wherever a test project sits.
+It applies to a suite the bootstrap writes; a suite already declared is not
+rewritten.
+
+**Non-goals.** Stopping at the first mutating check. Exempting
+`.vscode/settings.json` globally. Rewriting a repository's declared suites.
+Reminding the author to run `git status` (`--files` is already optional).
+
+**Tests.** In `drive.test.ts`, a read-only check after a mutating one passes,
+and the mutating check's refusal names its path. In `session.test.ts`,
+`rebaseline --path` leaves an uncommitted step file in the step's diff. In
+`configure.test.ts`, a choice made during a run does not enter the step's
+changed files. In `detect.test.ts`, a .NET solution declares `"."` as its test
+root.
+
+**Releasable.** Yes -- with 295 and 297, as 3.28.0 in session 298.
+
+### Session 297 of 298: A failure seen early, not repeated late
+
+Scope: `packages/router/src/drive.ts` (`afterRunOfRecordFix`, the
+fix-run-of-record ask), `packages/router/src/session.ts`
+(`judgeReleasePreflight`), `packages/router/src/cli/packaging.ts`
+(`rehearsePack`); their tests; `version.json` and the manifests `npm run
+stamp:version` writes; `tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The same report. Session 95's run of record failed five times in a
+row, four of them after a `fix-run-of-record` that changed nothing, at about
+five minutes of full-solution tests each: `afterRunOfRecordFix` goes back to
+the run of record whenever the fix moved nothing, with no count, and the ask
+invites "answer with no change". One no-change retry is right, for a stray
+process holding a lock or a flake; the fourth is a loop. And a `//` comment
+added to an `appsettings` file in session 80 broke `pack.ps1` under Windows
+PowerShell 5.1 eleven sessions later, at Release 1.7.0's `publish`, because
+nothing runs the pack before a release does. Session 290 added `dabbler
+packaging --rehearse`; `judgeReleasePreflight` checks that a packaging block
+is declared, that nothing is unverified, and the version file, and never
+rehearses.
+
+**Step 1 -- two no-change retries, then a stop.** The run counts consecutive
+`fix-run-of-record` answers that moved nothing while the suite stays red, and
+any tree move resets it. At two, the run stops with a `tests` stop the
+Mechanic can take, naming the failing tests, instead of running the suite a
+third time. The ask says a no-change answer is for a cause outside the tree,
+and that the second one stops.
+
+**Step 2 -- a release starts on a pack that works.** `judgeReleasePreflight`
+runs `rehearsePack` and refuses the start when it fails, with the pack's last
+lines and the log path. A refused start registers nothing, so no release
+number is spent or cancelled, and the person plans the fix as a session.
+
+**Step 3 -- the version and the words.** `version.json` goes to 3.28.0 (a
+minor: `rebaseline --path`, the rehearsal at a release's start and the
+no-change stop are new behaviour), stamped with `npm run stamp:version`, and
+the changelog gets a 3.28.0 section naming what 295, 296 and 297 changed for
+a developer.
+
+**Non-goals.** Killing stray processes, or any other .NET-specific cleanup.
+Rehearsing the pack outside a release start. Detecting flaky tests.
+
+**Tests.** In `drive.test.ts`, a second no-change fix that leaves the suite
+red stops the run, and a fix that moves the tree resets the count. In
+`session.test.ts`, a release whose rehearsal fails is refused at start and
+registers nothing. `npm run check:version` checks the stamp.
+
+**Releasable.** Yes -- with 295 and 296, as 3.28.0 in session 298.
+
+### Session 298 of 298: Release 3.28.0 (release: 3.28.0)
+
+The framework publishes sessions 295, 296 and 297 as 3.28.0 and nothing else.

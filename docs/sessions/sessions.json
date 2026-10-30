@@ -5871,9 +5871,9 @@
     {
       "number": 295,
       "title": "The Mechanic on a release session",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-30T10:41:22.869000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-30T11:04:32.826000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

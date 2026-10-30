@@ -5915,9 +5915,9 @@
     {
       "number": 297,
       "title": "A failure seen early, not repeated late",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-10-30T13:00:13.888000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-10-30T13:21:02.202000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

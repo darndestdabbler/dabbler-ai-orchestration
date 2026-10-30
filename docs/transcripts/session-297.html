@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 297 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 297 transcript</h1>
+<p class="stamp">Rendered 2026-10-30T17:21:08.734Z by dabbler-ai-router 3.27.0 at d01ca3e8fdc10c1762d2c08a39204a61d6ff86b7.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-30T13:00:29.797-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 297 of 298: A failure seen early, not repeated late</h3>
+<p>Scope: <code>packages/router/src/drive.ts</code> (<code>afterRunOfRecordFix</code>, the fix-run-of-record ask), <code>packages/router/src/session.ts</code> (<code>judgeReleasePreflight</code>), <code>packages/router/src/cli/packaging.ts</code> (<code>rehearsePack</code>); their tests; <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes; <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> The same report. Session 95's run of record failed five times in a row, four of them after a <code>fix-run-of-record</code> that changed nothing, at about five minutes of full-solution tests each: <code>afterRunOfRecordFix</code> goes back to the run of record whenever the fix moved nothing, with no count, and the ask invites &quot;answer with no change&quot;. One no-change retry is right, for a stray process holding a lock or a flake; the fourth is a loop. And a <code>//</code> comment added to an <code>appsettings</code> file in session 80 broke <code>pack.ps1</code> under Windows PowerShell 5.1 eleven sessions later, at Release 1.7.0's <code>publish</code>, because nothing runs the pack before a release does. Session 290 added <code>dabbler packaging --rehearse</code>; <code>judgeReleasePreflight</code> checks that a packaging block is declared, that nothing is unverified, and the version file, and never rehearses.</p>
+<p><strong>Step 1 -- two no-change retries, then a stop.</strong> The run counts consecutive <code>fix-run-of-record</code> answers that moved nothing while the suite stays red, and any tree move resets it. At two, the run stops with a <code>tests</code> stop the Mechanic can take, naming the failing tests, instead of running the suite a third time. The ask says a no-change answer is for a cause outside the tree, and that the second one stops.</p>
+<p><strong>Step 2 -- a release starts on a pack that works.</strong> <code>judgeReleasePreflight</code> runs <code>rehearsePack</code> and refuses the start when it fails, with the pack's last lines and the log path. A refused start registers nothing, so no release number is spent or cancelled, and the person plans the fix as a session.</p>
+<p><strong>Step 3 -- the version and the words.</strong> <code>version.json</code> goes to 3.28.0 (a minor: <code>rebaseline --path</code>, the rehearsal at a release's start and the no-change stop are new behaviour), stamped with <code>npm run stamp:version</code>, and the changelog gets a 3.28.0 section naming what 295, 296 and 297 changed for a developer.</p>
+<p><strong>Non-goals.</strong> Killing stray processes, or any other .NET-specific cleanup. Rehearsing the pack outside a release start. Detecting flaky tests.</p>
+<p><strong>Tests.</strong> In <code>drive.test.ts</code>, a second no-change fix that leaves the suite red stops the run, and a fix that moves the tree resets the count. In <code>session.test.ts</code>, a release whose rehearsal fails is refused at start and registers nothing. <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes -- with 295 and 296, as 3.28.0 in session 298.</p>
+<h2>Work Plan</h2>
+<p>Stop a red run of record from looping on no-change fixes, and start a release only on a pack that works. The driver run gains a no_change_fixes count (schema and generated type): afterRunOfRecordFix takes the count and returns the next phase and the new count -- a fix that moved the tree resets it and goes where it asked, a no-change fix increments it and runs the suite again, and the second consecutive no-change fix stops the run with a <code>tests</code> stop (which the Mechanic can take) naming the suite and the failing tests read from its run-of-record job log, instead of running the suite a third time. The fix-run-of-record ask says a no-change answer is for a cause outside the tree and that the second one stops. judgeReleasePreflight gains a rehearsal fact and refuses a release whose pack rehearsal fails, with the pack's last lines and the path of a log holding its whole output; releasePreflight runs rehearsePack only for a declared pack (never for a tag release) and only after the three cheap questions pass, and a refused start registers nothing. version.json goes to 3.28.0, stamped into the manifests with <code>npm run stamp:version</code>, and the changelog gets a 3.28.0 section naming what sessions 295, 296 and 297 changed for a developer.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/0b6d03a219f5bb3fadb920abecc340904c717cf9"><code>0b6d03a219f5bb3fadb920abecc340904c717cf9</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>No change stop</td><td><p>Add an optional integer no_change_fixes to driver-run.schema.json and regenerate src/generated/driver-run.ts with <code>npm run generate:types</code>. Change afterRunOfRecordFix in drive.ts to take the run's count and return the next phase and the new count, or a stop at two consecutive no-change fixes; any tree move resets the count. In runSynthesisedStep, persist the count, and at two throw Stop('tests', ...) naming the suite and the failing tests read from the run-of-record job log (its <code>test-failed test=</code> lines, else the log path). Reword the fix-run-of-record ask: a no-change answer is for a cause outside the tree, and the second one stops the run. Update the afterRunOfRecordFix tests in drive.test.ts: a second no-change fix that leaves the suite red stops, and a fix that moves the tree resets the count.</p></td><td><span class="mono">packages/router/schemas/driver-run.schema.json</span><br><span class="mono">packages/router/src/generated/driver-run.ts</span><br><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/drive.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>npm run check:types</code></td><td>yes</td></tr>
+<tr><td>Rehearse at release start</td><td><p>In session.ts, add a rehearsal member to ReleaseFacts (null where nothing was rehearsed) and have judgeReleasePreflight refuse a failed rehearsal with the pack's last lines and the log path, saying to plan the fix as a session. releasePreflight runs rehearsePack only where a pack (not a tag release) is declared and only after the three existing questions pass, writing the pack's whole output to a log under .dabbler/. The start refuses before registering anything. Tests in session.test.ts: judgeReleasePreflight refuses a failed rehearsal, and a release start whose pack fails is refused and registers nothing.</p></td><td><span class="mono">packages/router/src/session.ts</span><br><span class="mono">packages/router/test/session.test.ts</span><br><span class="mono">packages/router/test/walk-session.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Version and changelog</td><td><p>Set version.json to 3.28.0 and run <code>npm run stamp:version</code> to write it into the manifests. Add a 3.28.0 section to tools/dabbler-ai-orchestration/CHANGELOG.md naming what sessions 295, 296 and 297 changed for a developer.</p></td><td><span class="mono">version.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Killing stray processes, or any other .NET-specific cleanup.</li><li>Rehearsing the pack outside a release start: no rehearsal at plan, step or close.</li><li>Detecting flaky tests, or counting a fix that moved the tree toward the bound.</li><li>Publishing 3.28.0: that is session 298's release.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[17:00:29]</span> <span class="muted">run-started</span> session=297 mode=pull</div>
+<div class="line"><span class="at">[17:00:29]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[17:03:05]</span> <span class="muted">run-resumed</span> session=297 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[17:03:05]</span> <span class="muted">plan-accepted</span> steps=[&quot;no-change-stop&quot;,&quot;rehearse-at-release-start&quot;,&quot;version-and-changelog&quot;] non_goals=4</div>
+<div class="line"><span class="at">[17:03:07]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[17:03:07]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=no-change-stop</div>
+<div class="line"><span class="at">[17:05:07]</span> <span class="muted">run-resumed</span> session=297 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:05:16]</span> <span class="muted">check-passed</span> step=no-change-stop argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[17:05:19]</span> <span class="muted">check-passed</span> step=no-change-stop argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:types&quot;]</div>
+<div class="line"><span class="at">[17:06:39]</span> <span class="muted">named-tests-passed</span> step=no-change-stop suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[17:06:40]</span> <span class="muted">report-accepted</span> seq=2 step=no-change-stop files=[&quot;packages/router/schemas/driver-run.schema.json&quot;,&quot;packages/router/src/generated/driver-run.ts&quot;,&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;] notes=no_change_fixes on the run; afterRunOfRecordFix counts and stops at two; unchangedRedStop names the red suite and failing tests from its job log; ask reworded</div>
+<div class="line"><span class="at">[17:06:40]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=rehearse-at-release-start</div>
+<div class="line"><span class="at">[17:15:24]</span> <span class="muted">run-resumed</span> session=297 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:15:34]</span> <span class="muted">check-passed</span> step=rehearse-at-release-start argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[17:16:30]</span> <span class="muted">named-tests-passed</span> step=rehearse-at-release-start suite=typescript command=node scripts/suite.mjs container packages/router/test/session.test.ts packages/router/test/walk-session.test.ts</div>
+<div class="line"><span class="at">[17:16:32]</span> <span class="muted">report-accepted</span> seq=3 step=rehearse-at-release-start files=[&quot;packages/router/src/session.ts&quot;,&quot;packages/router/test/session.test.ts&quot;,&quot;packages/router/test/walk-session.test.ts&quot;] notes=ReleaseFacts.rehearsal; judgeReleasePreflight refuses a failed rehearsal with its tail and .dabbler/release-rehearsal.log; releasePreflight rehearses a declared pack only after the three cheap questions pass</div>
+<div class="line"><span class="at">[17:16:32]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=version-and-changelog</div>
+<div class="line"><span class="at">[17:17:02]</span> <span class="muted">run-resumed</span> session=297 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:17:05]</span> <span class="muted">check-passed</span> step=version-and-changelog argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[17:17:06]</span> <span class="muted">report-accepted</span> seq=4 step=version-and-changelog files=[&quot;version.json&quot;,&quot;package-lock.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version.json 3.28.0 stamped into the manifests; changelog 3.28.0 names 295, 296 and 297</div>
+<div class="line"><span class="at">[17:17:06]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[17:17:07]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[17:17:10]</span> <span class="muted">job-started</span> name=verification pid=58988 log=.dabbler/runs/s297/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:18:48]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s297/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:18:48]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[17:18:48]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[17:18:50]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[17:18:50]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=64856 log=.dabbler/runs/s297/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:18:55]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s297/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:18:55]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[17:18:56]</span> <span class="muted">job-started</span> name=run of record: typescript pid=54372 log=.dabbler/runs/s297/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:20:21]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s297/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:20:21]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[17:20:22]</span> <span class="muted">job-started</span> name=run of record: extension pid=60424 log=.dabbler/runs/s297/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:20:42]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s297/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:20:42]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[17:20:50]</span> <span class="muted">landed</span> commit=0b6d03a219f5bb3fadb920abecc340904c717cf9</div>
+<div class="line"><span class="at">[17:20:50]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[17:20:51]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[17:20:51]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[17:20:52]</span> <span class="muted">job-started</span> name=close pid=69504 log=.dabbler/runs/s297/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:21:08]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s297/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:21:08]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>3 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** `no_change_fixes` is reset only when an accepted `fix-run-of-record` observes a moved tree. It is not reset when a retry turns green. If that same driver run later re-enters the run of record after a Mechanic intervention and a newly verified baseline, the stale count can make the first no-change fix of the new red streak stop immediately. A useful test would start with `no_change_fixes: 1`, let the suite pass, move and reverify the tree, fail a later run of record, then answer its first fix with no change; it should rerun once with count `1`, whereas current code retains the old count and stops at `2`. (`packages/router/src/drive.ts`)</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** The visible drive tests pin the pure phase/count calculation and log parser, but do not drive the persisted driver path promised by the scenario. An integration case could run a red suite through two accepted no-change answers and assert a `tests` stop, no third suite invocation, persisted `no_change_fixes: 2`, and failing test names from the job log. (`packages/router/test/drive.test.ts`)</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** The visible release test covers failed rehearsal and non-registration, but not the required cheap-check ordering or tag exclusion. Useful cases would use a pack command that writes a marker, then assert the marker is absent when the version check fails and when the release is tag-based. (`packages/router/test/session.test.ts`)</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>2s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>82s</td><td>1415</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>18s</td><td>297</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

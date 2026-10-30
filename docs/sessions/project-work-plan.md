@@ -335,7 +335,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 295 | The Mechanic on a release session | no | 2026-10-30 |
 | 296 | A check is judged on what it changed | no | 2026-10-30 |
 | 297 | A failure seen early, not repeated late | no | 2026-10-30 |
-| 298 | Release 3.28.0 (release: 3.28.0) | — | not declared |
+| 298 | Release 3.28.0 (release: 3.28.0) | yes | 2026-10-30 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3516,3 +3516,9 @@ Stop a red run of record from looping on no-change fixes, and start a release on
 **Amended after acceptance:**
 
 - 2026-10-30 — step 'rehearse-at-release-start': its files: The Mechanic-on-a-refused-publish walk test simulated a feed refusal with a pack that always fails; the start now rehearses the pack, so the test starts on a working pack and switches to the refusing one after the start. (claude-code (anthropic, claude-opus-5-5))
+
+### Session 298 — Release 3.28.0 (release: 3.28.0)
+
+**Releasable: yes.**
+
+Release 3.28.0: the framework packs and publishes what is on the trunk.

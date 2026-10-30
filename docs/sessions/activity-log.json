@@ -12961,6 +12961,13 @@
       "what": "step 'rehearse-at-release-start': its files",
       "reason": "The Mechanic-on-a-refused-publish walk test simulated a feed refusal with a pack that always fails; the start now rehearses the pack, so the test starts on a working pack and switches to the refusing one after the start.",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 298,
+      "dateTime": "2026-10-30T14:15:25.587000-04:00",
+      "task": "Release 3.28.0: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

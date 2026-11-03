@@ -10,6 +10,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.29.0] — 2026-11-03
+
+**An engine terminal ends with its session.** Start Session opens a
+terminal whose shell is the engine's CLI, and until now nothing closed it:
+each session left one idle `claude` or `copilot` process behind until
+someone closed the tab. One machine had 54 of them, holding most of its
+memory and slowing every process start.
+
+### Changed
+
+- **Finished session terminals are closed past a limit.** Dabbler remembers
+  the engine terminals Start opens. Once a session is `complete` or
+  `cancelled`, its terminal counts as finished, and when more finished
+  terminals are open than `dabbler.keepFinishedSessionTerminals` allows,
+  the oldest are closed. That ends their engine processes. The check runs
+  when a session closes and when Start opens the next one. A terminal
+  whose session is in progress, and any terminal you opened yourself, is
+  never closed. Session 299.
+- **One information toast says what closed.** For example, "Closed 1
+  earlier session terminal (session 12) to free memory." Its one button,
+  **Change limit**, opens the setting. Nothing is asked.
+- **Engine terminals no longer come back on a reload.** They are created
+  as transient, so VS Code neither keeps nor revives them, whatever
+  `terminal.integrated.persistentSessionReviveProcess` says. A revived one
+  used to start the engine again with its opening sentence. Session 299.
+
+### Added
+
+- **`dabbler.keepFinishedSessionTerminals`** (default `2`, minimum `0`):
+  how many finished session terminals stay open beside the current one.
+  `0` closes a session's terminal as soon as the session closes; a large
+  number keeps them all.
+
 ## [3.28.0] — 2026-10-30
 
 **Fewer dead ends from the field.** A downstream report on a .NET project

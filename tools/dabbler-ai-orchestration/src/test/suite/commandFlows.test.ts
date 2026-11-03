@@ -568,6 +568,7 @@ interface FakeTerminal {
     env?: Record<string, string>;
     location?: { parentTerminal?: unknown };
     pty?: unknown;
+    isTransient?: boolean;
   };
   shown: number;
   disposed: number;
@@ -886,6 +887,9 @@ suite("Start opens the person's own CLI", () => {
     // which an operator may have set to the editor area, leaving a setting
     // called `panel` putting the pair in editor tabs.
     assert.strictEqual(cli.options.location, vscode.TerminalLocation.Panel);
+    // Transient, so VS Code neither persists nor revives it: a revived
+    // engine terminal re-runs the engine on every reload.
+    assert.strictEqual(cli.options.isTransient, true);
     // Claude Code takes a positional prompt for an interactive session, so
     // the sentence is argv and nothing is typed. It asks the AI for one
     // instruction and to answer in the background; it registers nothing, and

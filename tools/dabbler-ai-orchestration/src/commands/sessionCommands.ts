@@ -39,6 +39,7 @@ import { resolveRouterCli } from "../router/terminalShim";
 import { ensureDabblerTerminal, terminalLocation } from "../router/dabblerTerminal";
 import { asRepositoryNode, asSessionNode } from "./workExplorerTreeCommands";
 import { mechanicChoicesIn, modelItems } from "./configurationCommands";
+import { closeFinishedTerminals, rememberEngineTerminal } from "./engineTerminals";
 import type { ConfigurationModel, ConfigurationRole } from "../providers/solutionTreeModel";
 
 /**
@@ -830,6 +831,9 @@ export function defaultSessionRunUi(
         shellArgs: [...spec.args],
         ...(spec.env ? { env: { ...spec.env } } : {}),
         ...location,
+        // Neither persisted nor revived: a revived engine terminal would
+        // re-run the engine with its opening sentence on every reload.
+        isTransient: true,
       });
       terminal.show();
       // Typed, never sent: the person reads it and presses Enter. Whether a
@@ -1060,9 +1064,13 @@ export async function runStartSession(
     ui.showErrorMessage(`The session was not registered, so nothing was opened.${said === "" ? "" : ` ${said}`}`);
     return false;
   }
+  // Finished sessions' engine CLIs past the limit end here, before the
+  // new one opens; the new one never depends on any of them.
+  closeFinishedTerminals();
   // No framework process is started here: the AI's one request, and then each
   // of its answers, is what moves the session on.
   const opened = ui.openTerminal(terminal);
+  rememberEngineTerminal(opened, repository.root, repository.nextSession);
   // The framework's own terminal, beside the CLI. Both, or the person is
   // watching their engine work with no sight of what the framework is
   // doing -- which is the arrangement this session exists to build.

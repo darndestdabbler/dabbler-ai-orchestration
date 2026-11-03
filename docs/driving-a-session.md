@@ -1058,6 +1058,39 @@ registration the router refuses opens nothing at all, and the error says
 why. After it opens the terminals, the chat is yours: your scrollback,
 your Esc, and a waiter in the background you can talk over.
 
+**When the engine's terminal closes.** The CLI's terminal *is* the engine:
+its process lives until the tab closes. Dabbler remembers the terminals
+Start opened, and only those. Once a session is `complete` or `cancelled`
+its terminal is finished, and when more finished terminals are open than
+`dabbler.keepFinishedSessionTerminals` allows (default 2), the oldest
+close, which ends their engines. The check runs when a session closes and
+when Start opens the next one. A terminal whose session is in progress,
+and one you opened yourself, is never closed. One information toast names
+what closed -- *"Closed 1 earlier session terminal (session 1) to free
+memory."* -- and its one button, **Change limit**, opens the setting. `0`
+closes a session's terminal as soon as it closes. The engine terminals are
+transient, so a window reload neither keeps nor revives them, whatever
+`terminal.integrated.persistentSessionReviveProcess` says.
+
+Walked on 2026-11-03 from the installed 3.29.0 VSIX, on a scratch
+repository of eight sessions, each started and then cancelled from the
+Work Explorer:
+
+1. At the default limit, session 1's terminal closed when session 3 was
+   cancelled -- the current terminal and two finished ones stay open --
+   with the information toast naming it, and each later cancel closed the
+   next oldest. The process table showed the engines of sessions 1-4 gone
+   and those of 5 and 6, the two finished terminals the limit keeps,
+   still running.
+2. With the limit at 0, starting session 7 closed the terminals of
+   sessions 5 and 6, and cancelling session 7 closed its own at once. No
+   engine from those sessions was left running.
+3. A finished terminal closed by hand just before Start opened the next
+   session's terminal with no error.
+4. With `persistentSessionReviveProcess` at its default, reloading the
+   window during session 8 brought no engine terminal back, and session
+   8's engine process was gone.
+
 ### The Dabbler terminal
 
 Start opens a second terminal beside your CLI, named *Dabbler — <your

@@ -23,6 +23,7 @@ import {
 } from "./commands/workExplorerTreeCommands";
 import { SESSIONS_REL, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
 import { RUNS_REL } from "./utils/projection";
+import { closeFinishedTerminals } from "./commands/engineTerminals";
 import { SolutionTreeProvider } from "./providers/SolutionTreeProvider";
 import type { ConfigRoleName, SolutionNode } from "./providers/solutionTreeModel";
 import { ROLE_COMMANDS } from "./providers/solutionTreeModel";
@@ -181,8 +182,10 @@ export function activate(context: vscode.ExtensionContext): void {
         // `next`, ten seconds later.
         new vscode.RelativePattern(path.join(root, RUNS_REL), "*/driver/{run.json,plan.json}"),
       ];
-      const onEvent = () => {
+      const onEvent = (uri: vscode.Uri) => {
         treeProvider.refresh();
+        // A session closing is when its engine terminal may be past the limit.
+        if (path.basename(uri.fsPath) === "sessions.json") closeFinishedTerminals();
       };
       for (const pattern of patterns) {
         const watcher = vscode.workspace.createFileSystemWatcher(pattern);

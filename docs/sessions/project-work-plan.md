@@ -336,7 +336,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 296 | A check is judged on what it changed | no | 2026-10-30 |
 | 297 | A failure seen early, not repeated late | no | 2026-10-30 |
 | 298 | Release 3.28.0 (release: 3.28.0) | yes | 2026-10-30 |
-| 299 | Session 299 | — | not declared |
+| 299 | An engine terminal ends with its session | no | 2026-11-03 |
+| 300 | Release 3.29.0 (release: 3.29.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3524,7 +3525,11 @@ Stop a red run of record from looping on no-change fixes, and start a release on
 
 Release 3.28.0: the framework packs and publishes what is on the trunk.
 
-### Session 299 — Session 299
+### Session 299 — An engine terminal ends with its session
+
+**Releasable: no.**
+
+End the engine terminals Start opens once their sessions are over, so idle engine processes stop piling up. A small module, tools/dabbler-ai-orchestration/src/commands/engineTerminals.ts, remembers each terminal Start opens with its repository root and the session number Start registered (repository.nextSession), and only those. A remembered terminal is finished once sessions.json shows its session `complete` or `cancelled`; one no longer in vscode.window.terminals is forgotten silently. closeFinishedTerminals() keeps at most dabbler.keepFinishedSessionTerminals (new setting, default 2, minimum 0) finished terminals open across the window, disposing the oldest first, never an in-progress one, and when it closed any shows one information toast naming the sessions with a single "Change limit" button that opens the setting. It runs at Start before the new terminal opens and when the sessions watcher in extension.ts sees sessions.json change. The new terminal never depends on an old one, and disposing an already closed terminal is harmless. The engine terminal is created with isTransient: true so VS Code neither persists nor revives it. version.json goes to 3.29.0, stamped with `npm run stamp:version`, with a 3.29.0 CHANGELOG section; the walk from the installed VSIX is recorded in docs/driving-a-session.md.
 
 **Rolled back:**
 

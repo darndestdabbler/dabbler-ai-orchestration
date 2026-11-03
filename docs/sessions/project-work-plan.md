@@ -337,7 +337,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 297 | A failure seen early, not repeated late | no | 2026-10-30 |
 | 298 | Release 3.28.0 (release: 3.28.0) | yes | 2026-10-30 |
 | 299 | An engine terminal ends with its session | no | 2026-11-03 |
-| 300 | Release 3.29.0 (release: 3.29.0) | — | not declared |
+| 300 | Release 3.29.0 (release: 3.29.0) | yes | 2026-11-03 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3534,3 +3534,9 @@ End the engine terminals Start opens once their sessions are over, so idle engin
 **Rolled back:**
 
 - 2026-11-03 — session 299 — Rollback to Start of This Session from the Work Explorer (operator)
+
+### Session 300 — Release 3.29.0 (release: 3.29.0)
+
+**Releasable: yes.**
+
+Release 3.29.0: the framework packs and publishes what is on the trunk.

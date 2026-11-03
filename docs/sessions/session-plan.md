@@ -16520,7 +16520,7 @@ engine and the reviewing vehicle, and not the machine's. No new test.
 
 The framework publishes session 270 as 3.22.1 and nothing else.
 
-### Session 272 of 298: An API out of credits pauses for funds, and Continue resumes it
+### Session 272 of 300: An API out of credits pauses for funds, and Continue resumes it
 
 Scope: `packages/router/src/transports/api.ts` (the retry ladder),
 `packages/router/src/transports/copilot.ts` (the error classes),
@@ -16570,7 +16570,7 @@ funds kind, and the next instruction after it resumes the phase.
 
 **Releasable.** Yes -- with 273 to 278, as 3.23.0 in session 279.
 
-### Session 273 of 298: A cancelled session gets its transcript, marked cancelled
+### Session 273 of 300: A cancelled session gets its transcript, marked cancelled
 
 Scope: `packages/router/src/session.ts` (`cancel`, the rollback),
 `packages/router/src/transcript.ts` (the cancelled page),
@@ -16618,7 +16618,7 @@ the cancelled banner carries the reason and the last phase.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 274 of 298: The Mechanic, ported back to the router
+### Session 274 of 300: The Mechanic, ported back to the router
 
 Scope: `packages/router` -- `cli/consult.ts` (`--mechanic`), `drive.ts`
 (an intervention after the land rewinds to verify; the close lists
@@ -16670,7 +16670,7 @@ rewinds to verify and the close names it.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 275 of 298: The framework calls in the Mechanic without the person
+### Session 275 of 300: The framework calls in the Mechanic without the person
 
 Scope: `packages/router` -- `config.ts` (the `dabbler.mechanic` and
 `dabbler.mechanicModel` settings through the layers), `cli/configure.ts`
@@ -16752,7 +16752,7 @@ the Primary Model is refused.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 276 of 298: `off` names no Mechanic, and the Mechanic is walked past its stop
+### Session 276 of 300: `off` names no Mechanic, and the Mechanic is walked past its stop
 
 Scope: `packages/router` -- `driver.ts` (`renderStop`'s ways on),
 `config.ts` (the Mechanic's two readings); tests in `driver.test.ts`,
@@ -16786,7 +16786,7 @@ do, its budget, or its brief. A new verb or flag.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 277 of 298: Open a Mechanic, and what it did, in the extension
+### Session 277 of 300: Open a Mechanic, and what it did, in the extension
 
 Scope: `tools/dabbler-ai-orchestration` -- `src/commands/sessionCommands.ts`
 (*Open a Mechanic*), `src/providers/ActionRegistry.ts`,
@@ -16828,7 +16828,7 @@ each.
 
 **Releasable.** Yes -- with 272 to 278, as 3.23.0 in session 279.
 
-### Session 278 of 298: A failed release is diagnosed, and one caused outside the repository retries in place
+### Session 278 of 300: A failed release is diagnosed, and one caused outside the repository retries in place
 
 Scope: `packages/router/src/drive.ts` (`phasePublish`'s stop and ways
 on), `packages/router/src/cli/consult.ts` (the release briefing); tests in
@@ -16871,11 +16871,11 @@ release resumes at publish. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 272 to 277, as 3.23.0 in session 279.
 
-### Session 279 of 298: Release 3.23.0 (release: 3.23.0)
+### Session 279 of 300: Release 3.23.0 (release: 3.23.0)
 
 The framework publishes sessions 272 to 278 as 3.23.0 and nothing else.
 
-### Session 280 of 298: Open a Mechanic on a Copilot session in flight
+### Session 280 of 300: Open a Mechanic on a Copilot session in flight
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
 (`runOpenMechanic`); its test in `commandFlows.test.ts`; `version.json` and
@@ -16926,7 +16926,7 @@ stamp.
 **Releasable.** Yes -- with 281 and 282, as 3.24.0 in session 283; 3.23.1
 is never published on its own.
 
-### Session 281 of 298: An existing remote or folder is a starting point
+### Session 281 of 300: An existing remote or folder is a starting point
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts`
 (Set Up New Project: the remote prompt, the remote read before bootstrap,
@@ -16978,7 +16978,7 @@ offered as the starting point and nothing is deleted.
 
 **Releasable.** Yes -- with 280 and 282, as 3.24.0 in session 283.
 
-### Session 282 of 298: The planning session reads the code already there
+### Session 282 of 300: The planning session reads the code already there
 
 Scope: `packages/router/src/bootstrap/templates.ts` (`BOOTSTRAP_PLAN`,
 `PLAN_PROMPT`, `DECOMPOSITION_PROMPT`), `packages/router/src/drive.ts`
@@ -17023,11 +17023,11 @@ check:version` checks the stamp.
 
 **Releasable.** Yes -- with 280 and 281, as 3.24.0 in session 283.
 
-### Session 283 of 298: Release 3.24.0 (release: 3.24.0)
+### Session 283 of 300: Release 3.24.0 (release: 3.24.0)
 
 The framework publishes sessions 280, 281 and 282 as 3.24.0 and nothing else.
 
-### Session 285 of 298: The session plan outranks the author's own plan
+### Session 285 of 300: The session plan outranks the author's own plan
 
 Scope: `packages/router/prompt-templates/verification.md` (Completeness,
 Scope and simplicity, the tests in the diff), `packages/router/src/drive.ts`
@@ -17091,7 +17091,7 @@ while a session is in progress and accepted when none is.
 
 **Releasable.** Yes -- with 286, as 3.25.0 in session 287.
 
-### Session 286 of 298: Three tooling fixes from the field
+### Session 286 of 300: Three tooling fixes from the field
 
 Scope: `packages/router/src/session.ts` (`start`'s registration),
 `packages/router/src/ecosystem.ts` (`BUILD_OUTPUT`),
@@ -17140,11 +17140,11 @@ stamp.
 
 **Releasable.** Yes -- with 285, as 3.25.0 in session 287.
 
-### Session 287 of 298: Release 3.25.0 (release: 3.25.0)
+### Session 287 of 300: Release 3.25.0 (release: 3.25.0)
 
 The framework publishes sessions 285 and 286 as 3.25.0 and nothing else.
 
-### Session 288 of 298: The landed tree is the verified tree, and a failed run of record can be re-run
+### Session 288 of 300: The landed tree is the verified tree, and a failed run of record can be re-run
 
 Scope: `packages/router/src/land.ts` (`judgeLandReadiness`),
 `packages/router/src/drive.ts` (`landFacts`, `phaseLand`,
@@ -17196,7 +17196,7 @@ still goes through verification.
 
 **Releasable.** Yes -- with 289 and 290, as 3.26.0 in session 291.
 
-### Session 289 of 298: A round sees what earlier rounds asked
+### Session 289 of 300: A round sees what earlier rounds asked
 
 Scope: `packages/router/src/verify/rounds.ts` (the finding a round
 records), `packages/router/src/verify/prompts.ts` (`priorFindingsBlock`),
@@ -17242,7 +17242,7 @@ cap.
 
 **Releasable.** Yes -- with 288 and 290, as 3.26.0 in session 291.
 
-### Session 290 of 298: Packaging and the Mechanic, from the field
+### Session 290 of 300: Packaging and the Mechanic, from the field
 
 Scope: `packages/router/src/packaging.ts` (`runStep`, the rehearsal),
 `packages/router/src/cli/` (the `packaging` verb's options),
@@ -17292,11 +17292,11 @@ checks the stamp.
 
 **Releasable.** Yes -- with 288 and 289, as 3.26.0 in session 291.
 
-### Session 291 of 298: Release 3.26.0 (release: 3.26.0)
+### Session 291 of 300: Release 3.26.0 (release: 3.26.0)
 
 The framework publishes sessions 288, 289 and 290 as 3.26.0 and nothing else.
 
-### Session 292 of 298: .NET build output is ignored from the first project
+### Session 292 of 300: .NET build output is ignored from the first project
 
 Scope: `packages/router/src/projectGraph.ts` (`solutionProjects`,
 `readProjectGraph`), `packages/router/src/ecosystem.ts`
@@ -17356,7 +17356,7 @@ file. In `gates.test.ts`, an absent ledger's refusal names rollback.
 
 **Releasable.** Yes -- with 293, as 3.27.0 in session 294.
 
-### Session 293 of 298: Small defects from the field
+### Session 293 of 300: Small defects from the field
 
 Scope: `packages/router/src/gates.ts` (`sessionChangedNothing`),
 `packages/router/src/drive.ts` (the step baseline, the check-failed and
@@ -17411,11 +17411,11 @@ the stamp.
 
 **Releasable.** Yes -- with 292, as 3.27.0 in session 294.
 
-### Session 294 of 298: Release 3.27.0 (release: 3.27.0)
+### Session 294 of 300: Release 3.27.0 (release: 3.27.0)
 
 The framework publishes sessions 292 and 293 as 3.27.0 and nothing else.
 
-### Session 295 of 298: The Mechanic on a release session
+### Session 295 of 300: The Mechanic on a release session
 
 Scope: `packages/router/src/projection.ts` (`orchestratorOf`,
 `authoringNode`), `packages/router/src/drive.ts` (`callInTheMechanic`),
@@ -17469,7 +17469,7 @@ in flight opens on the configured engine.
 
 **Releasable.** Yes -- with 296 and 297, as 3.28.0 in session 298.
 
-### Session 296 of 298: A check is judged on what it changed
+### Session 296 of 300: A check is judged on what it changed
 
 Scope: `packages/router/src/drive.ts` (`judge`, `checkFailedRefusal`, the
 files-changed-omits refusal), `packages/router/src/checks.ts`
@@ -17529,7 +17529,7 @@ root.
 
 **Releasable.** Yes -- with 295 and 297, as 3.28.0 in session 298.
 
-### Session 297 of 298: A failure seen early, not repeated late
+### Session 297 of 300: A failure seen early, not repeated late
 
 Scope: `packages/router/src/drive.ts` (`afterRunOfRecordFix`, the
 fix-run-of-record ask), `packages/router/src/session.ts`
@@ -17578,6 +17578,102 @@ registers nothing. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 295 and 296, as 3.28.0 in session 298.
 
-### Session 298 of 298: Release 3.28.0 (release: 3.28.0)
+### Session 298 of 300: Release 3.28.0 (release: 3.28.0)
 
 The framework publishes sessions 295, 296 and 297 as 3.28.0 and nothing else.
+
+### Session 299 of 300: An engine terminal ends with its session
+
+Scope: `tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
+(the `createTerminal` call and Start), the extension's sessions watcher,
+the extension manifest (one new setting), their tests;
+`version.json` and the manifests `npm run stamp:version` writes;
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** Staff reported that Dabbler starts slowly. On 2026-11-03 the
+operator's machine had 63 `claude.exe` processes holding 15 GB. 54 of them
+were started by Start Session ("Run `dabbler session next …`") and went
+back as far as 2026-10-22. Memory commit stood at 115.9 of 118.2 GB, and
+every process start took seconds, including bare `node -e 0` and
+`git --version`. Dabbler 3.27.0 and 3.28.0 timed the same, so this is not
+a regression.
+
+The cause is that Start opens a terminal whose shell *is* the engine CLI
+(`shellPath: claude` or `copilot`, with `-i` for Copilot), and nothing ever
+closes it. Each session leaves one idle engine process until someone
+closes the tab. The Copilot seat is affected exactly as Claude Code is.
+The `-p` calls a reviewer or Mechanic makes exit by themselves.
+
+The terminals are also created without `isTransient`. Under VS Code's
+default `terminal.integrated.persistentSessionReviveProcess` (`onExit`),
+a terminal that persisted is recreated when the workspace reopens, which
+for these terminals means re-running the engine with its opening sentence.
+The operator's machine sets that option to `never`, so its leftover
+processes were never revived; most machines keep the default.
+
+**Step 1 -- the terminal closes when its session does.** Start remembers
+each terminal it opens, together with the repository root and the session
+number it registered. That covers only terminals Dabbler opened, never one
+the person opened. When the sessions watcher sees that session reach
+`complete` or `cancelled`, a new setting decides what happens:
+
+- `dabbler.closeSessionTerminals` is `ask` (the default),
+  `always` or `never`.
+- `ask` shows "Session N closed. Close its <engine> terminal?" with
+  [Close] [Keep].
+- [Close] and `always` dispose the terminal, which ends the engine
+  process.
+- A terminal the person has already closed is forgotten without a word.
+
+**Step 2 -- Start closes the repository's finished terminals.** Before
+Start opens a new terminal, it disposes every remembered terminal for the
+same repository whose session is `complete` or `cancelled`, unless the
+setting is `never`. It names each one it closed in the Dabbler terminal.
+A terminal whose session is still in progress is never touched.
+
+The new terminal never depends on the old one: no `parentTerminal`, no
+reused position, no reused process. So a person closing the old tab at any
+moment, before, during or after Start's check, changes nothing. Disposing
+an already closed terminal is a no-op, and Start opens the new terminal
+either way.
+
+**Step 3 -- engine terminals do not outlive a reload.** The engine terminal
+is created with `isTransient: true`, so VS Code neither persists nor
+revives it, whatever `persistentSessionReviveProcess` says. The CHANGELOG
+3.29.0 section says what changed for a developer and the new setting.
+Bump `version.json` to 3.29.0 (a minor: new behaviour and a setting), and
+stamp it with `npm run stamp:version`.
+
+**Non-goals.**
+- Reusing a terminal's process or position.
+- Sending `/clear` or any keystrokes into an engine.
+- A cleanup command, or counts in Troubleshoot.
+- Killing engine processes Dabbler did not start.
+- Changing the unattended `session drive`.
+
+**Tests.**
+- In the extension's unit suite (mocha, with `src/test/vscode-stub.js`):
+  - closing a session disposes its terminal under `always`, prompts under
+    `ask`, and leaves it under `never`;
+  - Start disposes only finished terminals of the same repository;
+  - a terminal the person disposed before or during Start's check produces
+    no error, and the new terminal still opens;
+  - a person's own terminal is never disposed;
+  - the terminal options carry `isTransient: true`.
+- `npm run check:version` checks the stamp.
+- **The walk**, from the installed VSIX on a scratch repository, recorded
+  in `docs/driving-a-session.md`:
+  1. Start a session, close it, and choose [Close]: the engine process is
+     gone from Task Manager.
+  2. Start, close, choose [Keep], then Start again: the old terminal
+     closes and the new one opens.
+  3. Close the old terminal by hand just as Start is chosen: the new one
+     opens with no error.
+  4. Reload the window with `persistentSessionReviveProcess` at its
+     default: no engine terminal comes back.
+
+**Releasable.** Yes -- as 3.29.0 in session 300.
+
+### Session 300 of 300: Release 3.29.0 (release: 3.29.0)
+
+The framework publishes session 299 as 3.29.0 and nothing else.

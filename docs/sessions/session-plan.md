@@ -17611,30 +17611,37 @@ for these terminals means re-running the engine with its opening sentence.
 The operator's machine sets that option to `never`, so its leftover
 processes were never revived; most machines keep the default.
 
-**Step 1 -- the terminal closes when its session does.** Start remembers
+**Step 1 -- Dabbler remembers the terminals it opens.** Start remembers
 each terminal it opens, together with the repository root and the session
 number it registered. That covers only terminals Dabbler opened, never one
-the person opened. When the sessions watcher sees that session reach
-`complete` or `cancelled`, a new setting decides what happens:
+the person opened. A remembered terminal is *finished* once the sessions
+watcher sees its session reach `complete` or `cancelled`. A terminal the
+person has already closed is forgotten without a word.
 
-- `dabbler.closeSessionTerminals` is `ask` (the default),
-  `always` or `never`.
-- `ask` shows "Session N closed. Close its <engine> terminal?" with
-  [Close] [Keep].
-- [Close] and `always` dispose the terminal, which ends the engine
-  process.
-- A terminal the person has already closed is forgotten without a word.
+**Step 2 -- at most N finished terminals stay open.** A new setting,
+`dabbler.keepFinishedSessionTerminals`, defaults to 2 and has a minimum of
+0. So the current session's terminal plus two finished ones may be open,
+and a fourth closes the oldest. Dabbler applies the limit across the
+window at two moments: at Start, before the new terminal opens, and when a
+session closes.
 
-**Step 2 -- Start closes the repository's finished terminals.** Before
-Start opens a new terminal, it disposes every remembered terminal for the
-same repository whose session is `complete` or `cancelled`, unless the
-setting is `never`. It names each one it closed in the Dabbler terminal.
-A terminal whose session is still in progress is never touched.
+- When the finished terminals exceed the limit, the oldest are disposed
+  first. That ends their engine processes, and the session that just
+  finished stays open.
+- 0 closes a terminal as soon as its session closes. A large value
+  effectively turns cleanup off.
+- A terminal whose session is still in progress never counts and is never
+  closed.
+- When anything was closed, Dabbler shows one *information* toast
+  (`showInformationMessage`, never a warning or an error) naming the
+  sessions, such as "Closed 1 earlier session terminal (session 12) to
+  free memory." It carries one button, "Change limit", which opens the
+  setting. There is no prompt and no question asked.
 
-The new terminal never depends on the old one: no `parentTerminal`, no
-reused position, no reused process. So a person closing the old tab at any
-moment, before, during or after Start's check, changes nothing. Disposing
-an already closed terminal is a no-op, and Start opens the new terminal
+The new terminal never depends on an old one: no `parentTerminal`, no
+reused position, no reused process. So a person closing an old tab at any
+moment, before, during or after the check, changes nothing. Disposing an
+already closed terminal is a no-op, and Start opens the new terminal
 either way.
 
 **Step 3 -- engine terminals do not outlive a reload.** The engine terminal
@@ -17645,6 +17652,7 @@ Bump `version.json` to 3.29.0 (a minor: new behaviour and a setting), and
 stamp it with `npm run stamp:version`.
 
 **Non-goals.**
+- A prompt or question when a session closes.
 - Reusing a terminal's process or position.
 - Sending `/clear` or any keystrokes into an engine.
 - A cleanup command, or counts in Troubleshoot.
@@ -17653,21 +17661,25 @@ stamp it with `npm run stamp:version`.
 
 **Tests.**
 - In the extension's unit suite (mocha, with `src/test/vscode-stub.js`):
-  - closing a session disposes its terminal under `always`, prompts under
-    `ask`, and leaves it under `never`;
-  - Start disposes only finished terminals of the same repository;
-  - a terminal the person disposed before or during Start's check produces
-    no error, and the new terminal still opens;
-  - a person's own terminal is never disposed;
+  - with the default limit, a fourth finished terminal closes the oldest,
+    and the toast is an information message naming it;
+  - a limit of 0 closes a terminal when its session closes;
+  - nothing closes, and no toast appears, while the count is within the
+    limit;
+  - in-progress terminals and the person's own terminals are never
+    disposed;
+  - a terminal the person disposed before or during the check produces no
+    error, and the new terminal still opens;
   - the terminal options carry `isTransient: true`.
 - `npm run check:version` checks the stamp.
 - **The walk**, from the installed VSIX on a scratch repository, recorded
   in `docs/driving-a-session.md`:
-  1. Start a session, close it, and choose [Close]: the engine process is
-     gone from Task Manager.
-  2. Start, close, choose [Keep], then Start again: the old terminal
-     closes and the new one opens.
-  3. Close the old terminal by hand just as Start is chosen: the new one
+  1. Run four sessions to their close with the default limit: after the
+     fourth, the first session's terminal closes, an information toast
+     names it, and its engine process is gone from Task Manager.
+  2. Set the limit to 0 through "Change limit": the next session's
+     terminal closes when that session closes.
+  3. Close an old terminal by hand just as Start is chosen: the new one
      opens with no error.
   4. Reload the window with `persistentSessionReviveProcess` at its
      default: no engine terminal comes back.

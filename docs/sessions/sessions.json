@@ -5951,9 +5951,9 @@
     {
       "number": 299,
       "title": "An engine terminal ends with its session",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-03T05:29:30.035000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-03T06:13:55.864000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

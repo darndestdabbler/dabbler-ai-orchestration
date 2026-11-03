@@ -12968,6 +12968,14 @@
       "dateTime": "2026-10-30T14:15:25.587000-04:00",
       "task": "Release 3.28.0: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "rollback",
+      "sessionNumber": 299,
+      "through": 299,
+      "dateTime": "2026-11-03T05:29:14.346000-05:00",
+      "reason": "Rollback to Start of This Session from the Work Explorer",
+      "by": "operator"
     }
   ]
 }

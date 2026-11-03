@@ -336,6 +336,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 296 | A check is judged on what it changed | no | 2026-10-30 |
 | 297 | A failure seen early, not repeated late | no | 2026-10-30 |
 | 298 | Release 3.28.0 (release: 3.28.0) | yes | 2026-10-30 |
+| 299 | Session 299 | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3522,3 +3523,9 @@ Stop a red run of record from looping on no-change fixes, and start a release on
 **Releasable: yes.**
 
 Release 3.28.0: the framework packs and publishes what is on the trunk.
+
+### Session 299 — Session 299
+
+**Rolled back:**
+
+- 2026-11-03 — session 299 — Rollback to Start of This Session from the Work Explorer (operator)

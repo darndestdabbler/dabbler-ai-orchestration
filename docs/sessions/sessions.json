@@ -6081,9 +6081,9 @@
     {
       "number": 306,
       "title": "The build contract holds",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-10T15:36:04.152000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-10T16:31:48.948000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

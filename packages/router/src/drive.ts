@@ -192,6 +192,8 @@ import {
   suiteRequiredForClose,
   surfaceDigest,
   treeDigest,
+  type SuiteSpec,
+  type TestRunRecord,
 } from "./testEvidence.ts";
 import { judgeDisputeEvidence, recordDispute } from "./verify/disputes.ts";
 import { DISPUTE_EVIDENCE_INLINE_CAP } from "./verify/prompts.ts";
@@ -401,6 +403,24 @@ export function afterRunOfRecordFix(
   if (moved === null || moved.length > 0) return { phase: then, noChangeFixes: 0 };
   const count = noChangeFixes + 1;
   return { phase: count >= NO_CHANGE_FIXES_BOUND ? "stop" : "run-of-record", noChangeFixes: count };
+}
+
+/**
+ * The suites whose red run of record a fix is owed for: those the close
+ * demands green, whose latest final run did not pass. A suite declared
+ * `required_for_close: false` is recorded red and never owes one.
+ */
+export function redSuitesOwingAFix<S extends SuiteSpec>(
+  suites: readonly S[],
+  records: readonly TestRunRecord[],
+): S[] {
+  return suites.filter((suite) => {
+    if (!suiteRequiredForClose(suite)) return false;
+    const latest = records
+      .filter((row) => row.suite === suite.name && (row.stage === STAGE_FINAL_FULL || row.stage === STAGE_FINAL_TARGETED))
+      .at(-1);
+    return latest !== undefined && latest.outcome !== OUTCOME_PASSED;
+  });
 }
 
 /** The tests a run-of-record job's log says failed, in order, each once. */
@@ -3457,13 +3477,7 @@ class Driver {
    * are, the log, rides in the brief.
    */
   private unchangedRedStop(): Stop {
-    const records = readRecords(this.repoRoot);
-    const red = this.expensiveSuites().filter((suite) => {
-      const latest = records
-        .filter((row) => row.suite === suite.name && (row.stage === STAGE_FINAL_FULL || row.stage === STAGE_FINAL_TARGETED))
-        .at(-1);
-      return latest !== undefined && latest.outcome !== OUTCOME_PASSED;
-    });
+    const red = redSuitesOwingAFix(this.expensiveSuites(), readRecords(this.repoRoot));
     const named = red.map((suite) => {
       const log = jobLogPath(this.repoRoot, this.sessionNumber, `run of record: ${suite.name}`);
       const tests = existsSync(log) ? failingTestsIn(readFileSync(log, "utf8")) : [];
@@ -4323,6 +4337,16 @@ class Driver {
       if (code === EXIT_OK) continue;
       if (code !== 1) {
         throw new Stop("tests", `the run of record for ${suite.name} could not be recorded (exit ${code})`);
+      }
+      // A suite the close does not demand green: its red record stands as
+      // the run of record, and the walk goes on. A release still demands it.
+      if (!suiteRequiredForClose(suite)) {
+        this.log("run-of-record-red-not-required", {
+          suite: suite.name,
+          command: suite.command,
+          log: repoRelativePath(this.repoRoot, jobLogPath(this.repoRoot, this.sessionNumber, jobName)),
+        });
+        continue;
       }
       this.log("tests-failed", { command: suite.command });
       const failed = readRecords(this.repoRoot).filter((row) => row.suite === suite.name && row.stage === stage).at(-1);

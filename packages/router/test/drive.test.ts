@@ -24,6 +24,7 @@ import {
   waiterSeenSince,
   watcherReading,
   writeRun,
+  writeWorkPlan,
 } from "../src/driver.ts";
 import { capture, writeErr, writeOut } from "../src/output.ts";
 import {
@@ -98,9 +99,11 @@ import {
   JOB_DEADLINE_EXCEEDED,
   beatWaiter,
   clearBeatIfMine,
+  redSuitesOwingAFix,
   type RegistrationFacts,
   type StepSpec,
 } from "../src/drive.ts";
+import type { SuiteSpec, TestRunRecord } from "../src/testEvidence.ts";
 import { beginJobRecord, jobRecord, jobStatusPath, setJobStarter } from "../src/jobs.ts";
 import { EXIT_FUNDS } from "../src/contracts/exitCodes.ts";
 import { rewindPhaseFor } from "../src/gates.ts";
@@ -893,6 +896,84 @@ describe("afterRunOfRecordFix", () => {
   it("sends a moved or unmeasured tree through verification and resets the count", () => {
     assert.deepEqual(afterRunOfRecordFix(["src/widget.py"], "preverify", 1), { phase: "preverify", noChangeFixes: 0 });
     assert.deepEqual(afterRunOfRecordFix(null, "preverify", 1), { phase: "preverify", noChangeFixes: 0 });
+  });
+});
+
+describe("a red run of record and what the close demands of the suite", () => {
+  const NOT_REQUIRED_YAML =
+    "schema_version: 1\n\ntesting:\n  suites:\n    - name: unit\n" +
+    "      command: python -m pytest\n      expensive: true\n      required_for_close: false\n" +
+    "      covers:\n        - src/\n        - tests/\n" +
+    "      test_roots:\n        - tests\n      test_glob: \"test_*.py\"\n" +
+    "      test_name: \"test_{name}.py\"\n";
+
+  /**
+   * A sandbox at the run of record whose suite job ends red: what the call
+   * printed, and the events the driver recorded. The land past it asks git
+   * what this sandbox does not answer, so a call that reaches it ends there.
+   */
+  async function redRunOfRecord(extra: Record<string, string>): Promise<{ repo: string; stdout: string; events: string[] }> {
+    const { repo, sessionsDir } = makeAnsweredSandbox(extra);
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeWorkPlan(repo, 1, {
+      schema_version: 1, session_number: 1, task: "Make the widget real.",
+      non_goals: ["Anything the step does not name."],
+      steps: [{ id: "one", ask: "Make it.", files: ["src/widget.py"], checks: [{ argv: ["node", "-e", "0"] }] }],
+      recorded_at: "2026-11-09T10:00:00-05:00",
+    });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase: "run-of-record", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: ["one"], baseline_tree: null,
+      stop: null, lease_epoch: 1,
+      started_at: "2026-11-09T10:00:00-05:00", updated_at: "2026-11-09T10:00:00-05:00",
+    });
+    const restore = setJobStarter((root, session, options) => {
+      const { log, status } = beginJobRecord(root, session, options.name);
+      writeFileSync(log, "1 failed\n");
+      writeFileSync(status, JSON.stringify({ exit: 1, ended_at: new Date().toISOString() }));
+      return jobRecord(root, session, options, process.pid);
+    });
+    let stdout = "";
+    try {
+      stdout = (await capture(() => sessionNext(sessionsDir, {}))).stdout;
+    } catch {
+      // The land's own git, which is not what is under test.
+    } finally {
+      restore();
+    }
+    return { repo, stdout, events: readDriverEvents(repo, 1).map((event) => event.event) };
+  }
+
+  it("records a red suite the close does not demand, asks no fix, and goes on to the land", async () => {
+    const { repo, stdout, events } = await redRunOfRecord({ "dabbler.yaml": NOT_REQUIRED_YAML });
+    assert.ok(events.includes("run-of-record-red-not-required"), events.join(", "));
+    assert.ok(!events.includes("tests-failed"), events.join(", "));
+    assert.doesNotMatch(stdout, /fix-run-of-record/);
+    assert.equal(readRun(repo, 1)?.pending_step ?? null, null);
+    assert.equal(readRun(repo, 1)?.phase, "land");
+  });
+
+  it("still asks for a fix when the red suite is one the close demands", async () => {
+    const { repo, stdout, events } = await redRunOfRecord({});
+    assert.match(stdout, /"step_id": "fix-run-of-record"/);
+    assert.ok(events.includes("tests-failed"), events.join(", "));
+    assert.ok(!events.includes("run-of-record-red-not-required"), events.join(", "));
+    assert.equal(readRun(repo, 1)?.pending_step?.id, "fix-run-of-record");
+  });
+
+  it("names only the suites the close demands among those still red", () => {
+    const suite = (name: string, requiredForClose?: boolean): SuiteSpec => ({
+      name, command: `run ${name}`, covers: [], expensive: true, runsWhole: true,
+      ...(requiredForClose === undefined ? {} : { requiredForClose }),
+    });
+    const record = (name: string, outcome: string): TestRunRecord => ({
+      suite: name, command: `run ${name}`, outcome, surfaceDigest: "s", recordedAt: "2026-11-09T10:00:00-05:00",
+      stage: "final-full", treeDigest: "t", policy: "", policyReason: "", selectedTests: [],
+      sessionNumber: 1, detail: "", durationSeconds: null,
+    });
+    const suites = [suite("unit"), suite("e2e", false), suite("contract")];
+    const records = [record("unit", "failed"), record("e2e", "failed"), record("contract", "passed")];
+    assert.deepEqual(redSuitesOwingAFix(suites, records).map((owed) => owed.name), ["unit"]);
   });
 });
 

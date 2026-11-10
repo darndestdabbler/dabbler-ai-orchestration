@@ -338,6 +338,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 298 | Release 3.28.0 (release: 3.28.0) | yes | 2026-10-30 |
 | 299 | An engine terminal ends with its session | no | 2026-11-03 |
 | 300 | Release 3.29.0 (release: 3.29.0) | yes | 2026-11-03 |
+| 301 | A suite the close does not demand cannot stop the run of record | no | 2026-11-09 |
+| 302 | Release 3.29.1 (release: 3.29.1) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3540,3 +3542,9 @@ End the engine terminals Start opens once their sessions are over, so idle engin
 **Releasable: yes.**
 
 Release 3.29.0: the framework packs and publishes what is on the trunk.
+
+### Session 301 — A suite the close does not demand cannot stop the run of record
+
+**Releasable: no.**
+
+Make the run of record honour `required_for_close`. In `phaseRunOfRecord` (packages/router/src/drive.ts), when `test-evidence run` exits 1 for a suite whose `suiteRequiredForClose(suite)` is false, the failed record the verb already wrote stands as the run of record, the driver logs one `run-of-record-red-not-required` event (suite, command, job log) and goes on to the next suite, so the session reaches the land; a required suite still logs `tests-failed` and is issued `fix-run-of-record`. `unchangedRedStop` names only required suites. Tests in packages/router/test/drive.test.ts cover the non-required red suite reaching the land with no fix asked, the required red suite still being asked for a fix, and the stop's reason leaving a red non-required suite out. Then docs/driving-a-session.md says a `required_for_close: false` suite is run and recorded but its failure does not stop the session, while a release still demands it green; version.json goes to 3.29.1, stamped with `npm run stamp:version`, with a 3.29.1 changelog section.

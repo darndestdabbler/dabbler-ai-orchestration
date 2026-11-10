@@ -10,6 +10,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.29.1] — 2026-11-09
+
+**A suite the close does not demand can no longer stop a session.** A
+suite declared `expensive: true` with `required_for_close: false` was run
+as the run of record, and when it failed the framework asked for a
+`fix-run-of-record` step anyway, though the close itself was content with
+it red. A suite left red on purpose, until a later session fixes it, left
+the session with no way to reach the land.
+
+### Fixed
+
+- **A red non-required suite is recorded, and the session goes on.** The
+  run of record still runs it, and its red result stays on the record. The
+  framework logs `run-of-record-red-not-required` with the suite, its
+  command and the job's log, and goes on to the next suite and the land. No
+  fix is asked for. A suite required for close is handled as before.
+  Session 301.
+- **The "stayed red" stop names only required suites.** When fixes that
+  changed nothing leave the run of record red, the stop's reason no longer
+  lists a suite the close does not demand.
+- **A release still demands every expensive suite green**, required for
+  close or not.
+
 ## [3.29.0] — 2026-11-03
 
 **An engine terminal ends with its session.** Start Session opens a

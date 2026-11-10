@@ -375,6 +375,14 @@ again. The step the framework is waiting on is written on `run.json` as
 `pending_step` until its report is accepted, which is what lets the call
 that resumes the session judge it before the phase's own work.
 
+Only a suite the close demands green comes back as that step. A suite
+declared `required_for_close: false` in `dabbler.yaml` is still run as the
+run of record and its red result is recorded, but its failure does not stop
+the session: the framework logs `run-of-record-red-not-required` and goes on
+to the next suite and the land. A release still demands it green — the
+whole suites a release session runs stop it on any red expensive suite,
+required for close or not.
+
 ### What the Primary Reviewer can see, and what it may ask for
 
 A round on the **Copilot seat** holds three tools — list, search, read —

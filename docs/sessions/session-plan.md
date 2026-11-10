@@ -17690,7 +17690,7 @@ stamp it with `npm run stamp:version`.
 
 The framework publishes session 299 as 3.29.0 and nothing else.
 
-### Session 301 of 302: A suite the close does not demand cannot stop the run of record
+### Session 301 of 304: A suite the close does not demand cannot stop the run of record
 
 Scope: `packages/router/src/drive.ts` (`phaseRunOfRecord`,
 `unchangedRedStop`), `packages/router/test/drive.test.ts`,
@@ -17748,6 +17748,131 @@ stamp.
 
 **Releasable.** Yes -- as 3.29.1 in session 302.
 
-### Session 302 of 302: Release 3.29.1 (release: 3.29.1)
+### Session 302 of 304: Release 3.29.1 (release: 3.29.1)
 
 The framework publishes session 301 as 3.29.1 and nothing else.
+
+### Session 303 of 304: Configuration comes first, and a machine reads itself
+
+Scope: `tools/dabbler-ai-orchestration/package.json` (`viewsWelcome`),
+`tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts`,
+`tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts`
+(`rootNodes`, the Authoring AI rows),
+`tools/dabbler-ai-orchestration/src/commands/configurationCommands.ts`,
+`tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`
+(`configuredStart`), `tools/dabbler-ai-orchestration/src/extension.ts`
+(activation), `packages/router/src/engines.ts` (`installedEngines`),
+`packages/router/src/projection.ts` (the `engines` block), the tests named
+after each, `tools/dabbler-ai-orchestration/README.md` (section 5 and the
+setup table), `docs/quick-start.md`, `version.json` and the manifests `npm
+run stamp:version` writes; `tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** From the field, 2026-11-10: a developer's first project, on a
+Copilot seat, on a machine where installing anything is already involved.
+Set Up New Project created the folder and reopened the window on it; the
+deferred Start offered session 1 and stopped with "Copilot needs a model
+and neither this repository nor this machine names one". Every way on the
+stop named then failed the same way: the Choose the Model button offered
+nothing, the Model row offered nothing, and `dabbler configure
+--authoring-model` refused every id as "not a model this engine's own list
+names". The seat had never been read, so there was no list to choose
+from, and the one command that opens the way -- `dabbler discovery
+refresh`, free, no prompt sent -- was named only inside the warning the
+empty picker shows. Reproduced on a scratch project with an empty per-user
+data directory and no keys: the refresh filled the list in seconds and the
+same `configure` then wrote the choice.
+
+Three things around the stop made it a wall rather than a step. The
+Solution Explorer shows nothing but a Set Up New Project button until the
+project exists, so the vehicle and the model cannot be set first, though
+nothing about them depends on a project. The Work Explorer offers the same
+button, so the two panes say one thing between them and neither says what
+to set. And nothing tells a developer whose machine has no engine CLI at
+all, or the npm `copilot.cmd` shim where the WinGet `copilot.exe` should
+be, until a session fails for it: the shim cuts a prompt at its first
+newline, and the first anyone learns of that is a seat that answers
+nothing.
+
+The order of onboarding is therefore turned around. Configuration is the
+first thing the Solution Explorer shows, with a folder open and before
+any project; a machine that has not read its seat or its vendors reads
+them itself, because the reading is free; a machine with no engine is
+told so, and told what to install; and the stop that Start makes points
+at the same section every other sentence points at.
+
+**Step 1 -- Configuration before the project.** With a workspace root
+and no projection file, `SolutionTreeProvider.getChildren` renders the
+Configuration root alone: `rootNodes` takes whether a solution exists and
+leaves the solution node out when it does not. The configuration already
+derives from `solutionConfiguration(root)` and never from the projection,
+so nothing new is read. The Solution Explorer's `viewsWelcome` entry
+loses its Set Up New Project link and says what the pane shows once a
+folder is open; the Work Explorer keeps the one button, so setting up a
+project is said in one place. With no folder open at all, both welcomes
+stay as they are.
+
+**Step 2 -- a reading nobody has taken is taken, free, by the pane.** On
+the first paint of the Configuration section in a window, when the
+reading says the catalog holds no block for a transport this machine can
+reach -- a `copilot` on PATH with no seat block, or a key in the
+environment with no api block -- the pane runs `dabbler discovery
+refresh` through `runVerb`, in the visible terminal Update the Catalog
+already uses, and refreshes the rows when it exits. Once per window and
+never while the record is current; it is the same verb the context menu
+offers, started by the pane instead of waited for. It sends no prompt and
+bills nothing, which is the whole reason it may run unasked. A refresh
+that fails leaves the row saying what it says today.
+
+**Step 3 -- a machine without an engine is told.** `installedEngines`
+already reads PATH; its reading now carries, for each engine, which file
+answered (`copilot.exe` or `copilot.cmd`), and the projection's `engines`
+block carries it through. The Authoring AI's Vehicle row says "no engine
+CLI on PATH" where none is, and where the first `copilot` on PATH is the
+npm `.cmd` shim it says so and names the remedy: `winget install
+GitHub.Copilot`, after `npm uninstall -g @github/copilot`. On activation,
+once per window, when no engine CLI is on PATH, a warning toast says to
+install Claude Code or the Copilot CLI and carries one action, "How to
+install", which opens the README's setup table. The extension tells; it
+installs nothing.
+
+**Step 4 -- Start says the first thing, not the last.** In
+`configuredStart`, a seat with no model is two different stops. When the
+seat is unread, the message says the seat has not been read yet and the
+action is Update the Catalog (`dabblerSolution.refreshRecord`); when it
+is read and nothing is chosen, the message is today's, naming the
+Solution Explorer's Configuration section by that name, with Choose the
+Model as its action. Every toast on this path names the same section.
+
+**Step 5 -- the words and the number.** README section 5 and the setup
+table, and `docs/quick-start.md`, say that the Configuration section is
+where a developer starts, before any project; that a fresh machine reads
+its seat and its vendors itself, for nothing; and that the Copilot CLI
+is installed with WinGet, with the npm shim named as the thing to avoid.
+`version.json` goes to 3.30.0 (a minor: the pane does something it did
+not do), stamped with `npm run stamp:version`, and the changelog gets a
+3.30.0 section saying what changed for a developer.
+
+**Non-goals.** Any change to what a choice is or where it is kept: four
+layers, no fifth. A catalog that ships, or a reading taken for another
+machine believed. Any probe that sends a prompt. Any change to
+`bootstrap` or to what Set Up New Project writes. A welcome for the
+no-folder case beyond its words. A WinGet or npm install run by the
+extension. The Work Explorer beyond keeping its button.
+
+**Tests.** In `solutionTreeProvider.test.ts`: a root with no projection
+file renders the Configuration node alone, and a root with one renders
+both. In `commandFlows.test.ts`: the first paint with an unread reachable
+transport runs the refresh verb once and a second paint runs nothing; a
+current record runs nothing; `configuredStart` on an unread seat names
+`dabblerSolution.refreshRecord` and on a read seat with no model names
+`dabblerSolution.setAuthoringModel`; activation with no engine on PATH
+shows the install warning once. In `engines.test.ts`: `installedEngines`
+reports the file that answered, and flags a `copilot.cmd` as the shim. In
+`projection.test.ts`: the `engines` block carries the shim flag. `npm run
+check:version` checks the stamp.
+
+**Releasable.** Yes -- as 3.30.0 in session 304.
+
+### Session 304 of 304: Release 3.30.0 (release: 3.30.0)
+
+The framework publishes session 303 as 3.30.0 and nothing else.

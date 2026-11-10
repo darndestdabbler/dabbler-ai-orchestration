@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 272 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 272 transcript</h1>
+<p class="stamp">Rendered 2026-10-21T16:07:44.630Z by dabbler-ai-router 3.21.0 at 95326351c2bb3105330332cbe57cd6f50b557c7b.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-21T11:53:58.605-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 272 of 278: An API out of credits pauses for funds, and Continue resumes it</h3>
+<p>Scope: <code>packages/router/src/transports/api.ts</code> (the retry ladder), <code>packages/router/src/transports/copilot.ts</code> (the error classes), <code>packages/router/src/drive.ts</code> (the stop and its ways on); tests in <code>api.test.ts</code>, <code>copilot.test.ts</code> and <code>drive.test.ts</code></p>
+<p><strong>Why.</strong> A developer using Dabbler on a real project, 2026-10-21: when an API runs out of credits the framework keeps trying and then fails, where it should pause so the developer can fund the account. Session 170 made the failure carry the provider's own words, so OpenAI's <code>credit_balance_exhausted</code> no longer reads as &quot;HTTP 429 Too Many Requests&quot;, and that is all it changed: <code>callModel</code> retries every <code>HttpStatusError</code> up to <code>retry.max_retries</code> with backoff and then throws &quot;API call failed after N attempts&quot;, and the seat transport files &quot;quota&quot; with the rate limits. An empty account is not a transient fault. Retrying it spends minutes, and the session ends in a failure a person has to read past to find a billing problem that one sentence could have named.</p>
+<p><strong>Step 1 -- out of funds is its own condition.</strong> The API transport recognises an exhausted balance from the provider's own error -- OpenAI's <code>insufficient_quota</code> and <code>credit_balance_exhausted</code>, Anthropic's &quot;credit balance is too low&quot; -- and never retries it. Google answers both a rate limit and a billing limit with 429 <code>RESOURCE_EXHAUSTED</code>; only the billing case is funds, and a rate limit keeps its retries. The seat transport separates the seat's exhausted AI credits from a rate limit the same way.</p>
+<p><strong>Step 2 -- the session pauses.</strong> A call refused for funds stops the run with a stop of its own kind, naming the vendor, the key's variable or the seat, and where that vendor's balance is topped up. Nothing done so far is lost, and the ways on are one: add funds, then ask for the next instruction, and the run resumes in the phase it stopped in, making the same call again. Cancel and rollback are not named.</p>
+<p><strong>Step 3 -- the words where a person reads them.</strong> <code>dabbler status</code> and the stop's line in the terminal say &quot;waiting for funds: &lt;vendor&gt;&quot;, so the pause reads as a wait and not as a failure.</p>
+<p><strong>Non-goals.</strong> The Authoring AI's own billing: its CLI tells the person itself. Any balance check before a call, or any polling of a vendor's balance. Any change to how a real rate limit or a timeout is retried.</p>
+<p><strong>Tests.</strong> In <code>api.test.ts</code>, a funds refusal from each of the three vendors' shapes is not retried and is told apart from a rate limit. In <code>copilot.test.ts</code>, the seat's credit exhaustion is its own class. In <code>drive.test.ts</code>, a verification call refused for funds stops with the funds kind, and the next instruction after it resumes the phase.</p>
+<p><strong>Releasable.</strong> Yes -- with 273 to 277, as 3.23.0 in session 278.</p>
+<h2>Work Plan</h2>
+<p>Make an exhausted balance a pause rather than a failure. The API transport recognises a funds refusal from the provider's own words (OpenAI's insufficient_quota and credit_balance_exhausted, Anthropic's 'credit balance is too low', Google's 429 RESOURCE_EXHAUSTED only where its words name billing or depleted credits) and throws a FundsError at once, naming the vendor, the key's variable and where that vendor's balance is topped up, without spending a retry; a real rate limit and a timeout keep the ladder unchanged. The seat transport classifies the seat's exhausted AI credits as a class of its own ahead of the rate-limit class, and route() raises the same FundsError for it. <code>verify</code> exits with a new EXIT_FUNDS, writing 'waiting for funds: &lt;vendor&gt;' first, and is not retried by dispatchVerification. The driver maps that exit to a stop of the new kind 'funds' whose one way on is to add funds and ask for the next instruction -- the existing resume then re-enters the verification phase and makes the same call; no cancel or rollback is offered. The stop's rendering and the run's waiting line read 'waiting for funds: &lt;vendor&gt;', so <code>dabbler status</code> and the terminal show a wait rather than a failure.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/5e071be965d2df33925aafb09599f3d7ddbd2f03"><code>5e071be965d2df33925aafb09599f3d7ddbd2f03</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Api funds</td><td><p>In packages/router/src/transports/api.ts add an exported FundsError (vendor, key variable, top-up place, the vendor's words) and a small exported predicate recognising a funds refusal from the status and the provider's words: OpenAI insufficient_quota / credit_balance_exhausted, Anthropic 'credit balance is too low', Google 429 RESOURCE_EXHAUSTED only when its words mention billing or depleted credits. callModel throws FundsError on the first such refusal and never retries it; every other HttpStatusError and timeout keeps the existing ladder. In api.test.ts: a funds refusal in each vendor's shape is not retried and throws FundsError, and a Google rate-limit 429 is still retried.</p></td><td><span class="mono">packages/router/src/transports/api.ts</span><br><span class="mono">packages/router/test/api.test.ts</span></td><td><code>node --test packages/router/test/api.test.ts</code></td><td>yes</td></tr>
+<tr><td>Seat funds</td><td><p>In packages/router/src/transports/copilot.ts add ERROR_CLASS_FUNDS and have classifyStderr recognise the seat's exhausted AI credits before the quota/rate-limit class. In packages/router/src/route.ts, a seat result failing with that class throws the FundsError from api.ts (vendor: the Copilot seat, top-up: the GitHub billing settings) rather than a DispatchError. In copilot.test.ts: credit exhaustion classifies as its own class and a rate limit still classifies as quota-rate-class.</p></td><td><span class="mono">packages/router/src/transports/copilot.ts</span><br><span class="mono">packages/router/src/route.ts</span><br><span class="mono">packages/router/test/copilot.test.ts</span></td><td><code>node --test packages/router/test/copilot.test.ts packages/router/test/route.test.ts</code></td><td>yes</td></tr>
+<tr><td>Verify funds exit</td><td><p>Add EXIT_FUNDS to packages/router/src/contracts/exitCodes.ts. In packages/router/src/verify/rounds.ts, a FundsError from the verification dispatch writes 'waiting for funds: &lt;vendor&gt;' with the key's variable or the seat and where to top up, records nothing, and returns EXIT_FUNDS; dispatchVerification does not retry it.</p></td><td><span class="mono">packages/router/src/contracts/exitCodes.ts</span><br><span class="mono">packages/router/src/verify/rounds.ts</span></td><td><code>node --test packages/router/test/rounds.test.ts</code></td><td>yes</td></tr>
+<tr><td>Funds stop</td><td><p>Add 'funds' to the stop kind enum in packages/router/schemas/driver-run.schema.json and regenerate packages/router/src/generated/driver-run.ts with the generate:types script. In packages/router/src/drive.ts, phaseVerify maps EXIT_FUNDS to a Stop of kind 'funds' carrying verify's own first line. In drive.test.ts: a verification job exiting EXIT_FUNDS stops with kind 'funds', and the next instruction after it resumes the verification phase.</p></td><td><span class="mono">packages/router/schemas/driver-run.schema.json</span><br><span class="mono">packages/router/src/generated/driver-run.ts</span><br><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/drive.test.ts</span></td><td><code>node --test packages/router/test/drive.test.ts</code></td><td>yes</td></tr>
+<tr><td>Funds words</td><td><p>In packages/router/src/driver.ts give the 'funds' kind its situation: a headline reading 'waiting for funds' rather than 'paused', one way on (add funds, then ask for the next instruction; the run resumes in the phase it stopped in and makes the same call), and no cancel or rollback. In driver.test.ts, renderStop of a funds stop reads as a wait and offers only the carry-on.</p></td><td><span class="mono">packages/router/src/driver.ts</span><br><span class="mono">packages/router/test/driver.test.ts</span></td><td><code>node --test packages/router/test/driver.test.ts</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>The Authoring AI's own billing: its CLI tells the person itself.</li><li>Any balance check before a call, or any polling of a vendor's balance.</li><li>Any change to how a real rate limit or a timeout is retried.</li><li>A funds pause for calls other than verification's (adjudication, triage): only the verification call is wired to the stop.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[15:53:58]</span> <span class="muted">run-started</span> session=272 mode=pull</div>
+<div class="line"><span class="at">[15:53:58]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[15:55:51]</span> <span class="muted">run-resumed</span> session=272 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[15:55:51]</span> <span class="muted">plan-accepted</span> steps=[&quot;api-funds&quot;,&quot;seat-funds&quot;,&quot;verify-funds-exit&quot;,&quot;funds-stop&quot;,&quot;funds-words&quot;] non_goals=4</div>
+<div class="line"><span class="at">[15:55:52]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[15:55:52]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=api-funds</div>
+<div class="line"><span class="at">[15:56:35]</span> <span class="muted">run-resumed</span> session=272 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[15:56:37]</span> <span class="muted">check-passed</span> step=api-funds argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/api.test.ts&quot;]</div>
+<div class="line"><span class="at">[15:56:41]</span> <span class="muted">named-tests-passed</span> step=api-funds suite=typescript command=node scripts/suite.mjs container packages/router/test/api.test.ts</div>
+<div class="line"><span class="at">[15:56:42]</span> <span class="muted">report-accepted</span> seq=2 step=api-funds files=[&quot;packages/router/src/transports/api.ts&quot;,&quot;packages/router/test/api.test.ts&quot;] notes=FundsError + isOutOfFunds; callModel throws it on the first funds refusal, Google 429 rate limit still retried</div>
+<div class="line"><span class="at">[15:56:42]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=seat-funds</div>
+<div class="line"><span class="at">[15:57:22]</span> <span class="muted">run-resumed</span> session=272 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[15:57:25]</span> <span class="muted">check-passed</span> step=seat-funds argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/copilot.test.ts&quot;,&quot;packages/router/test/route.test.ts&quot;]</div>
+<div class="line"><span class="at">[15:57:27]</span> <span class="muted">named-tests-passed</span> step=seat-funds suite=typescript-windows command=node scripts/suite.mjs host packages/router/test/copilot.test.ts</div>
+<div class="line"><span class="at">[15:57:31]</span> <span class="muted">named-tests-passed</span> step=seat-funds suite=typescript command=node scripts/suite.mjs container packages/router/test/route.test.ts</div>
+<div class="line"><span class="at">[15:57:31]</span> <span class="muted">report-accepted</span> seq=3 step=seat-funds files=[&quot;packages/router/src/transports/copilot.ts&quot;,&quot;packages/router/src/route.ts&quot;,&quot;packages/router/test/copilot.test.ts&quot;] notes=ERROR_CLASS_FUNDS classified ahead of auth and quota; route throws FundsError for it on the seat</div>
+<div class="line"><span class="at">[15:57:31]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=verify-funds-exit</div>
+<div class="line"><span class="at">[15:57:57]</span> <span class="muted">run-resumed</span> session=272 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[15:57:59]</span> <span class="muted">check-passed</span> step=verify-funds-exit argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/rounds.test.ts&quot;]</div>
+<div class="line"><span class="at">[15:58:04]</span> <span class="muted">named-tests-passed</span> step=verify-funds-exit suite=typescript command=node scripts/suite.mjs container packages/router/test/rounds.test.ts packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[15:58:04]</span> <span class="muted">report-accepted</span> seq=4 step=verify-funds-exit files=[&quot;packages/router/src/contracts/exitCodes.ts&quot;,&quot;packages/router/src/verify/rounds.ts&quot;] notes=EXIT_FUNDS = 8; verify writes the FundsError's words last and exits with it; dispatchVerification retries only DispatchError, so funds is not retried</div>
+<div class="line"><span class="at">[15:58:04]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=funds-stop</div>
+<div class="line"><span class="at">[15:59:10]</span> <span class="muted">run-resumed</span> session=272 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[15:59:12]</span> <span class="muted">check-passed</span> step=funds-stop argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/drive.test.ts&quot;]</div>
+<div class="line"><span class="at">[16:00:02]</span> <span class="muted">named-tests-passed</span> step=funds-stop suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[16:00:02]</span> <span class="muted">report-accepted</span> seq=5 step=funds-stop files=[&quot;packages/router/schemas/driver-run.schema.json&quot;,&quot;packages/router/src/generated/driver-run.ts&quot;,&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;] notes=stop kind 'funds' in the schema and generated type; phaseVerify maps EXIT_FUNDS to it; test: the stop, then the next call starts the verification job again</div>
+<div class="line"><span class="at">[16:00:02]</span> <span class="muted">instruction-issued</span> seq=6 kind=step step=funds-words</div>
+<div class="line"><span class="at">[16:00:48]</span> <span class="muted">run-resumed</span> session=272 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:00:51]</span> <span class="muted">check-passed</span> step=funds-words argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/driver.test.ts&quot;]</div>
+<div class="line"><span class="at">[16:01:39]</span> <span class="muted">named-tests-passed</span> step=funds-words suite=typescript command=node scripts/suite.mjs container packages/router/test/driver.test.ts</div>
+<div class="line"><span class="at">[16:01:39]</span> <span class="muted">report-accepted</span> seq=6 step=funds-words files=[&quot;packages/router/src/driver.ts&quot;,&quot;packages/router/test/driver.test.ts&quot;] notes=funds situation: headline 'waiting for funds', one carry-on, no cancel or rollback; the every-kind rendering test exempts funds and a test of its own holds it</div>
+<div class="line"><span class="at">[16:01:39]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[16:01:40]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[16:01:41]</span> <span class="muted">job-started</span> name=verification pid=7896 log=.dabbler/runs/s272/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:03:51]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s272/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:03:51]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[16:03:51]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[16:03:51]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[16:03:51]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=38660 log=.dabbler/runs/s272/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:03:53]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s272/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:03:53]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[16:03:53]</span> <span class="muted">job-started</span> name=run of record: typescript pid=53356 log=.dabbler/runs/s272/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:05:02]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="bad">1</span> log=.dabbler/runs/s272/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:05:02]</span> <span class="muted">tests-failed</span> command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[16:05:02]</span> <span class="muted">instruction-issued</span> seq=7 kind=step step=fix-run-of-record</div>
+<div class="line"><span class="at">[16:05:24]</span> <span class="muted">run-resumed</span> session=272 phase=<span class="milestone">run-of-record</span> mode=pull</div>
+<div class="line"><span class="at">[16:05:27]</span> <span class="muted">check-passed</span> step=fix-run-of-record argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/api.test.ts&quot;] owner=api-funds</div>
+<div class="line"><span class="at">[16:05:28]</span> <span class="muted">check-passed</span> step=fix-run-of-record argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/copilot.test.ts&quot;,&quot;packages/router/test/route.test.ts&quot;] owner=seat-funds</div>
+<div class="line"><span class="at">[16:05:29]</span> <span class="muted">check-passed</span> step=fix-run-of-record argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/rounds.test.ts&quot;] owner=verify-funds-exit</div>
+<div class="line"><span class="at">[16:05:30]</span> <span class="muted">check-passed</span> step=fix-run-of-record argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/drive.test.ts&quot;] owner=funds-stop</div>
+<div class="line"><span class="at">[16:05:31]</span> <span class="muted">check-passed</span> step=fix-run-of-record argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/driver.test.ts&quot;] owner=funds-words</div>
+<div class="line"><span class="at">[16:05:35]</span> <span class="muted">named-tests-passed</span> step=fix-run-of-record suite=typescript command=node scripts/suite.mjs container packages/router/test/transports.test.ts</div>
+<div class="line"><span class="at">[16:05:35]</span> <span class="muted">report-accepted</span> seq=7 step=fix-run-of-record files=[&quot;packages/router/test/transports.test.ts&quot;] notes=transports.test.ts asserted the funds refusal read as HTTP 429; it is now a FundsError carrying the same provider words, so the assertion drops the HTTP prefix and keeps the no-body-leak check</div>
+<div class="line"><span class="at">[16:05:35]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[16:05:36]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[16:05:36]</span> <span class="muted">job-started</span> name=verification pid=9588 log=.dabbler/runs/s272/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:06:07]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s272/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:06:07]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[16:06:07]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[16:06:07]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[16:06:07]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=35664 log=.dabbler/runs/s272/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:06:09]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s272/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:06:09]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[16:06:09]</span> <span class="muted">job-started</span> name=run of record: typescript pid=34180 log=.dabbler/runs/s272/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:07:16]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s272/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:07:17]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[16:07:17]</span> <span class="muted">job-started</span> name=run of record: extension pid=50444 log=.dabbler/runs/s272/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[16:07:35]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s272/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[16:07:35]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[16:07:39]</span> <span class="muted">landed</span> commit=5e071be965d2df33925aafb09599f3d7ddbd2f03</div>
+<div class="line"><span class="at">[16:07:39]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[16:07:39]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[16:07:39]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[16:07:39]</span> <span class="muted">job-started</span> name=close pid=49564 log=.dabbler/runs/s272/driver/jobs/close.log</div>
+<div class="line"><span class="at">[16:07:44]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s272/driver/jobs/close.log</div>
+<div class="line"><span class="at">[16:07:44]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>3 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** `isOutOfFunds` is provider-blind.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** The funds headline omits the vendor even though the required waiting phrase includes it.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** The drive test fabricates `EXIT_FUNDS` rather than exercising the new seat/API-to-verify conversion.</td><td>not answered</td></tr>
+</table></td></tr>
+<tr><td>2</td><td>fix-delta</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>3 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>The test invokes `callModel(&quot;anthropic&quot;, ...)` with OpenAI-specific `insufficient_quota` and `credit_balance_exhausted` fields, then accepts the funds-style error. A provider-aware implementation should not classify an Anthropic response using OpenAI-only markers.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>No relevant remediation appears in the fix delta, despite the required literal `waiting for funds: &lt;vendor&gt;`.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>No relevant remediation appears in the fix delta; the test still fabricates `EXIT_FUNDS` rather than exercising the promised seat/API refusal-to-verification-exit conversion.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td></td><td></td><td></td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="bad">failed</span></td><td>68s</td><td></td><td></td><td></td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>67s</td><td>1348</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>17s</td><td>282</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

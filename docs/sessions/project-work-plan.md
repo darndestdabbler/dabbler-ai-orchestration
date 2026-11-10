@@ -346,7 +346,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 306 | The build contract holds | no | 2026-11-10 |
 | 307 | .NET Framework builds the way Visual Studio builds it | no | 2026-11-10 |
 | 308 | A person may amend an accepted step's checks, and the engine is told so | no | 2026-11-10 |
-| 309 | Release 3.31.0 (release: 3.31.0) | — | not declared |
+| 309 | Release 3.31.0 (release: 3.31.0) | yes | 2026-11-10 |
 | 310 | The walk through six borrowed repositories | — | not declared |
 | 311 | Release 3.31.1 (release: 3.31.1) | — | not declared |
 
@@ -3607,3 +3607,9 @@ Give the dotnet-framework ecosystem a compile control and a suite that build and
 **Releasable: no.**
 
 Let a person amend an accepted step's checks, and tell the engine the truth about who may. `amendPlanStep` (driver.ts) takes whether a person is asking -- `planAmend` (session.ts) passes `personIsPresent()` -- and for an accepted step applies a person's `--checks-file` exactly as for an unaccepted one (through `judgeCheckPrograms` and `writeWorkPlan`), writing an `amendments.jsonl` row that carries `after_acceptance: true` beside the reason, `before` and `after`; the activity-log line says "accepted step" and the success line says every later fix is measured against the new checks. An accepted step's `--files` stays refused for everyone with its own sentence, and an engine asking for an accepted step's checks is refused in `isAPersonsVerb`'s words: report the step blocked with the proposed checks and the reason in the notes, and the person runs the amendment, printed whole with the sessions directory and step filled in. The help in cli/session.ts states the exception. In drive.ts the fix step's ask, `CHECK_FAILED_WAYS` (with the failed check's `owner` saying which case it is) and the `rejected-thrice` way on in driver.ts say that a check of the step in hand is the engine's to amend and an earlier, accepted step's is the operator's; a fix step in flight re-reads `allPlanChecks()` from the plan on disk on each answer, as `amendedSpec` does for a plan step. docs/driving-a-session.md says who may amend an accepted step's checks and what the record keeps; version.json goes to 3.31.0, stamped with `npm run stamp:version`, and the changelog gets a 3.31.0 section covering 305 to 308.
+
+### Session 309 — Release 3.31.0 (release: 3.31.0)
+
+**Releasable: yes.**
+
+Release 3.31.0: the framework packs and publishes what is on the trunk.

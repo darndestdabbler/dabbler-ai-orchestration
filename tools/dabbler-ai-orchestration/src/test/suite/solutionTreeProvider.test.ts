@@ -49,6 +49,21 @@ suite("SolutionTreeProvider: derives at startup", () => {
     assert.ok(rootNodes().length > 0);
   });
 
+  test("a folder not yet set up shows the Configuration alone, and a set-up one shows both", async () => {
+    // The vehicle and the model depend on nothing a project writes, and a
+    // first session stops on them when they are unset -- so they are the
+    // first thing the pane shows, before any project exists.
+    provider = new SolutionTreeProvider(root);
+    await sleep(PAST_SETTLE_MS);
+    assert.deepStrictEqual(provider.getChildren().map((node) => node.kind), ["configuration"]);
+    provider.dispose();
+
+    writeFileTree(root, { "docs/sessions/session-plan.md": "# Session plan\n" });
+    provider = new SolutionTreeProvider(root);
+    await sleep(PAST_SETTLE_MS);
+    assert.deepStrictEqual(provider.getChildren().map((node) => node.kind), ["solution", "configuration"]);
+  });
+
   test("a projection already on disk is re-derived, because a stale one looks current", async () => {
     // The inverse of what this asserted until session 155, and the reason is
     // the defect the old behaviour had: deriving only over a MISSING file

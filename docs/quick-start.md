@@ -29,9 +29,23 @@ Then a way to reach models. Either a GitHub Copilot seat with the Copilot
 CLI — the shipped default transport — or the direct provider APIs: put at
 least two keys in env vars (`DABBLER_ANTHROPIC_API_KEY`,
 `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`) — verification needs a
-second provider — and select that path with `DABBLER_TRANSPORT=api`, or
-`transport: profile: api` in a project-root `local-overrides.yaml` (see
-below).
+second provider — and select that path with `dabbler configure --transport
+api`.
+
+**Install the Copilot CLI with WinGet**: `winget install GitHub.Copilot`,
+which puts `copilot.exe` on PATH. Avoid the npm package
+(`@github/copilot`): it puts a `copilot.cmd` shim there, and `cmd.exe` cuts
+a prompt at its first newline. If you already have it, `npm uninstall -g
+@github/copilot` first. The Solution Explorer's Vehicle row says which one
+this machine has, and says so when it has no engine CLI at all.
+
+**In VS Code, the Configuration comes first.** Open the folder and the
+Solution Explorer shows its **Configuration** section before any project
+exists: the authoring AI's vehicle and model, and who reviews it. Set them
+there before setting the project up. A machine that has never read its
+Copilot seat or its vendors' model lists reads them itself the first time
+the section is shown — `dabbler discovery refresh`, free, with no prompt
+sent — so there is a list to choose a model from.
 
 ## 1. Bootstrap a project
 
@@ -414,6 +428,8 @@ dabbler discovery refresh
 It covers whichever transports this machine actually has -- a seat with no
 provider keys refreshes its seat block and leaves the rest standing -- and
 a session start does it for you, once on the first session of any given day.
+The Solution Explorer runs it too, once per window, when it is first shown on
+a machine that can reach a transport it has never read.
 
 The reading lands in `ai-model-catalog.json` under this platform's own
 per-user data directory (`%LOCALAPPDATA%\dabbler\` on Windows, the XDG

@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: solutions, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
-  "version": "3.29.1",
+  "version": "3.30.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -562,7 +562,7 @@
     "viewsWelcome": [
       {
         "view": "dabblerSolutionTree",
-        "contents": "This shows what the project is being built FROM: its projects, what each one references, and who breaks when one of them changes.\n\nIt fills in once the repository is set up, from the solution's build files as the sessions write them.\n[Set Up New Project](command:dabbler.setupNewProject)",
+        "contents": "This shows what the project is being built FROM: its projects, what each one references, and who breaks when one of them changes.\n\nOpen a folder and it shows the Configuration first -- the AI that authors, its model and who reviews it -- before any project exists; the projects fill in from the solution's build files as the sessions write them.\n[Open Folder](command:vscode.openFolder)",
         "when": "true"
       },
       {
@@ -639,7 +639,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.9",
-    "dabbler-ai-router": "3.29.1",
+    "dabbler-ai-router": "3.30.0",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",

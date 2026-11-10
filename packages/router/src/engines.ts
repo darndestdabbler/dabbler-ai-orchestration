@@ -217,6 +217,13 @@ export interface EngineInstallation {
   readonly program: string;
   /** Where it was found on PATH; null when it was not found at all. */
   readonly path: string | null;
+  /**
+   * True where the copilot that answered is the npm package's `copilot.cmd`
+   * shim rather than WinGet's `copilot.exe`. `cmd.exe` cuts a prompt at its
+   * first newline, and the first anyone learned of it was a seat that
+   * answered nothing.
+   */
+  readonly shim: boolean;
 }
 
 /**
@@ -275,7 +282,8 @@ export function installedEngines(
 ): EngineReading {
   const engines: EngineInstallation[] = BUILT_IN_ENGINES.map((engine) => {
     const program = ENGINE_PROGRAM[engine];
-    return { engine, program, path: lookupOnPath(program, env) };
+    const path = lookupOnPath(program, env);
+    return { engine, program, path, shim: engine === "copilot" && path !== null && /\.cmd$/i.test(path) };
   });
   const present = engines.filter((entry) => entry.path !== null);
   const quoted = present.map((entry) => `\`${entry.program}\``);

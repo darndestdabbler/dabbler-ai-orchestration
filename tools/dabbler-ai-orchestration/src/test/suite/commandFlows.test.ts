@@ -39,6 +39,9 @@ import { ROUTER_VERSION } from "dabbler-ai-router";
 import { prerequisiteReport, type ToolProbe } from "../../commands/troubleshoot";
 import {
   refreshRecord,
+  unreadCatalogReader,
+  warnWhenNoEngine,
+  ENGINE_INSTALL_URL,
   storeCredential,
   KEEP_AS_MACHINE_DEFAULT,
   setAsMyDefault,
@@ -1248,10 +1251,11 @@ suite("Start opens the person's own CLI", () => {
  * A configuration reading, as the router hands one back: the engine this
  * repository starts with and the authoring model it names.
  */
-function readingOf({ engine, model }: { engine?: string; model?: string }): unknown {
+function readingOf({ engine, model, unread }: { engine?: string; model?: string; unread?: string[] }): unknown {
   return {
     engines: { chosen: engine ?? null },
     authoring: { declaredAtStart: false, chosen: model === undefined ? null : { model } },
+    unread: unread ?? [],
   };
 }
 
@@ -1268,6 +1272,17 @@ suite("What the Configuration starts a session with", () => {
     assert.ok(refusal.message.includes("dabbler configure --authoring-model"), refusal.message);
     // Focusing the view reveals nothing, so nothing claims to be in front of anyone.
     assert.ok(!refusal.message.includes("in front of you"), refusal.message);
+    assert.ok(refusal.message.includes("Configuration section"), refusal.message);
+  });
+
+  test("a seat this machine has never read refuses with Update the Catalog, not an empty Model row", () => {
+    // From the field: every way on the old stop named offered nothing,
+    // because the seat had never been read and there was no list to choose from.
+    const refusal = configuredStart("/repo", readingOf({ engine: "copilot", unread: ["copilot-cli"] }));
+    assert.ok("message" in refusal, JSON.stringify(refusal));
+    assert.strictEqual(refusal.action.command, "dabblerSolution.refreshRecord");
+    assert.ok(refusal.message.includes("not read its seat"), refusal.message);
+    assert.ok(refusal.message.includes("Configuration section"), refusal.message);
   });
 
   test("a reading that names no engine refuses, and offers the Vehicle row", () => {
@@ -2072,6 +2087,67 @@ suite("the Configuration node's refresh", () => {
     // offer, and the operator found out in the terminal afterwards.
     assert.ok(asked.includes("While a session is in flight"), asked);
     assert.ok(asked.includes("verifier pool"), asked);
+  });
+
+  test("reads an unread reachable transport on the first paint, unasked and once; a current record runs nothing", async () => {
+    // A fresh seat machine: every model choice failed against an empty list,
+    // and the free refresh that fills it was named only inside a warning.
+    const ran: Array<readonly string[]> = [];
+    const ui: ConfigurationUi = {
+      confirm: () => Promise.reject(new Error("a free reading asks nothing")),
+      runVerb: (_title, _cwd, args) => {
+        ran.push(args);
+        return Promise.resolve(0);
+      },
+      pick: () => Promise.resolve(undefined),
+      showInformationMessage: () => undefined,
+      showWarningMessage: () => undefined,
+      workspaceRoot: () => "D:/ws",
+    };
+    const unread = {
+      ...PROJECTION,
+      configuration: { records: [ROW], unread: ["copilot-cli"] },
+    } as unknown as Projection;
+    let repainted = 0;
+    const paint = unreadCatalogReader(ui);
+    await paint(unread, () => (repainted += 1));
+    await paint(unread, () => (repainted += 1));
+    assert.deepStrictEqual(ran, [["discovery", "refresh"]]);
+    assert.strictEqual(repainted, 1);
+
+    await unreadCatalogReader(ui)(PROJECTION, () => (repainted += 1));
+    assert.strictEqual(ran.length, 1, "a current record ran a refresh");
+  });
+
+  test("a machine with no engine CLI on PATH is warned, with the way to install one; one with an engine is not", async () => {
+    const warned: string[] = [];
+    const opened: string[] = [];
+    const ui = {
+      warn: (message: string, action: string) => {
+        warned.push(message);
+        return Promise.resolve(action);
+      },
+      open: (url: string) => opened.push(url),
+    };
+    const reading = (path: string | null) => ({
+      engines: {
+        chosen: null,
+        reason: "",
+        installed: [
+          { engine: "claude-code", program: "claude", path: null },
+          { engine: "copilot", program: "copilot", path },
+        ],
+      },
+    });
+    assert.strictEqual(await warnWhenNoEngine(reading(null), ui), true);
+    assert.strictEqual(warned.length, 1);
+    assert.ok(warned[0].includes("Claude Code") && warned[0].includes("Copilot CLI"), warned[0]);
+    assert.deepStrictEqual(opened, [ENGINE_INSTALL_URL]);
+
+    assert.strictEqual(await warnWhenNoEngine(reading("C:/bin/copilot.exe"), ui), false);
+    // A reading that could not be taken carries no engines, and is not evidence of absence.
+    assert.strictEqual(await warnWhenNoEngine({ unavailable: "bad config" }, ui), false);
+    assert.strictEqual(warned.length, 1);
   });
 
   test("asks for a key in a terminal and never in this window", async () => {

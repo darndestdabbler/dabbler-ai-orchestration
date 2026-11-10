@@ -946,18 +946,34 @@ export function configuredStart(
       // set a machine default with `--mine` to look in the wrong file.
       message:
         "Neither this repository nor this machine names an engine to start a session with, so nothing was started. " +
-        "Choose one on the Authoring AI's Vehicle row, or run `dabbler configure --engine <engine>` in a terminal: " +
-        "either is saved to this repository, and Start Session then asks nothing.",
+        "Choose one on the Authoring AI's Vehicle row in the Solution Explorer's Configuration section, or run " +
+        "`dabbler configure --engine <engine>` in a terminal: either is saved to this repository, and Start Session " +
+        "then asks nothing.",
       action: { title: "Choose the Vehicle", command: "dabblerSolution.setEngine" },
     };
   }
   const model = authoringModelIn(reading);
   if (picked.modelRequired && model === "") {
+    // Two stops, and the first one comes first: a seat this machine has never
+    // read offers no model to choose, so sending a person to choose one sent
+    // them to an empty list -- and every way on from there failed the same way.
+    const unread = (reading as { unread?: readonly string[] } | null)?.unread ?? [];
+    if (unread.includes("copilot-cli")) {
+      return {
+        message:
+          `${picked.label} needs a model, and this machine has not read its seat's model list yet, so there is ` +
+          "none to choose and nothing was started. Update the Catalog in the Solution Explorer's Configuration " +
+          "section reads it, free and with no prompt sent -- or run `dabbler discovery refresh` in a terminal -- " +
+          "and then choose the model there.",
+        action: { title: "Update the Catalog", command: "dabblerSolution.refreshRecord" },
+      };
+    }
     return {
       message:
         `${picked.label} needs a model and neither this repository nor this machine names one, so nothing was started. ` +
-        "Choose one on the Authoring AI's Model row, or run `dabbler configure --authoring-model <id>` in a terminal: " +
-        "either is saved to this repository, and Start Session then asks nothing.",
+        "Choose one on the Authoring AI's Model row in the Solution Explorer's Configuration section, or run " +
+        "`dabbler configure --authoring-model <id>` in a terminal: either is saved to this repository, and Start " +
+        "Session then asks nothing.",
       action: { title: "Choose the Model", command: "dabblerSolution.setAuthoringModel" },
     };
   }

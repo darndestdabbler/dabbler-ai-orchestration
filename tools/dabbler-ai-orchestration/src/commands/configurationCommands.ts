@@ -330,6 +330,77 @@ export async function setReviewerTransport(
 }
 
 /**
+ * The router's own line, with its program name dropped: what is left is the
+ * verb and its arguments, which is what the bundled router is handed.
+ */
+function verbArgs(command: string): string[] {
+  const argv = command.trim().split(/\s+/);
+  return argv[0] === "dabbler" ? argv.slice(1) : argv;
+}
+
+/**
+ * Read, unasked, a transport this machine can reach and has never read.
+ *
+ * Returns the function the Configuration section calls each time it is
+ * painted; it runs the refresh at most once in the window's life, and only
+ * while the reading says a reachable transport is unread. It may run unasked
+ * because the refresh sends no prompt and bills nothing -- and until it has
+ * run, every model choice on that transport fails against an empty list. The
+ * terminal is the one Update the Catalog uses, so it is seen happening. A
+ * refresh that fails leaves the rows saying what they said; the terminal
+ * already says why.
+ */
+export function unreadCatalogReader(
+  ui: ConfigurationUi = defaultConfigurationUi(),
+): (projection: Projection | null | undefined, refreshed: () => void) => Promise<void> {
+  let taken = false;
+  return async (projection, refreshed) => {
+    const row = (projection?.configuration?.records ?? [])[0];
+    const root = ui.workspaceRoot();
+    if (taken || !row || !root || (projection?.configuration?.unread ?? []).length === 0) return;
+    taken = true;
+    await ui.runVerb(`Dabbler: ${row.record}`, root, verbArgs(row.command));
+    refreshed();
+  };
+}
+
+/** Where installing an engine CLI is explained: the README's requirements and setup table. */
+export const ENGINE_INSTALL_URL =
+  "https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/tools/dabbler-ai-orchestration/README.md#requirements";
+
+/** What the no-engine warning needs of the editor. */
+export interface EngineWarningUi {
+  warn: (message: string, action: string) => Thenable<string | undefined>;
+  open: (url: string) => unknown;
+}
+
+/**
+ * Tell a machine with no engine CLI on PATH, before a session fails for it.
+ *
+ * Only on a reading that SAYS so -- engines listed and none found. A reading
+ * that could not be taken carries no engines and is not evidence of absence.
+ * It tells and installs nothing. Answers whether it warned.
+ */
+export async function warnWhenNoEngine(
+  reading: unknown,
+  ui: EngineWarningUi = {
+    warn: (message, action) => vscode.window.showWarningMessage(message, action),
+    open: (url) => vscode.env.openExternal(vscode.Uri.parse(url)),
+  },
+): Promise<boolean> {
+  const installed = (reading as Projection["configuration"] | null)?.engines?.installed ?? [];
+  if (installed.length === 0 || installed.some((entry) => entry.path !== null)) return false;
+  const action = "How to install";
+  const picked = await ui.warn(
+    "No engine CLI is on PATH, so no session can start here. Install Claude Code or the GitHub Copilot CLI " +
+      "(`winget install GitHub.Copilot`), then reload the window.",
+    action,
+  );
+  if (picked === action) ui.open(ENGINE_INSTALL_URL);
+  return true;
+}
+
+/**
  * Update the catalog: re-read every transport this machine has.
  *
  * The command run is the one the ROUTER named on the row rather than one
@@ -364,10 +435,7 @@ export async function refreshRecord(
   // rather than spelled here.
   const row = (target.projection?.configuration?.records ?? [])[0];
   if (!row) return;
-  const argv = row.command.trim().split(/\s+/);
-  // The router's own line, with its program name dropped: what is left is
-  // the verb and its arguments, which is what the bundled router is handed.
-  const args = argv[0] === "dabbler" ? argv.slice(1) : argv;
+  const args = verbArgs(row.command);
   const agreed = await ui.confirm(
     [
       `Refresh ${row.record}?`,

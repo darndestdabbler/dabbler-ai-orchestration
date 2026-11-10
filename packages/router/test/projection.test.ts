@@ -287,6 +287,33 @@ describe("what a session would be run with", () => {
     }
   });
 
+  it("names a reachable transport nobody has read, and carries the shim flag on each engine", () => {
+    // A fresh machine with keys and no reading: every model choice fails
+    // against an empty list until a free refresh fills it, so a surface
+    // has to be able to tell that apart from a list that is merely short.
+    const root = tempDir("configuration-unread-");
+    const restore = onApi(root);
+    const ungit = inRepository(root);
+    try {
+      const keyed = configurationNode(root);
+      assert.ok((keyed["unread"] as string[]).includes(TRANSPORT_API));
+      const installed = (keyed["engines"] as { installed: { shim: unknown }[] }).installed;
+      assert.ok(installed.length > 0 && installed.every((entry) => typeof entry.shim === "boolean"));
+    } finally {
+      ungit();
+      restore();
+    }
+    const keyless = tempDir("configuration-keyless-");
+    const unkeyed = onVehicle(keyless, TRANSPORT_API, withEnv({}));
+    const ungit2 = inRepository(keyless);
+    try {
+      assert.ok(!(configurationNode(keyless)["unread"] as string[]).includes(TRANSPORT_API));
+    } finally {
+      ungit2();
+      unkeyed();
+    }
+  });
+
   /** The overlay `configure` writes, removed, so each call decides afresh. */
   /**
    * Back to a machine that has configured nothing.

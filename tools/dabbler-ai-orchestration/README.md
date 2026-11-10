@@ -58,7 +58,7 @@ Dabbler terminal.
 
 | | **Direct provider APIs** | **GitHub Copilot CLI seat** |
 |---|---|---|
-| Setup | Set `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_OPENAI_API_KEY` / `DABBLER_GEMINI_API_KEY` | Install the Copilot CLI and sign in; set the vehicle with `dabbler configure --transport copilot-cli`. Either install works: WinGet's `GitHub.Copilot` puts `copilot.exe` on PATH, the npm package puts a `copilot.cmd` shim there, and a shim's prompts travel by file |
+| Setup | Set `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_OPENAI_API_KEY` / `DABBLER_GEMINI_API_KEY` | Install the Copilot CLI with WinGet — `winget install GitHub.Copilot`, which puts `copilot.exe` on PATH — and sign in; set the vehicle with `dabbler configure --transport copilot-cli`. Avoid the npm package: its `copilot.cmd` shim runs through `cmd.exe`, which cuts a prompt at its first newline (`npm uninstall -g @github/copilot` removes it) |
 | Spend | Metered API calls, every one recorded per model and per session | Covered by your existing Copilot subscription |
 | Best for | Anyone with provider accounts | Shops whose staff hold only a Copilot seat and cannot get provider keys |
 
@@ -77,6 +77,15 @@ Different Models...** asks for the engine, its model, the reviewing vehicle and
 both reviewers for one session — each list decided by the picks before it,
 since the reviewers are what the reviewing vehicle lists and a reviewer is
 never from the author's vendor — and writes none of them down.
+
+**The Configuration is where you start, before any project.** Open a folder
+and the Solution Explorer shows the Configuration section alone until the
+project is set up, so the vehicle and the model can be chosen first. A fresh
+machine reads its Copilot seat and its vendors' model lists itself the first
+time the section is shown — `dabbler discovery refresh`, free, with no prompt
+sent — so the Model row has something to offer. A machine with no engine
+CLI on PATH is told so when the window opens, and the Vehicle row says when
+the Copilot CLI on PATH is the npm shim rather than WinGet's `copilot.exe`.
 
 Start Session registers the session and opens your AI's own CLI beside the
 Dabbler terminal. Your AI asks the framework for an instruction once, does what it
@@ -147,7 +156,10 @@ verdict.
   Anthropic, OpenAI, and Google; Dabbler only prefixes the names), or an
   authenticated GitHub Copilot CLI seat exposing two provider families
 - **One orchestrator AI agent** in VS Code (Claude Code or GitHub Copilot
-  — the framework is agent-agnostic)
+  — the framework is agent-agnostic), with its CLI on PATH: Claude Code's
+  `claude`, or the Copilot CLI installed with `winget install
+  GitHub.Copilot` — not the npm package, whose `copilot.cmd` shim cuts a
+  prompt at its first newline. The extension installs neither
 
 ## Get started
 

@@ -686,4 +686,23 @@ describe("which engine this machine leaves to choose", () => {
 
     assert.equal(installedEngines({ PATH: tempDir("engines-empty-") }).chosen, null);
   });
+
+  it(
+    "reports the file that answered, and flags a copilot.cmd as the npm shim",
+    { skip: process.platform !== "win32" && "a .cmd shim exists only where PATHEXT does" },
+    () => {
+      const env = { PATHEXT: ".COM;.EXE;.BAT;.CMD" };
+      const npm = tempDir("engines-shim-");
+      seed(npm, { "copilot.cmd": "@echo off\n" });
+      const shimmed = installedEngines({ ...env, PATH: npm }).engines.find((e) => e.engine === "copilot");
+      assert.match(String(shimmed?.path), /copilot\.cmd$/i);
+      assert.equal(shimmed?.shim, true);
+
+      const winget = tempDir("engines-exe-");
+      seed(winget, { "copilot.exe": "" });
+      const native = installedEngines({ ...env, PATH: winget }).engines.find((e) => e.engine === "copilot");
+      assert.match(String(native?.path), /copilot\.exe$/i);
+      assert.equal(native?.shim, false);
+    },
+  );
 });

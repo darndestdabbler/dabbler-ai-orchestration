@@ -112,7 +112,8 @@ export interface ConfigurationTransport {
 export interface ConfigurationEngines {
   chosen: string | null;
   reason: string;
-  installed: { engine: string; program: string; path: string | null }[];
+  /** `shim`: the copilot that answered is the npm package's `copilot.cmd`, not WinGet's `copilot.exe`. */
+  installed: { engine: string; program: string; path: string | null; shim?: boolean }[];
 }
 
 /** One model, as this machine's catalog lists it. */
@@ -341,6 +342,8 @@ export interface ProjectionConfiguration {
   /** The Auxiliary Reviewer: the third voice at a disputed impasse. */
   auxiliaryReviewer?: ConfigurationRole;
   records?: ConfigurationRecord[];
+  /** The transports this machine can reach and has never read: `copilot-cli`, `api`. */
+  unread?: string[];
   /** One per enabled provider: which key it is reached with. */
   credentials?: ConfigurationCredential[];
   /** Why there is nothing to show: a config this router could not load. */
@@ -427,11 +430,14 @@ function find(p: Projection, name: string): ProjectionProject | undefined {
   return projects(p).find((project) => project.name === name);
 }
 
-export function rootNodes(): SolutionNode[] {
+export function rootNodes(hasSolution = true): SolutionNode[] {
   // Two roots, and the second is collapsed like everything else here: what a
   // session is run with is a thing an operator looks at when they are
   // deciding, not a thing that should be in the way while they are working.
-  return [{ kind: "solution" }, { kind: "configuration" }];
+  // Before any project exists the Configuration is the whole pane: the
+  // vehicle and the model depend on nothing a project writes, and they are
+  // what a first session stops on when they are not set.
+  return hasSolution ? [{ kind: "solution" }, { kind: "configuration" }] : [{ kind: "configuration" }];
 }
 
 function configuration(p: Projection): ProjectionConfiguration {
@@ -1152,17 +1158,23 @@ export function descriptorFor(
       // machine has none. The developer's machine -- claude and copilot both
       // installed -- read "none installed" until session 162.
       const installed = (engines?.installed ?? []).filter((entry) => entry.path !== null).length;
+      // The npm package's `copilot.cmd`, first on PATH where WinGet's
+      // `copilot.exe` should be: `cmd.exe` cuts a prompt at its first
+      // newline, and until this row said so the first anyone learned of it
+      // was a seat that answered nothing.
+      const shim = authoring && (engines?.installed ?? []).some((entry) => entry.engine === "copilot" && entry.shim === true);
       const whose = whoseChoice(vehicle?.decidedLayer);
+      const said = chosen
+        ? `${chosen}${whose === "" ? "" : ` · ${whose}`}${shadowed.length > 0 ? " ⚠" : ""}`
+        : authoring
+          ? installed > 0
+            ? `${installed} installed, none chosen`
+            : "no engine CLI on PATH"
+          : "not read";
       return {
         id: `config:vehicle:${node.who}`,
         label: "Vehicle",
-        description: chosen
-          ? `${chosen}${whose === "" ? "" : ` · ${whose}`}${shadowed.length > 0 ? " ⚠" : ""}`
-          : authoring
-            ? installed > 0
-              ? `${installed} installed, none chosen`
-              : "none installed"
-            : "not read",
+        description: shim ? `${said} · copilot is the npm shim ⚠` : said,
         tooltip: [
           vehicleText(vehicle),
           authoring
@@ -1171,6 +1183,12 @@ export function descriptorFor(
           chosen ? whoseSentence(vehicle?.decidedLayer) : "",
           ...shadowed.map((layer) => `${layer.source} says '${layer.value}' and is overridden${overrider}.`),
           authoring && (context.chosenEngine ?? null) === null ? (engines?.reason ?? "") : "",
+          authoring && installed === 0
+            ? "Install Claude Code or the GitHub Copilot CLI (`winget install GitHub.Copilot`); the extension installs nothing."
+            : "",
+          shim
+            ? "The copilot on PATH is the npm package's `copilot.cmd` shim, and cmd.exe cuts a prompt at its first newline. Replace it with WinGet's: `npm uninstall -g @github/copilot`, then `winget install GitHub.Copilot`."
+            : "",
         ]
           .filter((line) => line !== "")
           .join("\n\n"),
@@ -1180,7 +1198,7 @@ export function descriptorFor(
           // different kinds of setting, which is exactly the reading this
           // section was reorganised to stop.
           id: "plug",
-          ...(shadowed.length > 0
+          ...(shadowed.length > 0 || shim
             ? { tone: "attention" as const }
             : chosen
               ? {}

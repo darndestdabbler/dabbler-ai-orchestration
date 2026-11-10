@@ -45,7 +45,7 @@ import {
   type FreshnessRow,
   type RetiredModel,
 } from "./discovery.ts";
-import { engineAliases, installedEngines } from "./engines.ts";
+import { engineAliases, installedEngines, type EngineReading } from "./engines.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { platformNewlines } from "./journal.ts";
 import { dumps } from "./pythonJson.ts";
@@ -958,6 +958,23 @@ export interface ConfigurationReadingOptions {
   readonly reviewers?: Readonly<Record<string, string | null | undefined>>;
 }
 
+/**
+ * The transports this machine can reach and has never read.
+ *
+ * A `copilot` on PATH with no seat block, a provider key that resolves with
+ * no api block. Either is a list every model choice fails against until
+ * `dabbler discovery refresh` reads it -- which is free and sends no prompt,
+ * so a surface may take the reading itself rather than wait to be asked.
+ */
+function unreadTransports(config: RouterConfig, engines: EngineReading): string[] {
+  const unread: string[] = [];
+  const copilot = engines.engines.some((entry) => entry.engine === "copilot" && entry.path !== null);
+  if (copilot && seatBlock() === null) unread.push(TRANSPORT_COPILOT_CLI);
+  const keyed = transportPresence(config).some((entry) => entry.transport === TRANSPORT_API && entry.present);
+  if (keyed && apiBlock(config) === null) unread.push(TRANSPORT_API);
+  return unread;
+}
+
 export function configurationNode(
   root: string,
   options: ConfigurationReadingOptions = {},
@@ -1082,6 +1099,7 @@ export function configurationNode(
       // so hanging it off a role would draw the same fact twice.
       credentials: credentialNodes(config),
       records: checkFreshness(config, Date.now()).map(recordNode),
+      unread: unreadTransports(config, engines),
     };
   } catch (error) {
     return {

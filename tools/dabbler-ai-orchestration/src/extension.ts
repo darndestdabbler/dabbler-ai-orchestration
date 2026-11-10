@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as os from "os";
 import * as path from "path";
 import { registerOpenFileCommands } from "./commands/openFile";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
@@ -57,9 +58,11 @@ import {
   setEngine,
   setRoleModel,
   setReviewerTransport,
+  unreadCatalogReader,
+  warnWhenNoEngine,
 } from "./commands/configurationCommands";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
-import { productionRouter } from "./router/host";
+import { productionRouter, solutionConfiguration } from "./router/host";
 
 export function activate(context: vscode.ExtensionContext): void {
   // Activation must NOT bail when no folder is open: the bootstrap and
@@ -70,8 +73,13 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // createTreeView rather than registerTreeDataProvider because the
   // former returns the TreeView handle that .message and reveal() live on.
-  const solutionProvider = new SolutionTreeProvider(
+  // A transport this machine can reach and has never read is read the first
+  // time the Configuration is painted: free, no prompt, and every model
+  // choice on it fails until it is.
+  const readUnreadCatalog = unreadCatalogReader();
+  const solutionProvider: SolutionTreeProvider = new SolutionTreeProvider(
     vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    (projection) => void readUnreadCatalog(projection, () => solutionProvider.refresh()),
   );
   context.subscriptions.push(
     solutionProvider,
@@ -135,6 +143,13 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   // The view can already be visible at activation (restored layout).
   void maybeOfferSetup();
+
+  // A machine with no engine CLI is told now, once per window, rather than
+  // by the first session that fails for it. With no folder open the reading
+  // is taken from the home directory: what is on PATH is the machine's.
+  void warnWhenNoEngine(
+    solutionConfiguration(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.homedir()),
+  );
 
   // --- File watchers ---
   let watcherSubs: vscode.Disposable[] = [];

@@ -816,12 +816,12 @@ suite("solutionTreeModel: what a session is run with", () => {
     assert.strictEqual(row.tooltip, "local-overrides.yaml: bad key");
   });
 
-  test("the authoring Vehicle says none is chosen when engines are installed, and 'none installed' only when none is", () => {
+  test("the authoring Vehicle says none is chosen when engines are installed, that no engine CLI is on PATH only when none is, and names the npm shim", () => {
     // Session 160's walk, on the one machine that matters most: claude and
     // copilot both on PATH, the router declining to default between them,
     // and the row reading "none installed". Two facts, two readings.
     const base = configured().configuration?.authoring as ConfigurationRole;
-    const unchosen = (installed: { engine: string; program: string; path: string | null }[]) =>
+    const unchosen = (installed: { engine: string; program: string; path: string | null; shim?: boolean }[]) =>
       deepFreeze(
         configured({
           authoring: { ...base, vehicle: { ...(base.vehicle as ConfigurationVehicle), chosen: null } },
@@ -834,12 +834,21 @@ suite("solutionTreeModel: what a session is run with", () => {
       { engine: "copilot", program: "copilot", path: "C:/bin/copilot.cmd" },
     ]));
     assert.ok(two.description?.includes("none chosen"), two.description);
-    assert.ok(!two.description?.includes("none installed"), two.description);
+    assert.ok(!two.description?.includes("no engine CLI"), two.description);
+    assert.ok(!two.description?.includes("shim"), two.description);
     const none = descriptorFor(node, unchosen([
       { engine: "claude-code", program: "claude", path: null },
       { engine: "copilot", program: "copilot", path: null },
     ]));
-    assert.strictEqual(none.description, "none installed");
+    assert.strictEqual(none.description, "no engine CLI on PATH");
+    // The npm shim: said on the row, and the remedy in the tooltip.
+    const shimmed = descriptorFor(node, unchosen([
+      { engine: "claude-code", program: "claude", path: null },
+      { engine: "copilot", program: "copilot", path: "C:/npm/copilot.cmd", shim: true },
+    ]));
+    assert.ok(shimmed.description?.includes("npm shim"), shimmed.description);
+    assert.ok(shimmed.tooltip?.includes("winget install GitHub.Copilot"), shimmed.tooltip);
+    assert.ok(shimmed.tooltip?.includes("npm uninstall -g @github/copilot"), shimmed.tooltip);
   });
 
   test("the reviewing Vehicle row sets the reviewing vehicle, and names the layer that overrides", () => {

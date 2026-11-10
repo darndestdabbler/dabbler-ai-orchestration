@@ -10,6 +10,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.30.0] — 2026-11-10
+
+**The Configuration comes first, and a machine reads itself.** On a fresh
+Copilot seat, a first session stopped with "Copilot needs a model", and every
+way on that stop named offered nothing: the seat had never been read, so
+there was no list to choose from, and the free command that fills it was
+named only inside a warning.
+
+- The Solution Explorer shows its **Configuration** section as soon as a
+  folder is open, before any project exists, so the vehicle and the model
+  can be set first. Its welcome no longer offers Set Up New Project; the
+  Work Explorer is the one place that does.
+- The first time the Configuration is shown in a window, a transport this
+  machine can reach and has never read — a `copilot` on PATH with no seat
+  reading, or a provider key with no vendor reading — is read for you with
+  `dabbler discovery refresh`, in the terminal Update the Catalog uses. It
+  is free and sends no prompt.
+- The authoring Vehicle row says "no engine CLI on PATH" where there is none,
+  and says so when the Copilot CLI on PATH is the npm `copilot.cmd` shim,
+  naming the fix: `npm uninstall -g @github/copilot`, then `winget install
+  GitHub.Copilot`. A window opened on a machine with no engine CLI says so
+  once, with a **How to install** link.
+- Start Session on a seat that has never been read now says that, and offers
+  **Update the Catalog**; on a read seat with no model chosen it offers
+  **Choose the Model** as before. Both name the Solution Explorer's
+  Configuration section.
+
 ## [3.29.1] — 2026-11-09
 
 **A suite the close does not demand can no longer stop a session.** A

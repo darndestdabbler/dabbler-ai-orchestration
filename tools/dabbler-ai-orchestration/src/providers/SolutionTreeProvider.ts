@@ -27,6 +27,7 @@ import {
   userConfigurationDirs,
 } from "../router/host";
 import { chosenEngineIn, mechanicChoicesIn } from "../commands/configurationCommands";
+import { hasSessionsRoot } from "../utils/fileSystem";
 
 const PROJECTION_RELPATH = path.join(".dabbler", "solution", "solution.json");
 
@@ -83,7 +84,11 @@ export class SolutionTreeProvider
 
   private settling: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(private readonly workspaceRoot: string | undefined) {
+  constructor(
+    private readonly workspaceRoot: string | undefined,
+    /** Called whenever the Configuration root is painted, with what it was painted from. */
+    private readonly onConfigurationPainted?: (projection: Projection) => void,
+  ) {
     if (!workspaceRoot) return;
     // The document itself: something rewrote it, so read it again.
     this.watch(PROJECTION_GLOB, () => this.refresh());
@@ -209,12 +214,27 @@ export class SolutionTreeProvider
       try {
         this.cached = JSON.parse(fs.readFileSync(file, "utf8")) as Projection;
       } catch {
-        // No solution here yet, or it is mid-write. Either way the tree is
-        // simply empty rather than an error the reader cannot act on.
-        return undefined;
+        // No solution here yet, or it is mid-write. The configuration never
+        // came from this file, so it is shown alone: setting the vehicle and
+        // the model is the first thing a new project needs, and none of it
+        // waits on one.
+        return { projects: [], configuration: this.currentConfiguration() } as unknown as Projection;
       }
     }
     return { ...this.cached, configuration: this.currentConfiguration() };
+  }
+
+  /**
+   * Whether there is a solution to show, or the configuration alone.
+   *
+   * Not whether the file exists, nor whether it lists a project: the
+   * derivation at activation writes one in every folder, and an empty folder
+   * projects as one project named after itself. A solution is a folder that
+   * has been set up -- it has a sessions root -- and a clone of one carries
+   * its sessions root with it.
+   */
+  private hasSolution(): boolean {
+    return this.cached !== undefined && !!this.workspaceRoot && hasSessionsRoot(this.workspaceRoot);
   }
 
   /**
@@ -271,12 +291,13 @@ export class SolutionTreeProvider
   public getChildren(element?: SolutionNode): SolutionNode[] {
     const p = this.projection();
     if (!p) return [];
-    return element ? childrenOf(element, p) : rootNodes();
+    return element ? childrenOf(element, p) : rootNodes(this.hasSolution());
   }
 
   public getTreeItem(element: SolutionNode): vscode.TreeItem {
     const p = this.projection();
     if (!p) return new vscode.TreeItem("");
+    if (element.kind === "configuration") this.onConfigurationPainted?.(p);
     const d = descriptorFor(element, p, {
       // Read at paint time rather than cached: it is a setting, and a
       // setting changed in the settings editor must not need a window

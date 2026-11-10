@@ -341,7 +341,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 301 | A suite the close does not demand cannot stop the run of record | no | 2026-11-09 |
 | 302 | Release 3.29.1 (release: 3.29.1) | yes | 2026-11-10 |
 | 303 | Configuration comes first, and a machine reads itself | no | 2026-11-10 |
-| 304 | Release 3.30.0 (release: 3.30.0) | — | not declared |
+| 304 | Release 3.30.0 (release: 3.30.0) | yes | 2026-11-10 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3562,3 +3562,9 @@ Release 3.29.1: the framework packs and publishes what is on the trunk.
 **Releasable: no.**
 
 Session 303 turns onboarding around so Configuration comes first and a machine reads itself. The router's reading of the machine grows two facts: `installedEngines` marks, for each engine, whether the file that answered on PATH is the npm `copilot.cmd` shim, and the projection's configuration carries which reachable transports have no believable catalog block (a `copilot` on PATH with no seat block, a key in the environment with no api block), with the `engines` block carrying the shim flag through. In the extension, a folder with no projection file shows the Configuration root alone (`rootNodes` takes whether a solution exists), and the Solution Explorer's welcome drops its Set Up New Project link so that the Work Explorer is the one place that offers it. On the first paint of the Configuration section in a window, an unread reachable transport makes the pane run `dabbler discovery refresh` unasked through `runVerb`, in the visible terminal Update the Catalog already uses, once per window and never while the record is current, repainting when it exits. The authoring Vehicle row says "no engine CLI on PATH" where there is none and names the shim with its remedy (`npm uninstall -g @github/copilot`, then `winget install GitHub.Copilot`), and activation with no engine CLI on PATH shows one warning whose "How to install" action opens the README's setup instructions. `configuredStart` splits a seat with no model into two stops: an unread seat points at Update the Catalog (`dabblerSolution.refreshRecord`), and a read seat with nothing chosen keeps Choose the Model, both naming the Solution Explorer's Configuration section. README section 5 and its setup table, and `docs/quick-start.md`, say all of this, `version.json` goes to 3.30.0 stamped with `npm run stamp:version`, and the changelog gets a 3.30.0 section.
+
+### Session 304 — Release 3.30.0 (release: 3.30.0)
+
+**Releasable: yes.**
+
+Release 3.30.0: the framework packs and publishes what is on the trunk.

@@ -6023,9 +6023,9 @@
     {
       "number": 303,
       "title": "Configuration comes first, and a machine reads itself",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-10T12:12:26.194000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-10T12:31:09.476000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

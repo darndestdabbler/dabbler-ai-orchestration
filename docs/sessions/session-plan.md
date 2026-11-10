@@ -17877,7 +17877,7 @@ check:version` checks the stamp.
 
 The framework publishes session 303 as 3.30.0 and nothing else.
 
-### Session 305 of 309: An existing repository is recognised, and the framework stands still in it
+### Session 305 of 311: An existing repository is recognised, and the framework stands still in it
 
 Scope: `packages/router/src/bootstrap/detect.ts` (the detectors, the
 project style, the test globs), `packages/router/src/bootstrap/index.ts`
@@ -17999,7 +17999,7 @@ and no module cut, and the managed body carries the rule.
 
 **Releasable.** No -- with 306, 307 and 308, as 3.31.0 in session 309.
 
-### Session 306 of 309: The build contract holds
+### Session 306 of 311: The build contract holds
 
 Scope: `packages/router/src/facts.ts` (the `contract` control),
 `packages/router/src/solutionDeps.ts` (the XML reads it reuses),
@@ -18092,7 +18092,7 @@ and leaves the others held.
 
 **Releasable.** No -- as 3.31.0 in session 309.
 
-### Session 307 of 309: .NET Framework builds the way Visual Studio builds it
+### Session 307 of 311: .NET Framework builds the way Visual Studio builds it
 
 Scope: `packages/router/src/bootstrap/detect.ts` (the `dotnet-framework`
 suite), `packages/router/src/checks.ts` and
@@ -18176,7 +18176,97 @@ scripted reference-assemblies directory.
 
 **Releasable.** No -- as 3.31.0 in session 309.
 
-### Session 308 of 309: The walk through six borrowed repositories
+### Session 308 of 311: A person may amend an accepted step's checks, and the engine is told so
+
+Scope: `packages/router/src/driver.ts` (`amendPlanStep`, the
+`rejected-thrice` ways on), `packages/router/src/session.ts` (`planAmend`),
+`packages/router/src/drive.ts` (`CHECK_FAILED_WAYS`, the fix step's ask),
+`packages/router/src/cli/session.ts` (the help), the tests named after
+each, `docs/driving-a-session.md`, `version.json` and the manifests
+`npm run stamp:version` writes, `tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** From the field, 2026-11-10: a session in another repository is
+stopped and has no way on but a cancel or a rollback. A check an earlier
+step declared no longer describes the tree -- the later work outgrew it,
+and the operator agreed it should change -- and `dabbler session plan
+amend --step <id> --checks-file ...` refused: *"step '<id>' has already
+been accepted; its report was measured against the step as it stood, and
+amending it now would move that bar afterwards"*.
+
+The framework contradicts itself here. A fix step and a run-of-record fix
+are measured against `allPlanChecks()` -- every plan step's checks, each
+one an accepted step's by the time a fix step exists -- and three of its
+own sentences send the engine to the verb that refuses: the fix step's ask
+(*"A check an earlier step declared that your fix outgrows is amended
+first, not fought"*), `CHECK_FAILED_WAYS`, and the `rejected-thrice` ways
+on. So the check keeps failing, the amendment keeps being refused, the
+third refusal stops the session, and the stop names the same verb again.
+The refusal's reason is half right: the accepted report WAS measured
+against the old checks and nothing may rewrite that. But an accepted
+step's checks are not only history -- they are run again against every
+fix -- and a bar that is still being applied has to be movable by someone.
+
+**What.** An accepted step's checks become amendable by a person, with the
+reason on the record and the row saying the step had been accepted. An
+engine is still refused, and is told what to do instead.
+
+**Step 1 -- the verb.** `amendPlanStep` takes whether a person is asking
+(`planAmend` passes `personIsPresent()`, which already separates an
+engine's shell from a person's terminal or click). For an accepted step:
+`--checks-file` from a person is applied exactly as an unaccepted step's
+is -- through `judgeCheckPrograms` and `writeWorkPlan` -- and the
+`amendments.jsonl` row carries `after_acceptance: true` beside the reason,
+`before` and `after`, so the record shows the accepted report was measured
+against `before`. The activity-log line says "accepted step". `--files`
+for an accepted step stays refused for everyone, with its own sentence:
+the files were measured once and nothing measures them again. An engine
+asking for an accepted step's checks is refused in the words of
+`isAPersonsVerb`: report the step blocked, with the proposed checks and
+the reason in the notes, and the person runs the amendment -- the refusal
+prints that command whole, sessions directory and step filled in. The
+verb's success line says the checks every later fix is measured against
+are the new ones; the help in `cli/session.ts` stops saying
+"not-yet-accepted" without the exception.
+
+**Step 2 -- the sentences that named a verb that refused.** The fix
+step's ask, `CHECK_FAILED_WAYS` and the `rejected-thrice` cost each say
+the true thing: a check of the step in hand is amended by the engine; a
+check an earlier, accepted step declared is the operator's to amend, and
+the engine reports blocked with the proposed checks. A failed check
+already carries its `owner`, so the rejection can say which of the two it
+is. The fix step in flight is measured against the amended checks on its
+next answer, not the ones it was issued with -- `allPlanChecks()` read
+again from the plan on disk, as `amendedSpec` already does for a plan
+step.
+
+**Step 3 -- the words and the number.** `docs/driving-a-session.md` says,
+where it describes amending a step, who may amend an accepted step's
+checks and what the record keeps. `version.json` goes to 3.31.0, stamped
+with `npm run stamp:version` -- a minor, because the trunk this publishes
+already carries 305 to 307's maintenance posture -- and the changelog gets
+a 3.31.0 section saying what changed for a developer across 305 to 308.
+
+**Non-goals.** Amending an accepted step's `files`, `id` or `ask`. Any
+change to an accepted report, a round or a verdict already written: the
+amendment moves what later fixes are measured against and nothing behind
+it. An engine or an unattended Mechanic amending an accepted step's
+checks. A Work Explorer command for the amendment. Showing amendments to
+the reviewer. Any new gate.
+
+**Tests.** In `driver.test.ts`: a person's amendment of an accepted step's
+checks is written and its row carries `after_acceptance` and the reason;
+the same call from an engine is refused naming the person's command; an
+accepted step's `--files` is refused for both. In `drive.test.ts`: a fix
+step whose earlier step's check was amended is accepted against the
+amended check. `npm run check:version` checks the stamp.
+
+**Releasable.** Yes -- with 305 to 307, as 3.31.0 in session 309.
+
+### Session 309 of 311: Release 3.31.0 (release: 3.31.0)
+
+The framework publishes sessions 305 to 308 as 3.31.0 and nothing else.
+
+### Session 310 of 311: The walk through six borrowed repositories
 
 Scope: `docs/uat/uat-maintenance-walk.md` (the record), the fixes the walk
 finds with a test beside each under the files they touch, `version.json`
@@ -18210,8 +18300,8 @@ own history, quirks and a layout nobody here chose. Six were read on
   Boot, Maven wrapper, tests named `*Tests.java`.
 
 **What.** Each repository is forked under the operator's account, cloned
-under `C:\temp\s308-<name>`, bootstrapped, and driven through the same two
-sessions by the 3.31.0 candidate installed from a VSIX into a scratch
+under `C:\temp\s310-<name>`, bootstrapped, and driven through the same two
+sessions by 3.31.0 as session 309 released it, installed into a scratch
 profile: session 1 adds an online calculator page that adds and subtracts
 two numbers, with its tests; session 2 adds documentation comments to the
 pages it touched and changes nothing else. The first proves a change that
@@ -18266,9 +18356,11 @@ finds is fixed with a test beside it, in this session's own diff where the
 framework is source here. `docs/uat/uat-maintenance-walk.md` records the
 six repositories, every session's timing from the driver's own lines, what
 was installed, what stopped and why, and what each IDE showed.
-`version.json` goes to 3.31.0 (a minor: a posture the framework did not
-have), stamped with `npm run stamp:version`, and the changelog says what
-changed for a developer maintaining an existing repository.
+`version.json` goes to 3.31.1 (a patch: what the walk fixed in the posture
+3.31.0 shipped), stamped with `npm run stamp:version`, and the changelog
+says what changed for a developer maintaining an existing repository. A
+walk that finds nothing to fix says so in the record and stamps nothing,
+and session 311 is removed from the plan rather than run.
 
 **Non-goals.** Upgrading any borrowed repository's target, format or
 dependencies. Fixing a borrowed repository's own pre-existing failures:
@@ -18282,8 +18374,8 @@ what the build files draw.
 fixes. The walk's own proof is the record and the six repositories'
 suites, green under their own runners.
 
-**Releasable.** Yes -- as 3.31.0 in session 309.
+**Releasable.** Yes -- as 3.31.1 in session 311.
 
-### Session 309 of 309: Release 3.31.0 (release: 3.31.0)
+### Session 311 of 311: Release 3.31.1 (release: 3.31.1)
 
-The framework publishes sessions 305 to 308 as 3.31.0 and nothing else.
+The framework publishes session 310 as 3.31.1 and nothing else.

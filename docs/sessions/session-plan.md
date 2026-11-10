@@ -17876,3 +17876,414 @@ check:version` checks the stamp.
 ### Session 304 of 304: Release 3.30.0 (release: 3.30.0)
 
 The framework publishes session 303 as 3.30.0 and nothing else.
+
+### Session 305 of 309: An existing repository is recognised, and the framework stands still in it
+
+Scope: `packages/router/src/bootstrap/detect.ts` (the detectors, the
+project style, the test globs), `packages/router/src/bootstrap/index.ts`
+(what bootstrap writes and says), `packages/router/src/bootstrap/templates.ts`
+(`PLAN_PROMPT`, `DECOMPOSITION_PROMPT`, `SHARED_BODY`),
+`packages/router/src/config.ts` and `packages/router/schemas/dabbler.schema.json`
+(the `posture` member), `packages/router/src/drive.ts` (`writeRootFiles`),
+`packages/router/src/ecosystem.ts` (`ensureRootFiles`),
+`packages/router/src/projectGraph.ts` (a solution file below the root),
+`packages/router/src/affected.ts` (the plural test name), the tests named
+after each, `docs/driving-a-session.md`, `README.md` and
+`tools/dabbler-ai-orchestration/README.md`
+
+**Why.** Staff are starting to use the framework to MAINTAIN repositories
+that already hold code: ASP.NET MVC on .NET Framework 4.5 and later, ASP.NET
+Core MVC, plain Maven web applications, Spring Framework WARs and Spring
+Boot services, each opened in Visual Studio, IntelliJ or Eclipse as often
+as in VS Code, by people who may never use this framework at all. The
+framework was built greenfield-first, and read against those repositories
+on 2026-11-10 it would do harm before it did work. Detection reads the
+repository root and nothing below it, so the common `src/Thing.sln` layout
+declares no suite, and a `.csproj` with no `Sdk` attribute -- the whole of
+.NET Framework -- is declared `dotnet test`, which cannot build it. The
+root-file scaffold runs before every step's checks and writes a `.slnx`
+beside that `src/Thing.sln`, with a `Directory.Build.props` that enables
+Nullable and ImplicitUsings; MSBuild imports that file into non-SDK projects
+too, and a C# 7.3 project stops compiling. The Maven test glob is
+`*Test.java`, so a Spring Boot repository's `FooServiceTests.java` is never
+the test named after `FooService.java`. And the planning prompt asks how
+production is split across tiers and what the module cuts are, then asks
+for "alignment" sessions first -- an invitation to restructure a WAR whose
+layout the `maven-war-plugin` depends on. Two advisors from two vendors
+read the same facts and reached the same shape, recorded in this session's
+consult: recognise the repository, confirm the posture with the person,
+and stand still in it.
+
+**What.** A repository that holds code is read as one, and under the
+posture that follows the framework writes nothing it was not asked for.
+
+**Step 1 -- detection reads what is there.** `detect.ts` reads two levels
+below the root, skipping `bin`, `obj`, `target`, `node_modules` and `.git`,
+so a solution file or a POM under `src/` is found, and the suite it
+declares names that file (`dotnet test src/Thing.sln`, `mvn -q -f
+src/pom.xml test`), because a suite declares a command and no working
+directory. A `.csproj` whose root element carries no `Sdk` attribute is a
+different ecosystem, `dotnet-framework`: this session declares it with no
+suite command and a note naming session 307, which gives it one, rather
+than a `dotnet test` line that fails the first time it runs. `.gradle.kts`
+counts as Gradle. The test globs accept the singular and the plural for
+both languages (`*Test.cs`/`*Tests.cs`, `*Test.java`/`*Tests.java`), and
+the name of the test after a source file tries both.
+
+**Step 2 -- the posture, in `dabbler.yaml`.** `posture: maintenance` is a
+member of `dabbler.yaml`, loaded by `config.ts` and described by the
+schema; `greenfield` is the word for what every repository is today, and
+the member's absence reads as `greenfield`, so no existing repository
+changes behaviour. Bootstrap writes `maintenance` when the repository
+holds tracked source or build files before bootstrap ran, says in its
+output what it found and which word it wrote, and writes the reason as a
+comment beside the member. The confirmation is the commit: a person reads
+one line in a file they are about to commit, and changing it is changing
+one word. No prompt, no second file, no record of the answer anywhere but
+the one place the answer lives.
+
+**Step 3 -- nothing is scaffolded.** Under `maintenance`, `writeRootFiles`
+in `drive.ts` does not call `ensureRootFiles`: no `.slnx`, no
+`Directory.Build.props`, no `Directory.Build.targets`, no parent POM, and
+no ignore rules appended. The build-output ignore in `ignoreBuildOutput`
+stays, because a step's check writing `bin/` into the tree is a defect in
+every posture. `projectGraph.ts` reads a solution file below the root the
+way it reads one at the root, so the Solution Explorer draws the
+repository as Visual Studio does.
+
+**Step 4 -- planning fits the repository.** Under `maintenance`,
+`PLAN_PROMPT` asks for no production split and no module cuts. It asks for
+a short plan with one section per change, says that the projects, their
+targets, their formats and their folders are the plan's givens, and
+replaces the "alignment" paragraph with one that says: fit this
+framework's documents and suites to the projects that exist, and change
+nothing else. `DECOMPOSITION_PROMPT` under `maintenance` decomposes into
+sessions of three to six steps each and proposes no restructuring. The
+managed body in `SHARED_BODY` gains one short paragraph, present in every
+posture, that states the maintenance rule for the engine: keep the target
+framework or JDK, the project format, the build tool and the test
+framework exactly as found; a new file in a non-SDK project is listed in
+its `.csproj` as a `Compile` or `Content` item; and a target change is a
+plan the person approves, never a step's own decision.
+
+**Step 5 -- the words.** `docs/driving-a-session.md` gains a section on an
+existing repository: what detection reads, what the posture means, what
+is never written under it, and what 306 and 307 add. The same section
+carries the one line this consult found about the engine terminal: a
+script typed into the engine's prompt at Start is another extension
+activating an environment in every new terminal (the Python Environments
+extension does this for a `.venv`), and the remedy is on that machine, not
+in this framework. `README.md` and the extension's README say in their
+setup tables that an existing repository is recognised.
+
+**Non-goals.** A suite command for `dotnet-framework` (session 307). The
+check that the target stays what it was (session 306). Any help with
+restructuring an existing solution, or any session that proposes one. A
+Solution Explorer that understands every framework: it draws what the
+build files say and no more. Any change to what a greenfield repository
+gets. A prompt that asks the posture. A third place a posture could be
+kept.
+
+**Tests.** In `detect.test.ts`: a `.sln` under `src/` declares a suite
+naming it; a non-SDK `.csproj` declares `dotnet-framework` with no
+command; a `build.gradle.kts` declares Gradle; `FooServiceTests.java` and
+`FooServiceTest.java` are each the test named after `FooService.java`. In
+`config.test.ts`: the member loads, its absence reads as `greenfield`, and
+a third word is refused by name. In `bootstrap.test.ts`: a root with
+tracked source gets `maintenance` and the reason beside it; an empty root
+gets `greenfield`. In `drive.test.ts`: under `maintenance` a tree with two
+projects and no root solution file gains no file before a step's checks.
+In `projectGraph.test.ts`: a solution file under `src/` is the graph's
+root. In `templates.test.ts`: the maintenance plan prompt names no tier
+and no module cut, and the managed body carries the rule.
+
+**Releasable.** No -- with 306, 307 and 308, as 3.31.0 in session 309.
+
+### Session 306 of 309: The build contract holds
+
+Scope: `packages/router/src/facts.ts` (the `contract` control),
+`packages/router/src/solutionDeps.ts` (the XML reads it reuses),
+`packages/router/src/checks.ts` (the control at a step's checks),
+`packages/router/src/verify/` (what the verifier is told),
+`packages/router/src/approvedPlan.ts` and
+`packages/router/schemas/approved-plan.schema.json` (the plan's
+`contract_change`), the tests named after each, `docs/driving-a-session.md`
+
+**Why.** The rule in the managed body says keep the target; a rule in prose
+is advice, and an engine under pressure to make a test pass upgrades a
+`TargetFrameworkVersion`, adds `<Nullable>enable</Nullable>`, bumps a
+package in `packages.config` or writes `<maven.compiler.release>` into a
+POM that built on JDK 8. Each of those compiles here and breaks in
+Visual Studio, IntelliJ or Eclipse on the next developer's machine, which
+is the one failure the maintenance posture exists to prevent. The
+advisors split on how to hold it: one would compare evaluated MSBuild
+properties and the effective POM, the other would diff the declared
+elements against HEAD. The diff is taken: it needs no toolchain, no stored
+baseline and no new state, and every edit an engine can make to those
+files is visible in it.
+
+**What.** A deterministic control, `contract`, that compares the elements
+which decide what a project builds as between the working tree and HEAD,
+and refuses a step whose diff moves one.
+
+**Step 1 -- the contract, read.** `facts.ts` gains a reader that, for every
+build file in the project graph, extracts the elements that fix the
+target: for a `.csproj` or `.fsproj`, the root element's `Sdk` and
+`ToolsVersion` attributes and the `TargetFramework`, `TargetFrameworks`,
+`TargetFrameworkVersion`, `TargetFrameworkProfile`, `LangVersion`,
+`Nullable` and `ImplicitUsings` properties, plus `Directory.Build.props`
+and `global.json` where they exist; for `packages.config`, every `package`
+entry's id, version and targetFramework; for `Web.config` and
+`App.config`, the `compilation` and `httpRuntime` targetFramework
+attributes; for a `pom.xml`, `packaging`, `parent`, the `java.version`
+and `maven.compiler.source`, `target` and `release` properties, the
+compiler plugin's `source`, `target` and `release`, and the toolchains
+plugin's `jdk`; for `.mvn/wrapper/maven-wrapper.properties`, the
+`distributionUrl`; for Gradle, `sourceCompatibility`, `targetCompatibility`,
+the toolchain's `languageVersion` and the wrapper's `distributionUrl`. The
+XML reads reuse `solutionDeps.ts`. The same reader runs over `git show
+HEAD:<path>`, and the two readings are compared element by element.
+
+**Step 2 -- what the comparison says.** A changed element is a failure
+naming the file, the element, the value at HEAD and the value in the tree.
+A build file deleted from the tree is a failure. A build file new in the
+tree -- a test project the session adds -- has nothing to compare and
+passes, with its target recorded in the detail. Under `maintenance`, every
+`.cs` or `.vb` file added under a non-SDK project's directory must appear
+as a `Compile` item of that project, and every `.cshtml`, `.aspx` or
+`.ascx` as a `Content` item; a file that does not is a failure naming it,
+because Visual Studio would not see it. The control is `not_applicable`
+under `greenfield`, and `dabbler facts` records it like any other.
+
+**Step 3 -- at the step, not only at the end.** `checks.ts` runs the
+`contract` control among a step's own checks under `maintenance`, so a
+report whose diff moves the target is refused at the report with the
+element named, and the engine fixes it in the same step rather than
+learning at the round. The verifier is told the posture, the contract and
+the control's result, so a reviewer reading a diff that touches a build
+file knows what it was held to.
+
+**Step 4 -- the human way out.** A target change is sometimes the work:
+the shop moves a service from 4.5.1 to 4.8. The plan carries
+`contract_change`, naming the files whose contract may move and the
+reason; the person approves it with the plan; the control then reports
+`not_applicable` for those files and `pass` or `fail` for the rest, and
+the record carries the approval. There is no flag on a report, no override
+in a step and no environment variable: the plan the person approved is the
+whole of the way.
+
+**Non-goals.** Evaluated MSBuild properties or an effective POM. A stored
+baseline of any kind. A control that reads package versions for SDK-style
+`PackageReference` items: those are the engine's to change within the
+target, and the review reads them. Any hold on application code.
+
+**Tests.** In `facts.test.ts`, each on a fixture tree with a HEAD: a
+non-SDK `.csproj` whose `TargetFrameworkVersion` moved is refused naming
+both values; an SDK `.csproj` that gained `Nullable` is refused; a
+`packages.config` entry bumped is refused; a POM that gained
+`maven.compiler.release` is refused; a wrapper whose `distributionUrl`
+moved is refused; a new test `.csproj` passes with its target recorded; a
+new `.cs` under a non-SDK project with no `Compile` item is refused naming
+the file, and with one passes; `greenfield` is `not_applicable`. In
+`checks.test.ts`: under `maintenance` a step's checks include the control
+and its failure refuses the report. In `approvedPlan.test.ts`: a plan
+naming `contract_change` for one file makes that file `not_applicable`
+and leaves the others held.
+
+**Releasable.** No -- as 3.31.0 in session 309.
+
+### Session 307 of 309: .NET Framework builds the way Visual Studio builds it
+
+Scope: `packages/router/src/bootstrap/detect.ts` (the `dotnet-framework`
+suite), `packages/router/src/checks.ts` and
+`packages/router/src/testEvidence.ts` (the `{msbuild}` and `{vstest}`
+substitutions and the stop), `packages/router/src/packaging.ts` (the
+substitution it already does, shared), `packages/router/src/affected.ts`
+(narrowing by `/TestCaseFilter`), the tests named after each,
+`docs/driving-a-session.md`, `README.md`
+
+**Why.** Session 305 recognises a non-SDK project and declares it with no
+command, which is honest and useless: a maintenance session on an ASP.NET
+MVC 5 application has no suite to run and no compile to prove. The way
+such a project builds is the way Visual Studio builds it -- `MSBuild.exe`
+from a Visual Studio or Build Tools installation, the .NET Framework
+targeting pack for its version, NuGet restoring `packages.config`, and
+`vstest.console.exe` over the test assembly -- and none of that is
+`dotnet test`. The pieces are findable: `vswhere.exe` sits at one fixed
+path on every machine with a Visual Studio installer, and answers where
+MSBuild and vstest are. On the machine this was planned on it answered
+Visual Studio Community 2026, MSBuild, vstest and targeting packs up to
+4.8, and no 4.8.1 pack -- which the first borrowed repository targets, so
+the stop this session writes is one the walk will meet.
+
+**What.** The `dotnet-framework` ecosystem gets its compile control and
+its suite, both spelled with two placeholders the framework fills from
+`vswhere` at spawn, and a stop that names what is missing.
+
+**Step 1 -- the suite and the control.** For a repository whose graph holds
+a non-SDK project, detection declares a `compile` control of `{msbuild}
+<solution> /t:Restore;Build /p:RestorePackagesConfig=true
+/p:Configuration=Debug /v:minimal /nologo`, and a suite whose command is
+`{vstest} <test assemblies>` with `/logger:console;verbosity=minimal`,
+the assemblies read from each test project's `AssemblyName` and
+`OutputPath` (with the defaults MSBuild uses where they are absent). The
+test runner is read from the test project's packages: an xunit, NUnit or
+MSTest adapter runs under vstest; a runner vstest cannot drive -- Fixie 1
+is one -- makes the suite the runner's own console from `packages/`, run
+whole, and the suite says so in its comment. Narrowing is `/TestCaseFilter:`
+over `FullyQualifiedName~<class>` joined with `|`, declared as `select`
+with the separator, in `affected.ts`'s existing shape.
+
+**Step 2 -- the placeholders.** `{msbuild}` and `{vstest}` are substituted
+per argv element at spawn, beside the `{output}` and `{secret}`
+substitution `packaging.ts` already does, by asking `vswhere.exe` at
+`%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe` with
+`-latest -products * -requires Microsoft.Component.MSBuild -find
+MSBuild\**\Bin\MSBuild.exe` and `-find
+Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe`.
+The answer is read once per run and recorded in the control's detail, so
+the record says which MSBuild built the evidence.
+
+**Step 3 -- the stop.** A machine with no `vswhere`, no MSBuild or no
+vstest stops before the control runs, naming Visual Studio or the Build
+Tools with the "ASP.NET and web development" workload as what to install,
+and never substitutes `dotnet test`. A machine whose targeting packs under
+`Reference Assemblies\Microsoft\Framework\.NETFramework` do not include the
+project's `TargetFrameworkVersion` stops naming that version's Developer
+Pack. Both are `session start` stops under `maintenance`, read from the
+machine and never from a declaration, in the shape of the engine and
+vehicle stops that already exist. A non-Windows machine stops with one
+sentence: this project builds on Windows.
+
+**Step 4 -- the words.** `docs/driving-a-session.md` says what a
+.NET Framework repository needs on the machine and how the framework finds
+it; the README's setup table gains the row.
+
+**Non-goals.** Building .NET Framework anywhere but Windows, or in the
+container runner. Converting a project, a solution or `packages.config`
+to anything. Web Deploy, publish profiles or IIS. A Developer Command
+Prompt: the binaries are found, not a shell. A stored path to MSBuild.
+
+**Tests.** In `detect.test.ts`: a non-SDK solution declares the control and
+the suite with both placeholders, reads the assembly name and output path,
+and a Fixie 1 test project declares the console runner whole. In
+`checks.test.ts`: the placeholders are substituted from a scripted
+`vswhere`, and a `vswhere` that answers nothing is the stop naming the
+Build Tools. In `testEvidence.test.ts`: the control's detail records the
+MSBuild path. In `affected.test.ts`: two classes narrow to one
+`/TestCaseFilter` argument. The targeting-pack stop is tested against a
+scripted reference-assemblies directory.
+
+**Releasable.** No -- as 3.31.0 in session 309.
+
+### Session 308 of 309: The walk through six borrowed repositories
+
+Scope: `docs/uat/uat-maintenance-walk.md` (the record), the fixes the walk
+finds with a test beside each under the files they touch, `version.json`
+and the manifests `npm run stamp:version` writes,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** Three sessions of reading, posture and runner prove nothing until
+a real old repository goes through a session and comes out buildable in
+the IDE its owners use. The operator asked for the sample applications to
+be found rather than written, so that what is walked is what staff will
+meet: public repositories with stars, each one framework, each with its
+own history, quirks and a layout nobody here chose. Six were read on
+2026-11-10 and cover the five frameworks:
+
+- `jbogard/ContosoUniversity` (386 stars, Apache-2.0): ASP.NET MVC 5 on
+  .NET Framework 4.8.1, non-SDK `.csproj`, `packages.config`, the
+  solution under `src/`, Fixie 1 integration tests over SQL Server Express
+  deployed by RoundhousE. The hardest case, and the one the scaffold would
+  have damaged.
+- `chsakell/mvcarchitecture` (496 stars, MIT): ASP.NET MVC 5 on .NET
+  Framework 4.5.1, four projects, no tests. The walk's test project is the
+  repository's first.
+- `jbogard/ContosoUniversityDotNetCore` (450 stars, MIT): ASP.NET Core MVC
+  on `netcoreapp2.0`, xunit, LocalDB. An out-of-support target that the
+  contract must keep.
+- `in28minutes/JavaWebApplicationStepByStep` (573 stars, Apache-2.0): a
+  servlet and JSP WAR on plain Maven, source and target 1.7, no tests.
+- `spring-petclinic/spring-framework-petclinic` (498 stars, Apache-2.0):
+  Spring Framework 7 as a WAR, Maven wrapper, JUnit 5, HSQLDB in memory.
+- `spring-projects/spring-petclinic` (9,635 stars, Apache-2.0): Spring
+  Boot, Maven wrapper, tests named `*Tests.java`.
+
+**What.** Each repository is forked under the operator's account, cloned
+under `C:\temp\s308-<name>`, bootstrapped, and driven through the same two
+sessions by the 3.31.0 candidate installed from a VSIX into a scratch
+profile: session 1 adds an online calculator page that adds and subtracts
+two numbers, with its tests; session 2 adds documentation comments to the
+pages it touched and changes nothing else. The first proves a change that
+touches a controller, a view, a route and a test project inside the
+existing shape; the second proves a change that must be verified without
+being tested, and that the diff is only comments. After the sessions each
+checkout is opened in the IDE its owners use -- Visual Studio 2026 for the
+three .NET repositories, IntelliJ IDEA 2022.3 for the three Java ones, and
+Eclipse where the operator installs it -- built, its tests run from the
+IDE's own test window, and one commit made from the IDE's own Git view.
+
+None of this enters this repository. The six forks live under the
+operator's account and are cloned under `C:\temp`; the walk runs on the
+operator's machine, as session 175's did; and what this repository keeps
+of it is the record and the fixes with their tests. Those tests, like
+every test 305 to 307 add, run on fixture trees and scripted tools, so a
+developer maintaining this repository needs no Visual Studio, no SQL
+Server and no JDK, and CI runs them as it runs everything else.
+
+**Step 1 -- the machine and the forks.** The six forks are cloned. The
+machine gains what the walk needs and the record says what was installed:
+the .NET Framework 4.8.1 Developer Pack, SQL Server Express as the
+`.\sqlexpress` instance ContosoUniversity names, and the .NET Core 2.1
+runtime for the `netcoreapp2.0` tests. The record notes what 307's stops
+said before each install, because the stop meeting the real machine is
+part of what is walked.
+
+**Step 2 -- the .NET Framework pair.** ContosoUniversity and
+mvcarchitecture, bootstrapped and driven. What is checked after each
+session: no file at the root the repository did not have; the
+`.csproj` diff is `Compile` and `Content` items and nothing else; the
+`contract` control passed and its detail names the MSBuild that built; the
+tests ran under the runner the repository already used. Then one tree is
+edited by hand to bump `TargetFrameworkVersion`, and `dabbler facts` is
+shown refusing it by name.
+
+**Step 3 -- the .NET Core one.** ContosoUniversityDotNetCore, the same
+way, with the `netcoreapp2.0` target held and the LocalDB tests run.
+
+**Step 4 -- the Java three.** The servlet WAR gains its first JUnit
+dependency and test, which the contract allows because a test dependency
+is not a target; the Spring Framework WAR and the Spring Boot service each
+gain a controller, a view and a test the plural glob selects.
+
+**Step 5 -- the round trip.** Each checkout is opened in its other IDE,
+built, its tests run and a commit made there; the record says for each
+whether anything had to be learned or undone. A non-Dabbler colleague
+reads one diff per ecosystem and the record carries what they said.
+
+**Step 6 -- the defects, the record and the number.** Each defect the walk
+finds is fixed with a test beside it, in this session's own diff where the
+framework is source here. `docs/uat/uat-maintenance-walk.md` records the
+six repositories, every session's timing from the driver's own lines, what
+was installed, what stopped and why, and what each IDE showed.
+`version.json` goes to 3.31.0 (a minor: a posture the framework did not
+have), stamped with `npm run stamp:version`, and the changelog says what
+changed for a developer maintaining an existing repository.
+
+**Non-goals.** Upgrading any borrowed repository's target, format or
+dependencies. Fixing a borrowed repository's own pre-existing failures:
+one is recorded and the walk continues around it. Eclipse where the
+operator has not installed it: IntelliJ is the Java round trip, and
+Eclipse's `.project`, `.classpath` and `.settings` are checked to be
+untouched rather than opened. A Solution Explorer for any of the six beyond
+what the build files draw.
+
+**Tests.** One test beside each defect fixed, named after the file it
+fixes. The walk's own proof is the record and the six repositories'
+suites, green under their own runners.
+
+**Releasable.** Yes -- as 3.31.0 in session 309.
+
+### Session 309 of 309: Release 3.31.0 (release: 3.31.0)
+
+The framework publishes sessions 305 to 308 as 3.31.0 and nothing else.

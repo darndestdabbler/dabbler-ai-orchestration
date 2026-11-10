@@ -6125,9 +6125,9 @@
     {
       "number": 308,
       "title": "A person may amend an accepted step's checks, and the engine is told so",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-10T17:46:08.526000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-10T17:59:19.594000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -5997,23 +5997,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "c89514db5db46f4fd51db55bf1a3a22f9e2374f1",
-      "frameworkVersion": "3.29.0",
       "verification": {
         "rounds": 1,
         "verifierModel": "gpt-5.6-sol",
         "verifierProvider": "openai",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "3.29.0",
+      "startCommit": "c89514db5db46f4fd51db55bf1a3a22f9e2374f1"
     },
     {
       "number": 302,
       "title": "Release 3.29.1 (release: 3.29.1)",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "status": "complete",
+      "startedAt": "2026-11-10T01:27:33.511000-05:00",
+      "completedAt": "2026-11-10T01:27:40.659000-05:00",
+      "orchestrator": {
+        "engine": "framework",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null,
+      "startCommit": "1ec8a4ecb4faaa1e370ebe4e2edc19874698db1e",
+      "frameworkVersion": "3.29.0",
+      "noChange": true
     }
   ]
 }

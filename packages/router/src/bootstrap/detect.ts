@@ -16,12 +16,14 @@
 //   levels below it are read; deeper layouts declare their own suites.
 //
 // A .NET Framework project -- a `.csproj` whose root element carries no `Sdk`
-// -- is not something `dotnet test` can build, so it declares no suite and
-// says why, rather than a line that fails the first time it runs.
+// -- is not something `dotnet test` can build. It builds the way Visual
+// Studio builds it, so it declares MSBuild and vstest by placeholder, and
+// the framework finds both on the machine when it runs them.
 
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
+import { PLACEHOLDER_MSBUILD, PLACEHOLDER_VSTEST } from "../checks.ts";
 import { PROJECT_CONFIG_FILENAME, type Posture } from "../config.ts";
 import { runGit } from "../journal.ts";
 import { readText } from "../textfile.ts";
@@ -52,6 +54,8 @@ export interface Ecosystem {
   readonly testName?: string | readonly string[];
   readonly select?: string;
   readonly selectSeparator?: string;
+  /** A line said above the suite, where its command needs a reason. */
+  readonly comment?: string;
 }
 
 function exists(root: string, ...names: readonly string[]): boolean {
@@ -231,11 +235,156 @@ function isSdkProject(text: string): boolean {
  * Framework projects -- no `Sdk` on the root element -- repository-relative.
  *
  * `dotnet test` cannot build one, so a repository holding any is the
- * `dotnet-framework` ecosystem: it is declared with no suite command rather
- * than a `dotnet test` line that fails the first time it runs.
+ * `dotnet-framework` ecosystem, built the way Visual Studio builds it: see
+ * `frameworkCompile` and `detectDotnetFramework`.
  */
 export function frameworkProjects(root: string, near: readonly string[] = filesNear(root)): string[] {
   return near.filter((rel) => /\.csproj$/i.test(rel) && !isSdkProject(reads(root, rel)));
+}
+
+/** The `TargetFrameworkVersion`s the .NET Framework projects declare (`v4.8.1`), each once, sorted. */
+export function frameworkVersions(root: string): string[] {
+  const versions = frameworkProjects(root).flatMap((rel) => {
+    const found = /<TargetFrameworkVersion>\s*(v[\d.]+)\s*<\/TargetFrameworkVersion>/.exec(reads(root, rel));
+    return found === null ? [] : [found[1] as string];
+  });
+  return [...new Set(versions)].sort();
+}
+
+/** A repository-relative path as Windows writes it, quoted: these commands run on Windows alone. */
+function windowsPath(rel: string): string {
+  return `"${rel.split("/").join("\\")}"`;
+}
+
+/** What a .NET Framework build is pointed at: the first solution near the root, else the first project. */
+function frameworkTarget(root: string, near: readonly string[]): string | null {
+  return near.find((rel) => /\.sln$/i.test(rel)) ?? frameworkProjects(root, near)[0] ?? null;
+}
+
+/**
+ * The compile control for a repository holding .NET Framework projects, or
+ * null where it holds none: MSBuild from the Visual Studio installation
+ * `vswhere` names, restoring `packages.config` in its own evaluation first
+ * (`/restore`), so the build sees the targets the packages bring.
+ */
+export function frameworkCompile(root: string): string | null {
+  const target = frameworkTarget(root, filesNear(root));
+  if (target === null || frameworkProjects(root).length === 0) return null;
+  return (
+    `${PLACEHOLDER_MSBUILD} ${windowsPath(target)} /restore /t:Build /p:RestorePackagesConfig=true ` +
+    "/p:Configuration=Debug /v:minimal /nologo"
+  );
+}
+
+/** A non-SDK project's text with its `packages.config` beside it: where its packages are named. */
+function projectAndPackages(root: string, rel: string): string {
+  const dir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/") + 1) : "";
+  return reads(root, rel) + reads(root, `${dir}packages.config`);
+}
+
+const TEST_PACKAGE = /\b(?:id|Include)="(?:xunit|nunit|mstest\.|Microsoft\.VisualStudio\.QualityTools\.UnitTestFramework|fixie)/i;
+/**
+ * What lets vstest discover a project's tests: an adapter package the project
+ * restores. A framework alone -- MSTest v1's included, whose built-in adapter
+ * not every vstest installation carries -- is a project vstest runs and finds
+ * nothing in.
+ */
+const VSTEST_ADAPTER =
+  /\b(?:id|Include)="(?:xunit\.runner\.visualstudio|NUnit3TestAdapter|NUnitTestAdapter|MSTest\.TestAdapter)[",]/i;
+const FIXIE_PACKAGE = /\b(?:id|Include)="Fixie[",]/i;
+
+/**
+ * The assembly a test project builds, repository-relative: its Debug
+ * `OutputPath` and `AssemblyName`, with MSBuild's own defaults where the
+ * project states neither -- `bin\Debug\` and the project file's stem.
+ */
+function testAssembly(root: string, rel: string): string {
+  const text = reads(root, rel);
+  const groups = [...text.matchAll(/<PropertyGroup\b([^>]*)>([\s\S]*?)<\/PropertyGroup>/g)];
+  const outputOf = (body: string): string | undefined => /<OutputPath>\s*([^<]*?)\s*<\/OutputPath>/.exec(body)?.[1];
+  const output =
+    groups.map(([, attrs, body]) => (/Debug/.test(attrs ?? "") ? outputOf(body ?? "") : undefined)).find(Boolean) ??
+    groups.map(([, attrs, body]) => (/Condition/.test(attrs ?? "") ? undefined : outputOf(body ?? ""))).find(Boolean) ??
+    "bin\\Debug\\";
+  const name = /<AssemblyName>\s*([^<]*?)\s*<\/AssemblyName>/.exec(text)?.[1] ?? basename(rel).replace(/\.csproj$/i, "");
+  const dir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/") + 1) : "";
+  const folder = output.split("\\").join("/").replace(/\/?$/, "/");
+  return `${dir}${folder}${name}.dll`;
+}
+
+/**
+ * The Fixie version a project restores into the solution's `packages\`
+ * folder, from its packages.config or its HintPath; null where neither says.
+ * A `<PackageReference>` restores into the per-user NuGet folder instead,
+ * which no committed command can name.
+ */
+function fixieVersion(text: string): string | null {
+  return (
+    /<package\b[^>]*\bid="Fixie"[^>]*\bversion="([^"]+)"/i.exec(text)?.[1] ??
+    /<package\b[^>]*\bversion="([^"]+)"[^>]*\bid="Fixie"/i.exec(text)?.[1] ??
+    /packages[\\/]Fixie\.(\d[\w.-]*)[\\/]/i.exec(text)?.[1] ??
+    null
+  );
+}
+
+/**
+ * The suite of a repository's .NET Framework test projects: vstest over
+ * their assemblies, narrowed by `/TestCaseFilter` -- the separator repeats
+ * the property, so two classes read `FullyQualifiedName~A|FullyQualifiedName~B`
+ * -- or, where a project runs under Fixie, whose 1.x releases vstest cannot
+ * drive, Fixie's own console from the restored packages, run whole.
+ */
+function detectDotnetFramework(root: string): Ecosystem | null {
+  const near = filesNear(root);
+  const tests = frameworkProjects(root, near).filter((rel) => TEST_PACKAGE.test(projectAndPackages(root, rel)));
+  if (tests.length === 0) return null;
+  const shared = {
+    key: "dotnet-framework",
+    testRoots: ["."],
+    testGlob: ["*Test.cs", "*Tests.cs"],
+    testName: ["{name}Test.cs", "{name}Tests.cs"],
+  };
+  const fixie: { rel: string; version: string }[] = [];
+  const vstest: string[] = [];
+  const unrun: string[] = [];
+  for (const rel of tests) {
+    const text = projectAndPackages(root, rel);
+    const version = FIXIE_PACKAGE.test(text) ? fixieVersion(text) : null;
+    if (version !== null) fixie.push({ rel, version });
+    else if (!FIXIE_PACKAGE.test(text) && VSTEST_ADAPTER.test(text)) vstest.push(rel);
+    else unrun.push(rel);
+  }
+  const unrunNote =
+    unrun.length > 0
+      ? `${unrun.join(", ")} carry no vstest adapter and no Fixie console in packages\\, so no suite runs them`
+      : "";
+  if (fixie.length > 0) {
+    const target = frameworkTarget(root, near) ?? "";
+    const packages = `${target.includes("/") ? target.slice(0, target.lastIndexOf("/") + 1) : ""}packages`;
+    const runner = `${packages}/Fixie.${(fixie[0] as { version: string }).version}/lib/net45/Fixie.Console.exe`;
+    return {
+      ...shared,
+      command: [runner, ...fixie.map((one) => testAssembly(root, one.rel))].map(windowsPath).join(" "),
+      runsWhole: true,
+      comment: [
+        "Fixie 1 runs under its own console, which vstest cannot drive, so this suite runs whole",
+        vstest.length > 0 ? `${vstest.join(", ")} run under vstest and need a suite of their own` : "",
+        unrunNote,
+      ]
+        .filter(Boolean)
+        .join("; "),
+    };
+  }
+  if (vstest.length === 0) return null;
+  const command = [PLACEHOLDER_VSTEST, ...vstest.map((rel) => windowsPath(testAssembly(root, rel)))].join(" ");
+  return {
+    ...shared,
+    command: `${command} "/logger:console;verbosity=minimal"`,
+    runsWhole: false,
+    select: `${command} "/logger:console;verbosity=minimal" /TestCaseFilter:FullyQualifiedName~{names}`,
+    selectSeparator: "|FullyQualifiedName~",
+    ...(unrunNote ? { comment: unrunNote } : {}),
+  };
 }
 
 /**
@@ -300,6 +449,7 @@ export const DETECTORS: readonly ((root: string) => Ecosystem | null)[] = [
   detectMaven,
   detectGradle,
   detectDotnet,
+  detectDotnetFramework,
   detectNode,
 ];
 
@@ -385,10 +535,20 @@ function quoted(value: string | readonly string[]): string {
   return typeof value === "string" ? `"${value}"` : `[${value.map((one) => `"${one}"`).join(", ")}]`;
 }
 
+/**
+ * A command as a YAML scalar: single-quoted where a plain one would be read
+ * as something else -- `{msbuild} ...` is a flow mapping, and a quoted Windows
+ * path is a double-quoted scalar with escapes in it.
+ */
+function commandScalar(command: string): string {
+  return /^[{['"&*!|>%@`]|["#]|: /.test(command) ? `'${command.split("'").join("''")}'` : command;
+}
+
 function suiteBlock(eco: Ecosystem): string {
   const lines = [
+    ...(eco.comment ? [`    # ${eco.comment}.`] : []),
     `    - name: ${eco.key}`,
-    `      command: ${eco.command}`,
+    `      command: ${commandScalar(eco.command)}`,
     "      expensive: true",
     "      covers:",
     '        - "."',
@@ -399,7 +559,7 @@ function suiteBlock(eco: Ecosystem): string {
   for (const root of eco.testRoots) lines.push(`        - "${root}"`);
   lines.push(`      test_glob: ${quoted(eco.testGlob)}`);
   if (eco.testName) lines.push(`      test_name: ${quoted(eco.testName)}`);
-  if (eco.select) lines.push(`      select: ${eco.select}`);
+  if (eco.select) lines.push(`      select: ${commandScalar(eco.select)}`);
   if (eco.selectSeparator) lines.push(`      select_separator: "${eco.selectSeparator}"`);
   return lines.join("\n");
 }
@@ -569,7 +729,7 @@ export function appendSuitesToProjectConfig(
  */
 export function renderProjectConfig(
   ecosystems: readonly Ecosystem[],
-  framework: readonly string[] = [],
+  compile: string | null = null,
   posture: PostureReading | null = null,
 ): string {
   const out = [PROJECT_CONFIG_HEADER];
@@ -581,27 +741,35 @@ export function renderProjectConfig(
         "\n" +
         PROJECT_CONFIG_SELECTION,
     );
+    if (compile !== null) out.push(compileBlock(compile));
   } else {
     out.push(PROJECT_CONFIG_NO_SUITES);
+    if (compile !== null) out.push(`\n${FRAMEWORK_NO_TESTS}testing:\n${compileBlock(compile)}`);
   }
-  if (framework.length > 0) out.push(frameworkNote(framework));
   out.push(PROJECT_CONFIG_PACKAGING);
   return out.join("");
 }
 
-/** The `dotnet-framework` declaration: what was found, and why it has no suite command. */
-function frameworkNote(projects: readonly string[]): string {
+const FRAMEWORK_NO_TESTS =
+  "# dotnet-framework: no test project vstest or Fixie's console can run was\n" +
+  "# found -- one needs an xunit, NUnit or MSTest adapter package, or Fixie in\n" +
+  "# packages.config -- so no suite is declared, and the compile control\n" +
+  "# below proves the build.\n";
+
+/**
+ * The compile control of a .NET Framework repository, inside `testing:`.
+ * Required: a red build goes back to the author before a reviewer is asked.
+ */
+function compileBlock(command: string): string {
   return (
-    "\n" +
-    "# dotnet-framework: no suite command. These projects carry no `Sdk`\n" +
-    "# attribute, so they are .NET Framework projects, which `dotnet test`\n" +
-    "# cannot build:\n" +
-    "#\n" +
-    projects.map((rel) => `#   ${rel}\n`).join("") +
-    "#\n" +
-    "# A line that failed the first time it ran would be worse than none.\n" +
-    "# Session 307 of this framework's plan gives them one (MSBuild and\n" +
-    "# vstest); until then, declare one yourself under testing.suites.\n"
+    "  # MSBuild from the Visual Studio installation vswhere names on this\n" +
+    "  # machine: `{msbuild}` is filled in when the control runs, and the record\n" +
+    "  # says which MSBuild it was.\n" +
+    "  controls:\n" +
+    "    - name: compile\n" +
+    "      kind: compile\n" +
+    `      command: ${commandScalar(command)}\n` +
+    "      required: true\n"
   );
 }
 
@@ -626,7 +794,7 @@ export function scaffoldProjectConfig(
       path,
       renderProjectConfig(
         detectEcosystems(projectDir),
-        frameworkProjects(projectDir),
+        frameworkCompile(projectDir),
         posture ?? readPosture(projectDir),
       ),
       "utf8",

@@ -27,14 +27,18 @@ import {
   programIsRunnable,
   normaliseRel,
   parsePorcelain,
+  readVsTools,
   resolveProgram,
   shlexSplit,
   spawnOptionsFor,
   setTreeKiller,
+  setVsToolsAsk,
   spawnProgram,
   terminateTree,
   treeKillCommand,
   unquotePorcelainPath,
+  vsToolsRefusal,
+  withVsTools,
 } from "../src/checks.ts";
 import { hiddenSpawn, snapshotWorktreeTree } from "../src/journal.ts";
 import { makeAnsweredRepo, tempDir } from "./support/answers.ts";
@@ -118,6 +122,45 @@ describe("splitting a declared command string", () => {
 });
 
 // --- Declarations -------------------------------------------------------------
+
+describe("the Visual Studio tools a declared command names", () => {
+  const MSBUILD = "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe";
+  const VSTEST = "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow\\vstest.console.exe";
+
+  it("substitutes {msbuild} and {vstest} from what vswhere answers, and asks nothing of a command naming neither", () => {
+    const asked: string[] = [];
+    const restore = setVsToolsAsk((args) => {
+      asked.push(args.at(-1) as string);
+      return args.at(-1)?.endsWith("MSBuild.exe") ? `${MSBUILD}\r\n` : `${VSTEST}\r\n`;
+    });
+    try {
+      assert.deepEqual(withVsTools(["dotnet", "test"]), ["dotnet", "test"]);
+      assert.deepEqual(asked, []);
+      assert.deepEqual(withVsTools(["{msbuild}", "Thing.sln"]), [MSBUILD, "Thing.sln"]);
+      assert.deepEqual(withVsTools(["{vstest} a.dll"], (path) => `"${path}"`), [`"${VSTEST}" a.dll`]);
+      assert.equal(asked.length, 2, "vswhere is asked once per tool for the whole run");
+    } finally {
+      restore();
+    }
+  });
+
+  it("stops a machine whose vswhere answers nothing, naming the Build Tools, and asks nothing of a command naming neither tool", () => {
+    const nothing = { platform: "win32" as const, tools: () => readVsTools(() => null), referenceRoot: null };
+    assert.equal(vsToolsRefusal(["dotnet test"], ["v4.8"], nothing), null);
+    const refusal = String(vsToolsRefusal(["{msbuild} T.sln", "{vstest} T.Tests.dll"], [], nothing));
+    assert.match(refusal, /name MSBuild and vstest, and vswhere found none/);
+    assert.match(refusal, /Visual Studio Build Tools, with the "ASP\.NET and web development" workload/);
+    assert.match(String(vsToolsRefusal(["{msbuild} T.sln"], [], { ...nothing, platform: "linux" })), /this project builds on Windows\.$/);
+  });
+
+  it("stops a machine with no targeting pack for a project's TargetFrameworkVersion, naming its Developer Pack", () => {
+    const root = tempDir("reference-");
+    mkdirSync(join(root, "v4.8"));
+    const machine = { platform: "win32" as const, tools: () => ({ msbuild: "MSBuild.exe", vstest: "vstest.console.exe" }), referenceRoot: root };
+    assert.equal(vsToolsRefusal(["{msbuild} T.sln"], ["v4.8"], machine), null);
+    assert.match(String(vsToolsRefusal(["{msbuild} T.sln"], ["v4.8", "v4.8.1"], machine)), /targets v4\.8\.1, .*Install the \.NET Framework 4\.8\.1 Developer Pack\.$/);
+  });
+});
 
 describe("refusing a broken check declaration at load", () => {
   const suite = { name: "unit", command: "x", covers: [] };

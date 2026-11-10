@@ -232,9 +232,8 @@ build file at the root keeps the plain `dotnet test` and `mvn -q test`.
 
 - A `.csproj` whose root element carries no `Sdk` attribute is a .NET
   Framework project, which `dotnet test` cannot build. Such a repository is
-  `dotnet-framework`: `dabbler.yaml` names those projects in a comment and
-  declares no suite for them, rather than a line that fails the first time
-  it runs.
+  `dotnet-framework`, and it builds the way Visual Studio builds it: see
+  *A .NET Framework repository* below.
 - `build.gradle.kts` counts as Gradle.
 - Tests are read by both spellings, in both languages: `*Test.cs` and
   `*Tests.cs`, `*Test.java` and `*Tests.java`. `test_glob` and `test_name`
@@ -368,9 +367,89 @@ is there or deleted. The engine the control holds can write under
 report, no override in a step and no environment variable. The plan the
 person approved is the only way to approve a target change.
 
-**What comes next.** Session 307 gives a `dotnet-framework` repository a
-suite command, through MSBuild and vstest. Until then, declare that suite
-by hand under `testing.suites`.
+### A .NET Framework repository
+
+A non-SDK project builds the way Visual Studio builds it. That needs
+`MSBuild.exe` from a Visual Studio installation, the .NET Framework
+targeting pack for the project's version, NuGet restoring
+`packages.config`, and `vstest.console.exe` to run the test assembly. None
+of that is `dotnet test`, and none of it runs anywhere but Windows.
+
+**What the machine needs.**
+
+- Windows.
+- Visual Studio, or the Visual Studio Build Tools, with the "ASP.NET and
+  web development" workload. Either one brings MSBuild, vstest and
+  `vswhere.exe`.
+- The targeting pack for each project's `TargetFrameworkVersion`, under
+  `%ProgramFiles(x86)%\Reference Assemblies\Microsoft\Framework\.NETFramework`.
+  A version Visual Studio did not install, such as 4.8.1, comes with that
+  version's Developer Pack.
+
+**What bootstrap declares.** `dabbler.yaml` gets a required `compile`
+control and, where there is a test project, a suite:
+
+```yaml
+testing:
+  suites:
+    - name: dotnet-framework
+      command: '{vstest} "Thing.Tests\bin\Debug\Thing.Tests.dll" "/logger:console;verbosity=minimal"'
+      select: '{vstest} "Thing.Tests\bin\Debug\Thing.Tests.dll" "/logger:console;verbosity=minimal" /TestCaseFilter:FullyQualifiedName~{names}'
+      select_separator: "|FullyQualifiedName~"
+  controls:
+    - name: compile
+      kind: compile
+      command: '{msbuild} "Thing.sln" /restore /t:Build /p:RestorePackagesConfig=true /p:Configuration=Debug /v:minimal /nologo'
+      required: true
+```
+
+- The control builds the first solution near the root, or the first
+  non-SDK project where there is no solution. `/restore` runs the
+  `packages.config` restore in its own pass first, so the build sees the
+  targets the restored packages bring.
+- vstest runs a non-SDK test project whose `packages.config` or project
+  file names a vstest adapter: `xunit.runner.visualstudio`,
+  `NUnit3TestAdapter`, `NUnitTestAdapter` or `MSTest.TestAdapter`. A test
+  project with a framework and no adapter package, an MSTest v1 project
+  among them, is left out of the suite, and a comment above the suite names
+  it, because vstest would run it and find nothing. Each assembly path
+  comes from the project's Debug `OutputPath` and its `AssemblyName`. Where
+  the project gives neither, MSBuild's defaults apply: `bin\Debug\` and the
+  project file's name.
+- Selection runs the tests named after the changed files through
+  `/TestCaseFilter`. Two classes read
+  `FullyQualifiedName~FooTests|FullyQualifiedName~BarTests`, one argument
+  quoted for the shell.
+- vstest cannot drive Fixie 1. A Fixie test project restored through
+  `packages.config` gets Fixie's own console from the solution's
+  `packages\` folder instead, and that suite runs whole. A comment above
+  the suite says why. Fixie restored by `<PackageReference>` lands in the
+  per-user NuGet folder, which no committed command can name, so it is
+  left out and named the same way.
+
+**How the tools are found.** `{msbuild}` and `{vstest}` are placeholders.
+The framework fills them in when it runs the command. It asks `vswhere.exe`
+at `%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\` for the latest
+installation with MSBuild, once per run, and records the paths it used in
+the control's detail and in the test run's detail. The record says which
+MSBuild built the evidence. No path is stored anywhere. A Developer Command
+Prompt is not needed, because the binaries are found rather than taken from
+a shell.
+
+**The stops at `session start`.** Under `maintenance`, a repository whose
+suites or controls name either placeholder is checked against the machine
+before the session is registered. The check reads the machine, never a
+declaration. It stops, naming what to install, in three cases:
+
+- the machine is not Windows: this project builds on Windows;
+- `vswhere` is missing, or finds no MSBuild or vstest: install Visual
+  Studio, or the Build Tools, with the "ASP.NET and web development"
+  workload;
+- a project's `TargetFrameworkVersion` has no targeting pack: install that
+  version's Developer Pack, for example the .NET Framework 4.8.1 Developer
+  Pack.
+
+The framework never runs `dotnet test` in their place.
 
 **A script typed into the engine's prompt at Start is not this framework.**
 It is another extension activating an environment in every new terminal.

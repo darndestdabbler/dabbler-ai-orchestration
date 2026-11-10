@@ -1492,6 +1492,205 @@ export function setTreeKiller(killer: TreeKiller): () => void {
   };
 }
 
+// --- Substitution, and the Visual Studio tools ----------------------------------
+
+/**
+ * Replace placeholders element by element.
+ *
+ * Per element and never through a shell: a credential substituted into a
+ * shell string can be re-split, re-quoted, or logged by the shell itself,
+ * and none of those are things the framework can take back.
+ */
+export function substitute(
+  argv: readonly string[],
+  mapping: Readonly<Record<string, string>>,
+): string[] {
+  return argv.map((element) => {
+    let text = String(element);
+    for (const [token, value] of Object.entries(mapping)) {
+      if (text.includes(token)) text = replaceAll(text, token, String(value));
+    }
+    return text;
+  });
+}
+
+/**
+ * `String.prototype.replace` with a string pattern replaces the FIRST match
+ * only and reads `$&` and friends in the replacement as back-references.
+ * A feed URL, a PAT or a path is exactly the kind of value that carries a `$`.
+ */
+export function replaceAll(text: string, needle: string, value: string): string {
+  return text.split(needle).join(value);
+}
+
+/**
+ * A .NET Framework project builds the way Visual Studio builds it, with the
+ * MSBuild and vstest of an installation, and no path to either is stable
+ * across machines or stored: a declared command names these, and each is
+ * asked of `vswhere` when it is spawned.
+ */
+export const PLACEHOLDER_MSBUILD = "{msbuild}";
+export const PLACEHOLDER_VSTEST = "{vstest}";
+
+/**
+ * What `vswhere` answered: each path, or null where it found none -- or where
+ * there is no `vswhere` to ask, which needs the same installation.
+ */
+export interface VsTools {
+  readonly msbuild: string | null;
+  readonly vstest: string | null;
+}
+
+/** `vswhere`'s arguments for each tool; the first line it prints is the answer. */
+const VSWHERE_FIND: Readonly<Record<"msbuild" | "vstest", readonly string[]>> = {
+  msbuild: ["-latest", "-products", "*", "-requires", "Microsoft.Component.MSBuild", "-find", "MSBuild\\**\\Bin\\MSBuild.exe"],
+  vstest: ["-latest", "-products", "*", "-find", "Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow\\vstest.console.exe"],
+};
+
+/** One question to `vswhere`: its stdout, or null where it could not be asked. */
+export type VsWhereAsk = (args: readonly string[]) => string | null;
+
+/** The one fixed place the Visual Studio installer puts `vswhere`, or null off Windows. */
+export function vswherePath(): string | null {
+  const base = process.env["ProgramFiles(x86)"];
+  if (process.platform !== "win32" || !base) return null;
+  return join(base, "Microsoft Visual Studio", "Installer", "vswhere.exe");
+}
+
+const spawnVsWhere: VsWhereAsk = (args) => {
+  const program = vswherePath();
+  if (program === null || !existsSync(program)) return null;
+  const proc = spawnSync(program, [...args], hiddenSpawn({ encoding: "utf8" as const, timeout: 30_000 }));
+  return proc.status === 0 ? proc.stdout : null;
+};
+
+/** What `vswhere` answers through `ask`: the first path each question prints. */
+export function readVsTools(ask: VsWhereAsk): VsTools {
+  const first = (out: string | null): string | null =>
+    out?.split(/\r?\n/).map((line) => line.trim()).find((line) => line !== "") ?? null;
+  return { msbuild: first(ask(VSWHERE_FIND.msbuild)), vstest: first(ask(VSWHERE_FIND.vstest)) };
+}
+
+let vsWhereAsk: VsWhereAsk = spawnVsWhere;
+let vsToolsRead: VsTools | null = null;
+
+/** The reading this process made, made once: every command of a run is built by the same tools. */
+export function vsTools(): VsTools {
+  vsToolsRead ??= readVsTools(vsWhereAsk);
+  return vsToolsRead;
+}
+
+/** Swap how `vswhere` is asked and forget the reading; the returned function restores both. */
+export function setVsToolsAsk(ask: VsWhereAsk): () => void {
+  const previous = { ask: vsWhereAsk, read: vsToolsRead };
+  vsWhereAsk = ask;
+  vsToolsRead = null;
+  return () => {
+    vsWhereAsk = previous.ask;
+    vsToolsRead = previous.read;
+  };
+}
+
+/** Whether a declared command names either tool, so `vswhere` is asked only where it is needed. */
+export function namesVsTool(command: string): boolean {
+  return command.includes(PLACEHOLDER_MSBUILD) || command.includes(PLACEHOLDER_VSTEST);
+}
+
+/** Every command the repository's suites and controls declare, read leniently: an error is not this reader's to report. */
+export function declaredCommands(config: unknown): string[] {
+  const testing = testingBlock(config) ?? {};
+  const entries = [testing["suites"], testing["controls"]].flatMap((list) => (Array.isArray(list) ? list : []));
+  return entries.filter(isRecord).flatMap((entry) => {
+    const argv = entry["argv"];
+    const command = typeof entry["command"] === "string" ? entry["command"] : Array.isArray(argv) ? argv.join(" ") : "";
+    const select = typeof entry["select"] === "string" ? [entry["select"]] : [];
+    return [command, ...select];
+  });
+}
+
+/** What the machine holds for a .NET Framework build; each part read where it is not given. */
+export interface VsMachine {
+  readonly platform: NodeJS.Platform;
+  readonly tools: () => VsTools;
+  /** `Reference Assemblies\Microsoft\Framework\.NETFramework`, or null where there is no such root. */
+  readonly referenceRoot: string | null;
+}
+
+const VS_INSTALL =
+  "Install Visual Studio, or the Visual Studio Build Tools, with the \"ASP.NET and web development\" " +
+  "workload; the framework finds MSBuild and vstest through vswhere, and never runs `dotnet test` in their place.";
+
+/**
+ * Why this machine cannot build and test what the repository declares, or
+ * null where it can. Read from the machine and never from a declaration: a
+ * command that names `{msbuild}` or `{vstest}` needs Windows, a Visual
+ * Studio installation that `vswhere` answers for, and the targeting pack for
+ * each project's `TargetFrameworkVersion`. A command naming neither asks
+ * nothing.
+ */
+export function vsToolsRefusal(
+  commands: readonly string[],
+  versions: readonly string[],
+  given: Partial<VsMachine> = {},
+): string | null {
+  const msbuild = commands.some((command) => command.includes(PLACEHOLDER_MSBUILD));
+  const vstest = commands.some((command) => command.includes(PLACEHOLDER_VSTEST));
+  if (!msbuild && !vstest) return null;
+  const platform = given.platform ?? process.platform;
+  if (platform !== "win32") {
+    return "this repository's .NET Framework projects build with MSBuild and vstest from a Visual Studio installation, which is on Windows: this project builds on Windows.";
+  }
+  const tools = (given.tools ?? vsTools)();
+  const missing = [msbuild && tools.msbuild === null ? "MSBuild" : "", vstest && tools.vstest === null ? "vstest" : ""].filter(Boolean);
+  if (missing.length > 0) {
+    return `this repository's declared commands name ${missing.join(" and ")}, and vswhere found none on this machine. ${VS_INSTALL}`;
+  }
+  const base = process.env["ProgramFiles(x86)"];
+  const root =
+    given.referenceRoot !== undefined
+      ? given.referenceRoot
+      : base
+        ? join(base, "Reference Assemblies", "Microsoft", "Framework", ".NETFramework")
+        : null;
+  const absent = versions.filter((version) => root === null || !existsSync(join(root, version)));
+  if (absent.length > 0) {
+    const packs = absent.map((version) => `the .NET Framework ${version.replace(/^v/, "")} Developer Pack`);
+    return (
+      `this repository targets ${absent.join(", ")}, and this machine has no targeting pack for ` +
+      `${absent.length === 1 ? "it" : "them"}${root === null ? "" : ` under ${root}`}. Install ${packs.join(" and ")}.`
+    );
+  }
+  return null;
+}
+
+/**
+ * Which tool each placeholder the command names was, for the record: what
+ * built the evidence is part of it. `""` for a command naming neither.
+ */
+export function vsToolsDetail(command: string): string {
+  if (!namesVsTool(command)) return "";
+  const tools = vsTools();
+  const named: string[] = [];
+  if (command.includes(PLACEHOLDER_MSBUILD)) named.push(`msbuild: ${tools.msbuild ?? "not found by vswhere"}`);
+  if (command.includes(PLACEHOLDER_VSTEST)) named.push(`vstest: ${tools.vstest ?? "not found by vswhere"}`);
+  return named.join("; ");
+}
+
+/**
+ * Each placeholder in `argv` replaced by the tool's path, `quote`d. A tool
+ * `vswhere` did not find is left as its placeholder: `session start` stops
+ * on that machine before anything is run, and a command that still reaches
+ * here fails naming what it lacked rather than running something else.
+ */
+export function withVsTools(argv: readonly string[], quote: (path: string) => string = (path) => path): string[] {
+  if (!argv.some(namesVsTool)) return [...argv];
+  const tools = vsTools();
+  const mapping: Record<string, string> = {};
+  if (tools.msbuild !== null) mapping[PLACEHOLDER_MSBUILD] = quote(tools.msbuild);
+  if (tools.vstest !== null) mapping[PLACEHOLDER_VSTEST] = quote(tools.vstest);
+  return substitute(argv, mapping);
+}
+
 /**
  * The Windows tree kill, as argv and options. Hidden like every other
  * spawn: this one fired often -- the engine's ten-second interrupt fallback
@@ -1791,7 +1990,7 @@ function spawnCheck(
   }
   const argv =
     command === check.argv.join(" ") ? [...check.argv] : shlexSplit(command);
-  return spawnProgram(argv, options);
+  return spawnProgram(withVsTools(argv), options);
 }
 
 /**
@@ -1802,7 +2001,9 @@ function spawnCheck(
  * are tracked, grouped and hidden by the same options.
  */
 export function spawnCommand(command: string, options: SpawnOptions): ChildProcess {
-  return track(spawn(command, spawnOptionsFor(options, "shell")));
+  // One string for a shell, so the substituted path is quoted for it.
+  const [line] = withVsTools([command], (path) => `"${path}"`);
+  return track(spawn(line as string, spawnOptionsFor(options, "shell")));
 }
 
 /**

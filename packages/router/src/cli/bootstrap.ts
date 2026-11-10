@@ -364,10 +364,11 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     if (framework.length > 0) {
       writeOut(
         `bootstrap: ${framework.join(", ")} carry no Sdk attribute, so they are .NET ` +
-          "Framework projects, which `dotnet test` cannot build; no suite is declared " +
-          "for them rather than one that fails the first time it runs. Session 307 of " +
-          "this framework's plan gives them one (MSBuild and vstest); until then, " +
-          `declare one in ${PROJECT_CONFIG_FILENAME} yourself.\n`,
+          "Framework projects, which `dotnet test` cannot build; they build the way Visual " +
+          `Studio builds them, and ${PROJECT_CONFIG_FILENAME} declares a compile control with ` +
+          "MSBuild and a suite for any test project, MSBuild and vstest found on this machine " +
+          "through vswhere when they run. A machine without Visual Studio or the Build Tools is stopped at " +
+          "`session start`, naming what to install.\n",
       );
     }
   }

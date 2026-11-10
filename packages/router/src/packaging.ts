@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 
-import { childEnv, isSetBookkeeping, spawnSyncProgram } from "./checks.ts";
+import { childEnv, isSetBookkeeping, replaceAll, spawnSyncProgram, substitute } from "./checks.ts";
 import { type RouterConfig, loadConfig } from "./config.ts";
 import { GATE_PUBLISHED_WHEN_RELEASABLE, type GateResult, runGates, sessionChangedNothing } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
@@ -605,37 +605,7 @@ export function loadDeclaration(
   };
 }
 
-// --- Substitution, redaction, execution --------------------------------------
-
-/**
- * Replace placeholders element by element.
- *
- * Per element and never through a shell: a credential substituted into a
- * shell string can be re-split, re-quoted, or logged by the shell itself,
- * and none of those are things the framework can take back.
- */
-export function substitute(
-  argv: readonly string[],
-  mapping: Readonly<Record<string, string>>,
-): string[] {
-  return argv.map((element) => {
-    let text = String(element);
-    for (const [token, value] of Object.entries(mapping)) {
-      if (text.includes(token)) text = replaceAll(text, token, String(value));
-    }
-    return text;
-  });
-}
-
-/**
- * `String.prototype.replace` with a string pattern replaces the FIRST match
- * only and reads `$&` and friends in the replacement as back-references.
- * Python's `str.replace` does neither, and a feed URL or a PAT is exactly the
- * kind of value that carries a `$`.
- */
-function replaceAll(text: string, needle: string, value: string): string {
-  return text.split(needle).join(value);
-}
+// --- Redaction, execution ------------------------------------------------------
 
 /**
  * Remove the resolved value from anything about to be written down.

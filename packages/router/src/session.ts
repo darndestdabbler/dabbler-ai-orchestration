@@ -51,6 +51,7 @@ import {
   explainAuthoringModel,
   explainReviewingTransport,
   loadConfig,
+  postureOf,
   sessionReviewerOf,
   withSessionReviewers,
   withSessionVehicle,
@@ -120,7 +121,8 @@ import {
   RELEASE_ENGINE,
   configurationNode,
 } from "./projection.ts";
-import { isFrameworkInstalledPath, materialPaths } from "./checks.ts";
+import { declaredCommands, isFrameworkInstalledPath, materialPaths, vsToolsRefusal } from "./checks.ts";
+import { frameworkVersions } from "./bootstrap/detect.ts";
 import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
   materialWorktreeChanges,
@@ -1780,6 +1782,16 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
         return EXIT_USAGE;
       }
       for (const warning of use.warnings) writeErr(`start: warning -- ${warning}\n`);
+      // A repository maintained as it is builds the way it already builds,
+      // and a machine that cannot is found here rather than at the first check.
+      const config = loadConfig(undefined, checkout);
+      if (postureOf(config) === "maintenance") {
+        const toolchain = vsToolsRefusal(declaredCommands(config), frameworkVersions(checkout));
+        if (toolchain !== null) {
+          writeErr(`start: refused -- ${toolchain} Nothing was started.\n`);
+          return EXIT_USAGE;
+        }
+      }
     } catch (error) {
       writeErr(`start: refused -- ${error instanceof Error ? error.message : String(error)}\n`);
       return EXIT_USAGE;

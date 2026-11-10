@@ -23,7 +23,7 @@ import { repoRootFromSessionsDir } from "./evidence.ts";
 // restated: two lists that disagree make a valid declaration read as a typo
 // in whichever module holds the shorter one. The prefix rule comes from the
 // same place, for the same reason.
-import { SUITE_FIELDS, matchingPrefixes, normaliseRel } from "./checks.ts";
+import { SUITE_FIELDS, matchingPrefixes, normaliseRel, vsToolsDetail } from "./checks.ts";
 import {
   isSessionRecordPath,
   nowIso,
@@ -961,7 +961,14 @@ export function recordRun(
       ([path, reason]) => [String(path), String(reason)] as const,
     ),
     sessionNumber: options.sessionNumber ?? null,
-    detail: options.detail ?? "",
+    // Which MSBuild and vstest ran, where the command names them, ahead of
+    // anything the caller says: a run's own diagnostics never hide its tools.
+    detail: [
+      outcome === OUTCOME_NONE_SELECTED ? "" : vsToolsDetail(String(command || suite.command)),
+      options.detail ?? "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
     durationSeconds: duration,
   };
   const path = runsPath(root);

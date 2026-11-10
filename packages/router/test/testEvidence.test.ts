@@ -25,6 +25,7 @@ import {
   type TestRunRecord,
 } from "../src/testEvidence.ts";
 import { TEST_OUTPUT_REL, spawnSuite } from "../src/cli/testEvidence.ts";
+import { setVsToolsAsk } from "../src/checks.ts";
 import { judgeFreshness } from "../src/gates.ts";
 import { capture } from "../src/output.ts";
 import { gitAnswers, tempDir } from "./support/answers.ts";
@@ -370,6 +371,22 @@ describe("the run record", () => {
     );
     const nothing = recordRun(root, UNIT, "none-selected", { stage: "final-targeted", durationSeconds: 1, sessionNumber: 4, repoRoot: root });
     assert.deepEqual([nothing.stage, nothing.outcome, nothing.command], ["final-targeted", "none-selected", ""]);
+  });
+
+  it("records which MSBuild and vstest a run's command named, as vswhere answered them", () => {
+    const root = tempDir();
+    const restore = setVsToolsAsk((args) =>
+      args.at(-1)?.endsWith("MSBuild.exe") ? "C:\\VS\\MSBuild\\Current\\Bin\\MSBuild.exe\n" : "",
+    );
+    try {
+      const row = recordRun(root, UNIT, "passed", { ...options, command: "{msbuild} T.sln && {vstest} T.Tests.dll", repoRoot: root });
+      assert.equal(row.detail, "msbuild: C:\\VS\\MSBuild\\Current\\Bin\\MSBuild.exe; vstest: not found by vswhere");
+      const said = recordRun(root, UNIT, "passed", { ...options, command: "{vstest} T.Tests.dll", detail: "3 projects", repoRoot: root });
+      assert.equal(said.detail, "vstest: not found by vswhere\n3 projects");
+      assert.equal(recordRun(root, UNIT, "passed", { ...options, repoRoot: root }).detail, "");
+    } finally {
+      restore();
+    }
   });
 
   it("writes the duration as the float it is, and reads back leniently, dropping a stage or policy it does not recognise", () => {

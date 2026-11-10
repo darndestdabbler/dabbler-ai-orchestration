@@ -168,6 +168,15 @@ names a solution file or POM kept below the root in the suite it declares.
 See *An existing repository* in
 [driving a session](docs/driving-a-session.md).
 
+The framework needs nothing beyond the extension. The repository's own build
+needs its toolchain on the machine:
+
+| Repository | Needs on the machine |
+|---|---|
+| .NET (SDK-style projects) | the .NET SDK its projects target |
+| Maven | a JDK, and Maven unless the repository carries `mvnw` |
+| .NET Framework (non-SDK projects) | Windows; Visual Studio or the Build Tools with the "ASP.NET and web development" workload, found through `vswhere`; the targeting pack, or Developer Pack, for each project's `TargetFrameworkVersion`. `session start` stops naming what is missing |
+
 ## The repository's artifacts
 
 A repository's sessions live under `docs/sessions/`. One file is written

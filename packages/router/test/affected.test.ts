@@ -6,6 +6,7 @@ import { describe, it } from "node:test";
 
 import { RECORD_PLACEHOLDER, commandNamesTest, preverifyRecipe, recordCommand, remediationRecipe, sessionSelection } from "../src/affected.ts";
 import { seed, tempDir } from "./support/answers.ts";
+import { targetedCommand } from "../src/checks.ts";
 import { STAGE_FINAL_FULL, runOfRecordRecipe } from "../src/testEvidence.ts";
 
 describe("what a command names", () => {
@@ -52,6 +53,23 @@ describe("what a session's changes select at its end", () => {
         ["tests/Csv.Model.Tests/CsvReaderTests.cs", "named-test", "src/Csv.Model/CsvReader.cs"],
         ["tests/Csv.Api.Tests/RoutesTests.cs", "dependent-project", "Csv.Api.Tests"],
       ],
+    );
+  });
+});
+
+describe("narrowing a .NET Framework suite", () => {
+  it("narrows two selected test classes to one /TestCaseFilter argument, quoted for the shell", () => {
+    const repo = tempDir();
+    seed(repo, { "Thing.Tests/FooTests.cs": "class FooTests {}\n", "Thing.Tests/BarTests.cs": "class BarTests {}\n" });
+    const selection = { scopes: [{ suite: "dotnet-framework", roots: ["."], glob: "*Tests.cs", testName: "{name}Tests.cs" }], smoke: [] };
+    const result = sessionSelection(repo, ["Thing/Foo.cs", "Thing/Bar.cs"], selection);
+    const command = targetedCommand("", result.forSuite("dotnet-framework"), {
+      select: '{vstest} "Thing.Tests\\bin\\Debug\\Thing.Tests.dll" /TestCaseFilter:FullyQualifiedName~{names}',
+      selectSeparator: "|FullyQualifiedName~",
+    });
+    assert.equal(
+      command,
+      '{vstest} "Thing.Tests\\bin\\Debug\\Thing.Tests.dll" /TestCaseFilter:FullyQualifiedName~"BarTests|FullyQualifiedName~FooTests"',
     );
   });
 });

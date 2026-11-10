@@ -26,7 +26,7 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { SET_BOOKKEEPING_BASENAMES, shlexSplit } from "./checks.ts";
+import { SET_BOOKKEEPING_BASENAMES, shlexSplit, vsToolsDetail, withVsTools } from "./checks.ts";
 import type { ContractChange } from "./approvedPlan.ts";
 import { postureOf, type Posture, type RouterConfig } from "./config.ts";
 import { childText, readXmlElements, type XmlElement } from "./solutionDeps.ts";
@@ -806,7 +806,10 @@ export function runControl(repoRoot: string, spec: ControlSpec): ControlFact {
       "the declared command is empty",
     );
   }
-  const resolved = resolveInterpreter(argv);
+  // Which MSBuild or vstest ran is part of what the row proves.
+  const tools = vsToolsDetail(spec.command);
+  const said = (detail: string): string => (tools ? `${tools}\n${detail}` : detail);
+  const resolved = resolveInterpreter(withVsTools(argv));
   const proc = spawnSync(resolved[0] as string, resolved.slice(1), hiddenSpawn({
     cwd: repoRoot,
     encoding: "buffer" as const,
@@ -820,7 +823,7 @@ export function runControl(repoRoot: string, spec: ControlSpec): ControlFact {
         STATUS_UNKNOWN,
         spec.command,
         spec.required,
-        `no result within ${CONTROL_TIMEOUT_SECONDS}s`,
+        said(`no result within ${CONTROL_TIMEOUT_SECONDS}s`),
       );
     }
     return controlFact(
@@ -828,7 +831,7 @@ export function runControl(repoRoot: string, spec: ControlSpec): ControlFact {
       STATUS_UNKNOWN,
       spec.command,
       spec.required,
-      `could not be executed: ${proc.error.message}`,
+      said(`could not be executed: ${proc.error.message}`),
     );
   }
   // A signalled child has a null status and is not a timeout; Python's
@@ -848,7 +851,7 @@ export function runControl(repoRoot: string, spec: ControlSpec): ControlFact {
       STATUS_PASS,
       spec.command,
       spec.required,
-      tail ? tail.slice(-CONTROL_DETAIL_LIMIT) : "exit 0, and the control printed nothing",
+      said(tail ? tail.slice(-CONTROL_DETAIL_LIMIT) : "exit 0, and the control printed nothing"),
     );
   }
   const status = proc.status === null ? -1 : proc.status;
@@ -857,9 +860,7 @@ export function runControl(repoRoot: string, spec: ControlSpec): ControlFact {
     STATUS_FAIL,
     spec.command,
     spec.required,
-    tail
-      ? `exit ${status}: ${tail.slice(-CONTROL_DETAIL_LIMIT)}`
-      : `exit ${status}`,
+    said(tail ? `exit ${status}: ${tail.slice(-CONTROL_DETAIL_LIMIT)}` : `exit ${status}`),
   );
 }
 

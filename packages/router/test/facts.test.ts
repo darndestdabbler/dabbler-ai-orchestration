@@ -25,13 +25,16 @@ import {
   contractFact,
   controlFact,
   controlFactRed,
+  controlSpec,
   factRecord,
   factRecordToDict,
   factsPath,
   loadControlsChecked,
   parseChangedLines,
   redFactsRefusal,
+  runControl,
 } from "../src/facts.ts";
+import { setVsToolsAsk } from "../src/checks.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 const CAP_ENV = "AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS";
 
@@ -144,6 +147,18 @@ describe("the control declarations", () => {
     ]);
     assert.deepEqual(loaded.controls.map((spec) => spec.kind), ["compile"]);
     assert.deepEqual(loadControlsChecked({ testing: { controls: {} } }).errors, ["testing.controls must be a list"]);
+  });
+
+  it("runs a compile control with the MSBuild vswhere names, and its row says which one", () => {
+    // Node stands in for MSBuild: what is proved is the substitution and the record.
+    const restore = setVsToolsAsk((args) => (args.at(-1)?.endsWith("MSBuild.exe") ? `${process.execPath}\n` : ""));
+    try {
+      const fact = runControl(tempDir(), controlSpec("compile", `{msbuild} -e "process.stdout.write('built')"`, true));
+      assert.equal(fact.status, STATUS_PASS);
+      assert.equal(fact.detail, `msbuild: ${process.execPath}\nbuilt`);
+    } finally {
+      restore();
+    }
   });
 
   it("has a timeout, so a hung control cannot wedge every round", () => {

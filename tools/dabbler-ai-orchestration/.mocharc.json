@@ -1,0 +1,10 @@
+{
+  "//": "The one place both doors into this suite are configured. `npm run test:unit` is the door CI runs and `scripts/run-unit.mjs` is the door dabbler.yaml declares; mocha finds this file from the package directory either way, so the compiler hook, the vscode stub and the per-user-records arming are stated once and neither door can drop one by being edited alone. `spec` is deliberately absent: mocha MERGES a configured spec with an appended path list rather than being narrowed by it (D116), so a glob here would turn every targeted run into a whole-suite run. Each door names its own.",
+  "require": [
+    "ts-node/register",
+    "./src/test/vscode-stub.js",
+    "./src/test/machine-state.js"
+  ],
+  "ui": "tdd",
+  "timeout": 120000
+}

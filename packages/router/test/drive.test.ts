@@ -79,6 +79,7 @@ import {
   mechanicHandsBack,
   unchangedStepFiles,
   checkFailedRefusal,
+  contractRefusal,
   runStepChecks,
   CHECK_FAILED_WAYS,
   noLoopMessage,
@@ -871,6 +872,30 @@ describe("a check that fails", () => {
     });
     assert.match(unstarted, /-> exit none \(failed to start\)\n.*ENOENT/);
     assert.ok(!unstarted.includes("timed out"), unstarted);
+  });
+});
+
+describe("the build contract at a step", () => {
+  it("is among a maintained repository's step checks, and a moved target refuses the report naming the element", () => {
+    const project = (version: string): string =>
+      `<Project ToolsVersion="15.0"><PropertyGroup><TargetFrameworkVersion>${version}</TargetFrameworkVersion></PropertyGroup></Project>`;
+    const repo = tempDir();
+    seed(repo, { "Web/Web.csproj": project("v4.8") });
+    const restore = gitAnswers([
+      [["ls-tree"], { stdout: "Web/Web.csproj" }],
+      [["ls-files"], { stdout: "Web/Web.csproj" }],
+      [["show", "HEAD:Web/Web.csproj"], { stdout: project("v4.5.1") }],
+      // No session plan at HEAD: nothing approved.
+      [["show"], { code: 128, stderr: "fatal: path does not exist" }],
+    ]);
+    try {
+      const refused = contractRefusal(repo, join(repo, "docs", "sessions"), 1, "maintenance");
+      assert.match(refused ?? "", /^\[contract-moved\] /);
+      assert.match(refused ?? "", /Web\/Web\.csproj: TargetFrameworkVersion at HEAD v4\.5\.1, in the tree v4\.8/);
+      assert.equal(contractRefusal(repo, join(repo, "docs", "sessions"), 1, "greenfield"), null);
+    } finally {
+      restore();
+    }
   });
 });
 

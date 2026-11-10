@@ -106,6 +106,8 @@ import { commitSessionTranscript } from "./transcript.ts";
 import { SETTING_AUTHORING_MODEL, SETTING_MECHANIC_MODEL, SETTING_TRANSCRIPT } from "./settings.ts";
 import { namedReviewers, readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
+import { approvedContractChange, sessionStartCommit } from "./approvedPlan.ts";
+import { STATUS_NOT_APPLICABLE, STATUS_PASS, contractFact } from "./facts.ts";
 import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
 import { detectEcosystems, existingBuildFiles } from "./bootstrap/detect.ts";
 import { type ScaffoldResult, ensureRootFiles, ignoreBuildOutput } from "./ecosystem.ts";
@@ -1046,6 +1048,8 @@ const RULE = {
   planRelease: "plan-release",
   /** A check names something this machine cannot spawn. */
   planCheckProgram: "plan-check-program",
+  /** The step moved the build contract an existing repository is held to. */
+  contractMoved: "contract-moved",
 } as const;
 
 /** One refusal, carrying the name of the rule that refused it. */
@@ -1584,6 +1588,38 @@ export async function runStepChecks(
     tree = after;
   }
   return results;
+}
+
+/**
+ * The build contract, held at the step under `maintenance`: the refusal of
+ * a tree whose build files moved against the commit the session started on,
+ * naming each file and element,
+ * or null where the contract holds or the posture holds none. Run with a
+ * step's own checks, so the step that moved a target is the step asked to
+ * put it back, rather than the round that finds it.
+ */
+export function contractRefusal(
+  repoRoot: string,
+  sessionsDir: string,
+  sessionNumber: number,
+  posture: Posture,
+): string | null {
+  if (posture !== "maintenance") return null;
+  const fact = contractFact(
+    repoRoot,
+    posture,
+    approvedContractChange(repoRoot, sessionsDir, sessionNumber),
+    sessionStartCommit(sessionsDir, sessionNumber),
+  );
+  if (fact.status === STATUS_PASS || fact.status === STATUS_NOT_APPLICABLE) return null;
+  return refusal(
+    RULE.contractMoved,
+    `${fact.detail}\nThis repository is maintained as it is (posture: maintenance), and what it ` +
+      "builds is the next developer's to open in Visual Studio, IntelliJ or Eclipse. Put each element " +
+      "back as it was when the session started. A target change the work needs is the person's to approve: a " +
+      "**Contract change.** paragraph in this session's section of the session plan, committed " +
+      "before the session starts.",
+  );
 }
 
 /**
@@ -3685,6 +3721,13 @@ class Driver {
       // is two names for one failure.
       this.log(green ? "check-passed" : RULE.checkFailed, { step: spec.id, argv: [...check.argv], ...(check.owner ? { owner: check.owner } : {}) });
       if (!green) reasons.push(checkFailedRefusal(spec.id, check, run, moved));
+    }
+    if (reasons.length === 0) {
+      const contract = contractRefusal(this.repoRoot, this.sessionsDir, this.sessionNumber, postureOf(config));
+      if (contract !== null) {
+        this.log(RULE.contractMoved, { step: spec.id });
+        reasons.push(contract);
+      }
     }
     if (reasons.length === 0) reasons.push(...(await this.namedTestRefusals(spec.id, changed, current, config)));
     return reasons;

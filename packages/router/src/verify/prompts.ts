@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { briefing, type AgencyGrant } from "../agency.ts";
 import { readWorkPlan } from "../driver.ts";
 import { SESSION_PLAN_FILENAME } from "../evidence.ts";
+import type { ControlFact } from "../facts.ts";
 import { extractSpecExcerpt } from "../session.ts";
 import type { Row } from "../ledger.ts";
 import { dumps } from "../pythonJson.ts";
@@ -374,6 +375,27 @@ export function runOfRecordBlock(failed: FailedRunOfRecord | null): string {
   ].join("\n");
 }
 
+/**
+ * What a maintained repository's build files were held to, for a reviewer
+ * reading a diff that touches one. Empty for a repository the framework
+ * scaffolds, which holds no contract.
+ */
+export function contractBlock(contract: ControlFact | null): string {
+  if (contract === null) return "";
+  return [
+    "#### The build contract",
+    "",
+    "This repository is maintained as it is (`posture: maintenance`): each build file's target " +
+      "elements -- target framework, language version, JDK, wrapper -- are held to HEAD, a file " +
+      "the session's approved plan names under **Contract change.** excepted, and a new source or view " +
+      `file under a non-SDK project must be listed in it. The framework's \`contract\` control: **${contract.status}**.`,
+    "",
+    "```",
+    contract.detail || "(no detail)",
+    "```",
+  ].join("\n");
+}
+
 export function buildTaskBlock(
   sessionsDir: string,
   sessionNumber: number,
@@ -384,6 +406,7 @@ export function buildTaskBlock(
   grant: AgencyGrant | null = null,
   untested: readonly string[] = [],
   failedRunOfRecord: FailedRunOfRecord | null = null,
+  contract: ControlFact | null = null,
 ): string {
   const parts: string[] = [];
   const prior = priorFindingsBlock(priorRounds, disputes, repoRoot);
@@ -402,6 +425,8 @@ export function buildTaskBlock(
   if (gap) parts.push(gap);
   const failed = runOfRecordBlock(failedRunOfRecord);
   if (failed) parts.push(failed);
+  const held = contractBlock(contract);
+  if (held) parts.push(held);
   const brief = grant !== null ? briefing(grant) : "";
   if (brief) parts.push(brief);
   return parts.join("\n\n");

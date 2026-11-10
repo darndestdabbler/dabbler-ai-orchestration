@@ -284,10 +284,93 @@ build tool and test framework as found. A new file in a non-SDK project is
 listed in its `.csproj` as a `Compile` or `Content` item, and a target
 change is a plan the person approves.
 
-**What comes next.** Session 306 checks that a target stays what it was.
-Session 307 gives a `dotnet-framework` repository a suite command, through
-MSBuild and vstest. Until then, declare that suite by hand under
-`testing.suites`.
+**The build contract.** Under `maintenance`, the framework checks that the
+target a session finds is the target it leaves. This check is the
+framework's own `contract` control, and `testing.controls` cannot declare
+it, replace it or drop it. It compares the working tree, element by
+element, with the commit the session started on, which the router records
+as the session's `startCommit` when it registers the session. That is not
+HEAD at the time of the check: an engine that moves a target and commits
+it has still moved it. The comparison covers every build file:
+
+- `.csproj`, `.vbproj` and `.fsproj`: the root element's `Sdk` and
+  `ToolsVersion`, and the `TargetFramework`, `TargetFrameworks`,
+  `TargetFrameworkVersion`, `TargetFrameworkProfile`, `LangVersion`,
+  `Nullable` and `ImplicitUsings` properties. Each declaration is compared
+  on its own, under its condition or its `PropertyGroup`'s, so a Debug
+  `LangVersion` that moved is not hidden by a Release one that did not.
+  `Directory.Build.props` is read the same way. `global.json` is read for its `sdk` and `msbuild-sdks`.
+- `packages.config`: every package's id, version and target framework.
+- `Web.config` and `App.config`: the `targetFramework` of `compilation`
+  and `httpRuntime`.
+- `pom.xml`: `packaging`, `parent` and its `relativePath`, the `java.version` and
+  `maven.compiler.source`, `target` and `release` properties, the compiler
+  plugin's `source`, `target` and `release`, and the toolchains plugin's
+  `jdk`. `.mvn/wrapper/maven-wrapper.properties` is read for its
+  `distributionUrl`.
+- Gradle: `sourceCompatibility`, `targetCompatibility`, the toolchain's
+  `languageVersion` and the wrapper's `distributionUrl`.
+
+The control reads declared text only. It runs no MSBuild, Maven or Gradle,
+it stores no baseline, and it ignores SDK-style `PackageReference`
+versions, which are the engine's to change within the target.
+
+The control fails in these cases. Each failure names the file, the element,
+the value at the session's start and the value in the tree:
+
+- a moved element;
+- an element added or removed: `<Nullable>enable</Nullable>` added to an
+  SDK project, or `<maven.compiler.release>` added to a POM that built on
+  JDK 8;
+- a deleted build file;
+- a new `.cs` or `.vb` file under a non-SDK project that no `Compile` item
+  of that project lists;
+- a new `.cshtml`, `.aspx` or `.ascx` file under a non-SDK project that no
+  `Content` item lists.
+
+A new build file, such as a test project the session adds, has nothing to
+be held to. It passes, and its target is recorded in the detail. Under
+`greenfield` the control is `not_applicable`.
+
+**Where a moved target is refused.** A moved target is refused at the
+report, not at the round. After a step's own checks pass, the framework
+runs the control. A failure refuses the report under `contract-moved`,
+with every moved element named, and the engine puts it back in the same
+step. The same control is recorded with the deterministic facts of every
+verification round, where a red one refuses the round before a reviewer
+is paid. The reviewer's brief also carries the posture and the control's
+result, so a reviewer reading a diff that touches a build file knows what
+that file was held to.
+
+**A target change that is the work.** Sometimes moving the target is the
+work itself, for example when the shop moves a service from 4.5.1 to 4.8.
+That change is approved in the session plan, by the person, before the
+session starts. Put a paragraph in that session's section of
+`session-plan.md`, naming each file in backticks and giving the reason:
+
+```markdown
+**Contract change.** `src/Web/Web.csproj`, `src/Web/Web.config` -- the
+shop moves this service from 4.5.1 to 4.8.
+```
+
+Commit it with the plan, before the session starts. The framework reads
+the paragraph from the session plan as committed at the commit the
+session started on. The files it names report `not_applicable`, with the
+reason in the detail, and every other build file stays held. An engine
+that writes the paragraph into its own section during the session
+approves nothing, whether it leaves the edit in the working tree or
+commits it, because neither is in the commit the session started on. A
+session with a pre-registered `approved-plan.json` may record the change
+there too, as `contract_change` with `files` and `reason`, bound into the
+plan's hash. That record grants nothing and withholds nothing, whether it
+is there or deleted. The engine the control holds can write under
+`.dabbler/`, and the file is bound to no commit. There is no flag on a
+report, no override in a step and no environment variable. The plan the
+person approved is the only way to approve a target change.
+
+**What comes next.** Session 307 gives a `dotnet-framework` repository a
+suite command, through MSBuild and vstest. Until then, declare that suite
+by hand under `testing.suites`.
 
 **A script typed into the engine's prompt at Start is not this framework.**
 It is another extension activating an environment in every new terminal.

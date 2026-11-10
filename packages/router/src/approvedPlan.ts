@@ -22,8 +22,8 @@ import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 import { workingTreeChanges } from "./affected.ts";
-import { hashBytes } from "./evidence.ts";
-import { nowIso, platformNewlines, repoRelativePath } from "./journal.ts";
+import { SESSION_PLAN_FILENAME, hashBytes } from "./evidence.ts";
+import { nowIso, platformNewlines, repoRelativePath, runGit } from "./journal.ts";
 import {
   LIFECYCLE_WRITTEN_FILES,
   atomicWriteJsonIndented,
@@ -31,6 +31,7 @@ import {
 } from "./ledger.ts";
 import { dumps } from "./pythonJson.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
+import { readRawSessionState } from "./sessionState.ts";
 import { readText } from "./textfile.ts";
 
 export const SCHEMA_VERSION = 1;
@@ -138,6 +139,7 @@ const CORE_FIELDS: readonly string[] = [
   "session_number",
   "session_slug",
   "steps",
+  "contract_change",
   "approved",
 ];
 const WRITES_LEDGER_FILENAME = "approved-plan-writes.jsonl";
@@ -598,6 +600,83 @@ export function compareToEnvelope(
     });
   }
   return { inside, outside, measured: true, unmeasuredReason: "" };
+}
+
+// --- An approved change to the build contract --------------------------------
+
+/** The build files whose contract a session's approved plan lets move, and why. */
+export interface ContractChange {
+  readonly files: readonly string[];
+  readonly reason: string;
+}
+
+/** A `**Contract change.**` paragraph, to the blank line that ends it. */
+const CONTRACT_CHANGE = /(?:^|\n)[ \t]*\*\*Contract change\.\*\*([\s\S]*?)(?=\n[ \t]*\n|$)/;
+
+/**
+ * The target change a session's section of the session plan approves: the
+ * files its `**Contract change.**` paragraph names in backticks, and the
+ * paragraph's other words, wherever they stand, as the reason. Null where
+ * the section has no such paragraph, or one that names no file or gives no
+ * reason -- an approval of nothing in particular is not an approval of
+ * everything, and a target moved for no stated reason is not one a person
+ * approved.
+ */
+export function contractChangeOf(section: string): ContractChange | null {
+  const match = CONTRACT_CHANGE.exec(section);
+  if (match === null) return null;
+  const paragraph = (match[1] ?? "").replace(/\s+/g, " ").trim();
+  const files = [...paragraph.matchAll(/`([^`]+)`/g)].map((found) => normalizePath((found[1] ?? "").trim()));
+  const reason = paragraph
+    .replace(/`[^`]+`/g, " ")
+    .replace(/(?:\s*[,;]\s*)+/g, ", ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s,;:.–—-]+|[\s,;:–—-]+$/g, "");
+  if (files.length === 0 || !/\p{L}/u.test(reason)) return null;
+  return { files, reason };
+}
+
+/**
+ * The commit this session started on, as the router recorded it when it
+ * registered the session -- the tree before the engine touched anything.
+ * HEAD where the session's row records none. Not HEAD itself where it does:
+ * the engine can commit, and a baseline that moves with what it commits
+ * holds nothing.
+ */
+export function sessionStartCommit(sessionsDir: string, sessionNumber: number): string {
+  const sessions = readRawSessionState(sessionsDir)?.["sessions"];
+  const row = Array.isArray(sessions)
+    ? sessions.find((entry) => isRecord(entry) && entry["number"] === sessionNumber)
+    : undefined;
+  const recorded = isRecord(row) ? row["startCommit"] : undefined;
+  return typeof recorded === "string" && recorded.trim() !== "" ? recorded.trim() : "HEAD";
+}
+
+/**
+ * The target change this session's plan approves: the `**Contract change.**`
+ * paragraph in this session's section of the session plan as committed at
+ * the commit the session started on, which the person approved by
+ * committing it before the session began. That commit is the one approval
+ * the engine the control holds cannot write: a paragraph the session writes
+ * into its own section, or commits there, is not in it. An
+ * `approved-plan.json`, under the engine-writable `.dabbler/` and bound to
+ * no commit, may record the change as `contract_change` but neither grants
+ * nor withholds anything by being there, or by being deleted.
+ */
+export function approvedContractChange(
+  repoRoot: string,
+  sessionsDir: string,
+  sessionNumber: number,
+): ContractChange | null {
+  const planRel = repoRelativePath(repoRoot, join(sessionsDir, SESSION_PLAN_FILENAME)).replace(/\\/g, "/");
+  const shown = runGit(repoRoot, ["show", `${sessionStartCommit(sessionsDir, sessionNumber)}:${planRel}`]);
+  if (shown.code !== 0) return null;
+  const heading = new RegExp(`^###\\s+Session\\s+${sessionNumber}\\b`, "m");
+  const start = heading.exec(shown.stdout);
+  if (start === null) return null;
+  const rest = shown.stdout.slice(start.index);
+  const next = /\n###\s+Session\s+\d+/.exec(rest.slice(1));
+  return contractChangeOf(next === null ? rest : rest.slice(0, next.index + 1));
 }
 
 // --- Risk flags --------------------------------------------------------------

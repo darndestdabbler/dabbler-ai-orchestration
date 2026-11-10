@@ -2059,6 +2059,50 @@ describe("a session-plan.md edit while a session is in progress", () => {
   });
 });
 
+describe("a maintained repository whose step moves its target", () => {
+  it("is refused at the report, once its own checks pass, naming the element", async () => {
+    setProviderKeys();
+    resetRouter();
+    resetRuntimeMode();
+    const project = (version: string): string =>
+      `<Project ToolsVersion="15.0"><PropertyGroup><TargetFrameworkVersion>${version}</TargetFrameworkVersion></PropertyGroup></Project>`;
+    const repo = makeRepo({ ...SEED, "Web/Web.csproj": project("v4.5.1") }, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED], { suites: [] }, { posture: "maintenance" });
+    const moves = { ...PLAN, steps: [{ ...PLAN.steps[0], files: ["src/widget.py", "Web/Web.csproj"] }] };
+
+    const refusals: string[][] = [];
+    const engine: Engine = {
+      name: "claude-code",
+      invoke: ({ instruction }) => {
+        if (instruction.step_id === "plan") {
+          const path = join(tempDir("answer-"), "answer.json");
+          writeFileSync(path, JSON.stringify(moves), "utf8");
+          report(sessionsDir, { seq: instruction.seq, answerFile: path });
+          return Promise.resolve({ exitCode: 0 });
+        }
+        if (instruction.kind === "rejection") {
+          refusals.push([...(instruction.reasons ?? [])]);
+          return Promise.resolve({ exitCode: 0 });
+        }
+        writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+        writeFileSync(join(repo, "Web", "Web.csproj"), project("v4.8"), "utf8");
+        report(sessionsDir, { seq: instruction.seq, stepId: "widget", status: "done", files: ["src/widget.py", "Web/Web.csproj"], testsRun: null, notes: "walked" });
+        return Promise.resolve({ exitCode: 0 });
+      },
+    };
+    await capture(() =>
+      driveSession(sessionsDir, { engine: "claude-code", provider: "anthropic", adapter: engine, maxInvocations: 3 }),
+    );
+
+    assert.equal(refusals.length, 1, "the moved target was not refused at the report");
+    const reasons = refusals[0].join(" ");
+    assert.match(reasons, /\[contract-moved\]/);
+    assert.match(reasons, /Web\/Web\.csproj: TargetFrameworkVersion at the session's start [0-9a-f]{12} v4\.5\.1, in the tree v4\.8/);
+    assert.doesNotMatch(reasons, /\[check-failed\]/);
+  });
+});
+
 describe("a session rolled back to where it started", () => {
   /** Drive the session in flight from its first `next` to `done`, answering its one step. */
   async function driveToDone(repo: string, sessionsDir: string, sessionNumber: number, plan: unknown, work: string): Promise<void> {

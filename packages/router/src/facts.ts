@@ -23,10 +23,13 @@
 // for a verifier to discover.
 
 import { spawnSync } from "node:child_process";
-import { appendFileSync, lstatSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { SET_BOOKKEEPING_BASENAMES, shlexSplit } from "./checks.ts";
+import type { ContractChange } from "./approvedPlan.ts";
+import { postureOf, type Posture, type RouterConfig } from "./config.ts";
+import { childText, readXmlElements, type XmlElement } from "./solutionDeps.ts";
 import {
   hiddenSpawn,
   MACHINE_DIRNAME,
@@ -891,6 +894,375 @@ export function collectControlFacts(
   return { facts, errors: loaded.errors };
 }
 
+// --- The build contract -----------------------------------------------------
+//
+// What a project builds is fixed by a handful of declared elements -- the
+// target framework, the language version, the JDK, the wrapper's Maven --
+// and an existing repository is held to the ones it had when the session
+// started. Each of
+// them compiles here when moved and breaks in Visual Studio, IntelliJ or
+// Eclipse on the next developer's machine, so a moved one is a failure
+// rather than a finding. Declared elements only: nothing is evaluated,
+// restored or built, and the commit the session started on is the whole of
+// the baseline.
+
+export const KIND_CONTRACT = "contract";
+
+/** The project properties that fix a .NET target, wherever a PropertyGroup sets them. */
+const DOTNET_PROPERTIES: ReadonlySet<string> = new Set([
+  "TargetFramework",
+  "TargetFrameworks",
+  "TargetFrameworkVersion",
+  "TargetFrameworkProfile",
+  "LangVersion",
+  "Nullable",
+  "ImplicitUsings",
+]);
+
+const POM_PROPERTIES: ReadonlySet<string> = new Set([
+  "java.version",
+  "maven.compiler.source",
+  "maven.compiler.target",
+  "maven.compiler.release",
+]);
+
+const COMPILER_SETTINGS: ReadonlySet<string> = new Set(["source", "target", "release"]);
+
+/** The Gradle settings that fix a Java target, each read as the rest of its line declares it. */
+const GRADLE_SETTING =
+  /^\s*(?:java\s*\.\s*)?(sourceCompatibility|targetCompatibility|languageVersion)\b\s*(?:=\s*)?(.*?)\s*$/;
+
+const DISTRIBUTION_URL = /^\s*distributionUrl\s*[=:]\s*(.*?)\s*$/;
+
+function isProjectFile(name: string): boolean {
+  return /\.(cs|vb|fs)proj$/i.test(name);
+}
+
+/** Whether `path` (repository-relative) is a build file whose contract is held. */
+export function isContractFile(path: string): boolean {
+  const forward = path.replace(/\\/g, "/");
+  const name = (forward.split("/").pop() ?? "").toLowerCase();
+  if (isProjectFile(name)) return true;
+  if (name === "maven-wrapper.properties") return forward.toLowerCase().endsWith(".mvn/wrapper/maven-wrapper.properties");
+  if (name === "gradle-wrapper.properties") return forward.toLowerCase().endsWith("gradle/wrapper/gradle-wrapper.properties");
+  return [
+    "directory.build.props",
+    "global.json",
+    "packages.config",
+    "web.config",
+    "app.config",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+  ].includes(name);
+}
+
+/** One build file's contract: element -> declared value, or why it could not be read. */
+export interface ContractReading {
+  readonly elements: ReadonlyMap<string, string>;
+  readonly error: string | null;
+}
+
+function msbuildContract(elements: readonly XmlElement[], out: Map<string, string>): void {
+  const root = elements.find((element) => element.parentId === null && element.name === "Project");
+  for (const attribute of ["Sdk", "ToolsVersion"]) {
+    const value = root?.attributes[attribute];
+    if (value !== undefined) out.set(`Project ${attribute}`, value);
+  }
+  // Each declaration is its own element: a condition usually sits on the
+  // PropertyGroup rather than the property, and a property declared twice
+  // under one condition is told apart by its place, so moving the first of
+  // two cannot be hidden by the second.
+  const byId = new Map(elements.map((each) => [each.id, each]));
+  const seen = new Map<string, number>();
+  for (const element of [...elements].sort((left, right) => left.id - right.id)) {
+    if (!DOTNET_PROPERTIES.has(element.name) || !element.path.includes("PropertyGroup")) continue;
+    const group = element.parentId === null ? undefined : byId.get(element.parentId);
+    const conditions = [group?.attributes["Condition"], element.attributes["Condition"]]
+      .map((condition) => condition?.trim())
+      .filter((condition): condition is string => Boolean(condition));
+    const base = conditions.length > 0 ? `${element.name} (${conditions.join(" and ")})` : element.name;
+    const count = (seen.get(base) ?? 0) + 1;
+    seen.set(base, count);
+    out.set(count === 1 ? base : `${base} #${count}`, element.text);
+  }
+}
+
+function descendantOf(byId: ReadonlyMap<number, XmlElement>, element: XmlElement, ancestor: XmlElement): boolean {
+  let parent = element.parentId;
+  while (parent !== null) {
+    if (parent === ancestor.id) return true;
+    parent = byId.get(parent)?.parentId ?? null;
+  }
+  return false;
+}
+
+function pomContract(elements: readonly XmlElement[], out: Map<string, string>): void {
+  for (const element of elements) {
+    const parentPath = element.path.join("/");
+    if (element.name === "packaging" && parentPath === "project") out.set("packaging", element.text);
+    if (element.name === "parent" && parentPath === "project") {
+      const coordinate = ["groupId", "artifactId", "version"].map((child) => childText(elements, element, child) ?? "");
+      out.set("parent", coordinate.join(":"));
+      // Where Maven looks for the parent first: a moved path can resolve another one.
+      const relativePath = childText(elements, element, "relativePath");
+      if (relativePath !== null) out.set("parent relativePath", relativePath);
+    }
+    if (POM_PROPERTIES.has(element.name) && parentPath === "project/properties") {
+      out.set(`properties ${element.name}`, element.text);
+    }
+  }
+  const byId = new Map(elements.map((each) => [each.id, each]));
+  for (const plugin of elements.filter((element) => element.name === "plugin")) {
+    const artifact = childText(elements, plugin, "artifactId");
+    const managed = plugin.path.includes("pluginManagement") ? "pluginManagement " : "";
+    for (const element of elements) {
+      if (!descendantOf(byId, element, plugin) || !element.path.includes("configuration")) continue;
+      if (artifact === "maven-compiler-plugin" && COMPILER_SETTINGS.has(element.name)) {
+        out.set(`${managed}maven-compiler-plugin ${element.name}`, element.text);
+      }
+      if (artifact === "maven-toolchains-plugin" && element.path.includes("jdk")) {
+        out.set(`${managed}maven-toolchains-plugin jdk ${element.name}`, element.text);
+      }
+    }
+  }
+}
+
+function globalJsonContract(text: string, out: Map<string, string>): void {
+  const doc = JSON.parse(text) as Record<string, unknown>;
+  const sdk = doc["sdk"];
+  if (sdk !== null && typeof sdk === "object") {
+    for (const [key, value] of Object.entries(sdk as Record<string, unknown>)) out.set(`sdk ${key}`, String(value));
+  }
+  const sdks = doc["msbuild-sdks"];
+  if (sdks !== null && typeof sdks === "object") {
+    for (const [key, value] of Object.entries(sdks as Record<string, unknown>)) out.set(`msbuild-sdks ${key}`, String(value));
+  }
+}
+
+/**
+ * The elements of one build file that fix what it builds. `path` decides
+ * which reader applies; a file that cannot be read says so rather than
+ * reading as a file with no contract, which would make every element look
+ * removed.
+ */
+export function readContract(path: string, text: string): ContractReading {
+  const out = new Map<string, string>();
+  const name = (path.replace(/\\/g, "/").split("/").pop() ?? "").toLowerCase();
+  try {
+    if (name === "global.json") {
+      globalJsonContract(text, out);
+    } else if (name.endsWith(".properties") || name.startsWith("build.gradle")) {
+      for (const line of text.split(/\r?\n/)) {
+        const url = DISTRIBUTION_URL.exec(line);
+        if (url && name.endsWith(".properties")) out.set("distributionUrl", url[1] as string);
+        const setting = GRADLE_SETTING.exec(line);
+        if (setting && name.startsWith("build.gradle")) out.set(setting[1] as string, setting[2] as string);
+      }
+    } else {
+      const elements = readXmlElements(text);
+      if (name === "pom.xml") pomContract(elements, out);
+      else if (name === "packages.config") {
+        for (const entry of elements.filter((element) => element.name === "package")) {
+          const id = entry.attributes["id"];
+          if (!id) continue;
+          const version = entry.attributes["version"] ?? "";
+          const framework = entry.attributes["targetFramework"];
+          out.set(`package ${id}`, framework ? `${version} (${framework})` : version);
+        }
+      } else if (name === "web.config" || name === "app.config") {
+        for (const element of elements) {
+          const framework = element.attributes["targetFramework"];
+          if ((element.name === "compilation" || element.name === "httpRuntime") && framework !== undefined) {
+            out.set(`${element.name} targetFramework`, framework);
+          }
+        }
+      } else msbuildContract(elements, out);
+    }
+  } catch (error) {
+    return { elements: out, error: error instanceof Error ? error.message : String(error) };
+  }
+  return { elements: out, error: null };
+}
+
+/** The paths git lists in `args`, repository-relative, or null when git cannot answer. */
+function listedPaths(repoRoot: string, args: readonly string[]): string[] | null {
+  const listed = runGit(repoRoot, args);
+  if (listed.code !== 0) return null;
+  return listed.stdout.split("\0").filter((path) => path !== "");
+}
+
+/** The item a non-SDK project must list a new file as, by its extension, or null for none. */
+function requiredItem(path: string): "Compile" | "Content" | null {
+  if (/\.(cs|vb)$/i.test(path)) return "Compile";
+  if (/\.(cshtml|aspx|ascx)$/i.test(path)) return "Content";
+  return null;
+}
+
+/** An MSBuild `Include` as a whole-path matcher: `**` crosses folders, `*` does not. */
+function includeMatcher(include: string): RegExp {
+  const pattern = include
+    .replace(/\\/g, "/")
+    .split(/(\*\*\/?|\*)/)
+    .map((part) =>
+      part === "**/" ? "(?:.*/)?" : part === "**" ? ".*" : part === "*" ? "[^/]*" : part.replace(/[.+?^${}()|[\]]/g, "\\$&"),
+    )
+    .join("");
+  return new RegExp(`^${pattern}$`, "i");
+}
+
+/**
+ * New source and view files a non-SDK project does not list. Such a project
+ * compiles only what it names, so a file MSBuild here is told about some
+ * other way is a file Visual Studio does not see. The nearest project above
+ * a file owns it; an SDK-style owner globs, and asks nothing.
+ */
+export function unlistedItems(
+  newFiles: readonly string[],
+  projects: ReadonlyMap<string, string>,
+): string[] {
+  const owners = [...projects.keys()].map((path) => ({ path, dir: path.includes("/") ? path.slice(0, path.lastIndexOf("/") + 1) : "" }));
+  const out: string[] = [];
+  for (const file of newFiles) {
+    const item = requiredItem(file);
+    if (item === null) continue;
+    const candidates = owners.filter((owner) => file.startsWith(owner.dir));
+    const depth = Math.max(-1, ...candidates.map((owner) => owner.dir.length));
+    const nearest = candidates.filter((owner) => owner.dir.length === depth);
+    if (nearest.length === 0) continue;
+    let listed = false;
+    let classic = false;
+    for (const owner of nearest) {
+      let elements: XmlElement[];
+      try {
+        elements = readXmlElements(projects.get(owner.path) as string);
+      } catch {
+        continue;
+      }
+      const root = elements.find((element) => element.parentId === null && element.name === "Project");
+      if (root === undefined || root.attributes["Sdk"] !== undefined) continue;
+      classic = true;
+      const relative = file.slice(owner.dir.length);
+      listed ||= elements.some(
+        (element) =>
+          element.name === item &&
+          element.attributes["Include"] !== undefined &&
+          includeMatcher(element.attributes["Include"]).test(relative),
+      );
+    }
+    if (classic && !listed) {
+      out.push(`${file}: new, and no ${item} item of ${nearest.map((owner) => owner.path).join(" or ")} lists it`);
+    }
+  }
+  return out;
+}
+
+function describeContract(reading: ContractReading): string {
+  if (reading.error !== null) return `unreadable (${reading.error})`;
+  if (reading.elements.size === 0) return "no target elements";
+  return [...reading.elements].map(([element, value]) => `${element}=${value}`).join(", ");
+}
+
+/**
+ * Every moved element, deleted build file and unreadable one, as a line
+ * each; and every new build file's target, which has nothing to be held to.
+ */
+export function compareContracts(
+  head: ReadonlyMap<string, ContractReading>,
+  tree: ReadonlyMap<string, ContractReading>,
+  base = "HEAD",
+): { failures: string[]; added: string[] } {
+  const failures: string[] = [];
+  const added: string[] = [];
+  for (const [path, before] of head) {
+    const after = tree.get(path);
+    if (after === undefined) {
+      failures.push(`${path}: deleted (at ${base}: ${describeContract(before)})`);
+      continue;
+    }
+    if (after.error !== null && before.error === null) {
+      failures.push(`${path}: could not be read (${after.error})`);
+      continue;
+    }
+    const names = [...new Set([...before.elements.keys(), ...after.elements.keys()])].sort();
+    for (const element of names) {
+      const was = before.elements.get(element);
+      const now = after.elements.get(element);
+      if (was === now) continue;
+      failures.push(`${path}: ${element} at ${base} ${was ?? "(absent)"}, in the tree ${now ?? "(absent)"}`);
+    }
+  }
+  for (const [path, reading] of tree) {
+    if (!head.has(path)) added.push(`${path}: new, ${describeContract(reading)}`);
+  }
+  return { failures, added };
+}
+
+/**
+ * The `contract` control: the working tree's build files held, element by
+ * element, to what `base` declares -- the commit the session started on,
+ * so a target the engine moves and commits is still a moved target. Not
+ * applicable to a repository the framework scaffolds, whose targets are its
+ * own to choose, nor to a file whose contract the session's approved plan
+ * lets move -- `approved` -- which the detail names with the plan's reason;
+ * every other file stays held.
+ */
+export function contractFact(
+  repoRoot: string,
+  posture: Posture,
+  approved: ContractChange | null = null,
+  base = "HEAD",
+): ControlFact {
+  if (posture !== "maintenance") {
+    return controlFact(KIND_CONTRACT, STATUS_NOT_APPLICABLE, "", false, "posture is greenfield: no build contract is held");
+  }
+  const label = base === "HEAD" ? "HEAD" : `the session's start ${base.slice(0, 12)}`;
+  const atHead = listedPaths(repoRoot, ["ls-tree", "-r", "-z", "--name-only", base]);
+  const listed = listedPaths(repoRoot, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
+  if (atHead === null || listed === null) {
+    return controlFact(KIND_CONTRACT, STATUS_UNKNOWN, "", true, `git could not list the build files at ${label} and in the tree`);
+  }
+  const head = new Map<string, ContractReading>();
+  for (const path of atHead.filter(isContractFile)) {
+    const shown = runGit(repoRoot, ["show", `${base}:${path}`]);
+    if (shown.code !== 0) {
+      return controlFact(KIND_CONTRACT, STATUS_UNKNOWN, "", true, `git could not show ${path} at ${label}`);
+    }
+    head.set(path, readContract(path, shown.stdout));
+  }
+  const inTree = listed.filter((path) => existsSync(join(repoRoot, ...path.split("/"))));
+  const tree = new Map<string, ContractReading>();
+  const projects = new Map<string, string>();
+  for (const path of inTree.filter(isContractFile)) {
+    const text = readFileSync(join(repoRoot, ...path.split("/")), "utf8");
+    tree.set(path, readContract(path, text));
+    if (isProjectFile(path)) projects.set(path, text);
+  }
+  const released: string[] = [];
+  for (const path of approved?.files ?? []) {
+    if (!head.has(path) && !tree.has(path)) continue;
+    head.delete(path);
+    tree.delete(path);
+    released.push(`${path}: not_applicable -- the approved plan changes its contract: ${approved?.reason ?? ""}`);
+  }
+  const { failures, added } = compareContracts(head, tree, label);
+  const headPaths = new Set(atHead);
+  failures.push(...unlistedItems(inTree.filter((path) => !headPaths.has(path)), projects));
+  if (failures.length > 0) {
+    return controlFact(
+      KIND_CONTRACT,
+      STATUS_FAIL,
+      "",
+      true,
+      `the build contract does not hold against ${label} -- keep each element as it declares it, ` +
+        "and list each new file in its project:\n" +
+        [...failures, ...released].join("\n"),
+    );
+  }
+  const held = `${head.size} build file(s) held to ${label}; none moved`;
+  return controlFact(KIND_CONTRACT, STATUS_PASS, "", true, [held, ...released, ...added].join("\n"));
+}
+
 // --- The record -------------------------------------------------------------
 
 export interface FactRecord {
@@ -941,9 +1313,15 @@ export function factRecordToDict(record: FactRecord): Record<string, unknown> {
 
 /**
  * Every deterministic fact about the tree as it now stands, in one record:
- * the declared controls and the lines the change adds. The changed lines
- * are context: nothing is judged by them.
+ * the declared controls, the build contract, and the lines the change adds.
+ * The changed lines are context: nothing is judged by them. The contract is
+ * the framework's own control rather than a declared one, so no
+ * `testing.controls` entry can name it, replace it or leave it out.
  */
+function isPlainObject(value: unknown): boolean {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export async function collectFacts(
   repoRoot: string,
   sessionsDir: string,
@@ -954,10 +1332,22 @@ export async function collectFacts(
   } = {},
 ): Promise<FactRecord> {
   const { preverifyBaseline } = await import("./affected.ts");
+  const { approvedContractChange, sessionStartCommit } = await import("./approvedPlan.ts");
 
   const { facts, errors } = collectControlFacts(repoRoot, config);
+  const posture = isPlainObject(config) ? postureOf(config as RouterConfig) : "greenfield";
+  const session = posture === "maintenance" ? options.sessionNumber ?? null : null;
+  const contract =
+    session === null
+      ? contractFact(repoRoot, posture)
+      : contractFact(
+          repoRoot,
+          posture,
+          approvedContractChange(repoRoot, sessionsDir, session),
+          sessionStartCommit(sessionsDir, session),
+        );
   return factRecord({
-    controls: [...facts],
+    controls: [...facts, contract],
     changed: changedLines(repoRoot, preverifyBaseline(repoRoot, sessionsDir)),
     sessionNumber: options.sessionNumber ?? null,
     roundNumber: options.roundNumber ?? null,

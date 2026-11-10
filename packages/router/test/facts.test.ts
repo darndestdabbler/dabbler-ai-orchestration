@@ -22,6 +22,7 @@ import {
   buildDiffPathspecs,
   changedLines,
   checkEvidenceCap,
+  contractFact,
   controlFact,
   controlFactRed,
   factRecord,
@@ -31,7 +32,7 @@ import {
   parseChangedLines,
   redFactsRefusal,
 } from "../src/facts.ts";
-import { gitAnswers, tempDir } from "./support/answers.ts";
+import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 const CAP_ENV = "AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS";
 
 describe("the diff pathspecs", () => {
@@ -195,5 +196,161 @@ describe("the record", () => {
     const lines = readFileSync(factsPath(repo), "utf8").trimEnd().split("\n");
     assert.equal(lines.length, 2);
     assert.equal(lines[0], '{"changedLines": null, "controls": [], "recordedAt": "one"}');
+  });
+});
+
+/**
+ * The contract control over a fixture tree with a HEAD: `tree` is written to
+ * disk, and git answers for HEAD with `head`'s paths and contents.
+ */
+function contractOver(
+  head: Record<string, string>,
+  tree: Record<string, string>,
+  posture: "greenfield" | "maintenance" = "maintenance",
+): ReturnType<typeof contractFact> {
+  const repo = tempDir();
+  seed(repo, tree);
+  const restore = gitAnswers([
+    [["ls-tree"], { stdout: Object.keys(head).join("\0") }],
+    [["ls-files"], { stdout: Object.keys(tree).join("\0") }],
+    [(args) => args[0] === "show", (args) => ({ stdout: head[(args[1] ?? "").replace(/^[^:]*:/, "")] ?? "" })],
+  ]);
+  try {
+    return contractFact(repo, posture);
+  } finally {
+    restore();
+  }
+}
+
+const CLASSIC = (version: string): string =>
+  `<Project ToolsVersion="15.0"><PropertyGroup><TargetFrameworkVersion>${version}</TargetFrameworkVersion></PropertyGroup></Project>`;
+const SDK = (extra = ""): string =>
+  `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework>${extra}</PropertyGroup></Project>`;
+
+describe("the build contract", () => {
+  it("refuses a non-SDK project whose TargetFrameworkVersion moved, naming both values", () => {
+    const fact = contractOver({ "Web/Web.csproj": CLASSIC("v4.5.1") }, { "Web/Web.csproj": CLASSIC("v4.8") });
+    assert.equal(fact.status, STATUS_FAIL);
+    assert.equal(fact.required, true);
+    assert.match(fact.detail, /Web\/Web\.csproj: TargetFrameworkVersion at HEAD v4\.5\.1, in the tree v4\.8/);
+  });
+
+  it("refuses an SDK project that gained Nullable", () => {
+    const fact = contractOver({ "App/App.csproj": SDK() }, { "App/App.csproj": SDK("<Nullable>enable</Nullable>") });
+    assert.equal(fact.status, STATUS_FAIL);
+    assert.match(fact.detail, /Nullable at HEAD \(absent\), in the tree enable/);
+  });
+
+  it("refuses the first of two conditioned LangVersion declarations moved, though the second is unchanged", () => {
+    const project = (debug: string): string =>
+      `<Project ToolsVersion="15.0">` +
+      `<PropertyGroup Condition=" '$(Configuration)' == 'Debug' "><LangVersion>${debug}</LangVersion></PropertyGroup>` +
+      `<PropertyGroup Condition=" '$(Configuration)' == 'Release' "><LangVersion>7.3</LangVersion></PropertyGroup></Project>`;
+    const fact = contractOver({ "Web/Web.csproj": project("7.3") }, { "Web/Web.csproj": project("latest") });
+    assert.equal(fact.status, STATUS_FAIL);
+    assert.match(fact.detail, /LangVersion \('\$\(Configuration\)' == 'Debug'\) at HEAD 7\.3, in the tree latest/);
+    assert.doesNotMatch(fact.detail, /Release/);
+  });
+
+  it("refuses a PropertyGroup whose condition moved under an unchanged LangVersion, naming both conditions", () => {
+    const project = (configuration: string): string =>
+      `<Project ToolsVersion="15.0"><PropertyGroup Condition=" '$(Configuration)' == '${configuration}' ">` +
+      `<LangVersion>7.3</LangVersion></PropertyGroup></Project>`;
+    const fact = contractOver({ "Web/Web.csproj": project("Debug") }, { "Web/Web.csproj": project("Release") });
+    assert.equal(fact.status, STATUS_FAIL);
+    assert.match(fact.detail, /LangVersion \('\$\(Configuration\)' == 'Debug'\) at HEAD 7\.3, in the tree \(absent\)/);
+    assert.match(fact.detail, /LangVersion \('\$\(Configuration\)' == 'Release'\) at HEAD \(absent\), in the tree 7\.3/);
+  });
+
+  it("refuses a POM whose parent relativePath moved", () => {
+    const pom = (path: string): string =>
+      `<project><parent><groupId>g</groupId><artifactId>p</artifactId><version>1</version><relativePath>${path}</relativePath></parent></project>`;
+    const fact = contractOver({ "app/pom.xml": pom("../parent/pom.xml") }, { "app/pom.xml": pom("") });
+    assert.equal(fact.status, STATUS_FAIL);
+    assert.match(fact.detail, /parent relativePath at HEAD \.\.\/parent\/pom\.xml, in the tree /);
+  });
+
+  it("refuses a packages.config entry bumped", () => {
+    const config = (version: string): string =>
+      `<?xml version="1.0"?><packages><package id="Newtonsoft.Json" version="${version}" targetFramework="net451" /></packages>`;
+    const fact = contractOver({ "Web/packages.config": config("6.0.4") }, { "Web/packages.config": config("13.0.3") });
+    assert.equal(fact.status, STATUS_FAIL);
+    assert.match(fact.detail, /package Newtonsoft\.Json at HEAD 6\.0\.4 \(net451\), in the tree 13\.0\.3 \(net451\)/);
+  });
+
+  it("refuses a POM that gained maven.compiler.release", () => {
+    const pom = (properties: string): string =>
+      `<project><packaging>war</packaging><properties><java.version>1.8</java.version>${properties}</properties></project>`;
+    const fact = contractOver(
+      { "pom.xml": pom("") },
+      { "pom.xml": pom("<maven.compiler.release>17</maven.compiler.release>") },
+    );
+    assert.equal(fact.status, STATUS_FAIL);
+    assert.match(fact.detail, /pom\.xml: properties maven\.compiler\.release at HEAD \(absent\), in the tree 17/);
+    assert.doesNotMatch(fact.detail, /java\.version/);
+  });
+
+  it("refuses a Maven wrapper whose distributionUrl moved", () => {
+    const wrapper = (version: string): string =>
+      `distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${version}/apache-maven-${version}-bin.zip\n`;
+    const path = ".mvn/wrapper/maven-wrapper.properties";
+    const fact = contractOver({ [path]: wrapper("3.6.3") }, { [path]: wrapper("3.9.9") });
+    assert.equal(fact.status, STATUS_FAIL);
+    assert.match(fact.detail, /maven-wrapper\.properties: distributionUrl at HEAD .*3\.6\.3.*, in the tree .*3\.9\.9/);
+  });
+
+  it("passes a new test project, recording its target, and refuses a deleted build file", () => {
+    const added = contractOver(
+      { "Web/Web.csproj": CLASSIC("v4.8") },
+      { "Web/Web.csproj": CLASSIC("v4.8"), "Web.Tests/Web.Tests.csproj": CLASSIC("v4.8") },
+    );
+    assert.equal(added.status, STATUS_PASS);
+    assert.match(added.detail, /1 build file\(s\) held to HEAD; none moved/);
+    assert.match(added.detail, /Web\.Tests\/Web\.Tests\.csproj: new, Project ToolsVersion=15\.0, TargetFrameworkVersion=v4\.8/);
+    const deleted = contractOver({ "Web/Web.csproj": CLASSIC("v4.8") }, {});
+    assert.equal(deleted.status, STATUS_FAIL);
+    assert.match(deleted.detail, /Web\/Web\.csproj: deleted/);
+  });
+
+  it("refuses a new .cs under a non-SDK project that no Compile item lists, naming the file, and passes it once listed", () => {
+    const project = (items: string): string =>
+      `<Project ToolsVersion="15.0"><PropertyGroup><TargetFrameworkVersion>v4.8</TargetFrameworkVersion></PropertyGroup>` +
+      `<ItemGroup><Compile Include="Global.asax.cs" />${items}</ItemGroup></Project>`;
+    const head = { "Web/Web.csproj": project("") };
+    const unlisted = contractOver(head, { "Web/Web.csproj": project(""), "Web/Controllers/CalcController.cs": "class C {}" });
+    assert.equal(unlisted.status, STATUS_FAIL);
+    assert.match(unlisted.detail, /Web\/Controllers\/CalcController\.cs: new, and no Compile item of Web\/Web\.csproj lists it/);
+    const listed = contractOver(head, {
+      "Web/Web.csproj": project(`<Compile Include="Controllers\\CalcController.cs" />`),
+      "Web/Controllers/CalcController.cs": "class C {}",
+    });
+    // The project gained an item, which is no element of its contract.
+    assert.equal(listed.status, STATUS_PASS, listed.detail);
+  });
+
+  it("holds the tree to the commit the session started on, so a target the engine moved and committed is still refused", () => {
+    const repo = tempDir();
+    seed(repo, { "Web/Web.csproj": CLASSIC("v4.8") });
+    // HEAD carries the engine's commit of v4.8; the start commit carries v4.5.1.
+    const at: Record<string, string> = { "HEAD:Web/Web.csproj": CLASSIC("v4.8"), "a1b2c3d4e5f6a7b8:Web/Web.csproj": CLASSIC("v4.5.1") };
+    const restore = gitAnswers([
+      [["ls-tree"], { stdout: "Web/Web.csproj" }],
+      [["ls-files"], { stdout: "Web/Web.csproj" }],
+      [(args) => args[0] === "show", (args) => ({ stdout: at[args[1] ?? ""] ?? "" })],
+    ]);
+    try {
+      assert.equal(contractFact(repo, "maintenance").status, STATUS_PASS);
+      const fact = contractFact(repo, "maintenance", null, "a1b2c3d4e5f6a7b8");
+      assert.equal(fact.status, STATUS_FAIL);
+      assert.match(fact.detail, /TargetFrameworkVersion at the session's start a1b2c3d4e5f6 v4\.5\.1, in the tree v4\.8/);
+    } finally {
+      restore();
+    }
+  });
+
+  it("does not apply to a greenfield repository", () => {
+    const fact = contractOver({ "App/App.csproj": SDK() }, { "App/App.csproj": SDK("<Nullable>enable</Nullable>") }, "greenfield");
+    assert.equal(fact.status, STATUS_NOT_APPLICABLE);
+    assert.equal(fact.required, false);
   });
 });

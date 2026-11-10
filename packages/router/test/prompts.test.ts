@@ -18,6 +18,7 @@ import {
   splitLines,
 } from "../src/verify/prompts.ts";
 import { writeWorkPlan } from "../src/driver.ts";
+import { controlFact } from "../src/facts.ts";
 import { appendDecision, registerSessionStart } from "../src/writers.ts";
 import { buildVerificationPrompt } from "../src/verifyjob.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
@@ -225,6 +226,17 @@ describe("the task block a round opens with", () => {
     assert.ok(block.includes("The unit suite failed its run of record (`npm test`)"));
     assert.ok(block.includes("the framework asked the author to fix the cause"));
     assert.ok(!buildTaskBlock(sessionsDir, 1, 2, [], null, repo).includes("run of record failed"));
+  });
+
+  it("tells a maintained repository's reviewer its posture and the contract result, and a greenfield one nothing", () => {
+    const repo = tempDir();
+    seed(repo, { "docs/sessions/session-plan.md": "### Session 1 of 1: First things\n1. Build the widget.\n" });
+    const sessionsDir = join(repo, "docs", "sessions");
+    const fact = controlFact("contract", "fail", "", true, "Web/Web.csproj: TargetFrameworkVersion at HEAD v4.5.1, in the tree v4.8");
+    const block = buildTaskBlock(sessionsDir, 1, 1, [], null, repo, null, [], null, fact);
+    assert.ok(block.includes("`posture: maintenance`") && block.includes("`contract` control: **fail**"), block);
+    assert.ok(block.includes("TargetFrameworkVersion at HEAD v4.5.1, in the tree v4.8"));
+    assert.ok(!buildTaskBlock(sessionsDir, 1, 1, [], null, repo, null, [], null, null).includes("The build contract"));
   });
 });
 

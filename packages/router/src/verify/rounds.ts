@@ -51,6 +51,7 @@ import {
   explainReviewingTransport,
   withSessionVehicle,
   verificationRoundCap,
+  postureOf,
   type RouterConfig,
 } from "../config.ts";
 import { namedReviewingVehicle } from "../sessionState.ts";
@@ -64,6 +65,7 @@ import {
   EvidenceEmptyError,
   EvidenceTooLargeError,
   FactsError,
+  KIND_CONTRACT,
   appendFacts,
   assembleEvidence,
   assembleFixDeltaEvidence,
@@ -899,6 +901,9 @@ export async function runRound(
       grant,
       untested,
       failedRunOfRecord,
+      postureOf(config) === "maintenance"
+        ? (facts.controls.find((fact) => fact.kind === KIND_CONTRACT) ?? null)
+        : null,
     ),
     "session-verification",
     evidence,

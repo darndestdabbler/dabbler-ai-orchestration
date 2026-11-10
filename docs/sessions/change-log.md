@@ -2185,3 +2185,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: none — this round's verifier could not look at the tree
 - Raw round output: `.dabbler/runs/s305/`
+
+## Session 306 adjudication — VERIFIED (every disputed finding OVERRULED)
+
+- Adjudicator: gemini-4-argon (google) over api
+- Excluded providers: anthropic, openai
+- Dispute on round 7 finding 0: OVERRULED — The cited evidence demonstrates that `approved-plan.json` lives in untracked, engine-writable `.dabbler/` (`AGENTS.md` 238-244), is not produced by driven sessions (`verify/steps.ts` 19-30), and accepts caller-supplied timestamps with an unkeyed content hash (`approvedPlan.ts` 313-324), meaning an engine could trivially forge and backdate it to bypass contract control if it granted authorization on its own; anchoring `approvedContractChange` to `docs/sessions/session-plan.md` at `sessionStartCommit` (`approvedPlan.ts` 646-690) while recording `contract_change` in the plan schema satisfies `session-plan.md` (18066-18073) without reopening the self-approval bypass.
+- Raw round output: `.dabbler/runs/s306/`

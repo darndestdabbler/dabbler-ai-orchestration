@@ -632,6 +632,10 @@ export interface AmendInput {
   readonly reason: string;
   /** Who was working when it was amended, as the record from `start` says. */
   readonly by: string;
+  /** Whether a person asked, rather than an engine: an accepted step's checks are a person's to move. */
+  readonly byPerson: boolean;
+  /** The sessions directory as the person's command names it, for the refusal that prints it. */
+  readonly sessionsDir: string;
 }
 
 /**
@@ -706,7 +710,26 @@ export function recordRepair(
 }
 
 /**
- * Change what ONE not-yet-accepted step is measured against.
+ * What an engine is told at a verb that is a person's: a forced cancel, a
+ * forced close, a held release, an accepted step's checks. One sentence for
+ * all of them, so the AI is told the same thing wherever it reaches for one,
+ * and told what to do instead. Here rather than in session.ts because this
+ * module is the one the other imports.
+ */
+export function personsVerb(
+  verb: string,
+  does: string,
+  how: string,
+  instead = "Report the step blocked and say why",
+): string {
+  return (
+    `\`session ${verb}\` is a person's verb, never the engine's: it ` +
+    `${does}, and that judgement is not the engine's to make. ${instead}; ${how}.`
+  );
+}
+
+/**
+ * Change what ONE step is measured against.
  *
  * Session 62 asked for exactly this and nothing in the framework could do
  * it: an engine that had correctly diagnosed a step it could not satisfy
@@ -715,11 +738,18 @@ export function recordRepair(
  * amended plan goes back through `writeWorkPlan` -- an amendment that could
  * write a plan the reader refuses would break the session it meant to save.
  *
- * What is NOT amendable is deliberate. An accepted step's report has been
- * measured; moving its bar afterwards changes what the record says was
- * judged. `task` and `releasable` are the declaration, and a step's `id`
- * and `ask` are the work itself -- a session that wants to do different
- * work replans, and replanning is a thing the record can show.
+ * An accepted step is different in one way and not another. Its report was
+ * measured against the step as it stood, and nothing rewrites that -- but
+ * its checks are run again against every fix, so a bar still being applied
+ * has to be movable by someone. A person may move it: the row says the step
+ * had been accepted, and its `before` is what the accepted report was
+ * measured against. An engine may not, and is told to hand the proposal to
+ * the person. An accepted step's `files` were measured once and nothing
+ * measures them again, so they move for nobody.
+ *
+ * `task` and `releasable` are the declaration, and a step's `id` and `ask`
+ * are the work itself -- a session that wants to do different work replans,
+ * and replanning is a thing the record can show.
  */
 export function amendPlanStep(
   repoRoot: string,
@@ -751,10 +781,24 @@ export function amendPlanStep(
         plan.steps.map((step) => `'${step.id}'`).join(", "),
     );
   }
-  if (acceptedSteps.includes(input.stepId)) {
+  const afterAcceptance = acceptedSteps.includes(input.stepId);
+  if (afterAcceptance && input.files !== null) {
     throw new LedgerError(
-      `step '${input.stepId}' has already been accepted; its report was measured against ` +
-        "the step as it stood, and amending it now would move that bar afterwards",
+      `step '${input.stepId}' has already been accepted, and its files were measured once, ` +
+        "when it was; nothing measures them again, so they are not amended. Its checks are " +
+        "a person's to amend",
+    );
+  }
+  if (afterAcceptance && !input.byPerson) {
+    throw new LedgerError(
+      personsVerb(
+        "plan amend",
+        `moves the checks of step '${input.stepId}', which was accepted and is measured ` +
+          "again against every fix",
+        `the person runs: dabbler session plan amend --sessions-dir ${input.sessionsDir.replace(/\\/g, "/")} ` +
+          `--step ${input.stepId} --checks-file <path> --reason "<why>"`,
+        "Report the step blocked, with the proposed checks and the reason in --notes",
+      ),
     );
   }
   const after = {
@@ -776,6 +820,7 @@ export function amendPlanStep(
     reason,
     by: input.by,
     amended_at: amendedAt,
+    ...(afterAcceptance ? { after_acceptance: true } : {}),
     before: { files: [...before.files], checks: before.checks },
     after: { files: after.files, checks: after.checks },
   });
@@ -1506,6 +1551,14 @@ export const AMEND_CHECKS_COMMAND =
   'dabbler session plan amend --step <id> --checks-file <path> --reason "<why>"';
 
 /**
+ * The way past a check an earlier, accepted step declared: that amendment
+ * refuses an engine, so naming the verb to it would send it to a refusal.
+ */
+export const ACCEPTED_CHECK_WAYS =
+  "A check an earlier, accepted step declared is the operator's to amend, never the " +
+  "engine's: report the step --status blocked, with the proposed checks and the reason in --notes.";
+
+/**
  * The third way to end a session, beside carrying on and cancelling: back to
  * where it started. A person's, because what a cancel leaves in the tree
  * was how unverified work reached a trunk, and an engine cannot judge that
@@ -1575,8 +1628,8 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         parts,
         `Read the last rejection's reasons and answer step${parts.step} again`,
         "The step is asked afresh. Nothing already accepted is re-asked, and " +
-          "no provider call is made by asking. A check that was wrong is amended " +
-          `first, not fought: ${AMEND_CHECKS_COMMAND}.`,
+          "no provider call is made by asking. A check of the step in hand that was " +
+          `wrong is amended first, not fought: ${AMEND_CHECKS_COMMAND}. ${ACCEPTED_CHECK_WAYS}`,
       ),
       rollbackChoice(),
       cancelChoice(),

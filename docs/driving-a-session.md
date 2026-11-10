@@ -181,6 +181,32 @@ answer now asks, and that a `wait` never reaches the engine.
   `dabbler verify --max-rounds` is unchanged: that is the verb's own flag,
   for a round run by hand outside a driven session.
 
+- **A step's checks that no longer describe it are amended, not fought.**
+  The step's files or its checks move with a reason, through the same verb:
+
+  ```
+  dabbler session plan amend --sessions-dir docs/sessions \
+      --step <id> --checks-file <path> --reason "<why>"
+  ```
+
+  and the next answer to that step is measured against the amended step.
+  The engine amends a step that has not been accepted yet.
+
+  **An accepted step's checks are a person's to amend, never the
+  engine's.** Its report was measured against the checks as they stood, and
+  nothing rewrites that; but every fix step and every run-of-record fix is
+  measured against every plan step's checks, so a check the later work
+  outgrew is still being applied, and someone has to be able to move it.
+  An engine that asks is refused and told to report the step `blocked`,
+  with the proposed checks and the reason in its notes; the refusal prints
+  the person's command whole. A person running it gets the amendment, and
+  the row in `amendments.jsonl` carries `after_acceptance: true` beside the
+  reason and the `before` checks, which are what the accepted report was
+  measured against. A fix step already in flight is measured against the
+  amended checks on its next answer. An accepted step's **files** are
+  amended by nobody: they were measured once, and nothing measures them
+  again.
+
 - **A non-goal the work falsifies is dropped, not disputed.** Non-goals are
   declared before the work, and the work can prove one of them wrong — the
   change the plan said it would not make turns out to be the only way the

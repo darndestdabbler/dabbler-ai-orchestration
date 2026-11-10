@@ -12,7 +12,9 @@ import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  ACCEPTED_CHECK_WAYS,
   WATCHER_OUTSTANDING,
+  amendPlanStep,
   instructionPath,
   loopPath,
   readRun,
@@ -828,13 +830,67 @@ describe("a check that fails", () => {
     const run = { exitCode: 1, timedOut: false, treeMutated: false, output: "" };
     const inherited = checkFailedRefusal("fix-round-1", { argv: ["grep", "ArchUnitNET", "x.csproj"], owner: "add-architecture-test" }, run);
     assert.match(inherited, /^\[check-failed\] check failed: grep ArchUnitNET x.csproj -> exit 1 \(declared by step 'add-architecture-test'\)/);
-    assert.ok(inherited.endsWith(CHECK_FAILED_WAYS), inherited);
+    // An earlier step's check is the operator's to amend, and that verb
+    // refuses an engine: the refusal says to report blocked instead.
+    assert.ok(inherited.endsWith(ACCEPTED_CHECK_WAYS), inherited);
+    assert.match(ACCEPTED_CHECK_WAYS, /operator's to amend.*--status blocked, with the proposed checks/);
     assert.match(CHECK_FAILED_WAYS, /dabbler session plan amend --step <id> --checks-file <path> --reason/);
     assert.match(CHECK_FAILED_WAYS, /--status blocked/);
     const own = checkFailedRefusal("add-architecture-test", { argv: ["grep", "ArchUnitNET", "x.csproj"], owner: "add-architecture-test" }, run);
     assert.ok(!own.includes("declared by step"), own);
+    assert.ok(own.endsWith(CHECK_FAILED_WAYS), own);
     const timedOut = checkFailedRefusal("widget", { argv: ["sleep"] }, { exitCode: null, timedOut: true, treeMutated: true, output: "tick\n" });
     assert.match(timedOut, /-> exit none \(timed out\) \(the check changed the tree\)\ntick\n/);
+  });
+
+  it("measures a fix step against an earlier step's check as a person amended it", async () => {
+    // From the field, 2026-11-10: a fix is measured against every accepted
+    // step's checks, and one the later work outgrew could not be moved.
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeWorkPlan(repo, 1, {
+      schema_version: 1, session_number: 1, task: "Make the widget real.",
+      non_goals: ["Anything the step does not name."],
+      steps: [
+        { id: "one", ask: "Make it.", files: ["src/widget.py"], checks: [{ argv: ["node", "-e", "process.exit(1)"] }] },
+        { id: "two", ask: "Polish it.", files: ["src/widget.py"], checks: [{ argv: ["node", "-e", "0"] }] },
+      ],
+      recorded_at: "2026-11-10T10:00:00-05:00",
+    });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase: "work", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: ["one"], baseline_tree: null,
+      stop: null, lease_epoch: 1,
+      pending_step: { id: "fix-configuration", ask: "Fix it.", then: "work" },
+      started_at: "2026-11-10T10:00:00-05:00", updated_at: "2026-11-10T10:00:00-05:00",
+    });
+    const asked = await capture(() => sessionNext(sessionsDir, {}));
+    const seq = owedInstruction(repo, 1)?.seq ?? 0;
+    assert.match(asked.stdout, /"step_id": "fix-configuration"/);
+    amendPlanStep(
+      repo,
+      1,
+      {
+        stepId: "one", files: null, checks: [{ argv: ["node", "-e", "0"] }],
+        reason: "the later work outgrew it", by: "operator", byPerson: true, sessionsDir: "docs/sessions",
+      },
+      ["one"],
+      "2026-11-10T10:01:00-05:00",
+    );
+    // The fix moves nothing: what is under test is the check it is measured against.
+    writeFileSync(
+      reportPath(repo, 1),
+      JSON.stringify(report({ seq, step_id: "fix-configuration", files_changed: [] })),
+    );
+    const answered = await capture(() => sessionNext(sessionsDir, {}));
+    const events = readDriverEvents(repo, 1);
+    assert.ok(
+      events.some((event) => event.event === "report-accepted" && event.fields["step"] === "fix-configuration"),
+      JSON.stringify(events),
+    );
+    assert.ok(events.some((event) => event.event === "check-passed" && event.fields["owner"] === "one"), JSON.stringify(events));
+    assert.ok(!events.some((event) => event.event === "check-failed"), answered.stdout);
+    assert.match(answered.stdout, /"step_id": "two"/);
   });
 
   it("is judged on what it changed: a read-only check after a writer passes, and the writer's refusal names its path", async () => {

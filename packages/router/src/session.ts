@@ -84,6 +84,7 @@ import {
   WORK_PLAN_SCHEMA,
   amendPlanStep,
   amendRoundCap,
+  personsVerb,
   dispositionsPath,
   dropNonGoal,
   driverDir,
@@ -2800,8 +2801,9 @@ export interface PlanAmendCliOptions {
 }
 
 /**
- * Amend what one not-yet-accepted step of the driven plan is measured
- * against, with the reason on the record beside who was working.
+ * Amend what one step of the driven plan is measured against, with the
+ * reason on the record beside who was working -- an accepted step's checks
+ * only when a person is asking.
  *
  * The plan under `.dabbler/runs/` is machine-owned like everything else
  * there, and this is the one writer for it -- which is the point. Session 62
@@ -2916,6 +2918,7 @@ export function planAmend(sessionsDir: string, options: PlanAmendCliOptions): nu
     return EXIT_BOUNDARY;
   }
 
+  const accepted = run?.accepted_steps ?? [];
   try {
     amendPlanStep(
       repoRoot,
@@ -2926,8 +2929,10 @@ export function planAmend(sessionsDir: string, options: PlanAmendCliOptions): nu
         checks,
         reason: options.reason,
         by,
+        byPerson: personIsPresent(),
+        sessionsDir: relative(repoRoot, sessionsDir) || ".",
       },
-      run?.accepted_steps ?? [],
+      accepted,
       nowIso(),
     );
   } catch (error) {
@@ -2935,19 +2940,24 @@ export function planAmend(sessionsDir: string, options: PlanAmendCliOptions): nu
     writeErr(`plan amend: refused -- ${error.message}\n`);
     return EXIT_BOUNDARY;
   }
+  const afterAcceptance = accepted.includes(options.stepId as string);
   const moved = [options.files === null ? null : "files", checks === null ? null : "checks"]
     .filter((part): part is string => part !== null)
     .join(" and ");
   recordAmendment(sessionsDir, {
     sessionNumber: target,
-    what: `step '${String(options.stepId)}': its ${moved}`,
+    what: `${afterAcceptance ? "accepted step" : "step"} '${String(options.stepId)}': its ${moved}`,
     reason: options.reason.trim(),
     by,
   });
   writeOut(
     `plan amend: step '${options.stepId}' of session ${sessionDisplayNumber(target)} amended by ` +
-      `${by}; the next instruction for it is measured against the new ` +
-      "step, and what changed is on the record.\n",
+      `${by}; ` +
+      (afterAcceptance
+        ? "its accepted report stays measured against the checks it was, and the checks every " +
+          "later fix is measured against are the new ones"
+        : "the next instruction for it is measured against the new step") +
+      ", and what changed is on the record.\n",
   );
   return EXIT_OK;
 }
@@ -3562,22 +3572,9 @@ export function personIsPresent(env: NodeJS.ProcessEnv = process.env): boolean {
   return !callerIsEngine(env);
 }
 
-/**
- * The refusal an engine meets at a verb that is a person's: a forced cancel,
- * a forced close, a held release. One sentence for all of them, so the AI is
- * told the same thing wherever it reaches for one, and told what to do
- * instead.
- */
-export function isAPersonsVerb(
-  verb: string,
-  does: string,
-  how: string,
-  instead = "Report the step blocked and say why",
-): string {
-  return (
-    `refused -- \`session ${verb}\` is a person's verb, never the engine's: it ` +
-    `${does}, and that judgement is not the engine's to make. ${instead}; ${how}.`
-  );
+/** The refusal an engine meets at a verb that is a person's, in `personsVerb`'s words. */
+export function isAPersonsVerb(...words: Parameters<typeof personsVerb>): string {
+  return `refused -- ${personsVerb(...words)}`;
 }
 
 /** The framework's own files a cancellation commits, and nothing else. */

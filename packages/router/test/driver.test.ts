@@ -291,13 +291,68 @@ describe("the four answer schemas", () => {
     try {
       writeWorkPlan(repo, 1, PLAN);
       const amend = (argv: string[]) =>
-        amendPlanStep(repo, 1, { stepId: "widget", files: null, checks: [{ argv }], reason: "why", by: "claude-code" }, [], "t");
+        amendPlanStep(
+          repo,
+          1,
+          { stepId: "widget", files: null, checks: [{ argv }], reason: "why", by: "claude-code", byPerson: false, sessionsDir: "docs/sessions" },
+          [],
+          "t",
+        );
       assert.throws(
         () => amend(["definitely-not-a-program-here", "x"]),
         (error: unknown) => error instanceof LedgerError && /is not a program here/.test(error.message),
       );
       assert.deepEqual(readWorkPlan(repo, 1)?.steps[0]?.checks, PLAN.steps[0]?.checks);
       assert.deepEqual(amend(["node", "-e", "0"]).steps[0]?.checks, [{ argv: ["node", "-e", "0"] }]);
+    } finally {
+      restore();
+    }
+  });
+
+  it("amendPlanStep moves an accepted step's checks for a person only, and its files for nobody", () => {
+    // From the field, 2026-11-10: every fix is measured against an accepted
+    // step's checks, and the only verb that could move one refused everybody.
+    const { repo, restore } = runDir();
+    try {
+      writeWorkPlan(repo, 1, PLAN);
+      const amend = (byPerson: boolean, change: { files?: string[]; checks?: { argv: string[] }[] }) =>
+        amendPlanStep(
+          repo,
+          1,
+          {
+            stepId: "widget",
+            files: change.files ?? null,
+            checks: change.checks ?? null,
+            reason: "the later work outgrew it",
+            by: "claude-code",
+            byPerson,
+            sessionsDir: "docs\\sessions",
+          },
+          ["widget"],
+          "t",
+        );
+      const checks = [{ argv: ["node", "-e", "0"] }];
+      assert.throws(
+        () => amend(false, { checks }),
+        (error: unknown) =>
+          error instanceof LedgerError &&
+          error.message.includes(
+            'dabbler session plan amend --sessions-dir docs/sessions --step widget --checks-file <path> --reason "<why>"',
+          ) &&
+          /Report the step blocked, with the proposed checks/.test(error.message),
+      );
+      for (const byPerson of [false, true]) {
+        assert.throws(
+          () => amend(byPerson, { files: ["src/other.py"] }),
+          (error: unknown) => error instanceof LedgerError && /its files were measured once/.test(error.message),
+        );
+      }
+      assert.deepEqual(readWorkPlan(repo, 1)?.steps[0]?.checks, PLAN.steps[0]?.checks);
+      assert.deepEqual(amend(true, { checks }).steps[0]?.checks, checks);
+      const row = readAmendments(repo, 1).at(-1) ?? {};
+      assert.equal(row["after_acceptance"], true);
+      assert.equal(row["reason"], "the later work outgrew it");
+      assert.deepEqual((row["before"] as { checks: unknown }).checks, PLAN.steps[0]?.checks);
     } finally {
       restore();
     }

@@ -100,6 +100,7 @@ import {
   appendSupervision,
   progressResumed,
   renderStop,
+  ACCEPTED_CHECK_WAYS,
   AMEND_CHECKS_COMMAND,
 } from "./driver.ts";
 import { commitSessionTranscript } from "./transcript.ts";
@@ -1510,10 +1511,12 @@ export interface StepSpec {
 }
 
 /**
- * The sentence every failed check ends with: the way past a check that is
- * wrong, and the way out of a step that cannot be done. An engine that
- * diagnosed its own stale check and had no verb in hand cancelled the
- * session instead (2026-10-02); the verb is named where the diagnosis is made.
+ * The sentence a failed check of the step in hand ends with: the way past a
+ * check that is wrong, and the way out of a step that cannot be done. An
+ * engine that diagnosed its own stale check and had no verb in hand
+ * cancelled the session instead (2026-10-02); the verb is named where the
+ * diagnosis is made. A check an earlier, accepted step declared ends with
+ * `ACCEPTED_CHECK_WAYS` instead, because that verb refuses the engine.
  */
 export const CHECK_FAILED_WAYS =
   "A check that no longer describes its step is amended, not fought: " +
@@ -1547,7 +1550,8 @@ export function checkFailedRefusal(
   run: { readonly exitCode: number | null; readonly timedOut: boolean; readonly treeMutated: boolean; readonly output: string },
   moved: readonly string[] = [],
 ): string {
-  const owner = check.owner !== undefined && check.owner !== stepId ? ` (declared by step '${check.owner}')` : "";
+  const earlier = check.owner !== undefined && check.owner !== stepId;
+  const owner = earlier ? ` (declared by step '${check.owner}')` : "";
   const shown = moved.slice(0, 5).join(", ");
   const more = moved.length > 5 ? ` and ${moved.length - 5} more` : "";
   return refusal(
@@ -1556,7 +1560,7 @@ export function checkFailedRefusal(
       owner +
       (run.treeMutated ? ` (the check changed the tree${shown ? `: ${shown}${more}` : ""})` : "") +
       (run.output.trim() ? `\n${tail(run.output)}` : "") +
-      `\n${CHECK_FAILED_WAYS}`,
+      `\n${earlier ? ACCEPTED_CHECK_WAYS : CHECK_FAILED_WAYS}`,
   );
 }
 
@@ -3589,14 +3593,19 @@ class Driver {
   /**
    * The step as the plan on disk now declares it, or the spec as issued.
    *
-   * Only a step that came FROM the plan is refreshed: a step the driver
-   * synthesised has no entry to be amended, and reading one in would be
-   * reading somebody else's step.
+   * A step that came FROM the plan is refreshed by id. A step the driver
+   * synthesised has no entry to be amended, but it is measured against
+   * every plan step's checks, and a person may amend an accepted step's
+   * checks while it is in flight -- so its checks are those read again.
    */
   private amendedSpec(spec: StepSpec): StepSpec {
-    if (!spec.fromPlan) return spec;
     const plan = readWorkPlan(this.repoRoot, this.sessionNumber);
-    const amended = plan?.steps.find((step) => step.id === spec.id);
+    if (plan === null) return spec;
+    if (!spec.fromPlan) {
+      this.plan = plan;
+      return { ...spec, checks: this.allPlanChecks() };
+    }
+    const amended = plan.steps.find((step) => step.id === spec.id);
     if (amended === undefined) return spec;
     this.plan = plan;
     return { ...amended, fromPlan: true };
@@ -4302,8 +4311,7 @@ class Driver {
         chosen.map((line) => `  ${line}`).join("\n") +
         "\n\nMake the fixes. The framework will run every step's checks and another " +
         "verification round on what you changed; the complete suite follows as the run of record. " +
-        "A check an earlier step declared that your fix outgrows is amended first, not fought: " +
-        `${AMEND_CHECKS_COMMAND}.`,
+        `A check that your fix outgrows is not fought. ${ACCEPTED_CHECK_WAYS}`,
       files: [],
       checks: this.allPlanChecks(),
       fromPlan: false,

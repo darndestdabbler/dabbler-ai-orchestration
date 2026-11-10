@@ -10,6 +10,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.31.0] — 2026-11-10
+
+**An existing repository is maintained as it is.** The framework recognised
+a repository that already held code only as far as the root, wrote build
+files of its own into it, and had no way to keep a session from changing
+what the build targets. A .NET Framework project was offered `dotnet test`,
+which cannot build it.
+
+### Added
+
+- **`posture` in `dabbler.yaml`: `greenfield` or `maintenance`.** Bootstrap
+  writes `maintenance` when the repository already holds tracked source or
+  build files, with the reason beside it. Under maintenance the framework
+  writes no solution or parent POM of its own, and planning takes the
+  existing projects as given: no production split, no module cuts, no
+  restructuring. Detection reads two levels below the root, so a solution
+  or POM under `src/` declares a suite that names it. Session 305.
+- **The build contract holds.** Under maintenance, a `contract` control
+  compares what each build file targets with what HEAD says: SDK and tools
+  version, target framework, language version, package versions, Java
+  version, compiler and wrapper settings. A step that moves one is refused
+  at its report, naming the file, the element and both values. The same
+  happens when a source file is added to a non-SDK project with no
+  `Compile` item. A planned change is approved by a `**Contract change.**`
+  paragraph in the session's section of `session-plan.md`, read from the
+  plan as committed. Session 306.
+- **.NET Framework builds and tests the way Visual Studio does.** A
+  repository with a non-SDK project gets a required `compile` control
+  through MSBuild (`/restore`, `packages.config` restored) and a suite
+  through `vstest.console`, narrowed by `/TestCaseFilter`. A Fixie test
+  project runs Fixie's own console, whole. Both tools are found through
+  `vswhere` on every run, and the run records which ones ran. `session
+  start` stops before anything runs when the machine cannot build the
+  repository, naming what to install: Visual Studio or the Build Tools with
+  the "ASP.NET and web development" workload, or the Developer Pack for the
+  project's target framework. Session 307.
+
+### Changed
+
+- **A person may amend an accepted step's checks.** A fix is measured
+  against every accepted step's checks, and the only verb that could move
+  one refused everybody, so a check the later work outgrew stopped the
+  session with no way on but a cancel. Now `dabbler session plan amend
+  --step <id> --checks-file <path>` run by a person amends it. The record
+  says the step had been accepted, and keeps the checks its report was
+  measured against. An engine is refused and told to report the step
+  blocked with the proposed checks; the messages that used to send it to
+  the amendment now say so. An accepted step's files stay unamendable.
+  Session 308.
+
 ## [3.30.0] — 2026-11-10
 
 **The Configuration comes first, and a machine reads itself.** On a fresh

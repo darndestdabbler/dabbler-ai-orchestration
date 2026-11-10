@@ -17689,3 +17689,65 @@ stamp it with `npm run stamp:version`.
 ### Session 300 of 300: Release 3.29.0 (release: 3.29.0)
 
 The framework publishes session 299 as 3.29.0 and nothing else.
+
+### Session 301 of 302: A suite the close does not demand cannot stop the run of record
+
+Scope: `packages/router/src/drive.ts` (`phaseRunOfRecord`,
+`unchangedRedStop`), `packages/router/test/drive.test.ts`,
+`docs/driving-a-session.md` (the run of record), `version.json` and the
+manifests `npm run stamp:version` writes;
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** From the field (`dabbler-platform`, session 21, 2026-11-09). A
+repository declared an `e2e` suite with `expensive: true` and
+`required_for_close: false`, red by design until a later session fixes the
+12 tests it names. The run of record ran it whole, it failed, and the
+framework issued `fix-run-of-record`; the author rightly reported the step
+blocked, because fixing the tests was a non-goal and loosening the suite
+would touch a gate. The session could not reach the land.
+
+The two halves of the framework disagree. `landFacts` owes only the suites
+with `expensive && suiteRequiredForClose(suite)`, and `judgeFreshness`
+fails only a `required` verdict, so the close is content with a red
+non-required suite. But `phaseRunOfRecord` walks every expensive suite and
+treats any exit 1 as a run-of-record failure, whatever
+`required_for_close` says. `required_for_close` was split from
+`expensive` so that "runs in the run of record" and "the close demands it
+green" could differ; the phase never read the second half.
+
+**Step 1 -- a red non-required suite is recorded and the walk goes on.**
+In `phaseRunOfRecord`, when `test-evidence run` exits 1 for a suite with
+`suiteRequiredForClose(suite) === false`, the failed record already
+written by the verb stands as the run of record, the driver logs one event
+(`run-of-record-red-not-required`, with the suite, its command and the
+job log) and continues to the next suite. A required suite is unchanged:
+`tests-failed` and `fix-run-of-record`, as today. `unchangedRedStop` names
+only required suites, so a red non-required suite never becomes that stop
+either. Nothing about the release path changes: `wholeRunsBeforeRelease`
+still stops a release on any red expensive suite.
+
+**Step 2 -- the words.** `docs/driving-a-session.md` says, where it
+describes the run of record, that a suite declared `required_for_close:
+false` is run and recorded but its failure does not stop the session, and
+that a release still demands it green. `version.json` goes to 3.29.1 (a
+patch: a phase now honours a declaration it already accepted), stamped
+with `npm run stamp:version`, and the changelog gets a 3.29.1 section
+saying what changed for a developer.
+
+**Non-goals.** Any change to what the close gate owes or to
+`judgeFreshness`. Any change to `wholeRunsBeforeRelease`. A new
+declaration in `dabbler.yaml`. Skipping the suite rather than running it:
+the record must still say it was red.
+
+**Tests.** In `drive.test.ts`: a run of record whose non-required suite
+exits 1 logs `run-of-record-red-not-required`, issues no
+`fix-run-of-record`, and reaches `land`; the same exit from a required
+suite still issues `fix-run-of-record`; `unchangedRedStop` leaves a red
+non-required suite out of its reason. `npm run check:version` checks the
+stamp.
+
+**Releasable.** Yes -- as 3.29.1 in session 302.
+
+### Session 302 of 302: Release 3.29.1 (release: 3.29.1)
+
+The framework publishes session 301 as 3.29.1 and nothing else.

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 266 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.absent { background: var(--panel); border-left: 3px solid var(--tone-warn); padding: .6rem .9rem; margin: 1.25rem 0; }
+.absent ul { margin: .35rem 0 0; padding-left: 1.2rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 266 transcript</h1>
+<p class="stamp">Rendered 2026-10-16T17:56:11.254Z by dabbler-ai-router 3.21.0 at 3bdb19403b97614a75282412d020a69a7aa176a9.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-16T13:52:00.272-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 266 of 267: The transcript links the commit, and no file</h3>
+<p>Scope: <code>packages/router/src/transcript.ts</code> (<code>commitPages</code> and the Work Plan's Files column); tests in <code>transcript.test.ts</code></p>
+<p><strong>Why.</strong> 264 linked each file in the Work Plan to its diff on GitHub's commit page, anchored at the file. GitHub renders a commit's diffs after the page loads, so the browser looks for the anchor before the file's diff exists and stays at the top: the link works only once the commit page is already open, and on a large commit it is worse than none. GitHub will not be framed, and a script on the page cannot reach into GitHub's tab. A diff embedded in the page would copy into every committed transcript what git already holds. The operator ruled: the page links the commit, once, and no file.</p>
+<p><strong>Step 1 -- the files are text and the commit is the link.</strong> The <code>Landed &lt;hash&gt;</code> line above the Work Plan's table keeps its link to the host's commit page. Every file in the Files column is plain text, on every host. <code>commitPages</code> returns the commit page alone, and the per-file link and its sha256 anchor are removed.</p>
+<p><strong>Non-goals.</strong> Any diff on the page. Any other column of the Work Plan, or the <code>Landed</code> line's wording. Re-rendering any page already committed. Any script on the page.</p>
+<p><strong>Tests.</strong> 264's assertions in <code>transcript.test.ts</code> are rewritten: with a GitHub remote the <code>Landed</code> line links the commit and no file is a link; the declared-files test the same. No new test.</p>
+<p><strong>Releasable.</strong> Yes -- with 247 to 265, as 3.22.0 in session 267.</p>
+<h2>Work Plan</h2>
+<p>Make the transcript link the landed commit and no file. In packages/router/src/transcript.ts, commitPages returns only the host's commit page for GitHub and Azure DevOps; the per-file link and GitHub's sha256 diff anchor (and the node:crypto import) are removed, and every file in the Work Plan's Files column is plain text on every host. The <code>Landed &lt;hash&gt;</code> line above the table keeps its commit link. 264's assertions in transcript.test.ts are rewritten so a GitHub remote links the commit on the Landed line and no file is a link, in both the event-log and declared-files tests; no new test.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/f4286808c6a85bef30ce9fc919876fd54f73009a"><code>f4286808c6a85bef30ce9fc919876fd54f73009a</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Commit link only</td><td><p>In packages/router/src/transcript.ts: reduce commitPages to the commit page alone (return the URL builder, or null for an unknown remote), remove the per-file <code>file</code> builders for GitHub and Azure DevOps and the createHash import, and render each Files cell's file as plain <code>&lt;span class=&quot;mono&quot;&gt;</code> text. The Landed line keeps its link. In packages/router/test/transcript.test.ts, rewrite 264's assertions: with a GitHub remote the Landed line links the commit and no file in the Work Plan is a link (event-log test and declared-files test); drop the sha256 anchor assertion and the createHash import.</p></td><td><a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/f4286808c6a85bef30ce9fc919876fd54f73009a#diff-05e40253371382a0b26c993a7c2cfcd6b2530b612d04ab6e9da178b61cd53af2"><span class="mono">packages/router/src/transcript.ts</span></a><br><a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/f4286808c6a85bef30ce9fc919876fd54f73009a#diff-b5b42a44cbdd17bba55dff2c06490dcb6550e6646d478a16ce569a500969d2a3"><span class="mono">packages/router/test/transcript.test.ts</span></a></td><td><code>npm --prefix packages/router run typecheck</code><br><code>node --test packages/router/test/transcript.test.ts</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Any diff on the page</li><li>Any other column of the Work Plan, or the Landed line's wording</li><li>Re-rendering any transcript page already committed</li><li>Any script on the page</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[17:52:00]</span> <span class="muted">run-started</span> session=266 mode=pull</div>
+<div class="line"><span class="at">[17:52:00]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[17:52:10]</span> <span class="muted">run-resumed</span> session=266 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[17:52:10]</span> <span class="muted">plan-accepted</span> steps=[&quot;commit-link-only&quot;] non_goals=4</div>
+<div class="line"><span class="at">[17:52:10]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[17:52:10]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=commit-link-only</div>
+<div class="line"><span class="at">[17:52:54]</span> <span class="muted">run-resumed</span> session=266 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:52:59]</span> <span class="muted">check-passed</span> step=commit-link-only argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[17:53:00]</span> <span class="muted">check-passed</span> step=commit-link-only argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/transcript.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:53:04]</span> <span class="muted">named-tests-passed</span> step=commit-link-only suite=typescript command=node scripts/suite.mjs container packages/router/test/transcript.test.ts</div>
+<div class="line"><span class="at">[17:53:04]</span> <span class="muted">report-accepted</span> seq=2 step=commit-link-only files=[&quot;packages/router/src/transcript.ts&quot;,&quot;packages/router/test/transcript.test.ts&quot;] notes=commitPage links the landed commit only; every file in the Work Plan is plain text</div>
+<div class="line"><span class="at">[17:53:04]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[17:53:06]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[17:53:07]</span> <span class="muted">job-started</span> name=verification pid=39604 log=.dabbler/runs/s266/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:54:19]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s266/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:54:19]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[17:54:19]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[17:54:19]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[17:54:21]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=24496 log=.dabbler/runs/s266/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:54:24]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s266/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:54:24]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[17:54:25]</span> <span class="muted">job-started</span> name=run of record: typescript pid=932 log=.dabbler/runs/s266/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:55:38]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s266/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:55:39]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[17:55:40]</span> <span class="muted">job-started</span> name=run of record: extension pid=48664 log=.dabbler/runs/s266/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:55:58]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s266/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:55:58]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[17:56:02]</span> <span class="muted">landed</span> commit=f4286808c6a85bef30ce9fc919876fd54f73009a</div>
+<div class="line"><span class="at">[17:56:02]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[17:56:02]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[17:56:02]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[17:56:03]</span> <span class="muted">job-started</span> name=close pid=42776 log=.dabbler/runs/s266/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:56:11]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s266/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:56:11]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gemini-4-argon</td><td>google</td><td>api</td><td>0</td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>52</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>71s</td><td>1341</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>282</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

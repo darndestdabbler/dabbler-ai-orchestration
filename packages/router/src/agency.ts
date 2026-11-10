@@ -43,6 +43,7 @@ import {
   type SuiteScope,
   declaresTests as selectionDeclaresTests,
   namesATest,
+  patternsOf,
   scopeIsComplete,
   selectionTestRoots,
 } from "./checks.ts";
@@ -691,7 +692,8 @@ function declaredLocations(grant: AgencyGrant): string {
     if (!scopeIsComplete(scope)) continue;
     const roots = scope.roots.map((root) => `\`${trimSlashes(root)}/\``).join(", ");
     const suite = scope.suite ? ` (suite \`${scope.suite}\`)` : "";
-    parts.push(`${roots} for filenames matching \`${scope.glob}\`${suite}`);
+    const globs = patternsOf(scope.glob).map((glob) => `\`${glob}\``).join(" or ");
+    parts.push(`${roots} for filenames matching ${globs}${suite}`);
   }
   return parts.join("; ") || "(none declared)";
 }
@@ -708,7 +710,7 @@ function exampleTestPath(grant: AgencyGrant): string {
   const complete = grant.testScopes.filter(scopeIsComplete);
   if (complete.length === 0) return "tests/test_example.py";
   const scope = complete[0];
-  return `${trimSlashes(scope.roots[0])}/${scope.glob.replace("*", "example")}`;
+  return `${trimSlashes(scope.roots[0])}/${(patternsOf(scope.glob)[0] as string).replace("*", "example")}`;
 }
 
 // --- What the round actually did ---------------------------------------------

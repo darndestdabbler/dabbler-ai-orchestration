@@ -22,6 +22,7 @@ import {
   chooseConfigSources,
   loadConfig,
   loadConfigFrom,
+  postureOf,
   resetProjectRootCache,
   resolveGenerationParams,
   explainEngine,
@@ -265,6 +266,15 @@ describe("loading a config", () => {
     assert.match(
       refusal(() => loadConfigFrom(sources({ project: { schema_version: 1, packaging: { push } } }))),
       /schema validation/,
+    );
+  });
+
+  it("reads a repository's posture, greenfield where it declares none, and refuses a third word by name", () => {
+    assert.equal(postureOf(loadConfigFrom(sources({ project: { schema_version: 1, posture: "maintenance" } }))), "maintenance");
+    assert.equal(postureOf(loadConfigFrom(sources({ project: { schema_version: 1 } }))), "greenfield");
+    assert.match(
+      refusal(() => loadConfigFrom(sources({ project: { schema_version: 1, posture: "legacy" } }))),
+      /at posture: "legacy" is not one of "greenfield", "maintenance"/,
     );
   });
 

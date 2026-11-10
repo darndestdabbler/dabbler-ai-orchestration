@@ -36,12 +36,17 @@ import { commitBeforeDeclaring, undeclaredSessionInFlight } from "../writers.ts"
 import {
   DECOMPOSITION_PROMPT,
   IGNORE_RULE,
+  MAINTENANCE_DECOMPOSITION_PROMPT,
+  MAINTENANCE_PLAN_PROMPT,
   PLAN_PROMPT,
+  declaredPosture,
   declaresPackaging,
   detectEcosystems,
   detectPackaging,
   ensureCommitGuard,
   ensureGitignore,
+  frameworkProjects,
+  readPosture,
   scaffoldBootstrapSessions,
   scaffoldProjectConfig,
   writeInstructionFiles,
@@ -194,12 +199,15 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     return EXIT_USAGE;
   }
 
+  // The prompt for the project's own posture: a repository maintained as it
+  // is is not asked how production is split.
+  const maintained = declaredPosture(parsed.projectDir) === "maintenance";
   if (parsed.printPlanPrompt) {
-    writeOut(PLAN_PROMPT + "\n");
+    writeOut((maintained ? MAINTENANCE_PLAN_PROMPT : PLAN_PROMPT) + "\n");
     return EXIT_OK;
   }
   if (parsed.printDecompositionPrompt) {
-    writeOut(DECOMPOSITION_PROMPT + "\n");
+    writeOut((maintained ? MAINTENANCE_DECOMPOSITION_PROMPT : DECOMPOSITION_PROMPT) + "\n");
     return EXIT_OK;
   }
 
@@ -313,7 +321,10 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   }
   applyTransportPreference(parsed);
 
-  const configPath = scaffoldProjectConfig(project);
+  // Read before anything below is committed: the posture is what the
+  // repository held when set-up began, not what set-up wrote.
+  const posture = readPosture(project);
+  const configPath = scaffoldProjectConfig(project, posture);
   if (configPath !== null) written.push(configPath);
   // A stored model choice the catalog no longer lists is met here, at
   // set-up, through the one reading `session start` refuses on -- rather
@@ -336,11 +347,29 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
         (declared.length > 0
           ? declared.map((eco) => eco.key).join(", ") +
             " — check the command and narrow what each suite covers"
-          : "no test suite, because nothing at the root of this " +
-            "repository says how its tests run; declare one before the " +
-            "first session that writes code") +
+          : "no test suite, because nothing in this repository says how " +
+            "its tests run; declare one before the first session that " +
+            "writes code") +
         "\n",
     );
+    writeOut(
+      `bootstrap: posture: ${posture.posture} -- ${posture.reason}. ` +
+        (posture.posture === "maintenance"
+          ? "Its projects, their targets, their formats and their folders are kept as they are. "
+          : "") +
+        `The line is in ${PROJECT_CONFIG_FILENAME}; committing it is the confirmation, ` +
+        "and changing the one word changes it.\n",
+    );
+    const framework = frameworkProjects(project);
+    if (framework.length > 0) {
+      writeOut(
+        `bootstrap: ${framework.join(", ")} carry no Sdk attribute, so they are .NET ` +
+          "Framework projects, which `dotnet test` cannot build; no suite is declared " +
+          "for them rather than one that fails the first time it runs. Session 307 of " +
+          "this framework's plan gives them one (MSBuild and vstest); until then, " +
+          `declare one in ${PROJECT_CONFIG_FILENAME} yourself.\n`,
+      );
+    }
   }
   // The same, for publishing. A repository whose build files say they are
   // meant to become a package has everything derivable already derived; what

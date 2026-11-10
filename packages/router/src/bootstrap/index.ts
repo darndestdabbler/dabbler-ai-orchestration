@@ -29,6 +29,9 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
+import { parse as parseYaml } from "yaml";
+
+import { PROJECT_CONFIG_FILENAME, type Posture, postureOf } from "../config.ts";
 import { SESSIONS_DIRNAME, SESSION_PLAN_FILENAME } from "../evidence.ts";
 import { readText } from "../textfile.ts";
 import { EXIT_BLOCKING } from "../contracts/exitCodes.ts";
@@ -62,8 +65,24 @@ export function scaffoldBootstrapSessions(projectDir: string): string[] {
   const plan = join(root, SESSION_PLAN_FILENAME);
   if (existsSync(plan)) return [];
   mkdirSync(root, { recursive: true });
-  writeFileSync(plan, bootstrapPlan(existingBuildFiles(projectDir)), "utf8");
+  writeFileSync(plan, bootstrapPlan(existingBuildFiles(projectDir), declaredPosture(projectDir)), "utf8");
   return [plan];
+}
+
+/**
+ * The posture this repository's `dabbler.yaml` declares, read the way the
+ * router reads it; `greenfield` where the file says none or cannot be read,
+ * which is what an absent member always meant.
+ */
+export function declaredPosture(projectDir: string): Posture {
+  try {
+    const parsed: unknown = parseYaml(readText(join(projectDir, PROJECT_CONFIG_FILENAME)), { version: "1.1" });
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? postureOf(parsed as Record<string, unknown>)
+      : "greenfield";
+  } catch {
+    return "greenfield";
+  }
 }
 
 /**

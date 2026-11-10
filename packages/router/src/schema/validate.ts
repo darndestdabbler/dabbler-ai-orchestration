@@ -141,8 +141,25 @@ export function schemaFailure(
   if (validate(data)) return null;
   const error = validate.errors?.[0];
   const location = errorLocation(error?.instancePath ?? "");
-  const message = error?.message ?? "does not match the schema";
+  const allowed = (error?.params as { allowedValues?: unknown } | undefined)?.allowedValues;
+  // An enum refusal names the word it refused and the words it accepts: "must
+  // be equal to one of the allowed values" leaves a person guessing both.
+  const message =
+    error?.keyword === "enum" && Array.isArray(allowed)
+      ? `${JSON.stringify(valueAt(data, error.instancePath))} is not one of ${allowed.map((value) => JSON.stringify(value)).join(", ")}`
+      : (error?.message ?? "does not match the schema");
   return `${subject} failed schema validation at ${location}: ${message}`;
+}
+
+/** The member a JSON Pointer names inside `data`. */
+function valueAt(data: unknown, pointer: string): unknown {
+  if (!pointer) return data;
+  let node = data;
+  for (const segment of pointer.replace(/^\//, "").split("/")) {
+    const key = segment.replace(/~1/g, "/").replace(/~0/g, "~");
+    node = node !== null && typeof node === "object" ? (node as Record<string, unknown>)[key] : undefined;
+  }
+  return node;
 }
 
 /** One schema error, split the way a caller reports it. */

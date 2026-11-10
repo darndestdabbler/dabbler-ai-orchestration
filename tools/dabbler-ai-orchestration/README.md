@@ -174,6 +174,14 @@ because session 1 is refused while they sit uncommitted. From there, choose
 the decomposition run through the same tracked, verified pipeline as every
 session after them.
 
+An existing repository is recognised: where it already holds tracked
+source or build files, setup writes `posture: maintenance` into
+`dabbler.yaml`, with the reason beside it. Under that posture the framework
+writes no root solution file, `Directory.Build.props` or parent POM. It
+plans changes to the projects as they are, and keeps their targets, formats
+and folders as they are. Committing that line is the confirmation, and
+changing the one word changes it.
+
 The full workflow, command by command, is in the
 [quick start](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/quick-start.md);
 what the framework does for itself once a session is under way is in

@@ -37,7 +37,7 @@ import { SETTINGS_RELPATH } from "../src/settings.ts";
 import { capture } from "../src/output.ts";
 import { writePreferences } from "../src/preferences.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
-import { makeAnsweredRepo, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
+import { gitAnswers, makeAnsweredRepo, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
 import { parse as parseYaml } from "yaml";
 
 const savedTransport = process.env[TRANSPORT_ENV_VAR];
@@ -188,7 +188,7 @@ describe("the instruction files", () => {
       assert.match(text, new RegExp(MANAGED_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
       // A fence an orchestrator loads every session is a budget, not just a
       // document.
-      assert.ok(text.replace(/\n$/, "").split("\n").length <= 150, path);
+      assert.ok(text.replace(/\n$/, "").split("\n").length <= 155, path);
     }
   });
 
@@ -603,14 +603,6 @@ describe("what a repository declares about its tests", () => {
     assert.deepEqual(detectEcosystems(project), []);
   });
 
-  it("declares nothing for a build file below the root", () => {
-    // A suite declares a command and no working directory, so
-    // `service/pom.xml` has no runnable line to become.
-    const project = tempDir("bootstrap-");
-    seed(project, { "service/pom.xml": "<project/>\n" });
-    assert.deepEqual(detectEcosystems(project), []);
-  });
-
   it("uses the committed wrapper as the entry point it was committed to be", () => {
     // `gradle test` on a machine that has only `gradlew` fails for a reason
     // the repository already solved.
@@ -625,8 +617,8 @@ describe("what a repository declares about its tests", () => {
     const project = tempDir("bootstrap-");
     seed(project, { "Csv.slnx": "<Solution />\n", "pom.xml": "<project/>\n" });
     const config = renderProjectConfig(detectEcosystems(project));
-    assert.match(config, /test_name: "\{name\}Tests\.cs"\n {6}select: dotnet test --filter \{names\}\n {6}select_separator: "\|"/);
-    assert.match(config, /test_name: "\{name\}Test\.java"\n {6}select: mvn -q test -Dtest=\{names\} -Dsurefire\.failIfNoSpecifiedTests=false/);
+    assert.match(config, /test_name: \["\{name\}Test\.cs", "\{name\}Tests\.cs"\]\n {6}select: dotnet test --filter \{names\}\n {6}select_separator: "\|"/);
+    assert.match(config, /test_name: \["\{name\}Test\.java", "\{name\}Tests\.java"\]\n {6}select: mvn -q test -Dtest=\{names\} -Dsurefire\.failIfNoSpecifiedTests=false/);
     assert.doesNotMatch(config, /repo_wide|runs_whole/);
     // Loaded the way the router loads it: YAML 1.1 reads a bare `.` as null,
     // and a null test root selected no named test in any Maven repository.
@@ -647,6 +639,33 @@ describe("what a repository declares about its tests", () => {
     );
   });
 
+  it("writes maintenance where the repository already tracks code, with the reason beside it", () => {
+    const project = tempDir("bootstrap-");
+    const restore = gitAnswers([
+      [["ls-files"], { stdout: "README.md\0src/Thing.Web/HomeController.cs\0src/Thing.sln\0" }],
+    ]);
+    try {
+      scaffoldProjectConfig(project);
+    } finally {
+      restore();
+    }
+    const text = readFileSync(join(project, "dabbler.yaml"), "utf8");
+    assert.match(text, /^posture: maintenance {2}# 2 tracked source or build file\(s\) when bootstrap ran \(src\/Thing\.sln\)/m);
+    assert.equal((parseYaml(text, { version: "1.1" }) as { posture: string }).posture, "maintenance");
+  });
+
+  it("writes greenfield where the repository tracks no code", () => {
+    const project = tempDir("bootstrap-");
+    const restore = gitAnswers([[["ls-files"], { stdout: "" }]]);
+    try {
+      scaffoldProjectConfig(project);
+    } finally {
+      restore();
+    }
+    const text = readFileSync(join(project, "dabbler.yaml"), "utf8");
+    assert.match(text, /^posture: greenfield {2}# no tracked source or build file/m);
+  });
+
   it("never overwrites a declaration the repository already made", () => {
     const project = tempDir("bootstrap-");
     seed(project, { "dabbler.yaml": "schema_version: 1\n" });
@@ -656,11 +675,11 @@ describe("what a repository declares about its tests", () => {
 
   it("declares .NET from a solution or project file at the root", () => {
     const project = tempDir("bootstrap-");
-    seed(project, { "Acme.csproj": "<Project/>\n" });
+    seed(project, { "Acme.csproj": '<Project Sdk="Microsoft.NET.Sdk"/>\n' });
     assert.equal(detectEcosystems(project)[0]?.key, "dotnet");
   });
 
-  it("names the solution and build files at the root, and nothing else", () => {
+  it("names the solution and build files at the root and below it, and nothing else", () => {
     const project = tempDir("bootstrap-");
     seed(project, {
       "pom.xml": "<project/>\n",
@@ -669,7 +688,7 @@ describe("what a repository declares about its tests", () => {
       "package.json": "{}\n",
       "service/build.gradle": "\n",
     });
-    assert.deepEqual(existingBuildFiles(project), ["Acme.sln", "pom.xml"]);
+    assert.deepEqual(existingBuildFiles(project), ["Acme.sln", "pom.xml", "service/build.gradle"]);
   });
 
   it("scaffolds a setup plan fitted to the solution already there", () => {

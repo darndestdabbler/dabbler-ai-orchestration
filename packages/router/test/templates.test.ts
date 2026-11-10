@@ -4,7 +4,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { DECOMPOSITION_PROMPT, PLAN_PROMPT, bootstrapPlan } from "../src/bootstrap/templates.ts";
+import {
+  DECOMPOSITION_PROMPT,
+  MAINTENANCE_DECOMPOSITION_PROMPT,
+  MAINTENANCE_PLAN_PROMPT,
+  PLAN_PROMPT,
+  SHARED_BODY,
+  bootstrapPlan,
+} from "../src/bootstrap/templates.ts";
 
 describe("bootstrapPlan", () => {
   it("over an existing solution, asks for the survey and alignment and adopts rather than re-creates", () => {
@@ -53,5 +60,31 @@ describe("DECOMPOSITION_PROMPT", () => {
     assert.match(DECOMPOSITION_PROMPT, /skeleton is for a\s+repository with no solution or build yet/);
     assert.match(DECOMPOSITION_PROMPT, /first numbered session adopts it instead/);
     assert.match(DECOMPOSITION_PROMPT, /no session re-creates a project that exists/);
+  });
+});
+
+describe("planning under maintenance", () => {
+  it("names no tier and no module cut, takes the projects as givens, and sizes sessions at three to six steps", () => {
+    const plan = bootstrapPlan(["src/Thing.sln"], "maintenance");
+    for (const text of [MAINTENANCE_PLAN_PROMPT, MAINTENANCE_DECOMPOSITION_PROMPT, plan]) {
+      assert.doesNotMatch(text, /\btiers?\b|\bmodules?\b|alignment/i);
+    }
+    for (const text of [MAINTENANCE_PLAN_PROMPT, plan]) {
+      assert.match(text, /plan's givens/);
+      assert.match(text, /change nothing else/);
+    }
+    assert.match(plan, /`src\/Thing\.sln`/);
+    for (const text of [MAINTENANCE_DECOMPOSITION_PROMPT, plan]) {
+      assert.match(text, /three to six work steps/);
+      assert.match(text, /no session writes a skeleton/i);
+    }
+  });
+});
+
+describe("SHARED_BODY", () => {
+  it("carries the maintenance rule in every posture", () => {
+    assert.match(SHARED_BODY, /target framework or JDK, its project\s+format, its build tool and its test framework, exactly as found/);
+    assert.match(SHARED_BODY, /non-SDK `\.csproj` is\s+listed in it as a `Compile` or `Content` item/);
+    assert.match(SHARED_BODY, /A target change is a plan\s+the person approves, never a step's own decision/);
   });
 });

@@ -310,17 +310,26 @@ export interface SelectionRisk {
 export interface SuiteScope {
   readonly suite: string;
   readonly roots: readonly string[];
-  readonly glob: string;
+  /** One pattern or several: a file matching any of them is a test (`*Test.java`, `*Tests.java`). */
+  readonly glob: string | readonly string[];
   /**
    * The basename a source file's tests take, `{name}` standing for the
    * source file's stem: `{name}Tests.cs`, `{name}Test.java`,
-   * `{name}.test.ts`. Absent where the suite names no tests after anything.
+   * `{name}.test.ts`. Several where a repository uses more than one -- the
+   * singular and the plural both occur, sometimes in one repository. Absent
+   * where the suite names no tests after anything.
    */
-  readonly testName?: string;
+  readonly testName?: string | readonly string[];
+}
+
+/** A scope field that may be one string or several, as a list. */
+export function patternsOf(value: string | readonly string[] | undefined): readonly string[] {
+  if (value === undefined) return [];
+  return (typeof value === "string" ? [value] : value).filter((pattern) => pattern !== "");
 }
 
 export function scopeIsComplete(scope: SuiteScope): boolean {
-  return scope.roots.length > 0 && scope.glob !== "";
+  return scope.roots.length > 0 && patternsOf(scope.glob).length > 0;
 }
 
 /**
@@ -478,6 +487,15 @@ function unknownKeys(
     .sort();
 }
 
+/** A string or a list of strings, trimmed, as a list; null for anything else. */
+function stringOrList(value: unknown): string[] | null {
+  if (typeof value === "string") return [value.trim()];
+  if (Array.isArray(value) && value.every((one) => typeof one === "string")) {
+    return (value as string[]).map((one) => one.trim());
+  }
+  return null;
+}
+
 /**
  * `(scopes, errors)` from `testing.suites`.
  *
@@ -513,10 +531,11 @@ export function loadTestScopes(config: unknown): {
       errors.push(`${label}.test_roots must be a list of strings`);
       return;
     }
-    if (typeof globRaw !== "string" || globRaw.trim() === "") {
+    const globs = stringOrList(globRaw);
+    if (globs === null || globs.length === 0 || globs.some((glob) => glob === "")) {
       errors.push(
-        `${label}.test_glob must be a non-empty string: a root with no glob ` +
-          "would make every file under it a test",
+        `${label}.test_glob must be a non-empty string or a list of them: a root ` +
+          "with no glob would make every file under it a test",
       );
       return;
     }
@@ -530,19 +549,21 @@ export function loadTestScopes(config: unknown): {
       );
       return;
     }
-    const testName = entry["test_name"];
-    if (testName !== undefined && (typeof testName !== "string" || !testName.includes("{name}"))) {
+    const testNames = entry["test_name"] === undefined ? undefined : stringOrList(entry["test_name"]);
+    if (testNames === null || (testNames !== undefined && (testNames.length === 0 || testNames.some((one) => !one.includes("{name}"))))) {
       errors.push(
-        `${label}.test_name must be a file name containing {name}, which stands for ` +
-          "the stem of the source file the test is named after",
+        `${label}.test_name must be a file name containing {name}, or a list of them; ` +
+          "{name} stands for the stem of the source file the test is named after",
       );
       return;
     }
+    // One pattern stays a string, so a scope reads back exactly as declared.
+    const one = (list: readonly string[]): string | readonly string[] => (list.length === 1 ? (list[0] as string) : list);
     scopes.push({
       suite: name,
       roots,
-      glob: globRaw.trim(),
-      ...(typeof testName === "string" ? { testName: testName.trim() } : {}),
+      glob: one(globs),
+      ...(testNames !== undefined ? { testName: one(testNames) } : {}),
     });
   });
   return { scopes, errors };
@@ -630,7 +651,7 @@ export function scopeForTest(
   for (const scope of selection.scopes) {
     if (!scopeIsComplete(scope)) continue;
     if (matchingPrefixes(rel, scope.roots).length === 0) continue;
-    if (fnmatchCase(name, scope.glob)) return scope;
+    if (patternsOf(scope.glob).some((glob) => fnmatchCase(name, glob))) return scope;
   }
   return null;
 }
@@ -911,17 +932,19 @@ function namedTestReader(
     let applies = false;
     const tests: string[] = [];
     for (const scope of selection.scopes) {
-      if (!scopeIsComplete(scope) || !scope.testName) continue;
-      const dot = scope.testName.lastIndexOf(".");
-      if (dot < 0) continue;
-      const extension = scope.testName.slice(dot);
-      if (base.length <= extension.length || !base.endsWith(extension)) continue;
-      applies = true;
-      const target = scope.testName.split("{name}").join(base.slice(0, -extension.length));
-      for (const root of scope.roots) {
-        for (const file of listed(root)) {
-          if (file.slice(file.lastIndexOf("/") + 1) !== target) continue;
-          if (scopeForTest(file, selection)?.suite === scope.suite) tests.push(file);
+      if (!scopeIsComplete(scope)) continue;
+      for (const testName of patternsOf(scope.testName)) {
+        const dot = testName.lastIndexOf(".");
+        if (dot < 0) continue;
+        const extension = testName.slice(dot);
+        if (base.length <= extension.length || !base.endsWith(extension)) continue;
+        applies = true;
+        const target = testName.split("{name}").join(base.slice(0, -extension.length));
+        for (const root of scope.roots) {
+          for (const file of listed(root)) {
+            if (file.slice(file.lastIndexOf("/") + 1) !== target) continue;
+            if (scopeForTest(file, selection)?.suite === scope.suite) tests.push(file);
+          }
         }
       }
     }

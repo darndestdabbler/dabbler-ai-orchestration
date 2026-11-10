@@ -7,7 +7,7 @@
 // the loop composes around them. The loop itself, driven from next to done,
 // is walk-session.test.ts.
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -72,6 +72,7 @@ import {
   staleJobDisposition,
   stepChangedPaths,
   existingStructureLine,
+  rootFilesFor,
   stepFilesLine,
   judgeIntervention,
   interventionsClosing,
@@ -108,6 +109,7 @@ import { beginJobRecord, jobRecord, jobStatusPath, setJobStarter } from "../src/
 import { EXIT_FUNDS } from "../src/contracts/exitCodes.ts";
 import { rewindPhaseFor } from "../src/gates.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
+import { readProjectGraph } from "../src/projectGraph.ts";
 import { checkRunGreen } from "../src/checks.ts";
 import type { RouterConfig } from "../src/config.ts";
 import { capDisputedRefusal } from "../src/verify/rounds.ts";
@@ -656,6 +658,24 @@ describe("the structure a plan ask names", () => {
     seed(root, { "Acme.sln": "\n", "Acme.Api.csproj": "<Project/>\n" });
     assert.match(existingStructureLine(root), /at its root: Acme\.Api\.csproj, Acme\.sln\./);
     assert.match(existingStructureLine(root), /never re-creating one/);
+  });
+});
+
+describe("the root files written before a step's checks", () => {
+  it("writes none under maintenance, where greenfield writes the solution its projects lack", () => {
+    const solution = (): string => {
+      const root = tempDir();
+      seed(root, {
+        "src/Model/Model.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>\n',
+        "src/Web/Web.csproj": '<Project Sdk="Microsoft.NET.Sdk.Web"><ItemGroup><ProjectReference Include="../Model/Model.csproj" /></ItemGroup></Project>\n',
+      });
+      return root;
+    };
+    const kept = solution();
+    assert.equal(rootFilesFor(kept, readProjectGraph(kept), "maintenance"), null);
+    assert.deepEqual(readdirSync(kept), ["src"]);
+    const laidOut = solution();
+    assert.ok(rootFilesFor(laidOut, readProjectGraph(laidOut), "greenfield")?.written.some((file) => file.endsWith(".slnx")));
   });
 });
 

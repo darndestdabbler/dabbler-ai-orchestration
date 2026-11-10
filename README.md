@@ -160,6 +160,14 @@ seat-cost reader needs it. Inside the editor that host is the runtime; a
 Node of your own is needed only to run `dabbler` outside it, or to build
 this repository.
 
+An existing repository is recognised. Where git already tracks source or
+build files, `dabbler bootstrap` writes `posture: maintenance` into
+`dabbler.yaml`, with the reason beside it. Under that posture the framework
+writes no root build files, plans changes to the projects as they are, and
+names a solution file or POM kept below the root in the suite it declares.
+See *An existing repository* in
+[driving a session](docs/driving-a-session.md).
+
 ## The repository's artifacts
 
 A repository's sessions live under `docs/sessions/`. One file is written

@@ -41,6 +41,7 @@ import { dirname, join, resolve as resolvePath } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
+import type { Dabbler } from "./generated/dabbler.ts";
 import { ASSET_DIR, SCHEMA_DIR } from "./paths.ts";
 import { repoRootFor } from "./journal.ts";
 import { schemaFailure } from "./schema/validate.ts";
@@ -809,6 +810,21 @@ export function driverInvocationCap(config: RouterConfig): number {
   const cap = toInteger("max_invocations" in block ? block["max_invocations"] : null);
   if (cap === null) return DEFAULT_DRIVER_INVOCATIONS;
   return cap >= 1 ? cap : DEFAULT_DRIVER_INVOCATIONS;
+}
+
+/** How the framework stands in a repository; the schema's `posture` enum is the vocabulary. */
+export type Posture = NonNullable<Dabbler["posture"]>;
+export const POSTURES: readonly Posture[] = ["greenfield", "maintenance"];
+
+/**
+ * This repository's posture, from `posture` in its `dabbler.yaml`, or
+ * `greenfield` where it says none -- what every repository was before the
+ * member existed, so a repository that never wrote it behaves as it always
+ * did. A word outside the vocabulary never reaches here: the schema refuses
+ * it at load, naming it.
+ */
+export function postureOf(config: RouterConfig): Posture {
+  return config["posture"] === "maintenance" ? "maintenance" : "greenfield";
 }
 
 export const ENGINE_OUTPUT_MODES = ["stream", "quiet"] as const;

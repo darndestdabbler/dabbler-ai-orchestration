@@ -215,6 +215,86 @@ answer now asks, and that a `wait` never reaches the engine.
   path is unchanged. The AI runs the amendment itself: what keeps the record
   honest is what the reviewer is shown, not who is allowed to type.
 
+## An existing repository
+
+The framework is used to maintain repositories that already hold code: an
+ASP.NET MVC application on .NET Framework, an ASP.NET Core service, a
+Maven WAR or a Spring Boot service. Those repositories are often opened in
+Visual Studio, IntelliJ or Eclipse by people who never use this framework.
+Set up in one, the framework recognises it and does not change it.
+
+**What detection reads.** `dabbler bootstrap` reads the repository root
+and two levels below it, skipping `bin`, `obj`, `target`, `node_modules`
+and `.git`. So a solution file or a POM under `src/` is found. A suite
+declares a command and no working directory, so the suite it writes names
+the file: `dotnet test src/Thing.sln`, `mvn -q -f src/pom.xml test`. A
+build file at the root keeps the plain `dotnet test` and `mvn -q test`.
+
+- A `.csproj` whose root element carries no `Sdk` attribute is a .NET
+  Framework project, which `dotnet test` cannot build. Such a repository is
+  `dotnet-framework`: `dabbler.yaml` names those projects in a comment and
+  declares no suite for them, rather than a line that fails the first time
+  it runs.
+- `build.gradle.kts` counts as Gradle.
+- Tests are read by both spellings, in both languages: `*Test.cs` and
+  `*Tests.cs`, `*Test.java` and `*Tests.java`. `test_glob` and `test_name`
+  take a list, so a Spring Boot repository's `FooServiceTests.java` is the
+  test named after `FooService.java`, as `FooServiceTest.java` would be.
+- The Solution Explorer reads a solution file below the root the way it
+  reads one at the root, and draws the projects that solution lists.
+
+**The posture, in `dabbler.yaml`.** One member says how the framework
+stands in the repository:
+
+```yaml
+posture: maintenance  # 214 tracked source or build file(s) when bootstrap ran (src/Thing.sln): the framework fits itself to them and writes no root build files. Changing this word to greenfield changes it.
+```
+
+- `greenfield` is what every repository was before the member existed, and
+  an absent member reads as `greenfield`. A repository that never wrote the
+  member behaves exactly as it did.
+- Bootstrap writes `maintenance` when git already tracks a source or build
+  file there, and `greenfield` when it tracks none. It writes the reason
+  beside the word and says both in its output.
+- There is no prompt. The confirmation is the commit: you read one line in
+  a file you are about to commit, and changing it is changing one word.
+- A third word is refused at load, naming the word and the two accepted
+  ones.
+
+**What is never written under `maintenance`.** Before a step's checks the
+framework writes nothing at the root:
+
+- no `.slnx` beside the repository's own solution file;
+- no `Directory.Build.props` or `Directory.Build.targets`, which MSBuild
+  imports into non-SDK projects too, so their settings would stop a C# 7.3
+  project compiling;
+- no parent POM, and none of the ignore rules those files bring.
+
+What a build writes (`bin/`, `obj/`, `target/`) is still ignored in every
+posture, because a step's check that writes build output into the tree is a
+defect wherever it happens.
+
+Planning fits the repository. The first two sessions ask what is to change
+and why. They treat the projects, their targets, their formats and their
+folders as givens, write one plan section per change, and break the work
+into sessions of three to six steps. They ask for no production split,
+write no skeleton and propose no restructuring. The managed body tells the
+engine to keep each project's target framework or JDK, project format,
+build tool and test framework as found. A new file in a non-SDK project is
+listed in its `.csproj` as a `Compile` or `Content` item, and a target
+change is a plan the person approves.
+
+**What comes next.** Session 306 checks that a target stays what it was.
+Session 307 gives a `dotnet-framework` repository a suite command, through
+MSBuild and vstest. Until then, declare that suite by hand under
+`testing.suites`.
+
+**A script typed into the engine's prompt at Start is not this framework.**
+It is another extension activating an environment in every new terminal.
+The Python Environments extension does this for a Python virtual
+environment it finds in the folder. This framework creates none and needs
+none. The remedy is on that machine, in that extension's settings.
+
 ## What comes back
 
 Stdout carries exactly one thing — the instruction, as JSON. Everything

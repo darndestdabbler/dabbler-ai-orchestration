@@ -9,16 +9,21 @@
 //   pytest section declares nothing about pytest. Where the runner is the
 //   toolchain's own lifecycle (`mvn test`, `dotnet test`), the build file is
 //   the declaration.
-// - **Only the repository root is read.** A suite declares a command and no
-//   working directory, so `service/pom.xml` cannot become a runnable line --
-//   `mvn -q test` at the root would simply fail. A multi-project repository
-//   declares its own suites; a scaffold that guessed at the layout would hand
-//   it a red suite instead.
+// - **A build file below the root is named, never entered.** A suite declares
+//   a command and no working directory, so a POM or solution under `src/` is
+//   named on the command line (`mvn -q -f src/pom.xml test`, `dotnet test
+//   src/Thing.sln`) -- the one form that runs from the root. The root and two
+//   levels below it are read; deeper layouts declare their own suites.
+//
+// A .NET Framework project -- a `.csproj` whose root element carries no `Sdk`
+// -- is not something `dotnet test` can build, so it declares no suite and
+// says why, rather than a line that fails the first time it runs.
 
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { basename, join, relative } from "node:path";
 
-import { PROJECT_CONFIG_FILENAME } from "../config.ts";
+import { PROJECT_CONFIG_FILENAME, type Posture } from "../config.ts";
+import { runGit } from "../journal.ts";
 import { readText } from "../textfile.ts";
 import {
   PROJECT_CONFIG_HEADER,
@@ -43,8 +48,8 @@ export interface Ecosystem {
   readonly command: string;
   readonly runsWhole: boolean;
   readonly testRoots: readonly string[];
-  readonly testGlob: string;
-  readonly testName?: string;
+  readonly testGlob: string | readonly string[];
+  readonly testName?: string | readonly string[];
   readonly select?: string;
   readonly selectSeparator?: string;
 }
@@ -53,14 +58,42 @@ function exists(root: string, ...names: readonly string[]): boolean {
   return names.some((name) => existsSync(join(root, name)));
 }
 
-/** `Path.glob(pattern)` over the root only; the patterns here are `*.ext`. */
-function globHit(root: string, pattern: string): boolean {
-  const suffix = pattern.slice(1);
-  try {
-    return readdirSync(root).some((entry) => entry.endsWith(suffix));
-  } catch {
-    return false;
+/** What a build or a package manager writes, and the router's own state: never a project. */
+const NOT_WALKED: ReadonlySet<string> = new Set(["bin", "obj", "target", "node_modules", ".git", ".dabbler"]);
+
+/**
+ * The files at the root and up to two levels below it, repository-relative
+ * with `/`: shallowest first, sorted within a level, so the first match is
+ * the build file a person would call the repository's own.
+ */
+function filesNear(root: string, depth = 2): string[] {
+  const found: string[] = [];
+  let level = [""];
+  for (let at = 0; at <= depth && level.length > 0; at += 1) {
+    const here: string[] = [];
+    const below: string[] = [];
+    for (const dir of level) {
+      let entries: { name: string; isDirectory: () => boolean }[];
+      try {
+        entries = readdirSync(join(root, dir), { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const rel = dir === "" ? entry.name : `${dir}/${entry.name}`;
+        if (!entry.isDirectory()) here.push(rel);
+        else if (!NOT_WALKED.has(entry.name)) below.push(rel);
+      }
+    }
+    found.push(...here.sort());
+    level = below.sort();
   }
+  return found;
+}
+
+/** Whether the path names a file at the root rather than below it. */
+function atRoot(rel: string): boolean {
+  return !rel.includes("/");
 }
 
 function reads(root: string, name: string): string {
@@ -116,8 +149,10 @@ function detectPython(root: string): Ecosystem | null {
  * phase, not a script someone had to write.
  */
 function detectMaven(root: string): Ecosystem | null {
-  if (!exists(root, "pom.xml")) return null;
-  const command = wrapped(root, "mvnw", "./mvnw -q test", "mvn -q test");
+  const pom = filesNear(root).find((rel) => basename(rel) === "pom.xml");
+  if (pom === undefined) return null;
+  const named = atRoot(pom) ? "" : ` -f ${pom}`;
+  const command = wrapped(root, "mvnw", `./mvnw -q${named} test`, `mvn -q${named} test`);
   // The whole repository is the test root: a reactor keeps each module's
   // tests under that module's own `src/test/java`, and `-Dtest` runs across
   // the reactor, where a module holding none of the named classes is not a
@@ -127,8 +162,8 @@ function detectMaven(root: string): Ecosystem | null {
     command,
     runsWhole: false,
     testRoots: ["."],
-    testGlob: "*Test.java",
-    testName: "{name}Test.java",
+    testGlob: JAVA_TEST_GLOBS,
+    testName: ["{name}Test.java", "{name}Tests.java"],
     select: `${command} -Dtest={names} -Dsurefire.failIfNoSpecifiedTests=false`,
   };
 }
@@ -140,29 +175,67 @@ function detectGradle(root: string): Ecosystem | null {
     command: wrapped(root, "gradlew", "./gradlew test", "gradle test"),
     runsWhole: true,
     testRoots: ["src/test/java"],
-    testGlob: "*Test.java",
+    testGlob: JAVA_TEST_GLOBS,
   };
 }
+
+/**
+ * Both spellings, in both languages: Surefire's own default includes
+ * `*Test.java` and `*Tests.java`, Spring Boot's generated test is
+ * `ApplicationTests.java`, and .NET test classes are as often `FooTest` as
+ * `FooTests`. A repository is read as it is named.
+ */
+const JAVA_TEST_GLOBS: readonly string[] = ["*Test.java", "*Tests.java"];
 
 /**
  * `dotnet test` is the SDK's own test entry point, and it resolves the
  * solution or project in the directory it runs in. A solution's test
  * projects sit wherever it puts them -- `X.Tests/` beside `X/` as often as
  * under `tests/` -- so its test root is the solution's own.
+ *
+ * A solution or project at the root is resolved by `dotnet test` itself;
+ * one only below it is named. A repository holding a .NET Framework project
+ * declares nothing here: see `frameworkProjects`.
  */
 function detectDotnet(root: string): Ecosystem | null {
-  const patterns = ["*.sln", "*.slnx", "*.csproj", "*.fsproj"];
-  if (!patterns.some((pattern) => globHit(root, pattern))) return null;
+  const near = filesNear(root);
+  if (frameworkProjects(root, near).length > 0) return null;
+  const rootLevel = near.some((rel) => atRoot(rel) && /\.(slnx?|csproj|fsproj)$/i.test(rel));
+  const solution = rootLevel ? undefined : near.find((rel) => /\.slnx?$/i.test(rel));
+  if (!rootLevel && solution === undefined) return null;
+  const command = solution === undefined ? "dotnet test" : `dotnet test ${solution}`;
   return {
     key: "dotnet",
-    command: "dotnet test",
+    command,
     runsWhole: false,
     testRoots: ["."],
-    testGlob: "*Tests.cs",
-    testName: "{name}Tests.cs",
-    select: "dotnet test --filter {names}",
+    testGlob: ["*Test.cs", "*Tests.cs"],
+    testName: ["{name}Test.cs", "{name}Tests.cs"],
+    select: `${command} --filter {names}`,
     selectSeparator: "|",
   };
+}
+
+/**
+ * Whether a project file is an SDK-style project: an `Sdk` attribute on its
+ * root element, or the rarer `<Sdk Name=...>` element or `<Import ... Sdk=...>`.
+ */
+function isSdkProject(text: string): boolean {
+  const root = /<Project\b([^>]*)>/.exec(text);
+  if (root !== null && /\bSdk\s*=/.test(root[1] ?? "")) return true;
+  return /<Sdk\s+Name\s*=/.test(text) || /<Import\b[^>]*\bSdk\s*=/.test(text);
+}
+
+/**
+ * The `.csproj` files at the root and two levels below that are .NET
+ * Framework projects -- no `Sdk` on the root element -- repository-relative.
+ *
+ * `dotnet test` cannot build one, so a repository holding any is the
+ * `dotnet-framework` ecosystem: it is declared with no suite command rather
+ * than a `dotnet test` line that fails the first time it runs.
+ */
+export function frameworkProjects(root: string, near: readonly string[] = filesNear(root)): string[] {
+  return near.filter((rel) => /\.csproj$/i.test(rel) && !isSdkProject(reads(root, rel)));
 }
 
 /**
@@ -246,16 +319,70 @@ export function detectEcosystems(projectDir: string): Ecosystem[] {
 /** The solution and build files the .NET, Maven and Gradle detectors read. */
 const BUILD_FILE = /^(.+\.(sln|slnx|csproj|fsproj)|pom\.xml|build\.gradle(\.kts)?)$/;
 
+/** A file that is code: what a repository already holding some is maintained in. */
+const SOURCE_FILE =
+  /\.(cs|vb|fs|java|kt|kts|scala|groovy|ts|tsx|js|jsx|mjs|cjs|py|go|rs|rb|php|cshtml|vbhtml|razor|aspx|ascx|asax|ashx|master|jsp|jspx|sql)$/i;
+
+/** The posture set-up chose for a repository, and the sentence that says why. */
+export interface PostureReading {
+  readonly posture: Posture;
+  readonly reason: string;
+}
+
 /**
- * The solution and build files already at the repository root, by name: the
- * code a planning session is to read and fit, rather than re-create.
+ * The posture of a repository at set-up, read from what git tracks there:
+ * `maintenance` where it already holds a source or build file, `greenfield`
+ * where it holds none. Tracked rather than present, because what a person
+ * has committed is what they are maintaining, and a folder of scratch files
+ * is not a codebase.
+ */
+export function readPosture(projectDir: string): PostureReading {
+  let listed: { code: number; stdout: string };
+  try {
+    listed = runGit(projectDir, ["ls-files", "-z"]);
+  } catch {
+    listed = { code: -1, stdout: "" };
+  }
+  if (listed.code !== 0) {
+    // Unread is not maintenance: what every repository was before the
+    // member existed, and one word to change.
+    return { posture: "greenfield", reason: "git could not list this repository's tracked files when bootstrap ran" };
+  }
+  const tracked = listed.stdout.split("\0").filter((path) => path !== "");
+  const code = tracked.filter((path) => BUILD_FILE.test(basename(path)) || SOURCE_FILE.test(path));
+  if (code.length === 0) {
+    return {
+      posture: "greenfield",
+      reason: "no tracked source or build file when bootstrap ran: the framework lays out new projects",
+    };
+  }
+  const example = code.find((path) => BUILD_FILE.test(basename(path))) ?? (code[0] as string);
+  return {
+    posture: "maintenance",
+    reason:
+      `${code.length} tracked source or build file(s) when bootstrap ran (${example}): ` +
+      "the framework fits itself to them and writes no root build files",
+  };
+}
+
+/** The `posture:` line, with its reason beside it. */
+function postureLine(reading: PostureReading): string {
+  const other = reading.posture === "maintenance" ? "greenfield" : "maintenance";
+  return `posture: ${reading.posture}  # ${reading.reason}. Changing this word to ${other} changes it.\n`;
+}
+
+/**
+ * The solution and build files already at the repository root and up to two
+ * levels below it, repository-relative: the code a planning session is to
+ * read and fit, rather than re-create.
  */
 export function existingBuildFiles(projectDir: string): string[] {
-  try {
-    return readdirSync(projectDir).filter((entry) => BUILD_FILE.test(entry)).sort();
-  } catch {
-    return [];
-  }
+  return filesNear(projectDir).filter((rel) => BUILD_FILE.test(basename(rel)));
+}
+
+/** One quoted YAML scalar, or a flow list of them. */
+function quoted(value: string | readonly string[]): string {
+  return typeof value === "string" ? `"${value}"` : `[${value.map((one) => `"${one}"`).join(", ")}]`;
 }
 
 function suiteBlock(eco: Ecosystem): string {
@@ -270,8 +397,8 @@ function suiteBlock(eco: Ecosystem): string {
   lines.push("      test_roots:");
   // Quoted: the loader reads YAML 1.1, where a bare `.` -- Maven's test root -- is null.
   for (const root of eco.testRoots) lines.push(`        - "${root}"`);
-  lines.push(`      test_glob: "${eco.testGlob}"`);
-  if (eco.testName) lines.push(`      test_name: "${eco.testName}"`);
+  lines.push(`      test_glob: ${quoted(eco.testGlob)}`);
+  if (eco.testName) lines.push(`      test_name: ${quoted(eco.testName)}`);
   if (eco.select) lines.push(`      select: ${eco.select}`);
   if (eco.selectSeparator) lines.push(`      select_separator: "${eco.selectSeparator}"`);
   return lines.join("\n");
@@ -442,8 +569,11 @@ export function appendSuitesToProjectConfig(
  */
 export function renderProjectConfig(
   ecosystems: readonly Ecosystem[],
+  framework: readonly string[] = [],
+  posture: PostureReading | null = null,
 ): string {
   const out = [PROJECT_CONFIG_HEADER];
+  if (posture !== null) out.push(postureLine(posture));
   if (ecosystems.length > 0) {
     out.push(
       PROJECT_CONFIG_TESTING_HEADER +
@@ -454,8 +584,25 @@ export function renderProjectConfig(
   } else {
     out.push(PROJECT_CONFIG_NO_SUITES);
   }
+  if (framework.length > 0) out.push(frameworkNote(framework));
   out.push(PROJECT_CONFIG_PACKAGING);
   return out.join("");
+}
+
+/** The `dotnet-framework` declaration: what was found, and why it has no suite command. */
+function frameworkNote(projects: readonly string[]): string {
+  return (
+    "\n" +
+    "# dotnet-framework: no suite command. These projects carry no `Sdk`\n" +
+    "# attribute, so they are .NET Framework projects, which `dotnet test`\n" +
+    "# cannot build:\n" +
+    "#\n" +
+    projects.map((rel) => `#   ${rel}\n`).join("") +
+    "#\n" +
+    "# A line that failed the first time it ran would be worse than none.\n" +
+    "# Session 307 of this framework's plan gives them one (MSBuild and\n" +
+    "# vstest); until then, declare one yourself under testing.suites.\n"
+  );
 }
 
 /**
@@ -468,11 +615,22 @@ export function renderProjectConfig(
  * never touched -- it is the repository's own statement about itself, and
  * later runs of bootstrap refresh instructions, not declarations.
  */
-export function scaffoldProjectConfig(projectDir: string): string | null {
+export function scaffoldProjectConfig(
+  projectDir: string,
+  posture?: PostureReading,
+): string | null {
   const path = join(projectDir, PROJECT_CONFIG_FILENAME);
   if (existsSync(path)) return null;
   try {
-    writeFileSync(path, renderProjectConfig(detectEcosystems(projectDir)), "utf8");
+    writeFileSync(
+      path,
+      renderProjectConfig(
+        detectEcosystems(projectDir),
+        frameworkProjects(projectDir),
+        posture ?? readPosture(projectDir),
+      ),
+      "utf8",
+    );
   } catch {
     return null;
   }

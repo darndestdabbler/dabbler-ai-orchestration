@@ -71,6 +71,29 @@ describe("the project graph", () => {
     assert.deepEqual(readProjectGraph(root).projects.map((project) => project.path), ["src/Csv/Csv.csproj"]);
   });
 
+  it("reads a solution file below the root as the solution, its projects resolved from its own folder", () => {
+    const root = tempDir("graph-src-sln-");
+    seed(root, {
+      "src/Thing.sln":
+        'Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Thing.Web", "Thing.Web\\Thing.Web.csproj", "{1}"\nEndProject\n' +
+        'Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Thing.Core", "Thing.Core\\Thing.Core.csproj", "{2}"\nEndProject\n',
+      "src/Thing.Web/Thing.Web.csproj":
+        '<Project ToolsVersion="15.0"><ItemGroup><ProjectReference Include="..\\Thing.Core\\Thing.Core.csproj" /></ItemGroup></Project>\n',
+      "src/Thing.Core/Thing.Core.csproj": '<Project ToolsVersion="15.0"></Project>\n',
+      // Not in the solution file, so not in the solution.
+      "tools/Stray/Stray.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>\n',
+    });
+    const graph = readProjectGraph(root);
+    assert.equal(graph.ecosystem, "dotnet");
+    assert.deepEqual(
+      graph.projects.map((project) => [project.name, project.path, project.dependsOn]),
+      [
+        ["Thing.Core", "src/Thing.Core/Thing.Core.csproj", []],
+        ["Thing.Web", "src/Thing.Web/Thing.Web.csproj", ["Thing.Core"]],
+      ],
+    );
+  });
+
   it("reads a Maven parent's two modules, the sibling dependency and the Spring Boot service", () => {
     const root = tempDir("graph-maven-");
     const parent = "  <parent><groupId>com.example</groupId><artifactId>csv-parent</artifactId><version>0.1.0</version></parent>\n";

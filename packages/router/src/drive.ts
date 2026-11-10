@@ -60,8 +60,10 @@ import {
   explainRoleModel,
   loadConfig,
   mechanicModeOrDefault,
+  postureOf,
   verificationRoundCap,
   transcriptCarry,
+  type Posture,
   type TranscriptCarry,
   PROJECT_CONFIG_FILENAME,
 } from "./config.ts";
@@ -106,8 +108,8 @@ import { namedReviewers, readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
 import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
 import { detectEcosystems, existingBuildFiles } from "./bootstrap/detect.ts";
-import { ensureRootFiles, ignoreBuildOutput } from "./ecosystem.ts";
-import { readProjectGraph } from "./projectGraph.ts";
+import { type ScaffoldResult, ensureRootFiles, ignoreBuildOutput } from "./ecosystem.ts";
+import { type ProjectGraph, readProjectGraph } from "./projectGraph.ts";
 import { BUILT_IN_ENGINES, builtInEngine, engineAliases, mailboxEngine } from "./engines.ts";
 import type { Engine, EngineOutcome, EngineOutput } from "./engines.ts";
 import {
@@ -1445,6 +1447,18 @@ class Rewound extends Error {
     super(`the run was sent back to '${to}'`);
     this.name = "Rewound";
   }
+}
+
+/**
+ * The root build files the framework writes before a step's checks, by
+ * posture. Under `maintenance` none: a solution file beside the one a
+ * repository already has, or a `Directory.Build.props` that MSBuild imports
+ * into its non-SDK projects too, breaks a build the person never asked to
+ * change. What a build writes is still ignored, in every posture, by
+ * `ignoreBuildOutput`.
+ */
+export function rootFilesFor(repoRoot: string, graph: ProjectGraph, posture: Posture): ScaffoldResult | null {
+  return posture === "maintenance" ? null : ensureRootFiles(repoRoot, graph);
 }
 
 /**
@@ -3749,7 +3763,14 @@ class Driver {
    */
   private writeRootFiles(): void {
     const graph = readProjectGraph(this.repoRoot);
-    const written = ensureRootFiles(this.repoRoot, graph);
+    let posture: Posture = "greenfield";
+    try {
+      posture = postureOf(this.config());
+    } catch (error) {
+      // A malformed config is the step judgement's to refuse, right after this.
+      if (!(error instanceof ConfigError)) throw error;
+    }
+    const written = rootFilesFor(this.repoRoot, graph, posture);
     const ignored = ignoreBuildOutput(this.repoRoot, graph);
     const wrote = [...new Set([...(written?.written ?? []), ...(written?.changed ?? []), ...ignored.changed])];
     const untracked = [...new Set([...(written?.untracked ?? []), ...ignored.untracked])];

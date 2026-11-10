@@ -342,6 +342,11 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 302 | Release 3.29.1 (release: 3.29.1) | yes | 2026-11-10 |
 | 303 | Configuration comes first, and a machine reads itself | no | 2026-11-10 |
 | 304 | Release 3.30.0 (release: 3.30.0) | yes | 2026-11-10 |
+| 305 | An existing repository is recognised, and the framework stands still in it | no | 2026-11-10 |
+| 306 | The build contract holds | — | not declared |
+| 307 | .NET Framework builds the way Visual Studio builds it | — | not declared |
+| 308 | The walk through six borrowed repositories | — | not declared |
+| 309 | Release 3.31.0 (release: 3.31.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3568,3 +3573,17 @@ Session 303 turns onboarding around so Configuration comes first and a machine r
 **Releasable: yes.**
 
 Release 3.30.0: the framework packs and publishes what is on the trunk.
+
+### Session 305 — An existing repository is recognised, and the framework stands still in it
+
+**Releasable: no.**
+
+Recognise a repository that already holds code and make the framework stand still in it. Detection in bootstrap/detect.ts reads two levels below the root (skipping bin, obj, target, node_modules, .git and .dabbler), so a solution file or POM under src/ declares a suite that names it (`dotnet test src/Thing.sln`, `mvn -q -f src/pom.xml test`); a .csproj whose root element carries no Sdk attribute is read as `dotnet-framework` and written into dabbler.yaml as a note naming session 307 rather than as a `dotnet test` suite that cannot build it; build.gradle.kts counts as Gradle; and the .NET and Java test globs and test names accept the singular and the plural, which means `test_glob` and `test_name` accept a list as well as a string -- the lookup of the test named after a source file lives in checks.ts (namedTestReader, which affected.ts's selection calls), so that is where the second name is tried. `posture` becomes a member of dabbler.yaml (`greenfield` | `maintenance`), described by the schema and read through config.ts, its absence reading as greenfield and any third word refused by name. Bootstrap writes `maintenance` when the repository holds tracked source or build files when it runs, with the reason as a comment beside the member, and says what it found and which word it wrote. Under maintenance the driver's writeRootFiles skips ensureRootFiles (no .slnx, Directory.Build.props/targets, parent POM or its ignore rules) while ignoreBuildOutput stays, and projectGraph.ts reads a solution file below the root as the solution. Under maintenance the planning prompts and the scaffolded setup sessions ask for no production split and no module cuts, take the existing projects as givens, and decompose into 3-6 step sessions with no restructuring; the managed body gains one paragraph, in every posture, stating the maintenance rule. docs/driving-a-session.md gains a section on an existing repository (including the Python Environments terminal note), and both READMEs say an existing repository is recognised.
+
+**Amended after acceptance:**
+
+- 2026-11-10 — step 'detect-below-root': its files: PROJECT_CONFIG_NO_SUITES in templates.ts says build files below the root get no suite, which this step makes false; two bootstrap.test.ts fixtures seed a bare <Project/> (now non-SDK) and assert existingBuildFiles is root-only, which this step changes (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-10 — step 'plural-test-names': its files: bootstrap.test.ts asserts the scaffolded .NET and Maven suites render one test_name each; this step renders the singular and the plural as a list, so that assertion is updated (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-10 — step 'posture-member': its files: the schema already refuses a third posture word, but its message names neither the word nor the accepted ones; naming them once in schemaFailure for every enum keeps the rule in the schema alone rather than restating it in config.ts (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-10 — step 'bootstrap-writes-posture': its files: walk-bootstrap's fixture .csproj targets net8.0 but carries no Sdk attribute, so the non-SDK rule landed in detect-below-root reads it as .NET Framework; the fixture gains the Sdk it means (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-10 — step 'maintenance-planning': its files: the managed section sat at exactly its 150-line budget in bootstrap.test.ts; the maintenance rule this step must add costs five lines, so the budget moves to 155 rather than unrelated prose being cut to make room (claude-code (anthropic, claude-opus-5-5))

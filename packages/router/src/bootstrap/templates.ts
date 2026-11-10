@@ -17,6 +17,8 @@
 // change to it should read as a change to the text rather than as a reflow
 // of the whole block.
 
+import type { Posture } from "../config.ts";
+
 export const MANAGED_START = "<!-- dabbler:managed:start -->";
 export const MANAGED_END = "<!-- dabbler:managed:end -->";
 
@@ -155,6 +157,11 @@ export const SHARED_BODY =
   "- `cancel`, `rollback` and `close` are a person's, never yours: report the step blocked and say why, and the person cancels or rolls back from the Work Explorer.\n" +
   "- A fix no session covers is a session's own work: insert a session into\n" +
   "  the session plan and make the fix there, never outside a session.\n" +
+  "- **Keep what a project is**: its target framework or JDK, its project\n" +
+  "  format, its build tool and its test framework, exactly as found -- above\n" +
+  "  all under `posture: maintenance`. A new file in a non-SDK `.csproj` is\n" +
+  "  listed in it as a `Compile` or `Content` item. A target change is a plan\n" +
+  "  the person approves, never a step's own decision.\n" +
   "\n" +
   "## Writing files\n" +
   "\n" +
@@ -357,14 +364,97 @@ export const DECOMPOSITION_PROMPT =
   "  to get under.\n";
 
 /**
+ * Session 1 for a repository under `posture: maintenance`: a plan of changes
+ * to the projects as they are, with no production split and no new cuts --
+ * the projects are the givens, and the plan is what changes in them.
+ */
+export const MAINTENANCE_PLAN_PROMPT =
+  "You are preparing the change plan for the Dabbler session workflow, in a\n" +
+  "repository that already holds code (`dabbler.yaml` says `posture:\n" +
+  "maintenance`).\n" +
+  "\n" +
+  "Create — or import — `docs/planning/solution-plan.md`, the stable artifact\n" +
+  "session 2 reads from. A repository that already carries\n" +
+  "`docs/planning/project-plan.md` has its plan there: amend that file in\n" +
+  "place rather than writing a second one.\n" +
+  "\n" +
+  "The plan's substance is the operator's, not yours. Before writing\n" +
+  "anything, ask them what is to change and why: the defects, the features\n" +
+  "or the upgrades they want, what is out of scope, and whether a ticket, a\n" +
+  "brief or notes already exist that should be imported. Do not search\n" +
+  "neighbouring directories for a plan, and do not draft one from the code.\n" +
+  "\n" +
+  "Read the repository before planning: its projects, their target\n" +
+  "frameworks or JDKs, their project formats, their build tools, their test\n" +
+  "frameworks and their folders. Those are the plan's givens. Do not ask how\n" +
+  "production is split, and do not propose new boundaries between projects.\n" +
+  "\n" +
+  "What the plan carries, short:\n" +
+  "- **The repository as found**: one paragraph naming the projects and what\n" +
+  "  each is built and tested with.\n" +
+  "- **One section per change**: what changes, in which project, and how it\n" +
+  "  is shown to work.\n" +
+  "\n" +
+  "Fit this framework's documents and suites to the projects that exist, and\n" +
+  "change nothing else: where `dabbler.yaml` declares no suite that runs the\n" +
+  "tests these projects have, say which session declares one. Restructuring,\n" +
+  "retargeting or reformatting a project is not a change this plan makes\n" +
+  "unless the operator asks for it by name.\n" +
+  "\n" +
+  "This session writes the plan and nothing else: it creates, edits or\n" +
+  "deletes no code, project, build file, test, `dabbler.yaml` suite or\n" +
+  "packaging.\n" +
+  "\n" +
+  "A later revision is just another plan session that amends the same file.\n";
+
+/**
+ * Its session 2: the changes broken into sessions of three to six steps,
+ * with no skeleton and no restructuring.
+ */
+export const MAINTENANCE_DECOMPOSITION_PROMPT =
+  "You are a session architect for an AI-led development workflow (the\n" +
+  "Dabbler session workflow), in a repository that already holds code\n" +
+  "(`dabbler.yaml` says `posture: maintenance`).\n" +
+  "\n" +
+  "Read `docs/planning/solution-plan.md` in this workspace (or\n" +
+  "`docs/planning/project-plan.md` where that is the file). Break each change\n" +
+  "it names into numbered sessions appended to `docs/sessions/session-plan.md`,\n" +
+  "under its `## Sessions` heading.\n" +
+  "\n" +
+  "Hard requirements (do not deviate):\n" +
+  "- **Plans only:** this session writes the session list, and creates,\n" +
+  "  edits or deletes no code, project, build file, test, `dabbler.yaml`\n" +
+  "  suite or packaging.\n" +
+  "- **The projects stay as they are:** no session writes a skeleton, and\n" +
+  "  none proposes restructuring, retargeting or reformatting a project. A\n" +
+  "  step that adds a file to a non-SDK project lists it in that project's\n" +
+  "  `.csproj`.\n" +
+  "- **Size:** each session is three to six work steps, one concern each.\n" +
+  "- **Releases are sessions of their own:** a release is a session with no\n" +
+  "  steps, headed `### Session <N>: Release <version> (release: <version>)`;\n" +
+  "  propose its version -- patch, minor or major -- for the person to\n" +
+  "  approve with the plan.\n" +
+  "- **Numbering:** continue from the highest session number the plan already\n" +
+  "  declares. Numbers are never reused and never renumbered.\n" +
+  "- **Layout:** one `### Session <N>: <title>` heading per session, and its\n" +
+  "  steps as a top-level ordered list. Step 1 registers the session and the\n" +
+  "  rest are the work. Cross-provider verification, the run of record and\n" +
+  "  the close are the framework's, never steps to plan; never write a step\n" +
+  "  that says \"run the tests\" without saying which run it means.\n" +
+  "- Do NOT hand-author `sessions.json`: the first `session start` bootstraps\n" +
+  "  it from this plan.\n";
+
+/**
  * The two setup sessions, written only into a repository with no plan.
  *
- * `existing` is the solution and build files already at the root. Empty, the
+ * `existing` is the solution and build files already there. Empty, the
  * first numbered session is the skeleton that writes them; named, the plan is
  * fitted to them and the first session adopts them, because a skeleton
- * written over a solution that exists re-creates its projects.
+ * written over a solution that exists re-creates its projects. Under
+ * `maintenance` the plan is a plan of changes to those projects as they are.
  */
-export function bootstrapPlan(existing: readonly string[]): string {
+export function bootstrapPlan(existing: readonly string[], posture: Posture = "greenfield"): string {
+  if (posture === "maintenance") return maintenancePlan(existing);
   const adopting = existing.length > 0;
   return (
     BOOTSTRAP_PLAN_BRIEF +
@@ -390,6 +480,85 @@ function existingSurvey(existing: readonly string[]): string {
     "   documents, suites and module boundaries fitted to the projects that\n" +
     "   exist, before any feature work. Restructuring existing code is the\n" +
     "   person's to approve with the plan.\n"
+  );
+}
+
+/** The setup sessions under `posture: maintenance`: a change plan, then sessions of three to six steps. */
+function maintenancePlan(existing: readonly string[]): string {
+  const found =
+    existing.length > 0 ? `: ${existing.map((name) => `\`${name}\``).join(", ")}` : "";
+  return (
+    "# Session plan\n" +
+    "\n" +
+    "> **Purpose:** the numbered sessions this repository runs, in order. The\n" +
+    "> first two set the work up; everything after them is the work.\n" +
+    "> **Workflow:** Full\n" +
+    "\n" +
+    "---\n" +
+    "\n" +
+    "## Sessions\n" +
+    "\n" +
+    "### Session 1: Author or import the change plan\n" +
+    "\n" +
+    "1. Register.\n" +
+    "2. The brief is the prompt this session was started with, or\n" +
+    "   `docs/planning/brief.md`: what is to change in this repository and\n" +
+    "   why -- the defects, the features or the upgrades wanted, and what is\n" +
+    "   out of scope. With neither, ask the person who started the session\n" +
+    "   for it and write their answer to that path before any work. The\n" +
+    "   plan's substance is theirs: do not search neighbouring directories\n" +
+    "   for one, and do not draft one from the code.\n" +
+    `3. This repository already holds code${found}, and\n` +
+    "   `dabbler.yaml` says `posture: maintenance`. Read it before planning --\n" +
+    "   its projects, their target frameworks or JDKs, their project formats,\n" +
+    "   their build tools, their test frameworks and their folders -- and take\n" +
+    "   all of them as the plan's givens. Do not ask how production is split,\n" +
+    "   and do not propose new boundaries between projects. Then create — or\n" +
+    "   import — `docs/planning/solution-plan.md`, short: one paragraph on the\n" +
+    "   repository as found, and one section per change, saying what changes,\n" +
+    "   in which project, and how it is shown to work. A repository that\n" +
+    "   already has `docs/planning/project-plan.md` amends that file instead.\n" +
+    "4. Fit this framework's documents and suites to the projects that exist,\n" +
+    "   and change nothing else: where `dabbler.yaml` declares no suite that\n" +
+    "   runs the tests these projects have, say which session declares one.\n" +
+    "   Restructuring, retargeting or reformatting a project is not a change\n" +
+    "   this plan makes unless the person asks for it by name.\n" +
+    FRAMEWORK_STEPS +
+    "\n" +
+    "This session writes the plan and nothing else: it creates, edits or\n" +
+    "deletes no code, project, build file, test, `dabbler.yaml` suite or\n" +
+    "packaging.\n" +
+    "\n" +
+    "**Creates:** `docs/planning/solution-plan.md`. A later revision is just\n" +
+    "another plan session that amends the same file.\n" +
+    "\n" +
+    "### Session 2: Break the change plan into numbered sessions\n" +
+    "\n" +
+    "1. Register.\n" +
+    "2. Read `docs/planning/solution-plan.md` (or `docs/planning/project-plan.md`\n" +
+    "   where that is the file this repository keeps its plan in) and break\n" +
+    "   each change into numbered sessions appended to this file, each of\n" +
+    "   three to six work steps: one `### Session <N>: <title>` heading, and\n" +
+    "   its steps as a top-level ordered list. Step 1 registers the session\n" +
+    "   and the rest are the work: cross-provider verification, the run of\n" +
+    "   record and the close are the framework's, never steps to plan. Never\n" +
+    "   write a step that says \"run the tests\" without saying which run it\n" +
+    "   means.\n" +
+    "3. No session writes a skeleton, and none proposes restructuring,\n" +
+    "   retargeting or reformatting a project: the projects stay as they are,\n" +
+    "   and a step that adds a file to a non-SDK project lists it in that\n" +
+    "   project's `.csproj`. A release is a session with no steps, headed\n" +
+    "   `### Session <N>: Release <version> (release: <version>)`; propose its\n" +
+    "   version -- patch, minor or major -- for the person to approve with\n" +
+    "   the plan.\n" +
+    FRAMEWORK_STEPS +
+    "\n" +
+    "This session writes the plan and nothing else: it creates, edits or\n" +
+    "deletes no code, project, build file, test, `dabbler.yaml` suite or\n" +
+    "packaging.\n" +
+    "\n" +
+    "**Creates:** the numbered session list the rest of this repository runs.\n" +
+    BOOTSTRAP_PLAN_END
   );
 }
 
@@ -566,7 +735,7 @@ export const PROJECT_CONFIG_TESTING_HEADER =
   "# or running one. The selection is what the record NAMES as affected by a\n" +
   "# change, and what `dabbler affected` prints.\n" +
   "#\n" +
-  "# One suite per ecosystem whose root build file says how its tests run, so\n" +
+  "# One suite per ecosystem whose build file says how its tests run, so\n" +
   "# a repository that is Java and .NET at once hands each runner its own\n" +
   "# tests. Check the command before you rely on it: it is read from what this\n" +
   "# repository already carries, and a repository can carry a runner it does\n" +
@@ -582,6 +751,7 @@ export const PROJECT_CONFIG_TESTING_HEADER =
   "#\n" +
   "#   test_name   the name a source file's tests take, `{name}` standing for\n" +
   "#               its stem: CsvSerializer.cs is tested by CsvSerializerTests.cs.\n" +
+  "#               A list where tests are named both ways, as test_glob may be.\n" +
   "#   select      the command that runs a selection: `{names}` the selected\n" +
   "#               test classes joined by `select_separator`, `{paths}` their\n" +
   "#               files. A suite without it runs whole.\n" +
@@ -611,16 +781,15 @@ export const PROJECT_CONFIG_SELECTION =
 
 export const PROJECT_CONFIG_NO_SUITES =
   "\n" +
-  "# No suite is declared, because nothing at the root of this repository says\n" +
-  "# how its tests run. Setup reads what is there -- a pytest section, a\n" +
-  "# `scripts.test`, a POM, a solution -- and where none of it says how the\n" +
-  "# tests run, it declares nothing rather than emitting a command that would\n" +
-  "# fail on its first use. That is a declaration, not an omission.\n" +
+  "# No suite is declared, because nothing in this repository says how its\n" +
+  "# tests run. Setup reads what is there -- a pytest section, a\n" +
+  "# `scripts.test`, a POM or a solution at the root or two levels below it\n" +
+  "# -- and where none of it says how the tests run, it declares nothing\n" +
+  "# rather than emitting a command that would fail on its first use. That is\n" +
+  "# a declaration, not an omission.\n" +
   "#\n" +
-  "# A repository whose build files live BELOW the root reaches this too: a\n" +
-  "# suite declares a command and no working directory, so `service/pom.xml`\n" +
-  "# has no runnable line to become. Declare the suite yourself -- a name, the\n" +
-  "# command that runs it, the paths it covers, and where its tests live:\n" +
+  "# Declare the suite yourself -- a name, the command that runs it, the paths\n" +
+  "# it covers, and where its tests live:\n" +
   "#\n" +
   "#   testing:\n" +
   "#     suites:\n" +

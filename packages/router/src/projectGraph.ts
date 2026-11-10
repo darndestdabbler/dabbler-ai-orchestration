@@ -1,7 +1,8 @@
 // The shape of a solution, read from its build files and from nothing else.
 //
-// A .NET solution is its root `.slnx` or `.sln` -- or, where there is
-// neither, every `.csproj` under the root -- and each project's
+// A .NET solution is its `.slnx` or `.sln` -- at the root, or up to two
+// levels below it where the root has none -- or, where there is neither,
+// every `.csproj` under the root -- and each project's
 // `<ProjectReference>`s. A Maven solution is its root `pom.xml`'s `<modules>`,
 // read recursively -- or, where there is no root POM, every `pom.xml` under
 // the root -- and each module's `<dependency>` on a sibling's artifact. A
@@ -10,7 +11,7 @@
 // Nothing here is declared. A list of projects kept beside the build files
 // is a second thing to keep true, and the build tool never reads it.
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { type XmlElement, buildFilesIn, childText, readXmlElements } from "./solutionDeps.ts";
@@ -68,36 +69,72 @@ function rootNames(root: string): string[] {
 
 // --- .NET ---------------------------------------------------------------------
 
-function slnxProjects(root: string, name: string): string[] {
-  return (elementsOf(join(root, name)) ?? [])
+/** A solution file's projects, each resolved against the solution file's own folder, as the IDE resolves them. */
+function slnxProjects(file: string): string[] {
+  return (elementsOf(file) ?? [])
     .filter((element) => element.name === "Project" && element.attributes["Path"])
-    .map((element) => resolve(root, posix(element.attributes["Path"] as string)));
+    .map((element) => resolve(dirname(file), posix(element.attributes["Path"] as string)));
 }
 
-function slnProjects(root: string, name: string): string[] {
+function slnProjects(file: string): string[] {
   let text = "";
   try {
-    text = readText(join(root, name));
+    text = readText(file);
   } catch {
     return [];
   }
   return [...text.matchAll(/^Project\("[^"]*"\)\s*=\s*"[^"]*",\s*"([^"]+\.csproj)"/gim)].map((match) =>
-    resolve(root, posix(match[1] as string)),
+    resolve(dirname(file), posix(match[1] as string)),
   );
 }
 
+/** What a build or a package manager writes, and the router's own state: never a solution. */
+const NOT_WALKED: ReadonlySet<string> = new Set(["bin", "obj", "target", "node_modules", ".git", ".dabbler"]);
+
 /**
- * The projects the first root solution file that lists any names, as absolute
- * paths, or null where none does. An empty solution is what `dotnet new sln`
- * writes, and reading it as "no projects" hid every `.csproj` beside it.
+ * The folders a solution file is looked for in: the root, then each level
+ * below it to two deep, shallowest first and sorted within a level. A
+ * repository kept as `src/Thing.sln` is as common as one at the root.
+ */
+function solutionFolders(root: string, depth = 2): string[][] {
+  const levels: string[][] = [[root]];
+  for (let at = 1; at <= depth; at += 1) {
+    const below = (levels[at - 1] as string[]).flatMap((dir) =>
+      rootNames(dir)
+        .filter((name) => !NOT_WALKED.has(name) && isFolder(join(dir, name)))
+        .map((name) => join(dir, name)),
+    );
+    if (below.length === 0) break;
+    levels.push(below);
+  }
+  return levels;
+}
+
+function isFolder(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The projects the first solution file that lists any names, as absolute
+ * paths, or null where none does: the root's first, `.slnx` before `.sln`,
+ * then each level below. An empty solution is what `dotnet new sln` writes,
+ * and reading it as "no projects" hid every `.csproj` beside it.
  */
 function solutionProjects(root: string): string[] | null {
-  const names = rootNames(root);
-  const lists = [
-    ...names.filter((name) => name.toLowerCase().endsWith(".slnx")).map((name) => slnxProjects(root, name)),
-    ...names.filter((name) => name.toLowerCase().endsWith(".sln")).map((name) => slnProjects(root, name)),
-  ];
-  return lists.find((projects) => projects.length > 0) ?? null;
+  for (const level of solutionFolders(root)) {
+    const files = level.flatMap((dir) => rootNames(dir).map((name) => join(dir, name)));
+    const lists = [
+      ...files.filter((file) => file.toLowerCase().endsWith(".slnx")).map(slnxProjects),
+      ...files.filter((file) => file.toLowerCase().endsWith(".sln")).map(slnProjects),
+    ];
+    const found = lists.find((projects) => projects.length > 0);
+    if (found !== undefined) return found;
+  }
+  return null;
 }
 
 function dotnetKind(elements: readonly XmlElement[]): ProjectKind {

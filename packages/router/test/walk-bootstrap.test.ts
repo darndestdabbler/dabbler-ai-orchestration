@@ -37,7 +37,7 @@ import { git, gitOut, makeRepo, scratchDir, writeFiles } from "./support/repo.ts
  */
 const PROJECT: Record<string, string> = {
   "Acme.Csv.csproj":
-    "<Project><PropertyGroup><PackageId>Acme.Csv</PackageId>" +
+    '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><PackageId>Acme.Csv</PackageId>' +
     "<TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>",
   "pytest.ini": "[pytest]\n",
   "src/acme/__init__.py": "VALUE = 1\n",

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 289 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 289 transcript</h1>
+<p class="stamp">Rendered 2026-10-27T13:09:04.978Z by dabbler-ai-router 3.23.0 at 74fff7090dab6a99803fbb2ecf75f02eb6632eb8.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-27T09:00:40.143-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 289 of 291: A round sees what earlier rounds asked</h3>
+<p>Scope: <code>packages/router/src/verify/rounds.ts</code> (the finding a round records), <code>packages/router/src/verify/prompts.ts</code> (<code>priorFindingsBlock</code>), <code>packages/router/prompt-templates/verification.md</code> (the tests in the diff), <code>packages/router/src/drive.ts</code> (the dispositions ask); their tests</p>
+<p><strong>Why.</strong> The same report. Session 21 took seven rounds swinging between demands that each round could defend on its own terms; round 6 deleted round 5's code and round 7 passed round 4's. The prompt makes an <strong>Acceptance criterion</strong> mandatory on every finding -- the closed question that settles whether it is fixed -- and the round record does not store it, so no later round ever sees what an earlier one asked for. Separately, every Dashboard test stubbed the API client while the shipped <code>appsettings.json</code> had an empty <code>BaseUrl</code>, so every page returned 500 in real use and a person found it; session 50 tested six new fields on EF InMemory with a partial raw-SQL seed. And the dispositions ask calls a citation's range optional while a file over 16,384 bytes without one is refused (two refusals, sessions 33 and 57).</p>
+<p><strong>Step 1 -- the criterion is stored and shown.</strong> The round records each finding's acceptance criterion, and <code>priorFindingsBlock</code> shows it to later rounds beside the finding.</p>
+<p><strong>Step 2 -- the real path, once.</strong> One sentence under *The tests in the diff*: where every test replaces a boundary -- an in-memory database, a stubbed client, a partial seed -- the reviewer asks for evidence that the shipped configuration and the real path are exercised at least once.</p>
+<p><strong>Step 3 -- guard tests are named.</strong> 285's sentence on tests edited to pass names an allow-list, scan or contract test changed in the same diff as the thing it guards. No second rule.</p>
+<p><strong>Step 4 -- the dispute ask states the cap.</strong> A cited file over 16,384 bytes is cited as <code>path:START-END</code>.</p>
+<p><strong>Non-goals.</strong> Retrofitting earlier round records. A new gate or severity. A rule of its own for security tests.</p>
+<p><strong>Tests.</strong> In <code>rounds.test.ts</code>, a finding's acceptance criterion is stored. In <code>prompts.test.ts</code>, it is shown to the next round, and the prompt carries the real-path sentence. In <code>drive.test.ts</code>, the dispositions ask names the cap.</p>
+<p><strong>Releasable.</strong> Yes -- with 288 and 290, as 3.26.0 in session 291.</p>
+<h2>Work Plan</h2>
+<p>Make a verification round see what earlier rounds asked. The verdict parser reads each finding's Acceptance criterion line, the round record stores it beside the failure scenario, and priorFindingsBlock shows it to later rounds under the finding. The verification prompt's section on the tests in the diff gains one sentence asking, where every test replaces a boundary (an in-memory database, a stubbed client, a partial seed), for evidence that the shipped configuration and the real path are exercised at least once; and its existing sentence on tests edited to pass names an allow-list, scan or contract test changed in the same diff as the thing it guards. The dispositions ask states that a cited file over 16,384 bytes is cited as path:START-END.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/70fada7ab3e909da80a499ca946b0e80f94b33db"><code>70fada7ab3e909da80a499ca946b0e80f94b33db</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Criterion stored and shown</td><td><p>In verdict.ts parse a finding's 'Acceptance criterion' line into Finding.acceptanceCriterion (as failureScenario is parsed); in rounds.ts store it on the round's finding, sliced like failureScenario; in prompts.ts priorFindingsBlock print it beside the finding as '  - Acceptance criterion: ...'. Tests: verdict.test.ts parses it, rounds.test.ts stores it, prompts.test.ts shows it to the next round.</p></td><td></td><td><code>node --test packages/router/test/verdict.test.ts packages/router/test/rounds.test.ts packages/router/test/prompts.test.ts</code></td><td>yes</td></tr>
+<tr><td>Real path sentence</td><td><p>Add one sentence under 'The tests in the diff' in verification.md: where every test replaces a boundary -- an in-memory database, a stubbed client, a partial seed -- the reviewer asks for evidence that the shipped configuration and the real path are exercised at least once. prompts.test.ts asserts the built prompt carries it.</p></td><td></td><td><code>node --test packages/router/test/prompts.test.ts</code></td><td>yes</td></tr>
+<tr><td>Guard tests named</td><td><p>In verification.md, extend the existing sentence on a test weakened or rewritten to make the change pass so it names an allow-list, scan or contract test changed in the same diff as the thing it guards. No second rule.</p></td><td></td><td><code>git grep -q allow-list, scan or contract test -- packages/router/prompt-templates/verification.md</code></td><td>yes</td></tr>
+<tr><td>Dispute ask states cap</td><td><p>In drive.ts dispositionAsk, state that a cited file over 16,384 bytes (DISPUTE_EVIDENCE_INLINE_CAP) must be cited as path:START-END. drive.test.ts asserts the dispositions ask names the cap.</p></td><td></td><td><code>node --test packages/router/test/drive.test.ts</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Retrofitting earlier round records with acceptance criteria</li><li>A new gate or a new severity</li><li>A rule of its own for security tests</li><li>A second rule about guard tests beyond naming them in the existing sentence</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[13:00:40]</span> <span class="muted">run-started</span> session=289 mode=pull</div>
+<div class="line"><span class="at">[13:00:40]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[13:01:30]</span> <span class="muted">run-resumed</span> session=289 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[13:01:30]</span> <span class="muted">plan-accepted</span> steps=[&quot;criterion-stored-and-shown&quot;,&quot;real-path-sentence&quot;,&quot;guard-tests-named&quot;,&quot;dispute-ask-states-cap&quot;] non_goals=4</div>
+<div class="line"><span class="at">[13:01:31]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[13:01:31]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=criterion-stored-and-shown</div>
+<div class="line"><span class="at">[13:02:30]</span> <span class="muted">run-resumed</span> session=289 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[13:02:33]</span> <span class="muted">check-passed</span> step=criterion-stored-and-shown argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/verdict.test.ts&quot;,&quot;packages/router/test/rounds.test.ts&quot;,&quot;packages/router/test/prompts.test.ts&quot;]</div>
+<div class="line"><span class="at">[13:02:36]</span> <span class="muted">named-tests-passed</span> step=criterion-stored-and-shown suite=typescript command=node scripts/suite.mjs container packages/router/test/prompts.test.ts packages/router/test/rounds.test.ts packages/router/test/verdict.test.ts</div>
+<div class="line"><span class="at">[13:02:37]</span> <span class="muted">report-accepted</span> seq=2 step=criterion-stored-and-shown files=[] notes=Parser reads Acceptance criterion; findingRows stores it; priorFindingsBlock shows it</div>
+<div class="line"><span class="at">[13:02:37]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=real-path-sentence</div>
+<div class="line"><span class="at">[13:02:57]</span> <span class="muted">run-resumed</span> session=289 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[13:02:59]</span> <span class="muted">check-passed</span> step=real-path-sentence argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/prompts.test.ts&quot;]</div>
+<div class="line"><span class="at">[13:03:03]</span> <span class="muted">named-tests-passed</span> step=real-path-sentence suite=typescript command=node scripts/suite.mjs container packages/router/test/prompts.test.ts</div>
+<div class="line"><span class="at">[13:03:04]</span> <span class="muted">report-accepted</span> seq=3 step=real-path-sentence files=[] notes=Real-path sentence under The tests in the diff; prompt test asserts it</div>
+<div class="line"><span class="at">[13:03:04]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=guard-tests-named</div>
+<div class="line"><span class="at">[13:03:14]</span> <span class="muted">run-resumed</span> session=289 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[13:03:16]</span> <span class="muted">check-passed</span> step=guard-tests-named argv=[&quot;git&quot;,&quot;grep&quot;,&quot;-q&quot;,&quot;allow-list, scan or contract test&quot;,&quot;--&quot;,&quot;packages/router/prompt-templates/verification.md&quot;]</div>
+<div class="line"><span class="at">[13:03:17]</span> <span class="muted">report-accepted</span> seq=4 step=guard-tests-named files=[] notes=Existing tests-edited-to-pass sentence names allow-list, scan and contract tests</div>
+<div class="line"><span class="at">[13:03:17]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=dispute-ask-states-cap</div>
+<div class="line"><span class="at">[13:04:02]</span> <span class="muted">run-resumed</span> session=289 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[13:04:04]</span> <span class="muted">check-passed</span> step=dispute-ask-states-cap argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/drive.test.ts&quot;]</div>
+<div class="line"><span class="at">[13:04:55]</span> <span class="muted">named-tests-passed</span> step=dispute-ask-states-cap suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[13:04:56]</span> <span class="muted">report-accepted</span> seq=5 step=dispute-ask-states-cap files=[] notes=dispositionAsk exported and states the 16,384-byte cap; drive test asserts it</div>
+<div class="line"><span class="at">[13:04:56]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[13:04:57]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[13:04:57]</span> <span class="muted">job-started</span> name=verification pid=16456 log=.dabbler/runs/s289/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[13:06:49]</span> <span class="muted">job-finished</span> name=verification exit=<span class="bad">4</span> log=.dabbler/runs/s289/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[13:06:49]</span> <span class="muted">verification-blocking</span></div>
+<div class="line"><span class="at">[13:06:49]</span> <span class="milestone">phase</span> phase=<span class="milestone">dispositions</span></div>
+<div class="line"><span class="at">[13:06:49]</span> <span class="muted">instruction-issued</span> seq=6 kind=rejection reasons=1</div>
+<div class="line"><span class="at">[13:07:06]</span> <span class="muted">run-resumed</span> session=289 phase=<span class="milestone">dispositions</span> mode=pull</div>
+<div class="line"><span class="at">[13:07:06]</span> <span class="muted">dispute-recorded</span> round=1 finding=0</div>
+<div class="line"><span class="at">[13:07:06]</span> <span class="muted">dispositions-accepted</span> round=1 fix=[] reject=[0] answers=[{&quot;finding&quot;:0,&quot;action&quot;:&quot;reject&quot;,&quot;reason&quot;:&quot;Finding is already imported in rounds.ts: `type Finding` is in the import from ../verdict.ts at lines 95-103, which the diff did not touch because it predates this session. `tsc --noEmit -p packages/router` passes and the step's tests ran green.&quot;}]</div>
+<div class="line"><span class="at">[13:07:06]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[13:07:06]</span> <span class="muted">job-started</span> name=verification pid=49304 log=.dabbler/runs/s289/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[13:07:27]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s289/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[13:07:27]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[13:07:27]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[13:07:27]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[13:07:27]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=44480 log=.dabbler/runs/s289/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[13:07:29]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s289/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[13:07:30]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[13:07:30]</span> <span class="muted">job-started</span> name=run of record: typescript pid=26548 log=.dabbler/runs/s289/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[13:08:38]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s289/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[13:08:38]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[13:08:38]</span> <span class="muted">job-started</span> name=run of record: extension pid=52620 log=.dabbler/runs/s289/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[13:08:55]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s289/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[13:08:55]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[13:08:58]</span> <span class="muted">landed</span> commit=70fada7ab3e909da80a499ca946b0e80f94b33db</div>
+<div class="line"><span class="at">[13:08:58]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[13:08:58]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[13:08:58]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[13:08:58]</span> <span class="muted">job-started</span> name=close pid=23016 log=.dabbler/runs/s289/driver/jobs/close.log</div>
+<div class="line"><span class="at">[13:09:04]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s289/driver/jobs/close.log</div>
+<div class="line"><span class="at">[13:09:04]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="bad">ISSUES_FOUND</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details open><summary>1 finding</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>major</strong> <span class="bad">blocking</span></td><td>`findingRows` references `Finding` without importing the module-scoped type</td><td>disputed — Finding is already imported in rounds.ts: `type Finding` is in the import from ../verdict.ts at lines 95-103, which the diff did not touch because it predates this session. `tsc --noEmit -p packages/router` passes and the step's tests ran green.</td></tr>
+</table></td></tr>
+<tr><td>2</td><td>fix-delta</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td>0</td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>68s</td><td>1393</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>296</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

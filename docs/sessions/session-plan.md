@@ -18791,7 +18791,7 @@ suites, green under their own runners.
 
 The framework publishes session 315 as 3.32.1 and nothing else.
 
-### Session 317 of 321: The guide says what holds an AI to the rules
+### Session 317 of 320: The guide says what holds an AI to the rules
 
 Scope: `docs/guide/discipline.md`, `docs/guide/verification.md` and
 `docs/guide/the-record.md` (new), `docs/guide/README.md` (new: the index),
@@ -18810,8 +18810,8 @@ mechanisms are spread through `docs/driving-a-session.md`, which is 1,700
 lines written for someone already driving a session, and through a root
 README that is half reference manual. A front page can make a claim in one
 sentence only if it can link to the page that proves it. Sessions 317 and
-318 write those pages; 319 takes the screenshots; 320 rewrites the two
-front pages over them; 321 releases.
+318 write those pages; 319 rewrites the two front pages over them, with
+the operator's screenshots; 320 releases.
 
 **What.** Three pages under `docs/guide/`, each written for a developer or
 a manager deciding whether to trust the product, who has not run a session.
@@ -18855,10 +18855,12 @@ pages with one line each. `check-shipped-docs.mjs` reads every page under
 retired.
 
 **Non-goals.** Rewriting `driving-a-session.md` or `quick-start.md`.
-A claim with no mechanism beside it. A claim the framework does not
-enforce: a changed file with no test named after it is shown to the
-reviewer and refuses nothing, so the page says the framework runs and
-records the tests and does not say every line is covered. Decision ids,
+A claim with no mechanism beside it. A stronger claim about tests than
+the mechanism: the framework runs the automated tests before any code is
+committed; the reviewer is shown every changed file with no test named
+after it and asked to judge whether it is tested; a test the session's
+plan promised and did not deliver is a blocking finding, and any other
+missing case is advice. The page says exactly that. Decision ids,
 session numbers or incident history on a guide page. Any change to
 behaviour.
 
@@ -18866,9 +18868,9 @@ behaviour.
 `check-shipped-docs.mjs` over the new pages, and each step's check is that
 run.
 
-**Releasable.** Yes -- with 318 to 320, as 3.32.2 in session 321.
+**Releasable.** Yes -- with 318 and 319, as 3.32.2 in session 320.
 
-### Session 318 of 321: The guide covers Consult with AI, the Mechanic and the Configuration
+### Session 318 of 320: The guide covers Consult with AI, the Mechanic and the Configuration
 
 Scope: `docs/guide/consult-and-mechanic.md` and
 `docs/guide/configuration.md` (new), `docs/guide/README.md`,
@@ -18913,7 +18915,7 @@ vehicle. Where each choice is kept and the order the layers are read, as
 and direct API keys, with what each needs. Where the model lists come from
 and that reading them costs nothing. Credentials. This is the root
 README's *Transports* and *Credentials* material, corrected and moved;
-session 320 removes it from the README.
+session 319 removes it from the README.
 
 **Step 3 -- `quick-start.md`.** Its machine-configuration section and its
 catalog section say what `configuration.md` says, in a paragraph each, and
@@ -18924,7 +18926,7 @@ link to it.
 is retired. The incident is the root README, which has told readers to set
 it since the release that stopped reading it. The check now refuses that
 README section, so this step replaces the section with one line linking
-to `configuration.md`; the rest of the README is session 320's. Both new
+to `configuration.md`; the rest of the README is session 319's. Both new
 pages join the index.
 
 **Non-goals.** Any change to the Mechanic, the consult brief or the
@@ -18936,67 +18938,14 @@ owner or a key's value in an example.
 **Tests.** None added. The lint control runs `check-shipped-docs.mjs`
 over every shipped page, and each step's check is that run.
 
-**Releasable.** Yes -- with 317, 319 and 320, as 3.32.2 in session 321.
+**Releasable.** Yes -- with 317 and 319, as 3.32.2 in session 320.
 
-### Session 319 of 321: The screenshots are taken from the running extension
-
-Scope: `docs/onboarding/capture-screens.mjs` and `capture-walk.mjs` (the
-listing's shots beside the deck's), `tools/dabbler-ai-orchestration/media/`
-(four new images; the ones no page references are removed),
-`docs/onboarding/README.md`
-
-**Why.** The listing has one image. It shows session 135 of 136 in this
-repository, a Solution Explorer reading "one module", and no Configuration
-section, which is now the first thing a person sees. The operator asked
-for new screenshots, one of them the Configuration. The onboarding deck
-already takes its screens from a real VS Code through one launch seam; the
-listing's image was made some other way and went stale because nothing
-could retake it.
-
-**What.** Four images, each written by the capture scripts that already
-exist, from a small sample solution and never from this repository: a
-stranger should see a project like theirs, and this one's tree shows three
-hundred sessions.
-
-**Step 1 -- the fixture.** The .NET sample of
-`docs/uat/uat-dotnet-json-solution.md`, staged under `C:\temp` with a few
-sessions complete and one in flight. The script says how to stage it in
-its own error message, as `capture-walk.mjs` does today.
-
-**Step 2 -- `configuration.png`.** The Solution Explorer with
-**Configuration** expanded: Authoring AI with its vehicle, model, Mechanic
-model and Mechanic delegation, and the two reviewers, each row showing
-whether it is this repository's or the machine default.
-
-**Step 3 -- `session-in-flight.png` and `two-terminals.png`.** The Work
-Explorer with one session expanded into its steps and phases; and the
-engine's terminal beside the Dabbler terminal during a review round, so
-the picture shows a reviewer from another provider answering.
-
-**Step 4 -- `transcript.png`.** A committed transcript page open in the
-browser, at a session that had a review round with findings and a fix.
-
-**Step 5 -- what is removed.** Images under `media/` that no page and no
-manifest entry references are deleted. `work-explorer-session.png` stays:
-the published 3.32.1 listing loads it from `master`, and it goes in the
-session after 321. The new images have new names for the same reason.
-`docs/onboarding/README.md` lists the four.
-
-**Non-goals.** A drawn or edited image. A screenshot of this repository.
-An animated capture. A model name, account or path in a picture that
-identifies a person or a seat's owner. New slides in the deck. A test
-that compares pixels.
-
-**Tests.** None added. Each step's check is that its image exists at the
-size the script states. The person reviewing the commit looks at the four.
-
-**Releasable.** Yes -- with 317, 318 and 320, as 3.32.2 in session 321.
-
-### Session 320 of 321: The two front pages say what Dabbler is for
+### Session 319 of 320: The two front pages say what Dabbler is for
 
 Scope: `README.md`, `tools/dabbler-ai-orchestration/README.md`,
-`tools/dabbler-ai-orchestration/package.json` (`description`, `keywords`),
-`docs/guide/README.md`, `version.json` and the manifests
+`tools/dabbler-ai-orchestration/media/` (five images in, the unreferenced
+ones out), `tools/dabbler-ai-orchestration/package.json` (`description`,
+`keywords`), `docs/guide/README.md`, `version.json` and the manifests
 `npm run stamp:version` writes, `tools/dabbler-ai-orchestration/CHANGELOG.md`
 
 **Why.** The root README is titled `dabbler-ai-router`, opens with how a
@@ -19007,59 +18956,83 @@ is about tidiness, and reaches verification in a paragraph of two hundred
 words. The two pages disagree on how many gates the close has. Neither
 says the thing the operator wants a stranger to leave with.
 
-**What.** Two short pages with one message, and everything else linked.
+The listing has one image, of session 135 in this repository, with no
+Configuration section in it. The operator took new ones on 2026-11-11 from
+real sessions on two sample solutions, and a risk table that states the
+message in four rows.
 
-**Step 1 -- the message.** Proposed headline, the person's to change when
+**What.** Two short pages with one message, the operator's screenshots,
+and everything else linked.
+
+**Step 1 -- the images.** The operator's files are copied into `media/`
+under these names, unedited:
+
+| From | To | Shows |
+|---|---|---|
+| `D:\dabbler-ai-orchestration-vs-code.png` | `overview.png` | the Configuration, the Work Explorer, the engine's terminal and the Dabbler terminal in one window |
+| `D:\dabbler-framework-output.png` | `review-round.png` | a reviewer from another provider finding a blocking defect, and the fix step that follows |
+| `D:\dabbler-framework-automated-tests.png` | `run-of-record.png` | the framework running the suite, project by project, before the land |
+| `D:\dabbler-session-management.png` | `session-steps.png` | a session in flight, its steps, and one step's description |
+
+A file the operator has retaken stands at the same path before the session
+starts. Images under `media/` that no page and no manifest entry
+references are deleted. `work-explorer-session.png` stays: the published
+3.32.1 listing loads it from `master`, and it goes in a later session.
+
+**Step 2 -- the message.** Proposed headline, the person's to change when
 approving this plan: **"AI writes the code. The framework holds it to the
-rules."** Under it, one paragraph, then the claims as a list of one
-sentence each, every one linking to the guide section that shows the
-mechanism:
+rules."** Under it, one paragraph, then the operator's risk table as a
+markdown table and not as a picture, so that it can be searched, read
+aloud and linked from. Each mitigation links to the guide section that
+shows its mechanism:
 
-- the AI works one instruction at a time inside rules it cannot change;
-- a model from a different provider reviews every session, and the two
-  work through findings and fixes for several rounds without a person;
-- the framework runs the tests and records the result, not the AI;
-- the code is hashed, so work cannot be claimed over a tree that moved;
-- everything deterministic is the framework's: progress, checks, tests,
-  git, the close;
-- every session leaves a plan, a log, the decisions and a transcript in
-  the repository;
-- when it is stuck there is **Consult with AI**, the **Mechanic**, and a
-  person's decision on the record.
+| Risk | What Dabbler does |
+|---|---|
+| AI's work is a black box | The framework shows the work as it happens and leaves a plan, a log, the decisions and a transcript in the repository. |
+| AI's work is not adequately evaluated | A model from a different provider reviews every session. The two work through findings and fixes, up to seven rounds, without a person. |
+| AI cheats in its work | The framework, not the AI, runs the checks, the tests, the reviews and the commits, and hashes the code so that work cannot be claimed over a tree that changed. An AI cannot easily cheat, and each way one is found to is closed with a deterministic check. |
+| AI does more than it is asked | Reviewers judge the work against the plan's goals and non-goals. Work a non-goal rules out is a blocking finding. |
+| Code reaches the trunk untested | The framework runs the automated tests before any code is committed, and the reviewer is shown every changed file that has no test. |
+| A session gets stuck | **Consult with AI**, the **Mechanic**, and a person's decision on the record. |
 
-**Step 2 -- the Marketplace page.** The headline, the session-in-flight
-image, the claims, then three short sections each with its image: *You
-choose the models* (Configuration), *What a session looks like* (the two
-terminals), *What it leaves behind* (the transcript). Then Requirements
-and Get started as they are, shortened, and the links to the guide.
-`description` in the manifest says the headline's message in one sentence;
-`keywords` gain what a person would search for.
+**Step 3 -- the Marketplace page.** The headline, `overview.png`, the
+table, then three short sections each with its image: *Two models, several
+rounds* (`review-round.png`), *The framework runs the tests*
+(`run-of-record.png`), *You can see where the work is*
+(`session-steps.png`). A paragraph on the Configuration points at the
+overview image. Then Requirements and Get started as they are, shortened,
+and the links to the guide. `description` in the manifest says the
+headline's message in one sentence; `keywords` gain what a person would
+search for.
 
-**Step 3 -- the root README.** Titled *Dabbler AI Orchestration*. The same
-headline, paragraph and claims, word for word, one image, install from the
-Marketplace, the guide's index, and the repository's own matters: layout,
-building from source, library use. Its reference sections go: each is
-already a guide page or a section of `driving-a-session.md`, and the page
-links there.
+**Step 4 -- the root README.** Titled *Dabbler AI Orchestration*. The same
+headline, paragraph and table, word for word, `overview.png`, install from
+the Marketplace, the guide's index, and the repository's own matters:
+layout, building from source, library use. Its reference sections go: each
+is already a guide page or a section of `driving-a-session.md`, and the
+page links there.
 
-**Step 4 -- the number.** `version.json` goes to 3.32.2, stamped with
+**Step 5 -- the number.** `version.json` goes to 3.32.2, stamped with
 `npm run stamp:version` -- a patch: pages, images and one docs check, and
 no behaviour changed. The changelog's 3.32.2 section says the listing and
 the guide are new.
 
-**Non-goals.** A count of gates, sessions, tests or models on either front
-page: a number stated on two pages is the number that drifted. A claim
-without a link to its mechanism. "Cannot cheat", "guaranteed" or "all
-code is tested": the pages say what is hashed, what is run and what is
-refused. Comparison with any named product. Badges, testimonials or
-install counts. A second copy of the reference material. Publishing to
-Open VSX.
+**Non-goals.** A count of gates, sessions or tests on either front page: a
+number stated on two pages is the number that drifted. The round cap is
+the one number, and it is read from the shipped configuration. A claim
+without a link to its mechanism. "Digital signatures": what the framework
+keeps are SHA-256 hashes, and the page says hashes. "All code is tested"
+as a guarantee: the framework runs every test before the commit and shows
+the reviewer what has none, and a missing test blocks only where the
+session's plan promised it. An edited or drawn screenshot. Comparison with
+any named product. Badges, testimonials or install counts. A second copy
+of the reference material. Publishing to Open VSX.
 
 **Tests.** None added. The lint control runs `check-shipped-docs.mjs` over
 both pages and the manifest; `npm run check:version` checks the stamp.
 
-**Releasable.** Yes -- with 317 to 319, as 3.32.2 in session 321.
+**Releasable.** Yes -- with 317 and 318, as 3.32.2 in session 320.
 
-### Session 321 of 321: Release 3.32.2 (release: 3.32.2)
+### Session 320 of 320: Release 3.32.2 (release: 3.32.2)
 
-The framework publishes sessions 317 to 320 as 3.32.2 and nothing else.
+The framework publishes sessions 317 to 319 as 3.32.2 and nothing else.

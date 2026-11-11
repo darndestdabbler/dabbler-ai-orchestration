@@ -19184,6 +19184,66 @@ both pages and the manifest; `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 319 and 320, as 3.32.3 in session 322.
 
-### Session 322 of 322: Release 3.32.3 (release: 3.32.3)
+### Session 322 of 324: Release 3.32.3 (release: 3.32.3)
 
 The framework publishes sessions 319 to 321 as 3.32.3 and nothing else.
+
+### Session 323 of 324: The listing says it in plain words, and names the transcript
+
+Scope: `tools/dabbler-ai-orchestration/README.md`, `README.md`,
+`version.json` and the manifests `npm run stamp:version` writes,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The operator read the 3.32.3 listing on 2026-11-11. It reads well
+to someone who already knows the framework, and several phrases do not
+read on a first pass: "Work a non-goal rules out is a blocking finding",
+"a tree that changed", "deterministic", "the trunk", "engine CLI", "reach
+to two provider families". The listing also never says that every session
+leaves a transcript page in the repository, which is the strongest answer
+to "what did the AI actually do".
+
+**Step 1 -- plain words on the Marketplace page.** These changes, and the
+same kind of change wherever else the page asks a reader to know
+the framework's vocabulary already:
+
+| Where | Now | Becomes |
+|---|---|---|
+| Paragraph | "ordinary deterministic code" | "ordinary code that does the same thing every time" |
+| Black-box row | unchanged | unchanged |
+| Cheats row | "hashes the code so that work cannot be claimed over a tree that changed. An AI cannot easily cheat, and each way one is found to is closed with a deterministic check." | "records a SHA-256 hash of the code it checked, so a passing result cannot be claimed for code that changed afterwards. An AI cannot easily cheat, and each way around the rules that turns up is closed with a new automatic check." |
+| Scope row | "Reviewers judge the work against the plan's goals and non-goals. Work a non-goal rules out is a blocking finding." | "Reviewers judge the work against what the plan says the session will and will not do. Out-of-scope work that AI does anyway is blocked by the framework." (the operator's wording) |
+| Untested row, risk | "Code reaches the trunk untested" | "Untested code gets committed" |
+| Stuck row | "**Consult with AI**, the **Mechanic**, and a person's decision on the record." | "A person can ask another AI what went wrong (**Consult with AI**), let a fresh AI make the smallest fix (the **Mechanic**), or decide for themselves, and the decision is recorded." |
+| Tests section | "against a hash of the tree it ran on" | "against a SHA-256 hash of the code it ran on" |
+| Requirements | "An engine CLI on PATH", "Reach to two provider families" | "An AI coding tool you run from the command line", "Access to models from two different AI companies" |
+
+**Step 2 -- the transcript.** Under *You can see where the work is*, one
+paragraph: every session, a cancelled one included, leaves a self-contained
+HTML page in the repository, under `docs/transcripts/`, carrying that
+session's plan, the work done, each issue the reviewer found and how it was
+dealt with, and the tests that ran. It links to *The transcript* in
+`the-record.md`. It says the page is committed with the code and needs
+nothing to open it, and that a repository can turn it off
+(`dabbler.transcript`), because it can.
+
+**Step 3 -- the root README** carries the paragraph and the table word for
+word as the Marketplace page does, as 321 established.
+
+**Step 4 -- the number.** `version.json` goes to 3.32.4, stamped with `npm
+run stamp:version` -- a patch: wording only. The changelog's 3.32.4 section
+says the listing reads more plainly and names the transcript.
+
+**Non-goals.** The guide pages: a later session if the operator wants the
+same pass there. A new screenshot or a changed image. Any number beyond the
+round cap. The font size of the listing's body text: Markdown cannot set
+it and the Marketplace's own stylesheet decides it, so it is not this
+session's to change. Any change to behaviour.
+
+**Tests.** None added. The lint control runs `check-shipped-docs.mjs`;
+`npm run check:version` checks the stamp.
+
+**Releasable.** Yes, as 3.32.4 in session 324.
+
+### Session 324 of 324: Release 3.32.4 (release: 3.32.4)
+
+The framework publishes session 323 as 3.32.4 and nothing else.

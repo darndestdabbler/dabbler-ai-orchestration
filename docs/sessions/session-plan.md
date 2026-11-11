@@ -18791,7 +18791,81 @@ suites, green under their own runners.
 
 The framework publishes session 315 as 3.32.1 and nothing else.
 
-### Session 317 of 320: The guide says what holds an AI to the rules
+### Session 317 of 322: The reviewing vehicle's row warns only when something is wrong
+
+Scope: `tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts`,
+`tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts`,
+`version.json` and the manifests `npm run stamp:version` writes,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The operator's report, 2026-11-11, on 3.32.1: the Vehicle row
+under Reviewing AI shows a warning mark that nothing clears. Choosing a
+vehicle on the row does not clear it, and neither does reloading the
+window.
+
+The cause is in how the row is drawn. `descriptorFor` adds the mark to a
+Vehicle row whenever any layer below the deciding one names a value. For
+the reviewing vehicle one always does: the configuration the distribution
+ships names `transport.profile`, so every repository's row has at least one
+layer underneath, and the mark is on every reviewing Vehicle row on every
+machine. A repository that names its own vehicle, over a machine default
+that agrees with it, shows the mark for doing exactly what the product asks.
+The authoring Vehicle row has no shipped layer under it, which is why the
+same rule leaves it clean.
+
+The mark was added when a persisted environment variable could override a
+person's choice with no surface able to show it. That variable is retired.
+What remains under a choice is the machine's default and the shipped
+default, and one layer overriding the next is how the layers are meant to
+work. It is not something for a person to fix.
+
+The report also says the tooltip called the choice the machine's default
+after the repository had named one. That was not reproduced: read on the
+reporter's repository with `dabbler.reviewerTransport` set, the router
+answers that the checkout decided, and the pane draws its row from that
+reading. Step 2 settles it on the running extension.
+
+**What.**
+
+**Step 1 -- the mark.** A Vehicle row no longer carries a warning mark
+because a lower layer names a value. Its description is the vehicle and
+whose choice it is, and nothing else. The tooltip keeps every line it has:
+what decided, and each layer it overrides with that layer's value. The mark
+for the npm Copilot shim on the authoring row stays, because that one is a
+fault a person can fix.
+
+**Step 2 -- the row on a repository that names its vehicle.** With
+`dabbler.reviewerTransport` in the checkout's settings, a machine default
+and the shipped default beneath it, the row reads `api · this repository`
+and its tooltip says the choice is this repository's. The existing test of
+the Vehicle row is extended to that case, drawn from the reading the router
+gives for such a repository. The operator sees the row itself on 3.32.2
+when retaking the screenshot; a pane that still names the machine there is
+a defect of its own and a session of its own.
+
+**Step 3 -- the number.** `version.json` goes to 3.32.2, stamped with
+`npm run stamp:version` -- a patch: one row drawn correctly. The
+changelog's 3.32.2 section says the reviewing Vehicle row no longer shows a
+warning for an ordinary choice.
+
+**Non-goals.** A new mark for a different condition on this row: none is
+added until an incident asks for one. Any change to how the layers are
+read, or to `dabbler configuration explain`. The marks on the model rows,
+which report a selection the vehicle does not list or a reviewer from the
+author's own provider. Retaking the operator's screenshot, which is theirs
+to do on the released build.
+
+**Tests.** No test is added. The Vehicle row's existing test in
+`solutionTreeModel.test.ts` changes with the behaviour: a row with layers
+beneath its choice carries no mark and still lists them in its tooltip.
+
+**Releasable.** Yes -- as 3.32.2 in session 318.
+
+### Session 318 of 322: Release 3.32.2 (release: 3.32.2)
+
+The framework publishes session 317 as 3.32.2 and nothing else.
+
+### Session 319 of 322: The guide says what holds an AI to the rules
 
 Scope: `docs/guide/discipline.md`, `docs/guide/verification.md` and
 `docs/guide/the-record.md` (new), `docs/guide/README.md` (new: the index),
@@ -18815,9 +18889,9 @@ Every one of those is true, and none has a page that says how. The
 mechanisms are spread through `docs/driving-a-session.md`, which is 1,700
 lines written for someone already driving a session, and through a root
 README that is half reference manual. A front page can make a claim in one
-sentence only if it can link to the page that proves it. Sessions 317 and
-318 write those pages; 319 rewrites the two front pages over them, with
-the operator's screenshots; 320 releases.
+sentence only if it can link to the page that proves it. Sessions 319 and
+320 write those pages; 321 rewrites the two front pages over them, with
+the operator's screenshots; 322 releases.
 
 **What.** Three pages under `docs/guide/`, each written for a developer or
 a manager deciding whether to trust the product, who has not run a session.
@@ -18889,9 +18963,9 @@ behaviour.
 `check-shipped-docs.mjs` over the new pages, and each step's check is that
 run.
 
-**Releasable.** Yes -- with 318 and 319, as 3.32.2 in session 320.
+**Releasable.** Yes -- with 320 and 321, as 3.32.3 in session 322.
 
-### Session 318 of 320: The guide covers Consult with AI, the Mechanic and the Configuration
+### Session 320 of 322: The guide covers Consult with AI, the Mechanic and the Configuration
 
 Scope: `docs/guide/consult-and-mechanic.md` and
 `docs/guide/configuration.md` (new), `docs/guide/README.md`,
@@ -18946,9 +19020,10 @@ operator has retaken stands at the same path before the session starts.
 | `D:\dabbler-solutionexplorer-dotnet-modules.png` | `first-5-projects.png` | quick-start | the projects and what one depends on |
 | `D:\vscode-tests-for-csv-parser-project.png` | `first-6-tests.png` | quick-start | the solution's tests passing in the editor's own Test Explorer |
 
-The Configuration image shows a warning mark beside the reviewing vehicle.
-The page says what that mark means, read from the running extension, or
-the operator retakes the image without it.
+The Configuration image is retaken by the operator on 3.32.2, where the
+reviewing vehicle's row no longer carries a warning mark for an ordinary
+choice (session 317), and stands at the same path before this session
+starts.
 
 **Step 2 -- `configuration.md`.** The Configuration section of the
 Solution Explorer, row by row: the engine, the vehicle, the authoring
@@ -18959,7 +19034,7 @@ vehicle. Where each choice is kept and the order the layers are read, as
 and direct API keys, with what each needs. Where the model lists come from
 and that reading them costs nothing. Credentials. This is the root
 README's *Transports* and *Credentials* material, corrected and moved;
-session 319 removes it from the README.
+session 321 removes it from the README.
 
 **Step 3 -- `quick-start.md`.** Its machine-configuration section and its
 catalog section say what `configuration.md` says, in a paragraph each, and
@@ -18972,7 +19047,7 @@ image shows. No step is added or reworded for an image.
 is retired. The incident is the root README, which has told readers to set
 it since the release that stopped reading it. The check now refuses that
 README section, so this step replaces the section with one line linking
-to `configuration.md`; the rest of the README is session 319's. Both new
+to `configuration.md`; the rest of the README is session 321's. Both new
 pages join the index.
 
 **Non-goals.** Any change to the Mechanic, the consult brief or the
@@ -18984,9 +19059,9 @@ owner or a key's value in an example.
 **Tests.** None added. The lint control runs `check-shipped-docs.mjs`
 over every shipped page, and each step's check is that run.
 
-**Releasable.** Yes -- with 317 and 319, as 3.32.2 in session 320.
+**Releasable.** Yes -- with 319 and 321, as 3.32.3 in session 322.
 
-### Session 319 of 320: The two front pages say what Dabbler is for
+### Session 321 of 322: The two front pages say what Dabbler is for
 
 Scope: `README.md`, `tools/dabbler-ai-orchestration/README.md`,
 `tools/dabbler-ai-orchestration/media/` (five images in, one of them
@@ -19031,7 +19106,7 @@ width a listing draws them.
 A file the operator has retaken stands at the same path before the session
 starts. Images under `media/` that no page and no manifest entry
 references are deleted. `work-explorer-session.png` stays: the published
-3.32.1 listing loads it from `master`, and it goes in a later session.
+3.32.2 listing loads it from `master`, and it goes in a later session.
 
 **Step 2 -- the message.** Proposed headline, the person's to change when
 approving this plan: **"AI writes the code. The framework holds it to the
@@ -19054,8 +19129,11 @@ The paragraph above the table carries both of the operator's messages:
 the framework holds an AI to the rules, and it standardizes the work so
 that it outlives the conversation that produced it.
 
-**Step 3 -- the Marketplace page.** The headline, `overview.png`, the
-table, then three short sections each with its image: *Two models, several
+**Step 3 -- the Marketplace page.** `overview.png` is the centrepiece of
+both front pages: the first image a reader sees, directly under the
+headline, at the full width of the page and above the paragraph and the
+table. No other image comes before it on either page. The Marketplace page
+is the headline, `overview.png`, the paragraph, the table, then three short sections each with its image: *Two models, several
 rounds* (`review-round.png`), *The framework runs the tests*
 (`run-of-record.png`), *You can see where the work is*
 (`session-steps.png`), *Anyone can pick it up* (`consult-result.png`,
@@ -19066,15 +19144,16 @@ headline's message in one sentence; `keywords` gain what a person would
 search for.
 
 **Step 4 -- the root README.** Titled *Dabbler AI Orchestration*. The same
-headline, paragraph and table, word for word, `overview.png`, install from
+headline, `overview.png` under it, then the paragraph and table, word for
+word, install from
 the Marketplace, the guide's index, and the repository's own matters:
 layout, building from source, library use. Its reference sections go: each
 is already a guide page or a section of `driving-a-session.md`, and the
 page links there.
 
-**Step 5 -- the number.** `version.json` goes to 3.32.2, stamped with
+**Step 5 -- the number.** `version.json` goes to 3.32.3, stamped with
 `npm run stamp:version` -- a patch: pages, images and one docs check, and
-no behaviour changed. The changelog's 3.32.2 section says the listing and
+no behaviour changed. The changelog's 3.32.3 section says the listing and
 the guide are new.
 
 **Non-goals.** A count of gates, sessions or tests on either front page: a
@@ -19093,8 +19172,8 @@ of the reference material. Publishing to Open VSX.
 **Tests.** None added. The lint control runs `check-shipped-docs.mjs` over
 both pages and the manifest; `npm run check:version` checks the stamp.
 
-**Releasable.** Yes -- with 317 and 318, as 3.32.2 in session 320.
+**Releasable.** Yes -- with 319 and 320, as 3.32.3 in session 322.
 
-### Session 320 of 320: Release 3.32.2 (release: 3.32.2)
+### Session 322 of 322: Release 3.32.3 (release: 3.32.3)
 
-The framework publishes sessions 317 to 319 as 3.32.2 and nothing else.
+The framework publishes sessions 319 to 321 as 3.32.3 and nothing else.

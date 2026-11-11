@@ -117,10 +117,9 @@ copilot --version
 dabbler configure --transport copilot-cli
 ```
 
-**Nothing sets `DABBLER_TRANSPORT` for you.** That variable outranks every
-configuration layer on the machine, so one repository's set-up used to change
-how every other one routed. If it is already set, `configure` says so and
-says which value wins.
+**`DABBLER_TRANSPORT` is retired: nothing reads it.** It used to outrank
+every configuration layer on the machine, so one repository's set-up changed
+how every other one routed. If it is still set in your environment, unset it.
 
 **Your session names its model, and that is not optional.** The Start Session
 flow asks for it and refuses to launch a seat without one, because a seat's
@@ -148,9 +147,8 @@ dabbler configure --transport api
 **A reviewer on a different vendor from the engine is a label and no longer a
 refusal.** Dabbler tells you whether the model you are choosing is on the same
 provider as the one authoring, and lets you decide. Two keys are enough to
-have the choice; three give you more of it. If `DABBLER_TRANSPORT` says
-`copilot-cli` in your environment it outranks the line above and the seat is
-billed — `configure` says so when it happens.
+have the choice; three give you more of it. A `DABBLER_TRANSPORT` left in
+your environment changes nothing: it is retired, and nothing reads it.
 
 ---
 

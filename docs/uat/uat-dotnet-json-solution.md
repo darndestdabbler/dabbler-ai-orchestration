@@ -99,11 +99,9 @@ copilot --version
 dabbler configure --transport copilot-cli
 ```
 
-**Nothing sets `DABBLER_TRANSPORT` for you, and you probably should not set it
-yourself.** That variable outranks every configuration layer on the machine,
-so one repository's set-up used to change how every other one routed. If it is
-already set in your environment, `configure` will tell you so and tell you
-which value wins.
+**`DABBLER_TRANSPORT` is retired: nothing reads it.** It used to outrank
+every configuration layer on the machine, so one repository's set-up changed
+how every other one routed. If it is still set in your environment, unset it.
 
 **Your session names its model, and that is not optional.** In the UI, the
 Start Session flow asks for it and refuses to launch a seat without one,
@@ -138,9 +136,8 @@ does not eliminate it, and that is a judgement about your work rather than one
 a tool can make for you. Two keys are enough to have the choice; three give
 you more of it.
 
-**If `DABBLER_TRANSPORT` is set to `copilot-cli` in your environment**, it
-outranks the line above and the seat is billed. `configure` says so when it
-happens.
+**A `DABBLER_TRANSPORT` left in your environment changes nothing**: it is
+retired, and nothing reads it.
 
 ---
 
@@ -250,10 +247,9 @@ bootstrap has already dealt with its own files. Note the line above it too —
 says how tests run. Step 5 is where you fix that, and it is not optional.
 
 Nothing here touches your machine outside the project. Bootstrap used to
-detect a Copilot seat and persist `DABBLER_TRANSPORT` at user scope, and
-that variable outranks every config layer -- so setting up one project
-changed how every other one routed, and shadowed whatever a later `dabbler
-configure` set. Name the vehicle for THIS checkout with `dabbler configure
+detect a Copilot seat and persist `DABBLER_TRANSPORT` at user scope, which
+changed how every other project routed; the variable is retired, and nothing
+reads it. Name the vehicle for THIS checkout with `dabbler configure
 --transport copilot-cli` when you want one.
 
 ---

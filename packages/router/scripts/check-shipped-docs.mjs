@@ -121,6 +121,15 @@ const QUALIFIED = [
     "`verify waive` is refused by name: a waiver may be mentioned only where the page says no verdict is waived, or names `session waive`, the one a person has",
   ],
   [/\bcodex\b/i, /\buntested\b/i, "D268: undocumented, not unsupported"],
+  // The root README listed this variable as the second layer of the
+  // vehicle's precedence, and told readers to set it, for releases after
+  // the router stopped reading it: a reader who followed it set a variable
+  // nothing reads. It is named only where the page says so.
+  [
+    /\bDABBLER_TRANSPORT\b/,
+    /\bretired\b|\bnothing reads\b|\bno longer read\b/i,
+    "`DABBLER_TRANSPORT` is retired and nothing reads it: name it only where the page says so",
+  ],
 ];
 
 /** A model id like `gpt-5.3-codex` is a vendor's name for a model, not this product's engine. */

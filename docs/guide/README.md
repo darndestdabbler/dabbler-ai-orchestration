@@ -15,3 +15,10 @@ each one can be read in one sitting. To run a session, read
 - [What is written down, and where](the-record.md): the files a session
   leaves and who writes each, the committed transcript, and how a person or
   a new model picks the work up.
+- [Consult with AI, and the Mechanic](consult-and-mechanic.md): what
+  happens when it gets stuck -- an AI to consult that drives nothing, a
+  fresh AI that makes the smallest fix, what it may never do unattended, and
+  the person's ways past a stop.
+- [The Configuration](configuration.md): each row of the Solution
+  Explorer's Configuration, where every choice is kept and which layer
+  wins, the two vehicles, the model lists, and credentials.

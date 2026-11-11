@@ -47,6 +47,11 @@ Copilot seat or its vendors' model lists reads them itself the first time
 the section is shown — `dabbler discovery refresh`, free, with no prompt
 sent — so there is a list to choose a model from.
 
+![The Dabbler AI Orchestration views before a folder is open: the Solution
+Explorer explains that it shows the Configuration first and offers Open
+Folder; the Work Explorer says nothing has run here yet and offers Set Up
+New Project.](guide/media/first-1-empty.png)
+
 ## 1. Bootstrap a project
 
 From your project root:
@@ -71,15 +76,17 @@ record — each verification round is written there *after* the tree
 snapshot it describes, so a committed ledger would present itself to the
 close gate as work done after verification.
 
+![A new project's folder, csv-parser-dotnet, after it is set up: .dabbler,
+docs, .gitignore, AGENTS.md, CLAUDE.md and
+dabbler.yaml.](guide/media/first-2-files.png)
+
 **It writes nothing outside the project.** `--transport
-api|copilot-cli` sets the checkout's own vehicle, in its gitignored
-`local-overrides.yaml`; omit it and the project's configuration decides.
+api|copilot-cli` sets the checkout's own vehicle, in its
+`.vscode/settings.json`; omit it and the project's configuration decides.
 Bootstrap used to detect a seat and persist `DABBLER_TRANSPORT` at user
-scope, and the one thing that reliably did was shadow whatever a later
-`dabbler configure` set — for every repository on the machine, from a
-per-project action — because the variable outranks every config layer.
-The variable is still *read*, so a deliberate override typed into a shell
-still works and the answer says which layer decided.
+scope, which shadowed whatever a later `dabbler configure` set, for every
+repository on the machine. The variable is retired and nothing reads it;
+if it is still set in your environment, unset it.
 
 Into a project with no session plan yet, it also scaffolds the two setup
 sessions into `docs/sessions/session-plan.md`. Choose
@@ -89,6 +96,15 @@ sessions into `docs/sessions/session-plan.md`. Choose
 breaks that plan into the numbered sessions the rest of the repository
 runs. Do not hand-author `sessions.json` — the first session start creates
 it from the plan.
+
+![The Work Explorer for csv-parser-dotnet with nothing run yet: two
+sessions planned, 001 "Author or import the solution plan" and 002
+"Challenge the plan, then break it into numbered
+sessions".](guide/media/first-3-two-sessions.png)
+
+![The Work Explorer after session 2: 001 and 002 complete, and 003
+Skeleton, 004 Domain model, 005 CSV deserialization, 006 Database layer and
+007 Console application planned.](guide/media/first-4-sessions.png)
 
 Prefer the untracked route? The same prompts are available loose:
 
@@ -107,6 +123,11 @@ what references it. A project reaches a sibling by project reference — a
 at `${project.version}` listed in the parent `pom.xml` for Maven — and every
 session runs in the repository itself. A repository with no build files is one
 project: itself.
+
+![The Solution Explorer for csv-parser-dotnet with its five projects:
+PersonModel, CsvDatabase and CsvDeserializer (libraries), CsvParserApp (an
+application) and CsvParser.Tests (a test project), opened to show that it
+depends on the other four.](guide/media/first-5-projects.png)
 
 ## 2. Start a session
 
@@ -169,6 +190,11 @@ session, and `--force`, are yours.
 Follow the spec's step list for the current session: make the edits and
 run the tests. **Do not commit yet** — verification reviews the working
 tree, and an already-committed tree presents an empty diff.
+
+![The editor's own Test Explorer with csv-parser-dotnet's tests: 55 of 55
+passed in CsvParser.Tests (net10.0), across classes such as
+CsvPersonReaderTests, PersonRepositoryTests and
+ProgramTests.](guide/media/first-6-tests.png)
 
 There is nothing to log. The Work Explorer's task rows are the
 lifecycle's six phases — *Register*, *Declare*, *Work*, *Verify*, *Run of
@@ -364,7 +390,7 @@ paths:
   sensitive_paths: []
 ```
 
-- **Tracked, unlike the overlay below.** CI reads the suite command, the
+- **Tracked, unlike the gitignored `local-overrides.yaml`.** CI reads the suite command, the
   next machine reads how its tests are named, and `dabbler affected`
   refuses to run without them.
 - A source file's tests are the tests named after it. `test_name` is the
@@ -384,73 +410,30 @@ paths:
   no layer at all, so it forks the whole registry rather than adding
   to it.
 
-## This machine's config (`local-overrides.yaml`)
+## This machine's configuration
 
-The packaged `router-config.yaml` is the published default and
-ships `transport: profile: copilot-cli`, because the seat is the surface
-staff receive. A machine without a seat says so in a project-root
-`local-overrides.yaml`, deep-merged over the packaged file:
-
-```yaml
-# local-overrides.yaml — provider API keys, no Copilot seat
-transport:
-  profile: api
-```
-
-- It is **never committed and never packaged**: `.gitignore` reserves
-  the name and it is not listed as package data.
-- It is **partial** — only the keys it changes. The merged result is
-  validated against the same schema as any config, so an overlay cannot
-  produce a config the router would have refused.
-- A key the schema does not declare is **refused at load**, not
-  ignored. An override the router silently drops is the failure this
-  file exists to prevent.
-- `testing`, `packaging` and `paths` are refused by name: they belong
-  in `dabbler.yaml`. A suite command or a feed coming from a gitignored
-  file would be attributed by the run of record to a repository that
-  never declared it.
-- It sits under `--transport` and `DABBLER_TRANSPORT` in the precedence
-  order, so nothing that works today changes its answer.
-
-An explicitly-named config — `--config`, or `AI_ROUTER_CONFIG` — takes
-neither layer: a caller who named a file meant that file.
+Which engine authors, on which model, which models review, and how each is
+reached are chosen in the Solution Explorer's **Configuration** section, or
+with `dabbler configure`. Every choice is this repository's own and is
+written to its committed `.vscode/settings.json`; the machine's
+`preferences.json` holds only the default for a repository that names
+none. A typed flag outranks the checkout, the checkout outranks the
+machine, and the machine outranks what the distribution ships.
+`DABBLER_TRANSPORT` and `transport.profile` in `local-overrides.yaml` are
+retired. `dabbler configuration explain` names the layer that decided each
+value. [The Configuration](guide/configuration.md) goes through it row by
+row, with what a Copilot seat and direct API keys each need.
 
 ## Refreshing the model catalog
 
-What models this machine can dispatch to is read into one file, and reading
-it costs nothing on either transport: each vendor states its models at a
-metadata endpoint, and a Copilot seat states its own in the reply to opening
-a conversation. No prompt is sent on either path.
-
-```
-dabbler discovery refresh
-```
-
-It covers whichever transports this machine actually has -- a seat with no
-provider keys refreshes its seat block and leaves the rest standing -- and
-a session start does it for you, once on the first session of any given day.
-The Solution Explorer runs it too, once per window, when it is first shown on
-a machine that can reach a transport it has never read.
-
-The reading lands in `ai-model-catalog.json` under this platform's own
-per-user data directory (`%LOCALAPPDATA%\dabbler\` on Windows, the XDG
-equivalent elsewhere), one block per transport. **Nothing ships a catalog.**
-A catalog is a reading of THIS machine's seat and THIS machine's keys, so a
-copy that travelled in a package would tell every machine about somebody
-else's models -- and a block recorded for another seat or another set of
-keys is read as unread rather than believed.
-
-A model that stops being listed is not deleted from the record: it moves to
-`retired` with the date it went, so an operator whose usual model vanished
-from a list is told it was withdrawn rather than left wondering what they
-broke.
-
-**There is no prompting probe and no way to spend a token here.** There was
-one until session 151 -- it sent a real prompt per model to establish that
-the model answered -- and every flag that chose models to prompt went with
-it. Whether the model asked for is the model that answered is now read from
-a verification round's own requested and served pair, which this framework
-produces for nothing as a by-product of the work.
+Reading what models this machine can reach costs nothing: each vendor's
+metadata endpoint and the Copilot seat's reply to opening a conversation
+state them, and no prompt is sent. `dabbler discovery refresh`, or
+**Update the Catalog** on the Configuration row, writes the reading to
+`ai-model-catalog.json` in this platform's per-user data directory
+(`%LOCALAPPDATA%\dabbler\` on Windows), and is refused while a session is
+in flight. See *Where the model lists come from* in
+[The Configuration](guide/configuration.md).
 
 ## Talking to an agent over its own protocol
 

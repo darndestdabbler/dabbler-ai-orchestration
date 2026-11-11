@@ -292,62 +292,7 @@ cause an outage is a maintenance signal that gets suppressed.
 
 ### Transport preference
 
-Resolved in this precedence (first set wins):
-
-1. an explicit `--transport api|copilot-cli` flag
-   (`dabbler verify --transport …`)
-2. the `DABBLER_TRANSPORT` env var (`api` | `copilot-cli`) — the
-   operator's standing preference
-3. `transport.profile` in the loaded config — the packaged
-   `router-config.yaml`, with the repository's tracked `dabbler.yaml`
-   and then a machine-local `local-overrides.yaml` deep-merged over it
-4. default: `api`
-
-Both layers are config *sources*, not precedence tiers: they change what
-tier 3 says and nothing above it.
-
-`dabbler.yaml` is the repository's own, and it is **tracked**. It carries
-`testing` (suites, controls, smoke tests), `packaging` and `paths` —
-the facts CI and the next machine have to read, behind a `schema_version`.
-Providers, models and roles stay in the packaged config: those are
-distribution facts, and a repository declaring how to run `mvn -q test`
-must not have to fork the model registry to do it.
-
-`local-overrides.yaml` is machine facts only. It lives at the project
-root, carries only the keys it changes, and is never committed and never
-packaged — `.gitignore` reserves the name and it is not package data. A key
-the schema does not declare is **refused at load**, not dropped, because an
-override the router silently ignores is the failure the file exists to
-prevent; and a key the repository owns is refused by name, because a suite
-command from a gitignored file would be attributed by the run of record to
-a repository that never declared it.
-
-This is how a machine disagrees with the published default. The packaged
-`router-config.yaml` ships `transport: profile: copilot-cli`, because the
-seat is the surface staff receive; a machine with provider API keys and no
-seat says so once, in a file it does not publish:
-
-```yaml
-# local-overrides.yaml — this machine has API keys and no Copilot seat
-transport:
-  profile: api
-```
-
-Config is the only layer that is client-, model- and transport-
-independent. The env var reaches only processes started after it was
-written; `--transport` has to be repeated on every command; and instruction
-files are read by some clients and not others.
-
-This is the MACHINE's vehicle, used where no role says otherwise. A role
-may carry its own — `roles.<role>.transport`, read between the environment
-variable and `transport.profile` — because a review may need the other
-transport when provider independence requires it.
-
-**Nothing persists the environment variable for you.** `bootstrap` used to
-write it at user scope, and a variable that outranks every config layer
-shadowed the very preference a later run set, for every repository on the
-machine. It is read and never written; `--no-transport-detect` retired
-with the writing.
+Where each choice is kept and which layer wins is in [The Configuration](docs/guide/configuration.md).
 
 ### When a session publishes
 

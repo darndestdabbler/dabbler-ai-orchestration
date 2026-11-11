@@ -18570,21 +18570,44 @@ the record says. It carries no source, no diff, no file content, no
 person's name, machine name, remote URL or absolute path, and its first
 lines say exactly that and that nothing has been sent.
 
-**Step 2 -- where it is offered.** Authorising a waiver writes the report
+**Step 2 -- what the repository's own words are replaced with.** The
+parts of a report somebody wrote in prose -- the stop's reason where it
+quotes an engine's notes, the request's lines, the advice, the person's
+reason -- can name what a state IT shop may not post: a system, a table,
+a colleague, a server. So before the report is written, the framework
+replaces in those parts what it can recognise as the repository's and not
+its own, each with a numbered placeholder that stays the same through the
+report so the account still reads: every path `git ls-files` knows and
+every folder of one (`<file-1>`, `<folder-1>`); the repository's name, its
+module and project names and its step ids (`<repository>`, `<module-1>`,
+`<step-1>`); a URL or host that is not the framework's own (`<url-1>`); an
+email address; anything the credential filter already recognises; and a
+backtick span or fenced block that is not a `dabbler` command
+(`<quoted-1>`). The framework's own words are left as they are -- the
+stop's kind and code, the rule's name, a `dabbler` command, a file under
+the sessions root or `.dabbler/` -- because those are what a maintainer
+reads the report for. Beside the report it writes a key, placeholder to
+original, headed as the person's to keep and never to send: a
+maintainer's question about `<file-2>` is one the person can answer
+without the report ever having carried it. The report's first lines say
+the replacement is mechanical, that prose can name a thing no pattern
+knows, and to read it before sending.
+
+**Step 3 -- where it is offered.** Authorising a waiver writes the report
 and prints its path with the waiver's own line: the moment a person has
 just said a rule was wrong here is the moment the report is worth most. A
 stop that recurs on its step offers it among its ways on, and so does any
 stop on request -- a wall somebody got round without a waiver, as the
 blocked loop was, is still a defect.
 
-**Step 3 -- sending it is the person's.** The verb's last line names where
+**Step 4 -- sending it is the person's.** The verb's last line names where
 reports go: the `bugs` address in the installed extension's own manifest,
 read at the call and written nowhere else. The Work Explorer's "Report
 this stop to Dabbler" opens the report for reading and, when the person
 says so, copies it and opens that address in their browser. The framework
 makes no network call with it, and nothing in configuration can make it.
 
-**Step 4 -- the words and the number.** `docs/driving-a-session.md` and
+**Step 5 -- the words and the number.** `docs/driving-a-session.md` and
 the README's section for a developer in a consumer repository say what to
 do when the framework itself is the wall: waive on the record, send the
 report. `version.json` goes to 3.32.0, stamped with
@@ -18593,9 +18616,13 @@ the changelog gets a 3.32.0 section saying what changed for a developer
 across 310 to 313.
 
 **Non-goals.** Sending anything without the person, or a setting that
-does. Telemetry of any kind. Redacting what the stop's own reason or the
-request says: the person reads it before it leaves, and that reading is
-the control. Collecting reports on this side, deduplicating them or
+does. Telemetry of any kind. A promise that the replacement catches
+everything: it is mechanical, a name in plain prose that matches nothing
+the repository declares passes through, and the person's reading stays
+the last control. A model asked to redact, which would send the text to a
+provider in order to keep it from one. A flag that writes the report
+unreplaced: the key is beside it, and the person can put back what they
+choose. Collecting reports on this side, deduplicating them or
 answering them. A report for a stop the framework did not record. Telling
 a consumer repository from this one: the report is written the same way
 in both, and here `mechanic-log.md` is already the list.
@@ -18603,7 +18630,11 @@ in both, and here `mechanic-log.md` is already the list.
 **Tests.** In `session.test.ts`: the report for a standing stop carries
 the stop as written, the versions and the request's lines where one
 stands, and carries no absolute path, remote URL or person's name from a
-fixture that holds all three; a waiver writes it and prints its path; a
+fixture that holds all three; a reason and a request that name a tracked
+file, a step, a module, a foreign URL, an email address and a quoted
+snippet come out with each replaced, the same placeholder for the same
+thing each time, a `dabbler` command and the stop's kind untouched, and
+the key beside the report mapping each back; a waiver writes it and prints its path; a
 session that met no stop is refused. In `driver.test.ts`: a recurring
 stop offers the report. The Work Explorer's command in the test file
 named after it. `npm run check:version` checks the stamp.

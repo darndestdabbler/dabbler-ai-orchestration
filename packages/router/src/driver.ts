@@ -1579,6 +1579,36 @@ function rollbackChoice(): StopChoice {
 }
 
 /**
+ * Going past the stop on a person's authority: a rule may be waived and a
+ * record may never be falsified, so the cost says what is let through and
+ * what the record will say. Never a release session's, which the verb refuses.
+ */
+function waiveChoice(letThrough: string): StopChoice {
+  return {
+    label: "Go past this stop on your authority -- yours to run, never the engine's",
+    cost:
+      `${letThrough} What was unmet stays written as unmet, beside your reason and your ` +
+      "name; the session closes complete with its verdict what it truly was, and the close " +
+      "says it had an authorised exception. The waiver is of this stop only: a later stop, or " +
+      "the same rule over a tree that has moved since, needs its own.",
+    command: 'dabbler session waive --reason "<why>"',
+  };
+}
+
+const WAIVE_STEP = waiveChoice(
+  "The step is accepted where it stands, and its checks are run once more so its row carries each one's real result. Only a step of the work plan.",
+);
+const WAIVE_TESTS = waiveChoice(
+  "The session goes on to the land with the run of record still failed, and the close's suite gate reads the waiver instead of refusing.",
+);
+const WAIVE_VERIFICATION = waiveChoice(
+  "The session goes on to the run of record with the verdict as it stands -- none, or the findings as they are -- and the close's verification gate reads the waiver instead of refusing.",
+);
+const WAIVE_CLOSE = waiveChoice(
+  "The gates this close named are recorded as waived, and the close completes this session and no other.",
+);
+
+/**
  * Opening a Mechanic: what a developer does when stuck -- another instance,
  * with a fresh context, told to get things going again. A way on from every
  * stop, ahead of ending it; the brief it reads says what it may touch.
@@ -1632,6 +1662,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "no provider call is made by asking. A check of the step in hand that was " +
           `wrong is amended first, not fought: ${AMEND_CHECKS_COMMAND}. ${ACCEPTED_CHECK_WAYS}`,
       ),
+      WAIVE_STEP,
       rollbackChoice(),
       cancelChoice(),
     ],
@@ -1701,6 +1732,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "Put right what stopped the run, then carry on",
         "The suite runs again -- your machine's time, and no provider call.",
       ),
+      WAIVE_TESTS,
       rollbackChoice(),
       cancelChoice(),
     ],
@@ -1750,6 +1782,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "Satisfy the gate the close named, then carry on",
         "Whatever the gate demands; its row names it, and the close is run again.",
       ),
+      WAIVE_CLOSE,
       rollbackChoice(),
       cancelChoice(),
     ],
@@ -1797,6 +1830,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "One more verification round: a provider call for the verifier, and " +
           "the round's own clock.",
       ),
+      WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
     ],
@@ -1811,6 +1845,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "One more verification round: a provider call for the verifier, and " +
           "the round's own clock. Nothing already verified is re-verified.",
       ),
+      WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
     ],
@@ -1837,6 +1872,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "environment, never in a file.",
         command: "dabbler configure --reviewer-model <id>",
       },
+      WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
     ],
@@ -1870,6 +1906,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         cost: "Verification stays cross-provider on every vehicle; what changes is how the round is reached.",
         command: "dabbler configure --reviewer-transport <vehicle>",
       },
+      WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
     ],
@@ -1897,6 +1934,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "dispositions again, with the refusal as a reason.",
         command: PULL_RESUME,
       },
+      WAIVE_VERIFICATION,
       // No cancel: this stop is the engine's to clear, and ending a session is
       // never the engine's.
     ],
@@ -1912,6 +1950,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         cost: REOPEN_COST,
         command: REOPEN_COMMAND,
       },
+      WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
     ],
@@ -1934,6 +1973,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
       // No second move: a dispute is never withdrawn -- the ledger keeps it --
       // and `verify reopen` refuses a cap reached over disputes, so offering
       // either would print a command that refuses.
+      WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
     ],
@@ -1955,6 +1995,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "The repair is given up. Nothing is spent, and the session closes on " +
           "the tree the round actually saw.",
       ),
+      WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
     ],

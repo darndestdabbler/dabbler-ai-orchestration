@@ -97,17 +97,18 @@ const RETIRED = [
  * Named only where the same neighbourhood says what is true of it.
  *
  * A flat ban would be wrong for both of these. `waiver` has to be sayable
- * in order to say there isn't one -- the whole correction is the sentence
- * *there is no waiver* -- so what is banned is the word standing alone,
- * offering an operator an exit that `verify waive` refuses by name. And
+ * in order to say there isn't one of a verdict -- `verify waive` refuses by
+ * name -- and to name the one a person has, `session waive`, which goes
+ * past a stop and never changes a verdict. What is banned is the word
+ * standing alone, where a reader cannot tell which of the two is meant. And
  * `codex` is an engine the router accepts and nothing has ever driven, so
  * it may be named where the page says so (D268).
  */
 const QUALIFIED = [
   [
     /\bwaiv(e|er|ing|ed)\b/i,
-    /\bno waiver\b|\bnot a waiver\b|\brefus(e|ed|es)\b|\bretired\b|\bcannot\b/i,
-    "`verify waive` is refused by name: a waiver may be mentioned only where the page says it does not exist",
+    /\bno waiver\b|\bnot a waiver\b|\brefus(e|ed|es)\b|\bretired\b|\bcannot\b|\bsession waive\b/i,
+    "`verify waive` is refused by name: a waiver may be mentioned only where the page says no verdict is waived, or names `session waive`, the one a person has",
   ],
   [/\bcodex\b/i, /\buntested\b/i, "D268: undocumented, not unsupported"],
 ];

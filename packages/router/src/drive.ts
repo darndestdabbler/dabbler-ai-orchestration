@@ -131,6 +131,7 @@ import {
   rewindPhaseFor,
   runGates,
   sessionChangedNothing,
+  standingWaivers,
 } from "./gates.ts";
 import type {
   DriverDisposition,
@@ -163,6 +164,7 @@ import {
   readDisputes,
   readPackaging,
   readRounds,
+  waiverOf,
 } from "./ledger.ts";
 import { readSessionState, sessionDisplayNumber, stalledAfterSeconds } from "./progress.ts";
 import {
@@ -367,6 +369,40 @@ export function stepChangedPaths(diff: readonly string[], sessionsRel: string): 
 
 /** The step a red run of record asks for. */
 const RUN_OF_RECORD_FIX = "fix-run-of-record";
+
+/**
+ * Where a run resumed over a waived stop goes on from, or null where the
+ * waiver is not of this stop -- a waiver is of the stop it names and never
+ * carries to the next one. What the stop judged is left as it was written:
+ * a red run of record goes on to the land still red, a verification goes on
+ * to the run of record with its verdict what it was, a step refused three
+ * times is accepted where it stands, and a close is run again over gates
+ * that read the waiver.
+ */
+export function phasePastWaiver(
+  stop: { readonly kind: string; readonly at: string },
+  waiver: Row | null,
+  phase: DriverRun["phase"],
+): DriverRun["phase"] | null {
+  const waived = waiver?.["stop"] as Row | undefined;
+  if (waived === undefined || waived["at"] !== stop.at || waived["kind"] !== stop.kind) return null;
+  if (stop.kind === "tests") return "land";
+  if (stop.kind === "verification") return "run-of-record";
+  if (stop.kind === "close" || stop.kind === "rejected-thrice") return phase;
+  return null;
+}
+
+/**
+ * The suites the land holds to a green run of record: every one owed, less
+ * those whose red run a standing waiver let through. Their runs stay red on
+ * the record; the land still holds every other suite, and the tree, to it.
+ */
+export function suitesTheLandHolds(suites: readonly LandSuiteFact[], redWaived: boolean): LandSuiteFact[] {
+  if (!redWaived) return [...suites];
+  return suites.filter(
+    (suite) => suite.latest === null || suite.latest.outcome === "passed" || suite.latest.outcome === "none-selected",
+  );
+}
 
 /**
  * The ask for a round's dispositions. It states the inline cap, because a
@@ -1865,6 +1901,11 @@ class Driver {
    */
   private currentStep: string | null = null;
   /**
+   * The work-plan step a person waived three refusals of, while this call
+   * has yet to reach it: it is accepted where it stands rather than asked.
+   */
+  private waivedStep: string | null = null;
+  /**
    * Pull mode only: whether the outstanding answer has been judged in this
    * call. One call judges one answer; every later call site in the same
    * call issues rather than reading the same answer twice.
@@ -2523,8 +2564,15 @@ class Driver {
     const afterRefusals = existing.stop?.kind === "rejected-thrice";
     const askedAfresh = afterRefusals || existing.stop?.kind === "blocked";
     if (askedAfresh) this.answered = true;
+    // A person's waiver of the stop being resumed: the run goes on past it
+    // instead of into it, and what the stop judged stays as it was written.
+    const waiver = existing.stop ? waiverOf(this.repoRoot, current, existing.stop.at) : null;
+    const past = existing.stop ? phasePastWaiver(existing.stop, waiver, existing.phase) : null;
+    if (past !== null && existing.stop?.kind === "rejected-thrice") this.waivedStep = existing.stop.step_id ?? null;
     this.run = {
       ...existing,
+      ...(past !== null ? { phase: past } : {}),
+      ...(past !== null && past !== existing.phase ? { pending_step: null } : {}),
       max_invocations: this.options.maxInvocations ?? existing.max_invocations,
       verification: this.verificationSettings(existing.verification ?? null),
       ...(afterRefusals ? { rejections: 0 } : {}),
@@ -2561,9 +2609,18 @@ class Driver {
         ? { mode: "pull" }
         : { invocations: this.run.invocations, max_invocations: this.run.max_invocations }),
       ...(existing.stop ? { after: existing.stop.kind } : {}),
-      ...(afterRefusals ? { refusals: "reset; the step is asked afresh" } : {}),
+      ...(afterRefusals && past === null ? { refusals: "reset; the step is asked afresh" } : {}),
       ...(askedAfresh && !afterRefusals ? { step: "asked afresh" } : {}),
     });
+    if (past !== null && waiver !== null) {
+      this.log("stop-waived", {
+        kind: existing.stop?.kind,
+        unmet: existing.stop?.reason,
+        by: waiver["by"],
+        reason: waiver["reason"],
+        goes_on_to: past,
+      });
+    }
     return EXIT_OK;
   }
 
@@ -3626,6 +3683,19 @@ class Driver {
       this.run = { ...this.run, baseline_tree: tree };
       this.save();
     }
+    if (this.waivedStep !== null && this.waivedStep === spec.id) {
+      this.waivedStep = null;
+      // The waiver let THAT tree past: one that has moved since is asked afresh.
+      const stands = standingWaivers(this.sessionsDir).some(({ row }) => {
+        const stop = row["stop"] as Row;
+        return stop["kind"] === "rejected-thrice" && stop["step_id"] === spec.id;
+      });
+      if (stands) {
+        await this.acceptWaivedStep(this.amendedSpec(spec));
+        return;
+      }
+      this.log("waiver-not-standing", { step: spec.id, why: "the tree moved since the waiver was given; the step is asked afresh" });
+    }
     let reasons: string[] = [];
     for (;;) {
       // An amendment to THIS step lands here, and nowhere else it could.
@@ -3688,6 +3758,27 @@ class Driver {
         );
       }
     }
+  }
+
+  /**
+   * A step a person waived three refusals of, accepted where it stands. Its
+   * checks are run once more so the row carries each one's real result --
+   * a waiver lets the step past them and never says they passed.
+   */
+  private async acceptWaivedStep(spec: StepSpec): Promise<void> {
+    const tree = snapshotWorktreeTree(this.repoRoot);
+    if (tree === null) throw new Stop("engine", "could not snapshot the working tree");
+    const checks = (await runStepChecks(this.repoRoot, spec.id, spec.checks, tree, this.config())).map(
+      ({ check, run }) => ({ argv: [...check.argv], green: checkRunGreen(run) }),
+    );
+    this.run = {
+      ...this.run,
+      baseline_tree: tree,
+      accepted_steps: spec.fromPlan ? [...this.run.accepted_steps, spec.id] : this.run.accepted_steps,
+    };
+    this.markProgress();
+    this.setRejections(0);
+    this.log("report-accepted-waived", { step: spec.id, checks });
   }
 
   /** The report's substance against the step: [] accepts, reasons refuse. */
@@ -4490,21 +4581,29 @@ class Driver {
         surfaceNow: surfaceDigest(this.repoRoot, suite.covers, { sessionsDir: this.sessionsDir }),
       };
     });
+    // A standing waiver holds the land to the tree the person let through:
+    // a verification's to that tree rather than the round's, a red run of
+    // record by leaving its suite's runs red and unheld. One that no longer
+    // stands -- the tree moved since -- is no waiver here.
+    const waived = standingWaivers(this.sessionsDir).map(({ row }) => row);
+    const kindWaived = (kind: string) => waived.find((row) => (row["stop"] as Row)["kind"] === kind);
+    const verification = kindWaived("verification");
     return {
       treeNow: treeDigest(this.repoRoot, { sessionsDir: this.sessionsDir }),
-      suites,
-      moved: this.movedSinceVerified(),
+      suites: suitesTheLandHolds(suites, kindWaived("tests") !== undefined),
+      moved: this.movedSinceVerified(typeof verification?.["tree"] === "string" ? verification["tree"] : null),
     };
   }
 
   /**
-   * The paths that moved since the tree the latest round verified, the
-   * session's bookkeeping left out; null when no round verified a tree or
-   * the diff could not be taken.
+   * The paths that moved since the tree the latest round verified -- or the
+   * tree a person's waiver of the verification let through -- the session's
+   * bookkeeping left out; null when neither names a tree or the diff could
+   * not be taken.
    */
-  private movedSinceVerified(): string[] | null {
+  private movedSinceVerified(letThrough: string | null = null): string[] | null {
     const round = latestRound(this.repoRoot, this.sessionNumber);
-    const verifiedTree = typeof round?.["completion_tree"] === "string" ? round["completion_tree"] : null;
+    const verifiedTree = letThrough ?? (typeof round?.["completion_tree"] === "string" ? round["completion_tree"] : null);
     if (verifiedTree === null) return null;
     const now = snapshotWorktreeTree(this.repoRoot);
     if (now === null) return null;

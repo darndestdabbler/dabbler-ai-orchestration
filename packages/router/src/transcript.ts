@@ -35,7 +35,7 @@ import { driverDir, readDriverEvents, readRun, readWorkPlan } from "./driver.ts"
 import { SESSION_PLAN_FILENAME } from "./evidence.ts";
 import { jobLogPath, jobStatusPath, jobsDir } from "./jobs.ts";
 import { TRANSCRIPTS_DIRNAME, runGit } from "./journal.ts";
-import { readRounds } from "./ledger.ts";
+import { readExceptions, readRounds } from "./ledger.ts";
 import { redact } from "./packaging.ts";
 import { SESSION_HEADING_RE, STATUS_CANCELLED, sessionDisplayNumber } from "./progress.ts";
 import { readRawSessionState } from "./sessionState.ts";
@@ -945,6 +945,36 @@ function renderCancelledBanner(row: Record<string, unknown> | null, run: DriverR
   );
 }
 
+/**
+ * Each stop a person authorised the session to go past, where it happened:
+ * what was unmet in the framework's words, who authorised going on, and why.
+ * Said plainly and not as a failure -- going on was a person's decision, on
+ * the record, and nothing it went past is shown as met.
+ */
+function renderExceptions(repoRoot: string, sessionNumber: number, secrets: readonly string[]): string {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = readExceptions(repoRoot, sessionNumber);
+  } catch {
+    return "<p>The record of authorised exceptions could not be read.</p>";
+  }
+  if (rows.length === 0) return "";
+  return table(
+    ["Stop", "What was unmet", "Authorised by", "Reason", "When"],
+    rows.map((row) => {
+      const stop = row["stop"] as Record<string, unknown>;
+      const step = typeof stop["step_id"] === "string" ? ` (step ${humanizeStepKey(stop["step_id"])})` : "";
+      return [
+        escapeHtml(`${text(stop["kind"])}${step}`),
+        escapeHtml(scrub(text(stop["reason"]), secrets)),
+        escapeHtml(text(row["by"])),
+        escapeHtml(scrub(text(row["reason"]), secrets)),
+        escapeHtml(text(row["recorded_at"])),
+      ];
+    }),
+  );
+}
+
 function renderStopBlock(run: DriverRun | null): string {
   const stop = run?.stop ?? null;
   if (stop === null) return "";
@@ -1055,6 +1085,7 @@ export function renderSessionTranscript(
     section("Session Plan", reading.planSection === null ? "" : planMarkdownToHtml(reading.planSection)),
     section("Work Plan", renderWorkPlan(repoRoot, sessionNumber, reading.workPlan, reading.run, reading.events)),
     section("Where it stopped", renderStopBlock(reading.run)),
+    section("Gone past on a person's authority", renderExceptions(repoRoot, sessionNumber, secrets)),
     section(
       "What the framework said",
       reading.events.length === 0

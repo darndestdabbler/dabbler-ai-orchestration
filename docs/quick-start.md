@@ -288,8 +288,9 @@ rung's exact command:
    dabbler verify adjudicate
    ```
 
-There is no third rung, and no waiver: no verdict a person can type
-exists anywhere in the loop. An undisputed session that reaches the cap
+There is no third rung, and no waiver of a verdict: no verdict a person can
+type exists anywhere in the loop. (A person may let a session past a stop
+with `dabbler session waive`; the record keeps the verdict it truly had.) An undisputed session that reaches the cap
 ends in one of two states the loop decides for itself — re-run the same
 `verify` command and it records whichever the tree says it is:
 

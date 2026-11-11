@@ -144,6 +144,10 @@ export function validateReopen(record: Row): Row {
   return validateAgainst(record, "verification-reopen.schema.json", "verification reopen");
 }
 
+export function validateException(record: Row): Row {
+  return validateAgainst(record, "session-exception.schema.json", "session exception");
+}
+
 export function validateStepEvent(record: Row): Row {
   return validateAgainst(record, "step-execution.schema.json", "step execution");
 }
@@ -625,6 +629,37 @@ export function standingReopen(repoRoot: string, sessionNumber: number): ReopenG
     reason: String(newest["reason"]),
     by: String(newest["by"]),
   };
+}
+
+// --- exceptions.jsonl --------------------------------------------------------
+
+export function exceptionsPath(repoRoot: string, sessionNumber: number): string {
+  return join(sessionRunDir(repoRoot, sessionNumber), "exceptions.jsonl");
+}
+
+/** A session's waivers, oldest first: each a person's authority to go past one stop. */
+export function readExceptions(repoRoot: string, sessionNumber: number): Row[] {
+  return readJsonl(exceptionsPath(repoRoot, sessionNumber), validateException);
+}
+
+/**
+ * Append one validated waiver. One per stop: a second for the same stop is
+ * the person answering a question already answered, and the row they wrote
+ * the first time is the one the record keeps.
+ */
+export function appendException(repoRoot: string, sessionNumber: number, record: Row): Row {
+  validateException(record);
+  const at = (record["stop"] as Row)["at"];
+  if (readExceptions(repoRoot, sessionNumber).some((row) => (row["stop"] as Row)["at"] === at)) {
+    throw new LedgerError(`the stop written at ${String(at)} is already waived for session ${sessionNumber}`);
+  }
+  appendJsonl(exceptionsPath(repoRoot, sessionNumber), record);
+  return record;
+}
+
+/** The waiver of the stop written at `at`, or null: a waiver is of that stop and no other. */
+export function waiverOf(repoRoot: string, sessionNumber: number, at: string): Row | null {
+  return readExceptions(repoRoot, sessionNumber).find((row) => (row["stop"] as Row)["at"] === at) ?? null;
 }
 
 // --- packaging.jsonl ---------------------------------------------------------

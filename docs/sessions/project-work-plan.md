@@ -348,7 +348,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 308 | A person may amend an accepted step's checks, and the engine is told so | no | 2026-11-10 |
 | 309 | Release 3.31.0 (release: 3.31.0) | yes | 2026-11-10 |
 | 310 | A stop's way on is true: a blocked step is asked afresh, and a rollback says what it keeps | no | 2026-11-11 |
-| 311 | A person may authorise going past a stop, and the record says so | — | not declared |
+| 311 | A person may authorise going past a stop, and the record says so | no | 2026-11-11 |
 | 312 | An exception is requested, checked and shown before a person authorises it | — | not declared |
 | 313 | A stop the framework caused reaches the people who can fix it | — | not declared |
 | 314 | Release 3.32.0 (release: 3.32.0) | — | not declared |
@@ -3632,3 +3632,9 @@ Make two things a stopped person is shown true. First, resuming past a `blocked`
 **Rolled back:**
 
 - 2026-11-11 — session 310 — Rollback to Start of This Session from the Work Explorer (operator)
+
+### Session 311 — A person may authorise going past a stop, and the record says so
+
+**Releasable: no.**
+
+Give a person one verb, `dabbler session waive --reason "<why>"`, that takes the session past the stop it stands at, once, on the record -- waive a rule, never falsify a record. The verb is a person's (an engine is refused in isAPersonsVerb's words and told to report the step blocked naming what to waive and why); it needs a standing stop of a waivable kind (rejected-thrice on a step's checks, tests, verification, close) and a reason, and writes one validated row to the run's own `exceptions.jsonl` -- the stop's kind, code, step and words as the framework wrote them, the person's reason, who and when, and the commit and tree it was given at -- plus an amendment line on the activity log. `session next` after a waiver carries on past that stop and only that one: a thrice-rejected step is accepted with each check's real result on its row; a failed run of record stays failed and the session goes on to the land; a verification stop keeps its verdict (none, or the findings as they stand) and goes on to the run of record; a refused close records its refused gates as waived and completes this session and no other. A close gate reading evidence a waiver already covered reports `waived`, naming the row, instead of refusing it again. The session closes `complete` with its true verdict; the status projection, the close's own line ("closed with N authorised exception(s)") and the transcript page carry each exception in the ordinary voice. Each waivable stop offers the waiver among its ways on with an honest cost, `close --force`'s help points a single gate at `session waive`, UNATTENDED_DENIED and the Mechanic's brief say the waiver is the person's, and docs/driving-a-session.md states the rule and the verb.

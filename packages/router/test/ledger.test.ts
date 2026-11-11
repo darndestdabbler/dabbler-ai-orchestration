@@ -11,6 +11,9 @@ import { platformNewlines } from "../src/journal.ts";
 import {
   LedgerError,
   appendDispute,
+  appendException,
+  readExceptions,
+  waiverOf,
   appendPackaging,
   appendReanchor,
   appendRound,
@@ -162,6 +165,22 @@ describe("appending to the ledger", () => {
     };
     appendDispute(repo, 1, { ...row });
     assert.throws(() => appendDispute(repo, 1, { ...row }), /at most once/);
+  });
+
+  it("reads a waiver back as written, finds it by its stop, and refuses a second of one stop", () => {
+    const repo = tempDir();
+    const row = {
+      schema_version: 1, session_number: 1,
+      stop: { kind: "tests", code: null, step_id: null, reason: "the suite failed", at: "2026-01-01T00:00:00+00:00" },
+      reason: "the failure is the known flaky clock test", by: "the operator",
+      recorded_at: "2026-01-01T00:05:00+00:00", commit: "a".repeat(40), tree: "b".repeat(40),
+    };
+    appendException(repo, 1, { ...row });
+    assert.deepEqual(readExceptions(repo, 1), [row]);
+    assert.deepEqual(waiverOf(repo, 1, "2026-01-01T00:00:00+00:00"), row);
+    assert.equal(waiverOf(repo, 1, "2026-01-02T00:00:00+00:00"), null);
+    assert.throws(() => appendException(repo, 1, { ...row }), /already waived/);
+    assert.throws(() => appendException(repo, 2, { ...row, stop: { ...row.stop, kind: "land" } }), LedgerError);
   });
 
   it("appends a packaging refusal beside its later success", () => {

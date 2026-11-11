@@ -14,25 +14,25 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { after, describe, it } from "node:test";
+import { after, afterEach, describe, it } from "node:test";
 
 import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { driveSession, mechanicMemoPath, reportAndNext, sessionNext, setMechanicLauncher, type Engine } from "../src/drive.ts";
 import { mailboxEngine, type EngineOutcome } from "../src/engines.ts";
-import { readInstruction, readReport, readRun, readWorkPlan, writeRun, writeWorkPlan } from "../src/driver.ts";
+import { readDriverEvents, readInstruction, readReport, readRun, readWorkPlan, writeRun, writeWorkPlan } from "../src/driver.ts";
 import { EXIT_UNAVAILABLE } from "../src/contracts/exitCodes.ts";
 import { beginJobRecord, jobRecord, setJobStarter, startJob } from "../src/jobs.ts";
 import { SETTING_AUTHORING_MODEL, SETTING_ENGINE, SETTING_MECHANIC, SETTING_MECHANIC_MODEL, writeSettings } from "../src/settings.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { judgeSuiteDeclaration } from "../src/gates.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
-import { appendPackaging, readPackaging, readRounds } from "../src/ledger.ts";
+import { appendPackaging, appendRound, readPackaging, readRounds } from "../src/ledger.ts";
 import { capture } from "../src/output.ts";
 import { detectOutOfBandWrite } from "../src/evidence.ts";
 import { readRawSessionState, readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import { EXIT_OK, EXIT_USAGE, RELEASE_ENGINE, cancel, declare, holdRelease, interrupt, planAmend, report, restore, rollback, start } from "../src/session.ts";
+import { EXIT_OK, EXIT_USAGE, RELEASE_ENGINE, cancel, declare, holdRelease, interrupt, planAmend, report, restore, rollback, start, waiveStop } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
 import { amendmentEntries, readTaskDeclaration } from "../src/writers.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
@@ -2626,5 +2626,88 @@ describe("a step reported blocked, resumed past", () => {
     } finally {
       unset();
     }
+  });
+});
+
+describe("a stop a person waived, gone past", () => {
+  // Each case goes on into a phase that starts a job; what is asserted is
+  // where it went, so the job is dropped unrun rather than settled.
+  afterEach(() => {
+    restoreJobs();
+    restoreJobs = useInProcessJobs();
+  });
+  const AT = "2026-11-11T10:30:00-05:00";
+  /** A session standing at `stop`, its one step's check one that never passes. */
+  function standingAt(
+    stop: Record<string, unknown>,
+    phase: string,
+    accepted: string[],
+  ): { repo: string; sessionsDir: string } {
+    setProviderKeys();
+    configure([VERIFIED]);
+    const { repo, sessionsDir } = makeSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
+    writeSettings(repo, { [SETTING_MECHANIC]: "attended" });
+    writeWorkPlan(repo, 1, {
+      schema_version: 1, session_number: 1, task: "Make the widget real.",
+      non_goals: ["Anything the step does not name."],
+      steps: [{ id: "one", ask: "Make it.", files: ["src/widget.py"], checks: [{ argv: [NODE, "-e", "process.exit(1)"] }] }],
+      recorded_at: "2026-11-11T10:00:00-05:00",
+    });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase, seq: 4,
+      invocations: 0, max_invocations: 24, accepted_steps: accepted, baseline_tree: null,
+      stop, lease_epoch: 1,
+      started_at: "2026-11-11T10:00:00-05:00", updated_at: AT,
+    });
+    return { repo, sessionsDir };
+  }
+  const waive = async (sessionsDir: string): Promise<void> => {
+    const waived = await capture(() => Promise.resolve(waiveStop(sessionsDir, { reason: "the check is wrong here" })));
+    assert.equal(waived.value, EXIT_OK, waived.stderr);
+  };
+  const REFUSED = { kind: "rejected-thrice", reason: "step 'one' was refused 3 times", step_id: "one", at: AT };
+
+  it("accepts a step refused three times where it stands, its check's real result on the row", async () => {
+    const { repo, sessionsDir } = standingAt(REFUSED, "work", []);
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n");
+    await waive(sessionsDir);
+    const resumed = await next(sessionsDir);
+    assert.ok(readRun(repo, 1)!.accepted_steps.includes("one"), resumed.err);
+    const accepted = readDriverEvents(repo, 1).find((event) => event.event === "report-accepted-waived");
+    assert.deepEqual((accepted?.fields as Record<string, unknown>)["checks"], [
+      { argv: [NODE, "-e", "process.exit(1)"], green: false },
+    ]);
+  });
+
+  it("asks the step afresh where the tree moved after the waiver, which then needs its own", async () => {
+    const { repo, sessionsDir } = standingAt(REFUSED, "work", []);
+    await waive(sessionsDir);
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 3\n");
+    const resumed = await next(sessionsDir);
+    assert.equal(resumed.instruction?.step_id, "one", resumed.err);
+    assert.equal(resumed.instruction?.kind, "step");
+    assert.deepEqual(readRun(repo, 1)!.accepted_steps, []);
+  });
+
+  it("goes on from a waived verification to the run of record with the verdict and findings as they stood", async () => {
+    const { repo, sessionsDir } = standingAt(
+      { kind: "verification", code: "cap-unresolved", reason: "blocking findings stand at the cap", step_id: null, at: AT },
+      "verify",
+      ["one"],
+    );
+    appendRound(repo, 1, {
+      round: 1, verdict: "ISSUES_FOUND", blocking: true,
+      findings: [{ description: "the widget returns 1", severity: "major" }],
+      completion_tree: "a".repeat(40), recorded_at: "2026-11-11T10:20:00-05:00",
+      verifier_model: "gpt-5-4", verifier_provider: "openai",
+    });
+    const before = readRounds(repo, 1);
+    await waive(sessionsDir);
+    const resumed = await next(sessionsDir);
+    const waived = readDriverEvents(repo, 1).find((event) => event.event === "stop-waived");
+    assert.equal((waived?.fields as Record<string, unknown>)["goes_on_to"], "run-of-record", resumed.err);
+    assert.notEqual(readRun(repo, 1)!.phase, "verify");
+    assert.deepEqual(readRounds(repo, 1), before);
   });
 });

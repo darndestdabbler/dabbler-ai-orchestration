@@ -105,7 +105,8 @@ import {
   writeWorkPlan,
   appendSupervision,
 } from "./driver.ts";
-import type { DriverInstruction } from "./generated/index.ts";
+import type { DriverInstruction, DriverRun } from "./generated/index.ts";
+import { VERSION } from "./version.ts";
 import {
   CAUSE_NOT_LISTED,
   CAUSE_NO_KEY,
@@ -160,7 +161,9 @@ import {
   MACHINE_DIRNAME,
   OUTCOME_PUBLISHED,
   RUNS_DIRNAME,
+  appendException,
   latestRound,
+  readExceptions,
   readPackaging,
   sessionRunDir,
 } from "./ledger.ts";
@@ -3115,10 +3118,14 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
       forced,
       noChange,
     });
+    // Said where the session ends: a person let it past a stop, and the
+    // verdict above is still whatever it truly was.
+    const exceptions = repoRoot ? readExceptions(repoRoot, current).length : 0;
     writeOut(
       `close: session ${sessionDisplayNumber(current)} of ` +
         `${basename(sessionsDir)} closed` +
         (verdict ? ` (${String(verdict)})` : "") +
+        (exceptions > 0 ? ` with ${exceptions} authorised exception(s)` : "") +
         ".\n",
     );
     for (const line of steppedOverLines(repoRoot, sessionsDir, current as number)) {
@@ -4249,6 +4256,150 @@ export function holdRelease(sessionsDir: string, options: HoldReleaseCliOptions)
     writeOut(
       `hold-release: session ${sessionDisplayNumber(current)} publishes nothing: ${reason}. The ` +
         "session closes as held, and the close says so.\n",
+    );
+    return EXIT_OK;
+  } finally {
+    releaseLock(lock);
+  }
+}
+
+// --- waive ---------------------------------------------------------------------
+
+export interface WaiveCliOptions {
+  readonly reason: string;
+  /** The caller is an engine (`callerIsEngine`); a waiver is a person's. */
+  readonly engine?: boolean;
+}
+
+/** The stops a person may authorise going past: each has something to go past. */
+export const WAIVABLE_STOP_KINDS: ReadonlySet<string> = new Set([
+  "rejected-thrice",
+  "tests",
+  "verification",
+  "close",
+]);
+
+/**
+ * Why the standing stop cannot be waived, or null where it can. A stop of
+ * any other kind has its own way on, and a waiver cannot make a push or a
+ * provider answer; `rejected-thrice` is waivable only on a step of the work
+ * plan, because with no plan there is no work to accept.
+ */
+function unwaivable(sessionsDir: string, repoRoot: string, current: number, stop: NonNullable<DriverRun["stop"]>): string | null {
+  if (releaseSessionVersion(sessionsDir, current) !== null) {
+    return "a release session is not waived past: an unpublished release is not closed as one";
+  }
+  if (!WAIVABLE_STOP_KINDS.has(stop.kind)) {
+    return `a '${stop.kind}' stop has nothing to go past; its own ways on are the ones it printed`;
+  }
+  if (stop.kind === "rejected-thrice") {
+    const plan = readWorkPlan(repoRoot, current);
+    const onAStep = plan !== null && plan.steps.some((step) => step.id === stop.step_id);
+    if (!onAStep) return "the refusals were not of a work-plan step, so there is no step's work to accept";
+  }
+  return null;
+}
+
+/**
+ * A person's authority to take the session past the stop it stands at,
+ * once, on the record. A rule may be waived and a record may never be
+ * falsified: the row keeps the stop as the framework wrote it and adds who
+ * authorised going on, and why. Nothing the stop judged is rewritten.
+ */
+export function waiveStop(sessionsDir: string, options: WaiveCliOptions): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`waive: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  if (options.engine === true) {
+    writeErr(
+      `waive: ${isAPersonsVerb(
+        "waive",
+        "lets a session past a rule that refused it",
+        "a person waives a stop from an interactive terminal of their own",
+        "Report the step blocked and say what should be waived and why",
+      )}\n`,
+    );
+    return EXIT_BOUNDARY;
+  }
+  const reason = options.reason.trim();
+  if (reason === "") {
+    writeErr("waive: --reason carries why this session may go past the stop it stands at\n");
+    return EXIT_USAGE;
+  }
+  const repoRoot = repoRootFor(sessionsDir);
+  if (repoRoot === null) {
+    writeErr(`waive: not inside a git repository: ${sessionsDir}\n`);
+    return EXIT_BOUNDARY;
+  }
+  let lock: string;
+  try {
+    lock = acquireLockWithTimeout(sessionsDir, `waive/${process.pid}`);
+  } catch (error) {
+    if (!(error instanceof LockContentionError)) throw error;
+    writeErr(`waive: refused -- ${error.message}\n`);
+    return EXIT_LOCK_CONTENTION;
+  }
+  try {
+    const raw = readRawSessionState(sessionsDir);
+    const current = ((raw ? derivedView(raw) : null)?.["currentSession"] ?? null) as number | null;
+    if (current === null) {
+      writeErr(`waive: refused -- no session is in flight under ${sessionsDir}.\n`);
+      return EXIT_BOUNDARY;
+    }
+    const shown = sessionDisplayNumber(current);
+    const stop = readRun(repoRoot, current)?.stop ?? null;
+    if (stop === null) {
+      writeErr(`waive: refused -- session ${shown} stands at no stop, so there is nothing to go past.\n`);
+      return EXIT_BOUNDARY;
+    }
+    const why = unwaivable(sessionsDir, repoRoot, current, stop);
+    if (why !== null) {
+      writeErr(`waive: refused -- ${why}.\n`);
+      return EXIT_BOUNDARY;
+    }
+    // The tree is what a waiver lets through, so one given at a tree nobody
+    // could read would let through anything.
+    const tree = snapshotWorktreeTree(repoRoot);
+    if (tree === null) {
+      writeErr("waive: refused -- the working tree could not be read, so there is no tree to let through; try again.\n");
+      return EXIT_BOUNDARY;
+    }
+    const by = whoIsWorking(sessionsDir, current);
+    const record: Record<string, unknown> = {
+      schema_version: 1,
+      session_number: current,
+      stop: {
+        kind: stop.kind,
+        code: stop.code ?? null,
+        step_id: stop.step_id ?? null,
+        reason: stop.reason,
+        at: stop.at,
+      },
+      reason,
+      by,
+      recorded_at: nowIso(),
+      commit: runGit(repoRoot, ["rev-parse", "HEAD"]).stdout.trim(),
+      tree,
+      framework_version: VERSION,
+    };
+    try {
+      appendException(repoRoot, current, record);
+    } catch (error) {
+      if (!(error instanceof LedgerError)) throw error;
+      writeErr(`waive: refused -- ${error.message}\n`);
+      return EXIT_BOUNDARY;
+    }
+    recordAmendment(sessionsDir, {
+      sessionNumber: current,
+      what: `a '${stop.kind}' stop, waived: ${stop.reason}`,
+      reason,
+      by,
+    });
+    writeOut(
+      `waive: session ${shown} goes past its '${stop.kind}' stop: ${reason}. What was unmet ` +
+        "stays written as unmet, and the record says you authorised going on. Carry on with " +
+        "`dabbler session next`.\n",
     );
     return EXIT_OK;
   } finally {

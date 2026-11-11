@@ -45,6 +45,7 @@ import { nowIso } from "./journal.ts";
 import {
   LedgerError,
   ROW_REMEDIATED_AT_CAP,
+  readExceptions,
   readRounds,
 } from "./ledger.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
@@ -1628,6 +1629,33 @@ export function buildVerificationView(
  * Computed fresh on every call -- a cache would need a freshness protocol,
  * and the v1 one (digests plus stale states) cost more than recomputing.
  */
+/**
+ * The stops a person authorised a session to go past, oldest first: what was
+ * unmet in the framework's words, who authorised going on, and why. An
+ * unreadable record projects none rather than failing the whole view; the
+ * close and the gates read the same rows and refuse on it themselves.
+ */
+export function exceptionsView(repoRoot: string, sessionNumber: number): Record<string, unknown>[] {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = readExceptions(repoRoot, sessionNumber);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    return [];
+  }
+  return rows.map((row) => {
+    const stop = row["stop"] as Record<string, unknown>;
+    return {
+      kind: stop["kind"],
+      stepId: stop["step_id"] ?? null,
+      unmet: stop["reason"],
+      by: row["by"],
+      reason: row["reason"],
+      at: row["recorded_at"],
+    };
+  });
+}
+
 export function buildProjection(
   sessionsDir: string,
   options: { readonly stalledAfterSeconds?: number } = {},
@@ -1775,6 +1803,9 @@ export function buildProjection(
         if (!(error instanceof VerificationRefused)) throw error;
         sessionOut["verificationRefused"] = error.message;
       }
+      // Present only on a session a person let past a stop.
+      const exceptions = exceptionsView(repoRoot, number as number);
+      if (exceptions.length > 0) sessionOut["exceptions"] = exceptions;
     }
     sessionsOut.push(sessionOut);
   }

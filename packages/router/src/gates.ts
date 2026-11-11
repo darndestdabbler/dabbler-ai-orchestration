@@ -51,6 +51,7 @@ import { readRun } from "./driver.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
 import {
+  isSessionRecordPath,
   repoRelativePath,
   repoRootFor,
   runGit,
@@ -62,8 +63,10 @@ import {
   OUTCOME_PUBLISHED,
   ROW_REMEDIATED_AT_CAP,
   readPackaging,
+  readExceptions,
   readRounds,
   standingReopen,
+  type Row,
 } from "./ledger.ts";
 import { releasabilityOf } from "./writers.ts";
 import { readSessionState } from "./progress.ts";
@@ -128,6 +131,12 @@ export interface GateResult {
    * never claims to have proved anything.
    */
   readonly inapplicable: boolean;
+  /**
+   * A person authorised going past what this gate reads, and the row that
+   * says so. Not a pass: the gate's evidence is unmet and stays written as
+   * unmet, so the row never wears the pass mark. It does not refuse.
+   */
+  readonly waived?: string;
 }
 
 /** A predicate's answer, before it becomes a row. */
@@ -150,6 +159,8 @@ export const GATE_NOT_APPLICABLE = "(N/A)";
  * mark as the eight that judged.
  */
 export const GATE_NOT_APPLICABLE_MARK = "-";
+/** The mark a gate a person waived carries: neither passed nor refusing. */
+export const GATE_WAIVED_MARK = "~";
 
 /**
  * One gate as a line, for whoever is showing it.
@@ -178,6 +189,7 @@ export const GATE_NOT_APPLICABLE_MARK = "-";
 export function renderGateRow(gate: GateResult, nameWidth = 0): string {
   const name = gate.name.padEnd(nameWidth);
   if (gate.inapplicable) return `${GATE_NOT_APPLICABLE_MARK} ${name} ${GATE_NOT_APPLICABLE}`;
+  if (gate.waived !== undefined) return `${GATE_WAIVED_MARK} ${name}  waived -- ${gate.waived}`;
   const mark = gate.passed ? GATE_PASS_MARK : GATE_FAIL_MARK;
   return gate.remediation
     ? `${mark} ${name}  ${gate.remediation}`
@@ -1057,7 +1069,62 @@ export function rewindPhaseFor(
   return earliest === null ? null : (EVIDENCE_PHASE_ORDER[earliest] as EvidencePhase);
 }
 
+// --- Waivers --------------------------------------------------------------------
+
+/** The gate whose evidence each waivable stop is about. A close's are the gates its stop names. */
+const GATE_OF_WAIVED_STOP: Readonly<Record<string, string>> = {
+  tests: "test_run_fresh",
+  verification: "verification_clean",
+};
+
+/**
+ * The in-flight session's waivers that still stand, each with its place in
+ * `exceptions.jsonl`. A waiver stands while the tree is the one it was given
+ * at, the session's own record left out: a tree that has moved since is not
+ * the tree the person let through, and the same rule refusing it needs a
+ * waiver of its own.
+ */
+export function standingWaivers(sessionsDir: string): { readonly row: Row; readonly index: number }[] {
+  const root = repoRootFor(sessionsDir);
+  const current = currentSession(sessionsDir);
+  if (root === null || typeof current !== "number") return [];
+  const rows = readExceptions(root, current);
+  if (rows.length === 0) return [];
+  const now = snapshotWorktreeTree(root);
+  const sessionsRel = repoRelativePath(root, sessionsDir);
+  const stands = (given: unknown): boolean => {
+    if (typeof given !== "string" || now === null) return false;
+    if (given === now) return true;
+    const moved = changedPathsBetween(root, given, now);
+    return moved !== null && moved.every((path) => isSessionRecordPath(path) || isSetBookkeeping(path, sessionsRel));
+  };
+  return rows.map((row, index) => ({ row, index: index + 1 })).filter(({ row }) => stands(row["tree"]));
+}
+
+/**
+ * Each gate a standing waiver covers, with the words its row is shown in:
+ * who authorised going on, the row, and why. One decision by the person, not
+ * one per gate that reads the same fact.
+ */
+export function waivedGates(sessionsDir: string): Map<string, string> {
+  const waived = new Map<string, string>();
+  for (const { row, index } of standingWaivers(sessionsDir)) {
+    const stop = row["stop"] as Row;
+    const words = `by ${String(row["by"])} (exceptions.jsonl row ${index}): ${String(row["reason"])}`;
+    const named = stop["kind"] === "close"
+      ? GATE_CHECKS.map(([name]) => name).filter((name) => String(stop["reason"]).includes(name))
+      : [GATE_OF_WAIVED_STOP[String(stop["kind"])]].filter((name): name is string => name !== undefined);
+    for (const name of named) if (!waived.has(name)) waived.set(name, words);
+  }
+  return waived;
+}
+
 export interface RunGatesOptions {
+  /**
+   * The gates a person waived, by name, with the words the row is shown in;
+   * `waivedGates` of the session in flight unless a caller hands in its own.
+   */
+  readonly waived?: ReadonlyMap<string, string>;
   readonly forced?: boolean;
   readonly config?: RouterConfig | null;
   /**
@@ -1098,6 +1165,9 @@ export function runGates(
   const forced = options.forced === true;
   const config = options.config ?? null;
   const omit = new Set(options.omit ?? []);
+  // Read only once a gate refuses: a clean close asks git nothing more.
+  let waivedRead: ReadonlyMap<string, string> | undefined = options.waived;
+  const waived = (): ReadonlyMap<string, string> => (waivedRead ??= waivedGates(sessionsDir));
   const results: GateResult[] = [];
   for (const [name, predicate] of options.gates ?? GATE_CHECKS) {
     if (omit.has(name)) continue;
@@ -1126,11 +1196,15 @@ export function runGates(
       const text = error instanceof Error ? error.message : String(error);
       row = [false, `gate crashed (${kind}: ${text}); failing closed`];
     }
+    const passed = Boolean(row[0]);
+    const waiver = passed ? undefined : waived().get(name);
     results.push({
       name,
-      passed: Boolean(row[0]),
+      // A waived gate does not refuse; its unmet evidence stays in the remediation.
+      passed: passed || waiver !== undefined,
       remediation: row[1],
       inapplicable: row[2] === true,
+      ...(waiver !== undefined ? { waived: waiver } : {}),
     });
   }
   return results;

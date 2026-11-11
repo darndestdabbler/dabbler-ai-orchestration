@@ -8,6 +8,7 @@ import {
   GATE_FAIL_MARK,
   GATE_NOT_APPLICABLE,
   GATE_PASS_MARK,
+  GATE_WAIVED_MARK,
   type GateResult,
   renderGateRow,
   EVIDENCE_GATES,
@@ -27,6 +28,7 @@ import {
   judgeWorktree,
   parseRevListCount,
   previewPaths,
+  rewindPhaseFor,
   runGates,
   type NoChangeFacts,
   type PushFacts,
@@ -289,12 +291,14 @@ describe("verdict_vocabulary", () => {
 describe("the driver", () => {
   const pass = (): readonly [boolean, string] => [true, ""];
   const fail = (): readonly [boolean, string] => [false, "no"];
+  // A refusing gate reads the waivers; a test that hands in its gates hands in those too.
+  const waived = new Map<string, string>();
 
   it("turns a gate that throws into a failed row rather than wedging the close", () => {
     const boom = (): never => {
       throw new Error("boom");
     };
-    const rows = runGates(SESSIONS, { gates: [["working_tree_clean", boom]] });
+    const rows = runGates(SESSIONS, { waived, gates: [["working_tree_clean", boom]] });
     assert.deepEqual(rows, [
       { name: "working_tree_clean", passed: false, remediation: "gate crashed (Error: boom); failing closed", inapplicable: false },
     ]);
@@ -302,6 +306,7 @@ describe("the driver", () => {
 
   it("lets --force skip the bookkeeping gates and never the evidence ones", () => {
     const rows = runGates(SESSIONS, {
+      waived,
       forced: true,
       gates: [["working_tree_clean", fail], ["verdict_vocabulary", fail]],
     });
@@ -324,6 +329,7 @@ describe("the driver", () => {
     // A release session changes nothing by design; what it exists for is the
     // packaging run, so that gate is still asked.
     const rows = runGates(SESSIONS, {
+      waived,
       noChange: true,
       gates: [["verification_clean", fail], ["test_run_fresh", fail], ["published_when_releasable", fail]],
     });
@@ -332,6 +338,25 @@ describe("the driver", () => {
       ["test_run_fresh", true],
       ["published_when_releasable", false],
     ]);
+  });
+
+  it("reports a gate over waived evidence as waived, naming the row, and does not refuse", () => {
+    const words = "by the operator (exceptions.jsonl row 1): the reviewer could not be reached";
+    const rows = runGates(SESSIONS, {
+      waived: new Map([["verification_clean", words]]),
+      gates: [["verification_clean", () => [false, "no round has verified this tree"]], ["test_run_fresh", fail]],
+    });
+    const [verification, tests] = rows;
+    assert.equal(verification!.passed, true);
+    assert.equal(verification!.waived, words);
+    assert.equal(verification!.remediation, "no round has verified this tree");
+    assert.equal(rewindPhaseFor(rows), "run-of-record");
+    assert.equal(tests!.passed, false);
+    assert.equal(tests!.waived, undefined);
+    const shown = renderGateRow(verification!);
+    assert.ok(shown.startsWith(`${GATE_WAIVED_MARK} verification_clean`), shown);
+    assert.ok(!shown.includes(GATE_PASS_MARK));
+    assert.match(shown, /waived -- by the operator \(exceptions\.jsonl row 1\)/);
   });
 
   it("marks an inapplicable row as such and not as a pass", () => {

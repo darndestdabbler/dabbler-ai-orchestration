@@ -105,6 +105,7 @@ describe("mechanicBrief", () => {
     assert.match(brief, /Never weaken a gate, a verdict or a test/);
     assert.match(brief, /rollback` keeps the work: .*`dabbler\/rolled-back\/s<N>-<time>`.*git checkout <branch> -- <paths>/);
     assert.match(brief, /dabbler session hold-release/);
+    assert.match(brief, /`dabbler session waive --reason "<why>"`.*never yours to type/);
     assert.match(brief, /dabbler verify reopen/);
     assert.match(brief, /Commit nothing and push nothing/);
     // The two instructions, as the session plan states them.

@@ -38,7 +38,8 @@ reached the close stays blocked until an operator resolves it — there is
 no silent pass. A finding the orchestrator believes is wrong doesn't loop
 forever either: it can **dispute** the finding with evidence from the
 repo, and a deadlock at the round cap goes to a third **adjudicating**
-provider that neither wrote nor reviewed the work. **There is no waiver.**
+provider that neither wrote nor reviewed the work. **There is no waiver of
+a verdict:** a person may let a session past a stop with `dabbler session waive`, and the record keeps what was unmet and the verdict it truly had.
 At the cap the loop ends itself and says which end it reached —
 *remediated at the cap*, where every blocking finding was fixed and the
 cap left the fix unreviewed, so the work lands labelled unreviewed; or

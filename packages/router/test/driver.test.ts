@@ -802,6 +802,23 @@ describe("a stop, as a person reads it", () => {
     assert.ok(onward.cost.includes(AMEND_CHECKS_COMMAND), onward.cost);
   });
 
+  it("offers the waiver on each stop with something to go past, as the person's, and on no other", () => {
+    const WAIVE = 'dabbler session waive --reason "<why>"';
+    const waivable = new Set(["rejected-thrice", "tests", "verification", "close"]);
+    for (const [kind, code] of [
+      ...KINDS.map((kind) => [kind, null] as const),
+      ...CODES.map((code) => ["verification", code] as const),
+    ]) {
+      const words = renderStop({ kind, code, reason: "x", step_id: "widget" } as never, { session_number: 7, phase: "verify", engine: "cli" });
+      const offered = words.choices.find((choice) => choice.command === WAIVE);
+      assert.equal(offered !== undefined, waivable.has(kind), `${code ?? kind}: ${words.ways}`);
+      if (offered === undefined) continue;
+      assert.match(offered.label, /yours to run, never the engine's/);
+      assert.match(offered.cost, /What was unmet stays written as unmet/);
+      assert.match(offered.cost, /of this stop only/);
+    }
+  });
+
   it("offers the rollback beside every cancel, before it, and names it as the person's", () => {
     // A stop whose only ending was the cancel left what the session did in
     // the tree, for the next start to offer to commit. The third way is on

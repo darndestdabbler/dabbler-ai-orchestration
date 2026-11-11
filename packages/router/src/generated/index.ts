@@ -20,6 +20,7 @@ export * from "./rounds.ts";
 export * from "./router-config.ts";
 export * from "./run-event.ts";
 export * from "./run-projection.ts";
+export * from "./session-exception.ts";
 export * from "./session-organization.ts";
 export * from "./sessions.ts";
 export * from "./solution-dependencies.ts";

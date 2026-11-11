@@ -15,7 +15,7 @@ import { describe, it } from "node:test";
 import { capture } from "../src/output.ts";
 import { changedPathsBetween, platformNewlines, snapshotWorktreeTree } from "../src/journal.ts";
 import { checkPublishedWhenReleasable } from "../src/gates.ts";
-import { appendPackaging } from "../src/ledger.ts";
+import { appendPackaging, readExceptions } from "../src/ledger.ts";
 import {
   SOURCE_API,
   SOURCE_SEAT,
@@ -80,6 +80,7 @@ import {
   STARTING_POINT,
   start,
   steppedOverLines,
+  waiveStop,
   type SequenceFacts,
 } from "../src/session.ts";
 import { loopPath, readInstruction, readRepairs, readReport, readRun, recordRepair, writeInstruction, writeRun } from "../src/driver.ts";
@@ -1992,6 +1993,88 @@ describe("a session that publishes nothing", () => {
       assert.deepEqual(amendmentEntries(published.sessionsDir, 1), []);
     } finally {
       published.restore();
+    }
+  });
+});
+
+describe("a person's waiver of a stop", () => {
+  const HEAD = "a1".repeat(20);
+  function stopped(
+    stop: Record<string, unknown> | null,
+    first: Parameters<typeof cleanRepoAnswers>[1] = [],
+  ): { repo: string; sessionsDir: string; restore: () => void } {
+    const repo = tempDir("waive-");
+    seed(repo, SEED);
+    const restore = cleanRepoAnswers(repo, [[["rev-parse", "HEAD"], { stdout: HEAD }], ...first]);
+    const sessionsDir = join(repo, "docs", "sessions");
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "claude-code", phase: "run-of-record",
+      seq: 5, invocations: 0, max_invocations: 24, accepted_steps: [] as string[], baseline_tree: null,
+      stop, started_at: "2026-11-11T09:00:00-05:00", updated_at: "2026-11-11T10:00:00-05:00",
+    });
+    return { repo, sessionsDir, restore };
+  }
+  const TESTS_STOP = { kind: "tests", reason: "the suite 'unit' failed", class: "first", step_id: null, at: "2026-11-11T10:00:00-05:00" };
+
+  it("writes one row with the stop as the framework wrote it and the person's reason", async () => {
+    const state = stopped(TESTS_STOP);
+    try {
+      const waived = await run(() => waiveStop(state.sessionsDir, { reason: "a known flaky clock test" }));
+      assert.equal(waived.code, EXIT_OK, waived.err);
+      const [row, ...more] = readExceptions(state.repo, 1);
+      assert.deepEqual(more, []);
+      assert.deepEqual(row!["stop"], { kind: "tests", code: null, step_id: null, reason: "the suite 'unit' failed", at: TESTS_STOP.at });
+      assert.equal(row!["reason"], "a known flaky clock test");
+      assert.equal(row!["commit"], HEAD);
+      assert.match(String(row!["tree"]), /^\S{7,}$/);
+      assert.match(String(amendmentEntries(state.sessionsDir, 1)[0]!["what"]), /'tests' stop, waived/);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("refuses where the tree it would let through cannot be read, and writes no row", async () => {
+    const state = stopped(TESTS_STOP, [[["write-tree"], { code: 1, stderr: "fatal: index unreadable" }]]);
+    try {
+      const refused = await run(() => waiveStop(state.sessionsDir, { reason: "go on" }));
+      assert.equal(refused.code, EXIT_BOUNDARY);
+      assert.match(refused.err, /the working tree could not be read/);
+      assert.deepEqual(readExceptions(state.repo, 1), []);
+      assert.deepEqual(amendmentEntries(state.sessionsDir, 1), []);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("refuses an engine, naming what it should report instead", async () => {
+    const state = stopped(TESTS_STOP);
+    try {
+      const engine = await run(() => waiveStop(state.sessionsDir, { reason: "x", engine: true }));
+      assert.equal(engine.code, EXIT_BOUNDARY);
+      assert.match(engine.err, /a person's verb, never the engine's/);
+      assert.match(engine.err, /Report the step blocked and say what should be waived and why/);
+      assert.deepEqual(readExceptions(state.repo, 1), []);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("refuses where there is no stop, or one with nothing to go past", async () => {
+    for (const [stop, words] of [
+      [null, /stands at no stop/],
+      [{ ...TESTS_STOP, kind: "land" }, /a 'land' stop has nothing to go past/],
+      [{ ...TESTS_STOP, kind: "rejected-thrice", step_id: "plan" }, /not of a work-plan step/],
+    ] as const) {
+      const state = stopped(stop);
+      try {
+        const refused = await run(() => waiveStop(state.sessionsDir, { reason: "go on" }));
+        assert.equal(refused.code, EXIT_BOUNDARY);
+        assert.match(refused.err, words);
+        assert.deepEqual(readExceptions(state.repo, 1), []);
+      } finally {
+        state.restore();
+      }
     }
   });
 });

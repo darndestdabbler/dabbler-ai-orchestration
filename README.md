@@ -40,7 +40,10 @@ There is one implementation, in TypeScript, and it runs two ways:
    **remediated at the cap** when every blocking finding was fixed and the
    cap left the fix unreviewed (the work lands, labelled unreviewed),
    **unresolved** when findings still stand (nothing lands but the
-   record). There is no waiver and no verdict a person can type.
+   record). There is no waiver of a verdict and no verdict a person can
+   type; a person may let a session past a stop with
+   `dabbler session waive`, and the record keeps what was unmet and the
+   verdict it truly had.
 4. `dabbler session close` runs the gates `GATE_CHECKS` declares —
    verification clean, working tree clean, pushed to remote, test run
    fresh, published when releasable, and verdict

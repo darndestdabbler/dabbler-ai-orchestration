@@ -104,6 +104,8 @@ import {
   beatWaiter,
   clearBeatIfMine,
   redSuitesOwingAFix,
+  phasePastWaiver,
+  suitesTheLandHolds,
   type RegistrationFacts,
   type StepSpec,
 } from "../src/drive.ts";
@@ -111,6 +113,7 @@ import type { SuiteSpec, TestRunRecord } from "../src/testEvidence.ts";
 import { beginJobRecord, jobRecord, jobStatusPath, setJobStarter } from "../src/jobs.ts";
 import { EXIT_FUNDS } from "../src/contracts/exitCodes.ts";
 import { rewindPhaseFor } from "../src/gates.ts";
+import { judgeLandReadiness, type LandSuiteFact } from "../src/land.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
 import { readProjectGraph } from "../src/projectGraph.ts";
 import { checkRunGreen } from "../src/checks.ts";
@@ -1511,6 +1514,37 @@ describe("the land's push on a branch with no upstream", () => {
       two();
     }
     assert.equal(pushes.length, 1);
+  });
+});
+
+describe("going on past a waived stop", () => {
+  const AT = "2026-11-11T10:00:00-05:00";
+  const waiverOf = (kind: string) => ({ stop: { kind, code: null, step_id: null, reason: "unmet", at: AT }, reason: "go on", by: "the operator" });
+
+  it("goes on from a waived tests stop to the land, the failed run still failed", () => {
+    assert.equal(phasePastWaiver({ kind: "tests", at: AT }, waiverOf("tests"), "run-of-record"), "land");
+    const red: LandSuiteFact = {
+      name: "unit",
+      latest: { outcome: "failed", treeDigest: "tree-a", surfaceDigest: "surface-a", recordedAt: AT },
+      surfaceNow: "surface-a",
+    };
+    const facts = { treeNow: "tree-a", suites: [red], moved: [] as string[] };
+    assert.match(judgeLandReadiness(facts)?.reason ?? "", /unit's run of record is failed, not green/);
+    assert.equal(judgeLandReadiness({ ...facts, suites: suitesTheLandHolds(facts.suites, true) }), null);
+    assert.equal(red.latest?.outcome, "failed");
+    assert.deepEqual(suitesTheLandHolds(facts.suites, false), [red]);
+  });
+
+  it("goes on from a waived verification stop to the run of record, a close's and a step's where they stand", () => {
+    assert.equal(phasePastWaiver({ kind: "verification", at: AT }, waiverOf("verification"), "verify"), "run-of-record");
+    assert.equal(phasePastWaiver({ kind: "close", at: AT }, waiverOf("close"), "close"), "close");
+    assert.equal(phasePastWaiver({ kind: "rejected-thrice", at: AT }, waiverOf("rejected-thrice"), "work"), "work");
+  });
+
+  it("does not carry a waiver to the next stop", () => {
+    assert.equal(phasePastWaiver({ kind: "tests", at: "2026-11-11T11:00:00-05:00" }, waiverOf("tests"), "run-of-record"), null);
+    assert.equal(phasePastWaiver({ kind: "verification", at: AT }, waiverOf("tests"), "verify"), null);
+    assert.equal(phasePastWaiver({ kind: "tests", at: AT }, null, "run-of-record"), null);
   });
 });
 

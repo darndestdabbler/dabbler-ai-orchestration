@@ -30,6 +30,7 @@ import {
   decision,
   holdRelease,
   interrupt,
+  waiveStop,
   rebaseline,
   migrate,
   plan,
@@ -58,6 +59,7 @@ const SUMMARY: Record<string, string> = {
   report: "answer the driver's outstanding instruction",
   plan: "record the plan prose in project-work-plan.md; `plan amend` changes a driven step",
   "hold-release": "hold this session's release, for a person's reason; it closes as held",
+  waive: "take the session past the stop it stands at, once, for a person's reason, on the record",
   close: "run gates and close the session",
   cancel: "cancel one session",
   restore: "restore a cancelled session",
@@ -231,12 +233,24 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  session has published. Only a release session -- a session plan heading",
     "  carrying `(release: <version>)` -- publishes at all.",
   ],
+  waive: [
+    "  --reason TEXT            required: why this session may go past the stop it stands at",
+    "",
+    "  A person's verb, for the session in flight: a rule may be waived and a record",
+    "  may never be falsified. It writes one row naming the stop as the framework",
+    "  wrote it, your reason and who was working; `session next` then goes past that",
+    "  stop and no other. What was unmet stays written as unmet. Only a step refused",
+    "  three times, a test run, a verification and a close are waived; a release",
+    "  session is not.",
+  ],
   close: [
     "  --dry-run                print the gate rows and write nothing",
     "  --force                  bypass bookkeeping gates, never evidence ones.",
     "                           It promotes EVERY open session and stamps",
     "                           forceClosed at the repository level -- it is how a",
-    "                           whole plan is abandoned, never how one gate is passed",
+    "                           whole plan is abandoned, never how one gate is passed.",
+    "                           A single gate is passed with `dabbler session waive",
+    "                           --reason \"<why>\"`, which closes this session and no other",
   ],
   cancel: [
     "  --reason TEXT            required: why the session is being cancelled",
@@ -529,6 +543,15 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       return EXIT_USAGE;
     }
     return holdRelease(sessionsDir, { reason, engine: !personIsPresent() });
+  }
+
+  if (subcommand === "waive") {
+    const reason = values.get("--reason");
+    if (reason === undefined) {
+      writeErr("dabbler session waive: the following arguments are required: --reason\n");
+      return EXIT_USAGE;
+    }
+    return waiveStop(sessionsDir, { reason, engine: !personIsPresent() });
   }
 
   if (subcommand === "rollback") {

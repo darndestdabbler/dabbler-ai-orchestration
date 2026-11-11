@@ -202,6 +202,7 @@ function recordRows(repoRoot: string, session: number): string[] {
  */
 export const UNATTENDED_DENIED = [
   "cancel, rollback, close or hold-release the session",
+  "waive a stop",
   "change the session plan or what counts as done",
   "make a significant design choice or add a dependency the plan did not approve",
   "touch credentials, spend money, or reach anything outside this repository",
@@ -238,7 +239,9 @@ function mandateLines(root: string, memoPath: string | null): string[] {
   if (memoPath === null) {
     return [
       "- A person's verbs are theirs: recommend them and let the person type them -- " +
-        '`dabbler session hold-release --reason "<why>"`, `dabbler session cancel --force --reason "<why>"`.',
+        '`dabbler session hold-release --reason "<why>"`, `dabbler session cancel --force --reason "<why>"`, ' +
+        'and `dabbler session waive --reason "<why>"`, which takes the session past the stop it stands at on the ' +
+        "person's authority and is never yours to type.",
       "- Once the person agrees you may run `dabbler verify reopen --rounds N --reason \"<why>\"`, " +
         "`dabbler session plan amend ... --reason \"<why>\"`, and ordinary file edits.",
       "- Commit nothing and push nothing: leave the fix and its log entry in the working tree. The framework takes " +

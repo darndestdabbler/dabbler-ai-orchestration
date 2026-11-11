@@ -13,7 +13,7 @@ import { describe, it } from "node:test";
 import { transcriptVerb, parseTranscriptArgs } from "../src/cli/transcript.ts";
 import { appendDriverEvent, driverDir, writeRun, writeWorkPlan } from "../src/driver.ts";
 import { jobLogPath, jobStatusPath } from "../src/jobs.ts";
-import { roundsPath } from "../src/ledger.ts";
+import { appendException, roundsPath } from "../src/ledger.ts";
 import { capture } from "../src/output.ts";
 import { TRANSCRIPTS_DIRNAME } from "../src/journal.ts";
 import {
@@ -158,6 +158,22 @@ describe("one session's transcript", () => {
     assert.match(html, /<span class="good">VERIFIED<\/span>/);
     // The clock the terminal prints, not the full instant the row carries.
     assert.match(html, /<span class="at">\[\d\d:\d\d:\d\d\]<\/span>/);
+  });
+
+  it("shows each stop a person let it past: what was unmet, who authorised going on, and why", () => {
+    const root = repoWithASession();
+    assert.ok(!render(root).includes("Gone past on a person"), "a session nobody waived has no such section");
+    appendException(root, 5, {
+      schema_version: 1, session_number: 5,
+      stop: { kind: "tests", code: null, step_id: null, reason: "the run of record for typescript stayed red", at: "2026-10-16T09:36:00-04:00" },
+      reason: "the red test is a clock race fixed upstream", by: "the operator",
+      recorded_at: "2026-10-16T09:37:00-04:00", commit: HEAD, tree: HEAD,
+    });
+    const html = render(root);
+    assert.ok(html.includes("<h2>Gone past on a person's authority</h2>"));
+    assert.match(html, /the run of record for typescript stayed red/);
+    assert.ok(html.includes("<td>the operator</td>"));
+    assert.match(html, /the red test is a clock race fixed upstream/);
   });
 
   it("carries the rounds, this session's test runs, and no other session's", () => {

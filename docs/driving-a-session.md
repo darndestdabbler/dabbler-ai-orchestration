@@ -1052,6 +1052,42 @@ the plan, then Start Session again. A job still running finishes into a
 directory nothing reads. Nothing under `.dabbler/` is tracked for any of
 this.
 
+**Going past a stop with `session waive`: waive a rule, never falsify a
+record.** Where a gate is wrong for this session and you have read it, you
+may take the session past the stop it stands at, once, on the record:
+
+    dabbler session waive --reason "<why>"
+
+`session waive` is a person's verb, refused to an engine like the cancel:
+an engine reports the step blocked and says which stop to go past and why,
+and you decide. It writes
+one row to the run's `exceptions.jsonl` -- the stop as the framework wrote
+it, your reason, who was working, and the commit and tree it was given at --
+and a line on the activity log. The next `session next` goes past that stop
+instead of into it, and what was unmet stays written as unmet:
+
+- a step refused three times is accepted where it stands, its checks run once
+  more so its row carries each one's real result;
+- a test run stays a failed run, and the session goes on to the land;
+- a verification -- every code of it -- keeps its verdict, none or the
+  findings as they stand, and the session goes on to the run of record;
+- a refused close records the gates it named as waived, and completes this
+  session and no other.
+
+A gate over evidence a `session waive` row covered reports `waived`,
+naming the row, rather than refusing the same fact again. The
+session closes `complete` with its verdict what it truly was; the close's
+line says "closed with N authorised exception(s)", `dabbler status` carries
+each one, and the transcript shows what was unmet, who authorised going on,
+and why. One `session waive` is of that stop only: the next stop, or the
+same rule refusing a tree that has moved since, needs its own. It cannot
+reach an `engine`, `crash`, `interrupted`, `budget`, `funds`, `tree`,
+`land` or `blocked` stop, or three refusals of the plan itself, because
+going past cannot make a push or a provider answer; nor a release session,
+because an unpublished release is not closed as one. `session close
+--force` is not this: it abandons a whole plan, and a single gate is passed
+with `dabbler session waive`.
+
 **A cancelled session ends its loop.** The loop reads the ledger at every
 phase boundary, while it waits for an answer, while a job runs, and again
 before the commit and before the push. A session cancelled or force-closed
@@ -1153,7 +1189,7 @@ dabbler verify reopen --rounds 1 --reason "<why>"
 
 That records a grant in `verification-reopens.jsonl` under `.dabbler/runs/s<N>/` and
 reopens the loop. Read what it is carefully, because it is easy to mistake
-for the waiver this framework does not have:
+for a waiver of the verdict, which this framework does not have:
 
 - **It buys rounds, never a verdict.** Nothing is verified until a round
   says so, and `verification_clean` refuses while a grant stands that no

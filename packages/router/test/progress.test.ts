@@ -11,7 +11,7 @@ import { describe, it } from "node:test";
 
 import { writeRun, writeWorkPlan } from "../src/driver.ts";
 import { beatWaiter } from "../src/drive.ts";
-import { appendRound, roundsPath } from "../src/ledger.ts";
+import { appendException, appendRound, roundsPath } from "../src/ledger.ts";
 import {
   DEFAULT_STALLED_AFTER_SECONDS,
   SESSION_STATUSES,
@@ -689,6 +689,33 @@ describe("the verification view", () => {
   it("judges against the repository's own round cap, and a number even where no configuration can be read", () => {
     assert.equal(typeof verificationCap(join(tempDir(), "nowhere")), "number");
     assert.ok((verificationCap(makeStateDirs().repo) ?? 0) > 0);
+  });
+});
+
+describe("a session a person let past a stop", () => {
+  it("carries each exception on its row once closed, with what was unmet and who authorised going on", () => {
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    appendException(repo, 1, {
+      schema_version: 1, session_number: 1,
+      stop: { kind: "verification", code: "no-verdict", step_id: null, reason: "no round reached a verdict", at: "2026-11-11T10:00:00-05:00" },
+      reason: "the reviewer's provider is down and the change is a typo", by: "the operator",
+      recorded_at: "2026-11-11T10:05:00-05:00", commit: "a".repeat(40), tree: "b".repeat(40),
+    });
+    flipStateToClosed(sessionsDir, { verdict: null });
+    const [row] = sessions(sessionsDir);
+    assert.equal(row!["status"], "complete");
+    assert.equal(row!["verificationVerdict"], null);
+    assert.deepEqual(row!["exceptions"], [{
+      kind: "verification", stepId: null, unmet: "no round reached a verdict", by: "the operator",
+      reason: "the reviewer's provider is down and the change is a typo", at: "2026-11-11T10:05:00-05:00",
+    }]);
+  });
+
+  it("projects no exceptions member on a session nobody waived", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    assert.equal("exceptions" in sessions(sessionsDir)[0]!, false);
   });
 });
 

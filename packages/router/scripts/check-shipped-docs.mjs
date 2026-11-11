@@ -36,7 +36,9 @@
 // once true and must go on saying it; a check that reached them would be
 // asking a history to be current.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+
+const GUIDE = "docs/guide";
 
 /** Pages a stranger reads. Nothing under docs/sessions/ is ever one. */
 const SHIPPED = [
@@ -56,6 +58,14 @@ const SHIPPED = [
   "docs/uat/uat-dotnet-json-solution.md",
   "docs/uat/uat-java-json-solution.md",
   "docs/tutorials/csv-solution/csv-multi-module-walkthrough.md",
+  // The guide is the pages the front pages link to for their proof, so
+  // every page in it is shipped -- including one added after this list.
+  ...(existsSync(GUIDE)
+    ? readdirSync(GUIDE)
+        .filter((name) => name.endsWith(".md"))
+        .sort()
+        .map((name) => `${GUIDE}/${name}`)
+    : []),
 ];
 
 /** The Marketplace listing text, which is prose that happens to live in JSON. */

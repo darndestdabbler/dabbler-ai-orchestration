@@ -55,7 +55,7 @@ whether it is fair.
 - **`close --force`.** Argon: deprecate it. Not taken now: it is the way
   to abandon a plan, and its help is made to say so.
 - **Defect reports from consumer repositories.** Both wanted a bundle a
-  person previews and sends. Owed, as its own session.
+  person previews and sends. Taken, as session 313.
 
 ## What was wrong or overstated
 
@@ -81,7 +81,8 @@ branch, and the stop's own sentence said the opposite.
 
 ## The plan
 
-Sessions 310 to 312, released as 3.32.0 in 313, ahead of the walk: a
+Sessions 310 to 313, released as 3.32.0 in 314, ahead of the walk: a
 stop's way on is true; a person may authorise going past a stop and the
 record says so; an exception is requested, checked and shown before it is
-authorised.
+authorised; and a stop the framework caused becomes a report the person
+reads and sends themselves -- nothing is sent for them.

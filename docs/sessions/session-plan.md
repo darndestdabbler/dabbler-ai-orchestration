@@ -17877,7 +17877,7 @@ check:version` checks the stamp.
 
 The framework publishes session 303 as 3.30.0 and nothing else.
 
-### Session 305 of 315: An existing repository is recognised, and the framework stands still in it
+### Session 305 of 316: An existing repository is recognised, and the framework stands still in it
 
 Scope: `packages/router/src/bootstrap/detect.ts` (the detectors, the
 project style, the test globs), `packages/router/src/bootstrap/index.ts`
@@ -17999,7 +17999,7 @@ and no module cut, and the managed body carries the rule.
 
 **Releasable.** No -- with 306, 307 and 308, as 3.31.0 in session 309.
 
-### Session 306 of 315: The build contract holds
+### Session 306 of 316: The build contract holds
 
 Scope: `packages/router/src/facts.ts` (the `contract` control),
 `packages/router/src/solutionDeps.ts` (the XML reads it reuses),
@@ -18092,7 +18092,7 @@ and leaves the others held.
 
 **Releasable.** No -- as 3.31.0 in session 309.
 
-### Session 307 of 315: .NET Framework builds the way Visual Studio builds it
+### Session 307 of 316: .NET Framework builds the way Visual Studio builds it
 
 Scope: `packages/router/src/bootstrap/detect.ts` (the `dotnet-framework`
 suite), `packages/router/src/checks.ts` and
@@ -18176,7 +18176,7 @@ scripted reference-assemblies directory.
 
 **Releasable.** No -- as 3.31.0 in session 309.
 
-### Session 308 of 315: A person may amend an accepted step's checks, and the engine is told so
+### Session 308 of 316: A person may amend an accepted step's checks, and the engine is told so
 
 Scope: `packages/router/src/driver.ts` (`amendPlanStep`, the
 `rejected-thrice` ways on), `packages/router/src/session.ts` (`planAmend`),
@@ -18262,11 +18262,11 @@ amended check. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 305 to 307, as 3.31.0 in session 309.
 
-### Session 309 of 315: Release 3.31.0 (release: 3.31.0)
+### Session 309 of 316: Release 3.31.0 (release: 3.31.0)
 
 The framework publishes sessions 305 to 308 as 3.31.0 and nothing else.
 
-### Session 310 of 315: A stop's way on is true: a blocked step is asked afresh, and a rollback says what it keeps
+### Session 310 of 316: A stop's way on is true: a blocked step is asked afresh, and a rollback says what it keeps
 
 Scope: `packages/router/src/drive.ts` (the two resumes past a stop),
 `packages/router/src/driver.ts` (the `blocked` situation, `rollbackChoice`),
@@ -18327,9 +18327,9 @@ blocked situation's carry-on move says the step is asked again, and the
 rollback choice names the branch. In `consult.test.ts`: both briefs say a
 rollback keeps the work.
 
-**Releasable.** Yes -- with 311 and 312, as 3.32.0 in session 313.
+**Releasable.** Yes -- with 311 to 313, as 3.32.0 in session 314.
 
-### Session 311 of 315: A person may authorise going past a stop, and the record says so
+### Session 311 of 316: A person may authorise going past a stop, and the record says so
 
 Scope: `packages/router/src/session.ts` and `cli/session.ts` (the verb),
 `packages/router/src/drive.ts` (going on past each kind),
@@ -18428,9 +18428,9 @@ In `gates.test.ts`: a gate over waived evidence reports `waived` and does
 not refuse. In `progress.test.ts` and `transcript.test.ts`: a session
 closed past a waiver carries the exception.
 
-**Releasable.** Yes -- with 310 and 312, as 3.32.0 in session 313.
+**Releasable.** Yes -- with 310, 312 and 313, as 3.32.0 in session 314.
 
-### Session 312 of 315: An exception is requested, checked and shown before a person authorises it
+### Session 312 of 316: An exception is requested, checked and shown before a person authorises it
 
 Scope: `packages/router/src/cli/consult.ts` (the Mechanic's brief, the
 consult brief), `docs/sessions/mechanic-log.md` (the entry's shape),
@@ -18438,8 +18438,7 @@ consult brief), `docs/sessions/mechanic-log.md` (the entry's shape),
 `packages/router/src/session.ts` (the card), `packages/router/src/driver.ts`
 (a repeated stop), the Work Explorer's stop commands under
 `tools/dabbler-ai-orchestration/src/`, the tests named after each,
-`docs/driving-a-session.md`, `version.json` and the manifests
-`npm run stamp:version` writes, `tools/dabbler-ai-orchestration/CHANGELOG.md`
+`docs/driving-a-session.md`
 
 **Why.** Session 311 gives a person the authority. This one makes sure
 what they are asked is fair, balanced and in plain language, so the
@@ -18507,11 +18506,9 @@ person's reason. A session closed past a waiver carries a small mark with
 the count, and its transcript opens at it. Where the same stop recurs on
 the same step, the stop's ways on lead with the check.
 
-**Step 6 -- the words and the number.** `docs/driving-a-session.md` says
-how an exception is requested, checked and authorised, and what each of
-the three roles says in it. `version.json` goes to 3.32.0, stamped with
-`npm run stamp:version` -- a minor: a new verb -- and the changelog gets a
-3.32.0 section saying what changed for a developer across 310 to 312.
+**Step 6 -- the words.** `docs/driving-a-session.md` says how an
+exception is requested, checked and authorised, and what each of the
+three roles says in it. The number and the changelog are session 313's.
 
 **Non-goals.** A check that gates the person: an unreachable adviser, or
 no check at all, never refuses a waiver. A dispute ladder, the Auxiliary
@@ -18520,7 +18517,7 @@ person asks for a second opinion when they want one. A script the
 framework executes. The author's engine requesting an exception other than
 by reporting blocked. Triage run without the person asking. Sending a
 defect report from a consumer repository to this one's maintainers, which
-is owed and is its own session.
+is session 313's.
 
 **Tests.** In `consult.test.ts`: the Mechanic's brief carries the request
 instruction, and the consult brief names an exception's files and state.
@@ -18530,15 +18527,94 @@ written. In `session.test.ts`: the card is printed in its order with each
 part attributed, says so where no check was run, and changes nothing. In
 `driver.test.ts`: a stop that recurs on its step leads with the check.
 The Work Explorer's commands in the test file named after theirs.
-`npm run check:version` checks the stamp.
 
-**Releasable.** Yes -- with 310 and 311, as 3.32.0 in session 313.
+**Releasable.** Yes -- with 310, 311 and 313, as 3.32.0 in session 314.
 
-### Session 313 of 315: Release 3.32.0 (release: 3.32.0)
+### Session 313 of 316: A stop the framework caused reaches the people who can fix it
 
-The framework publishes sessions 310 to 312 as 3.32.0 and nothing else.
+Scope: `packages/router/src/session.ts` and `cli/session.ts` (the verb,
+and the waiver's call to it), `packages/router/src/driver.ts` (the ways
+on), the Work Explorer's stop commands under
+`tools/dabbler-ai-orchestration/src/`, the tests named after each,
+`docs/driving-a-session.md`, the README, `version.json` and the manifests
+`npm run stamp:version` writes, `tools/dabbler-ai-orchestration/CHANGELOG.md`
 
-### Session 314 of 315: The walk through six borrowed repositories
+**Why.** In a consumer repository the framework is an installed package.
+A rule that is wrong there is fixed nowhere the developer can reach, and
+after session 311 they will waive it and carry on -- which is right for
+them and teaches this repository nothing. The exception that argued for a
+framework change stays in one checkout's untracked record. The
+blocked-stop defect session 310 fixes reached here only because one
+developer wrote a paragraph about it by hand; the developer before them,
+if there was one, did not.
+
+Round 23's two advisers both asked for the same thing: a report the
+person previews and sends themselves, and nothing sent for them. A state
+IT shop cannot have a tool posting its sessions to a public tracker, and
+a report nobody had to assemble is the only kind that gets filed.
+
+**What.** One report, written by the framework from what the record
+already holds, for a person to read and send.
+
+**Step 1 -- the report.** `dabbler session defect-report` writes one
+self-contained markdown file for the stop a session stands at, or with
+`--session N` the last stop that session met, under `.dabbler/reports/`,
+and prints its path. It carries: the router's and the extension's
+versions, the engine, the vehicles and the platform; the stop's kind,
+code, phase and reason as the framework wrote them, the ways on it
+offered, and the run's earlier stops by kind; where they exist, the
+exception request's lines from `mechanic-log.md` -- with **Deterministic
+fix** first, because that is the change being asked for -- the advice row
+and the person's reason for the waiver; and what cleared the stop where
+the record says. It carries no source, no diff, no file content, no
+person's name, machine name, remote URL or absolute path, and its first
+lines say exactly that and that nothing has been sent.
+
+**Step 2 -- where it is offered.** Authorising a waiver writes the report
+and prints its path with the waiver's own line: the moment a person has
+just said a rule was wrong here is the moment the report is worth most. A
+stop that recurs on its step offers it among its ways on, and so does any
+stop on request -- a wall somebody got round without a waiver, as the
+blocked loop was, is still a defect.
+
+**Step 3 -- sending it is the person's.** The verb's last line names where
+reports go: the `bugs` address in the installed extension's own manifest,
+read at the call and written nowhere else. The Work Explorer's "Report
+this stop to Dabbler" opens the report for reading and, when the person
+says so, copies it and opens that address in their browser. The framework
+makes no network call with it, and nothing in configuration can make it.
+
+**Step 4 -- the words and the number.** `docs/driving-a-session.md` and
+the README's section for a developer in a consumer repository say what to
+do when the framework itself is the wall: waive on the record, send the
+report. `version.json` goes to 3.32.0, stamped with
+`npm run stamp:version` -- a minor: two new verbs across the block -- and
+the changelog gets a 3.32.0 section saying what changed for a developer
+across 310 to 313.
+
+**Non-goals.** Sending anything without the person, or a setting that
+does. Telemetry of any kind. Redacting what the stop's own reason or the
+request says: the person reads it before it leaves, and that reading is
+the control. Collecting reports on this side, deduplicating them or
+answering them. A report for a stop the framework did not record. Telling
+a consumer repository from this one: the report is written the same way
+in both, and here `mechanic-log.md` is already the list.
+
+**Tests.** In `session.test.ts`: the report for a standing stop carries
+the stop as written, the versions and the request's lines where one
+stands, and carries no absolute path, remote URL or person's name from a
+fixture that holds all three; a waiver writes it and prints its path; a
+session that met no stop is refused. In `driver.test.ts`: a recurring
+stop offers the report. The Work Explorer's command in the test file
+named after it. `npm run check:version` checks the stamp.
+
+**Releasable.** Yes -- with 310 to 312, as 3.32.0 in session 314.
+
+### Session 314 of 316: Release 3.32.0 (release: 3.32.0)
+
+The framework publishes sessions 310 to 313 as 3.32.0 and nothing else.
+
+### Session 315 of 316: The walk through six borrowed repositories
 
 Scope: `docs/uat/uat-maintenance-walk.md` (the record), the fixes the walk
 finds with a test beside each under the files they touch, `version.json`
@@ -18573,7 +18649,7 @@ own history, quirks and a layout nobody here chose. Six were read on
 
 **What.** Each repository is forked under the operator's account, cloned
 under `C:\temp\s310-<name>`, bootstrapped, and driven through the same two
-sessions by 3.32.0 as session 313 released it, installed into a scratch
+sessions by 3.32.0 as session 314 released it, installed into a scratch
 profile: session 1 adds an online calculator page that adds and subtracts
 two numbers, with its tests; session 2 adds documentation comments to the
 pages it touched and changes nothing else. The first proves a change that
@@ -18602,7 +18678,7 @@ the fixes that run made here, their tests and its
 `dabbler/rolled-back/s310-2026-11-11T06-26-45-847Z` and, as a patch and as
 whole files with a note beside them, in `C:\temp\s310-rollback-save`. Step
 1 reads both, and each later step brings back what still holds against the
-tree as it is now -- sessions 310 to 312 have moved `drive.ts` since --
+tree as it is now -- sessions 310 to 313 have moved `drive.ts` since --
 and walks only what that run did not reach or what 3.32.0 changed.
 
 **Step 1 -- the machine and the forks.** The six forks are cloned. The
@@ -18644,7 +18720,7 @@ was installed, what stopped and why, and what each IDE showed.
 3.31.0 shipped), stamped with `npm run stamp:version`, and the changelog
 says what changed for a developer maintaining an existing repository. A
 walk that finds nothing to fix says so in the record and stamps nothing,
-and session 315 is removed from the plan rather than run.
+and session 316 is removed from the plan rather than run.
 
 **Non-goals.** Upgrading any borrowed repository's target, format or
 dependencies. Fixing a borrowed repository's own pre-existing failures:
@@ -18658,8 +18734,8 @@ what the build files draw.
 fixes. The walk's own proof is the record and the six repositories'
 suites, green under their own runners.
 
-**Releasable.** Yes -- as 3.32.1 in session 315.
+**Releasable.** Yes -- as 3.32.1 in session 316.
 
-### Session 315 of 315: Release 3.32.1 (release: 3.32.1)
+### Session 316 of 316: Release 3.32.1 (release: 3.32.1)
 
-The framework publishes session 314 as 3.32.1 and nothing else.
+The framework publishes session 315 as 3.32.1 and nothing else.

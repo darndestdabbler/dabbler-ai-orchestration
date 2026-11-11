@@ -19143,6 +19143,16 @@ and the links to the guide. `description` in the manifest says the
 headline's message in one sentence; `keywords` gain what a person would
 search for.
 
+**The two front pages link to each other**, the operator, 2026-11-11: each
+carries one line of text directly under its headline pointing at the
+other: the Marketplace page at the repository on GitHub, for the guide and
+the source, and the root README at the Marketplace listing, to install.
+The links are absolute URLs, because the Marketplace page is served away
+from the repository and a relative link there points nowhere. The line
+is text, so `overview.png` is still the first image on both pages, and
+the most compelling material, the headline, the image and the risk
+table, stays above everything else.
+
 **Step 4 -- the root README.** Titled *Dabbler AI Orchestration*. The same
 headline, `overview.png` under it, then the paragraph and table, word for
 word, install from

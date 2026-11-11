@@ -6183,9 +6183,9 @@
     {
       "number": 311,
       "title": "A person may authorise going past a stop, and the record says so",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-11T02:00:00.970000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-11T02:40:28.356000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "step-execution.jsonl (one row per step opened and one per step closed)",
+  "description": "The machine-owned execution record for one session's approved-plan steps, under .dabbler/runs/s<N>/step-execution.jsonl. Appended only by ai_router.verify. A step is in flight or it is not, and this file is what says which: the last 'opened' row with no 'closed' row after it is the open step, and there is never more than one. A row that fails validation on read is a refusal, not a skip -- an unreadable execution record means the framework cannot tell what is open, and guessing is how work escapes a plan.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "event", "recorded_at", "session_number", "step_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Frozen at v1. A reader that finds any other value refuses the record rather than interpreting it."
+    },
+    "event": {
+      "enum": ["opened", "closed"],
+      "description": "Two words, and no third: a step that was neither opened nor closed did not happen."
+    },
+    "recorded_at": { "type": "string", "minLength": 1 },
+    "session_number": { "type": "integer", "minimum": 1 },
+    "step_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "A step_id the session's approved plan declares. Nothing else may be opened."
+    },
+    "base_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "HEAD when the step opened. Everything the step is measured against is anchored here, so the close refuses when HEAD has moved: a commit landed mid-step and the diff no longer carries the step's work."
+    },
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What the step changed, against what it declared. Present on 'closed'.",
+      "required": ["inside"],
+      "properties": {
+        "inside": { "type": "array", "items": { "type": "string" } },
+        "outside": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "closed_tree": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The worktree snapshot this step closed on, and the baseline the next step is measured against. Present on 'closed'. A closed step's work stays in the working tree until the session commits, so without this the next step would be charged for its predecessor's files -- and dropping those paths by name instead would let a later step edit them again, outside its own envelope, unremarked."
+    },
+    "deterministic": {
+      "type": "array",
+      "description": "The controls and the targeted test run, as facts. Present on 'closed'; a step never closes with a red required one.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "status", "required"],
+        "properties": {
+          "kind": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["pass", "fail", "not_applicable", "unknown"] },
+          "required": { "type": "boolean" },
+          "command": { "type": "string" },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "event": { "const": "opened" } } },
+      "then": { "required": ["base_commit"] }
+    },
+    {
+      "if": { "properties": { "event": { "const": "closed" } } },
+      "then": {
+        "required": [
+          "base_commit", "envelope", "deterministic", "closed_tree"
+        ]
+      }
+    }
+  ]
+}

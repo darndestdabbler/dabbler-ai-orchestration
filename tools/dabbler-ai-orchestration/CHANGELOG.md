@@ -10,6 +10,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.32.3] — 2026-11-11
+
+**The listing says what Dabbler is for.** No behaviour changed in this
+release: it is pages and pictures.
+
+### Changed
+
+- **A new Marketplace page and repository README.** Both open with one
+  message, *AI writes the code. The framework holds it to the rules.*, a
+  screenshot of a session in flight, and a table of the risks of letting
+  an AI write code beside what the framework does about each, every row
+  linked to the page that shows the mechanism. New screenshots, taken from
+  real sessions on sample solutions, show a review round, the framework
+  running the tests, and a session's steps. The two pages link to each
+  other, and the README's reference sections are now links to the guide
+  and to *Driving a session*.
+
+### Added
+
+- **The guide, under `docs/guide/`.** One page for each claim the front
+  pages make: the rules an AI works inside, the review by two models from
+  different providers, what is written down and where, Consult with AI and
+  the Mechanic, and the Configuration.
+
 ## [3.32.2] — 2026-11-11
 
 ### Fixed

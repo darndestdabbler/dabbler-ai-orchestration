@@ -1,8 +1,8 @@
 {
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
-  "description": "Organize AI-led development like work: solutions, numbered sessions and step-by-step plans in a native tree — plus cross-provider verification before every close, recorded as evidence you can check.",
-  "version": "3.32.2",
+  "description": "AI writes the code and the framework holds it to the rules: it runs the checks and tests itself, has a model from another provider review every session, and keeps the plan and the record in your repository.",
+  "version": "3.32.3",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -20,6 +20,13 @@
     "verification",
     "modules",
     "planning",
+    "code review",
+    "cross-provider review",
+    "ai governance",
+    "automated testing",
+    "session plan",
+    "claude code",
+    "github copilot",
     "dabbler"
   ],
   "icon": "media/darndest-dabbler-icon.png",
@@ -695,7 +702,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.9",
-    "dabbler-ai-router": "3.32.2",
+    "dabbler-ai-router": "3.32.3",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",

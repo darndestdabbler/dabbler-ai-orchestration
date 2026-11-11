@@ -3,8 +3,12 @@
 Each page here takes one claim made about Dabbler and shows the mechanism
 behind it, with the command or file where you can see it for yourself.
 They are written for someone deciding whether to trust the product, and
-each one can be read in one sitting. To run a session, read
-[Driving a session](../driving-a-session.md).
+each one can be read in one sitting. They are what the
+[repository's front page](../../README.md) and the
+[Marketplace listing](https://marketplace.visualstudio.com/items?itemName=DarndestDabbler.dabbler-ai-orchestration)
+link to for their proof. To run a session, read
+[Driving a session](../driving-a-session.md); the files on disk are in the
+[schema reference](../schema-reference.md).
 
 - [The rules an AI works inside](discipline.md): one instruction at a time,
   declared files and checks, the framework measuring the work instead of

@@ -6335,9 +6335,9 @@
     {
       "number": 319,
       "title": "The guide says what holds an AI to the rules",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-11T09:44:34.786000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-11T09:59:59.603000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

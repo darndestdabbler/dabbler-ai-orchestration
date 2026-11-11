@@ -17877,7 +17877,7 @@ check:version` checks the stamp.
 
 The framework publishes session 303 as 3.30.0 and nothing else.
 
-### Session 305 of 311: An existing repository is recognised, and the framework stands still in it
+### Session 305 of 315: An existing repository is recognised, and the framework stands still in it
 
 Scope: `packages/router/src/bootstrap/detect.ts` (the detectors, the
 project style, the test globs), `packages/router/src/bootstrap/index.ts`
@@ -17999,7 +17999,7 @@ and no module cut, and the managed body carries the rule.
 
 **Releasable.** No -- with 306, 307 and 308, as 3.31.0 in session 309.
 
-### Session 306 of 311: The build contract holds
+### Session 306 of 315: The build contract holds
 
 Scope: `packages/router/src/facts.ts` (the `contract` control),
 `packages/router/src/solutionDeps.ts` (the XML reads it reuses),
@@ -18092,7 +18092,7 @@ and leaves the others held.
 
 **Releasable.** No -- as 3.31.0 in session 309.
 
-### Session 307 of 311: .NET Framework builds the way Visual Studio builds it
+### Session 307 of 315: .NET Framework builds the way Visual Studio builds it
 
 Scope: `packages/router/src/bootstrap/detect.ts` (the `dotnet-framework`
 suite), `packages/router/src/checks.ts` and
@@ -18176,7 +18176,7 @@ scripted reference-assemblies directory.
 
 **Releasable.** No -- as 3.31.0 in session 309.
 
-### Session 308 of 311: A person may amend an accepted step's checks, and the engine is told so
+### Session 308 of 315: A person may amend an accepted step's checks, and the engine is told so
 
 Scope: `packages/router/src/driver.ts` (`amendPlanStep`, the
 `rejected-thrice` ways on), `packages/router/src/session.ts` (`planAmend`),
@@ -18262,11 +18262,283 @@ amended check. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes -- with 305 to 307, as 3.31.0 in session 309.
 
-### Session 309 of 311: Release 3.31.0 (release: 3.31.0)
+### Session 309 of 315: Release 3.31.0 (release: 3.31.0)
 
 The framework publishes sessions 305 to 308 as 3.31.0 and nothing else.
 
-### Session 310 of 311: The walk through six borrowed repositories
+### Session 310 of 315: A stop's way on is true: a blocked step is asked afresh, and a rollback says what it keeps
+
+Scope: `packages/router/src/drive.ts` (the two resumes past a stop),
+`packages/router/src/driver.ts` (the `blocked` situation, `rollbackChoice`),
+`packages/router/src/cli/consult.ts` (both briefs), the tests named after
+each, `docs/driving-a-session.md`
+
+**Why.** Two sentences a stopped person is shown are false, and both cost
+a session on 2026-11-10 and 11.
+
+The first, from a consumer repository and then from this one's own walk:
+an engine reports a step `blocked`, a person clears what it was blocked
+on, and the stop's own way on -- `dabbler session next` -- stops again on
+the spot. The pull re-issues the instruction at the same seq, the blocked
+report is still on disk and is not spent (`reportIsSpent` asks only
+whether its seq is lower), and `askForStep` judges it blocked a second
+time. The run moves only when the engine answers the step again, which
+nothing printed says. A `rejected-thrice` stop already resumes by leaving
+the refused answer behind and asking afresh; the comment on that code
+describes this exact loop, and a blocked stop was never given the same
+treatment.
+
+The second: every stop's rollback choice says "Everything the session did
+is lost". It is not. `rollback` keeps the work no commit holds as one
+commit on a local branch, `dabbler/rolled-back/s<N>-<time>`, and has since
+it was written. A person weighing a rollback, and an AI consulted about
+one, are told the opposite of what is true, so a rollback reads as more
+expensive than it is and the work is found again instead of brought back.
+
+**What.**
+
+**Step 1 -- a blocked step is asked afresh.** Resuming past a `blocked`
+stop leaves the blocked report behind, as resuming past `rejected-thrice`
+leaves the refused one: the step's instruction is issued afresh and the
+engine answers it. Both resumes do it -- the one a call to `session next`
+makes and the one a Mechanic's fix makes. The refusal count is left as it
+is, because a blocked report was never a refusal.
+
+**Step 2 -- the sentences.** The `blocked` situation's carry-on line says
+what happens: the step is asked again and the engine answers it.
+`rollbackChoice` says what a rollback keeps and where -- the branch -- and
+what it does discard: the session's place in the run, its rounds and its
+test runs. Both briefs `dabbler consult` prints say the same in one line,
+so a consult or a Mechanic that recommends a rollback knows the work comes
+back with `git checkout <branch> -- <paths>` or a cherry-pick, and says so
+to the person. `docs/driving-a-session.md` says how a blocked stop
+resumes, beside where it says how a `rejected-thrice` one does.
+
+**Non-goals.** Any change to how a step is reported blocked, to who may
+cancel or roll back, or to the push loop, which invokes its engine and so
+always gets a new report. Removing reports from disk. A copy of rolled-back
+work anywhere but the branch that already holds it. Bringing the work back
+automatically.
+
+**Tests.** In `drive.test.ts`: under the pull, a run stopped `blocked` and
+resumed prints the step's instruction as outstanding and does not stop
+again; the same after a Mechanic's resume. In `driver.test.ts`: the
+blocked situation's carry-on move says the step is asked again, and the
+rollback choice names the branch. In `consult.test.ts`: both briefs say a
+rollback keeps the work.
+
+**Releasable.** Yes -- with 311 and 312, as 3.32.0 in session 313.
+
+### Session 311 of 315: A person may authorise going past a stop, and the record says so
+
+Scope: `packages/router/src/session.ts` and `cli/session.ts` (the verb),
+`packages/router/src/drive.ts` (going on past each kind),
+`packages/router/src/driver.ts` (the ways on), `packages/router/src/gates.ts`,
+`packages/router/src/progress.ts` (the projection),
+`packages/router/src/transcript.ts`, `packages/router/src/cli/consult.ts`
+(`UNATTENDED_DENIED`), the schema the new rows need, the tests named after
+each, `docs/driving-a-session.md`
+
+**Why.** The operator, 2026-11-11: "developers will abandon this
+framework, and then all the work that has been done on it and all the rule
+integrity will not have mattered at all, if the framework rules prevent
+human operators from getting a session over the finish line."
+
+There is no way today for a person to say: I have read this gate, it is
+wrong here, let this session past it and write down that I said so. The
+ways on are to satisfy the rule, to move it where a verb exists for that
+(`plan amend`, `verify reopen`), or to give the work up. `session close
+--force` is the one bypass, it passes bookkeeping gates and never
+evidence, and it marks every open session in the plan complete. The
+Mechanic cannot help: its brief forbids it to weaken a gate or write the
+record, so when the wall is a rule it has nothing it may do --
+`mechanic-log.md` has no entry and no run on this machine carries a
+Mechanic event. In a consumer repository the framework is an installed
+package, so a wrong rule is a wall until the next release.
+
+Round 23 (`docs/design/consults/round23-synthesis.md`) put the operator's
+proposal to Sol and Argon. Both drew the same line, and it is the rule
+here: **a rule may be waived and a record may never be falsified.** The
+record keeps what actually happened -- the test failed, no verdict came,
+the check refused -- and adds that a person authorised going on, and why.
+It never says the gate was met.
+
+**What.** One person's verb, `dabbler session waive --reason "<why>"`,
+that takes the session past the stop it stands at, once, on the record.
+
+**Step 1 -- the verb and the row.** `session waive` is a person's, refused
+to an engine in `isAPersonsVerb`'s words: report the step blocked and say
+what should be waived and why. It needs a standing stop of a kind step 2
+names and a reason. It writes one row to the run's own
+`exceptions.jsonl` -- the stop's kind, code, step and reason as the
+framework wrote them, the person's reason, who and when as the record
+already names them, and the commit and tree it was given at -- and a line
+on the activity log. A waiver is of THAT stop: the next stop, or the same
+rule refusing a tree that has since moved, needs its own.
+
+**Step 2 -- going on.** `session next` after a waiver carries on past the
+stop instead of into it, and what was unmet stays written as unmet:
+
+- `rejected-thrice` on a step's checks: the step is accepted with each
+  check's real result on its row.
+- `tests`: the run of record stays a failed run, and the session goes on
+  to the land.
+- `verification`, every code of it: the verdict stays what it was -- none,
+  or the findings as they stand -- and the session goes on to the run of
+  record.
+- `close`: the gates that refused are recorded as waived, and the close
+  completes this session and no other.
+
+A close gate that reads evidence a waiver already covered reports
+`waived`, naming the row, rather than refusing the same fact a second
+time: one decision by the person, not one per gate that reads it.
+
+**Step 3 -- what the record says.** The session closes `complete`, and its
+verdict is whatever it truly was; no new status word. The projection
+`dabbler status` prints carries the session's exceptions, the close's own
+line says "closed with N authorised exception(s)", and the transcript page
+shows each one where it happened -- what was unmet, who authorised going
+on, and their reason -- in the page's ordinary voice, not as a failure.
+
+**Step 4 -- the ways on, and who may not.** Each stop step 2 names offers
+the waiver among its ways on, with a cost that says what is let through
+and what the record will say. `close --force`'s help says a single gate is
+passed with `session waive` and that `--force` abandons a plan.
+`UNATTENDED_DENIED` gains "waive a stop", and the Mechanic's brief says
+the waiver is the person's to type. `docs/driving-a-session.md` gains the
+rule -- waive, never falsify -- and the verb.
+
+**Non-goals.** A stop with nothing to go past: `engine`, `crash`,
+`interrupted`, `budget`, `funds`, `tree`, `land`, `blocked`, and
+`rejected-thrice` where no work plan was written -- each has its own way
+on, and a waiver cannot make a push or a provider answer. `publish`, and a
+release session altogether: an unpublished release is not closed as one.
+Any change to a verdict, a round or a test run already written. A
+standing or plan-wide waiver, or a setting that waives without the person.
+An engine or a Mechanic waiving. Removing `close --force`. The request,
+the independent check and the Work Explorer, which are session 312's.
+
+**Tests.** In `session.test.ts`: a person's waiver of a standing stop
+writes its row with the stop as written and the reason; an engine is
+refused naming what to report; no stop, or a kind with nothing to go
+past, is refused. In `drive.test.ts`: a waived `tests` stop goes on to the
+land with the failed run still failed; a waived `verification` stop goes
+on with the verdict unchanged; a waiver does not carry to the next stop.
+In `gates.test.ts`: a gate over waived evidence reports `waived` and does
+not refuse. In `progress.test.ts` and `transcript.test.ts`: a session
+closed past a waiver carries the exception.
+
+**Releasable.** Yes -- with 310 and 312, as 3.32.0 in session 313.
+
+### Session 312 of 315: An exception is requested, checked and shown before a person authorises it
+
+Scope: `packages/router/src/cli/consult.ts` (the Mechanic's brief, the
+consult brief), `docs/sessions/mechanic-log.md` (the entry's shape),
+`packages/router/src/triage.ts` and `cli/triage.ts`,
+`packages/router/src/session.ts` (the card), `packages/router/src/driver.ts`
+(a repeated stop), the Work Explorer's stop commands under
+`tools/dabbler-ai-orchestration/src/`, the tests named after each,
+`docs/driving-a-session.md`, `version.json` and the manifests
+`npm run stamp:version` writes, `tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** Session 311 gives a person the authority. This one makes sure
+what they are asked is fair, balanced and in plain language, so the
+decision is informed and takes a minute. The operator, 2026-11-11: in 95%
+of cases neither the author nor the Mechanic is trying to cheat -- there
+is a real blocker that needs an exception and possibly a framework change
+-- and what must not happen is that the person "is handed something that
+makes no sense." And they must be able to open an AI consult to help them
+decide, so everything said about an exception has to be somewhere a
+consult can read.
+
+The operator proposed a ladder: reviewer, dispute, second look, the
+Auxiliary, then three positions. Round 23 cut it, and the operator agreed:
+ONE independent check, as advice and never as a gate on the person, with a
+second opinion when the person asks for one. Up to five model calls before
+a stuck developer may proceed is itself a wall, and what protects a person
+from being talked into an exception is a reviewer that reads the record
+for itself and a card that shows the rule's own words.
+
+**What.**
+
+**Step 1 -- the request.** The Mechanic's brief, attended and unattended,
+gains an instruction for the case its licence has never covered: where the
+wall is a rule and no fix within the rules clears it, do not work around
+it -- ask. The request is its `mechanic-log.md` entry, whose shape gains
+four lines: **Rule in the way** (in the rule's own words, from the stop),
+**Why it is wrong here**, **What going past it lets through**, and **What
+was tried within the rules**. An unattended Mechanic writes the request,
+says so in its memo and hands back. The entry's existing **Deterministic
+fix** line is the framework change the exception argues for.
+
+**Step 2 -- the check.** `dabbler triage` already asks a provider that is
+not the author's to classify a stop from the record. Where a request
+stands for the stop it reads that too, and its answer gains three
+members: the within-rules path, as the exact commands or as "none found"
+-- never as "the request is right", because finding no alternative is not
+agreement; whether the request's account of the stop matches the record,
+and what differs where it does not; and whether a person who was not
+there could follow the request, and what is unclear. The answer is kept
+as an advice row in the run's `exceptions.jsonl`, with the adviser named
+and marked as advice. A named path is tried rather than argued: the
+Mechanic's reply to one is to run it and add what happened to its entry.
+A second opinion is the rung `triage --provider` already is, run when the
+person asks.
+
+**Step 3 -- the card.** `dabbler session waive` with no `--reason` prints
+the card and changes nothing. The framework assembles it in a fixed order
+from parts it does not paraphrase, each attributed to who said it: the
+rule and what was unmet, from the record; the request, in the Mechanic's
+words; the advice, in the adviser's words -- leading with a within-rules
+path where one was named, and saying "no independent check was run" or
+"the adviser could not be reached" where that is so, neither of which
+refuses the waiver; and what the record will say once it is authorised.
+
+**Step 4 -- a consult can read it.** With a stop standing, the consult
+brief says whether an exception has been requested, checked or
+authorised, and names the files: the log entry and the run's
+`exceptions.jsonl`. A consult opened to help the person decide reads what
+the person reads.
+
+**Step 5 -- the Work Explorer.** A stopped session offers "Check this
+stop", which runs the triage and says before it does that it is one
+provider call, and "Review exception", which shows the card and takes the
+person's reason. A session closed past a waiver carries a small mark with
+the count, and its transcript opens at it. Where the same stop recurs on
+the same step, the stop's ways on lead with the check.
+
+**Step 6 -- the words and the number.** `docs/driving-a-session.md` says
+how an exception is requested, checked and authorised, and what each of
+the three roles says in it. `version.json` goes to 3.32.0, stamped with
+`npm run stamp:version` -- a minor: a new verb -- and the changelog gets a
+3.32.0 section saying what changed for a developer across 310 to 312.
+
+**Non-goals.** A check that gates the person: an unreachable adviser, or
+no check at all, never refuses a waiver. A dispute ladder, the Auxiliary
+called automatically, or three positions gathered by the framework: the
+person asks for a second opinion when they want one. A script the
+framework executes. The author's engine requesting an exception other than
+by reporting blocked. Triage run without the person asking. Sending a
+defect report from a consumer repository to this one's maintainers, which
+is owed and is its own session.
+
+**Tests.** In `consult.test.ts`: the Mechanic's brief carries the request
+instruction, and the consult brief names an exception's files and state.
+In `triage.test.ts`: with a request standing the answer carries the path
+or "none found", the match and the plainness, and the advice row is
+written. In `session.test.ts`: the card is printed in its order with each
+part attributed, says so where no check was run, and changes nothing. In
+`driver.test.ts`: a stop that recurs on its step leads with the check.
+The Work Explorer's commands in the test file named after theirs.
+`npm run check:version` checks the stamp.
+
+**Releasable.** Yes -- with 310 and 311, as 3.32.0 in session 313.
+
+### Session 313 of 315: Release 3.32.0 (release: 3.32.0)
+
+The framework publishes sessions 310 to 312 as 3.32.0 and nothing else.
+
+### Session 314 of 315: The walk through six borrowed repositories
 
 Scope: `docs/uat/uat-maintenance-walk.md` (the record), the fixes the walk
 finds with a test beside each under the files they touch, `version.json`
@@ -18301,7 +18573,7 @@ own history, quirks and a layout nobody here chose. Six were read on
 
 **What.** Each repository is forked under the operator's account, cloned
 under `C:\temp\s310-<name>`, bootstrapped, and driven through the same two
-sessions by 3.31.0 as session 309 released it, installed into a scratch
+sessions by 3.32.0 as session 313 released it, installed into a scratch
 profile: session 1 adds an online calculator page that adds and subtracts
 two numbers, with its tests; session 2 adds documentation comments to the
 pages it touched and changes nothing else. The first proves a change that
@@ -18320,6 +18592,18 @@ of it is the record and the fixes with their tests. Those tests, like
 every test 305 to 307 add, run on fixture trees and scripted tools, so a
 developer maintaining this repository needs no Visual Studio, no SQL
 Server and no JDK, and CI runs them as it runs everything else.
+
+**What the first run left.** This walk was started once as session 310 and
+rolled back on 2026-11-11, stopped at the round trip for a person at the
+IDEs. Its work was not lost and is not to be found a second time: the six
+checkouts stand under `C:\temp\s310-<name>` with their sessions driven;
+the fixes that run made here, their tests and its
+`docs/uat/uat-maintenance-walk.md` are on the local branch
+`dabbler/rolled-back/s310-2026-11-11T06-26-45-847Z` and, as a patch and as
+whole files with a note beside them, in `C:\temp\s310-rollback-save`. Step
+1 reads both, and each later step brings back what still holds against the
+tree as it is now -- sessions 310 to 312 have moved `drive.ts` since --
+and walks only what that run did not reach or what 3.32.0 changed.
 
 **Step 1 -- the machine and the forks.** The six forks are cloned. The
 machine gains what the walk needs and the record says what was installed:
@@ -18356,11 +18640,11 @@ finds is fixed with a test beside it, in this session's own diff where the
 framework is source here. `docs/uat/uat-maintenance-walk.md` records the
 six repositories, every session's timing from the driver's own lines, what
 was installed, what stopped and why, and what each IDE showed.
-`version.json` goes to 3.31.1 (a patch: what the walk fixed in the posture
+`version.json` goes to 3.32.1 (a patch: what the walk fixed in the posture
 3.31.0 shipped), stamped with `npm run stamp:version`, and the changelog
 says what changed for a developer maintaining an existing repository. A
 walk that finds nothing to fix says so in the record and stamps nothing,
-and session 311 is removed from the plan rather than run.
+and session 315 is removed from the plan rather than run.
 
 **Non-goals.** Upgrading any borrowed repository's target, format or
 dependencies. Fixing a borrowed repository's own pre-existing failures:
@@ -18374,8 +18658,8 @@ what the build files draw.
 fixes. The walk's own proof is the record and the six repositories'
 suites, green under their own runners.
 
-**Releasable.** Yes -- as 3.31.1 in session 311.
+**Releasable.** Yes -- as 3.32.1 in session 315.
 
-### Session 311 of 311: Release 3.31.1 (release: 3.31.1)
+### Session 315 of 315: Release 3.32.1 (release: 3.32.1)
 
-The framework publishes session 310 as 3.31.1 and nothing else.
+The framework publishes session 314 as 3.32.1 and nothing else.

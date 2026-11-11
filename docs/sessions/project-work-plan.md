@@ -351,7 +351,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 311 | A person may authorise going past a stop, and the record says so | no | 2026-11-11 |
 | 312 | An exception is requested, checked and shown before a person authorises it | no | 2026-11-11 |
 | 313 | A stop the framework caused reaches the people who can fix it | no | 2026-11-11 |
-| 314 | Release 3.32.0 (release: 3.32.0) | — | not declared |
+| 314 | Release 3.32.0 (release: 3.32.0) | yes | 2026-11-11 |
 | 315 | The walk through six borrowed repositories | — | not declared |
 | 316 | Release 3.32.1 (release: 3.32.1) | — | not declared |
 
@@ -3659,3 +3659,9 @@ Give a developer whose session the framework itself stopped one short report to 
 **Amended after acceptance:**
 
 - 2026-11-11 — step 'replaced-and-checked': its files: The machine's credential values are read by transcript.ts's machineSecrets; exporting it keeps one implementation of that rule instead of a second copy in session.ts (claude-code (anthropic, claude-opus-5-5))
+
+### Session 314 — Release 3.32.0 (release: 3.32.0)
+
+**Releasable: yes.**
+
+Release 3.32.0: the framework packs and publishes what is on the trunk.

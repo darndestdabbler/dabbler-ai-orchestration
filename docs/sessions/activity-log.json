@@ -13161,6 +13161,13 @@
       "what": "step 'replaced-and-checked': its files",
       "reason": "The machine's credential values are read by transcript.ts's machineSecrets; exporting it keeps one implementation of that rule instead of a second copy in session.ts",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 314,
+      "dateTime": "2026-11-11T04:33:59.162000-05:00",
+      "task": "Release 3.32.0: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

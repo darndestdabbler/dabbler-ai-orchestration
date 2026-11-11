@@ -18805,6 +18805,12 @@ hashes the code, so an AI cannot easily claim work it did not do. Every
 deterministic job is the framework's. The record is open to anyone who
 clones the repository.
 
+The operator added a second message the same day: the framework
+standardizes the work of AI. Every session is planned, run and recorded
+the same way whichever model writes it, so a person or a later model can
+pick the work up where the last session finished, the next day or the next
+year, from what is in the repository.
+
 Every one of those is true, and none has a page that says how. The
 mechanisms are spread through `docs/driving-a-session.md`, which is 1,700
 lines written for someone already driving a session, and through a root
@@ -18849,6 +18855,18 @@ under the sessions root, with who writes each. The run records under
 `docs/transcripts/`, with one linked as an example. `dabbler status` and
 `dabbler transcript`. What `session waive` leaves on the record.
 
+The page ends with a section headed *Picking the work up*, which is the
+operator's second message and the reason the record has one shape. Every
+session has the same phases and leaves the same files, whichever engine and
+model wrote it. Every engine reads the same instructions, from `AGENTS.md`.
+A session starts in a fresh conversation and is handed its instruction by
+the framework, so nothing it needs is in an earlier chat or in one model's
+memory. The section then lists what a person or a model new to the
+repository reads, in order: the plan for what is next, `dabbler status` for
+where things stand, the last session's transcript for what was done and
+what the reviewer said, and the decisions log for why. Each sentence is
+checked against the running product before it is written.
+
 **Step 4 -- the index and the check.** `docs/guide/README.md` lists the
 pages with one line each. `check-shipped-docs.mjs` reads every page under
 `docs/guide/`, so a guide page cannot name something the product has
@@ -18860,7 +18878,10 @@ the mechanism: the framework runs the automated tests before any code is
 committed; the reviewer is shown every changed file with no test named
 after it and asked to judge whether it is tested; a test the session's
 plan promised and did not deliver is a blocking finding, and any other
-missing case is advice. The page says exactly that. Decision ids,
+missing case is advice. The page says exactly that. A claim that any
+model can continue any repository: the claim is about the record, which
+needs no particular model to read it, and a seat that does not list the
+model a repository selected is still refused at the start. Decision ids,
 session numbers or incident history on a guide page. Any change to
 behaviour.
 
@@ -18874,7 +18895,9 @@ run.
 
 Scope: `docs/guide/consult-and-mechanic.md` and
 `docs/guide/configuration.md` (new), `docs/guide/README.md`,
-`docs/quick-start.md` (its two configuration sections), `README.md` (its
+`docs/guide/media/` (new: ten of the operator's images),
+`docs/quick-start.md` (its two configuration sections and its opening
+sequence), `README.md` (its
 *Transport preference* section only),
 `packages/router/scripts/check-shipped-docs.mjs` (one qualified name)
 
@@ -18906,6 +18929,27 @@ wall is a rule it requests an exception and does not work around it. Then
 one paragraph each on *Check this stop*, *Review exception* and *Report
 this stop to Dabbler*, linking to `driving-a-session.md` for the rest.
 
+The operator's images, taken 2026-11-11 on a sample .NET solution, are
+copied into `docs/guide/media/` under these names, unedited. A file the
+operator has retaken stands at the same path before the session starts.
+
+| From | To | Page | Shows |
+|---|---|---|---|
+| `D:\dabbler-start-session.png` | `session-menu.png` | consult | a planned session's menu, with **Consult with AI** on it |
+| `D:\dabbler-ai-consult.png` | `consult-request.png` | consult | a person asking a consult to insert a testing session |
+| `D:\dabbler-inserted-session-after-consult.png` | `consult-result.png` | consult | the Work Explorer afterwards, with the new session in it |
+| `D:\dabbler-configuration.png` | `configuration.png` | configuration | the Configuration with every row open |
+| `D:\dabbler-startup.png` | `first-1-empty.png` | quick-start | the two views before a folder is open |
+| `D:\dabbler-initial-files.png` | `first-2-files.png` | quick-start | what setting a project up writes |
+| `D:\dabbler-initial-sessions.png` | `first-3-two-sessions.png` | quick-start | the two sessions every project starts with |
+| `D:\dabbler-generated-sessions.png` | `first-4-sessions.png` | quick-start | the sessions the plan is broken into |
+| `D:\dabbler-solutionexplorer-dotnet-modules.png` | `first-5-projects.png` | quick-start | the projects and what one depends on |
+| `D:\vscode-tests-for-csv-parser-project.png` | `first-6-tests.png` | quick-start | the solution's tests passing in the editor's own Test Explorer |
+
+The Configuration image shows a warning mark beside the reviewing vehicle.
+The page says what that mark means, read from the running extension, or
+the operator retakes the image without it.
+
 **Step 2 -- `configuration.md`.** The Configuration section of the
 Solution Explorer, row by row: the engine, the vehicle, the authoring
 model, the Mechanic's model and delegation, the two reviewers and their
@@ -18919,7 +18963,9 @@ session 319 removes it from the README.
 
 **Step 3 -- `quick-start.md`.** Its machine-configuration section and its
 catalog section say what `configuration.md` says, in a paragraph each, and
-link to it.
+link to it. Its opening gains the six `first-` images in order, each under
+the step it already describes, with alternative text that says what the
+image shows. No step is added or reworded for an image.
 
 **Step 4 -- the check.** `DABBLER_TRANSPORT` joins the qualified names in
 `check-shipped-docs.mjs`: a shipped page may name it only where it says it
@@ -18943,7 +18989,8 @@ over every shipped page, and each step's check is that run.
 ### Session 319 of 320: The two front pages say what Dabbler is for
 
 Scope: `README.md`, `tools/dabbler-ai-orchestration/README.md`,
-`tools/dabbler-ai-orchestration/media/` (five images in, the unreferenced
+`tools/dabbler-ai-orchestration/media/` (five images in, one of them
+copied from `docs/guide/media/`, and the unreferenced
 ones out), `tools/dabbler-ai-orchestration/package.json` (`description`,
 `keywords`), `docs/guide/README.md`, `version.json` and the manifests
 `npm run stamp:version` writes, `tools/dabbler-ai-orchestration/CHANGELOG.md`
@@ -18969,10 +19016,17 @@ under these names, unedited:
 
 | From | To | Shows |
 |---|---|---|
-| `D:\dabbler-ai-orchestration-vs-code.png` | `overview.png` | the Configuration, the Work Explorer, the engine's terminal and the Dabbler terminal in one window |
-| `D:\dabbler-framework-output.png` | `review-round.png` | a reviewer from another provider finding a blocking defect, and the fix step that follows |
+| `D:\dabbler-vs-code.png` | `overview.png` | the Solution Explorer, the Work Explorer with a session in flight, the engine's terminal and the Dabbler terminal in one window |
+| `D:\dabbler-issues-found.png` | `review-round.png` | a reviewer from another provider finding a blocking defect, and the fix step that follows |
 | `D:\dabbler-framework-automated-tests.png` | `run-of-record.png` | the framework running the suite, project by project, before the land |
-| `D:\dabbler-session-management.png` | `session-steps.png` | a session in flight, its steps, and one step's description |
+| `D:\dabbler-work-detail-hover.png` | `session-steps.png` | a session in flight, its steps, and one step's description |
+| `docs/guide/media/consult-result.png` | `consult-result.png` | the plan after a person asked a consult for one more session |
+
+The first, second and fourth replace the operator's earlier files of
+2026-11-11 (`dabbler-ai-orchestration-vs-code.png`,
+`dabbler-framework-output.png`, `dabbler-session-management.png`): the
+later ones are smaller, show the same surfaces, and stay readable at the
+width a listing draws them.
 
 A file the operator has retaken stands at the same path before the session
 starts. Images under `media/` that no page and no manifest entry
@@ -18994,12 +19048,18 @@ shows its mechanism:
 | AI does more than it is asked | Reviewers judge the work against the plan's goals and non-goals. Work a non-goal rules out is a blocking finding. |
 | Code reaches the trunk untested | The framework runs the automated tests before any code is committed, and the reviewer is shown every changed file that has no test. |
 | A session gets stuck | **Consult with AI**, the **Mechanic**, and a person's decision on the record. |
+| Only the AI that did the work can continue it | Every session is planned, run and recorded the same way, whichever model writes it. A person or a different model starts the next session from the plan and the record in the repository, the next day or the next year. |
+
+The paragraph above the table carries both of the operator's messages:
+the framework holds an AI to the rules, and it standardizes the work so
+that it outlives the conversation that produced it.
 
 **Step 3 -- the Marketplace page.** The headline, `overview.png`, the
 table, then three short sections each with its image: *Two models, several
 rounds* (`review-round.png`), *The framework runs the tests*
 (`run-of-record.png`), *You can see where the work is*
-(`session-steps.png`). A paragraph on the Configuration points at the
+(`session-steps.png`), *Anyone can pick it up* (`consult-result.png`,
+linking to *Picking the work up* in `the-record.md`). A paragraph on the Configuration points at the
 overview image. Then Requirements and Get started as they are, shortened,
 and the links to the guide. `description` in the manifest says the
 headline's message in one sentence; `keywords` gain what a person would
@@ -19024,7 +19084,9 @@ without a link to its mechanism. "Digital signatures": what the framework
 keeps are SHA-256 hashes, and the page says hashes. "All code is tested"
 as a guarantee: the framework runs every test before the commit and shows
 the reviewer what has none, and a missing test blocks only where the
-session's plan promised it. An edited or drawn screenshot. Comparison with
+session's plan promised it. An edited or drawn screenshot. The operator's
+video of the Dabbler terminal: a listing does not play one, and it waits
+for a session that decides how to show it. Comparison with
 any named product. Badges, testimonials or install counts. A second copy
 of the reference material. Publishing to Open VSX.
 

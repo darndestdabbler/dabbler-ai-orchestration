@@ -6379,9 +6379,9 @@
     {
       "number": 321,
       "title": "The two front pages say what Dabbler is for",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-11T10:15:08.462000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-11T10:25:36.046000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

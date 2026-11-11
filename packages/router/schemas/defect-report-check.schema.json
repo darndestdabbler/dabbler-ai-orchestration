@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "the answer `dabbler session defect-report` asks the Primary Reviewer for",
+  "description": "Two drafted passages for the framework's maintainers, read for anything that is not the framework's. The reviewer names phrases and never rewrites a passage: the framework replaces each phrase named with a placeholder, and the person's reading is still the last control. Validated on arrival; an answer that does not fit leaves the passages out of the report.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["clean", "phrases"],
+  "properties": {
+    "clean": {
+      "type": "boolean",
+      "description": "True where neither passage names anything that is not the framework's own: no repository, file, folder, step, module, project, product, organisation, person, host or credential."
+    },
+    "phrases": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Each phrase, exactly as it appears in a passage, that names something that is not the framework's. Empty where clean is true."
+    }
+  }
+}

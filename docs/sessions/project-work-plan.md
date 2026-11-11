@@ -353,7 +353,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 313 | A stop the framework caused reaches the people who can fix it | no | 2026-11-11 |
 | 314 | Release 3.32.0 (release: 3.32.0) | yes | 2026-11-11 |
 | 315 | The walk through six borrowed repositories | no | 2026-11-11 |
-| 316 | Release 3.32.1 (release: 3.32.1) | — | not declared |
+| 316 | Release 3.32.1 (release: 3.32.1) | yes | 2026-11-11 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3671,3 +3671,9 @@ Release 3.32.0: the framework packs and publishes what is on the trunk.
 **Releasable: no.**
 
 Session 315 finishes the walk session 310 started and rolled back: the maintenance posture shipped in 3.31.0, now as 3.32.0 released it, walked through six borrowed public repositories -- jbogard/ContosoUniversity, chsakell/mvcarchitecture, jbogard/ContosoUniversityDotNetCore, in28minutes/JavaWebApplicationStepByStep, spring-petclinic/spring-framework-petclinic and spring-projects/spring-petclinic -- forked under the operator's account and already cloned and driven under C:\temp\s310-<name>. What that run found is not found again: its record docs/uat/uat-maintenance-walk.md and its fixes with their tests (D1 maintenance writing .gitignore rules, D2 a folder of IntelliSense files read as a targeting pack, D3 bootstrap's compile control carrying a name the loader refuses, D4 ./mvnw under cmd, D5 TargetFrameworkRootPath unhonoured by the stop and the check environment, W2 facts hiding a red control's detail) are brought back from C:\temp\s310-rollback-save against the tree as sessions 310-313 left it, each still with a fixture-based test named after the file it fixes. 3.32.0 is installed into the scratch VS Code profile and each checkout is re-read with it; each ecosystem step confirms, against the checkouts as they stand, no new root file, a build-file diff of items only, the contract control passing with the MSBuild or Maven it named, the tests under the repository's own runner, and walks only what the first run did not reach or what 3.32.0 changed. The IDE round trip -- Visual Studio 2026 for the .NET three, IntelliJ IDEA for the Java three, Eclipse where installed: build, tests from the IDE's test window, one commit from its Git view -- and a non-Dabbler colleague's reading of one diff per ecosystem are recorded. Finally the record is finished, version.json goes to 3.32.1 stamped with `npm run stamp:version`, and the CHANGELOG says what changed for a developer maintaining an existing repository; nothing of the six repositories enters this one.
+
+### Session 316 — Release 3.32.1 (release: 3.32.1)
+
+**Releasable: yes.**
+
+Release 3.32.1: the framework packs and publishes what is on the trunk.

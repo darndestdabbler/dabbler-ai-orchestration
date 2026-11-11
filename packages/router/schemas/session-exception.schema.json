@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "exceptions.jsonl row (a person's waiver of one stop, or advice about one)",
+  "description": "One row per stop a person authorised the session to go past, or per independent check of a stop, in .dabbler/runs/s<N>/exceptions.jsonl. A rule may be waived and a record may never be falsified: a waiver keeps the stop exactly as the framework wrote it -- the test failed, no verdict came, the check refused -- and adds that a person authorised going on, and why. It never says the gate was met, and nothing it covers is rewritten. A waiver is of THAT stop, matched on its kind and the time it was written: the next stop, or the same rule refusing a tree that has since moved, needs its own. Written only by the CLI (dabbler session waive), which an engine is refused. An advice row is what `dabbler triage` answered about a stop, or that its adviser could not be reached: marked as advice, it authorises nothing and no gate reads it.",
+  "oneOf": [{ "$ref": "#/$defs/waiver" }, { "$ref": "#/$defs/advice" }],
+  "$defs": {
+    "stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "code", "step_id", "reason", "at"],
+      "description": "The stop advised on, copied from run.json as the framework wrote it: any kind, since a check may be asked of every stop.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "code": {
+          "type": ["string", "null"]
+        },
+        "step_id": {
+          "type": ["string", "null"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What was unmet, in the framework's words."
+        },
+        "at": {
+          "type": "string",
+          "minLength": 1,
+          "description": "When the stop was written; what the loop matches the row to."
+        }
+      }
+    },
+    "waiver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "session_number",
+        "stop",
+        "reason",
+        "by",
+        "recorded_at",
+        "commit",
+        "tree"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "session_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stop": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "code", "step_id", "reason", "at"],
+          "description": "The stop waived, copied from run.json as the framework wrote it.",
+          "properties": {
+            "kind": {
+              "enum": ["rejected-thrice", "tests", "verification", "close"],
+              "description": "The kinds with something to go past. Every other stop has its own way on, and a waiver cannot make a push or a provider answer."
+            },
+            "code": {
+              "type": ["string", "null"]
+            },
+            "step_id": {
+              "type": ["string", "null"]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "description": "What was unmet, in the framework's words."
+            },
+            "at": {
+              "type": "string",
+              "minLength": 1,
+              "description": "When the stop was written; what the loop matches the waiver to."
+            }
+          }
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why the person authorised going on, in their words. Permanent."
+        },
+        "by": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Who was working, as the session record from 'dabbler session start' says; written by the verb and never typed."
+        },
+        "recorded_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "description": "HEAD when the waiver was given."
+        },
+        "tree": {
+          "type": "string",
+          "minLength": 7,
+          "description": "The worktree snapshot when the waiver was given: the tree it lets through, and while the tree is still this one the waiver stands. A waiver is refused when the snapshot cannot be taken."
+        },
+        "framework_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "advice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "session_number",
+        "advice",
+        "stop",
+        "adviser",
+        "simulated",
+        "answer",
+        "unreachable",
+        "recorded_at"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "session_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "advice": {
+          "const": true,
+          "description": "This row is advice: an opinion about the stop, never a decision, and nothing reads it as one."
+        },
+        "stop": {
+          "$ref": "#/$defs/stop"
+        },
+        "adviser": {
+          "description": "Who answered, and the provider they were reached on; null where nobody could be reached.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["model", "provider"],
+              "properties": {
+                "model": { "type": "string", "minLength": 1 },
+                "provider": { "type": "string", "minLength": 1 }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "simulated": {
+          "type": "boolean",
+          "description": "Served by a script rather than a vendor."
+        },
+        "answer": {
+          "type": ["object", "null"],
+          "description": "The adviser's answer, as triage.schema.json validated it on arrival; null where the adviser could not be reached."
+        },
+        "unreachable": {
+          "type": ["string", "null"],
+          "description": "Why no adviser answered, where none did."
+        },
+        "recorded_at": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

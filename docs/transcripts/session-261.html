@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 261 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.absent { background: var(--panel); border-left: 3px solid var(--tone-warn); padding: .6rem .9rem; margin: 1.25rem 0; }
+.absent ul { margin: .35rem 0 0; padding-left: 1.2rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 261 transcript</h1>
+<p class="stamp">Rendered 2026-10-16T16:09:31.990Z by dabbler-ai-router 3.21.0 at e0fa51b3acdd5201750596dd58f11a7b6ae10f4a.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-16T12:02:44.170-04:00.</p>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[16:02:44]</span> <span class="muted">run-started</span> session=261 mode=pull</div>
+<div class="line"><span class="at">[16:02:44]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[16:03:13]</span> <span class="muted">run-resumed</span> session=261 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[16:03:13]</span> <span class="muted">plan-accepted</span> steps=[&quot;landed-full-hash&quot;,&quot;files-section&quot;] non_goals=4</div>
+<div class="line"><span class="at">[16:03:13]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[16:03:14]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=landed-full-hash</div>
+<div class="line"><span class="at">[16:03:52]</span> <span class="muted">run-resumed</span> session=261 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:03:57]</span> <span class="muted">check-passed</span> step=landed-full-hash argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[16:03:58]</span> <span class="muted">check-passed</span> step=landed-full-hash argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/drive.test.ts&quot;]</div>
+<div class="line"><span class="at">[16:04:48]</span> <span class="muted">named-tests-passed</span> step=landed-full-hash suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[16:04:49]</span> <span class="muted">report-accepted</span> seq=2 step=landed-full-hash files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;] notes=landed row logs the full HEAD hash via exported landedFields; test asserts it</div>
+<div class="line"><span class="at">[16:04:49]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=files-section</div>
+<div class="line"><span class="at">[16:06:03]</span> <span class="muted">run-resumed</span> session=261 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:06:08]</span> <span class="muted">check-passed</span> step=files-section argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[16:06:09]</span> <span class="muted">check-passed</span> step=files-section argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/transcript.test.ts&quot;]</div>
+<div class="line"><span class="at">[16:06:12]</span> <span class="muted">named-tests-passed</span> step=files-section suite=typescript command=node scripts/suite.mjs container packages/router/test/transcript.test.ts</div>
+<div class="line"><span class="at">[16:06:13]</span> <span class="muted">report-accepted</span> seq=3 step=files-section files=[&quot;packages/router/src/transcript.ts&quot;,&quot;packages/router/test/transcript.test.ts&quot;] notes=Files section after Test runs: landed commit (or not landed) and step/file table; GitHub and Azure DevOps links built from host and path only, other remotes text only</div>
+<div class="line"><span class="at">[16:06:13]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[16:06:14]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[16:06:15]</span> <span class="muted">job-started</span> name=verification pid=44140 log=.dabbler/runs/s261/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:07:40]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s261/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:07:40]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[16:07:40]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[16:07:40]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[16:07:42]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=25892 log=.dabbler/runs/s261/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:07:44]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s261/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:07:45]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[16:07:46]</span> <span class="muted">job-started</span> name=run of record: typescript pid=46084 log=.dabbler/runs/s261/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:09:00]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s261/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:09:01]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[16:09:02]</span> <span class="muted">job-started</span> name=run of record: extension pid=42440 log=.dabbler/runs/s261/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[16:09:20]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s261/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[16:09:20]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[16:09:24]</span> <span class="muted">landed</span> commit=8d9d1d56</div>
+<div class="line"><span class="at">[16:09:24]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[16:09:24]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[16:09:24]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[16:09:25]</span> <span class="muted">job-started</span> name=close pid=46208 log=.dabbler/runs/s261/driver/jobs/close.log</div>
+<div class="line"><span class="at">[16:09:31]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s261/driver/jobs/close.log</div>
+<div class="line"><span class="at">[16:09:31]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gemini-4-argon</td><td>google</td><td>api</td><td><details><summary>12 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** In `packages/router/test/transcript.test.ts`, no test exercises a session that has `report-accepted` events but no `landed` event against a known remote.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Precondition:** `repoWithASession()` with `appendDriverEvent(root, 5, &quot;report-accepted&quot;, { step: &quot;events&quot;, files: [&quot;src/a.ts&quot;] }, &quot;work&quot;)` and no `landed` event.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Input:** `render(root, {}, { stdout: &quot;https://github.com/owner/repo.git&quot; })`.</td><td>not answered</td></tr>
+<tr><td>3</td><td><strong>minor</strong></td><td>**Expectation:** Output matches `/&lt;p&gt;not landed&lt;\/p&gt;/`, contains `&lt;code&gt;events&lt;/code&gt;` and `src/a.ts`, and contains no `&lt;a href` links even though `origin` is a GitHub URL.</td><td>not answered</td></tr>
+<tr><td>4</td><td><strong>minor</strong></td><td>**Nit:** In `packages/router/test/transcript.test.ts`, the Azure DevOps URL parsing and credential-stripping branches in `commitPages` are untested.</td><td>not answered</td></tr>
+<tr><td>5</td><td><strong>minor</strong></td><td>**Precondition:** `repoWithASession()` with a `report-accepted` event (`{ step: &quot;events&quot;, files: [&quot;src/a.ts&quot;] }`) and a `landed` event (`{ commit: HEAD }`).</td><td>not answered</td></tr>
+<tr><td>6</td><td><strong>minor</strong></td><td>**Input:** `render(root, {}, { stdout: &quot;https://pat-secret@dev.azure.com/org/proj/_git/repo.git&quot; })` (and/or `https://org.visualstudio.com/DefaultCollection/proj/_git/repo`).</td><td>not answered</td></tr>
+<tr><td>7</td><td><strong>minor</strong></td><td>**Expectation:** Output links the commit to `https://dev.azure.com/org/proj/_git/repo/commit/${HEAD}`, links `src/a.ts` to `https://dev.azure.com/org/proj/_git/repo/commit/${HEAD}?path=/src/a.ts`, and does not contain `pat-secret`.</td><td>not answered</td></tr>
+<tr><td>8</td><td><strong>minor</strong></td><td>**Nit:** In `packages/router/test/transcript.test.ts`, the `(step, file)` deduplication in `renderFiles` (`seen.has(&quot;${step}\0${file}&quot;)`) is untested.</td><td>not answered</td></tr>
+<tr><td>9</td><td><strong>minor</strong></td><td>**Precondition:** `repoWithASession()` with two `report-accepted` events for the same step `&quot;events&quot;` both listing `&quot;src/a.ts&quot;`, plus a third `report-accepted` event for step `&quot;renderer&quot;` also listing `&quot;src/a.ts&quot;`.</td><td>not answered</td></tr>
+<tr><td>10</td><td><strong>minor</strong></td><td>**Input:** `render(root)`.</td><td>not answered</td></tr>
+<tr><td>11</td><td><strong>minor</strong></td><td>**Expectation:** `&lt;tr&gt;&lt;td&gt;&lt;code&gt;events&lt;/code&gt;&lt;/td&gt;` appears once for `src/a.ts`, while `&lt;tr&gt;&lt;td&gt;&lt;code&gt;renderer&lt;/code&gt;&lt;/td&gt;` also appears for `src/a.ts` (same file across distinct steps is preserved; duplicate within the same step is collapsed).</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>52</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>73s</td><td>1336</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>283</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Steps accepted</h2>
+<p><code>landed-full-hash</code>, <code>files-section</code></p>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

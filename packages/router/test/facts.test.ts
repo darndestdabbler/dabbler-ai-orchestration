@@ -35,6 +35,7 @@ import {
   runControl,
 } from "../src/facts.ts";
 import { setVsToolsAsk } from "../src/checks.ts";
+import { renderFacts } from "../src/cli/facts.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 const CAP_ENV = "AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS";
 
@@ -367,5 +368,19 @@ describe("the build contract", () => {
     const fact = contractOver({ "App/App.csproj": SDK() }, { "App/App.csproj": SDK("<Nullable>enable</Nullable>") }, "greenfield");
     assert.equal(fact.status, STATUS_NOT_APPLICABLE);
     assert.equal(fact.required, false);
+  });
+});
+
+describe("dabbler facts as a person reads it", () => {
+  it("prints a red control's reason under its row, and a green one's not", () => {
+    const moved = "the build contract does not hold against HEAD -- keep each element as it declares it:\nApp/App.csproj: TargetFrameworkVersion at HEAD v4.8.1, in the tree v4.8";
+    const text = renderFacts(
+      factRecord({
+        controls: [controlFact("compile", STATUS_PASS, "{msbuild} App.sln", true, "msbuild: MSBuild.exe\nBuild succeeded."), controlFact("contract", STATUS_FAIL, "", true, moved)],
+        changed: { "App/App.csproj": [3] },
+      }),
+    );
+    assert.match(text, /contract +fail +\n +the build contract does not hold.*\n +App\/App\.csproj: TargetFrameworkVersion at HEAD v4\.8\.1, in the tree v4\.8\n/);
+    assert.doesNotMatch(text, /Build succeeded/);
   });
 });

@@ -668,10 +668,12 @@ describe("the structure a plan ask names", () => {
 });
 
 describe("the root files written before a step's checks", () => {
-  it("writes none under maintenance, where greenfield writes the solution its projects lack", () => {
+  it("writes none under maintenance, not even a rule in the repository's .gitignore, where greenfield writes the solution and the rules", () => {
+    const ownIgnore = "[Bb]in/\n[Oo]bj/\n";
     const solution = (): string => {
       const root = tempDir();
       seed(root, {
+        ".gitignore": ownIgnore,
         "src/Model/Model.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>\n',
         "src/Web/Web.csproj": '<Project Sdk="Microsoft.NET.Sdk.Web"><ItemGroup><ProjectReference Include="../Model/Model.csproj" /></ItemGroup></Project>\n',
       });
@@ -679,9 +681,12 @@ describe("the root files written before a step's checks", () => {
     };
     const kept = solution();
     assert.equal(rootFilesFor(kept, readProjectGraph(kept), "maintenance"), null);
-    assert.deepEqual(readdirSync(kept), ["src"]);
+    assert.deepEqual(readdirSync(kept).sort(), [".gitignore", "src"]);
+    assert.equal(readFileSync(join(kept, ".gitignore"), "utf8"), ownIgnore);
     const laidOut = solution();
-    assert.ok(rootFilesFor(laidOut, readProjectGraph(laidOut), "greenfield")?.written.some((file) => file.endsWith(".slnx")));
+    const scaffold = rootFilesFor(laidOut, readProjectGraph(laidOut), "greenfield");
+    assert.ok(scaffold?.written.some((file) => file.endsWith(".slnx")));
+    assert.deepEqual(scaffold?.changed, [".gitignore"]);
   });
 });
 

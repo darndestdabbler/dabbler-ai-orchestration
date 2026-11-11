@@ -1491,15 +1491,25 @@ class Rewound extends Error {
 }
 
 /**
- * The root build files the framework writes before a step's checks, by
- * posture. Under `maintenance` none: a solution file beside the one a
- * repository already has, or a `Directory.Build.props` that MSBuild imports
- * into its non-SDK projects too, breaks a build the person never asked to
- * change. What a build writes is still ignored, in every posture, by
- * `ignoreBuildOutput`.
+ * The root build files and ignore rules the framework writes before a step's
+ * checks, by posture. Under `maintenance` none: a solution file beside the
+ * one a repository already has, or a `Directory.Build.props` that MSBuild
+ * imports into its non-SDK projects too, breaks a build the person never
+ * asked to change, and the repository's `.gitignore` and index are its own --
+ * it ignores its build output in its own words (`[Bb]in/`, a bare `target`),
+ * and untracking a committed `bin\` reference is a change nobody asked for.
  */
 export function rootFilesFor(repoRoot: string, graph: ProjectGraph, posture: Posture): ScaffoldResult | null {
-  return posture === "maintenance" ? null : ensureRootFiles(repoRoot, graph);
+  if (posture === "maintenance") return null;
+  const root = ensureRootFiles(repoRoot, graph);
+  const ignored = ignoreBuildOutput(repoRoot, graph);
+  return {
+    written: root?.written ?? [],
+    skipped: root?.skipped ?? [],
+    changed: [...(root?.changed ?? []), ...ignored.changed],
+    untracked: [...(root?.untracked ?? []), ...ignored.untracked],
+    notes: root?.notes ?? [],
+  };
 }
 
 /**
@@ -3921,9 +3931,8 @@ class Driver {
       if (!(error instanceof ConfigError)) throw error;
     }
     const written = rootFilesFor(this.repoRoot, graph, posture);
-    const ignored = ignoreBuildOutput(this.repoRoot, graph);
-    const wrote = [...new Set([...(written?.written ?? []), ...(written?.changed ?? []), ...ignored.changed])];
-    const untracked = [...new Set([...(written?.untracked ?? []), ...ignored.untracked])];
+    const wrote = [...new Set([...(written?.written ?? []), ...(written?.changed ?? [])])];
+    const untracked = [...new Set(written?.untracked ?? [])];
     if (wrote.length === 0 && untracked.length === 0) return;
     const tree =
       this.run.baseline_tree === null

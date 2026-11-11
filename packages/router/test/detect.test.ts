@@ -7,6 +7,7 @@ import { parse as parseYaml } from "yaml";
 
 import { detectEcosystems, frameworkCompile, frameworkProjects, renderProjectConfig } from "../src/bootstrap/detect.ts";
 import { loadSelectionConfig, selectTests } from "../src/checks.ts";
+import { loadControlsChecked } from "../src/facts.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
 const SDK = '<Project Sdk="Microsoft.NET.Sdk"></Project>\n';
@@ -47,9 +48,9 @@ describe("detectEcosystems", () => {
     const config = parseYaml(renderProjectConfig(detectEcosystems(project), frameworkCompile(project)), { version: "1.1" }) as {
       testing: { suites: Array<Record<string, unknown>>; controls: Array<Record<string, unknown>> };
     };
+    assert.deepEqual(loadControlsChecked(config).errors, [], "the control loader reads what bootstrap writes");
     assert.deepEqual(config.testing.controls, [
       {
-        name: "compile",
         kind: "compile",
         command: '{msbuild} "Thing.sln" /restore /t:Build /p:RestorePackagesConfig=true /p:Configuration=Debug /v:minimal /nologo',
         required: true,

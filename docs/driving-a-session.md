@@ -293,11 +293,17 @@ framework writes nothing at the root:
 - no `Directory.Build.props` or `Directory.Build.targets`, which MSBuild
   imports into non-SDK projects too, so their settings would stop a C# 7.3
   project compiling;
-- no parent POM, and none of the ignore rules those files bring.
+- no parent POM;
+- no line in the repository's `.gitignore`, and no tracked file untracked.
 
-What a build writes (`bin/`, `obj/`, `target/`) is still ignored in every
-posture, because a step's check that writes build output into the tree is a
-defect wherever it happens.
+An existing repository already ignores what its build writes, in its own
+words — `[Bb]in/` and `[Oo]bj/` from Visual Studio's template, a bare
+`target` — and appending `bin/` beside them is a change to a file the
+person did not ask to change. One that does not ignore its build output
+meets the same refusal a step's check meets anywhere when it changes the
+tree it measures, naming the paths, and the rule is the person's to add.
+Under `greenfield` the framework still writes the ignore rules for `bin/`,
+`obj/` and `target/`.
 
 Planning fits the repository. The first two sessions ask what is to change
 and why. They treat the projects, their targets, their formats and their

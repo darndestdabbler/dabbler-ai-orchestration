@@ -766,8 +766,7 @@ function compileBlock(command: string): string {
     "  # machine: `{msbuild}` is filled in when the control runs, and the record\n" +
     "  # says which MSBuild it was.\n" +
     "  controls:\n" +
-    "    - name: compile\n" +
-    "      kind: compile\n" +
+    "    - kind: compile\n" +
     `      command: ${commandScalar(command)}\n` +
     "      required: true\n"
   );

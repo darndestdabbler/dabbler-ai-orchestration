@@ -19,6 +19,7 @@ import {
   endLiveChildren,
   execute,
   fnmatchCase,
+  forThisShell,
   judgeCheckPrograms,
   loadChecks,
   makeCheck,
@@ -144,6 +145,12 @@ describe("the Visual Studio tools a declared command names", () => {
     }
   });
 
+  it("gives cmd.exe a wrapper beside the repository as .\\mvnw, and every other shell the committed ./mvnw", () => {
+    assert.equal(forThisShell("./mvnw -q test -Dtest=A ./x", "win32"), ".\\mvnw -q test -Dtest=A ./x");
+    assert.equal(forThisShell("./gradlew test", "linux"), "./gradlew test");
+    assert.equal(forThisShell("mvn -q test", "win32"), "mvn -q test");
+  });
+
   it("stops a machine whose vswhere answers nothing, naming the Build Tools, and asks nothing of a command naming neither tool", () => {
     const nothing = { platform: "win32" as const, tools: () => readVsTools(() => null), referenceRoot: null };
     assert.equal(vsToolsRefusal(["dotnet test"], ["v4.8"], nothing), null);
@@ -153,12 +160,32 @@ describe("the Visual Studio tools a declared command names", () => {
     assert.match(String(vsToolsRefusal(["{msbuild} T.sln"], [], { ...nothing, platform: "linux" })), /this project builds on Windows\.$/);
   });
 
-  it("stops a machine with no targeting pack for a project's TargetFrameworkVersion, naming its Developer Pack", () => {
+  it("stops a machine with no targeting pack for a project's TargetFrameworkVersion, naming its Developer Pack, where a folder of IntelliSense files is no pack", () => {
     const root = tempDir("reference-");
-    mkdirSync(join(root, "v4.8"));
+    mkdirSync(join(root, "v4.8", "RedistList"), { recursive: true });
+    writeFileSync(join(root, "v4.8", "RedistList", "FrameworkList.xml"), "<FileList />\n");
+    mkdirSync(join(root, "v4.5.1"));
+    writeFileSync(join(root, "v4.5.1", "System.xml"), "<doc />\n");
     const machine = { platform: "win32" as const, tools: () => ({ msbuild: "MSBuild.exe", vstest: "vstest.console.exe" }), referenceRoot: root };
     assert.equal(vsToolsRefusal(["{msbuild} T.sln"], ["v4.8"], machine), null);
-    assert.match(String(vsToolsRefusal(["{msbuild} T.sln"], ["v4.8", "v4.8.1"], machine)), /targets v4\.8\.1, .*Install the \.NET Framework 4\.8\.1 Developer Pack\.$/);
+    assert.match(String(vsToolsRefusal(["{msbuild} T.sln"], ["v4.8", "v4.8.1"], machine)), /targets v4\.8\.1, .*Install the \.NET Framework 4\.8\.1 Developer Pack, or, where nothing can be installed, set TargetFrameworkRootPath/);
+    assert.match(String(vsToolsRefusal(["{msbuild} T.sln"], ["v4.5.1"], machine)), /targets v4\.5\.1, .*Install the \.NET Framework 4\.5\.1 Developer Pack/);
+  });
+
+  it("reads the packs where MSBuild will when TargetFrameworkRootPath names a folder of them", () => {
+    const folder = tempDir("reference-package-");
+    mkdirSync(join(folder, ".NETFramework", "v4.5.1", "RedistList"), { recursive: true });
+    writeFileSync(join(folder, ".NETFramework", "v4.5.1", "RedistList", "FrameworkList.xml"), "<FileList />\n");
+    const machine = { platform: "win32" as const, tools: () => ({ msbuild: "MSBuild.exe", vstest: "vstest.console.exe" }) };
+    const was = process.env["TargetFrameworkRootPath"];
+    process.env["TargetFrameworkRootPath"] = folder;
+    try {
+      assert.equal(vsToolsRefusal(["{msbuild} T.sln"], ["v4.5.1"], machine), null);
+      assert.match(String(vsToolsRefusal(["{msbuild} T.sln"], ["v4.8"], machine)), /targets v4\.8, .*under .*reference-package-/);
+    } finally {
+      if (was === undefined) delete process.env["TargetFrameworkRootPath"];
+      else process.env["TargetFrameworkRootPath"] = was;
+    }
   });
 });
 

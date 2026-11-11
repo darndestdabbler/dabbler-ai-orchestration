@@ -10,6 +10,48 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.32.1] — 2026-11-11
+
+**An existing repository comes out of a session as it went in, apart from
+the change you asked for.** The `maintenance` posture that 3.31.0 shipped
+was walked through six public repositories nobody here wrote: three .NET
+(Framework 4.5.1 and 4.8.1, and .NET Core 2.0) and three Java (a Java 7
+servlet WAR, a Spring Framework WAR and a Spring Boot service). Each was
+driven through four sessions and then opened, built, tested and committed
+in Visual Studio 2026 or IntelliJ IDEA. The record is
+`docs/uat/uat-maintenance-walk.md`. What the walk found is fixed here.
+
+### Fixed
+
+- **The framework no longer edits your `.gitignore` under
+  `maintenance`.** Before each step's checks it appended `bin/`, `obj/`,
+  `TestResults/` and coverage rules, which would have changed five of the
+  six repositories, though all of them already ignore their build output
+  in their own words (`[Bb]in/`, a bare `target`). Under `maintenance`
+  the ignore rules are now the repository's. Under `greenfield` the
+  framework still writes them.
+- **The targeting-pack stop at `session start` now asks the question
+  MSBuild asks.** A version folder under Reference Assemblies that holds
+  only IntelliSense `.xml` files (left by a language pack or an older SDK)
+  used to count as an installed pack, and the session then failed at its
+  first build with MSB3644. The stop now needs the folder's
+  `RedistList\FrameworkList.xml`. It also reads under
+  `TargetFrameworkRootPath` when that is set, and checks carry the
+  variable. So a machine that cannot install a Developer Pack can build
+  from Microsoft's `Microsoft.NETFramework.ReferenceAssemblies` package,
+  and the refusal names that way. Visual Studio's own project system still
+  needs the pack installed.
+- **Bootstrap's `compile` control no longer carries a `name:` key**, which
+  the control loader refused, recording a declaration error each round. A
+  `dabbler.yaml` written by 3.31.0 keeps the line until you delete it.
+- **A Maven or Gradle wrapper suite runs on Windows.** Bootstrap declares
+  `./mvnw -q test`, which `cmd.exe` cannot run. cmd is now given `.\mvnw`,
+  and the committed declaration stays the portable one.
+- **`dabbler facts` prints why a control is red.** A failing or unknown
+  control's detail is printed under its row, such as which
+  `TargetFrameworkVersion` moved, or MSBuild's error. Before, it was only
+  in `--json`.
+
 ## [3.32.0] — 2026-11-11
 
 **A person can finish a session the framework stopped, and tell Dabbler

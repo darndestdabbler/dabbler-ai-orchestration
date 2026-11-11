@@ -6,7 +6,7 @@
 
 import { loadConfig } from "../config.ts";
 import { repoRootFor, resolveSessionsDir } from "../evidence.ts";
-import { collectFacts, factRecordToDict } from "../facts.ts";
+import { type FactRecord, STATUS_FAIL, STATUS_UNKNOWN, collectFacts, factRecordToDict } from "../facts.ts";
 import { dumps } from "../pythonJson.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -74,25 +74,31 @@ export async function factsVerb(argv: string[]): Promise<number> {
     writeOut(dumps(factRecordToDict(record), { indent: 2, sortKeys: true }) + "\n");
     return EXIT_OK;
   }
-  for (const fact of record.controls) {
-    writeOut(
-      `  ${fact.kind.padEnd(10)} ${fact.status.padEnd(15)} ${fact.command}\n`,
-    );
-  }
-  if (record.changed === null) {
-    writeOut("  changed lines: the change set could not be determined\n");
-  } else {
-    const total = Object.values(record.changed).reduce(
-      (sum, lines) => sum + lines.length,
-      0,
-    );
-    writeOut(
-      `  changed lines: ${total} added across ` +
-        `${Object.keys(record.changed).length} file(s)\n`,
-    );
-  }
+  writeOut(renderFacts(record));
   for (const error of record.errors) {
     writeErr(`  DECLARATION ERROR ${error}\n`);
   }
   return EXIT_OK;
+}
+
+/**
+ * The record as a person reads it: one row per control, and under a red or
+ * unknown one its detail, which is the reason -- a `contract fail` row alone
+ * says that a target moved and not which, or where.
+ */
+export function renderFacts(record: FactRecord): string {
+  const rows: string[] = [];
+  for (const fact of record.controls) {
+    rows.push(`  ${fact.kind.padEnd(10)} ${fact.status.padEnd(15)} ${fact.command}`);
+    if (fact.status === STATUS_FAIL || fact.status === STATUS_UNKNOWN) {
+      rows.push(...fact.detail.split("\n").filter((line) => line.trim() !== "").map((line) => `      ${line}`));
+    }
+  }
+  if (record.changed === null) {
+    rows.push("  changed lines: the change set could not be determined");
+  } else {
+    const total = Object.values(record.changed).reduce((sum, lines) => sum + lines.length, 0);
+    rows.push(`  changed lines: ${total} added across ${Object.keys(record.changed).length} file(s)`);
+  }
+  return rows.join("\n") + "\n";
 }

@@ -1363,6 +1363,8 @@ export const CHILD_ENV_ALLOWLIST: readonly string[] = [
   // Toolchain roots. Every one of these names a directory.
   "VIRTUAL_ENV", "JAVA_HOME",
   "DOTNET_ROOT", "DOTNET_ROOT(X86)",
+  // Where MSBuild reads .NET Framework reference assemblies when no pack is installed.
+  "TargetFrameworkRootPath",
   "DOTNET_CLI_TELEMETRY_OPTOUT", "DOTNET_NOLOGO",
   "GOROOT", "GOPATH", "GOCACHE", "GOMODCACHE",
   "CARGO_HOME", "RUSTUP_HOME",
@@ -1645,19 +1647,32 @@ export function vsToolsRefusal(
   if (missing.length > 0) {
     return `this repository's declared commands name ${missing.join(" and ")}, and vswhere found none on this machine. ${VS_INSTALL}`;
   }
+  // MSBuild reads a pack under $(TargetFrameworkRootPath) when it is set -- the
+  // way Microsoft's ReferenceAssemblies packages supply one with no install --
+  // and under Program Files otherwise; the stop reads where MSBuild will.
   const base = process.env["ProgramFiles(x86)"];
+  const override = process.env["TargetFrameworkRootPath"];
   const root =
     given.referenceRoot !== undefined
       ? given.referenceRoot
-      : base
-        ? join(base, "Reference Assemblies", "Microsoft", "Framework", ".NETFramework")
-        : null;
-  const absent = versions.filter((version) => root === null || !existsSync(join(root, version)));
+      : override
+        ? join(override, ".NETFramework")
+        : base
+          ? join(base, "Reference Assemblies", "Microsoft", "Framework", ".NETFramework")
+          : null;
+  // A pack is its RedistList, which is what MSBuild reads to accept the folder:
+  // a language pack leaves a version folder holding only IntelliSense `.xml`
+  // files, and MSBuild answers that folder with MSB3644.
+  const absent = versions.filter(
+    (version) => root === null || !existsSync(join(root, version, "RedistList", "FrameworkList.xml")),
+  );
   if (absent.length > 0) {
     const packs = absent.map((version) => `the .NET Framework ${version.replace(/^v/, "")} Developer Pack`);
     return (
       `this repository targets ${absent.join(", ")}, and this machine has no targeting pack for ` +
-      `${absent.length === 1 ? "it" : "them"}${root === null ? "" : ` under ${root}`}. Install ${packs.join(" and ")}.`
+      `${absent.length === 1 ? "it" : "them"}${root === null ? "" : ` under ${root}`}. Install ${packs.join(" and ")}, ` +
+      "or, where nothing can be installed, set TargetFrameworkRootPath to a folder holding `.NETFramework\\<version>`, " +
+      "such as the `build` folder of Microsoft's Microsoft.NETFramework.ReferenceAssemblies package for it."
     );
   }
   return null;
@@ -2002,8 +2017,18 @@ function spawnCheck(
  */
 export function spawnCommand(command: string, options: SpawnOptions): ChildProcess {
   // One string for a shell, so the substituted path is quoted for it.
-  const [line] = withVsTools([command], (path) => `"${path}"`);
+  const [line] = withVsTools([forThisShell(command)], (path) => `"${path}"`);
   return track(spawn(line as string, spawnOptionsFor(options, "shell")));
+}
+
+/**
+ * A committed command names a wrapper beside it as `./mvnw`, which every
+ * POSIX shell runs and `cmd.exe` reads as a program called `.`; written
+ * `.\mvnw`, cmd finds `mvnw.cmd` through PATHEXT. The declaration stays the
+ * portable one, and only the shell that cannot read it is given the other.
+ */
+export function forThisShell(command: string, platform: NodeJS.Platform = process.platform): string {
+  return platform === "win32" ? command.replace(/^\.\//, ".\\") : command;
 }
 
 /**

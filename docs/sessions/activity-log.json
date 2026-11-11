@@ -13231,6 +13231,13 @@
       "dateTime": "2026-11-11T11:05:40.168000-05:00",
       "task": "Put the 3.32.3 Marketplace listing (tools/dabbler-ai-orchestration/README.md) into plain words a first-time reader can follow: replace 'deterministic', 'a tree that changed', 'the trunk', 'engine CLI', 'reach to two provider families' and the non-goal wording with the phrasings the session plan gives, and do the same wherever else the page leans on the framework's own vocabulary. Add one paragraph under 'You can see where the work is' saying that every session, a cancelled one included, leaves a self-contained HTML transcript page under docs/transcripts/ with the plan, the work, each review finding and how it was dealt with, and the tests that ran; that it is committed with the code and needs nothing to open it; that a repository can turn it off with dabbler.transcript; linking to 'The transcript' in the-record.md. Carry the same opening paragraph and risk table word for word into the root README.md (and plain the root README's one sentence that repeats the requirements' vocabulary), then bump version.json to 3.32.4, stamp the manifests with npm run stamp:version, and add a 3.32.4 changelog section saying the listing reads more plainly and names the transcript.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 324,
+      "dateTime": "2026-11-11T11:35:04.328000-05:00",
+      "task": "Release 3.32.4: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

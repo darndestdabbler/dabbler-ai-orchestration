@@ -6425,23 +6425,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "a7b4b2da3687480967d6db3bf02a1e36e953075f",
-      "frameworkVersion": "3.32.1",
       "verification": {
         "rounds": 1,
         "verifierModel": "gpt-5.6-sol",
         "verifierProvider": "openai",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "3.32.1",
+      "startCommit": "a7b4b2da3687480967d6db3bf02a1e36e953075f"
     },
     {
       "number": 324,
       "title": "Release 3.32.4 (release: 3.32.4)",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "status": "complete",
+      "startedAt": "2026-11-11T11:35:03.955000-05:00",
+      "completedAt": "2026-11-11T11:35:09.581000-05:00",
+      "orchestrator": {
+        "engine": "framework",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null,
+      "startCommit": "228f86deb06acbab01346a7fe1d8ba38f78bc828",
+      "frameworkVersion": "3.32.1",
+      "noChange": true
     }
   ]
 }

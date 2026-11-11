@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 319 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 319 transcript</h1>
+<p class="stamp">Rendered 2026-11-11T15:00:02.591Z by dabbler-ai-router 3.32.1 at f718950ef9dce57e356d8f9026eadcddb751f656.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-11T09:44:42.826-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 319 of 322: The guide says what holds an AI to the rules</h3>
+<p>Scope: <code>docs/guide/discipline.md</code>, <code>docs/guide/verification.md</code> and <code>docs/guide/the-record.md</code> (new), <code>docs/guide/README.md</code> (new: the index), <code>packages/router/scripts/check-shipped-docs.mjs</code> (the pages it reads)</p>
+<p><strong>Why.</strong> The operator, 2026-11-11: the two front pages undersell the product and no longer describe it, and the message a stranger should take away is discipline. An AI works inside well-defined rules. A model from a different provider must review the work. The framework runs the tests and hashes the code, so an AI cannot easily claim work it did not do. Every deterministic job is the framework's. The record is open to anyone who clones the repository.</p>
+<p>The operator added a second message the same day: the framework standardizes the work of AI. Every session is planned, run and recorded the same way whichever model writes it, so a person or a later model can pick the work up where the last session finished, the next day or the next year, from what is in the repository.</p>
+<p>Every one of those is true, and none has a page that says how. The mechanisms are spread through <code>docs/driving-a-session.md</code>, which is 1,700 lines written for someone already driving a session, and through a root README that is half reference manual. A front page can make a claim in one sentence only if it can link to the page that proves it. Sessions 319 and 320 write those pages; 321 rewrites the two front pages over them, with the operator's screenshots; 322 releases.</p>
+<p><strong>What.</strong> Three pages under <code>docs/guide/</code>, each written for a developer or a manager deciding whether to trust the product, who has not run a session. Each claim is followed by its mechanism and the command or file where a reader can see it for themselves. Each page is short enough to read in one sitting and links to <code>driving-a-session.md</code> for the full account instead of repeating it.</p>
+<p>**Step 1 -- <code>discipline.md</code>: the rules, and what enforces each.** One instruction at a time, and the instruction in hand is the whole of what is asked. Each step declares its files and its checks before work starts. The framework hashes the working tree (SHA-256 over every tracked path and its content) before and after a step's checks, and refuses a report over a tree that moved. The approved plan carries a digest bound in at approval. The test run of record is held to the digest of the tree it ran against, so a change after the run makes it stale. The gates at the close, each with what it reads. The verbs that are a person's and refused to an engine: cancel, rollback, close, <code>session waive</code>. Then the list of what the framework does so that no AI has to be trusted to: registration, progress, each step's checks, the tests, the review rounds, the commit, the push and the close.</p>
+<p>**Step 2 -- <code>verification.md</code>: two models from different providers.** Who the Primary Reviewer is and why it is never the author. What it is sent. Round 1 over the whole diff and later rounds over the fix. Findings answered and fixed without a person, round after round up to the cap. A dispute with evidence, and the Auxiliary Reviewer that settles one. The two ends at the cap. <code>verify reopen</code>. The raw reviewer output kept before any parsing. No verdict a person can type.</p>
+<p>**Step 3 -- <code>the-record.md</code>: what is written down, and where.** The plan, the activity log, the change log, the decisions log and the work plan under the sessions root, with who writes each. The run records under <code>.dabbler/runs/</code>. The transcript page committed for every session under <code>docs/transcripts/</code>, with one linked as an example. <code>dabbler status</code> and <code>dabbler transcript</code>. What <code>session waive</code> leaves on the record.</p>
+<p>The page ends with a section headed *Picking the work up*, which is the operator's second message and the reason the record has one shape. Every session has the same phases and leaves the same files, whichever engine and model wrote it. Every engine reads the same instructions, from <code>AGENTS.md</code>. A session starts in a fresh conversation and is handed its instruction by the framework, so nothing it needs is in an earlier chat or in one model's memory. The section then lists what a person or a model new to the repository reads, in order: the plan for what is next, <code>dabbler status</code> for where things stand, the last session's transcript for what was done and what the reviewer said, and the decisions log for why. Each sentence is checked against the running product before it is written.</p>
+<p><strong>Step 4 -- the index and the check.</strong> <code>docs/guide/README.md</code> lists the pages with one line each. <code>check-shipped-docs.mjs</code> reads every page under <code>docs/guide/</code>, so a guide page cannot name something the product has retired.</p>
+<p><strong>Non-goals.</strong> Rewriting <code>driving-a-session.md</code> or <code>quick-start.md</code>. A claim with no mechanism beside it. A stronger claim about tests than the mechanism: the framework runs the automated tests before any code is committed; the reviewer is shown every changed file with no test named after it and asked to judge whether it is tested; a test the session's plan promised and did not deliver is a blocking finding, and any other missing case is advice. The page says exactly that. A claim that any model can continue any repository: the claim is about the record, which needs no particular model to read it, and a seat that does not list the model a repository selected is still refused at the start. Decision ids, session numbers or incident history on a guide page. Any change to behaviour.</p>
+<p><strong>Tests.</strong> None added: these are pages. The lint control runs <code>check-shipped-docs.mjs</code> over the new pages, and each step's check is that run.</p>
+<p><strong>Releasable.</strong> Yes -- with 320 and 321, as 3.32.3 in session 322.</p>
+<h2>Work Plan</h2>
+<p>Write three guide pages under docs/guide/ for a developer or manager deciding whether to trust the product, each claim followed by its mechanism and the command or file where a reader can see it: discipline.md (one instruction at a time, declared files and checks, the SHA-256 working-tree digest before and after a step's checks, the plan digest bound at approval, the run of record held to its tree's digest, the close gates and what each reads, the verbs refused to an engine, and the list of deterministic work the framework does itself), verification.md (the Primary Reviewer from a different provider and never the author, what it is sent, round 1 over the whole diff and later rounds over the fix, findings answered and fixed round after round up to the cap, disputes with evidence and the Auxiliary Reviewer, the two ends at the cap, verify reopen, raw reviewer output kept before parsing, and no verdict a person can type, with the test claim stated exactly as the plan words it), and the-record.md (the files under the sessions root and who writes each, the run records under .dabbler/runs/, the committed transcript pages with one linked as an example, dabbler status and dabbler transcript, what session waive leaves on the record, and a closing 'Picking the work up' section). Add docs/guide/README.md as the index, and extend packages/router/scripts/check-shipped-docs.mjs to read every page under docs/guide/. The check change is made first so that each page's own step is checked by the run that will read it; every sentence is checked against the running product before it is written, and each page links to driving-a-session.md for the full account rather than repeating it.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/ee4c16a51f6282e3f5636b3ae7e50aebdcf3c996"><code>ee4c16a51f6282e3f5636b3ae7e50aebdcf3c996</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Check reads guide</td><td><p>Extend packages/router/scripts/check-shipped-docs.mjs so that, besides its fixed list, it reads every .md page under docs/guide/ (none while the folder does not exist yet), and so its summary line counts them.</p></td><td><span class="mono">packages/router/scripts/check-shipped-docs.mjs</span></td><td><code>node packages/router/scripts/check-shipped-docs.mjs</code></td><td>yes</td></tr>
+<tr><td>Discipline</td><td><p>Write docs/guide/discipline.md: the rules an AI works inside and what enforces each, as Step 1 of the session plan describes, each claim verified against the source and followed by the command or file that shows it.</p></td><td><span class="mono">docs/guide/discipline.md</span></td><td><code>node packages/router/scripts/check-shipped-docs.mjs</code></td><td>yes</td></tr>
+<tr><td>Verification</td><td><p>Write docs/guide/verification.md: cross-provider review, as Step 2 of the session plan describes, with the test claim stated exactly as the plan's non-goals word it.</p></td><td><span class="mono">docs/guide/verification.md</span></td><td><code>node packages/router/scripts/check-shipped-docs.mjs</code></td><td>yes</td></tr>
+<tr><td>The record</td><td><p>Write docs/guide/the-record.md: what is written down and where, as Step 3 of the session plan describes, ending with the 'Picking the work up' section.</p></td><td><span class="mono">docs/guide/the-record.md</span></td><td><code>node packages/router/scripts/check-shipped-docs.mjs</code></td><td>yes</td></tr>
+<tr><td>Index</td><td><p>Write docs/guide/README.md, the index: one line for each guide page.</p></td><td><span class="mono">docs/guide/README.md</span></td><td><code>node packages/router/scripts/check-shipped-docs.mjs</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Rewriting docs/driving-a-session.md or docs/quick-start.md</li><li>Rewriting the two front pages (README.md and the extension README) -- that is session 321</li><li>A claim with no mechanism beside it, or a claim about tests stronger than the mechanism</li><li>A claim that any model can continue any repository: the claim is about the record</li><li>Decision ids, session numbers or incident history on a guide page</li><li>Any change to the product's behaviour, and any new test</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[14:44:42]</span> <span class="muted">run-started</span> session=319 mode=pull</div>
+<div class="line"><span class="at">[14:44:42]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[14:45:14]</span> <span class="muted">run-resumed</span> session=319 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[14:45:14]</span> <span class="muted">plan-accepted</span> steps=[&quot;check-reads-guide&quot;,&quot;discipline&quot;,&quot;verification&quot;,&quot;the-record&quot;,&quot;index&quot;] non_goals=6</div>
+<div class="line"><span class="at">[14:45:14]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[14:45:14]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=check-reads-guide</div>
+<div class="line"><span class="at">[14:45:36]</span> <span class="muted">run-resumed</span> session=319 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:45:38]</span> <span class="muted">check-passed</span> step=check-reads-guide argv=[&quot;node&quot;,&quot;packages/router/scripts/check-shipped-docs.mjs&quot;]</div>
+<div class="line"><span class="at">[14:45:38]</span> <span class="muted">report-accepted</span> seq=2 step=check-reads-guide files=[&quot;packages/router/scripts/check-shipped-docs.mjs&quot;] notes=check-shipped-docs reads every .md under docs/guide/ (none if absent); the summary count includes them</div>
+<div class="line"><span class="at">[14:45:38]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=discipline</div>
+<div class="line"><span class="at">[14:48:43]</span> <span class="muted">run-resumed</span> session=319 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:48:44]</span> <span class="muted">check-passed</span> step=discipline argv=[&quot;node&quot;,&quot;packages/router/scripts/check-shipped-docs.mjs&quot;]</div>
+<div class="line"><span class="at">[14:48:44]</span> <span class="muted">report-accepted</span> seq=3 step=discipline files=[&quot;docs/guide/discipline.md&quot;] notes=discipline.md: each rule with its mechanism and where to see it, checked against drive.ts, checks.ts, gates.ts, session.ts</div>
+<div class="line"><span class="at">[14:48:44]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=verification</div>
+<div class="line"><span class="at">[14:56:07]</span> <span class="muted">run-resumed</span> session=319 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:56:09]</span> <span class="muted">check-passed</span> step=verification argv=[&quot;node&quot;,&quot;packages/router/scripts/check-shipped-docs.mjs&quot;]</div>
+<div class="line"><span class="at">[14:56:09]</span> <span class="muted">report-accepted</span> seq=4 step=verification files=[&quot;docs/guide/verification.md&quot;] notes=verification.md: reviewer selection, what is sent per round, the test claim as the plan words it, disputes, cap ends, reopen, raw output, no typed verdict</div>
+<div class="line"><span class="at">[14:56:09]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=the-record</div>
+<div class="line"><span class="at">[14:57:01]</span> <span class="muted">run-resumed</span> session=319 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:57:02]</span> <span class="muted">check-passed</span> step=the-record argv=[&quot;node&quot;,&quot;packages/router/scripts/check-shipped-docs.mjs&quot;]</div>
+<div class="line"><span class="at">[14:57:03]</span> <span class="muted">report-accepted</span> seq=5 step=the-record files=[&quot;docs/guide/the-record.md&quot;] notes=the-record.md: sessions-root files and writers, run records, transcripts with s317 linked, status/transcript, waive's trail, Picking the work up</div>
+<div class="line"><span class="at">[14:57:03]</span> <span class="muted">instruction-issued</span> seq=6 kind=step step=index</div>
+<div class="line"><span class="at">[14:57:18]</span> <span class="muted">run-resumed</span> session=319 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:57:20]</span> <span class="muted">check-passed</span> step=index argv=[&quot;node&quot;,&quot;packages/router/scripts/check-shipped-docs.mjs&quot;]</div>
+<div class="line"><span class="at">[14:57:20]</span> <span class="muted">report-accepted</span> seq=6 step=index files=[&quot;docs/guide/README.md&quot;] notes=docs/guide/README.md: one line per guide page</div>
+<div class="line"><span class="at">[14:57:20]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[14:57:21]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[14:57:21]</span> <span class="muted">job-started</span> name=verification pid=37768 log=.dabbler/runs/s319/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[14:58:14]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s319/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[14:58:14]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[14:58:14]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[14:58:14]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[14:58:14]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=11292 log=.dabbler/runs/s319/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[14:58:16]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s319/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[14:58:16]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[14:58:16]</span> <span class="muted">job-started</span> name=run of record: typescript pid=53196 log=.dabbler/runs/s319/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[14:59:35]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s319/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[14:59:36]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[14:59:36]</span> <span class="muted">job-started</span> name=run of record: extension pid=38884 log=.dabbler/runs/s319/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[14:59:54]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s319/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[14:59:54]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[14:59:58]</span> <span class="muted">landed</span> commit=ee4c16a51f6282e3f5636b3ae7e50aebdcf3c996</div>
+<div class="line"><span class="at">[14:59:58]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[14:59:58]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[14:59:58]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[14:59:58]</span> <span class="muted">job-started</span> name=close pid=62376 log=.dabbler/runs/s319/driver/jobs/close.log</div>
+<div class="line"><span class="at">[15:00:02]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s319/driver/jobs/close.log</div>
+<div class="line"><span class="at">[15:00:02]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>3 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit — Issue:** The approved-plan digest is omitted, and the step-check section never states the required SHA-256 working-tree digest mechanism. Its only explicit SHA-256 description concerns the later test run and suite-covered files, which is a different mechanism.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit — Issue:** The required test claim was to say the reviewer sees “every changed file with no test named after it,” but the page twice narrows this to “every changed source file.”</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit — Issue:** The shipped-docs check discovers only Markdown files directly inside `docs/guide/`; `readdirSync(GUIDE)` does not traverse subdirectories. A future page such as `docs/guide/topic/details.md` would silently escape the check despite the requirement to read every page “under `docs/guide/`.”</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>79s</td><td>1493</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>18s</td><td>316</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

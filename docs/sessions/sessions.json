@@ -6205,9 +6205,9 @@
     {
       "number": 312,
       "title": "An exception is requested, checked and shown before a person authorises it",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-11T02:45:42.584000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-11T03:24:25.886000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

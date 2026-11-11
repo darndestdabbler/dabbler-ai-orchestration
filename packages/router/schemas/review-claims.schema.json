@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "review-claims.json (the canonical author claims for a change)",
+  "description": "The canonical record of what the author says the change does, under .dabbler/runs/<set>/s<N>/critique/<change-id>/review-claims.json. This file — not any Markdown rendering of it — is the artifact code reads. A human-readable twin may be generated for people and is never parsed; deleting the twin changes no behavior. The repository's end-of-set change-log.md is a different artifact with a different owner and is not overloaded for this purpose.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "change_id", "claims", "recorded_at"],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Frozen at v1. A reader that finds any other value refuses the record rather than interpreting it."
+    },
+    "change_id": { "type": "string", "minLength": 7 },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "recorded_at": { "type": "string", "minLength": 1 },
+    "claims": {
+      "type": "array",
+      "description": "May be empty: a change whose author claims nothing is a valid input, and is not the same as a missing claims file.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "statement"],
+        "properties": {
+          "claim_id": { "type": "string", "minLength": 1 },
+          "statement": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One assertion about the change, in the author's words."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "behavior-added",
+              "behavior-changed",
+              "behavior-removed",
+              "refactor-no-behavior-change",
+              "dependency",
+              "documentation"
+            ]
+          },
+          "paths": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

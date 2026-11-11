@@ -106,12 +106,22 @@ describe("dabbler version", () => {
     const extension = tempDir("ext-");
     writeFileSync(
       join(extension, "package.json"),
-      JSON.stringify({ name: "some-extension", version: "9.9.9", engines: { vscode: "^1.90.0" } }),
+      JSON.stringify({ name: "dabbler-ai-orchestration", version: "9.9.9", engines: { vscode: "^1.90.0" } }),
       "utf8",
     );
     mkdirSync(join(extension, "dist"), { recursive: true });
-    assert.deepEqual(extensionAbove(join(extension, "dist")), ["some-extension", "9.9.9"]);
+    assert.deepEqual(extensionAbove(join(extension, "dist")), ["dabbler-ai-orchestration", "9.9.9"]);
     assert.equal(extensionAbove(tempDir("no-ext-")), null);
+    // Another extension's manifest above a router in its node_modules is not Dabbler's.
+    const consumer = tempDir("consumer-ext-");
+    writeFileSync(
+      join(consumer, "package.json"),
+      JSON.stringify({ name: "acme-tool", version: "1.0.0", engines: { vscode: "^1.90.0" }, bugs: "https://acme.example/issues" }),
+      "utf8",
+    );
+    const nested = join(consumer, "node_modules", "dabbler-ai-router", "dist");
+    mkdirSync(nested, { recursive: true });
+    assert.equal(extensionAbove(nested), null);
   });
 });
 

@@ -26,7 +26,7 @@ Newest entry last. Each entry has this shape:
 ```
 
 Where the wall is a rule and no fix within the rules clears it, the entry is
-a **request for an exception**, and it carries five more lines. A person
+a **request for an exception**, and it carries seven more lines. A person
 decides it with `dabbler session waive`, which prints these lines on its card
 in the Mechanic's words; the **Deterministic fix** line is the framework
 change the exception argues for.
@@ -38,6 +38,15 @@ change the exception argues for.
 - **Why it is wrong here:** why this case is not the one the rule is for.
 - **What going past it lets through:** what stays unmet, plainly.
 - **What was tried within the rules:** each attempt and what happened.
+- **Problem for the maintainers:** the framework's behaviour that is wrong,
+  in the framework's terms.
+- **Fix for the maintainers:** the change to the framework asked for, in the
+  framework's terms.
 ```
+
+The last two lines may be offered to the framework's maintainers by
+`dabbler session defect-report`, so they name nothing of this repository: no
+path, step, module, project, URL or person. The entry's other lines were
+written for this repository's record and stay in it.
 
 <!-- Entries follow. -->

@@ -398,7 +398,7 @@ const CREDENTIAL_NAME = /(?:KEY|TOKEN|SECRET|PASSWORD|PAT|CREDENTIAL)S?$/i;
  * this only feeds it -- including its minimum length, which is what keeps a
  * short, ordinary value from burying the page under redactions.
  */
-function machineSecrets(): string[] {
+export function machineSecrets(): string[] {
   const secrets: string[] = [];
   for (const [name, value] of Object.entries(process.env)) {
     if (typeof value === "string" && value !== "" && CREDENTIAL_NAME.test(name)) {

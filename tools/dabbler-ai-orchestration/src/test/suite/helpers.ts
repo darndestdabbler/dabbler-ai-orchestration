@@ -257,6 +257,7 @@ export function fakeRouter(
           waiveOptions.push(options);
           return answer("session waive", { stdout: message });
         },
+        defectReport: text("session defect-report"),
       },
       verify: {
         round: text("verify"),

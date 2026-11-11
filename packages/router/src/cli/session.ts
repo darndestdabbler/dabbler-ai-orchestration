@@ -28,6 +28,7 @@ import {
   cancel,
   close,
   decision,
+  defectReport,
   holdRelease,
   interrupt,
   waiveCard,
@@ -61,6 +62,7 @@ const SUMMARY: Record<string, string> = {
   plan: "record the plan prose in project-work-plan.md; `plan amend` changes a driven step",
   "hold-release": "hold this session's release, for a person's reason; it closes as held",
   waive: "take the session past the stop it stands at, once, for a person's reason, on the record; without one, print the card",
+  "defect-report": "write a short report of a stop the framework caused, for you to read and send to its maintainers",
   close: "run gates and close the session",
   cancel: "cancel one session",
   restore: "restore a cancelled session",
@@ -247,6 +249,17 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  stop and no other. What was unmet stays written as unmet. Only a step refused",
     "  three times, a test run, a verification and a close are waived; a release",
     "  session is not.",
+  ],
+  "defect-report": [
+    "  --session N              report the last stop session N met; omitted, the stop",
+    "                           the session in flight stands at",
+    "",
+    "  Writes one markdown file under .dabbler/reports/ and prints its path: where the",
+    "  stop is in the framework (versions, engine, vehicles, platform, the stop's kind,",
+    "  code, phase and rule), the problem and a suggested fix, and an example that is",
+    "  yours to write. What it recognises as this repository's is replaced, and a",
+    "  key beside it maps each placeholder back; read it before you send it. Nothing",
+    "  is sent: the last line names where reports go, and sending one is yours.",
   ],
   close: [
     "  --dry-run                print the gate rows and write nothing",
@@ -554,6 +567,15 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     const reason = values.get("--reason");
     if (reason === undefined) return waiveCard(sessionsDir);
     return waiveStop(sessionsDir, { reason, engine: !personIsPresent() });
+  }
+
+  if (subcommand === "defect-report") {
+    const named = integer(values.get("--session"), "--session");
+    if (typeof named === "string") {
+      writeErr(`dabbler session defect-report: ${named}\n`);
+      return EXIT_USAGE;
+    }
+    return defectReport(sessionsDir, { sessionNumber: named ?? sessionNumber });
   }
 
   if (subcommand === "rollback") {

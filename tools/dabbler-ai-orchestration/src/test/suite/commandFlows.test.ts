@@ -32,6 +32,7 @@ import {
   engineTerminalFor,
   repositoryOf,
   runCheckStop,
+  runReportStop,
   runConsultWithAi,
   runOpenMechanic,
   runOpenTranscript,
@@ -819,6 +820,41 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(await runReviewException(makeRepository({ currentSession: 2 }), shown.ui, refused.router, async () => { prompted = true; return "x"; }), false);
     assert.strictEqual(prompted, false);
     assert.match(shown.errors[0], /nothing to go past/);
+  });
+
+  test("Report this stop says it is one provider call, opens the report, and copies and browses only on the person's say-so", async () => {
+    const root = makeTempDir("report-stop-");
+    try {
+      writeFileTree(root, { ".dabbler/reports/s2-x.md": "# Dabbler defect report\n" });
+      const said =
+        "defect-report: session 002's 'tests' stop, written to .dabbler/reports/s2-x.md\n" +
+        "Reports go to https://example.com/issues -- read the report, then send it yourself if you choose. Nothing has been sent.\n";
+      const done: string[] = [];
+      const actions = {
+        open: async (file: string) => { done.push(`open ${path.basename(file)}`); },
+        copy: async (text: string) => { done.push(`copy ${text.trim()}`); },
+        browse: async (address: string) => { done.push(`browse ${address}`); return true; },
+      };
+      // Declined: no call is made.
+      const asked: string[] = [];
+      const declined = fakeRouter(0, said);
+      const no = driveUi({ confirm: async (message) => { asked.push(message); return false; } });
+      assert.strictEqual(await runReportStop(makeRepository({ root, currentSession: 2 }), no.ui, declined.router, actions), false);
+      assert.match(asked[0], /This is one provider call/);
+      assert.match(asked[0], /nothing is sent/);
+      assert.ok(!declined.asked.includes("session defect-report"));
+      // Accepted, then not sent: the report opens and nothing is copied.
+      const kept = fakeRouter(0, said);
+      const read = driveUi({ confirm: async () => true, choose: async () => undefined });
+      assert.strictEqual(await runReportStop(makeRepository({ root, currentSession: 2 }), read.ui, kept.router, actions), true);
+      assert.deepStrictEqual(done, ["open s2-x.md"]);
+      // Sent by the person: copied, and their browser opened at the manifest's address.
+      const sent = driveUi({ confirm: async () => true, choose: async () => "Copy and open" });
+      assert.strictEqual(await runReportStop(makeRepository({ root, currentSession: 2 }), sent.ui, fakeRouter(0, said).router, actions), true);
+      assert.deepStrictEqual(done.slice(1), ["open s2-x.md", "copy # Dabbler defect report", "browse https://example.com/issues"]);
+    } finally {
+      rmrf(root);
+    }
   });
 
   test("Open Transcript opens the committed page at its exceptions, and says so where there is no page yet", async () => {

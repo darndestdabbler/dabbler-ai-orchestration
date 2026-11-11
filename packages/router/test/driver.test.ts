@@ -819,6 +819,18 @@ describe("a stop, as a person reads it", () => {
     assert.ok(!disputed.choices.some((choice) => choice.command === "dabbler triage"), disputed.ways);
   });
 
+  it("offers the report to the maintainers where the same stop recurs on its step, and not otherwise", () => {
+    const REPORT = "dabbler session defect-report";
+    const stop = { kind: "tests", code: null, reason: "the suite failed", step_id: null, at: "2026-11-11T10:00:00-05:00" };
+    const context = { session_number: 7, phase: "run-of-record", engine: "cli" };
+    const again = renderStop(stop as never, { ...context, stop_history: [{ ...stop, at: "2026-11-11T09:00:00-05:00" }, { ...stop }] });
+    const offered = again.choices.find((choice) => choice.command === REPORT);
+    assert.ok(offered !== undefined, again.ways);
+    assert.match(offered.cost, /One provider call\..*nothing is sent/);
+    const once = renderStop(stop as never, { ...context, stop_history: [{ ...stop }] });
+    assert.ok(!once.choices.some((choice) => choice.command === REPORT), once.ways);
+  });
+
   it("offers the waiver on each stop with something to go past, as the person's, and on no other", () => {
     const WAIVE = 'dabbler session waive --reason "<why>"';
     const waivable = new Set(["rejected-thrice", "tests", "verification", "close"]);

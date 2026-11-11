@@ -169,13 +169,13 @@ suite("ActionRegistry: session actions", () => {
     assert.ok(!offered(sessions[0]).includes("dabbler.openMechanic"));
   });
 
-  test("Check this stop and Review exception are offered on the session in flight while a stop stands, and nowhere else", () => {
+  test("Check this stop, Review exception and Report this stop are offered on the session in flight while a stop stands, and nowhere else", () => {
     const stopped = makeSession({ number: 2, status: "in-progress", stopActor: "operator" });
     const working = makeSession({ number: 2, status: "in-progress" });
     const done = makeSession({ number: 1, status: "complete", stopActor: "operator" });
     const offered = (session: ReturnType<typeof makeSession>) =>
       applicableSessionActions(makeRepository({ currentSession: 2, sessions: [done, session] }), session).map((a) => a.id);
-    for (const id of ["dabbler.checkStop", "dabbler.reviewException"]) {
+    for (const id of ["dabbler.checkStop", "dabbler.reviewException", "dabbler.reportStop"]) {
       assert.ok(offered(stopped).includes(id), id);
       assert.ok(!offered(working).includes(id), id);
       assert.ok(!offered(done).includes(id), id);

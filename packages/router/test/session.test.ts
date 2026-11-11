@@ -82,9 +82,11 @@ import {
   steppedOverLines,
   waiveCard,
   waiveStop,
+  defectReport,
   type SequenceFacts,
 } from "../src/session.ts";
-import { loopPath, readInstruction, readRepairs, readReport, readRun, recordRepair, writeInstruction, writeRun } from "../src/driver.ts";
+import { loopPath, readInstruction, readRepairs, readReport, readRun, recordRepair, writeInstruction, writeRun, writeWorkPlan } from "../src/driver.ts";
+import { NoCandidateError, setRouteSource } from "../src/route.ts";
 import {
   amendmentEntries,
   readTaskDeclaration,
@@ -95,7 +97,7 @@ import {
   sessionIsReleasable,
   workBegunRefusal,
 } from "../src/writers.ts";
-import { cleanRepoAnswers, gitAnswers, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
+import { cleanRepoAnswers, gitAnswers, makeAnsweredSandbox, routeAnswers, seed, tempDir, type RoutedCall } from "./support/answers.ts";
 import { SESSION_USE_STAND_IN } from "./support/repo.ts";
 
 /** One verb's exit code and everything it wrote, so a refusal can be read. */
@@ -2030,6 +2032,8 @@ describe("a person's waiver of a stop", () => {
       assert.equal(row!["commit"], HEAD);
       assert.match(String(row!["tree"]), /^\S{7,}$/);
       assert.match(String(amendmentEntries(state.sessionsDir, 1)[0]!["what"]), /'tests' stop, waived/);
+      // The moment a person has said a rule was wrong here is when the report is offered.
+      assert.match(waived.out, /`dabbler session defect-report` writes a short report .* one provider call/);
     } finally {
       state.restore();
     }
@@ -2131,6 +2135,187 @@ describe("a person's waiver of a stop", () => {
         assert.match(refused.err, words);
         assert.deepEqual(readExceptions(state.repo, 1), []);
       } finally {
+        state.restore();
+      }
+    }
+  });
+});
+
+describe("a defect report of a stop the framework caused", () => {
+  const STOP = {
+    kind: "verification",
+    code: "cap-unresolved",
+    reason:
+      "[cap-unresolved-at-terminal] C:\\Users\\alice\\work\\src\\widget.py still fails; " +
+      "remote https://git.example.org/alice/secret.git; reviewed for Alice Example",
+    class: "first",
+    step_id: null,
+    at: "2026-11-11T10:00:00-05:00",
+  };
+  function stopped(stop: Record<string, unknown> | null, history: Record<string, unknown>[] = []) {
+    const repo = tempDir("report-");
+    seed(repo, SEED);
+    const restore = cleanRepoAnswers(repo);
+    const sessionsDir = join(repo, "docs", "sessions");
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "claude-code", phase: "verify",
+      seq: 5, invocations: 0, max_invocations: 24, accepted_steps: [] as string[], baseline_tree: null,
+      stop, stop_history: history as never, started_at: "2026-11-11T09:00:00-05:00", updated_at: "2026-11-11T10:00:00-05:00",
+    });
+    return { repo, sessionsDir, restore };
+  }
+  /** An extension's own manifest above a stand-in package root, as the VSIX lays it out. */
+  function extensionRoot(): string {
+    const extension = tempDir("ext-");
+    writeFileSync(
+      join(extension, "package.json"),
+      JSON.stringify({ name: "dabbler-ai-orchestration", version: "9.9.9", engines: { vscode: "^1.90.0" }, bugs: { url: "https://example.com/dabbler/issues" } }),
+    );
+    mkdirSync(join(extension, "dist"));
+    return join(extension, "dist");
+  }
+
+  it("carries its four sections with the stop's framework values and none of the repository's", async () => {
+    const state = stopped(STOP);
+    try {
+      const made = await run(() => defectReport(state.sessionsDir, { packageRoot: extensionRoot() }));
+      assert.equal(made.code, EXIT_OK, made.err);
+      const path = /written to (\S+)/.exec(made.out)![1]!;
+      assert.match(path, /^\.dabbler\/reports\/s1-.*\.md$/);
+      const report = readFileSync(join(state.repo, path), "utf8");
+      assert.deepEqual(
+        [...report.matchAll(/^## (.+)$/gm)].map((found) => found[1]),
+        ["Where", "Problem", "Suggested fix", "Example"],
+      );
+      for (const value of ["`verification`", "`cap-unresolved`", "`verify`", "`cap-unresolved-at-terminal`", "dabbler-ai-orchestration 9.9.9", "claude-code"]) {
+        assert.ok(report.includes(value), value);
+      }
+      assert.match(report, /Nothing has been sent/);
+      for (const leak of ["widget.py", "C:\\Users", "git.example.org", "Alice", state.repo]) {
+        assert.ok(!report.includes(leak), leak);
+      }
+      assert.match(made.out.trim().split("\n").at(-1)!, /^Reports go to https:\/\/example\.com\/dabbler\/issues -- .*Nothing has been sent\.$/);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("refuses a session that met no stop, and reports a named session's last one", async () => {
+    const clear = stopped(null);
+    try {
+      const refused = await run(() => defectReport(clear.sessionsDir));
+      assert.equal(refused.code, EXIT_BOUNDARY);
+      assert.match(refused.err, /stands at no stop/);
+      const none = await run(() => defectReport(clear.sessionsDir, { sessionNumber: 1 }));
+      assert.equal(none.code, EXIT_BOUNDARY);
+      assert.match(none.err, /met no stop the framework recorded/);
+      assert.ok(!existsSync(join(clear.repo, ".dabbler", "reports")));
+    } finally {
+      clear.restore();
+    }
+    const past = stopped(null, [{ kind: STOP.kind, code: STOP.code, reason: STOP.reason, at: STOP.at, step_id: null }]);
+    try {
+      const made = await run(() => defectReport(past.sessionsDir, { sessionNumber: 1 }));
+      assert.equal(made.code, EXIT_OK, made.err);
+      assert.match(made.out, /session 001's 'verification' stop/);
+    } finally {
+      past.restore();
+    }
+  });
+
+  /** A stop with the Mechanic's request standing, naming what is the repository's. */
+  function requested(): { repo: string; sessionsDir: string; restore: () => void } {
+    const repo = tempDir("report-");
+    seed(repo, { ...SEED, "src/Widgets/Widgets.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' });
+    const restore = cleanRepoAnswers(repo, [[["ls-files"], { stdout: "src/widget.py\nsrc/Widgets/Widgets.csproj\ndabbler.yaml\n" }]]);
+    const sessionsDir = join(repo, "docs", "sessions");
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "claude-code", phase: "verify",
+      seq: 5, invocations: 0, max_invocations: 24, accepted_steps: [] as string[], baseline_tree: null,
+      stop: STOP, started_at: "2026-11-11T09:00:00-05:00", updated_at: "2026-11-11T10:00:00-05:00",
+    });
+    writeWorkPlan(repo, 1, {
+      schema_version: 1, session_number: 1, recorded_at: "2026-11-11T09:05:00-05:00", task: "Build the widget.",
+      non_goals: ["Nothing else."], steps: [{ id: "build-widget", ask: "Build it.", files: ["src/widget.py"], checks: [{ argv: ["node", "-v"] }] }],
+    });
+    writeFileSync(
+      join(sessionsDir, "mechanic-log.md"),
+      "# Mechanic log\n\n## Session 1 -- the cap\n\n" +
+        `- **Stop at:** \`${STOP.at}\`\n- **Rule in the way:** the cap\n- **Why it is wrong here:** our widget is special\n` +
+        "- **Problem for the maintainers:** The framework refused step build-widget in module Widgets because " +
+        "src/widget.py moved; see https://git.example.org/team/repo/issues/4 or mail bob@example.org.\n" +
+        "  ```\n  const secret = 1;\n  ```\n  ~~~text\n  private_thing = 2\n  ~~~\n" +
+        `  It was at ${join(repo, "src", "widget.py")}. Contoso hit this; run \`dabbler session next\` to see it.\n` +
+        "- **Fix for the maintainers:** Measure src/widget.py against the tree of step build-widget, not HEAD.\n",
+    );
+    return { repo, sessionsDir, restore };
+  }
+
+  it("replaces what is the repository's before the reviewer reads it, and the phrases the reviewer names, with a key", async () => {
+    const state = requested();
+    const calls: RoutedCall[] = [];
+    const scripted = routeAnswers([["openai", JSON.stringify({ clean: false, phrases: ["Contoso"] })]], { calls });
+    try {
+      const made = await run(() => defectReport(state.sessionsDir));
+      assert.equal(made.code, EXIT_OK, made.err);
+      const path = /written to (\S+)/.exec(made.out)![1]!;
+      const report = readFileSync(join(state.repo, path), "utf8");
+      const key = readFileSync(join(state.repo, path.replace(/\.md$/, "-key.md")), "utf8");
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0]!.role, "reviewer");
+      for (const sent of ["widget.py", "build-widget", "git.example.org", "bob@", "const secret", "private_thing", "our widget is special", STOP.reason]) {
+        assert.ok(!calls[0]!.content.includes(sent), sent);
+        assert.ok(!report.includes(sent), sent);
+      }
+      assert.ok(!report.includes("Contoso"));
+      const problem = report.slice(report.indexOf("## Problem"), report.indexOf("## Suggested fix"));
+      const fix = report.slice(report.indexOf("## Suggested fix"), report.indexOf("## Example"));
+      for (const placeholder of ["<step-1>", "<module-1>", "<file-1>", "<url-1>", "<email-1>", "<phrase-1>"]) {
+        assert.ok(problem.includes(placeholder), placeholder);
+      }
+      assert.ok(fix.includes("<file-1>") && fix.includes("<step-1>") && !fix.includes("<file-2>"));
+      assert.ok(problem.includes("`dabbler session next`"));
+      assert.match(report, /Checked by: openai-model \(openai\), the Primary Reviewer/);
+      assert.ok(problem.includes("<repository>/<file-1>"), problem);
+      for (const line of [
+        "<file-1>: src/widget.py", "<step-1>: build-widget", "<module-1>: Widgets", "<email-1>: bob@example.org",
+        "<url-1>: https://git.example.org/team/repo/issues/4", "<phrase-1>: Contoso",
+      ]) {
+        assert.ok(key.includes(line), line);
+      }
+      assert.match(key, /yours to keep, never to send/);
+    } finally {
+      scripted();
+      state.restore();
+    }
+  });
+
+  it("leaves the two sections empty and the draft beside the report where the reviewer cannot be reached or applied", async () => {
+    const cases: [() => () => void, RegExp][] = [
+      [() => setRouteSource(() => Promise.reject(new NoCandidateError("no reviewer is reachable"))), /the Primary Reviewer could not be reached/],
+      // Flagged with nothing to replace: no check at all, never the draft as it stands.
+      [() => routeAnswers([["openai", JSON.stringify({ clean: false, phrases: [] })]]), /not clean and named no phrase/],
+    ];
+    for (const [answering, said] of cases) {
+      const state = requested();
+      const restoreRoute = answering();
+      try {
+        const made = await run(() => defectReport(state.sessionsDir));
+        assert.equal(made.code, EXIT_OK, made.err);
+        const path = /written to (\S+)/.exec(made.out)![1]!;
+        const report = readFileSync(join(state.repo, path), "utf8");
+        assert.ok(!report.includes("refused step") && !report.includes("<file-1>"));
+        assert.match(report, /## Problem\n\n_Yours to write/);
+        assert.match(report, /## Suggested fix\n\n_Yours to write/);
+        assert.match(report, said);
+        assert.match(report, /Checked by: nobody -- .* with [1-9]\d* phrase\(s\) replaced and 2 code snippet\(s\) removed\./);
+        const draft = readFileSync(join(state.repo, path.replace(/\.md$/, "-draft.md")), "utf8");
+        assert.ok(draft.includes("refused step <step-1>") && draft.includes("<file-1>"));
+        assert.match(made.out, /unchecked draft is .*-draft\.md: not part of the report/);
+      } finally {
+        restoreRoute();
         state.restore();
       }
     }

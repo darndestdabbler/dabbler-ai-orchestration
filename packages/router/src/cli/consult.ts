@@ -268,6 +268,11 @@ export function exceptionRequestLines(root: string): string[] {
     "  - **Why it is wrong here:** why this case is not the one the rule is for.",
     "  - **What going past it lets through:** what stays unmet, plainly.",
     "  - **What was tried within the rules:** each attempt and what happened.",
+    "  - **Problem for the maintainers:** the framework's behaviour that is wrong, in the framework's terms.",
+    "  - **Fix for the maintainers:** the change to the framework asked for, in the framework's terms.",
+    "- Those two lines may be offered to the framework's maintainers by `dabbler session defect-report`, so they " +
+      "name nothing of this repository -- no path, step, module, project, URL or person. The entry's other lines " +
+      "stay in this repository's record.",
     "- Its **Deterministic fix** line is the framework change the exception argues for. A person decides the " +
       "request with `dabbler session waive`; an independent check of it is `dabbler triage`, and a within-rules " +
       "path the check names is run, and what happened added to the entry, rather than argued.",

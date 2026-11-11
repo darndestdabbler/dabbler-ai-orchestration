@@ -4,6 +4,7 @@ export * from "./approved-plan.ts";
 export * from "./baseline-reanchor.ts";
 export * from "./check-ir.ts";
 export * from "./dabbler.ts";
+export * from "./defect-report-check.ts";
 export * from "./dispositions.ts";
 export * from "./disputes.ts";
 export * from "./driver-disposition.ts";

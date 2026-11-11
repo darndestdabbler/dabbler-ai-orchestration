@@ -183,6 +183,11 @@ export interface SessionWaiveOptions extends RepositoryTarget {
   readonly reason?: string;
 }
 
+export interface SessionDefectReportOptions extends RepositoryTarget {
+  /** A session other than the one in flight: its last recorded stop is reported. */
+  readonly session?: number;
+}
+
 export interface SessionVerbs {
   start(options: SessionStartOptions): Promise<RouterResult<RouterText>>;
   close(options: SessionCloseOptions): Promise<RouterResult<RouterText>>;
@@ -192,6 +197,8 @@ export interface SessionVerbs {
   decision(options: SessionDecisionOptions): Promise<RouterResult<RouterText>>;
   interrupt(options: SessionInterruptOptions): Promise<RouterResult<RouterText>>;
   waive(options: SessionWaiveOptions): Promise<RouterResult<RouterText>>;
+  /** One provider call; writes the report and prints its path. Sends nothing. */
+  defectReport(options: SessionDefectReportOptions): Promise<RouterResult<RouterText>>;
 }
 
 export interface VerifyRoundOptions extends RepositoryTarget {

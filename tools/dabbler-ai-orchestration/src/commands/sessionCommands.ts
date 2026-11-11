@@ -1211,6 +1211,69 @@ export async function runReviewException(
   return true;
 }
 
+/** What Report this stop does with the file once it is written, each a seam a test speaks through. */
+export interface ReportStopActions {
+  open: (file: string) => Thenable<unknown>;
+  copy: (text: string) => Thenable<void>;
+  browse: (address: string) => Thenable<boolean>;
+}
+
+const REPORT_STOP_ACTIONS: ReportStopActions = {
+  open: (file) => vscode.window.showTextDocument(vscode.Uri.file(file)),
+  copy: (text) => vscode.env.clipboard.writeText(text),
+  browse: (address) => vscode.env.openExternal(vscode.Uri.parse(address)),
+};
+
+/**
+ * Report this stop to Dabbler: `dabbler session defect-report`, said first to
+ * be one provider call. The report opens for reading; only when the person
+ * says so is it copied and the address its manifest names opened in their
+ * browser. Nothing is sent by anybody but them.
+ */
+export async function runReportStop(
+  repository: SessionsRepository,
+  ui: SessionRunUi,
+  router: Router = productionRouter(),
+  actions: ReportStopActions = REPORT_STOP_ACTIONS,
+): Promise<boolean> {
+  const session = repository.currentSession;
+  if (session === null) {
+    ui.showInformationMessage(`Nothing is in flight in ${repository.label}; there is no stop to report.`);
+    return false;
+  }
+  const number = String(session).padStart(3, "0");
+  const yes = await ui.confirm(
+    `Write a report of session ${number}'s stop for Dabbler's maintainers? This is one provider call: the Primary ` +
+      "Reviewer reads the report's two short passages for anything of your repository's. The report opens for you " +
+      "to read; nothing is sent.",
+    "Write the report",
+  );
+  if (!yes) return false;
+  const result = await router.session.defectReport({ repoRoot: repository.root });
+  if (!result.ok) {
+    ui.showErrorMessage(`No report was written for session ${number}'s stop — ${result.message.trim() || `exit ${result.exitCode}`}`);
+    return false;
+  }
+  const written = /written to (\S+)/.exec(result.value.stdout)?.[1];
+  if (written === undefined) {
+    ui.report(`Report this stop — session ${number}`, result.value.stdout);
+    return false;
+  }
+  const file = path.join(repository.root, written);
+  await actions.open(file);
+  const address = /^Reports go to (\S+) -- /m.exec(result.value.stdout)?.[1];
+  if (address === undefined) return true;
+  const send = await ui.choose(
+    `When you have read the report: copy it and open ${address} in your browser, to send it yourself? ` +
+      "Its key stays with you.",
+    ["Copy and open"],
+  );
+  if (send !== "Copy and open") return true;
+  await actions.copy(fs.readFileSync(file, "utf8"));
+  await actions.browse(address);
+  return true;
+}
+
 /**
  * A closed session's committed transcript, opened at the section of stops it
  * went past on a person's authority. The page is the Log phase's, written
@@ -1363,6 +1426,11 @@ export function registerSessionCommands(
       const repository = repositoryOf(arg);
       if (!repository) return;
       await runReviewException(repository, ui, router);
+    }),
+    vscode.commands.registerCommand("dabbler.reportStop", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      await runReportStop(repository, ui, router);
     }),
     vscode.commands.registerCommand("dabbler.openTranscript", async (arg: unknown) => {
       const node = asSessionNode(arg);

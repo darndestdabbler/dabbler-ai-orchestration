@@ -60,6 +60,7 @@ import {
   type SessionStartOptions,
   type SessionVerbs,
   type SessionWaiveOptions,
+  type SessionDefectReportOptions,
   type TestEvidenceRecordOptions,
   type TestEvidenceVerbs,
   type VerifyAdjudicateOptions,
@@ -329,6 +330,12 @@ export class InProcessRouter implements Router {
     waive: (o: SessionWaiveOptions) => {
       const args = ["waive"];
       optional(args, "--reason", o.reason);
+      return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
+    },
+    // A person's click, after they were told it is one provider call.
+    defectReport: (o: SessionDefectReportOptions) => {
+      const args = ["defect-report"];
+      optional(args, "--session", o.session?.toString());
       return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
     },
   };

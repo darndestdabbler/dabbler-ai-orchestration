@@ -350,7 +350,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 310 | A stop's way on is true: a blocked step is asked afresh, and a rollback says what it keeps | no | 2026-11-11 |
 | 311 | A person may authorise going past a stop, and the record says so | no | 2026-11-11 |
 | 312 | An exception is requested, checked and shown before a person authorises it | no | 2026-11-11 |
-| 313 | A stop the framework caused reaches the people who can fix it | — | not declared |
+| 313 | A stop the framework caused reaches the people who can fix it | no | 2026-11-11 |
 | 314 | Release 3.32.0 (release: 3.32.0) | — | not declared |
 | 315 | The walk through six borrowed repositories | — | not declared |
 | 316 | Release 3.32.1 (release: 3.32.1) | — | not declared |
@@ -3649,3 +3649,13 @@ Make an exception something a person is asked fairly and can decide in a minute.
 
 - 2026-11-11 — step 'explorer-mark': its files: the extension opens a session's transcript at its exceptions section by the router's own page name and anchor, which index.ts must export rather than the extension restating the name rule (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-11 — step 'explorer-mark': its files: the exceptions section's heading gains the id the Work Explorer opens the page at, and the transcript test that reads that heading is updated with it (claude-code (anthropic, claude-opus-5-5))
+
+### Session 313 — A stop the framework caused reaches the people who can fix it
+
+**Releasable: no.**
+
+Give a developer whose session the framework itself stopped one short report to read and send to Dabbler's maintainers, written so it carries nothing of their repository. `dabbler session defect-report` (or `--session N` for the last stop that session met) writes one markdown file under `.dabbler/reports/` and prints its path; it has four sections and no fifth -- Where (the router's and the extension's versions, the engine, the vehicles, the platform, and the stop's kind, code, phase and rule name: framework-owned values, never the stop's reason), Problem and Suggested fix (the Mechanic's two new mechanic-log.md lines, Problem for the maintainers and Fix for the maintainers), and Example (an empty heading that is the person's to write or leave) -- and opens by saying what it carries, who checked it, how many phrases were replaced, and that nothing has been sent. Before either drafted line enters the report the framework removes every backtick span and fenced block that is not a `dabbler` command and replaces what it recognises as the repository's with numbered placeholders, stable through the report (tracked paths and their folders, the repository's name, its module, project and step ids, foreign URLs and hosts, email addresses, and what the credential filter recognises); then the Primary Reviewer is sent the two passages and nothing else and answers clean or with exact phrases, which are replaced the same way. A key, placeholder to original, is written beside the report as the person's to keep and never send. With no reviewer reachable or no request standing, the two sections are empty headings and any draft stays in a file beside the report. Authorising a waiver prints the command; a stop that recurs on its step offers it among its ways on; the Work Explorer's "Report this stop to Dabbler" says it is one provider call, opens the report for reading and, when the person says so, copies it and opens the `bugs` address from the installed extension's own manifest. The framework makes no network call with the report. docs/driving-a-session.md and the extension README say what to do when the framework is the wall: waive on the record, send the report. version.json goes to 3.32.0, stamped, with a changelog section covering 310 to 313.
+
+**Amended after acceptance:**
+
+- 2026-11-11 — step 'replaced-and-checked': its files: The machine's credential values are read by transcript.ts's machineSecrets; exporting it keeps one implementation of that rule instead of a second copy in session.ts (claude-code (anthropic, claude-opus-5-5))

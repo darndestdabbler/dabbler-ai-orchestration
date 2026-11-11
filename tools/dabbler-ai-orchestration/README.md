@@ -46,6 +46,19 @@ cap left the fix unreviewed, so the work lands labelled unreviewed; or
 *unresolved*, where findings still stand and nothing lands but the record.
 No verdict a person can type exists anywhere in the product.
 
+**When the framework itself is the wall.** A rule that is wrong in your
+repository is fixed in Dabbler, not in your code. Waive it on the record
+with `dabbler session waive`, then send the report:
+`dabbler session defect-report` (**Report this stop to Dabbler** in the Work Explorer) writes
+one short file under `.dabbler/reports/` saying where the stop is in the
+framework, what is wrong and a suggested fix, with an example only if you
+write one. What it recognises as your repository's -- paths, names, URLs,
+credentials -- is replaced by placeholders, the Primary Reviewer checks the
+two drafted passages for anything left, and the key back to the originals
+stays with you. Neither catches everything, so read it before you send it.
+It costs one provider call, and nothing is sent: you send it yourself, to
+the address the extension names.
+
 **3. The build files are the solution.**
 The Solution Explorer reads your `.slnx`, `.sln`, `.csproj` or `pom.xml` files
 and shows each project, what it references and what references it — there is

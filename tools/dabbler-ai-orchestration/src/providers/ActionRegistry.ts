@@ -154,6 +154,14 @@ export const SESSION_ACTIONS: SessionAction[] = [
     when: hasStandingStop,
   },
   {
+    id: "dabbler.reportStop",
+    label: "Report this stop to Dabbler",
+    group: 911,
+    // A stop the framework recorded, standing now: the report is of it, and
+    // the person reads and sends what is written.
+    when: hasStandingStop,
+  },
+  {
     id: "dabbler.openTranscript",
     label: "Open Transcript at its Exceptions",
     group: 910,

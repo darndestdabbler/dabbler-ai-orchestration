@@ -1650,6 +1650,18 @@ const CHECK_CHOICE: StopChoice = {
   command: "dabbler triage",
 };
 
+/**
+ * A report for the framework's maintainers of a stop that keeps coming back:
+ * written when asked for, read by the person, and sent by nobody else.
+ */
+const REPORT_CHOICE: StopChoice = {
+  label: "Report this stop to Dabbler -- if the framework is the wall, a short report for its maintainers",
+  cost:
+    "One provider call. It writes a file under .dabbler/reports/ for you to read and send yourself; what it " +
+    "recognises as this repository's is replaced, it may not catch everything, and nothing is sent.",
+  command: "dabbler session defect-report",
+};
+
 /** Whether the run stopped the same way on the same step before this stop. */
 function recurs(stop: StopRecord, run: StopContext): boolean {
   return (run.stop_history ?? []).some(
@@ -2181,7 +2193,7 @@ export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
       : endAt === -1
         ? [...moves, MECHANIC_CHOICE]
         : [...moves.slice(0, endAt), MECHANIC_CHOICE, ...moves.slice(endAt)];
-  const choices = stop.kind !== "funds" && recurs(stop, run) ? [CHECK_CHOICE, ...offered] : offered;
+  const choices = stop.kind !== "funds" && recurs(stop, run) ? [CHECK_CHOICE, ...offered, REPORT_CHOICE] : offered;
   const next = actorSentence(
     actor,
     resume,

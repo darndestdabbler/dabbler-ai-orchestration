@@ -10,6 +10,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.32.0] — 2026-11-11
+
+**A person can finish a session the framework stopped, and tell Dabbler
+when the framework was wrong.** A stop whose rule did not fit the case had
+no way on but a cancel, a blocked step could not be asked again, and an
+exception that argued for a framework change stayed in one checkout's
+untracked record.
+
+### Added
+
+- **`dabbler session waive --reason "<why>"` takes a session past the stop
+  it stands at, once, on the record.** It waives a rule and never falsifies
+  a record: a step refused three times, a failed test run, a verification
+  and a close can be gone past. What was unmet stays written as unmet, the
+  session closes with the verdict it truly had, and the close, the status
+  view and the transcript say who authorised going on and why. It is a
+  person's verb; an engine is refused and reports the step blocked.
+  Session 311.
+- **An exception is requested, checked and shown before you decide.** The
+  Mechanic asks rather than working around a rule, in its
+  `mechanic-log.md` entry. `dabbler triage` (*Check this stop*) has a
+  provider that is not the author's check the request: it names a path
+  within the rules, or says none was found. `dabbler session waive` with no
+  reason (*Review exception*) prints the card: the rule, the request, the
+  advice and what the record will say. A session closed past a waiver
+  carries a mark in the Work Explorer. Session 312.
+- **`dabbler session defect-report` writes a short report for Dabbler's
+  maintainers** (*Report this stop to Dabbler*): where the stop is in the
+  framework, the problem and a suggested fix, and an example only if you
+  write one. What it recognises as your repository's -- paths, names, URLs,
+  credentials -- is replaced with placeholders, the Primary Reviewer checks
+  the two drafted passages for anything left, and the key back to the
+  originals stays with you. Neither catches everything, so you read it
+  first. It costs one provider call and sends nothing: you send it to the
+  extension's own issues address. Authorising a waiver
+  offers it, and so does a stop that keeps coming back. Session 313.
+
+### Fixed
+
+- **A blocked step is asked again when the session resumes.** Resuming past
+  a `blocked` stop answered the old blocked report, so `session next` kept
+  stopping on it. The step's instruction is now issued afresh. A rollback's
+  description now says what it keeps (uncommitted work as a commit on a
+  local `dabbler/rolled-back/...` branch, a landed commit under its revert)
+  and what it discards. Session 310.
+
 ## [3.31.0] — 2026-11-10
 
 **An existing repository is maintained as it is.** The framework recognised

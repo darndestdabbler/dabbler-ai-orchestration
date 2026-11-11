@@ -9,11 +9,8 @@
 // (`<extension>/dist/`, see `paths.ts`). A development checkout has no such
 // manifest above it and prints one line.
 
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-
 import { PACKAGE_ROOT } from "../paths.ts";
-import { VERSION } from "../version.ts";
+import { VERSION, extensionManifestAbove } from "../version.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;
@@ -21,31 +18,8 @@ const EXIT_USAGE = 2;
 
 /** The extension manifest above `start`, as `[name, version]`, or null. */
 export function extensionAbove(start: string): [string, string] | null {
-  let directory = dirname(start);
-  for (;;) {
-    const manifest = join(directory, "package.json");
-    if (existsSync(manifest)) {
-      try {
-        const parsed = JSON.parse(readFileSync(manifest, "utf8")) as {
-          name?: unknown;
-          version?: unknown;
-          engines?: { vscode?: unknown };
-        };
-        if (
-          typeof parsed.engines?.vscode === "string" &&
-          typeof parsed.name === "string" &&
-          typeof parsed.version === "string"
-        ) {
-          return [parsed.name, parsed.version];
-        }
-      } catch {
-        // A manifest that will not parse is not the extension's.
-      }
-    }
-    const parent = dirname(directory);
-    if (parent === directory) return null;
-    directory = parent;
-  }
+  const manifest = extensionManifestAbove(start);
+  return manifest === null ? null : [manifest.name, manifest.version];
 }
 
 /** The lines the verb prints: the router, then the extension when inside one. */

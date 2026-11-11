@@ -1100,7 +1100,9 @@ framework from parts it does not paraphrase:
   timestamp, so the request is of that stop and no later one),
   **Rule in the way** (the rule's own words, from the stop),
   **Why it is wrong here**, **What going
-  past it lets through**, and **What was tried within the rules**. Its
+  past it lets through**, **What was tried within the rules**, and two
+  lines for the framework's maintainers, **Problem for the maintainers** and
+  **Fix for the maintainers**, which name nothing of the repository. Its
   **Deterministic fix** line is the framework change the exception argues
   for. Called in unattended, it writes the request, says so in its memo and
   hands back: going past a stop is never its to do.
@@ -1134,6 +1136,47 @@ checked or authorised, and names `mechanic-log.md` and the run's
 `exceptions.jsonl`. A session closed past one carries a mark with the count
 in the Work Explorer, and *Open Transcript at its Exceptions* opens its page
 at the section that says what was unmet, who authorised going on, and why.
+
+**When the framework itself is the wall: go past it on the record with
+`session waive`, then send the report.** In a repository where the framework
+is an installed package, a rule that is wrong is fixed nowhere you can reach.
+Go past it with `session waive` as above, and then tell the people who can
+fix it:
+
+    dabbler session defect-report
+
+(*Report this stop to Dabbler* in the Work Explorer; `--session N` reports
+the last stop session N met.) It writes one markdown file under
+`.dabbler/reports/` and prints its path, and it has four sections. **Where**
+holds only values the framework owns: the router's and the extension's
+versions, the engine, the vehicles, the platform, and the stop's kind, code,
+phase and rule. **Problem** and **Suggested fix** are the Mechanic's two
+lines for the maintainers, from its request, written in the framework's
+terms. **Example** is yours to write or to leave empty. The stop's reason,
+the engine's notes, the request's other lines and the advice are never in
+it, and neither is the reason you gave `session waive`: they are about your
+repository, and they stay in its record.
+
+Before either drafted line goes in, the framework removes every code snippet
+that is not a `dabbler` command. It replaces what it recognises as your
+repository's -- tracked paths and their folders, the repository's name, its
+modules, projects and step ids, URLs and hosts that are not the
+framework's, email addresses, credentials -- with numbered placeholders
+such as `<file-1>`. Then the Primary Reviewer is sent those two passages
+and nothing else, and names any phrase that is still yours; each one is
+replaced the same way, and nothing is rewritten. The key, placeholder to
+original, sits beside the report: it is yours to keep and never to send.
+Where no reviewer can be reached, or no request stands, the two sections
+are left for you to write, and any draft stays in a separate file beside
+the report. Drafted prose that nobody checked never goes into the report.
+
+Writing it is one provider call, made when you ask and not before. Sending
+it is yours: the last line names the `bugs` address in the installed
+extension's own manifest, and the Work Explorer copies the report and opens
+that address only when you say so. The framework makes no network call with
+a report, and nothing in configuration can make it. The replacement and the
+check do not catch everything, so read the report before you send it -- it
+is short so that you can.
 
 **A cancelled session ends its loop.** The loop reads the ledger at every
 phase boundary, while it waits for an answer, while a job runs, and again

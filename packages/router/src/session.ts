@@ -59,7 +59,7 @@ import {
   type RouterConfig,
   type TranscriptCarry,
 } from "./config.ts";
-import { commitSessionTranscript, isCancelledPage } from "./transcript.ts";
+import { commitSessionTranscript, isCancelledPage, machineSecrets } from "./transcript.ts";
 import {
   credentialStops,
   pastedKeyRefusal,
@@ -107,14 +107,22 @@ import {
   waiverConsequence,
 } from "./driver.ts";
 import type { DriverInstruction, DriverRun } from "./generated/index.ts";
-import { VERSION } from "./version.ts";
+import { type ExtensionManifest, VERSION, extensionManifestAbove } from "./version.ts";
+import { PACKAGE_ROOT } from "./paths.ts";
+import { citedRules } from "./triage.ts";
+import { readProjectGraph } from "./projectGraph.ts";
+import { looksLikeASecret } from "./credentials.ts";
+import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
+import type { DefectReportCheck } from "./generated/defect-report-check.ts";
 import {
   CAUSE_NOT_LISTED,
   CAUSE_NO_KEY,
   CAUSE_UNREAD,
   NoCandidateError,
+  RouterError,
   apiLadder,
   prose,
+  route,
   seatLadder,
 } from "./route.ts";
 import { ROLE_AUXILIARY_REVIEWER, ROLE_PRIMARY_REVIEWER } from "./selection.ts";
@@ -4514,12 +4522,479 @@ export function waiveStop(sessionsDir: string, options: WaiveCliOptions): number
     writeOut(
       `waive: session ${shown} goes past its '${stop.kind}' stop: ${reason}. What was unmet ` +
         "stays written as unmet, and the record says you authorised going on. Carry on with " +
-        "`dabbler session next`.\n",
+        "`dabbler session next`.\n" +
+        "If the rule was the framework's mistake, `dabbler session defect-report` writes a short report for you " +
+        "to read and send to its maintainers: one provider call, made only when you run it, and nothing is sent.\n",
     );
     return EXIT_OK;
   } finally {
     releaseLock(lock);
   }
+}
+
+// --- the defect report -------------------------------------------------------
+
+/** Where defect reports are written: beside the run records, never tracked. */
+export const REPORTS_DIRNAME = "reports";
+
+export interface DefectReportOptions {
+  /** A session other than the one in flight: its last recorded stop is reported. */
+  readonly sessionNumber?: number | null;
+  /** Where the router runs from, so the extension's manifest above it is found. */
+  readonly packageRoot?: string;
+}
+
+/** A stop as the report reads it: the framework's values and its phase, never its reason's words. */
+interface ReportedStop {
+  readonly kind: string;
+  readonly code: string | null;
+  readonly at: string;
+  readonly phase: string | null;
+  readonly rule: string | null;
+}
+
+/** The stop a report is of: the standing one, or with a session named the last that session's run recorded. */
+function reportedStop(run: DriverRun | null, named: boolean): ReportedStop | null {
+  if (run === null) return null;
+  const stop = run.stop ?? (named ? run.stop_history?.at(-1) ?? null : null);
+  if (stop === null) return null;
+  const phase =
+    run.stop !== null && run.stop.at === stop.at
+      ? run.phase
+      : run.resumed_from?.at === stop.at
+        ? run.resumed_from.phase
+        : null;
+  return { kind: stop.kind, code: stop.code ?? null, at: stop.at, phase, rule: citedRules([stop.reason])[0] ?? null };
+}
+
+/** The vehicle this checkout's reviewers are reached through, or why it could not be read. */
+function reviewingVehicle(repoRoot: string): string {
+  try {
+    return explainReviewingTransport(loadConfig(undefined, repoRoot), null, repoRoot).transport;
+  } catch {
+    return "not readable from this checkout's configuration";
+  }
+}
+
+/** Where the report says reports go, from the installed extension's own manifest. */
+function sendToLine(manifest: ExtensionManifest | null): string {
+  if (manifest === null) {
+    return "No extension manifest was found above this router, so there is no address to name. Nothing has been sent.";
+  }
+  if (manifest.bugs === null) {
+    return `The extension's manifest (${manifest.name} ${manifest.version}) names no address for reports. Nothing has been sent.`;
+  }
+  return `Reports go to ${manifest.bugs} -- read the report, then send it yourself if you choose. Nothing has been sent.`;
+}
+
+/** An empty section for the person to write, said to be theirs. */
+function personsSection(heading: string, words: string): string[] {
+  return [`## ${heading}`, "", `_${words}_`, ""];
+}
+
+/**
+ * The report's four sections and its opening lines. Where carries values the
+ * framework owns -- they locate the rule in the framework's source and
+ * nothing in the repository's -- and never the stop's reason, which can carry
+ * a path or a step.
+ */
+function reportText(parts: {
+  readonly stop: ReportedStop;
+  readonly engine: string;
+  readonly reviewing: string;
+  readonly extension: ExtensionManifest | null;
+  /** Who checked the drafted passages, as one sentence. */
+  readonly checked: string;
+  /** The two checked passages, or null where they are the person's to write. */
+  readonly passages: { readonly problem: string; readonly fix: string } | null;
+}): string {
+  const { stop, passages } = parts;
+  const section = (heading: string, text: string | undefined, words: string): string[] =>
+    text === undefined || text === "" ? personsSection(heading, words) : [`## ${heading}`, "", text, ""];
+  return [
+    "# Dabbler defect report",
+    "",
+    "> This report carries the framework's versions, where the stop is in the framework's own code, and the " +
+      "sections below. The stop's reason is left out, and what the framework recognised as your repository's in " +
+      "the drafted passages is replaced -- recognising is not catching everything, so read it before you send it.",
+    `> Checked by: ${parts.checked}`,
+    "> Nothing has been sent. Read it, and send it yourself if you choose.",
+    "",
+    "## Where",
+    "",
+    `- Router: dabbler-ai-router ${VERSION}`,
+    `- Extension: ${parts.extension === null ? "not running inside the extension" : `${parts.extension.name} ${parts.extension.version}`}`,
+    `- Engine: ${parts.engine}`,
+    `- Vehicles: authoring through the engine's CLI; reviewing through ${parts.reviewing}`,
+    `- Platform: ${process.platform} ${process.arch}, Node ${process.version}`,
+    `- Stop: kind \`${stop.kind}\`, code \`${stop.code ?? "none"}\`, phase \`${stop.phase ?? "not recorded"}\`, ` +
+      `rule \`${stop.rule ?? "none cited"}\``,
+    "",
+    ...section("Problem", passages?.problem, "Yours to write: what the framework did that was wrong, in the framework's terms."),
+    ...section("Suggested fix", passages?.fix, "Yours to write: what the framework should do instead."),
+    ...personsSection(
+      "Example",
+      "Yours to write or to leave empty. The framework puts nothing here; what you add is sent as you wrote it.",
+    ),
+  ].join("\n");
+}
+
+/**
+ * `dabbler session defect-report`: one short markdown file for a stop the
+ * framework recorded, for a person to read and send to the framework's
+ * maintainers. It is written under `.dabbler/reports/`, its path is printed,
+ * and nothing is sent: the person is the one who sends it.
+ */
+export async function defectReport(sessionsDir: string, options: DefectReportOptions = {}): Promise<number> {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`defect-report: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  const repoRoot = repoRootFor(sessionsDir);
+  if (repoRoot === null) {
+    writeErr(`defect-report: not inside a git repository: ${sessionsDir}\n`);
+    return EXIT_BOUNDARY;
+  }
+  const named = options.sessionNumber !== undefined && options.sessionNumber !== null;
+  const raw = readRawSessionState(sessionsDir);
+  const number = named
+    ? (options.sessionNumber as number)
+    : (((raw ? derivedView(raw) : null)?.["currentSession"] ?? null) as number | null);
+  if (number === null) {
+    writeErr(
+      `defect-report: refused -- no session is in flight under ${sessionsDir}; ` +
+        "`--session N` reports the last stop session N met.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+  const shown = sessionDisplayNumber(number);
+  const run = readRun(repoRoot, number);
+  const stop = reportedStop(run, named);
+  if (run === null || stop === null) {
+    writeErr(
+      `defect-report: refused -- session ${shown} ${named ? "met no stop the framework recorded" : "stands at no stop"}, ` +
+        "so there is nothing to report.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+  const extension = extensionManifestAbove(options.packageRoot ?? PACKAGE_ROOT);
+  const directory = join(repoRoot, ".dabbler", REPORTS_DIRNAME);
+  const name = `s${number}-${stop.at.replace(/[^0-9A-Za-z]+/g, "-").replace(/-+$/, "")}`;
+  const shownPath = (file: string): string => relative(repoRoot, join(directory, file)).split("\\").join("/");
+
+  // The Mechanic's two lines for the maintainers, scrubbed before anybody --
+  // the reviewer included -- reads them.
+  const request = readExceptionRequest(sessionsDir, number, stop.at);
+  const problem = request === null ? null : maintainerLine(request, "Problem for the maintainers");
+  const fix = request === null ? null : maintainerLine(request, "Fix for the maintainers");
+  const holders = new Placeholders();
+  let passages: { problem: string; fix: string } | null = null;
+  let checked: string;
+  let draft: string | null = null;
+  if (problem === null && fix === null) {
+    checked =
+      `nobody -- ${request === null ? "no request for an exception stands for this stop" : "the request carries no lines for the maintainers"}, ` +
+      "so nothing was drafted and 0 phrases were replaced. The two sections are yours to write.";
+  } else {
+    const names = repositoryNames(repoRoot, number, extension);
+    const drafted = { problem: scrubPassage(problem ?? "", names, holders), fix: scrubPassage(fix ?? "", names, holders) };
+    const review = await checkPassages(drafted, number);
+    if (typeof review === "string") {
+      draft = `${name}-draft.md`;
+      checked =
+        `nobody -- ${review}. Drafted prose nobody checked is never in this report: the two sections are yours to ` +
+        `write, and the unchecked draft is beside it in ${draft}, with ${holders.replaced} phrase(s) replaced and ` +
+        `${holders.removed} code snippet(s) removed.`;
+      writeDraft(directory, draft, drafted);
+    } else {
+      passages = {
+        problem: replacePhrases(drafted.problem, review.phrases, holders),
+        fix: replacePhrases(drafted.fix, review.phrases, holders),
+      };
+      checked =
+        `${review.model} (${review.provider}), the Primary Reviewer${review.simulated ? " -- SIMULATED, served by a script" : ""}, ` +
+        `who was sent the two passages below and nothing else; ${holders.replaced} phrase(s) replaced and ` +
+        `${holders.removed} code snippet(s) removed. The key to what was replaced is beside this file and stays with you.`;
+    }
+  }
+  const text = reportText({ stop, engine: run.engine, reviewing: reviewingVehicle(repoRoot), extension, checked, passages });
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, `${name}.md`), `${text}\n`, "utf8");
+  const key = `${name}-key.md`;
+  writeFileSync(join(directory, key), keyText(`${name}.md`, holders), "utf8");
+  writeOut(
+    [
+      `defect-report: session ${shown}'s '${stop.kind}' stop, written to ${shownPath(`${name}.md`)}`,
+      `The key to its placeholders is ${shownPath(key)}: yours to keep, never to send.`,
+      ...(draft === null ? [] : [`The unchecked draft is ${shownPath(draft)}: not part of the report.`]),
+      sendToLine(extension),
+      "",
+    ].join("\n"),
+  );
+  return EXIT_OK;
+}
+
+/** A request's line for the maintainers, with its continuation lines, or null where it has none. */
+function maintainerLine(entry: string, label: string): string | null {
+  const lines = entry.split(/\r?\n/);
+  const at = lines.findIndex((line) => line.trimStart().startsWith(`- **${label}:**`));
+  if (at === -1) return null;
+  const taken = [(lines[at] as string).replace(`- **${label}:**`, "").trim()];
+  for (const line of lines.slice(at + 1)) {
+    if (line.trimStart().startsWith("- ") || line.startsWith("#") || line.trim() === "") break;
+    taken.push(line.trim());
+  }
+  // Kept on their lines, so a fenced block is still one when it is removed.
+  const text = taken.join("\n").trim();
+  return text === "" ? null : text;
+}
+
+/** Numbered placeholders, one per thing however often it appears, and the key back to each. */
+class Placeholders {
+  private readonly byOriginal = new Map<string, string>();
+  private readonly counts = new Map<string, number>();
+  /** How many occurrences were replaced, and how many code snippets were removed. */
+  replaced = 0;
+  removed = 0;
+
+  for(kind: string, original: string): string {
+    // One thing is one placeholder whichever separator or case spells it.
+    const identity = `${kind}\0${original.toLowerCase().split("\\").join("/")}`;
+    const known = this.byOriginal.get(identity);
+    this.replaced += 1;
+    if (known !== undefined) return known;
+    const count = (this.counts.get(kind) ?? 0) + 1;
+    this.counts.set(kind, count);
+    const placeholder = kind === "repository" ? "<repository>" : `<${kind}-${count}>`;
+    this.byOriginal.set(identity, placeholder);
+    this.originals.push([placeholder, original]);
+    return placeholder;
+  }
+
+  readonly originals: [string, string][] = [];
+}
+
+/** What a passage is scrubbed of: the repository's own names, gathered once. */
+interface RepositoryNames {
+  readonly roots: readonly string[];
+  readonly repository: string;
+  readonly files: readonly string[];
+  readonly folders: readonly string[];
+  readonly modules: readonly string[];
+  readonly steps: readonly string[];
+  /** URL prefixes that are the framework's own and stay as written. */
+  readonly ownUrls: readonly string[];
+}
+
+function repositoryNames(repoRoot: string, sessionNumber: number, extension: ExtensionManifest | null): RepositoryNames {
+  const listed = runGit(repoRoot, ["ls-files"]);
+  const files = listed.code === 0 ? listed.stdout.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "") : [];
+  const folders = new Set<string>();
+  for (const file of files) {
+    for (let folder = dirname(file); folder !== "." && folder !== ""; folder = dirname(folder)) folders.add(folder);
+  }
+  let modules: string[] = [];
+  try {
+    modules = readProjectGraph(repoRoot).projects.filter((project) => project.path !== ".").map((project) => project.name);
+  } catch {
+    modules = [];
+  }
+  const own = extension?.bugs?.replace(/\/issues\/?$/, "") ?? null;
+  return {
+    roots: [repoRoot, repoRoot.split("\\").join("/"), repoRoot.split("/").join("\\")],
+    repository: basename(repoRoot),
+    files,
+    folders: [...folders],
+    modules,
+    steps: (readWorkPlan(repoRoot, sessionNumber)?.steps ?? []).map((step) => step.id),
+    ownUrls: own === null ? [] : [own],
+  };
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** A name standing alone: not inside a longer word, path or placeholder. */
+function standalone(name: string): RegExp {
+  return new RegExp(`(?<![\\w./\\\\-])${escapeRegExp(name)}(?![\\w\\\\/-])`, "gi");
+}
+
+/** A path, spelled with either separator. */
+function pathPattern(path: string, folder: boolean): RegExp {
+  const body = path.split("/").map(escapeRegExp).join("[\\\\/]");
+  return new RegExp(`(?<![\\w./\\\\-])${body}${folder && !path.includes("/") ? "(?=[\\\\/])" : "(?![\\w\\\\/-])"}`, "gi");
+}
+
+const HOST = /(?<![\w.@/-])(?:[a-z0-9-]+\.)+(?:com|org|net|io|dev|gov|edu|us|uk|de|local|internal|corp|cloud|app|ai)(?![\w.-])/gi;
+const URL_LIKE = /\b(?:https?|ssh|git):\/\/[^\s)>\]"'`]+|\b[\w.-]+@[\w.-]+:[\w./~-]+/g;
+const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+
+/**
+ * A drafted passage with every code snippet that is not a `dabbler` command
+ * removed and what is recognisably the repository's replaced. Recognising is
+ * not catching everything: the person's reading is the last control.
+ */
+function scrubPassage(text: string, names: RepositoryNames, holders: Placeholders): string {
+  const isCommand = (inner: string): boolean => /^dabbler(\s|$)/.test(inner.trim()) && !inner.trim().includes("\n");
+  let out = text
+    .replace(/(```|~~~)[\w-]*[ \t]*\n?([\s\S]*?)(?:\1|$)/g, (whole, _fence: string, inner: string) => {
+      if (isCommand(inner)) return `\`${inner.trim()}\``;
+      holders.removed += 1;
+      return "";
+    })
+    .replace(/`([^`\n]+)`/g, (whole, inner: string) => {
+      if (isCommand(inner)) return whole;
+      holders.removed += 1;
+      return "";
+    });
+  const swap = (pattern: RegExp, kind: string): void => {
+    out = out.replace(pattern, (found) => holders.for(kind, found));
+  };
+  for (const secret of machineSecrets().filter((value) => value.length >= 8)) {
+    out = out.split(secret).join("\0");
+    out = out.replace(/\0/g, () => holders.for("credential", secret));
+  }
+  // The root with a separator after it is held as a marker, so the path that
+  // follows is still read as a tracked file or folder of the repository.
+  const ROOT_MARK = "\u0001";
+  for (const root of [...new Set(names.roots)].sort((a, b) => b.length - a.length)) {
+    out = out.replace(new RegExp(`${escapeRegExp(root)}([\\\\/])?`, "gi"), (found, separator: string | undefined) =>
+      separator === undefined ? holders.for("repository", found) : ROOT_MARK,
+    );
+  }
+  out = out.replace(URL_LIKE, (found) => {
+    const url = found.replace(/[.,;:!?]+$/, "");
+    const rest = found.slice(url.length);
+    return names.ownUrls.some((own) => url.toLowerCase().startsWith(own.toLowerCase())) ? found : `${holders.for("url", url)}${rest}`;
+  });
+  swap(EMAIL, "email");
+  const ownHosts = names.ownUrls.map((own) => own.replace(/^\w+:\/\//, "").split("/")[0]!.toLowerCase());
+  out = out.replace(HOST, (found) => (ownHosts.includes(found.toLowerCase()) ? found : holders.for("url", found)));
+  for (const file of [...names.files].sort((a, b) => b.length - a.length)) swap(pathPattern(file, false), "file");
+  for (const folder of [...names.folders].sort((a, b) => b.length - a.length)) swap(pathPattern(folder, true), "folder");
+  if (names.repository.length >= 3) swap(standalone(names.repository), "repository");
+  for (const module of names.modules.filter((name) => name.length >= 2)) swap(standalone(module), "module");
+  for (const step of names.steps) swap(standalone(step), "step");
+  out = out.replace(new RegExp(ROOT_MARK, "g"), () => `${holders.for("repository", names.roots[0] ?? "")}/`);
+  out = out.replace(/[^\s`()[\]{}<>,;"']+/g, (token) =>
+    !token.includes("://") && looksLikeASecret(token) ? holders.for("credential", token) : token,
+  );
+  return out.replace(/\s+/g, " ").trim();
+}
+
+/** Each phrase the reviewer named, replaced wherever it stands. Never a rewrite. */
+function replacePhrases(text: string, phrases: readonly string[], holders: Placeholders): string {
+  let out = text;
+  for (const phrase of [...phrases].sort((a, b) => b.length - a.length)) {
+    if (phrase.trim() === "" || !out.includes(phrase)) continue;
+    out = out.split(phrase).join("\0");
+    out = out.replace(/\0/g, () => holders.for("phrase", phrase));
+  }
+  return out;
+}
+
+export const DEFECT_REPORT_CHECK_SCHEMA = "defect-report-check.schema.json";
+
+/**
+ * The Primary Reviewer, sent the two passages and nothing else, names any
+ * phrase that is not the framework's. Its answer, or why there is none.
+ */
+async function checkPassages(
+  passages: { readonly problem: string; readonly fix: string },
+  sessionNumber: number,
+): Promise<{ model: string; provider: string; simulated: boolean; phrases: string[] } | string> {
+  const prompt = [
+    "Two short passages follow, which a developer may send to the maintainers of Dabbler, a framework that runs " +
+      "AI-led coding sessions. They should describe the framework's behaviour and a change to it, in the framework's " +
+      "own terms, and name nothing of the developer's own work.",
+    "",
+    "Name every phrase, exactly as it appears in a passage, that names something that is not the framework's own: " +
+      "a repository, file, folder, step, module, project, product, organisation, person, host, ticket or credential. " +
+      "Placeholders in angle brackets, such as <file-1>, are already replaced: leave them. Do not rewrite anything.",
+    "",
+    'Answer with JSON only: {"clean": <true or false>, "phrases": ["<each phrase, exactly as written>"]}.',
+    "",
+    "--- Problem ---",
+    passages.problem,
+    "--- Suggested fix ---",
+    passages.fix,
+  ].join("\n");
+  let result;
+  try {
+    result = await route(prompt, { taskType: "defect-report-check", role: ROLE_PRIMARY_REVIEWER, sessionNumber });
+  } catch (error) {
+    if (error instanceof RouterError) return `the Primary Reviewer could not be reached (${error.message})`;
+    throw error;
+  }
+  let text = result.content.trim();
+  if (text.startsWith("```")) {
+    const firstBreak = text.indexOf("\n");
+    const closing = text.lastIndexOf("```");
+    if (firstBreak >= 0 && closing > firstBreak) text = text.slice(firstBreak + 1, closing).trim();
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return `the Primary Reviewer, ${result.model_name} (${result.provider}), answered in a shape that could not be read`;
+  }
+  const failure = schemaFailure(parsed, loadSchemaFile(DEFECT_REPORT_CHECK_SCHEMA), "defect report check");
+  const who = `the Primary Reviewer, ${result.model_name} (${result.provider}),`;
+  if (failure) return `${who} answered in a shape that could not be used`;
+  // An answer that cannot be applied exactly is no check at all: the draft
+  // stays out of the report rather than going in with what was flagged.
+  const answer = parsed as DefectReportCheck;
+  if (answer.clean === answer.phrases.length > 0) {
+    return `${who} answered ${answer.clean ? "clean and named phrases" : "not clean and named no phrase"}, so its answer could not be applied`;
+  }
+  const passagesText = `${passages.problem}\n${passages.fix}`;
+  if (answer.phrases.some((phrase) => phrase.trim() === "" || !passagesText.includes(phrase))) {
+    return `${who} named a phrase that is not in the passages as written, so its answer could not be applied`;
+  }
+  return {
+    model: result.model_name,
+    provider: result.provider,
+    simulated: result.metadata["simulated"] === true,
+    phrases: answer.phrases,
+  };
+}
+
+/** The scrubbed draft nobody checked, beside the report and never in it. */
+function writeDraft(directory: string, file: string, drafted: { readonly problem: string; readonly fix: string }): void {
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    join(directory, file),
+    [
+      "# Unchecked draft -- not part of the report",
+      "",
+      "> No reviewer read these passages. Placeholders are already in them; the key beside the report maps each back.",
+      "> Copy what you choose into the report after reading it yourself.",
+      "",
+      "## Problem",
+      "",
+      drafted.problem,
+      "",
+      "## Suggested fix",
+      "",
+      drafted.fix,
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+}
+
+/** The key, placeholder to original: the person's to keep and never to send. */
+function keyText(report: string, holders: Placeholders): string {
+  return [
+    `# Key to ${report} -- yours to keep, never to send`,
+    "",
+    "Each placeholder in the report, and what it replaced. Put back what you choose before sending; this file " +
+      "stays with you.",
+    "",
+    ...(holders.originals.length === 0 ? ["_Nothing was replaced._"] : holders.originals.map(([placeholder, original]) => `- ${placeholder}: ${original}`)),
+    "",
+  ].join("\n");
 }
 
 export { DECIDERS, SESSION_PLAN_FILENAME };

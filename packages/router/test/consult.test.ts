@@ -154,7 +154,7 @@ describe("mechanicBrief", () => {
     const unattended = mechanicBrief(sessionsDir, { memoPath: ".dabbler/scratch/mechanic-memo-s1.md" });
     for (const brief of [mechanicBrief(sessionsDir), unattended]) {
       assert.match(brief, /do not work around it -- ask/);
-      for (const line of ["Stop at", "Rule in the way", "Why it is wrong here", "What going past it lets through", "What was tried within the rules"]) {
+      for (const line of ["Stop at", "Rule in the way", "Why it is wrong here", "What going past it lets through", "What was tried within the rules", "Problem for the maintainers", "Fix for the maintainers"]) {
         assert.ok(brief.includes(`**${line}:**`), line);
       }
     }

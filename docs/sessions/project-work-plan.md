@@ -3613,3 +3613,9 @@ Let a person amend an accepted step's checks, and tell the engine the truth abou
 **Releasable: yes.**
 
 Release 3.31.0: the framework packs and publishes what is on the trunk.
+
+### Session 310 — The walk through six borrowed repositories
+
+**Rolled back:**
+
+- 2026-11-11 — session 310 — Rollback to Start of This Session from the Work Explorer (operator)

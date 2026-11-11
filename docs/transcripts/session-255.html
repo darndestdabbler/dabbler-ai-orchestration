@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 255 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.absent { background: var(--panel); border-left: 3px solid var(--tone-warn); padding: .6rem .9rem; margin: 1.25rem 0; }
+.absent ul { margin: .35rem 0 0; padding-left: 1.2rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 255 transcript</h1>
+<p class="stamp">Rendered 2026-10-16T14:08:31.629Z by dabbler-ai-router 3.21.0 at 2926057896531929b1d3b31ecf52c3a9a6ab3461.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-16T10:01:37.724-04:00.</p>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[14:01:37]</span> <span class="muted">run-started</span> session=255 mode=pull</div>
+<div class="line"><span class="at">[14:01:37]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[14:02:26]</span> <span class="muted">run-resumed</span> session=255 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[14:02:26]</span> <span class="muted">plan-accepted</span> steps=[&quot;record-named-not-carried&quot;,&quot;seat-window-is-providers&quot;] non_goals=4</div>
+<div class="line"><span class="at">[14:02:26]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[14:02:26]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=record-named-not-carried</div>
+<div class="line"><span class="at">[14:03:39]</span> <span class="muted">run-resumed</span> session=255 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:03:43]</span> <span class="muted">check-passed</span> step=record-named-not-carried argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/facts.test.ts&quot;]</div>
+<div class="line"><span class="at">[14:03:47]</span> <span class="muted">check-failed</span> step=record-named-not-carried suite=typescript command=node scripts/suite.mjs container packages/router/test/facts.test.ts</div>
+<div class="line"><span class="at">[14:03:47]</span> <span class="muted">report-rejected</span> seq=2 step=record-named-not-carried rejection=1 reasons=[&quot;[check-failed] named tests failed: node scripts/suite.mjs container packages/router/test/facts.test.ts -&gt; exit 1\nnmeasurable change set from an empty one\n    ok 1 - carries counts rather than line numbers, omits what is absent, and tells an unmeasurable change set from an empty one\n      ---\n      duration_ms: 0.273635\n      type: 'test'\n      ...\n    # Subtest: appends one sorted-key line per collection\n    ok 2 - appends one sorted-key line per collection\n      ---\n      duration_ms: 1.027103\n      type: 'test'\n      ...\n    1..2\nok 7 - the record\n  ---\n  duration_ms: 1.371426\n  type: 'suite'\n  ...\n1..7\n# tests 11\n# suites 7\n# pass 10\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 749.586991&quot;]</div>
+<div class="line"><span class="at">[14:03:47]</span> <span class="muted">instruction-issued</span> seq=3 kind=rejection step=record-named-not-carried reasons=1</div>
+<div class="line"><span class="at">[14:04:28]</span> <span class="muted">run-resumed</span> session=255 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:04:31]</span> <span class="muted">check-passed</span> step=record-named-not-carried argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/facts.test.ts&quot;]</div>
+<div class="line"><span class="at">[14:04:34]</span> <span class="muted">named-tests-passed</span> step=record-named-not-carried suite=typescript command=node scripts/suite.mjs container packages/router/test/facts.test.ts</div>
+<div class="line"><span class="at">[14:04:34]</span> <span class="muted">report-accepted</span> seq=3 step=record-named-not-carried files=[&quot;packages/router/src/facts.ts&quot;,&quot;packages/router/test/facts.test.ts&quot;]</div>
+<div class="line"><span class="at">[14:04:34]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=seat-window-is-providers</div>
+<div class="line"><span class="at">[14:05:17]</span> <span class="muted">run-resumed</span> session=255 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:05:19]</span> <span class="muted">check-passed</span> step=seat-window-is-providers argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/route.test.ts&quot;]</div>
+<div class="line"><span class="at">[14:05:23]</span> <span class="muted">named-tests-passed</span> step=seat-window-is-providers suite=typescript command=node scripts/suite.mjs container packages/router/test/route.test.ts</div>
+<div class="line"><span class="at">[14:05:23]</span> <span class="muted">report-accepted</span> seq=4 step=seat-window-is-providers files=[&quot;packages/router/src/route.ts&quot;,&quot;packages/router/test/route.test.ts&quot;]</div>
+<div class="line"><span class="at">[14:05:23]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[14:05:24]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[14:05:26]</span> <span class="muted">job-started</span> name=verification pid=36380 log=.dabbler/runs/s255/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[14:06:43]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s255/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[14:06:43]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[14:06:43]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[14:06:43]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[14:06:44]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=42640 log=.dabbler/runs/s255/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[14:06:47]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s255/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[14:06:47]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[14:06:49]</span> <span class="muted">job-started</span> name=run of record: typescript pid=38268 log=.dabbler/runs/s255/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[14:08:01]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s255/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[14:08:01]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[14:08:02]</span> <span class="muted">job-started</span> name=run of record: extension pid=2864 log=.dabbler/runs/s255/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[14:08:20]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s255/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[14:08:20]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[14:08:24]</span> <span class="muted">landed</span> commit=529a7d31</div>
+<div class="line"><span class="at">[14:08:24]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[14:08:24]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[14:08:24]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[14:08:25]</span> <span class="muted">job-started</span> name=close pid=13804 log=.dabbler/runs/s255/driver/jobs/close.log</div>
+<div class="line"><span class="at">[14:08:31]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s255/driver/jobs/close.log</div>
+<div class="line"><span class="at">[14:08:31]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gemini-4-argon</td><td>google</td><td>api</td><td>8</td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>70s</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Steps accepted</h2>
+<p><code>record-named-not-carried</code>, <code>seat-window-is-providers</code></p>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(output not carried)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(output not carried)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(output not carried)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(output not carried)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(output not carried)</span></div>
+</main>
+</body>
+</html>

@@ -204,6 +204,9 @@ export function sessionTranscriptName(sessionNumber: number): string {
   return `session-${String(sessionNumber).padStart(3, "0")}.html`;
 }
 
+/** The id of the page's section of stops gone past on a person's authority. */
+export const EXCEPTIONS_ANCHOR = "exceptions";
+
 // --- Reading one session's records --------------------------------------------
 
 /** How much of the jobs' own output a transcript carries. */
@@ -670,8 +673,9 @@ function renderEvent(event: DriverEvent, secrets: readonly string[]): string {
   );
 }
 
-function section(title: string, body: string): string {
-  return body === "" ? "" : `<h2>${escapeHtml(title)}</h2>\n${body}`;
+function section(title: string, body: string, id?: string): string {
+  if (body === "") return "";
+  return `<h2${id === undefined ? "" : ` id="${id}"`}>${escapeHtml(title)}</h2>\n${body}`;
 }
 
 function table(
@@ -1085,7 +1089,7 @@ export function renderSessionTranscript(
     section("Session Plan", reading.planSection === null ? "" : planMarkdownToHtml(reading.planSection)),
     section("Work Plan", renderWorkPlan(repoRoot, sessionNumber, reading.workPlan, reading.run, reading.events)),
     section("Where it stopped", renderStopBlock(reading.run)),
-    section("Gone past on a person's authority", renderExceptions(repoRoot, sessionNumber, secrets)),
+    section("Gone past on a person's authority", renderExceptions(repoRoot, sessionNumber, secrets), EXCEPTIONS_ANCHOR),
     section(
       "What the framework said",
       reading.events.length === 0

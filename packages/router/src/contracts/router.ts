@@ -174,6 +174,15 @@ export interface SessionInterruptOptions extends RepositoryTarget {
   readonly stop?: boolean;
 }
 
+export interface SessionWaiveOptions extends RepositoryTarget {
+  /**
+   * Why the session may go past the stop it stands at. Absent prints the
+   * card -- the stop, the request, the advice and what the record will say --
+   * and changes nothing.
+   */
+  readonly reason?: string;
+}
+
 export interface SessionVerbs {
   start(options: SessionStartOptions): Promise<RouterResult<RouterText>>;
   close(options: SessionCloseOptions): Promise<RouterResult<RouterText>>;
@@ -182,6 +191,7 @@ export interface SessionVerbs {
   rollback(options: SessionRollbackOptions): Promise<RouterResult<RouterText>>;
   decision(options: SessionDecisionOptions): Promise<RouterResult<RouterText>>;
   interrupt(options: SessionInterruptOptions): Promise<RouterResult<RouterText>>;
+  waive(options: SessionWaiveOptions): Promise<RouterResult<RouterText>>;
 }
 
 export interface VerifyRoundOptions extends RepositoryTarget {

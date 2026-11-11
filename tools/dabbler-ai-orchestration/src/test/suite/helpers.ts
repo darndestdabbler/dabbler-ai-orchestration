@@ -14,6 +14,7 @@ import type {
   Router,
   RouterResult,
   SessionInterruptOptions,
+  SessionWaiveOptions,
   ProgressProjection as ProjectionPayload,
   ProgressProjectionSession as SessionRecord,
   ProgressProjectionVerification as SessionVerification,
@@ -205,6 +206,8 @@ export function fakeRouter(
   /** What the Configuration section asked the router to set. */
   configureOptions: ConfigureOptions[];
   interruptOptions: SessionInterruptOptions[];
+  /** What `session waive` was asked: the card has no reason, the waiver one. */
+  waiveOptions: SessionWaiveOptions[];
   /** Which repository each writing `deps` verb was asked about. */
   depsCalls: { verb: string; options: DepsRepositoryOptions }[];
   /** What `affected` was asked to plan: the hypothetical paths, when any. */
@@ -218,6 +221,7 @@ export function fakeRouter(
   const configureOptions: ConfigureOptions[] = [];
   const bootstrapOptions: BootstrapOptions[] = [];
   const interruptOptions: SessionInterruptOptions[] = [];
+  const waiveOptions: SessionWaiveOptions[] = [];
   const depsCalls: { verb: string; options: DepsRepositoryOptions }[] = [];
   const affectedOptions: AffectedOptions[] = [];
   const answer = <T,>(verb: string, value: T): Promise<RouterResult<T>> => {
@@ -234,6 +238,7 @@ export function fakeRouter(
     bootstrapOptions,
     configureOptions,
     interruptOptions,
+    waiveOptions,
     depsCalls,
     affectedOptions,
     router: {
@@ -247,6 +252,10 @@ export function fakeRouter(
         interrupt: (options: SessionInterruptOptions) => {
           interruptOptions.push(options);
           return answer("session interrupt", { stdout: message });
+        },
+        waive: (options: SessionWaiveOptions) => {
+          waiveOptions.push(options);
+          return answer("session waive", { stdout: message });
         },
       },
       verify: {

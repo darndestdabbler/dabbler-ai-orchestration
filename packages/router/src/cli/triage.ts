@@ -5,9 +5,11 @@
 // and a button that spends one is a button somebody presses to see what it
 // does.
 //
-// It prints and it writes nothing. The classification is an opinion, and an
-// opinion that quietly landed on the record would be indistinguishable from
-// a finding the framework stands behind.
+// It prints, and keeps the answer as one advice row in the run's
+// `exceptions.jsonl`, marked as advice with the adviser named: an opinion on
+// the record is kept apart from anything the framework stands behind, and
+// no gate reads it. `dabbler session waive` with no reason shows it on the
+// card in the adviser's words.
 
 import { SessionsRootNotFoundError, resolveSessionsDir } from "../evidence.ts";
 import { IdentityResolutionError } from "../identity.ts";
@@ -28,7 +30,10 @@ function usage(): string {
     "",
     "Ask a provider that is not the working engine's to classify a stopped session:",
     "engine-error, framework-defect or plan-defect, with the minimal amendment and one",
-    "recommendation. It reads the record and writes nothing.",
+    "recommendation. Where a request for an exception stands in mechanic-log.md it",
+    "checks that too: a within-rules path or \"none found\", whether its account",
+    "matches the record, and whether it is plain. The answer is kept as an advice",
+    "row in the run's exceptions.jsonl; it authorises nothing.",
     "",
     "options:",
     "  -h, --help            show this help message and exit",
@@ -133,6 +138,9 @@ export async function triageVerb(argv: string[]): Promise<number> {
           reasoning: outcome.answer.reasoning,
           recommendation: outcome.answer.recommendation,
           amendment: outcome.answer.amendment ?? null,
+          within_rules: outcome.answer.within_rules ?? null,
+          account: outcome.answer.account ?? null,
+          plain: outcome.answer.plain ?? null,
           adviser: outcome.adviser,
           excluded: outcome.excluded,
           simulated: outcome.simulated,
@@ -162,6 +170,16 @@ export async function triageVerb(argv: string[]): Promise<number> {
     );
   }
   lines.push(`  recommendation: ${outcome.answer.recommendation}`, "");
+  const { within_rules: path, account, plain } = outcome.answer;
+  if (path !== undefined) {
+    lines.push(
+      "  the request for an exception, checked:",
+      `  within the rules: ${path}`,
+      `  its account of the stop: ${account?.matches ? "matches the record" : `differs from the record: ${account?.differences ?? ""}`}`,
+      `  plain to a person who was not there: ${plain?.followable ? "yes" : `no: ${plain?.unclear ?? ""}`}`,
+      "",
+    );
+  }
   writeOut(lines.join("\n"));
   return EXIT_OK;
 }

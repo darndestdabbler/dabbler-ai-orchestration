@@ -157,12 +157,17 @@ export { configurationSourceDirs } from "./preferences.ts";
 // as an ANSI escape; the transcript paints it as a CSS class; what the line
 // IS is settled in one place.
 export {
+  EXCEPTIONS_ANCHOR,
   TONES,
   fieldTone,
   humanizeStepKey,
+  sessionTranscriptName,
   lineTone,
   verdictTone,
   type PaintedTone,
   type ThemeKind,
   type Tone,
 } from "./transcript.ts";
+// Where a session's page is, and the section the Work Explorer opens it at,
+// by the names the writer uses rather than a second statement of them.
+export { TRANSCRIPTS_DIRNAME } from "./journal.ts";

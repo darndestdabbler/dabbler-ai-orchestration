@@ -802,6 +802,23 @@ describe("a stop, as a person reads it", () => {
     assert.ok(onward.cost.includes(AMEND_CHECKS_COMMAND), onward.cost);
   });
 
+  it("leads with the check where the same stop recurs on its step, and not otherwise", () => {
+    const stop = { kind: "rejected-thrice", code: null, reason: "refused 3 times", step_id: "widget", at: "2026-11-11T10:00:00-05:00" };
+    const context = { session_number: 7, phase: "work", engine: "cli" };
+    const earlier = { kind: "rejected-thrice", step_id: "widget", at: "2026-11-11T09:00:00-05:00" };
+    const again = renderStop(stop as never, { ...context, stop_history: [earlier, { ...stop }] });
+    assert.equal(again.choices[0]!.command, "dabbler triage");
+    assert.match(again.choices[0]!.cost, /One provider call\. It is advice only/);
+    for (const history of [[{ ...stop }], [{ ...earlier, step_id: "other" }, { ...stop }], [{ ...earlier, kind: "tests" }, { ...stop }]]) {
+      const once = renderStop(stop as never, { ...context, stop_history: history });
+      assert.ok(!once.choices.some((choice) => choice.command === "dabbler triage"), once.ways);
+    }
+    // A verification's code is the situation: one dispute refused is not the cap disputed.
+    const refused = { kind: "verification", code: "dispute-refused", reason: "over the inline cap", step_id: "widget", at: "2026-11-11T10:00:00-05:00" };
+    const disputed = renderStop(refused as never, { ...context, stop_history: [{ ...refused, code: "cap-disputed", at: earlier.at }, { ...refused }] });
+    assert.ok(!disputed.choices.some((choice) => choice.command === "dabbler triage"), disputed.ways);
+  });
+
   it("offers the waiver on each stop with something to go past, as the person's, and on no other", () => {
     const WAIVE = 'dabbler session waive --reason "<why>"';
     const waivable = new Set(["rejected-thrice", "tests", "verification", "close"]);

@@ -10,10 +10,17 @@
 // **Asked for, never automatic.** An engine or a person calls it when a
 // session is stuck; no loop calls it on its own.
 //
-// **It is an opinion, and it acts on nothing.** Nothing here writes to
-// `.dabbler/runs/`, amends a plan, moves a gate or clears a stop. The caller
-// decides what to do with the answer, and where that decision relaxes
+// **It is an opinion, and it acts on nothing.** Nothing here amends a plan,
+// moves a gate or clears a stop. What it writes is one advice row in the
+// run's `exceptions.jsonl` -- the answer with the adviser named, or that
+// nobody could be reached -- marked as advice, which no gate reads. The
+// caller decides what to do with the answer, and where that decision relaxes
 // anything the framework checks, a person makes it on the record.
+//
+// Where the Mechanic has requested an exception (`mechanic-log.md`), the
+// request is read with the stop and checked: a within-rules path or "none
+// found", whether its account matches the record, and whether a person who
+// was not there could follow it.
 //
 // The exclusion is the same one verification runs under: the orchestrator's
 // effective provider, resolved by `identity` from the record rather than
@@ -35,6 +42,7 @@ import {
 } from "./driver.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
 import { resolveSessionOrchestratorIdentity } from "./identity.ts";
+import { appendAdvice, readExceptionRequest } from "./ledger.ts";
 import { readSessionState } from "./progress.ts";
 import { PACKAGE_ROOT } from "./paths.ts";
 import { DispatchError, NoCandidateError, RouterError, route } from "./route.ts";
@@ -90,6 +98,8 @@ export interface TriageArtifacts {
   /** The step the plan declares, if the stop is on one. */
   readonly step: { id: string; ask: string; files: readonly string[]; checks: unknown } | null;
   readonly transcriptTail: string;
+  /** The Mechanic's standing request for an exception, verbatim, or null. */
+  readonly request?: string | null;
 }
 
 /** `[files-changed-omits] ...` -- the rule a refusal opens with. */
@@ -154,7 +164,7 @@ export function ruleSourceFor(slugs: readonly string[]): Record<string, string> 
 }
 
 /** What the record holds about this stop, gathered and nothing more. */
-export function collectArtifacts(repoRoot: string, sessionNumber: number): TriageArtifacts {
+export function collectArtifacts(repoRoot: string, sessionNumber: number, sessionsDir: string): TriageArtifacts {
   const instruction = readInstruction(repoRoot, sessionNumber);
   const run = readRun(repoRoot, sessionNumber);
   const reasons = instruction?.reasons ?? [];
@@ -175,6 +185,7 @@ export function collectArtifacts(repoRoot: string, sessionNumber: number): Triag
         ? null
         : { id: declared.id, ask: declared.ask, files: declared.files, checks: declared.checks },
     transcriptTail: transcriptTail(repoRoot, sessionNumber, run?.invocations ?? 0),
+    request: run?.stop ? readExceptionRequest(sessionsDir, sessionNumber, run.stop.at) : null,
   };
 }
 
@@ -220,8 +231,23 @@ const ASK =
   "weakens what the framework checks. Nothing you propose is applied by the framework: a " +
   "person decides, and `relaxes_a_gate` is what they are told first.";
 
+/**
+ * What is asked more where a Mechanic has requested an exception: a check of
+ * the request, never a verdict on it. The person decides; this is advice.
+ */
+const ASK_OF_A_REQUEST =
+  "A request for an exception to the rule that stopped the session stands, in the Mechanic's words, " +
+  "below. Check it, and add three members to your JSON object:\n" +
+  '"within_rules": the exact commands that would clear the stop WITHIN the rules, or exactly "none found". ' +
+  "It is never your verdict on the request: finding no alternative is not agreeing with it.\n" +
+  '"account": {"matches": true|false, "differences": "<where the request\'s account of the stop differs ' +
+  'from the record above, or empty>"}\n' +
+  '"plain": {"followable": true|false, "unclear": "<what a person who was not there could not follow, ' +
+  'or empty>"}';
+
 export function buildTriagePrompt(artifacts: TriageArtifacts): string {
-  const parts: string[] = [ASK, "", "--- the stop ---"];
+  const request = artifacts.request ?? null;
+  const parts: string[] = [ASK, ...(request === null ? [] : ["", ASK_OF_A_REQUEST]), "", "--- the stop ---"];
   const stop = artifacts.run?.stop ?? null;
   parts.push(
     stop === null
@@ -253,6 +279,7 @@ export function buildTriagePrompt(artifacts: TriageArtifacts): string {
   parts.push(artifacts.report === null ? "(none)" : jsonBlock(artifacts.report));
   parts.push("", "--- the tail of the engine's transcript ---");
   parts.push(artifacts.transcriptTail.trim() === "" ? "(none)" : artifacts.transcriptTail);
+  if (request !== null) parts.push("", "--- the request for an exception, from mechanic-log.md ---", request);
   return parts.join("\n");
 }
 
@@ -270,7 +297,7 @@ function jsonBlock(value: unknown): string {
  * needed removing would be content this call did not ask for. What is
  * inside the fence is taken exactly as written and validated as it stands.
  */
-export function parseTriageAnswer(content: string): Triage {
+export function parseTriageAnswer(content: string, request = false): Triage {
   let text = content.trim();
   if (text.startsWith("```")) {
     const firstBreak = text.indexOf("\n");
@@ -288,7 +315,14 @@ export function parseTriageAnswer(content: string): Triage {
   }
   const failure = schemaFailure(parsed, loadSchemaFile(TRIAGE_SCHEMA), "triage answer");
   if (failure) throw new TriageError(failure);
-  return parsed as Triage;
+  const answer = parsed as Triage;
+  if (request) {
+    const missing = (["within_rules", "account", "plain"] as const).filter((member) => answer[member] === undefined);
+    if (missing.length > 0) {
+      throw new TriageError(`a request for an exception stands, and the answer omits ${missing.join(", ")}`);
+    }
+  }
+  return answer;
 }
 
 export interface TriageOutcome {
@@ -311,11 +345,9 @@ export interface TriageOptions {
 /**
  * Ask a provider that is not the working engine's to classify the stop.
  *
- * One attempt and one retry, and the retry is for a malformed answer only:
- * a schema that did not fit once may fit when the shape is said again, and
- * anything else -- an unreachable provider, an excluded one -- is a fact
- * about this rung that the caller above needs, not something to spend a
- * second call on.
+ * One provider call, and no retry: the person is told the check is one
+ * call before they ask for it. An answer that does not fit the shape is
+ * refused, naming the adviser, and asking again is the person's to do.
  */
 export async function triage(
   sessionsDir: string,
@@ -327,7 +359,7 @@ export async function triage(
     throw new TriageError(`no session is in flight under ${sessionsDir}; there is nothing to triage`);
   }
   const identity = resolveSessionOrchestratorIdentity(sessionsDir, sessionNumber);
-  const artifacts = collectArtifacts(repoRoot, sessionNumber);
+  const artifacts = collectArtifacts(repoRoot, sessionNumber, sessionsDir);
   if (artifacts.run === null) {
     throw new TriageError(
       `session ${sessionNumber} has no run record; there is no stop here to classify`,
@@ -342,68 +374,106 @@ export async function triage(
         "triage classifies a stop, and there is none to classify",
     );
   }
+  const stop = artifacts.run.stop as NonNullable<DriverRun["stop"]>;
   const excluded = [
     ...new Set([identity.effectiveProvider, ...(options.alsoExclude ?? [])].map((p) => p.toLowerCase())),
   ];
   const prompt = buildTriagePrompt(artifacts);
 
-  let last: TriageError | null = null;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    let result;
-    try {
-      result = await route(attempt === 0 ? prompt : `${prompt}\n\n${RESHAPE}`, {
-        taskType: "session-triage",
-        role: ROLE_PRIMARY_REVIEWER,
-        sessionNumber,
-        excludeProviders: excluded,
-        transport: options.transport ?? null,
-      });
-    } catch (error) {
-      if (error instanceof NoCandidateError) {
-        throw new TriageUnavailableError(
-          `no adviser exists outside ${excluded.join(", ")}: ${error.message}`,
-        );
-      }
-      // Every way the router itself can fail arrives as a TriageError, so a
-      // caller climbing a ladder sees "this rung did not answer" rather than
-      // an exception it has no rung for. An outage, an expired key and a
-      // rate limit are routine, and a ladder that fell over on one would
-      // skip the human it is supposed to end at. A DispatchError names the
-      // provider that failed, so the next rung asks somebody else.
-      if (error instanceof RouterError) {
-        throw new TriageError(
-          `the adviser could not be reached: ${error.message}`,
-          error instanceof DispatchError ? error.provider : null,
-        );
-      }
-      throw error;
-    }
-    // Asserted here as well as at the call: the offline transport builds its
-    // one candidate without consulting the exclusion.
-    if (excluded.includes(result.provider.toLowerCase())) {
-      throw new TriageError(
-        `the adviser answered on '${result.provider}', which this call excludes ` +
-          `(${excluded.join(", ")}); the answer is discarded rather than used.`,
+  let result;
+  try {
+    result = await route(prompt, {
+      taskType: "session-triage",
+      role: ROLE_PRIMARY_REVIEWER,
+      sessionNumber,
+      excludeProviders: excluded,
+      transport: options.transport ?? null,
+    });
+  } catch (error) {
+    if (error instanceof NoCandidateError) {
+      const unavailable = new TriageUnavailableError(
+        `no adviser exists outside ${excluded.join(", ")}: ${error.message}`,
       );
+      keepAdvice(repoRoot, sessionNumber, stop, { unreachable: unavailable.message });
+      throw unavailable;
     }
-    try {
-      return {
-        answer: parseTriageAnswer(result.content),
-        adviser: { model: result.model_name, provider: result.provider },
-        excluded,
-        simulated: result.metadata["simulated"] === true,
-      };
-    } catch (error) {
-      if (!(error instanceof TriageError)) throw error;
-      last = new TriageError(error.message, result.provider);
+    // Every way the router itself can fail arrives as a TriageError, so a
+    // caller climbing a ladder sees "this rung did not answer" rather than
+    // an exception it has no rung for. An outage, an expired key and a
+    // rate limit are routine, and a ladder that fell over on one would
+    // skip the human it is supposed to end at. A DispatchError names the
+    // provider that failed, so the next rung asks somebody else.
+    if (error instanceof RouterError) {
+      const unreached = new TriageError(
+        `the adviser could not be reached: ${error.message}`,
+        error instanceof DispatchError ? error.provider : null,
+      );
+      keepAdvice(repoRoot, sessionNumber, stop, { unreachable: unreached.message });
+      throw unreached;
     }
+    throw error;
   }
-  throw last as TriageError;
+  // Asserted here as well as at the call: the offline transport builds its
+  // one candidate without consulting the exclusion.
+  if (excluded.includes(result.provider.toLowerCase())) {
+    throw new TriageError(
+      `the adviser answered on '${result.provider}', which this call excludes ` +
+        `(${excluded.join(", ")}); the answer is discarded rather than used.`,
+    );
+  }
+  let outcome: TriageOutcome;
+  try {
+    outcome = {
+      answer: parseTriageAnswer(result.content, artifacts.request !== null),
+      adviser: { model: result.model_name, provider: result.provider },
+      excluded,
+      simulated: result.metadata["simulated"] === true,
+    };
+  } catch (error) {
+    if (!(error instanceof TriageError)) throw error;
+    // A check was asked for and the adviser answered: kept, so no view says
+    // no check ran, and kept as no answer, because it could not be read.
+    keepAdvice(repoRoot, sessionNumber, stop, {
+      adviser: { model: result.model_name, provider: result.provider },
+      unusable: error.message,
+    });
+    throw new TriageError(error.message, result.provider);
+  }
+  keepAdvice(repoRoot, sessionNumber, stop, { outcome });
+  return outcome;
 }
 
-const RESHAPE =
-  "Your previous answer did not fit the shape asked for. Answer again with ONE JSON " +
-  "object and no prose around it.";
+/**
+ * The answer kept as an advice row in the run's `exceptions.jsonl`, the
+ * adviser named -- or the fact that nobody could be reached, or that the
+ * adviser's answer could not be used. Advice authorises nothing: no gate
+ * reads it, and the card shows it in the adviser's words.
+ */
+function keepAdvice(
+  repoRoot: string,
+  sessionNumber: number,
+  stop: NonNullable<DriverRun["stop"]>,
+  said: {
+    readonly outcome?: TriageOutcome;
+    readonly unreachable?: string;
+    readonly adviser?: { readonly model: string; readonly provider: string };
+    readonly unusable?: string;
+  },
+): void {
+  const unanswered =
+    said.unusable !== undefined ? `the adviser's answer could not be used: ${said.unusable}` : (said.unreachable ?? null);
+  appendAdvice(repoRoot, sessionNumber, {
+    schema_version: 1,
+    session_number: sessionNumber,
+    advice: true,
+    stop: { kind: stop.kind, code: stop.code ?? null, step_id: stop.step_id ?? null, reason: stop.reason, at: stop.at },
+    adviser: said.outcome?.adviser ?? said.adviser ?? null,
+    simulated: said.outcome?.simulated ?? false,
+    answer: said.outcome?.answer ?? null,
+    unreachable: unanswered,
+    recorded_at: new Date().toISOString(),
+  });
+}
 
 /**
  * The session in flight, as the lifecycle records it.

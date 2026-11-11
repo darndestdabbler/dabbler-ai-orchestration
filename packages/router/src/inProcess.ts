@@ -59,6 +59,7 @@ import {
   type SessionRollbackOptions,
   type SessionStartOptions,
   type SessionVerbs,
+  type SessionWaiveOptions,
   type TestEvidenceRecordOptions,
   type TestEvidenceVerbs,
   type VerifyAdjudicateOptions,
@@ -322,6 +323,12 @@ export class InProcessRouter implements Router {
       const args = ["interrupt", "--reason", o.reason];
       if (o.stop === true) args.push("--stop");
       optional(args, "--session-number", o.sessionNumber?.toString());
+      return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
+    },
+    // A person's click; without a reason it prints the card and changes nothing.
+    waive: (o: SessionWaiveOptions) => {
+      const args = ["waive"];
+      optional(args, "--reason", o.reason);
       return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
     },
   };

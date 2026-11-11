@@ -115,6 +115,21 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.checkStop",
+        "title": "Check this stop",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.reviewException",
+        "title": "Review exception",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.openTranscript",
+        "title": "Open Transcript at its Exceptions",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabbler.consultWithAi",
         "title": "Consult with AI",
         "category": "Dabbler"
@@ -298,6 +313,18 @@
           "when": "false"
         },
         {
+          "command": "dabbler.checkStop",
+          "when": "false"
+        },
+        {
+          "command": "dabbler.reviewException",
+          "when": "false"
+        },
+        {
+          "command": "dabbler.openTranscript",
+          "when": "false"
+        },
+        {
           "command": "dabblerSolution.setEngine",
           "when": "false"
         },
@@ -394,6 +421,21 @@
           "command": "dabbler.openMechanic",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openMechanic;/",
           "group": "6_session@607"
+        },
+        {
+          "command": "dabbler.checkStop",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-checkStop;/",
+          "group": "6_session@608"
+        },
+        {
+          "command": "dabbler.reviewException",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-reviewException;/",
+          "group": "6_session@609"
+        },
+        {
+          "command": "dabbler.openTranscript",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openTranscript;/",
+          "group": "6_session@610"
         },
         {
           "command": "dabblerSessionSets.cancel",

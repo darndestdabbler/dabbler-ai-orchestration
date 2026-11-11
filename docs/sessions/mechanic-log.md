@@ -25,4 +25,19 @@ Newest entry last. Each entry has this shape:
   needed here next time.
 ```
 
+Where the wall is a rule and no fix within the rules clears it, the entry is
+a **request for an exception**, and it carries five more lines. A person
+decides it with `dabbler session waive`, which prints these lines on its card
+in the Mechanic's words; the **Deterministic fix** line is the framework
+change the exception argues for.
+
+```markdown
+- **Stop at:** `<the stop's at, from run.json>` -- the request is of that
+  stop only, and a later stop needs its own.
+- **Rule in the way:** the rule, in its own words, from the stop.
+- **Why it is wrong here:** why this case is not the one the rule is for.
+- **What going past it lets through:** what stays unmet, plainly.
+- **What was tried within the rules:** each attempt and what happened.
+```
+
 <!-- Entries follow. -->

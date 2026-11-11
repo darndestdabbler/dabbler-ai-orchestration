@@ -31,8 +31,11 @@ import {
   defaultSessionRunUi,
   engineTerminalFor,
   repositoryOf,
+  runCheckStop,
   runConsultWithAi,
   runOpenMechanic,
+  runOpenTranscript,
+  runReviewException,
   runStartSession,
 } from "../../commands/sessionCommands";
 import { ROUTER_VERSION } from "dabbler-ai-router";
@@ -544,6 +547,7 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
       return undefined;
     },
     showFrameworkTerminal: () => undefined,
+    runCommand: () => undefined,
     withProgress: (_title, work) => work(),
     ...overrides,
   };
@@ -784,6 +788,56 @@ suite("Start opens the person's own CLI", () => {
     assert.match(cli.name, /^Mechanic/);
     assert.ok(cli.args.includes("sonnet"), cli.args.join(" "));
     assert.ok(cli.args.some((arg) => /dabbler consult --sessions-dir docs\/sessions --mechanic/.test(arg)), cli.args.join(" "));
+  });
+
+  test("Check this stop says it is one provider call before it runs, and runs triage only on a yes", async () => {
+    const commands: string[] = [];
+    const asked: string[] = [];
+    const no = driveUi({ confirm: async (message) => { asked.push(message); return false; }, runCommand: (_root, _name, command) => commands.push(command) });
+    assert.strictEqual(await runCheckStop(makeRepository({ currentSession: 2 }), no.ui), false);
+    assert.match(asked[0], /This is one provider call:/);
+    assert.match(asked[0], /advice only/);
+    assert.strictEqual(commands.length, 0);
+    const yes = driveUi({ confirm: async () => true, runCommand: (_root, _name, command) => commands.push(command) });
+    assert.strictEqual(await runCheckStop(makeRepository({ currentSession: 2 }), yes.ui), true);
+    assert.deepStrictEqual(commands, ["dabbler triage --sessions-dir docs/sessions"]);
+  });
+
+  test("Review exception shows the card, then waives only on a reason the person typed", async () => {
+    const reports: string[] = [];
+    const fake = fakeRouter(0, "waive: the card for session 002's 'tests' stop. Nothing has changed.");
+    const run = driveUi({ report: (_title, body) => reports.push(body) });
+    assert.strictEqual(await runReviewException(makeRepository({ currentSession: 2 }), run.ui, fake.router, async () => undefined), false);
+    assert.match(reports[0], /the card for session 002/);
+    assert.deepStrictEqual(fake.waiveOptions.map((o) => o.reason), [undefined]);
+    assert.strictEqual(await runReviewException(makeRepository({ currentSession: 2 }), run.ui, fake.router, async () => "  the clock test is flaky  "), true);
+    assert.deepStrictEqual(fake.waiveOptions.map((o) => o.reason), [undefined, undefined, "the clock test is flaky"]);
+    // A stop the verb refuses to go past is said, and no reason is asked for.
+    const refused = fakeRouter(3, "waive: refused -- a 'land' stop has nothing to go past.");
+    let prompted = false;
+    const shown = driveUi();
+    assert.strictEqual(await runReviewException(makeRepository({ currentSession: 2 }), shown.ui, refused.router, async () => { prompted = true; return "x"; }), false);
+    assert.strictEqual(prompted, false);
+    assert.match(shown.errors[0], /nothing to go past/);
+  });
+
+  test("Open Transcript opens the committed page at its exceptions, and says so where there is no page yet", async () => {
+    const root = makeTempDir("transcript-open-");
+    try {
+      const opened: { page: string; fragment: string }[] = [];
+      const open = async (page: string, fragment: string) => { opened.push({ page, fragment }); return true; };
+      const absent = driveUi();
+      assert.strictEqual(await runOpenTranscript(makeRepository({ root }), 7, absent.ui, open), false);
+      assert.strictEqual(opened.length, 0);
+      assert.match(absent.infos[0], /Session 007 has no committed transcript yet/);
+      writeFileTree(root, { "docs/transcripts/session-007.html": "<h2 id=\"exceptions\">Gone past</h2>" });
+      assert.strictEqual(await runOpenTranscript(makeRepository({ root }), 7, driveUi().ui, open), true);
+      assert.strictEqual(opened.length, 1);
+      assert.match(opened[0].page.split("\\").join("/"), /docs\/transcripts\/session-007\.html$/);
+      assert.strictEqual(opened[0].fragment, "exceptions");
+    } finally {
+      rmrf(root);
+    }
   });
 
   test("Open a Mechanic on a Copilot session in flight offers the model it declared, and refuses nothing", async () => {

@@ -15,7 +15,7 @@ import { describe, it } from "node:test";
 import { capture } from "../src/output.ts";
 import { changedPathsBetween, platformNewlines, snapshotWorktreeTree } from "../src/journal.ts";
 import { checkPublishedWhenReleasable } from "../src/gates.ts";
-import { appendPackaging, readExceptions } from "../src/ledger.ts";
+import { appendAdvice, appendPackaging, readExceptions } from "../src/ledger.ts";
 import {
   SOURCE_API,
   SOURCE_SEAT,
@@ -80,6 +80,7 @@ import {
   STARTING_POINT,
   start,
   steppedOverLines,
+  waiveCard,
   waiveStop,
   type SequenceFacts,
 } from "../src/session.ts";
@@ -2055,6 +2056,63 @@ describe("a person's waiver of a stop", () => {
       assert.match(engine.err, /a person's verb, never the engine's/);
       assert.match(engine.err, /Report the step blocked and say what should be waived and why/);
       assert.deepEqual(readExceptions(state.repo, 1), []);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("prints the card in its order, each part attributed, says where no check was run, and changes nothing", async () => {
+    const state = stopped(TESTS_STOP);
+    try {
+      const bare = await run(() => waiveCard(state.sessionsDir));
+      assert.equal(bare.code, EXIT_OK, bare.err);
+      assert.match(bare.out, /Nothing has changed/);
+      assert.match(bare.out, /no exception was requested/);
+      assert.match(bare.out, /no independent check was run/);
+      // A check whose answer could not be used is said as that, and is not "no check".
+      const unusable = {
+        schema_version: 1, session_number: 1, advice: true,
+        stop: { kind: "tests", code: null, step_id: null, reason: TESTS_STOP.reason, at: TESTS_STOP.at },
+        adviser: { model: "gpt-x", provider: "openai" }, simulated: false, answer: null,
+        unreachable: "the adviser's answer could not be used: not JSON", recorded_at: "2026-11-11T10:02:00-05:00",
+      };
+      appendAdvice(state.repo, 1, unusable);
+      const spoiled = await run(() => waiveCard(state.sessionsDir));
+      assert.match(spoiled.out, /a check was run and gpt-x \(openai\) answered, but its answer could not be used/);
+      assert.doesNotMatch(spoiled.out, /no independent check was run/);
+      writeFileSync(
+        join(state.sessionsDir, "mechanic-log.md"),
+        `# Mechanic log\n\n## Session 1 -- the clock test\n\n- **Stop at:** \`${TESTS_STOP.at}\`\n- **Rule in the way:** the suite 'unit' failed\n- **Why it is wrong here:** the clock test is flaky on this host\n`,
+      );
+      appendAdvice(state.repo, 1, {
+        schema_version: 1, session_number: 1, advice: true,
+        stop: { kind: "tests", code: null, step_id: null, reason: TESTS_STOP.reason, at: TESTS_STOP.at },
+        adviser: { model: "gpt-x", provider: "openai" }, simulated: false,
+        answer: {
+          classification: "framework-defect", reasoning: "the test reads the wall clock", recommendation: "waive it once",
+          within_rules: "dabbler session next", account: { matches: true, differences: "" }, plain: { followable: false, unclear: "which host" },
+        },
+        unreachable: null, recorded_at: "2026-11-11T10:05:00-05:00",
+      });
+      const card = await run(() => waiveCard(state.sessionsDir));
+      assert.equal(card.code, EXIT_OK, card.err);
+      const at = (text: string): number => card.out.indexOf(text);
+      const order = [
+        "1. The rule, and what was unmet -- the framework's words",
+        "the suite 'unit' failed",
+        "2. The request, in the Mechanic's words -- docs/sessions/mechanic-log.md",
+        "the clock test is flaky on this host",
+        "3. The advice, in the adviser's words -- gpt-x (openai)",
+        "Within the rules, try this first: dabbler session next",
+        "the test reads the wall clock",
+        "Plain to a person who was not there: no: which host",
+        "4. What the record will say once you authorise -- the framework's words",
+        "the run of record still failed",
+      ].map(at);
+      assert.ok(order.every((index) => index >= 0), card.out);
+      assert.deepEqual([...order].sort((a, b) => a - b), order);
+      assert.deepEqual(readExceptions(state.repo, 1), []);
+      assert.deepEqual(amendmentEntries(state.sessionsDir, 1), []);
     } finally {
       state.restore();
     }

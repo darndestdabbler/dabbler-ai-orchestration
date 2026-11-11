@@ -1426,6 +1426,13 @@ export interface StopContext {
   readonly engine?: string;
   /** The Mechanic's delegation in force: `off` names no Mechanic among the ways on. */
   readonly mechanic?: string;
+  /** The run's stops so far: one that recurs on its step leads its ways on with the check. */
+  readonly stop_history?: readonly {
+    readonly kind: string;
+    readonly code?: string | null;
+    readonly step_id?: string | null;
+    readonly at?: string;
+  }[];
 }
 
 /**
@@ -1609,6 +1616,16 @@ const WAIVE_CLOSE = waiveChoice(
 );
 
 /**
+ * What the record will say once a stop of this kind is waived: the waiver's
+ * own cost words, for the card a person reads before authorising. Null for a
+ * kind with nothing to go past.
+ */
+export function waiverConsequence(kind: string): string | null {
+  const choice = ({ "rejected-thrice": WAIVE_STEP, tests: WAIVE_TESTS, verification: WAIVE_VERIFICATION, close: WAIVE_CLOSE } as Record<string, StopChoice>)[kind];
+  return choice === undefined ? null : choice.cost;
+}
+
+/**
  * Opening a Mechanic: what a developer does when stuck -- another instance,
  * with a fresh context, told to get things going again. A way on from every
  * stop, ahead of ending it; the brief it reads says what it may touch.
@@ -1620,6 +1637,29 @@ const MECHANIC_CHOICE: StopChoice = {
     "that lets the session carry on, and records it in the mechanic log for the reviewer to judge.",
   command: "dabbler consult --mechanic",
 };
+
+/**
+ * An independent check of a stop that keeps coming back: asked for, never
+ * run by the framework, and advice that never gates the person.
+ */
+const CHECK_CHOICE: StopChoice = {
+  label: "Check this stop -- it has stopped this step before: a provider that is not the author's reads the record and says whose it is",
+  cost:
+    "One provider call. It is advice only: it names a way within the rules where it finds one, is kept in " +
+    "the run's exceptions.jsonl, and refuses nothing.",
+  command: "dabbler triage",
+};
+
+/** Whether the run stopped the same way on the same step before this stop. */
+function recurs(stop: StopRecord, run: StopContext): boolean {
+  return (run.stop_history ?? []).some(
+    (row) =>
+      row.at !== stop.at &&
+      row.kind === stop.kind &&
+      (row.code ?? null) === (stop.code ?? null) &&
+      (row.step_id ?? null) === (stop.step_id ?? null),
+  );
+}
 
 /** Carrying on from where it stopped, which most situations spell their own way. */
 function carryOn(parts: MoveParts, label: string, cost: string): StopChoice {
@@ -2135,12 +2175,13 @@ export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
   // tree can pay for a round. A Mechanic set `off` is named nowhere.
   const ending = new Set([cancelChoice().command, rollbackChoice().command]);
   const endAt = moves.findIndex((choice) => ending.has(choice.command));
-  const choices =
+  const offered =
     stop.kind === "funds" || run.mechanic === "off"
       ? moves
       : endAt === -1
         ? [...moves, MECHANIC_CHOICE]
         : [...moves.slice(0, endAt), MECHANIC_CHOICE, ...moves.slice(endAt)];
+  const choices = stop.kind !== "funds" && recurs(stop, run) ? [CHECK_CHOICE, ...offered] : offered;
   const next = actorSentence(
     actor,
     resume,

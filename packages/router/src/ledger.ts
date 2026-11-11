@@ -637,9 +637,54 @@ export function exceptionsPath(repoRoot: string, sessionNumber: number): string 
   return join(sessionRunDir(repoRoot, sessionNumber), "exceptions.jsonl");
 }
 
-/** A session's waivers, oldest first: each a person's authority to go past one stop. */
+/**
+ * A session's waivers, oldest first: each a person's authority to go past one
+ * stop. The file's advice rows are left out -- advice authorises nothing.
+ */
 export function readExceptions(repoRoot: string, sessionNumber: number): Row[] {
-  return readJsonl(exceptionsPath(repoRoot, sessionNumber), validateException);
+  return readJsonl(exceptionsPath(repoRoot, sessionNumber), validateException).filter((row) => row["advice"] !== true);
+}
+
+/** What independent checks said about this session's stops, oldest first. */
+export function readAdvice(repoRoot: string, sessionNumber: number): Row[] {
+  return readJsonl(exceptionsPath(repoRoot, sessionNumber), validateException).filter((row) => row["advice"] === true);
+}
+
+/** Append one validated advice row: an opinion about a stop, marked as one. */
+export function appendAdvice(repoRoot: string, sessionNumber: number, record: Row): Row {
+  if (record["advice"] !== true) throw new LedgerError("an advice row is marked advice: true");
+  validateException(record);
+  appendJsonl(exceptionsPath(repoRoot, sessionNumber), record);
+  return record;
+}
+
+/** The line that makes a mechanic-log entry a request for an exception. */
+const REQUEST_LINE = "**Rule in the way:**";
+
+/**
+ * The request for an exception to THIS stop: the session's latest
+ * `mechanic-log.md` entry carrying a Rule in the way line and naming the
+ * stop's own `at` on its Stop at line, verbatim, or null. A request made of
+ * an earlier stop is not one of this stop. Read, never paraphrased -- the
+ * person reads it in the Mechanic's words.
+ */
+export function readExceptionRequest(sessionsDir: string, sessionNumber: number, stopAt: string): string | null {
+  const path = join(sessionsDir, "mechanic-log.md");
+  if (!existsSync(path)) return null;
+  const entries = readFileSync(path, "utf8").split(/\r?\n(?=## )/);
+  const requests = entries.filter((entry) => {
+    const heading = /^## Session (\d+)\b/.exec(entry);
+    const at = /\*\*Stop at:\*\*\s*`?([^`\s]+)`?/.exec(entry);
+    return (
+      heading !== null &&
+      Number(heading[1]) === sessionNumber &&
+      entry.includes(REQUEST_LINE) &&
+      at !== null &&
+      at[1] === stopAt
+    );
+  });
+  const latest = requests.at(-1);
+  return latest === undefined ? null : latest.trim();
 }
 
 /**

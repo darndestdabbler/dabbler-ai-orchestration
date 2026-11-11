@@ -6193,23 +6193,36 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "e2d4a464f58d397de93857879b51071afd52fad1",
-      "frameworkVersion": "3.29.1",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5.6-sol",
         "verifierProvider": "openai",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "3.29.1",
+      "startCommit": "e2d4a464f58d397de93857879b51071afd52fad1"
     },
     {
       "number": 312,
       "title": "An exception is requested, checked and shown before a person authorises it",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-11-11T02:45:42.584000-05:00",
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "5f54d2420c267699353672c935f6d4c59b0bf477",
+      "frameworkVersion": "3.29.1",
+      "verification": {
+        "rounds": 4,
+        "verifierModel": "gpt-5.6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
     },
     {
       "number": 313,

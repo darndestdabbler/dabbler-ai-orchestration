@@ -11,7 +11,10 @@ import { platformNewlines } from "../src/journal.ts";
 import {
   LedgerError,
   appendDispute,
+  appendAdvice,
   appendException,
+  readAdvice,
+  readExceptionRequest,
   readExceptions,
   waiverOf,
   appendPackaging,
@@ -181,6 +184,45 @@ describe("appending to the ledger", () => {
     assert.equal(waiverOf(repo, 1, "2026-01-02T00:00:00+00:00"), null);
     assert.throws(() => appendException(repo, 1, { ...row }), /already waived/);
     assert.throws(() => appendException(repo, 2, { ...row, stop: { ...row.stop, kind: "land" } }), LedgerError);
+  });
+
+  it("keeps advice beside a waiver and never reads it as one", () => {
+    const repo = tempDir();
+    const stop = { kind: "push", code: null, step_id: null, reason: "the push was refused", at: "2026-01-01T00:00:00+00:00" };
+    const advice = {
+      schema_version: 1, session_number: 1, advice: true, stop,
+      adviser: { model: "gpt-x", provider: "openai" }, simulated: false,
+      answer: { classification: "framework-defect", reasoning: "r", recommendation: "s" },
+      unreachable: null, recorded_at: "2026-01-01T00:01:00+00:00",
+    };
+    appendAdvice(repo, 1, { ...advice });
+    appendAdvice(repo, 1, { ...advice, adviser: null, answer: null, unreachable: "no provider", recorded_at: "2026-01-01T00:02:00+00:00" });
+    assert.deepEqual(readExceptions(repo, 1), []);
+    assert.equal(readAdvice(repo, 1).length, 2);
+    assert.deepEqual(readAdvice(repo, 1)[0], advice);
+    assert.throws(() => appendAdvice(repo, 1, { ...advice, advice: false }), LedgerError);
+  });
+
+  it("reads the request for an exception to this stop from the mechanic log, verbatim, and no other stop's", () => {
+    const sessionsDir = tempDir();
+    const AT = "2026-11-11T10:00:00-05:00";
+    assert.equal(readExceptionRequest(sessionsDir, 4, AT), null);
+    writeFileSync(
+      join(sessionsDir, "mechanic-log.md"),
+      [
+        "# Mechanic log", "", "```markdown", "## Session <N> -- the stop", "- **Rule in the way:** template", "```", "",
+        "## Session 4 -- an ordinary fix", "", `- **Stop at:** \`${AT}\``, "- **Stop:** tests", "",
+        "## Session 4 -- the clock rule", "", `- **Stop at:** \`${AT}\``, "- **Rule in the way:** a test must pass", "- **Why it is wrong here:** it is flaky", "",
+        "## Session 4 -- an earlier stop", "", "- **Stop at:** `2026-11-11T08:00:00-05:00`", "- **Rule in the way:** another", "",
+        "## Session 5 -- elsewhere", "", `- **Stop at:** \`${AT}\``, "- **Rule in the way:** another", "",
+      ].join("\n"),
+    );
+    assert.equal(
+      readExceptionRequest(sessionsDir, 4, AT),
+      `## Session 4 -- the clock rule\n\n- **Stop at:** \`${AT}\`\n- **Rule in the way:** a test must pass\n- **Why it is wrong here:** it is flaky`,
+    );
+    assert.equal(readExceptionRequest(sessionsDir, 4, "2026-11-11T11:00:00-05:00"), null);
+    assert.equal(readExceptionRequest(sessionsDir, 6, AT), null);
   });
 
   it("appends a packaging refusal beside its later success", () => {

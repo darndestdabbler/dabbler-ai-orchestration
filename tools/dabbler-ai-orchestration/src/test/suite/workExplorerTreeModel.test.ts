@@ -553,6 +553,17 @@ suite("workExplorerTreeModel: session descriptor", () => {
     assert.strictEqual(queued.description, undefined);
   });
 
+  test("a closed session that went past a stop carries a mark with the count", () => {
+    const closed = new Date(2026, 10, 11, 9, 0, 0).toISOString();
+    const waiver = { kind: "tests", stepId: null, unmet: "the suite failed", by: "the operator", reason: "flaky", at: closed };
+    const one = sessionDescriptor({ kind: "session", repository, session: makeSession({ completedAt: closed, exceptions: [waiver] }) });
+    const two = sessionDescriptor({ kind: "session", repository, session: makeSession({ completedAt: closed, exceptions: [waiver, waiver] }) });
+    const none = sessionDescriptor({ kind: "session", repository, session: makeSession({ completedAt: closed }) });
+    assert.strictEqual(one.description, "2026-11-11 · 1 exception");
+    assert.strictEqual(two.description, "2026-11-11 · 2 exceptions");
+    assert.strictEqual(none.description, "2026-11-11");
+  });
+
   test("a session waiting for funds says whose, and a handed-back stop shows the Mechanic's memo", () => {
     const waitingOn = (forWhat: string) => ({
       owner: "person" as const,

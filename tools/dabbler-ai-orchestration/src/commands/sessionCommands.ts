@@ -21,15 +21,20 @@
 // The driver is a child process rather than an in-process call, and the
 // reason is stated once in `router/driveProcess.ts`.
 
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import {
   COMMIT_CHANGES_FLAG,
   ENUMERATION_CLI_ALIASES,
+  EXCEPTIONS_ANCHOR,
   MERGE_ORIGIN_FLAG,
   STARTING_POINT,
+  TRANSCRIPTS_DIRNAME,
   UNDO_CHANGES_FLAG,
   preflightRefusedModel,
   releaseSessionToStart,
+  sessionTranscriptName,
   type Router,
 } from "dabbler-ai-router";
 import { SESSIONS_REL, type SessionsRepository } from "../utils/fileSystem";
@@ -677,6 +682,13 @@ export interface SessionRunUi {
    */
   showFrameworkTerminal: (repoRoot: string, beside: unknown) => void;
   /**
+   * Run one `dabbler` command where the person can watch it and read what it
+   * printed: a terminal of its own, named, in the repository. For a verb that
+   * spends a provider call, which belongs in a terminal rather than on the
+   * editor's thread.
+   */
+  runCommand: (repoRoot: string, name: string, command: string) => void;
+  /**
    * Run something slow where the operator can see it is running.
    *
    * Survey finding F12: the extension had ZERO progress call sites, and a
@@ -845,6 +857,11 @@ export function defaultSessionRunUi(
     },
     showFrameworkTerminal: (repoRoot, beside) =>
       ensureDabblerTerminal(repoRoot, beside as vscode.Terminal | undefined),
+    runCommand: (repoRoot, name, command) => {
+      const terminal = vscode.window.createTerminal({ name, cwd: repoRoot });
+      terminal.show();
+      terminal.sendText(command, true);
+    },
     withProgress: <T,>(title: string, work: () => Promise<T>): Promise<T> =>
       Promise.resolve(
         vscode.window.withProgress(
@@ -1128,6 +1145,95 @@ export async function runConsultWithAi(
 }
 
 /**
+ * Check this stop: `dabbler triage`, a provider that is not the author's
+ * reading the record. Said first to be one provider call and advice only,
+ * because it is a button that spends one; the person's yes runs it.
+ */
+export async function runCheckStop(repository: SessionsRepository, ui: SessionRunUi): Promise<boolean> {
+  const session = repository.currentSession;
+  if (session === null) {
+    ui.showInformationMessage(`Nothing is in flight in ${repository.label}; there is no stop to check.`);
+    return false;
+  }
+  const number = String(session).padStart(3, "0");
+  const yes = await ui.confirm(
+    `Check session ${number}'s stop? This is one provider call: a model that is not the author's reads the ` +
+      "record and says whose the stop is, naming a way within the rules where it finds one. It is advice only " +
+      "and is kept in the run's exceptions.jsonl; it decides nothing.",
+    "Check this stop",
+  );
+  if (!yes) return false;
+  const dir = SESSIONS_REL.replace(/\\/g, "/");
+  ui.runCommand(repository.root, `Check this stop — ${repository.label}`, `dabbler triage --sessions-dir ${dir}`);
+  return true;
+}
+
+/**
+ * Review exception: the card -- the stop, the request, the advice and what
+ * the record will say -- and then the person's reason, which authorises
+ * going past the stop on the record. A dismissed or empty box changes
+ * nothing, and the card is read whether or not a check was run.
+ */
+export async function runReviewException(
+  repository: SessionsRepository,
+  ui: SessionRunUi,
+  router: Router = productionRouter(),
+  promptReason: (prompt: string, placeHolder: string) => Thenable<string | undefined> = (
+    prompt,
+    placeHolder,
+  ) => vscode.window.showInputBox({ prompt, placeHolder, ignoreFocusOut: true }),
+): Promise<boolean> {
+  const session = repository.currentSession;
+  if (session === null) {
+    ui.showInformationMessage(`Nothing is in flight in ${repository.label}; there is no stop to go past.`);
+    return false;
+  }
+  const number = String(session).padStart(3, "0");
+  const card = await router.session.waive({ repoRoot: repository.root });
+  if (!card.ok) {
+    ui.showErrorMessage(`Session ${number}'s stop cannot be gone past — ${card.message.trim() || `exit ${card.exitCode}`}`);
+    return false;
+  }
+  ui.report(`Review exception — session ${number}`, card.value.stdout);
+  const reason = await promptReason(
+    `Why may session ${number} go past this stop? Your reason and your name are recorded beside what was unmet.`,
+    "e.g. the clock test is flaky on this host; the fix is planned",
+  );
+  if (reason === undefined || reason.trim() === "") return false;
+  const result = await router.session.waive({ repoRoot: repository.root, reason: reason.trim() });
+  if (!result.ok) {
+    ui.showErrorMessage(`Going past session ${number}'s stop refused — ${result.message.trim() || `exit ${result.exitCode}`}`);
+    return false;
+  }
+  ui.showInformationMessage(
+    `Session ${number} goes past its stop on your authority. To carry on, ask your AI to run \`dabbler session next\`.`,
+  );
+  return true;
+}
+
+/**
+ * A closed session's committed transcript, opened at the section of stops it
+ * went past on a person's authority. The page is the Log phase's, written
+ * after the close; where it is not there yet, that is said.
+ */
+export async function runOpenTranscript(
+  repository: SessionsRepository,
+  sessionNumber: number,
+  ui: SessionRunUi,
+  open: (page: string, fragment: string) => Thenable<boolean> = (page, fragment) =>
+    vscode.env.openExternal(vscode.Uri.file(page).with({ fragment })),
+): Promise<boolean> {
+  const page = path.join(repository.root, TRANSCRIPTS_DIRNAME, sessionTranscriptName(sessionNumber));
+  if (!fs.existsSync(page)) {
+    ui.showInformationMessage(
+      `Session ${String(sessionNumber).padStart(3, "0")} has no committed transcript yet: the page is written after the close.`,
+    );
+    return false;
+  }
+  return open(page, EXCEPTIONS_ANCHOR);
+}
+
+/**
  * Open a Mechanic: the authoring engine's CLI, briefed to diagnose and fix
  * what stopped the session. The Mechanic Model is offered first and any
  * other of that engine's models may be taken; the same two refusals as
@@ -1247,6 +1353,21 @@ export function registerSessionCommands(
       const repository = repositoryOf(arg);
       if (!repository) return;
       await runOpenMechanic(repository, ui);
+    }),
+    vscode.commands.registerCommand("dabbler.checkStop", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      await runCheckStop(repository, ui);
+    }),
+    vscode.commands.registerCommand("dabbler.reviewException", async (arg: unknown) => {
+      const repository = repositoryOf(arg);
+      if (!repository) return;
+      await runReviewException(repository, ui, router);
+    }),
+    vscode.commands.registerCommand("dabbler.openTranscript", async (arg: unknown) => {
+      const node = asSessionNode(arg);
+      if (!node) return;
+      await runOpenTranscript(node.repository, node.session.number, ui);
     }),
     vscode.commands.registerCommand(
       "dabblerSessionSets.closeSession",

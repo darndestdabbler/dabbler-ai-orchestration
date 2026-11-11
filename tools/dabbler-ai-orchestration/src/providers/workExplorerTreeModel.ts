@@ -634,7 +634,7 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
           : (session.waiting?.says ?? "in flight")
         : session.status === "planned"
           ? "planned"
-          : closeDateLabel(session.completedAt),
+          : withExceptionMark(closeDateLabel(session.completedAt), session),
     tooltip: sessionTooltip(node),
     icon: sessionIcon(session.iconKey),
     contextValue: tokenString(tokens),
@@ -645,6 +645,17 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
     // declared no plan.
     collapsible: sessionHasChildren(session) ? "collapsed" : "none",
   };
+}
+
+/**
+ * A closed session that went past a stop on a person's authority carries a
+ * small mark with the count, so the record that says so is one look away.
+ */
+function withExceptionMark(date: string | undefined, session: SessionRecord): string | undefined {
+  const count = session.exceptions?.length ?? 0;
+  if (count === 0) return date;
+  const mark = `${count} exception${count === 1 ? "" : "s"}`;
+  return date === undefined ? mark : `${date} · ${mark}`;
 }
 
 /** "unresolved at the cap" -> "Unresolved at the cap". */

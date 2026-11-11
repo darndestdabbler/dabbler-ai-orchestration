@@ -30,6 +30,7 @@ import {
   decision,
   holdRelease,
   interrupt,
+  waiveCard,
   waiveStop,
   rebaseline,
   migrate,
@@ -59,7 +60,7 @@ const SUMMARY: Record<string, string> = {
   report: "answer the driver's outstanding instruction",
   plan: "record the plan prose in project-work-plan.md; `plan amend` changes a driven step",
   "hold-release": "hold this session's release, for a person's reason; it closes as held",
-  waive: "take the session past the stop it stands at, once, for a person's reason, on the record",
+  waive: "take the session past the stop it stands at, once, for a person's reason, on the record; without one, print the card",
   close: "run gates and close the session",
   cancel: "cancel one session",
   restore: "restore a cancelled session",
@@ -234,7 +235,11 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  carrying `(release: <version>)` -- publishes at all.",
   ],
   waive: [
-    "  --reason TEXT            required: why this session may go past the stop it stands at",
+    "  --reason TEXT            why this session may go past the stop it stands at.",
+    "                           Without it, the card is printed and nothing changes:",
+    "                           the stop from the record, the request in the Mechanic's",
+    "                           words, the advice in the adviser's, and what the",
+    "                           record will say once you authorise",
     "",
     "  A person's verb, for the session in flight: a rule may be waived and a record",
     "  may never be falsified. It writes one row naming the stop as the framework",
@@ -547,10 +552,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
 
   if (subcommand === "waive") {
     const reason = values.get("--reason");
-    if (reason === undefined) {
-      writeErr("dabbler session waive: the following arguments are required: --reason\n");
-      return EXIT_USAGE;
-    }
+    if (reason === undefined) return waiveCard(sessionsDir);
     return waiveStop(sessionsDir, { reason, engine: !personIsPresent() });
   }
 

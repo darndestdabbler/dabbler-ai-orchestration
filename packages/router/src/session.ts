@@ -104,6 +104,7 @@ import {
   writeReport,
   writeWorkPlan,
   appendSupervision,
+  waiverConsequence,
 } from "./driver.ts";
 import type { DriverInstruction, DriverRun } from "./generated/index.ts";
 import { VERSION } from "./version.ts";
@@ -163,6 +164,8 @@ import {
   RUNS_DIRNAME,
   appendException,
   latestRound,
+  readAdvice,
+  readExceptionRequest,
   readExceptions,
   readPackaging,
   sessionRunDir,
@@ -4298,6 +4301,118 @@ function unwaivable(sessionsDir: string, repoRoot: string, current: number, stop
     if (!onAStep) return "the refusals were not of a work-plan step, so there is no step's work to accept";
   }
   return null;
+}
+
+/** Each line of `text` under a two-space indent, so a quoted part reads as one. */
+function quoted(text: string): string[] {
+  return text.split(/\r?\n/).map((line) => (line === "" ? "" : `   ${line}`));
+}
+
+/** The latest check of THIS stop, in the adviser's words, leading with a within-rules path. */
+function adviceLines(row: Record<string, unknown> | undefined, runDir: string): string[] {
+  if (row === undefined) {
+    return [
+      "3. The advice: no independent check was run. `dabbler triage` runs one -- one provider call, advice " +
+        "only -- and none is needed to authorise.",
+    ];
+  }
+  const adviser = row["adviser"] as { model: string; provider: string } | null;
+  if (adviser === null) {
+    return [
+      `3. The advice: the adviser could not be reached (${runDir}/exceptions.jsonl): ${String(row["unreachable"])}`,
+      "   None is needed to authorise.",
+    ];
+  }
+  const simulated = row["simulated"] === true ? " -- SIMULATED, served by a script" : "";
+  if (row["answer"] === null) {
+    return [
+      `3. The advice: a check was run and ${adviser.model} (${adviser.provider}) answered, but its answer could ` +
+        `not be used (${runDir}/exceptions.jsonl): ${String(row["unreachable"])}`,
+      "   None is needed to authorise.",
+    ];
+  }
+  const answer = row["answer"] as Record<string, unknown>;
+  const lines = [`3. The advice, in the adviser's words -- ${adviser.model} (${adviser.provider})${simulated}, ${runDir}/exceptions.jsonl:`];
+  const path = answer["within_rules"];
+  if (typeof path === "string") {
+    lines.push(
+      path.trim().toLowerCase() === "none found"
+        ? "   Within the rules: none found. That is not agreement with the request."
+        : `   Within the rules, try this first: ${path}`,
+    );
+  }
+  lines.push(`   ${String(answer["classification"])}: ${String(answer["reasoning"])}`);
+  lines.push(`   Recommendation: ${String(answer["recommendation"])}`);
+  const account = answer["account"] as { matches: boolean; differences: string } | undefined;
+  if (account !== undefined) {
+    lines.push(`   The request's account of the stop: ${account.matches ? "matches the record" : `differs from the record: ${account.differences}`}`);
+  }
+  const plain = answer["plain"] as { followable: boolean; unclear: string } | undefined;
+  if (plain !== undefined) {
+    lines.push(`   Plain to a person who was not there: ${plain.followable ? "yes" : `no: ${plain.unclear}`}`);
+  }
+  return lines;
+}
+
+/**
+ * The card a person reads before authorising an exception, in a fixed order
+ * and from parts the framework does not paraphrase: the stop from the
+ * record, the request in the Mechanic's words, the advice in the adviser's,
+ * and what the record will say. Changes nothing.
+ */
+export function waiveCard(sessionsDir: string): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`waive: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  const repoRoot = repoRootFor(sessionsDir);
+  if (repoRoot === null) {
+    writeErr(`waive: not inside a git repository: ${sessionsDir}\n`);
+    return EXIT_BOUNDARY;
+  }
+  const raw = readRawSessionState(sessionsDir);
+  const current = ((raw ? derivedView(raw) : null)?.["currentSession"] ?? null) as number | null;
+  if (current === null) {
+    writeErr(`waive: refused -- no session is in flight under ${sessionsDir}.\n`);
+    return EXIT_BOUNDARY;
+  }
+  const shown = sessionDisplayNumber(current);
+  const stop = readRun(repoRoot, current)?.stop ?? null;
+  if (stop === null) {
+    writeErr(`waive: refused -- session ${shown} stands at no stop, so there is nothing to go past.\n`);
+    return EXIT_BOUNDARY;
+  }
+  const why = unwaivable(sessionsDir, repoRoot, current, stop);
+  if (why !== null) {
+    writeErr(`waive: refused -- ${why}.\n`);
+    return EXIT_BOUNDARY;
+  }
+  const root = (relative(repoRoot, sessionsDir) || ".").split("\\").join("/");
+  const runDir = `.dabbler/runs/s${current}`;
+  const request = readExceptionRequest(sessionsDir, current, stop.at);
+  const advice = readAdvice(repoRoot, current).filter((row) => (row["stop"] as Record<string, unknown>)["at"] === stop.at).at(-1);
+  const where = [stop.step_id ? `step '${stop.step_id}'` : null, stop.code ? `code '${stop.code}'` : null].filter(Boolean).join(", ");
+  writeOut(
+    [
+      `waive: the card for session ${shown}'s '${stop.kind}' stop. Nothing has changed.`,
+      "",
+      `1. The rule, and what was unmet -- the framework's words, ${runDir}/driver/run.json${where === "" ? "" : ` (${where})`}:`,
+      ...quoted(stop.reason),
+      "",
+      ...(request === null
+        ? ["2. The request: no exception was requested -- the mechanic log carries no request naming this stop."]
+        : [`2. The request, in the Mechanic's words -- ${root}/mechanic-log.md:`, ...quoted(request)]),
+      "",
+      ...adviceLines(advice, runDir),
+      "",
+      "4. What the record will say once you authorise -- the framework's words:",
+      ...quoted(waiverConsequence(stop.kind) ?? ""),
+      "",
+      'To authorise: dabbler session waive --reason "<why>". To decide nothing, do nothing.',
+      "",
+    ].join("\n"),
+  );
+  return EXIT_OK;
 }
 
 /**

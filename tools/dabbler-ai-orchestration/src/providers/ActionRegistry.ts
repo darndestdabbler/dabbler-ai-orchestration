@@ -60,12 +60,11 @@ export function applicableRepositoryActions(
 // decision about one session, so it lives here rather than on the
 // repository.
 //
-// The two 60x entries after the run prompt are the planning-time reading
-// of a session that stopped at the cap: send it back, respecify it. The
-// third of that trio is cancel, which already exists. There is NO
-// approve-over entry and none may be added: the framework has no approval
-// anywhere, and a menu item that accepted work over a standing finding
-// would be the retired waiver wearing a click.
+// There is no approve-over entry: the framework has no approval anywhere.
+// What a person may do at a stop is go past it on their own authority, on
+// the record, after reading the card -- Review exception, which is
+// `dabbler session waive` and writes what was unmet as unmet. Check this
+// stop is the independent check beside it, advice and never a gate.
 export interface SessionAction {
   id: string;
   label: string;
@@ -94,6 +93,10 @@ export function fundsVendor(session: SessionRecord): string | null {
   const said = /waiting for funds:\s*([^.]+)/i.exec(session.waiting.for);
   return said === null ? null : said[1].trim();
 }
+
+/** The session in flight, with a stop standing over it. */
+const hasStandingStop = (repository: SessionsRepository, session: SessionRecord): boolean =>
+  repository.currentSession === session.number && session.status === "in-progress" && session.stopActor !== undefined;
 
 export const SESSION_ACTIONS: SessionAction[] = [
   {
@@ -135,6 +138,28 @@ export const SESSION_ACTIONS: SessionAction[] = [
     // The session a Mechanic would diagnose: the one in flight, stopped or not.
     when: (repository, session) =>
       repository.currentSession === session.number && session.status === "in-progress",
+  },
+  {
+    id: "dabbler.checkStop",
+    label: "Check this stop",
+    group: 908,
+    // A stop standing over the session in flight: `stopActor` is projected
+    // only then, so a row without one has nothing to check.
+    when: hasStandingStop,
+  },
+  {
+    id: "dabbler.reviewException",
+    label: "Review exception",
+    group: 909,
+    when: hasStandingStop,
+  },
+  {
+    id: "dabbler.openTranscript",
+    label: "Open Transcript at its Exceptions",
+    group: 910,
+    // A closed session that went past a stop on a person's authority: its
+    // committed page says what was unmet and who authorised going on.
+    when: (_repository, session) => session.status === "complete" && (session.exceptions?.length ?? 0) > 0,
   },
   {
     id: "dabblerSessionSets.cancel",

@@ -1088,6 +1088,53 @@ because an unpublished release is not closed as one. `session close
 --force` is not this: it abandons a whole plan, and a single gate is passed
 with `dabbler session waive`.
 
+**An exception is requested, checked and authorised -- by three roles, each
+in its own words.** Most stops that end here are real blockers, not anyone
+trying to cheat, and what must not happen is a person handed something that
+makes no sense. So what you read before typing a reason is assembled by the
+framework from parts it does not paraphrase:
+
+- **The Mechanic requests.** Where the wall is a rule and no fix within the
+  rules clears it, the Mechanic does not work around it: it asks, with its
+  `mechanic-log.md` entry carrying more lines -- **Stop at** (the stop's own
+  timestamp, so the request is of that stop and no later one),
+  **Rule in the way** (the rule's own words, from the stop),
+  **Why it is wrong here**, **What going
+  past it lets through**, and **What was tried within the rules**. Its
+  **Deterministic fix** line is the framework change the exception argues
+  for. Called in unattended, it writes the request, says so in its memo and
+  hands back: going past a stop is never its to do.
+- **An adviser checks, when you ask.** `dabbler triage` (*Check this stop* in
+  the Work Explorer, which says first that it is one provider call, and is:
+  an answer that does not fit is refused, not asked again) has a
+  provider that is not the author's read the record and the request, and
+  answer three more things: the path within the rules, as the exact commands
+  or "none found" -- which is never agreement with the request; whether the
+  request's account of the stop matches the record, and what differs; and
+  whether a person who was not there could follow it. The answer is kept as
+  an advice row in the run's `exceptions.jsonl`, the adviser named; advice
+  authorises nothing and no gate reads it. A path it names is tried rather
+  than argued: the Mechanic runs it and adds what happened to its entry. A
+  second opinion is `dabbler triage --provider <the first adviser's>`, run
+  when you want one. Nothing runs a check on its own, and a stop that keeps
+  coming back on the same step leads its ways on with the offer.
+- **You authorise.** `dabbler session waive` with no `--reason` (*Review
+  exception* in the Work Explorer) prints the card and changes nothing: the
+  rule and what was unmet, from the record; the request, in the Mechanic's
+  words; the advice, in the adviser's words, leading with a within-rules path
+  where one was named; and what the record will say once you authorise. Where
+  no check was run the card says "no independent check was run", and where
+  the adviser could not be reached, or answered in a shape that could not be
+  used, it says so -- none of these refuses you. Then
+  `dabbler session waive --reason "<why>"` is the decision, on the record.
+
+A consult opened to help you decide reads what you read: with a stop
+standing, `dabbler consult` says whether an exception has been requested,
+checked or authorised, and names `mechanic-log.md` and the run's
+`exceptions.jsonl`. A session closed past one carries a mark with the count
+in the Work Explorer, and *Open Transcript at its Exceptions* opens its page
+at the section that says what was unmet, who authorised going on, and why.
+
 **A cancelled session ends its loop.** The loop reads the ledger at every
 phase boundary, while it waits for an answer, while a job runs, and again
 before the commit and before the push. A session cancelled or force-closed

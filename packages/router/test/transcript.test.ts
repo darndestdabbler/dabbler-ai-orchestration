@@ -19,6 +19,7 @@ import { TRANSCRIPTS_DIRNAME } from "../src/journal.ts";
 import {
   TONES,
   ansiToHtml,
+  EXCEPTIONS_ANCHOR,
   fieldTone,
   humanizeStepKey,
   isCancelledPage,
@@ -170,7 +171,8 @@ describe("one session's transcript", () => {
       recorded_at: "2026-10-16T09:37:00-04:00", commit: HEAD, tree: HEAD,
     });
     const html = render(root);
-    assert.ok(html.includes("<h2>Gone past on a person's authority</h2>"));
+    // The id is the anchor the Work Explorer opens the page at.
+    assert.ok(html.includes(`<h2 id="${EXCEPTIONS_ANCHOR}">Gone past on a person's authority</h2>`));
     assert.match(html, /the run of record for typescript stayed red/);
     assert.ok(html.includes("<td>the operator</td>"));
     assert.match(html, /the red test is a clock race fixed upstream/);

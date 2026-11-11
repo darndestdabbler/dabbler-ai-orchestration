@@ -8,6 +8,7 @@ import { describe, it } from "node:test";
 import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { DRIVER_SCHEMA_VERSION, readRun, writeInstruction, writeRun } from "../src/driver.ts";
 import { TriageError, buildTriagePrompt, citedRules, parseTriageAnswer, ruleSourceFor, triage } from "../src/triage.ts";
+import { readAdvice, readExceptions } from "../src/ledger.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { cleanRepoAnswers, makeConfig, routeAnswers, seed, setProviderKeys, tempDir, type RoutedCall } from "./support/answers.ts";
 import { writeFileSync } from "node:fs";
@@ -78,7 +79,7 @@ describe("dabbler triage over a stopped session", () => {
     return { repo, sessionsDir };
   }
 
-  it("asks a provider that is not the working engine's, and refuses an answer that does not fit, once more when the shape is said again", async () => {
+  it("asks a provider that is not the working engine's, once, and refuses an answer that does not fit without asking again", async () => {
     const { sessionsDir } = stoppedSession();
     const calls: RoutedCall[] = [];
     const restore = routeAnswers([["openai", ANSWER]], { calls });
@@ -94,13 +95,73 @@ describe("dabbler triage over a stopped session", () => {
       restore();
     }
     const refused: RoutedCall[] = [];
-    const again = routeAnswers([["openai", "I think the plan is wrong."], ["openai", JSON.stringify({ classification: "nobody-s-fault", reasoning: "x", recommendation: "y" })]], { calls: refused });
+    // The person is told the check is one provider call, and it is.
+    const again = routeAnswers([["openai", "I think the plan is wrong."], ["openai", ANSWER]], { calls: refused });
     try {
       await assert.rejects(triage(sessionsDir), TriageError);
-      assert.equal(refused.length, 2);
+      assert.equal(refused.length, 1);
     } finally {
       again();
     }
+  });
+
+  it("checks a standing request for an exception, requires the three members, and keeps the answer as advice", async () => {
+    const { repo, sessionsDir } = stoppedSession();
+    writeFileSync(
+      join(sessionsDir, "mechanic-log.md"),
+      `# Mechanic log\n\n## Session 1 -- the files rule\n\n- **Stop at:** \`${STOP.at}\`\n- **Rule in the way:** [files-changed-omits]\n- **Why it is wrong here:** the file is generated\n`,
+    );
+    const checked = JSON.stringify({
+      ...JSON.parse(ANSWER),
+      within_rules: "none found",
+      account: { matches: false, differences: "the record names src/widget.py, the request a generated file" },
+      plain: { followable: true, unclear: "" },
+    });
+    // An answer that omits what a request asks for is refused, and kept as a
+    // check that ran and gave no usable answer -- never as no check at all.
+    const omitted = routeAnswers([["openai", ANSWER]]);
+    try {
+      await assert.rejects(triage(sessionsDir), /a request for an exception stands, and the answer omits within_rules, account, plain/);
+    } finally {
+      omitted();
+    }
+    const unusable = readAdvice(repo, 1);
+    assert.equal(unusable.length, 1);
+    assert.deepEqual(unusable[0]!["adviser"], { model: "openai-model", provider: "openai" });
+    assert.equal(unusable[0]!["answer"], null);
+    assert.match(String(unusable[0]!["unreachable"]), /the adviser's answer could not be used: .*omits within_rules/);
+    const calls: RoutedCall[] = [];
+    const restore = routeAnswers([["openai", checked]], { calls });
+    try {
+      const outcome = await triage(sessionsDir);
+      assert.equal(calls.length, 1);
+      assert.ok(calls[0].content.includes("the request for an exception, from mechanic-log.md") && calls[0].content.includes("the file is generated"));
+      assert.equal(outcome.answer.within_rules, "none found");
+      assert.equal(outcome.answer.account?.matches, false);
+      assert.equal(outcome.answer.plain?.followable, true);
+    } finally {
+      restore();
+    }
+    const advice = readAdvice(repo, 1);
+    assert.equal(advice.length, 2);
+    assert.deepEqual(advice[1]!["adviser"], { model: "openai-model", provider: "openai" });
+    assert.equal((advice[1]!["answer"] as Record<string, unknown>)["within_rules"], "none found");
+    assert.equal((advice[1]!["stop"] as Record<string, unknown>)["at"], STOP.at);
+    assert.deepEqual(readExceptions(repo, 1), []);
+  });
+
+  it("keeps an adviser that could not be reached as advice that says so", async () => {
+    const { repo, sessionsDir } = stoppedSession();
+    const restore = routeAnswers([["anthropic", ANSWER]]);
+    try {
+      await assert.rejects(triage(sessionsDir), TriageError);
+    } finally {
+      restore();
+    }
+    const advice = readAdvice(repo, 1);
+    assert.equal(advice.length, 1);
+    assert.equal(advice[0]!["adviser"], null);
+    assert.match(String(advice[0]!["unreachable"]), /no adviser exists outside anthropic/);
   });
 
   it("asks nobody about a run that has not stopped", async () => {

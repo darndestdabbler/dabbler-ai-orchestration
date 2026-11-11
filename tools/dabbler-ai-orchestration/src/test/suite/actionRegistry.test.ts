@@ -169,6 +169,31 @@ suite("ActionRegistry: session actions", () => {
     assert.ok(!offered(sessions[0]).includes("dabbler.openMechanic"));
   });
 
+  test("Check this stop and Review exception are offered on the session in flight while a stop stands, and nowhere else", () => {
+    const stopped = makeSession({ number: 2, status: "in-progress", stopActor: "operator" });
+    const working = makeSession({ number: 2, status: "in-progress" });
+    const done = makeSession({ number: 1, status: "complete", stopActor: "operator" });
+    const offered = (session: ReturnType<typeof makeSession>) =>
+      applicableSessionActions(makeRepository({ currentSession: 2, sessions: [done, session] }), session).map((a) => a.id);
+    for (const id of ["dabbler.checkStop", "dabbler.reviewException"]) {
+      assert.ok(offered(stopped).includes(id), id);
+      assert.ok(!offered(working).includes(id), id);
+      assert.ok(!offered(done).includes(id), id);
+    }
+  });
+
+  test("Open Transcript at its Exceptions is offered on a closed session that went past a stop, and on no other row", () => {
+    const waiver = { kind: "tests", stepId: null, unmet: "the suite failed", by: "the operator", reason: "flaky", at: "" };
+    const waived = makeSession({ number: 1, status: "complete", exceptions: [waiver] });
+    const clean = makeSession({ number: 2, status: "complete" });
+    const inFlight = makeSession({ number: 3, status: "in-progress", exceptions: [waiver] });
+    const repository = makeRepository({ currentSession: 3, sessions: [waived, clean, inFlight] });
+    const offered = (session: ReturnType<typeof makeSession>) => applicableSessionActions(repository, session).map((a) => a.id);
+    assert.ok(offered(waived).includes("dabbler.openTranscript"));
+    assert.ok(!offered(clean).includes("dabbler.openTranscript"));
+    assert.ok(!offered(inFlight).includes("dabbler.openTranscript"));
+  });
+
   test("Rollback to Start of This Session is offered on a session in flight or completed, and on no other row", () => {
     // The router rolls back to the start of a session that ran -- in flight
     // or completed -- and refuses a cancelled one (restore's) and one that

@@ -7,7 +7,8 @@ import { describe, it } from "node:test";
 
 import { UNATTENDED_DENIED, consultBrief, mechanicBrief } from "../src/cli/consult.ts";
 import { writeRun } from "../src/driver.ts";
-import { appendPackaging } from "../src/ledger.ts";
+import { appendAdvice, appendPackaging } from "../src/ledger.ts";
+import { writeFileSync } from "node:fs";
 import { registerSessionStart } from "../src/writers.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 
@@ -66,6 +67,35 @@ describe("consultBrief", () => {
     assert.doesNotMatch(engines, /Resume Session|ask the AI working the session to run/);
   });
 
+  it("says where an exception to the standing stop is, and names its files", () => {
+    const { repo, sessionsDir } = repository();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const stop = { kind: "tests", reason: "the suite failed", at: "2026-08-31T12:30:00-04:00" };
+    writeRun(repo, 1, { ...RUN, stop });
+    const before = consultBrief(sessionsDir, 1);
+    assert.match(before, /An exception to this stop: not requested, not checked, not authorised\./);
+    assert.ok(before.includes("`docs/sessions/mechanic-log.md`") && before.includes("`.dabbler/runs/s1/exceptions.jsonl`"));
+    assert.match(before, /`dabbler session waive` with no reason prints the card/);
+    // A request of an earlier stop is not one of this stop.
+    writeFileSync(join(sessionsDir, "mechanic-log.md"), "# Mechanic log\n\n## Session 1 -- tests\n\n- **Stop at:** `2026-08-31T09:00:00-04:00`\n- **Rule in the way:** the suite failed\n");
+    assert.match(consultBrief(sessionsDir, 1), /An exception to this stop: not requested,/);
+    writeFileSync(join(sessionsDir, "mechanic-log.md"), `# Mechanic log\n\n## Session 1 -- tests\n\n- **Stop at:** \`${stop.at}\`\n- **Rule in the way:** the suite failed\n`);
+    const row = {
+      schema_version: 1, session_number: 1, advice: true, stop: { ...stop, code: null, step_id: null },
+      adviser: null, simulated: false, answer: null, unreachable: "nobody", recorded_at: "2026-08-31T12:40:00-04:00",
+    };
+    appendAdvice(repo, 1, row);
+    assert.match(
+      consultBrief(sessionsDir, 1),
+      /An exception to this stop: requested \(an entry with a Rule in the way line, of this stop\), a check was asked for and the adviser could not be reached, not authorised\./,
+    );
+    appendAdvice(repo, 1, {
+      ...row, adviser: { model: "gpt-x", provider: "openai" }, unreachable: null,
+      answer: { classification: "framework-defect", reasoning: "r", recommendation: "s" }, recorded_at: "2026-08-31T12:50:00-04:00",
+    });
+    assert.match(consultBrief(sessionsDir, 1), /requested \(an entry with a Rule in the way line, of this stop\), checked by an adviser, not authorised\./);
+  });
+
   it("permits plan edits only while no session is in progress", () => {
     const { sessionsDir } = repository();
     assert.match(consultBrief(sessionsDir), /Edit and commit the plan files/);
@@ -111,6 +141,24 @@ describe("mechanicBrief", () => {
     // The two instructions, as the session plan states them.
     assert.ok(brief.includes("- Diagnose, recommend, and act only when the person agrees.\n"));
     assert.ok(brief.includes("- Make the minimum viable unblocking fix and record it in `docs/sessions/mechanic-log.md`.\n"));
+  });
+
+  it("tells the Mechanic, attended or not, to ask for an exception rather than work around a rule", () => {
+    const { repo, sessionsDir } = repository();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      ...RUN,
+      phase: "work",
+      stop: { kind: "rejected-thrice", reason: "the step was refused three times", at: "2026-08-31T12:30:00-04:00" },
+    });
+    const unattended = mechanicBrief(sessionsDir, { memoPath: ".dabbler/scratch/mechanic-memo-s1.md" });
+    for (const brief of [mechanicBrief(sessionsDir), unattended]) {
+      assert.match(brief, /do not work around it -- ask/);
+      for (const line of ["Stop at", "Rule in the way", "Why it is wrong here", "What going past it lets through", "What was tried within the rules"]) {
+        assert.ok(brief.includes(`**${line}:**`), line);
+      }
+    }
+    assert.match(unattended, /say in the memo that an exception is requested/);
   });
 
   it("called in unattended, carries the deny-list and the memo path, and asks for no consent", () => {

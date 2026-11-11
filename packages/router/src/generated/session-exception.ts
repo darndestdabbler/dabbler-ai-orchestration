@@ -3,9 +3,23 @@
 // when this file no longer matches it.
 
 /**
- * exceptions.jsonl row (one person's waiver of one stop)
+ * The stop advised on, copied from run.json as the framework wrote it: any kind, since a check may be asked of every stop.
  */
-export type SessionException = {
+export type SessionExceptionStop = {
+  kind: string;
+  code: string | null;
+  step_id: string | null;
+  /**
+   * What was unmet, in the framework's words.
+   */
+  reason: string;
+  /**
+   * When the stop was written; what the loop matches the row to.
+   */
+  at: string;
+};
+
+export type SessionExceptionWaiver = {
   schema_version: 1;
   session_number: number;
   /**
@@ -46,3 +60,38 @@ export type SessionException = {
   tree: string;
   framework_version?: string;
 };
+
+export type SessionExceptionAdvice = {
+  schema_version: 1;
+  session_number: number;
+  /**
+   * This row is advice: an opinion about the stop, never a decision, and nothing reads it as one.
+   */
+  advice: true;
+  stop: SessionExceptionStop;
+  /**
+   * Who answered, and the provider they were reached on; null where nobody could be reached.
+   */
+  adviser: {
+    model: string;
+    provider: string;
+  } | null;
+  /**
+   * Served by a script rather than a vendor.
+   */
+  simulated: boolean;
+  /**
+   * The adviser's answer, as triage.schema.json validated it on arrival; null where the adviser could not be reached or its answer could not be used.
+   */
+  answer: Record<string, unknown> | null;
+  /**
+   * Why no usable answer came, where none did: nobody could be reached (the adviser is null), or the named adviser's answer could not be used (the answer is null).
+   */
+  unreachable: string | null;
+  recorded_at: string;
+};
+
+/**
+ * exceptions.jsonl row (a person's waiver of one stop, or advice about one)
+ */
+export type SessionException = SessionExceptionWaiver | SessionExceptionAdvice;

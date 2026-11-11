@@ -19,6 +19,24 @@ export type Triage = {
    */
   recommendation: string;
   /**
+   * Asked where a request for an exception stands: the exact commands that would clear the stop within the rules, or exactly `none found`. Never a verdict on the request -- finding no alternative is not agreeing with it.
+   */
+  within_rules?: string;
+  /**
+   * Asked where a request stands: whether its account of the stop matches the record, and what differs where it does not.
+   */
+  account?: {
+    matches: boolean;
+    differences: string;
+  };
+  /**
+   * Asked where a request stands: whether a person who was not there could follow it, and what is unclear.
+   */
+  plain?: {
+    followable: boolean;
+    unclear: string;
+  };
+  /**
    * The MINIMAL change to the plan step that would let the session continue, or null when no amendment would help. Proposing one is not making one.
    */
   amendment?: {

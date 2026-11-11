@@ -20,7 +20,14 @@ import {
 } from "../evidence.ts";
 import { readRun, renderStop } from "../driver.ts";
 import type { DriverRun } from "../generated/index.ts";
-import { latestRound, readPackaging } from "../ledger.ts";
+import {
+  LedgerError,
+  latestRound,
+  readAdvice,
+  readExceptionRequest,
+  readExceptions,
+  readPackaging,
+} from "../ledger.ts";
 import { buildProjection, readSessionState } from "../progress.ts";
 import { writeErr, writeOut } from "./output.ts";
 import { statSync } from "node:fs";
@@ -71,7 +78,43 @@ function standingStop(session: Row): string | null {
   return blocked === undefined ? null : String(blocked["intent"]);
 }
 
-function describeSession(session: Row): string[] {
+/**
+ * Where an exception to the standing stop is: requested, checked, authorised
+ * -- and the files that say so, so a consult opened to help the person decide
+ * reads what the person reads.
+ */
+function exceptionLines(sessionsDir: string, repoRoot: string, root: string, number: number): string[] {
+  const at = readRun(repoRoot, number)?.stop?.at ?? null;
+  const ofThisStop = (row: Row): boolean => (row["stop"] as Row)["at"] === at;
+  let advice: Row[] = [];
+  let waivers: Row[] = [];
+  try {
+    advice = readAdvice(repoRoot, number).filter(ofThisStop);
+    waivers = readExceptions(repoRoot, number).filter(ofThisStop);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+  }
+  const requested = at !== null && readExceptionRequest(sessionsDir, number, at) !== null;
+  const latest = advice.at(-1);
+  const state = [
+    requested ? "requested (an entry with a Rule in the way line, of this stop)" : "not requested",
+    latest === undefined
+      ? "not checked"
+      : latest["adviser"] === null
+        ? "a check was asked for and the adviser could not be reached"
+        : latest["answer"] === null
+          ? "a check was run and the adviser's answer could not be used"
+          : "checked by an adviser",
+    waivers.length > 0 ? "authorised by a person" : "not authorised",
+  ].join(", ");
+  return [
+    `- An exception to this stop: ${state}. The request is in \`${root}/mechanic-log.md\`; the advice and any ` +
+      `waiver are in \`.dabbler/runs/s${number}/exceptions.jsonl\`. \`dabbler session waive\` with no reason ` +
+      "prints the card the person reads, and changes nothing.",
+  ];
+}
+
+function describeSession(session: Row, where?: { sessionsDir: string; repoRoot: string; root: string }): string[] {
   const lines = [`- Session ${String(session["number"])}, "${String(session["title"])}": ${String(session["status"])}.`];
   const stop = standingStop(session);
   if (stop === null) return lines;
@@ -89,6 +132,7 @@ function describeSession(session: Row): string[] {
       `step's files or checks; ${resume}.`,
     "- `dabbler session cancel --force` is the person's verb only. Never run it; name it to them if it is the way.",
     ROLLBACK_KEEPS,
+    ...(where === undefined ? [] : exceptionLines(where.sessionsDir, where.repoRoot, where.root, session["number"] as number)),
   );
   return lines;
 }
@@ -108,7 +152,7 @@ export function consultBrief(sessionsDir: string, session?: number): string {
     now.push(`- No session is in progress. ${String(repository["sessionsCompleted"])} of ${sessions.length} are complete.`);
   } else {
     const row = sessions.find((entry) => entry["number"] === current);
-    if (row !== undefined) now.push(...describeSession(row));
+    if (row !== undefined) now.push(...describeSession(row, { sessionsDir, repoRoot, root }));
   }
   if (session !== undefined && session !== current) {
     const row = sessions.find((entry) => entry["number"] === session);
@@ -211,6 +255,26 @@ export const UNATTENDED_DENIED = [
 ] as const;
 
 /**
+ * What a Mechanic does where the wall is a rule: it asks for an exception and
+ * never works around one. The four lines are the shape `mechanic-log.md`
+ * states, so the person, the adviser and a consult read one account.
+ */
+export function exceptionRequestLines(root: string): string[] {
+  return [
+    "- Where the wall is a rule and no fix within the rules clears it, do not work around it -- ask. The " +
+      `request is your \`${root}/mechanic-log.md\` entry, with these lines beside the others:`,
+    "  - **Stop at:** the stop's `at`, exactly as the stop above gives it: the request is of that stop only.",
+    "  - **Rule in the way:** the rule, in its own words, from the stop.",
+    "  - **Why it is wrong here:** why this case is not the one the rule is for.",
+    "  - **What going past it lets through:** what stays unmet, plainly.",
+    "  - **What was tried within the rules:** each attempt and what happened.",
+    "- Its **Deterministic fix** line is the framework change the exception argues for. A person decides the " +
+      "request with `dabbler session waive`; an independent check of it is `dabbler triage`, and a within-rules " +
+      "path the check names is run, and what happened added to the entry, rather than argued.",
+  ];
+}
+
+/**
  * The licence of a Mechanic called in on a refused publish: a release
  * session has no review step, so it diagnoses and edits nothing.
  */
@@ -250,6 +314,7 @@ function mandateLines(root: string, memoPath: string | null): string[] {
       "",
       "## Your instructions",
       ...mechanicInstructions(root).map((instruction) => `- ${instruction}`),
+      ...exceptionRequestLines(root),
     ];
   }
   return [
@@ -267,6 +332,9 @@ function mandateLines(root: string, memoPath: string | null): string[] {
     `- Always end by writing a memo to \`${memoPath}\` for the person: the cause and its evidence, what you tried, ` +
       "the line it reached, and one recommendation -- with the `dabbler session plan amend ... --reason \"<why>\"` " +
       "drafted for them to approve where the plan needs one.",
+    ...exceptionRequestLines(root),
+    "- Unattended, a request is all you do about such a wall: write it, make no other edit for it, say in the memo " +
+      "that an exception is requested and for which rule, and hand back.",
   ];
 }
 
@@ -301,7 +369,7 @@ export function mechanicBrief(sessionsDir: string, options: { memoPath?: string 
     stop.push(
       `- Session ${current} stopped in phase '${run.phase}'` +
         `${record.step_id ? ` at step '${record.step_id}'` : ""}: kind '${record.kind}'` +
-        `${record.code ? `, code '${record.code}'` : ""}.`,
+        `${record.code ? `, code '${record.code}'` : ""}, at \`${record.at}\`.`,
       `- The rule that refused, in its own words: ${record.reason}`,
       `- ${words.next}${words.ways}`,
     );

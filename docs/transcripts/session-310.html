@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 310 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 310 transcript</h1>
+<p class="stamp">Rendered 2026-11-11T06:54:19.456Z by dabbler-ai-router 3.29.1 at 9f193cf2a61c2938c2c5eb15373288312145fc00.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-11T01:36:24.838-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 310 of 316: A stop's way on is true: a blocked step is asked afresh, and a rollback says what it keeps</h3>
+<p>Scope: <code>packages/router/src/drive.ts</code> (the two resumes past a stop), <code>packages/router/src/driver.ts</code> (the <code>blocked</code> situation, <code>rollbackChoice</code>), <code>packages/router/src/cli/consult.ts</code> (both briefs), the tests named after each, <code>docs/driving-a-session.md</code></p>
+<p><strong>Why.</strong> Two sentences a stopped person is shown are false, and both cost a session on 2026-11-10 and 11.</p>
+<p>The first, from a consumer repository and then from this one's own walk: an engine reports a step <code>blocked</code>, a person clears what it was blocked on, and the stop's own way on -- <code>dabbler session next</code> -- stops again on the spot. The pull re-issues the instruction at the same seq, the blocked report is still on disk and is not spent (<code>reportIsSpent</code> asks only whether its seq is lower), and <code>askForStep</code> judges it blocked a second time. The run moves only when the engine answers the step again, which nothing printed says. A <code>rejected-thrice</code> stop already resumes by leaving the refused answer behind and asking afresh; the comment on that code describes this exact loop, and a blocked stop was never given the same treatment.</p>
+<p>The second: every stop's rollback choice says &quot;Everything the session did is lost&quot;. It is not. <code>rollback</code> keeps the work no commit holds as one commit on a local branch, <code>dabbler/rolled-back/s&lt;N&gt;-&lt;time&gt;</code>, and has since it was written. A person weighing a rollback, and an AI consulted about one, are told the opposite of what is true, so a rollback reads as more expensive than it is and the work is found again instead of brought back.</p>
+<p><strong>What.</strong></p>
+<p><strong>Step 1 -- a blocked step is asked afresh.</strong> Resuming past a <code>blocked</code> stop leaves the blocked report behind, as resuming past <code>rejected-thrice</code> leaves the refused one: the step's instruction is issued afresh and the engine answers it. Both resumes do it -- the one a call to <code>session next</code> makes and the one a Mechanic's fix makes. The refusal count is left as it is, because a blocked report was never a refusal.</p>
+<p><strong>Step 2 -- the sentences.</strong> The <code>blocked</code> situation's carry-on line says what happens: the step is asked again and the engine answers it. <code>rollbackChoice</code> says what a rollback keeps and where -- the branch -- and what it does discard: the session's place in the run, its rounds and its test runs. Both briefs <code>dabbler consult</code> prints say the same in one line, so a consult or a Mechanic that recommends a rollback knows the work comes back with <code>git checkout &lt;branch&gt; -- &lt;paths&gt;</code> or a cherry-pick, and says so to the person. <code>docs/driving-a-session.md</code> says how a blocked stop resumes, beside where it says how a <code>rejected-thrice</code> one does.</p>
+<p><strong>Non-goals.</strong> Any change to how a step is reported blocked, to who may cancel or roll back, or to the push loop, which invokes its engine and so always gets a new report. Removing reports from disk. A copy of rolled-back work anywhere but the branch that already holds it. Bringing the work back automatically.</p>
+<p><strong>Tests.</strong> In <code>drive.test.ts</code>: under the pull, a run stopped <code>blocked</code> and resumed prints the step's instruction as outstanding and does not stop again; the same after a Mechanic's resume. In <code>driver.test.ts</code>: the blocked situation's carry-on move says the step is asked again, and the rollback choice names the branch. In <code>consult.test.ts</code>: both briefs say a rollback keeps the work.</p>
+<p><strong>Releasable.</strong> Yes -- with 311 to 313, as 3.32.0 in session 314.</p>
+<h2>Work Plan</h2>
+<p>Make two things a stopped person is shown true. First, resuming past a <code>blocked</code> stop leaves the blocked report behind exactly as resuming past <code>rejected-thrice</code> leaves the refused one: both resumes in drive.ts (the one a <code>session next</code> call makes when it takes the run, and the one a Mechanic's fix makes) mark the outstanding answer as already judged for a blocked stop too, so the step's instruction is issued afresh under a new seq and the engine answers it, while the refusal count is reset only after <code>rejected-thrice</code>, since a blocked report was never a refusal. Second, the words: the <code>blocked</code> situation's carry-on move in driver.ts says the step is asked again and the engine answers it; <code>rollbackChoice</code> stops saying everything is lost and says what a rollback keeps -- uncommitted work as one commit on the local branch <code>dabbler/rolled-back/s&lt;N&gt;-&lt;time&gt;</code>, a landed commit in history under its revert -- and what it discards: the session's place in the run, its rounds and its test runs; both <code>dabbler consult</code> briefs carry one line saying a rollback keeps the work and that it comes back with <code>git checkout &lt;branch&gt; -- &lt;paths&gt;</code> or a cherry-pick, to be said to the person; and docs/driving-a-session.md says how a blocked stop resumes beside the rejected-thrice paragraph. Tests in drive.test.ts, driver.test.ts and consult.test.ts as the plan names them.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/3a1bffc7e046a8c22a1b007ba3d328330fd3f2b8"><code>3a1bffc7e046a8c22a1b007ba3d328330fd3f2b8</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Blocked asked afresh</td><td><p>In packages/router/src/drive.ts, in both resumes past a stop -- the run-taking resume in the pull (where <code>afterRefusals</code> is computed from <code>existing.stop?.kind</code>) and the Mechanic's resume (where it is computed from <code>stop.kind</code>) -- treat a <code>blocked</code> stop like <code>rejected-thrice</code> in marking the outstanding answer judged (<code>this.answered = true</code>), so the step is issued afresh; reset <code>rejections</code> only after <code>rejected-thrice</code>. Update the comments to say why and the run-resumed log field to say the step is asked afresh. In packages/router/test/drive.test.ts add the two tests: under the pull, a run stopped <code>blocked</code> and resumed prints the step's instruction as outstanding (a new seq) and does not stop again; the same after a Mechanic's resume.</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/walk-session.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>node --test packages/router/test/drive.test.ts</code></td><td>yes</td></tr>
+<tr><td>The sentences</td><td><p>In packages/router/src/driver.ts, change the <code>blocked</code> situation's carry-on cost to say the step is asked again under a new instruction and the engine answers it (the blocked report is left behind), and rewrite <code>rollbackChoice</code>'s label and cost: the work is kept -- uncommitted work as one commit on the local branch <code>dabbler/rolled-back/s&lt;N&gt;-&lt;time&gt;</code>, a landed commit in history under its revert -- and what is discarded is the session's place in the run, its rounds and its test runs; the session goes back to not-started with the reason on the record. In packages/router/src/cli/consult.ts add one line to each brief (consultBrief's stopped-session lines and mechanicBrief's rules) saying a rollback keeps the work on that branch and it comes back with <code>git checkout &lt;branch&gt; -- &lt;paths&gt;</code> or a cherry-pick, which the consult says to the person when it recommends one. Tests: in packages/router/test/driver.test.ts, the blocked situation's carry-on move says the step is asked again, and the rollback choice names the branch; in packages/router/test/consult.test.ts, both briefs say a rollback keeps the work.</p></td><td><span class="mono">packages/router/src/driver.ts</span><br><span class="mono">packages/router/src/cli/consult.ts</span><br><span class="mono">packages/router/test/driver.test.ts</span><br><span class="mono">packages/router/test/consult.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>npm --prefix packages/router run lint</code><br><code>node --test packages/router/test/driver.test.ts packages/router/test/consult.test.ts</code></td><td>yes</td></tr>
+<tr><td>The doc</td><td><p>In docs/driving-a-session.md, beside the paragraph that says how carrying on past <code>rejected-thrice</code> works, say how a <code>blocked</code> stop resumes: once the blocker is cleared, <code>dabbler session next</code> leaves the blocked report behind and asks the step afresh under a new seq, and the engine answers it; the refusal count is untouched. Where the doc describes rollback, make sure nothing says the work is lost.</p></td><td><span class="mono">docs/driving-a-session.md</span></td><td><code>node -e const d=require('fs').readFileSync('docs/driving-a-session.md','utf8');process.exit(/blocked[\s\S]{0,400}asked afresh|asked afresh[\s\S]{0,400}blocked/.test(d.slice(d.indexOf('rejected-thrice')))&amp;&amp;!/everything the session did is lost/i.test(d)?0:1)</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>No change to how a step is reported blocked, to who may cancel or roll back, or to the push loop, which invokes its engine and so always gets a new report.</li><li>No report is removed from disk.</li><li>No copy of rolled-back work anywhere but the branch that already holds it, and no bringing it back automatically.</li><li>The six-repository maintenance walk and its saved first-run work are session 315's, not this one's.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[06:36:24]</span> <span class="muted">run-started</span> session=310 mode=pull</div>
+<div class="line"><span class="at">[06:36:24]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[06:37:55]</span> <span class="muted">run-resumed</span> session=310 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[06:37:55]</span> <span class="muted">plan-accepted</span> steps=[&quot;blocked-asked-afresh&quot;,&quot;the-sentences&quot;,&quot;the-doc&quot;] non_goals=4</div>
+<div class="line"><span class="at">[06:37:55]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[06:37:55]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=blocked-asked-afresh</div>
+<div class="line"><span class="at">[06:42:38]</span> <span class="muted">run-resumed</span> session=310 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[06:42:47]</span> <span class="muted">check-passed</span> step=blocked-asked-afresh argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[06:42:47]</span> <span class="muted">check-passed</span> step=blocked-asked-afresh argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/drive.test.ts&quot;]</div>
+<div class="line"><span class="at">[06:43:40]</span> <span class="muted">check-failed</span> step=blocked-asked-afresh suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[06:43:40]</span> <span class="muted">report-rejected</span> seq=2 step=blocked-asked-afresh rejection=1 reasons=[&quot;[check-failed] named tests failed: node scripts/suite.mjs container packages/router/test/drive.test.ts -&gt; exit 1\n ---\n      duration_ms: 51.65984\n      type: 'test'\n      ...\n    # Subtest: puts the author's work and the step baseline back as they were when a work-phase attempt is undone\n    ok 5 - puts the author's work and the step baseline back as they were when a work-phase attempt is undone\n      ---\n      duration_ms: 223.321923\n      type: 'test'\n      ...\n    1..5\nok 67 - the Mechanic, called in without the person, on a real checkout\n  ---\n  duration_ms: 613.076668\n  type: 'suite'\n  ...\n1..67\n# tests 139\n# suites 67\n# pass 137\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 50488.240326&quot;]</div>
+<div class="line"><span class="at">[06:43:40]</span> <span class="muted">instruction-issued</span> seq=3 kind=rejection step=blocked-asked-afresh reasons=1</div>
+<div class="line"><span class="at">[06:47:05]</span> <span class="muted">run-resumed</span> session=310 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[06:47:11]</span> <span class="muted">check-passed</span> step=blocked-asked-afresh argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[06:47:11]</span> <span class="muted">check-passed</span> step=blocked-asked-afresh argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/drive.test.ts&quot;]</div>
+<div class="line"><span class="at">[06:48:02]</span> <span class="muted">named-tests-passed</span> step=blocked-asked-afresh suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/walk-session.test.ts</div>
+<div class="line"><span class="at">[06:48:02]</span> <span class="muted">report-accepted</span> seq=3 step=blocked-asked-afresh files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/walk-session.test.ts&quot;] notes=The two resume tests moved to walk-session.test.ts (the loop's walkthrough, selected by drive.test.ts): they need a real checkout and no-git.ts confines real git to walkthroughs; step files amended on the record. drive.test.ts is unchanged.</div>
+<div class="line"><span class="at">[06:48:02]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=the-sentences</div>
+<div class="line"><span class="at">[06:50:07]</span> <span class="muted">run-resumed</span> session=310 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[06:50:16]</span> <span class="muted">check-passed</span> step=the-sentences argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[06:50:16]</span> <span class="muted">check-passed</span> step=the-sentences argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[06:50:16]</span> <span class="muted">check-passed</span> step=the-sentences argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/driver.test.ts&quot;,&quot;packages/router/test/consult.test.ts&quot;]</div>
+<div class="line"><span class="at">[06:51:07]</span> <span class="muted">named-tests-passed</span> step=the-sentences suite=typescript command=node scripts/suite.mjs container packages/router/test/consult.test.ts packages/router/test/driver.test.ts</div>
+<div class="line"><span class="at">[06:51:07]</span> <span class="muted">report-accepted</span> seq=4 step=the-sentences files=[&quot;packages/router/src/driver.ts&quot;,&quot;packages/router/src/cli/consult.ts&quot;,&quot;packages/router/test/driver.test.ts&quot;,&quot;packages/router/test/consult.test.ts&quot;] notes=Blocked carry-on says the step is asked again under a new instruction; rollbackChoice says the work is kept on dabbler/rolled-back/s&lt;N&gt;-&lt;time&gt; (landed commits under their reverts) and names what is discarded; one ROLLBACK_KEEPS line in both consult briefs. Assertions folded into the existing tests.</div>
+<div class="line"><span class="at">[06:51:07]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=the-doc</div>
+<div class="line"><span class="at">[06:51:30]</span> <span class="muted">run-resumed</span> session=310 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[06:51:31]</span> <span class="muted">check-passed</span> step=the-doc argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const d=require('fs').readFileSync('docs/driving-a-session.md','utf8');process.exit(/blocked[\\s\\S]{0,400}asked afresh|asked afresh[\\s\\S]{0,400}blocked/.test(d.slice(d.indexOf('rejected-thrice')))&amp;&amp;!/everything the session did is lost/i.test(d)?0:1)&quot;]</div>
+<div class="line"><span class="at">[06:51:32]</span> <span class="muted">report-accepted</span> seq=5 step=the-doc files=[&quot;docs/driving-a-session.md&quot;] notes=A paragraph beside the rejected-thrice one says how a blocked stop resumes (asked afresh, count untouched, a Mechanic's fix the same); the rollback paragraph says how kept work comes back.</div>
+<div class="line"><span class="at">[06:51:32]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[06:51:33]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[06:51:33]</span> <span class="muted">job-started</span> name=verification pid=53640 log=.dabbler/runs/s310/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[06:52:37]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s310/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[06:52:37]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[06:52:37]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[06:52:37]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[06:52:37]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=21268 log=.dabbler/runs/s310/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[06:52:39]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s310/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[06:52:39]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[06:52:39]</span> <span class="muted">job-started</span> name=run of record: typescript pid=43376 log=.dabbler/runs/s310/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[06:53:52]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s310/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[06:53:52]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[06:53:52]</span> <span class="muted">job-started</span> name=run of record: extension pid=46944 log=.dabbler/runs/s310/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[06:54:10]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s310/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[06:54:10]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[06:54:14]</span> <span class="muted">landed</span> commit=3a1bffc7e046a8c22a1b007ba3d328330fd3f2b8</div>
+<div class="line"><span class="at">[06:54:14]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[06:54:14]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[06:54:14]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[06:54:14]</span> <span class="muted">job-started</span> name=close pid=47900 log=.dabbler/runs/s310/driver/jobs/close.log</div>
+<div class="line"><span class="at">[06:54:19]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s310/driver/jobs/close.log</div>
+<div class="line"><span class="at">[06:54:19]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>1 finding</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** The new tests start with `rejections` absent or zero, so they do not pin the requirement that a blocked resume preserves a nonzero refusal count. A useful case would start a blocked stop with `rejections: 2`, resume through both `session next` and a Mechanic fix, and assert the fresh instruction retains `rejections === 2`; today’s implementation appears correct, but a future reset regression would pass the visible tests.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>72s</td><td>1461</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>18s</td><td>309</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

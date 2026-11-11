@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "exceptions.jsonl row (one person's waiver of one stop)",
+  "description": "One row per stop a person authorised the session to go past, in .dabbler/runs/s<N>/exceptions.jsonl. A rule may be waived and a record may never be falsified: the row keeps the stop exactly as the framework wrote it -- the test failed, no verdict came, the check refused -- and adds that a person authorised going on, and why. It never says the gate was met, and nothing it covers is rewritten. A waiver is of THAT stop, matched on its kind and the time it was written: the next stop, or the same rule refusing a tree that has since moved, needs its own. Written only by the CLI (dabbler session waive), which an engine is refused.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_number",
+    "stop",
+    "reason",
+    "by",
+    "recorded_at",
+    "commit"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "session_number": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "code", "step_id", "reason", "at"],
+      "description": "The stop waived, copied from run.json as the framework wrote it.",
+      "properties": {
+        "kind": {
+          "enum": ["rejected-thrice", "tests", "verification", "close"],
+          "description": "The kinds with something to go past. Every other stop has its own way on, and a waiver cannot make a push or a provider answer."
+        },
+        "code": {
+          "type": ["string", "null"]
+        },
+        "step_id": {
+          "type": ["string", "null"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What was unmet, in the framework's words."
+        },
+        "at": {
+          "type": "string",
+          "minLength": 1,
+          "description": "When the stop was written; what the loop matches the waiver to."
+        }
+      }
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Why the person authorised going on, in their words. Permanent."
+    },
+    "by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Who was working, as the session record from 'dabbler session start' says; written by the verb and never typed."
+    },
+    "recorded_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "HEAD when the waiver was given."
+    },
+    "tree": {
+      "type": "string",
+      "minLength": 7,
+      "description": "The worktree snapshot when the waiver was given, so a reader can see which tree was let through. Absent when the snapshot could not be taken."
+    },
+    "framework_version": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

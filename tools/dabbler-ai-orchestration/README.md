@@ -6,8 +6,8 @@ The guide, the source and the issues are on GitHub:
 ![One VS Code window with a session in flight on csv-parser-dotnet. On the left, the Dabbler panel: the Solution Explorer with the repository's five projects and its Configuration (claude-code, api), and under it the Work Explorer at 4 of 7 sessions, session 005 "CSV deserialization" in progress with Register and Plan ticked, Work open on its three steps, and Verify, Test and Close still to come; sessions 006 and 007 not started. In the middle, Claude Code's own terminal writing the code. On the right, the Dabbler terminal: session 004 closed, then session 005's plan and each step the framework handed the engine, timed to the second.](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/overview.png)
 
 Dabbler lets an AI write the code and keeps everything else out of its
-hands. The framework, which is ordinary deterministic code, hands the AI
-one instruction at a time, runs the checks and the tests itself, has a
+hands. The framework, which is ordinary code that does the same thing every
+time, hands the AI one instruction at a time, runs the checks and the tests itself, has a
 model from another provider review the work, and commits only what passed.
 And it does every session the same way, whichever model writes it, so that
 the plan, the record and the reasons stay in the repository after the
@@ -17,10 +17,10 @@ conversation that produced them is gone.
 |---|---|
 | AI's work is a black box | The framework shows the work as it happens and leaves a plan, a log, the decisions and a transcript in the repository. ([The record](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/the-record.md#under-the-sessions-root-committed-with-the-code)) |
 | AI's work is not adequately evaluated | A model from a different provider reviews every session. The two work through findings and fixes, up to seven rounds, without a person. ([Two models](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/verification.md#findings-fixes-and-disputes)) |
-| AI cheats in its work | The framework, not the AI, runs the checks, the tests, the reviews and the commits, and hashes the code so that work cannot be claimed over a tree that changed. An AI cannot easily cheat, and each way one is found to is closed with a deterministic check. ([The rules](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/discipline.md#the-framework-measures-the-work-not-the-report)) |
-| AI does more than it is asked | Reviewers judge the work against the plan's goals and non-goals. Work a non-goal rules out is a blocking finding. ([What the reviewer is sent](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/verification.md#what-the-reviewer-is-sent)) |
-| Code reaches the trunk untested | The framework runs the automated tests before any code is committed, and the reviewer is shown every changed file that has no test. ([Tests](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/verification.md#what-the-reviewer-is-asked-about-tests)) |
-| A session gets stuck | **Consult with AI**, the **Mechanic**, and a person's decision on the record. ([When it gets stuck](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/consult-and-mechanic.md)) |
+| AI cheats in its work | The framework, not the AI, runs the checks, the tests, the reviews and the commits, and records a SHA-256 hash of the code it checked, so a passing result cannot be claimed for code that changed afterwards. An AI cannot easily cheat, and each way around the rules that turns up is closed with a new automatic check. ([The rules](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/discipline.md#the-framework-measures-the-work-not-the-report)) |
+| AI does more than it is asked | Reviewers judge the work against what the plan says the session will and will not do. Out-of-scope work that AI does anyway is blocked by the framework. ([What the reviewer is sent](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/verification.md#what-the-reviewer-is-sent)) |
+| Untested code gets committed | The framework runs the automated tests before any code is committed, and the reviewer is shown every changed file that has no test. ([Tests](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/verification.md#what-the-reviewer-is-asked-about-tests)) |
+| A session gets stuck | A person can ask another AI what went wrong (**Consult with AI**), let a fresh AI make the smallest fix (the **Mechanic**), or decide for themselves, and the decision is recorded. ([When it gets stuck](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/consult-and-mechanic.md)) |
 | Only the AI that did the work can continue it | Every session is planned, run and recorded the same way, whichever model writes it. A person or a different model starts the next session from the plan and the record in the repository, the next day or the next year. ([Picking the work up](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/the-record.md#picking-the-work-up)) |
 
 ---
@@ -42,9 +42,9 @@ person or an AI can use to type one. See
 ![The Dabbler terminal's run of record on a Maven solution: mvn test runs each project in turn (person-model, csv-deserializer, db-persistence, app), each passing with none failed, and only then does the framework move to the land phase and record the suite as passed.](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/run-of-record.png)
 
 The AI never reports that the tests pass. The framework runs each step's
-own checks and tests when the step is reported, then the declared suites
-once the review is done, and records the run against a hash of the tree it
-ran on. Change one file afterwards and the run no longer counts. See
+own checks and tests when the step is reported, then the project's test
+suites once the review is done, and records the run against a SHA-256 hash
+of the code it ran on. Change one file afterwards and the run no longer counts. See
 [The rules an AI works inside](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/discipline.md#the-run-of-record-is-held-to-the-tree-it-ran-against).
 
 ## You can see where the work is
@@ -56,6 +56,14 @@ anything the AI says about itself. Each session shows its phases and its
 steps as they happen, and hovering on a step shows exactly what the AI was
 asked to do. The **Dabbler terminal** beside it says who owes what, and for
 how long.
+
+Every session, a cancelled one included, also leaves a transcript in the
+repository: one self-contained HTML page under `docs/transcripts/`, carrying
+that session's plan, the work done, each issue the reviewer found and how it
+was dealt with, and the tests that ran. The page is committed with the code
+and needs nothing to open it but a browser. A repository that does not want
+one turns it off with the `dabbler.transcript` setting. See
+[The transcript](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/the-record.md#the-transcript-one-page-per-session-committed).
 
 ## Anyone can pick it up
 
@@ -73,7 +81,8 @@ model, starts it from the plan and the record. See
 The **Configuration** row under the Solution Explorer, at the top left of
 the first image, holds every choice a person makes: which AI writes the
 code and with which model, which models review it, and whether each is
-reached through a GitHub Copilot seat or provider API keys. Each choice is
+reached through a GitHub Copilot subscription or your own API keys from
+each AI company. Each choice is
 saved in the repository, so it travels to the next clone. See
 [The Configuration](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/configuration.md).
 
@@ -83,14 +92,14 @@ saved in the repository, so it travels to the next clone. See
 
 - **VS Code** 1.135 or newer. Nothing else to install: the framework ships
   inside this extension and runs on the editor's own Node.
-- **An engine CLI on PATH** to write the code: Claude Code's `claude`, or
+- **An AI coding tool you run from the command line** to write the code: Claude Code's `claude`, or
   the GitHub Copilot CLI installed with `winget install GitHub.Copilot`
   (not the npm package, whose `copilot.cmd` shim cuts a prompt at its first
   newline).
-- **Reach to two provider families** for the review: two of
-  `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY` and
-  `DABBLER_GEMINI_API_KEY`, or a Copilot seat that offers models from two
-  providers.
+- **Access to models from two different AI companies** for the review:
+  two of `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY` and
+  `DABBLER_GEMINI_API_KEY`, or a GitHub Copilot subscription that offers
+  models from two of them.
 
 ## Get started
 

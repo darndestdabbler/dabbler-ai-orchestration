@@ -360,6 +360,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 320 | The guide covers Consult with AI, the Mechanic and the Configuration | no | 2026-11-11 |
 | 321 | The two front pages say what Dabbler is for | no | 2026-11-11 |
 | 322 | Release 3.32.3 (release: 3.32.3) | yes | 2026-11-11 |
+| 323 | The listing says it in plain words, and names the transcript | no | 2026-11-11 |
+| 324 | Release 3.32.4 (release: 3.32.4) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3719,3 +3721,9 @@ Rewrite the two front pages around one message. Copy the operator's five screens
 **Releasable: yes.**
 
 Release 3.32.3: the framework packs and publishes what is on the trunk.
+
+### Session 323 — The listing says it in plain words, and names the transcript
+
+**Releasable: no.**
+
+Put the 3.32.3 Marketplace listing (tools/dabbler-ai-orchestration/README.md) into plain words a first-time reader can follow: replace 'deterministic', 'a tree that changed', 'the trunk', 'engine CLI', 'reach to two provider families' and the non-goal wording with the phrasings the session plan gives, and do the same wherever else the page leans on the framework's own vocabulary. Add one paragraph under 'You can see where the work is' saying that every session, a cancelled one included, leaves a self-contained HTML transcript page under docs/transcripts/ with the plan, the work, each review finding and how it was dealt with, and the tests that ran; that it is committed with the code and needs nothing to open it; that a repository can turn it off with dabbler.transcript; linking to 'The transcript' in the-record.md. Carry the same opening paragraph and risk table word for word into the root README.md (and plain the root README's one sentence that repeats the requirements' vocabulary), then bump version.json to 3.32.4, stamp the manifests with npm run stamp:version, and add a 3.32.4 changelog section saying the listing reads more plainly and names the transcript.

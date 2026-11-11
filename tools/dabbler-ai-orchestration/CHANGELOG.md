@@ -10,6 +10,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.32.4] — 2026-11-11
+
+**The listing says it in plain words, and names the transcript.** No
+behaviour changed in this release: it is wording only.
+
+### Changed
+
+- **Plainer words on the Marketplace page and the repository README.**
+  Phrases that asked a first-time reader to know the framework's own
+  vocabulary — "deterministic", "a tree that changed", "the trunk",
+  "engine CLI", "reach to two provider families" — now say what they mean.
+- **The transcript is named.** The listing now says that every session,
+  a cancelled one included, leaves a self-contained HTML page under
+  `docs/transcripts/` with its plan, the work, each review finding and
+  how it was dealt with, and the tests that ran.
+
 ## [3.32.3] — 2026-11-11
 
 **The listing says what Dabbler is for.** No behaviour changed in this

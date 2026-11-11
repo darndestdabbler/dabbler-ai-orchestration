@@ -13101,6 +13101,21 @@
       "dateTime": "2026-11-11T01:26:48.859000-05:00",
       "reason": "Rollback to Start of This Session from the Work Explorer",
       "by": "operator"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 310,
+      "dateTime": "2026-11-11T01:37:55.271000-05:00",
+      "task": "Make two things a stopped person is shown true. First, resuming past a `blocked` stop leaves the blocked report behind exactly as resuming past `rejected-thrice` leaves the refused one: both resumes in drive.ts (the one a `session next` call makes when it takes the run, and the one a Mechanic's fix makes) mark the outstanding answer as already judged for a blocked stop too, so the step's instruction is issued afresh under a new seq and the engine answers it, while the refusal count is reset only after `rejected-thrice`, since a blocked report was never a refusal. Second, the words: the `blocked` situation's carry-on move in driver.ts says the step is asked again and the engine answers it; `rollbackChoice` stops saying everything is lost and says what a rollback keeps -- uncommitted work as one commit on the local branch `dabbler/rolled-back/s<N>-<time>`, a landed commit in history under its revert -- and what it discards: the session's place in the run, its rounds and its test runs; both `dabbler consult` briefs carry one line saying a rollback keeps the work and that it comes back with `git checkout <branch> -- <paths>` or a cherry-pick, to be said to the person; and docs/driving-a-session.md says how a blocked stop resumes beside the rejected-thrice paragraph. Tests in drive.test.ts, driver.test.ts and consult.test.ts as the plan names them.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 310,
+      "dateTime": "2026-11-11T01:45:22.677000-05:00",
+      "what": "step 'blocked-asked-afresh': its files",
+      "reason": "The two resume tests need a real checkout, and test/support/no-git.ts confines real git to walkthroughs; walk-session.test.ts is the loop's walkthrough and is selected by drive.test.ts, so the tests go there and drive.test.ts is unchanged.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

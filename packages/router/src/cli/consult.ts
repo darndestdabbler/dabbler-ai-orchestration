@@ -55,6 +55,15 @@ function usage(): string {
 
 type Row = Record<string, unknown>;
 
+/**
+ * What a rollback keeps, for a consult that recommends one: the person
+ * weighs it as a loss, and the work is found again rather than brought back.
+ */
+const ROLLBACK_KEEPS =
+  "- `dabbler session rollback` keeps the work: what no commit holds goes on the local branch " +
+  "`dabbler/rolled-back/s<N>-<time>`, and comes back with `git checkout <branch> -- <paths>` or a " +
+  "cherry-pick. Say so to the person when you recommend one.";
+
 /** The blocked task row's words: the router's one rendering of a standing stop. */
 function standingStop(session: Row): string | null {
   const tasks = Array.isArray(session["tasks"]) ? (session["tasks"] as Row[]) : [];
@@ -79,6 +88,7 @@ function describeSession(session: Row): string[] {
       "verification cap; `dabbler session plan amend --step <id> ... --reason \"<why>\"` for a " +
       `step's files or checks; ${resume}.`,
     "- `dabbler session cancel --force` is the person's verb only. Never run it; name it to them if it is the way.",
+    ROLLBACK_KEEPS,
   );
   return lines;
 }
@@ -317,6 +327,7 @@ export function mechanicBrief(sessionsDir: string, options: { memoPath?: string 
     "## The rules that keep the session restartable",
     `- Never write under .dabbler/runs/, ${root}/sessions.json or any other record the router writes.`,
     "- Never weaken a gate, a verdict or a test so that it passes.",
+    ROLLBACK_KEEPS,
     ...mandate,
     ...(release
       ? []

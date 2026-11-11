@@ -632,6 +632,13 @@ on is the intervention the bound exists to force. If a step genuinely
 cannot be done, say so instead: `--status blocked` with the reason in
 `--notes`.
 
+A `blocked` report stops the session the same way, and resumes the same
+way. Once the person has cleared what the step was blocked on, `dabbler
+session next` does not judge the blocked report again: it is left behind,
+and the step is asked afresh under a new seq for the engine to answer. A
+blocked report was never a refusal, so the count is left as it stands. A
+Mechanic's fix resumes it the same way.
+
 The same shape carries the Primary Reviewer's findings. When a round is blocking
 you are asked for a **disposition** per finding — `fix`, or `reject` with
 a reason and evidence paths — as JSON. A `fix` becomes a step named
@@ -1030,7 +1037,8 @@ release: it refuses to reach or pass a session that released, because a tag
 and a listing cannot be unpublished and a release run again would collide
 with its own tag. Work no commit holds is kept first, as one commit on a
 local branch named `dabbler/rolled-back/s<N>-<time>`, so nothing a rollback
-touches is gone -- and what it reverted is still in history, so a rollback
+touches is gone: it comes back with `git checkout <branch> -- <paths>` or a
+cherry-pick -- and what it reverted is still in history, so a rollback
 itself is undone with `git revert` of its commits, which the ledger's
 integrity check accepts because the restored file is one the router wrote.
 `--dry-run` says what would be undone -- the sessions, the commits, whose

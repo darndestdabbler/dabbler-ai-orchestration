@@ -1568,11 +1568,12 @@ function rollbackChoice(): StopChoice {
   return {
     label:
       "Roll back to the start of this session -- yours to run, never the " +
-      "engine's: everything it did discarded, the session plan kept",
+      "engine's: the tree back where it started, the work kept, the session plan kept",
     cost:
-      "Everything the session did is lost -- the tree before the land, a " +
-      "revert after it -- and the session goes back to not-started with " +
-      "your reason on the record. Amend the plan, then start it again.",
+      "The work is kept: what no commit holds as one commit on the local branch " +
+      "dabbler/rolled-back/s<N>-<time>, and a landed commit in history under its revert. " +
+      "Discarded are the session's place in the run, its rounds and its test runs; it goes " +
+      "back to not-started with your reason on the record. Amend the plan, then start it again.",
     command: 'dabbler session rollback --reason "<why>"',
   };
 }
@@ -1642,7 +1643,9 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
       carryOn(
         parts,
         `Clear what step${parts.step} is blocked on, then carry on`,
-        "Whatever the blocker itself costs; the step's report says what it is.",
+        "Whatever the blocker itself costs; the step's report says what it is. The step " +
+          "is then asked again, under a new instruction, and the engine answers it: the " +
+          "blocked report is left behind.",
       ),
       rollbackChoice(),
       cancelChoice(),

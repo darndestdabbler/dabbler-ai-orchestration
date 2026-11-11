@@ -2257,8 +2257,10 @@ class Driver {
       const moved = treeWithPaths(this.repoRoot, String(this.run.baseline_tree), files);
       if (moved !== null) this.run = { ...this.run, baseline_tree: moved };
     }
+    // The answer the stop was judged on is left behind, as a resume past it
+    // by `session next` leaves it: the step is asked afresh.
     const afterRefusals = stop.kind === "rejected-thrice";
-    if (afterRefusals) this.answered = true;
+    if (afterRefusals || stop.kind === "blocked") this.answered = true;
     this.run = {
       ...this.run,
       ...(afterRefusals ? { rejections: 0 } : {}),
@@ -2514,9 +2516,13 @@ class Driver {
     // answer is not judged a fourth time: it is left behind, the count
     // starts over, and the phase issues its instruction afresh. Without
     // this the pull cannot resume a `rejected-thrice` stop at all -- every
-    // call would rejudge the same answer and stop again on the spot.
+    // call would rejudge the same answer and stop again on the spot. A
+    // `blocked` report is left behind the same way, once the person has
+    // cleared what it was blocked on, but it was never a refusal: the count
+    // stands.
     const afterRefusals = existing.stop?.kind === "rejected-thrice";
-    if (afterRefusals) this.answered = true;
+    const askedAfresh = afterRefusals || existing.stop?.kind === "blocked";
+    if (askedAfresh) this.answered = true;
     this.run = {
       ...existing,
       max_invocations: this.options.maxInvocations ?? existing.max_invocations,
@@ -2556,6 +2562,7 @@ class Driver {
         : { invocations: this.run.invocations, max_invocations: this.run.max_invocations }),
       ...(existing.stop ? { after: existing.stop.kind } : {}),
       ...(afterRefusals ? { refusals: "reset; the step is asked afresh" } : {}),
+      ...(askedAfresh && !afterRefusals ? { step: "asked afresh" } : {}),
     });
     return EXIT_OK;
   }

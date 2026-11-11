@@ -19,10 +19,10 @@ import { after, describe, it } from "node:test";
 import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { driveSession, mechanicMemoPath, reportAndNext, sessionNext, setMechanicLauncher, type Engine } from "../src/drive.ts";
 import { mailboxEngine, type EngineOutcome } from "../src/engines.ts";
-import { readInstruction, readReport, readRun, readWorkPlan, writeRun } from "../src/driver.ts";
+import { readInstruction, readReport, readRun, readWorkPlan, writeRun, writeWorkPlan } from "../src/driver.ts";
 import { EXIT_UNAVAILABLE } from "../src/contracts/exitCodes.ts";
 import { beginJobRecord, jobRecord, setJobStarter, startJob } from "../src/jobs.ts";
-import { SETTING_AUTHORING_MODEL, SETTING_ENGINE, SETTING_MECHANIC_MODEL, writeSettings } from "../src/settings.ts";
+import { SETTING_AUTHORING_MODEL, SETTING_ENGINE, SETTING_MECHANIC, SETTING_MECHANIC_MODEL, writeSettings } from "../src/settings.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { judgeSuiteDeclaration } from "../src/gates.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
@@ -2561,4 +2561,70 @@ describe("the Mechanic, called in without the person, on a real checkout", () =>
     }
   });
 
+});
+
+describe("a step reported blocked, resumed past", () => {
+  /** A session in its work phase whose one step was answered `blocked`; the next `next` stops on it. */
+  async function answeredBlocked(settings: Record<string, string>): Promise<{ repo: string; sessionsDir: string; seq: number }> {
+    setProviderKeys();
+    configure([VERIFIED]);
+    const { repo, sessionsDir } = makeSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
+    writeSettings(repo, settings);
+    writeWorkPlan(repo, 1, {
+      schema_version: 1, session_number: 1, task: "Make the widget real.",
+      non_goals: ["Anything the step does not name."],
+      steps: [{ id: "one", ask: "Make it.", files: ["src/widget.py"], checks: [{ argv: [NODE, "-e", "0"] }] }],
+      recorded_at: "2026-11-11T10:00:00-05:00",
+    });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase: "work", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: [], baseline_tree: null,
+      stop: null, lease_epoch: 1,
+      started_at: "2026-11-11T10:00:00-05:00", updated_at: "2026-11-11T10:00:00-05:00",
+    });
+    const seq = (await next(sessionsDir)).instruction?.seq ?? 0;
+    const blocked = await capture(() =>
+      Promise.resolve(
+        report(sessionsDir, { seq, stepId: "one", status: "blocked", files: [], testsRun: null, notes: "the database is down" }),
+      ),
+    );
+    assert.equal(blocked.value, EXIT_OK, blocked.stderr);
+    return { repo, sessionsDir, seq };
+  }
+
+  it("is asked afresh under the pull, and does not stop again on the same report", async () => {
+    const { repo, sessionsDir, seq } = await answeredBlocked({ [SETTING_MECHANIC]: "attended" });
+    assert.equal((await next(sessionsDir)).instruction, null);
+    assert.equal(readRun(repo, 1)?.stop?.kind, "blocked");
+
+    // The person cleared what it was blocked on, and asks again.
+    const resumed = await next(sessionsDir);
+    const run = readRun(repo, 1)!;
+    assert.equal(run.stop, null, resumed.err);
+    assert.equal(resumed.instruction?.step_id, "one");
+    assert.ok((resumed.instruction?.seq ?? 0) > seq, "the step is asked under a new seq");
+    assert.equal(run.rejections ?? 0, 0, "a blocked report was never a refusal");
+  });
+
+  it("is asked afresh after a Mechanic's fix too", async () => {
+    const { repo, sessionsDir, seq } = await answeredBlocked({ [SETTING_MECHANIC]: "unattended" });
+    const unset = setMechanicLauncher(() => ({
+      name: "stand-in-mechanic",
+      invoke: () => {
+        writeFileSync(join(repo, "FIXED"), "the database is back\n");
+        return Promise.resolve({ exitCode: 0 });
+      },
+    }));
+    try {
+      const resumed = await next(sessionsDir);
+      const run = readRun(repo, 1)!;
+      assert.equal(run.mechanic_attempts?.[0]?.kind, "blocked");
+      assert.equal(run.stop, null, resumed.err);
+      assert.equal(resumed.instruction?.step_id, "one");
+      assert.ok((resumed.instruction?.seq ?? 0) > seq, "the step is asked under a new seq");
+    } finally {
+      unset();
+    }
+  });
 });

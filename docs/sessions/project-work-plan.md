@@ -347,8 +347,13 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 307 | .NET Framework builds the way Visual Studio builds it | no | 2026-11-10 |
 | 308 | A person may amend an accepted step's checks, and the engine is told so | no | 2026-11-10 |
 | 309 | Release 3.31.0 (release: 3.31.0) | yes | 2026-11-10 |
-| 310 | The walk through six borrowed repositories | — | not declared |
-| 311 | Release 3.31.1 (release: 3.31.1) | — | not declared |
+| 310 | A stop's way on is true: a blocked step is asked afresh, and a rollback says what it keeps | no | 2026-11-11 |
+| 311 | A person may authorise going past a stop, and the record says so | — | not declared |
+| 312 | An exception is requested, checked and shown before a person authorises it | — | not declared |
+| 313 | A stop the framework caused reaches the people who can fix it | — | not declared |
+| 314 | Release 3.32.0 (release: 3.32.0) | — | not declared |
+| 315 | The walk through six borrowed repositories | — | not declared |
+| 316 | Release 3.32.1 (release: 3.32.1) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3614,7 +3619,15 @@ Let a person amend an accepted step's checks, and tell the engine the truth abou
 
 Release 3.31.0: the framework packs and publishes what is on the trunk.
 
-### Session 310 — The walk through six borrowed repositories
+### Session 310 — A stop's way on is true: a blocked step is asked afresh, and a rollback says what it keeps
+
+**Releasable: no.**
+
+Make two things a stopped person is shown true. First, resuming past a `blocked` stop leaves the blocked report behind exactly as resuming past `rejected-thrice` leaves the refused one: both resumes in drive.ts (the one a `session next` call makes when it takes the run, and the one a Mechanic's fix makes) mark the outstanding answer as already judged for a blocked stop too, so the step's instruction is issued afresh under a new seq and the engine answers it, while the refusal count is reset only after `rejected-thrice`, since a blocked report was never a refusal. Second, the words: the `blocked` situation's carry-on move in driver.ts says the step is asked again and the engine answers it; `rollbackChoice` stops saying everything is lost and says what a rollback keeps -- uncommitted work as one commit on the local branch `dabbler/rolled-back/s<N>-<time>`, a landed commit in history under its revert -- and what it discards: the session's place in the run, its rounds and its test runs; both `dabbler consult` briefs carry one line saying a rollback keeps the work and that it comes back with `git checkout <branch> -- <paths>` or a cherry-pick, to be said to the person; and docs/driving-a-session.md says how a blocked stop resumes beside the rejected-thrice paragraph. Tests in drive.test.ts, driver.test.ts and consult.test.ts as the plan names them.
+
+**Amended after acceptance:**
+
+- 2026-11-11 — step 'blocked-asked-afresh': its files: The two resume tests need a real checkout, and test/support/no-git.ts confines real git to walkthroughs; walk-session.test.ts is the loop's walkthrough and is selected by drive.test.ts, so the tests go there and drive.test.ts is unchanged. (claude-code (anthropic, claude-opus-5-5))
 
 **Rolled back:**
 

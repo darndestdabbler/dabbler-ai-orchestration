@@ -53,6 +53,7 @@ describe("consultBrief", () => {
     assert.match(brief, /dabbler verify reopen/);
     assert.match(brief, /dabbler session plan amend/);
     assert.match(brief, /`dabbler session cancel --force` is the person's verb only/);
+    assert.match(brief, /rollback` keeps the work: .*`dabbler\/rolled-back\/s<N>-<time>`.*git checkout <branch> -- <paths>/);
     // A stop that is the operator's says how a person carries it on: through the AI.
     writeRun(repo, 1, { ...RUN, stop: { kind: "verification", code: "cap-disputed", reason: "one dispute stands", at: "2026-08-31T12:30:00-04:00" } });
     const operators = consultBrief(sessionsDir, 1);
@@ -102,6 +103,7 @@ describe("mechanicBrief", () => {
     assert.match(brief, /no packaging run is on its record/);
     assert.match(brief, /Never write under \.dabbler\/runs\//);
     assert.match(brief, /Never weaken a gate, a verdict or a test/);
+    assert.match(brief, /rollback` keeps the work: .*`dabbler\/rolled-back\/s<N>-<time>`.*git checkout <branch> -- <paths>/);
     assert.match(brief, /dabbler session hold-release/);
     assert.match(brief, /dabbler verify reopen/);
     assert.match(brief, /Commit nothing and push nothing/);

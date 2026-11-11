@@ -824,6 +824,11 @@ describe("a stop, as a person reads it", () => {
     const offered = words.choices.find((choice) => /session rollback/.test(choice.command));
     assert.match(String(offered?.label), /yours to run, never the engine's/);
     assert.match(String(offered?.cost), /back to not-started/);
+    // A rollback keeps the work, and says where.
+    assert.match(String(offered?.cost), /dabbler\/rolled-back\/s<N>-<time>/);
+    assert.doesNotMatch(String(offered?.cost), /is lost/);
+    // Carrying on past a blocked step asks it again rather than rejudging the report.
+    assert.match(String(words.choices[0]?.cost), /asked again, under a new instruction/);
   });
 
   it("prints no command its own verb would refuse as usage, and the cancel it prints runs as printed", async () => {

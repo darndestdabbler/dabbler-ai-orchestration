@@ -355,7 +355,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 315 | The walk through six borrowed repositories | no | 2026-11-11 |
 | 316 | Release 3.32.1 (release: 3.32.1) | yes | 2026-11-11 |
 | 317 | The reviewing vehicle's row warns only when something is wrong | no | 2026-11-11 |
-| 318 | Release 3.32.2 (release: 3.32.2) | — | not declared |
+| 318 | Release 3.32.2 (release: 3.32.2) | yes | 2026-11-11 |
 | 319 | The guide says what holds an AI to the rules | — | not declared |
 | 320 | The guide covers Consult with AI, the Mechanic and the Configuration | — | not declared |
 | 321 | The two front pages say what Dabbler is for | — | not declared |
@@ -3689,3 +3689,9 @@ Release 3.32.1: the framework packs and publishes what is on the trunk.
 **Releasable: no.**
 
 Stop the Vehicle rows in the Configuration pane from carrying a warning mark merely because a layer beneath the deciding one names a value: in descriptorFor's configVehicle case, the description is the vehicle and whose choice it is, the icon takes no attention tone for shadowed layers, and the tooltip keeps every line it has (what decided, and each overridden layer with its value). The npm Copilot shim mark on the authoring row stays. The existing reviewing Vehicle row test is extended to a repository that names dabbler.reviewerTransport over a machine default and the shipped default: the row reads 'api · this repository', carries no mark, says in its tooltip that the choice is this repository's, and still lists the layers it overrides. Then version.json goes to 3.32.2, stamped with npm run stamp:version, and the changelog gains a 3.32.2 section saying the reviewing Vehicle row no longer warns for an ordinary choice.
+
+### Session 318 — Release 3.32.2 (release: 3.32.2)
+
+**Releasable: yes.**
+
+Release 3.32.2: the framework packs and publishes what is on the trunk.

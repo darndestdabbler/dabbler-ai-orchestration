@@ -1136,10 +1136,11 @@ export function descriptorFor(
     case "configVehicle": {
       const authoring = node.who === "authoring";
       const vehicle = configVehicle(p, node.who);
-      // The shadowing is the whole point of this row. A setting that is
-      // being overridden by one above it looks exactly like one that is in
-      // force, which is how a persisted environment variable came to decide
-      // what every session here cost.
+      // The tooltip names every layer the choice overrides, so a setting that
+      // is not in force never reads as one that is. It is not a fault: one
+      // layer overriding the next is how the layers work, and the reviewing
+      // vehicle always has the shipped default beneath it, so the row marks
+      // nothing for it.
       const shadowed = (vehicle?.layers ?? []).slice(1);
       const engines = configuration(p).engines;
       // What the OPERATOR chose outranks what the machine leaves to choose:
@@ -1165,7 +1166,7 @@ export function descriptorFor(
       const shim = authoring && (engines?.installed ?? []).some((entry) => entry.engine === "copilot" && entry.shim === true);
       const whose = whoseChoice(vehicle?.decidedLayer);
       const said = chosen
-        ? `${chosen}${whose === "" ? "" : ` · ${whose}`}${shadowed.length > 0 ? " ⚠" : ""}`
+        ? `${chosen}${whose === "" ? "" : ` · ${whose}`}`
         : authoring
           ? installed > 0
             ? `${installed} installed, none chosen`
@@ -1198,7 +1199,7 @@ export function descriptorFor(
           // different kinds of setting, which is exactly the reading this
           // section was reorganised to stop.
           id: "plug",
-          ...(shadowed.length > 0 || shim
+          ...(shim
             ? { tone: "attention" as const }
             : chosen
               ? {}

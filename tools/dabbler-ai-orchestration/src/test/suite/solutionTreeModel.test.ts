@@ -851,9 +851,11 @@ suite("solutionTreeModel: what a session is run with", () => {
     assert.ok(shimmed.tooltip?.includes("npm uninstall -g @github/copilot"), shimmed.tooltip);
   });
 
-  test("the reviewing Vehicle row sets the reviewing vehicle, and names the layer that overrides", () => {
-    // The operator's case: the machine's vehicle was already copilot-cli, the
-    // checkout's reviewerTransport said api, and the row wrote the machine's.
+  test("the reviewing Vehicle row sets the reviewing vehicle, names the layers it overrides, and marks none of them", () => {
+    // A repository that names its reviewing vehicle, over a machine default
+    // that agrees and the shipped default beneath both -- the reading the
+    // router gives for one. Every reviewing row has the shipped layer under
+    // it, so a mark for being overridden was on every row on every machine.
     const base = configured().configuration?.primaryReviewer as ConfigurationRole;
     const row = descriptorFor(
       { kind: "configVehicle", who: "reviewing" },
@@ -863,10 +865,14 @@ suite("solutionTreeModel: what a session is run with", () => {
             ...base,
             vehicle: {
               ...(base.vehicle as ConfigurationVehicle),
+              chosen: "api",
               decidedBy: "dabbler.reviewerTransport",
+              decidedLayer: "checkout",
               layers: [
                 { source: "dabbler.reviewerTransport", value: "api" },
-                { source: "dabbler.transport", value: "copilot-cli" },
+                { source: "preferences.json reviewerTransport", value: "api" },
+                { source: ".vscode\\settings.json", value: "copilot-cli" },
+                { source: "transport.profile", value: "copilot-cli" },
               ],
             },
           },
@@ -874,11 +880,15 @@ suite("solutionTreeModel: what a session is run with", () => {
       ),
     );
     assert.strictEqual(row.command, "dabblerSolution.setReviewerTransport");
-    assert.ok(row.description?.includes("⚠"), row.description);
-    assert.ok(
-      row.tooltip?.includes("dabbler.transport says 'copilot-cli' and is overridden by dabbler.reviewerTransport"),
-      row.tooltip,
-    );
+    assert.strictEqual(row.description, "api · this repository");
+    assert.strictEqual(row.icon?.tone, undefined);
+    assert.ok(row.tooltip?.includes("This is THIS REPOSITORY's choice"), row.tooltip);
+    for (const line of [
+      "preferences.json reviewerTransport says 'api' and is overridden by dabbler.reviewerTransport",
+      "transport.profile says 'copilot-cli' and is overridden by dabbler.reviewerTransport",
+    ]) {
+      assert.ok(row.tooltip?.includes(line), row.tooltip);
+    }
   });
 });
 

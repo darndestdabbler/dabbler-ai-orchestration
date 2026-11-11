@@ -10,6 +10,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.32.2] — 2026-11-11
+
+### Fixed
+
+- **The reviewing Vehicle row no longer shows a warning for an ordinary
+  choice.** The row marked itself whenever a layer beneath the one that
+  decided named a value, and the reviewing vehicle always has the shipped
+  default beneath it, so the mark was on every reviewing Vehicle row and
+  nothing cleared it. A choice overriding the layers below it is how the
+  layers work: the row now reads the vehicle and whose choice it is, and
+  its tooltip still lists each layer it overrides. The authoring row keeps
+  its mark for the npm Copilot shim, which is a fault a person can fix.
+
 ## [3.32.1] — 2026-11-11
 
 **An existing repository comes out of a session as it went in, apart from

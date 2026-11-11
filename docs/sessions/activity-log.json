@@ -13182,6 +13182,13 @@
       "dateTime": "2026-11-11T06:43:22.161000-05:00",
       "task": "Release 3.32.1: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 317,
+      "dateTime": "2026-11-11T09:37:25.026000-05:00",
+      "task": "Stop the Vehicle rows in the Configuration pane from carrying a warning mark merely because a layer beneath the deciding one names a value: in descriptorFor's configVehicle case, the description is the vehicle and whose choice it is, the icon takes no attention tone for shadowed layers, and the tooltip keeps every line it has (what decided, and each overridden layer with its value). The npm Copilot shim mark on the authoring row stays. The existing reviewing Vehicle row test is extended to a repository that names dabbler.reviewerTransport over a machine default and the shipped default: the row reads 'api \u00b7 this repository', carries no mark, says in its tooltip that the choice is this repository's, and still lists the layers it overrides. Then version.json goes to 3.32.2, stamped with npm run stamp:version, and the changelog gains a 3.32.2 section saying the reviewing Vehicle row no longer warns for an ordinary choice.",
+      "releasable": false
     }
   ]
 }

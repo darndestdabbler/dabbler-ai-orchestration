@@ -18533,7 +18533,9 @@ The Work Explorer's commands in the test file named after theirs.
 ### Session 313 of 316: A stop the framework caused reaches the people who can fix it
 
 Scope: `packages/router/src/session.ts` and `cli/session.ts` (the verb,
-and the waiver's call to it), `packages/router/src/driver.ts` (the ways
+the check and the waiver's line), `packages/router/src/cli/consult.ts`
+(the Mechanic's brief), `docs/sessions/mechanic-log.md` (the entry's
+shape), `packages/router/src/driver.ts` (the ways
 on), the Work Explorer's stop commands under
 `tools/dabbler-ai-orchestration/src/`, the tests named after each,
 `docs/driving-a-session.md`, the README, `version.json` and the manifests
@@ -18553,52 +18555,64 @@ person previews and sends themselves, and nothing sent for them. A state
 IT shop cannot have a tool posting its sessions to a public tracker, and
 a report nobody had to assemble is the only kind that gets filed.
 
-**What.** One report, written by the framework from what the record
-already holds, for a person to read and send.
+The operator, 2026-11-11: a consumer's repository may hold what it should
+not, and a person may not read a long report carefully enough before
+sending it. So the report is limited to a pointer to the framework's own
+code, a description of the problem and a suggested fix; it carries no
+example unless the person writes one; and what the Mechanic drafts is
+read by a reviewer for anything sensitive before the person sees it.
+Sending two short passages to a provider that already reads the session's
+diffs adds no exposure, and a public issue cannot be taken back.
+
+**What.** One short report: where the stop is in the framework, what is
+wrong and what would fix it, for a person to read and send.
 
 **Step 1 -- the report.** `dabbler session defect-report` writes one
-self-contained markdown file for the stop a session stands at, or with
-`--session N` the last stop that session met, under `.dabbler/reports/`,
-and prints its path. It carries: the router's and the extension's
-versions, the engine, the vehicles and the platform; the stop's kind,
-code, phase and reason as the framework wrote them, the ways on it
-offered, and the run's earlier stops by kind; where they exist, the
-exception request's lines from `mechanic-log.md` -- with **Deterministic
-fix** first, because that is the change being asked for -- the advice row
-and the person's reason for the waiver; and what cleared the stop where
-the record says. It carries no source, no diff, no file content, no
-person's name, machine name, remote URL or absolute path, and its first
-lines say exactly that and that nothing has been sent.
+markdown file under `.dabbler/reports/` for the stop a session stands at,
+or with `--session N` the last stop that session met, and prints its
+path. It has four sections and no fifth. **Where**: the router's and the
+extension's versions, the engine, the vehicles, the platform, and the
+stop's kind, code, phase and rule name -- values the framework owns, which
+locate the rule in the framework's source and nothing in the
+repository's, and never the stop's reason, which can carry a path or a
+step. **Problem** and **Suggested fix**: the Mechanic's two lines for the
+maintainers, after step 2. **Example**: an empty heading that says it is
+the person's to write or to leave. Its first lines say what it carries,
+who checked it and how many phrases were replaced, and that nothing has
+been sent.
 
-**Step 2 -- what the repository's own words are replaced with.** The
-parts of a report somebody wrote in prose -- the stop's reason where it
-quotes an engine's notes, the request's lines, the advice, the person's
-reason -- can name what a state IT shop may not post: a system, a table,
-a colleague, a server. So before the report is written, the framework
-replaces in those parts what it can recognise as the repository's and not
-its own, each with a numbered placeholder that stays the same through the
-report so the account still reads: every path `git ls-files` knows and
-every folder of one (`<file-1>`, `<folder-1>`); the repository's name, its
-module and project names and its step ids (`<repository>`, `<module-1>`,
-`<step-1>`); a URL or host that is not the framework's own (`<url-1>`); an
-email address; anything the credential filter already recognises; and a
-backtick span or fenced block that is not a `dabbler` command
-(`<quoted-1>`). The framework's own words are left as they are -- the
-stop's kind and code, the rule's name, a `dabbler` command, a file under
-the sessions root or `.dabbler/` -- because those are what a maintainer
-reads the report for. Beside the report it writes a key, placeholder to
-original, headed as the person's to keep and never to send: a
-maintainer's question about `<file-2>` is one the person can answer
-without the report ever having carried it. The report's first lines say
-the replacement is mechanical, that prose can name a thing no pattern
-knows, and to read it before sending.
+**Step 2 -- what is drafted, and what is checked.** The Mechanic's brief
+gains two lines in its `mechanic-log.md` entry, **Problem for the
+maintainers** and **Fix for the maintainers**: the framework's behaviour
+and the change asked for, in the framework's terms, naming nothing of
+this repository. The entry's other lines were written for this
+repository's record and stay in it. Before either line enters a report
+the framework removes every backtick span and fenced block that is not a
+`dabbler` command, and replaces what it recognises as the repository's
+and not its own, each with a numbered placeholder that stays the same
+through the report: every path `git ls-files` knows and every folder of
+one (`<file-1>`, `<folder-1>`); the repository's name, its module and
+project names and its step ids (`<repository>`, `<module-1>`,
+`<step-1>`); a URL or host that is not the framework's own (`<url-1>`);
+an email address; and anything the credential filter already recognises.
+Then the Primary Reviewer is sent the two passages and nothing else, and
+answers clean or with the exact phrases that name what is not the
+framework's; those are replaced the same way. It names phrases and never
+rewrites a passage. Beside the report the framework writes a key,
+placeholder to original, headed as the person's to keep and never to
+send. Where the reviewer cannot be reached, or no request stands for the
+stop, the two sections are empty headings for the person to write, and
+any draft stays in a file beside the report: drafted prose nobody checked
+is never in the thing that gets sent.
 
-**Step 3 -- where it is offered.** Authorising a waiver writes the report
-and prints its path with the waiver's own line: the moment a person has
-just said a rule was wrong here is the moment the report is worth most. A
-stop that recurs on its step offers it among its ways on, and so does any
-stop on request -- a wall somebody got round without a waiver, as the
-blocked loop was, is still a defect.
+**Step 3 -- where it is offered.** Authorising a waiver prints the command
+with the waiver's own line: the moment a person has just said a rule was
+wrong here is the moment the report is worth most, and writing it is one
+provider call, which is made when the person asks and not before. A stop
+that recurs on its step offers it among its ways on, and so does any stop
+on request -- a wall somebody got round without a waiver, as the blocked
+loop was, is still a defect. The Work Explorer says it is one provider
+call before it makes it.
 
 **Step 4 -- sending it is the person's.** The verb's last line names where
 reports go: the `bugs` address in the installed extension's own manifest,
@@ -18616,11 +18630,14 @@ the changelog gets a 3.32.0 section saying what changed for a developer
 across 310 to 313.
 
 **Non-goals.** Sending anything without the person, or a setting that
-does. Telemetry of any kind. A promise that the replacement catches
-everything: it is mechanical, a name in plain prose that matches nothing
-the repository declares passes through, and the person's reading stays
-the last control. A model asked to redact, which would send the text to a
-provider in order to keep it from one. A flag that writes the report
+does. Telemetry of any kind. The stop's reason, an engine's notes, the
+exception request's own lines, the advice or the waiver's reason in a
+report: they are about the repository, and they stay in its record. An
+example the framework wrote. A reviewer that rewrites the passages, or
+that is sent anything but them. Drafted prose in a report that no
+reviewer checked. A promise that the replacement and the check catch
+everything: the person's reading stays the last control, over a report
+short enough to be read. A flag that writes the report
 unreplaced: the key is beside it, and the person can put back what they
 choose. Collecting reports on this side, deduplicating them or
 answering them. A report for a stop the framework did not record. Telling
@@ -18628,14 +18645,17 @@ a consumer repository from this one: the report is written the same way
 in both, and here `mechanic-log.md` is already the list.
 
 **Tests.** In `session.test.ts`: the report for a standing stop carries
-the stop as written, the versions and the request's lines where one
-stands, and carries no absolute path, remote URL or person's name from a
-fixture that holds all three; a reason and a request that name a tracked
-file, a step, a module, a foreign URL, an email address and a quoted
-snippet come out with each replaced, the same placeholder for the same
-thing each time, a `dabbler` command and the stop's kind untouched, and
-the key beside the report mapping each back; a waiver writes it and prints its path; a
-session that met no stop is refused. In `driver.test.ts`: a recurring
+its four sections with the stop's kind, code and rule name and the
+versions, and carries no reason, absolute path, remote URL or person's
+name from a fixture that holds each; two drafted lines that name a
+tracked file, a step, a module, a foreign URL, an email address and a
+fenced snippet come out with each replaced, the same placeholder for the
+same thing each time, the snippet gone, a `dabbler` command untouched,
+and the key beside the report mapping each back; a phrase the reviewer
+names is replaced; an unreachable reviewer leaves the two sections empty
+and the draft beside the report; a waiver prints the command; a
+session that met no stop is refused. In `consult.test.ts`: the Mechanic's
+brief carries the two lines. In `driver.test.ts`: a recurring
 stop offers the report. The Work Explorer's command in the test file
 named after it. `npm run check:version` checks the stamp.
 

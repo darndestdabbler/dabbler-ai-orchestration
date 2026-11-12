@@ -6451,9 +6451,9 @@
     {
       "number": 325,
       "title": "The risks table says what a reader most needs to know",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-12T09:55:54.425000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-12T10:00:03.958000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

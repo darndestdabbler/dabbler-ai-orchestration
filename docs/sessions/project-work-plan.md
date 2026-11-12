@@ -362,6 +362,9 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 322 | Release 3.32.3 (release: 3.32.3) | yes | 2026-11-11 |
 | 323 | The listing says it in plain words, and names the transcript | no | 2026-11-11 |
 | 324 | Release 3.32.4 (release: 3.32.4) | yes | 2026-11-11 |
+| 325 | The risks table says what a reader most needs to know | no | 2026-11-12 |
+| 326 | A guide page on what a session costs, and what is sent to a reviewer | — | not declared |
+| 327 | Release 3.32.5 (release: 3.32.5) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3733,3 +3736,9 @@ Put the 3.32.3 Marketplace listing (tools/dabbler-ai-orchestration/README.md) in
 **Releasable: yes.**
 
 Release 3.32.4: the framework packs and publishes what is on the trunk.
+
+### Session 325 — The risks table says what a reader most needs to know
+
+**Releasable: no.**
+
+Rewrite five right-hand cells of the risks table on the Marketplace page (tools/dabbler-ai-orchestration/README.md) -- the black-box, evaluation, does-more-than-asked, untested-code and gets-stuck rows -- to the exact text the session plan gives, each keeping the link it has now; carry the same table word for word into the root README.md; and in docs/guide/the-record.md, under The transcript, say what `outline` and `full` carry and that neither carries the AI's own terminal conversation, making the paragraph above it agree.

@@ -46,13 +46,19 @@ After a session closes, the framework renders its record into one
 self-contained HTML page, with no script and no network, under
 `docs/transcripts/`, and commits and pushes it on its own. That page is how
 somebody who did not run the session sees how it ran: its section of the
-plan, the work plan the engine declared, every line the framework printed,
-each review round with its findings, the test runs, and the jobs. For
-example:
+plan, the work plan the engine declared, the framework's own lines, each
+review round with its findings, the test runs, and as much of the jobs'
+output as the setting below asks for. For example:
 [session 317's transcript](../transcripts/session-317.html).
 
 What a page carries is set by `dabbler.transcript` in the repository's
 `.vscode/settings.json`: `off`, `outline` (the default) or `full`.
+`outline` carries the framework's own lines, the review rounds, the test
+runs, the steps accepted, the stop, and the output of any job that failed;
+`full` adds the output of every job.
+Neither carries the AI's own conversation in its terminal: the page
+records what the framework asked, what it measured and what the reviewer
+said.
 
 `dabbler transcript --from N --to M` renders pages for earlier sessions
 from records already on disk. Nothing is sent to a model and nothing is

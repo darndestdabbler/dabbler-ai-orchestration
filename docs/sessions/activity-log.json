@@ -13238,6 +13238,13 @@
       "dateTime": "2026-11-11T11:35:04.328000-05:00",
       "task": "Release 3.32.4: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 325,
+      "dateTime": "2026-11-12T09:56:48.650000-05:00",
+      "task": "Rewrite five right-hand cells of the risks table on the Marketplace page (tools/dabbler-ai-orchestration/README.md) -- the black-box, evaluation, does-more-than-asked, untested-code and gets-stuck rows -- to the exact text the session plan gives, each keeping the link it has now; carry the same table word for word into the root README.md; and in docs/guide/the-record.md, under The transcript, say what `outline` and `full` carry and that neither carries the AI's own terminal conversation, making the paragraph above it agree.",
+      "releasable": false
     }
   ]
 }

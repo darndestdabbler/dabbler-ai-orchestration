@@ -228,6 +228,10 @@ suite("set up new project", () => {
       existing?: string[];
       /** Offer actions answered by name, before `choose`. */
       accept?: string[];
+      /** The repository already in the folder; absent, it is not read. */
+      checkout?: { origin: string | null; branch: string | null };
+      /** The answer to "which branch?"; absent, accepted unchanged; null, Escape. */
+      branchAnswer?: string | null;
     } = {},
   ): {
     ui: SetUpProjectUi;
@@ -237,6 +241,8 @@ suite("set up new project", () => {
     ran: string[];
     opened: string[];
     remembered: string[];
+    remoteAsks: number;
+    branchAsks: string[];
     inits: number;
   } {
     const errors: string[] = [];
@@ -245,6 +251,8 @@ suite("set up new project", () => {
     const ran: string[] = [];
     const opened: string[] = [];
     const remembered: string[] = [];
+    const branchAsks: string[] = [];
+    let remoteAsks = 0;
     let inits = 0;
     const ui: SetUpProjectUi = {
       showInformationMessage: (m: string) => infos.push(m),
@@ -273,8 +281,24 @@ suite("set up new project", () => {
     // Skipping is the default here, because skipping is a real answer: a
     // flow that only works when a remote is given would be a required step
     // wearing an optional one's clothes.
-    ui.askRemote = () => Promise.resolve(options.remote);
-    if (options.remoteBranches !== undefined) ui.readRemote = () => Promise.resolve(options.remoteBranches ?? null);
+    ui.askRemote = () => {
+      remoteAsks += 1;
+      return Promise.resolve(options.remote);
+    };
+    if (options.remoteBranches !== undefined) {
+      const branches = options.remoteBranches;
+      ui.readRemote = () => Promise.resolve({ branches, defaultBranch: branches[0] ?? null });
+    }
+    if (options.checkout !== undefined) {
+      const checkout = options.checkout;
+      ui.readCheckout = () => Promise.resolve(checkout);
+    }
+    ui.askBranch = (current: string) => {
+      branchAsks.push(current);
+      return Promise.resolve(
+        options.branchAnswer === null ? undefined : (options.branchAnswer ?? current),
+      );
+    };
     if (options.existing !== undefined) ui.existingFiles = () => Promise.resolve(options.existing ?? []);
     if (!options.noGit) {
       ui.initRepository = () => {
@@ -290,6 +314,10 @@ suite("set up new project", () => {
       ran,
       opened,
       remembered,
+      get remoteAsks() {
+        return remoteAsks;
+      },
+      branchAsks,
       get inits() {
         return inits;
       },
@@ -370,6 +398,49 @@ suite("set up new project", () => {
     const left = fakeRouter(0);
     assert.strictEqual(await runSetUpProjectFlow(no.ui, left.router), true);
     assert.strictEqual(left.bootstrapOptions[0].commitExisting, undefined);
+  });
+
+  test("does not ask a folder whose repository has an origin where it pushes, nor offer the pull", async () => {
+    // Answering with the repository's own URL led to the pull, which renamed
+    // the checked-out branch to origin's default and merged it.
+    const fixture = setUpUi("D:\\ws", {
+      checkout: { origin: "https://example.invalid/p.git", branch: "feature" },
+      remote: "https://example.invalid/p.git",
+      remoteBranches: ["main"],
+    });
+    const fake = fakeRouter(0);
+    assert.strictEqual(await runSetUpProjectFlow(fixture.ui, fake.router), true);
+    assert.strictEqual(fixture.remoteAsks, 0);
+    assert.ok(!fixture.offers.some((offer) => offer.includes("already holds")), fixture.offers.join("\n"));
+    assert.strictEqual(fake.bootstrapOptions[0].remote, undefined);
+    assert.strictEqual(fake.bootstrapOptions[0].fromOrigin, undefined);
+  });
+
+  test("asks which branch when origin has the one checked out, and a new name reaches bootstrap", async () => {
+    const shared = { origin: "https://example.invalid/p.git", branch: "main" };
+    const renamed = setUpUi("D:\\ws", { checkout: shared, remoteBranches: ["main"], branchAnswer: "remediation" });
+    const fake = fakeRouter(0);
+    assert.strictEqual(await runSetUpProjectFlow(renamed.ui, fake.router), true);
+    assert.deepStrictEqual(renamed.branchAsks, ["main"]);
+    assert.strictEqual(fake.bootstrapOptions[0].branch, "remediation");
+
+    // Accepted unchanged, nothing is passed; Escape writes nothing.
+    const kept = setUpUi("D:\\ws", { checkout: shared, remoteBranches: ["main"] });
+    const same = fakeRouter(0);
+    assert.strictEqual(await runSetUpProjectFlow(kept.ui, same.router), true);
+    assert.strictEqual(same.bootstrapOptions[0].branch, undefined);
+    const escaped = setUpUi("D:\\ws", { checkout: shared, remoteBranches: ["main"], branchAnswer: null });
+    assert.strictEqual(await runSetUpProjectFlow(escaped.ui, unusableRouter()), false);
+  });
+
+  test("asks a new project nothing about its branch", async () => {
+    const { ui, branchAsks } = setUpUi(undefined, {
+      newFolder: "D:\\fresh",
+      remote: "https://example.invalid/p.git",
+      remoteBranches: [],
+    });
+    assert.strictEqual(await runSetUpProjectFlow(ui, fakeRouter(0).router), true);
+    assert.deepStrictEqual(branchAsks, []);
   });
 
   test("opens a folder it created before offering anything about it", async () => {

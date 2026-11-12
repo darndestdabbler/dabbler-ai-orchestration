@@ -366,6 +366,8 @@ export interface BootstrapOptions {
   readonly fromOrigin?: boolean;
   /** Commit the files already in the folder as the project's starting point, as the person answered. */
   readonly commitExisting?: boolean;
+  /** The branch the framework's files are committed to and pushed on: checked out where it exists, made from the commit checked out where it does not. */
+  readonly branch?: string;
 }
 
 /**

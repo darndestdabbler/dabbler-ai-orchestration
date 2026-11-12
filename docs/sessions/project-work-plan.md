@@ -365,6 +365,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 325 | The risks table says what a reader most needs to know | no | 2026-11-12 |
 | 326 | A guide page on what a session costs, and what is sent to a reviewer | no | 2026-11-12 |
 | 327 | Release 3.32.5 (release: 3.32.5) | yes | 2026-11-12 |
+| 328 | Set Up New Project asks which branch, in a repository that already has one | no | 2026-11-12 |
+| 329 | Release 3.33.0 (release: 3.33.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3754,3 +3756,13 @@ Write docs/guide/cost-and-what-is-sent.md, a guide page on what a session costs 
 **Releasable: yes.**
 
 Release 3.32.5: the framework packs and publishes what is on the trunk.
+
+### Session 328 — Set Up New Project asks which branch, in a repository that already has one
+
+**Releasable: no.**
+
+Let Set Up New Project put the framework's files on a branch of their own in a repository that already has one, and stop asking a clone with an origin where it pushes. `dabbler bootstrap` gains `--branch <name>` (and `Router.bootstrap` a `branch` option beside `fromOrigin` and `commitExisting`): before anything is written it checks the name with `git check-ref-format --branch` (a usage error naming it on refusal), refuses a repository with no commit unless `--from-origin` is checking out origin's default branch into an empty folder, refuses `--from-origin` into a folder with files of its own, then checks out the named branch -- an existing one, here or at origin, is checked out and never recreated or merged; a new one is made from the commit checked out. The scaffold is committed there and, where there is an origin, that branch alone is pushed with its upstream; a refused push names the command that finishes it and fails nothing. In the extension, a folder whose repository already has an `origin` is neither asked for a remote nor offered the pull, and where origin already has the checked-out branch, or the project starts from origin's history into an empty folder, one input box asks which branch Dabbler should work on, pre-filled with the current branch (origin's default in the second case): unchanged carries on as now, a new name is passed as `branch`, Escape cancels with nothing written. `docs/driving-a-session.md` gains one paragraph under *An existing repository* and the Marketplace page's *Get started* one sentence; `version.json` goes to 3.33.0, stamped, with a 3.33.0 changelog section.
+
+**Amended after acceptance:**
+
+- 2026-11-12 — step 'setup-flow-branch': its checks: The host run of commandFlows.test.ts fails three 'Start opens the person's own CLI' tests with or without this step's change (80 pass/3 fail before, 83/3 after): they depend on this machine. The extension suite's declared runner is scripts/suite.mjs extension, which runs in the container where all 86 pass; the check now uses that runner. (claude-code (anthropic, claude-opus-5-5))

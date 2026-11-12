@@ -108,7 +108,9 @@ the Configuration first; then **Set Up New Project** writes the
 instructions your AI reads and the first two sessions, and commits them.
 Choose **Start Session** on the repository's row and watch the tree. An
 existing repository is recognised and kept as it is: the framework plans
-changes to its projects and leaves their layout alone.
+changes to its projects and leaves their layout alone. It can be set up on
+a branch of its own, so the framework's files stay off the main branch
+until you merge them.
 
 The framework is open source (MIT). [Your costs](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/cost-and-what-is-sent.md)
 are your provider's API spend or your Copilot seat.

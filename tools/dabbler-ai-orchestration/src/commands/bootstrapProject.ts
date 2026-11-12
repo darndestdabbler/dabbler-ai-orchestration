@@ -55,8 +55,18 @@ export interface SetUpProjectUi {
    * remote is added, and the push gate says so at every close.
    */
   askRemote?: () => Promise<string | undefined>;
-  /** The remote's branch names, read before anything is written; null when it cannot be read. */
-  readRemote?: (url: string) => Promise<string[] | null>;
+  /** The remote's branch names and its default branch, read before anything is written; null when it cannot be read. */
+  readRemote?: (url: string) => Promise<RemoteBranches | null>;
+  /**
+   * The repository already in the folder: its `origin`, and the branch
+   * checked out at a commit. Either is null where there is none.
+   */
+  readCheckout?: (root: string) => Promise<{ origin: string | null; branch: string | null }>;
+  /**
+   * Which branch the framework works on, pre-filled with `current`.
+   * Undefined cancels set-up.
+   */
+  askBranch?: (current: string) => Promise<string | undefined>;
   /** Files in the folder that nothing has committed: the starting point a person may already have. */
   existingFiles?: (root: string) => Promise<string[]>;
   /** Start session 1 in the project just prepared. */
@@ -70,6 +80,11 @@ export interface SetUpProjectUi {
    * the window that opens makes it.
    */
   rememberPendingStart?: (root: string) => Thenable<void>;
+}
+
+export interface RemoteBranches {
+  readonly branches: string[];
+  readonly defaultBranch: string | null;
 }
 
 /**
@@ -110,6 +125,8 @@ function defaultUi(pending?: PendingStartStore): SetUpProjectUi {
     chooseNewProjectFolder: chooseNewProjectFolder,
     askRemote: askRemote,
     readRemote: readRemote,
+    readCheckout: readCheckout,
+    askBranch: askBranch,
     existingFiles: existingFiles,
     startSession: startSessionIn,
     openFolder: (root) =>
@@ -148,15 +165,20 @@ export async function runSetUpProjectFlow(
   // The remote, before the project is written rather than after it is
   // closed. `bootstrap` records it and pushes the branch with an upstream;
   // an empty answer sets the project up without one, and nothing here
-  // insists.
-  const remote = ui.askRemote ? ((await ui.askRemote()) ?? "").trim() : "";
+  // insists. A repository that already has an origin is not asked: the
+  // origin it has is where it pushes, and `bootstrap` leaves it as it is.
+  const checkout =
+    !created && ui.readCheckout ? await ui.readCheckout(root) : { origin: null, branch: null };
+  const remote =
+    checkout.origin === null && ui.askRemote ? ((await ui.askRemote()) ?? "").trim() : "";
 
   // What is already there is a starting point, asked about once here rather
   // than refused at session 1. Each is the person's one answer; declining
   // the pull writes nothing, because a remote is never overwritten.
   const existing = !created && ui.existingFiles ? await ui.existingFiles(root) : [];
   let fromOrigin = false;
-  const branches = remote && ui.readRemote ? await ui.readRemote(remote) : null;
+  const read = remote && ui.readRemote ? await ui.readRemote(remote) : null;
+  const branches = read?.branches ?? null;
   if (branches !== null && branches.length > 0) {
     const pull = "Pull it and start from it";
     const choice = await ui.offer?.(
@@ -185,6 +207,25 @@ export async function runSetUpProjectFlow(
     commitExisting = choice === keep;
   }
 
+  // Which branch, asked only where the branch is shared: origin already has
+  // the one checked out, or the project starts from origin's history into
+  // an empty folder. A new name is `bootstrap`'s to create and push. A
+  // repository already set up is not asked: its branch is git's to change.
+  const setUp = fs.existsSync(path.join(root, "docs", "sessions", "session-plan.md"));
+  let shared: string | null = null;
+  if (!setUp && fromOrigin && existing.length === 0 && checkout.branch === null) {
+    shared = read?.defaultBranch ?? null;
+  } else if (!setUp && checkout.origin !== null && checkout.branch !== null && ui.readRemote) {
+    const atOrigin = await ui.readRemote(checkout.origin);
+    if (atOrigin?.branches.includes(checkout.branch)) shared = checkout.branch;
+  }
+  let branch = "";
+  if (shared !== null && ui.askBranch) {
+    const answer = await ui.askBranch(shared);
+    if (answer === undefined) return false;
+    if (answer.trim() !== "" && answer.trim() !== shared) branch = answer.trim();
+  }
+
   // No transport, deliberately. Setting up one project is not a statement
   // about how it routes: the project's own configuration decides, and this
   // click has no answer to contribute. `bootstrap` used to persist a
@@ -199,6 +240,7 @@ export async function runSetUpProjectFlow(
     ...(remote ? { remote } : {}),
     ...(fromOrigin ? { fromOrigin } : {}),
     ...(commitExisting ? { commitExisting } : {}),
+    ...(branch ? { branch } : {}),
   };
   let result = await router.bootstrap(options);
   if (!result.ok && ui.initRepository) {
@@ -371,16 +413,51 @@ const QUIET_GIT = {
   windowsHide: true,
 };
 
-async function readRemote(url: string): Promise<string[] | null> {
+async function readRemote(url: string): Promise<RemoteBranches | null> {
   try {
-    const { stdout } = await execFile("git", ["ls-remote", "--heads", url], QUIET_GIT);
-    return stdout
-      .split("\n")
-      .map((line) => /\trefs\/heads\/(.+)$/.exec(line.trim())?.[1])
-      .filter((branch): branch is string => branch !== undefined);
+    const { stdout } = await execFile("git", ["ls-remote", "--symref", url], QUIET_GIT);
+    const lines = stdout.split("\n").map((line) => line.trim());
+    return {
+      branches: lines
+        .map((line) => /^[0-9a-f]+\trefs\/heads\/(.+)$/.exec(line)?.[1])
+        .filter((branch): branch is string => branch !== undefined),
+      defaultBranch:
+        lines.map((line) => /^ref: refs\/heads\/(.+)\tHEAD$/.exec(line)?.[1]).find((b) => b !== undefined) ?? null,
+    };
   } catch {
     return null;
   }
+}
+
+async function readCheckout(root: string): Promise<{ origin: string | null; branch: string | null }> {
+  const read = async (args: string[]): Promise<string | null> => {
+    try {
+      const { stdout } = await execFile("git", args, { ...QUIET_GIT, cwd: root });
+      return stdout.trim() || null;
+    } catch {
+      return null;
+    }
+  };
+  // `rev-parse` answers only at a commit: a repository with none has no
+  // branch to share yet.
+  const branch = await read(["rev-parse", "--abbrev-ref", "HEAD"]);
+  return {
+    origin: await read(["remote", "get-url", "origin"]),
+    branch: branch === "HEAD" ? null : branch,
+  };
+}
+
+async function askBranch(current: string): Promise<string | undefined> {
+  return vscode.window.showInputBox({
+    title: "Which branch should Dabbler work on?",
+    prompt:
+      `A new name is created from '${current}' and pushed, and the framework's files ` +
+      "are committed to it and to no other branch.",
+    value: current,
+    ignoreFocusOut: true,
+    validateInput: (value) =>
+      value.trim() === "" ? "The branch needs a name." : undefined,
+  });
 }
 
 async function existingFiles(root: string): Promise<string[]> {

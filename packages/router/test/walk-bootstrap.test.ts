@@ -12,7 +12,7 @@
 // that ONE directory answers all of them, from nothing, in one pass -- which
 // is what a person setting up a project actually does.
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -371,5 +371,90 @@ describe("a branch brought level with an origin the host created", () => {
     assert.match(readFileSync(join(repo, "src", "lib.txt"), "utf8"), /^theirs\r?\n$/);
     assert.match(readFileSync(join(repo, "README.md"), "utf8"), /^# ours\r?\n$/);
     git(repo, "push", "-q");
+  });
+});
+
+describe("a set-up on a branch of its own", () => {
+  // A repository whose default branch takes changes only by pull request is
+  // set up on a branch a person names, and nothing reaches the default.
+
+  it("commits the scaffold on the named branch, pushes that branch alone, and leaves the one it was made from where it was", async () => {
+    const repo = makeRepo({ "README.md": "# app\n" }, { origin: true });
+    const before = gitOut(repo, "rev-parse", "HEAD");
+
+    const setup = await capture(() => bootstrapVerb(["--project-dir", repo, "--branch", "remediation"]));
+    assert.equal(setup.value, 0, setup.stderr);
+    assert.equal(gitOut(repo, "symbolic-ref", "--short", "HEAD"), "remediation");
+    assert.equal(gitOut(repo, "log", "-1", "--format=%s"), "Set up Dabbler");
+    assert.equal(gitOut(repo, "rev-parse", "HEAD^"), before);
+    assert.equal(gitOut(repo, "rev-parse", "main"), before);
+    assert.equal(gitOut(repo, "rev-parse", "--abbrev-ref", "remediation@{upstream}"), "origin/remediation");
+    const atOrigin = (branch: string) => gitOut(repo, "ls-remote", "origin", `refs/heads/${branch}`).split("\t")[0];
+    assert.equal(atOrigin("remediation"), gitOut(repo, "rev-parse", "HEAD"));
+    assert.equal(atOrigin("main"), before);
+  });
+
+  it("checks out a branch that already exists rather than making it again", async () => {
+    const repo = makeRepo({ "README.md": "# app\n" });
+    const before = gitOut(repo, "rev-parse", "HEAD");
+    git(repo, "switch", "-q", "-c", "remediation");
+    writeFiles(repo, { "fix.txt": "fix\n" });
+    git(repo, "add", "-A");
+    git(repo, "commit", "-q", "-m", "their fix");
+    const fix = gitOut(repo, "rev-parse", "HEAD");
+    git(repo, "switch", "-q", "main");
+
+    const setup = await capture(() => bootstrapVerb(["--project-dir", repo, "--branch", "remediation"]));
+    assert.equal(setup.value, 0, setup.stderr);
+    assert.equal(gitOut(repo, "symbolic-ref", "--short", "HEAD"), "remediation");
+    assert.equal(gitOut(repo, "rev-parse", "HEAD^"), fix);
+    assert.equal(gitOut(repo, "rev-parse", "main"), before);
+    assert.equal(gitOut(repo, "rev-list", "--merges", "HEAD"), "");
+  });
+
+  it("starts an empty folder from origin's default branch and pushes only the new branch", async () => {
+    const seed = scratchDir("branch-seed-");
+    const bare = join(scratchDir("branch-bare-"), "origin.git");
+    writeFiles(seed, { "app.txt": "theirs\n" });
+    git(seed, "init", "-q", "-b", "main");
+    git(seed, "add", "-A");
+    git(seed, "commit", "-q", "-m", "their work");
+    git(seed, "init", "-q", "--bare", "-b", "main", bare);
+    git(seed, "push", "-q", bare, "main");
+    const theirs = gitOut(seed, "rev-parse", "HEAD");
+    const folder = scratchDir("branch-from-");
+
+    const setup = await capture(() =>
+      bootstrapVerb(["--project-dir", folder, "--remote", bare, "--from-origin", "--branch", "remediation"]),
+    );
+    assert.equal(setup.value, 0, setup.stderr);
+    assert.equal(gitOut(folder, "symbolic-ref", "--short", "HEAD"), "remediation");
+    assert.equal(gitOut(folder, "rev-parse", "HEAD^"), theirs);
+    assert.equal(gitOut(bare, "rev-parse", "refs/heads/main"), theirs);
+    assert.equal(gitOut(bare, "rev-parse", "refs/heads/remediation"), gitOut(folder, "rev-parse", "HEAD"));
+  });
+
+  it("is refused, writing nothing, for a name git refuses, a repository with no commit, or one already set up", async () => {
+    // Not even the repository: the name is refused before `git init`.
+    const bare = scratchDir("badname-");
+    const named = await capture(() => bootstrapVerb(["--project-dir", bare, "--branch", "bad..name"]));
+    assert.equal(named.value, 2);
+    assert.match(named.stderr, /'bad\.\.name'/);
+    assert.deepEqual(readdirSync(bare), []);
+
+    const unborn = scratchDir("unborn-");
+    git(unborn, "init", "-q");
+    const empty = await capture(() => bootstrapVerb(["--project-dir", unborn, "--branch", "remediation"]));
+    assert.equal(empty.value, 2);
+    assert.match(empty.stderr, /needs a commit to branch from/);
+    assert.deepEqual(readdirSync(unborn), [".git"]);
+
+    // Changing the branch of a repository already set up is git's.
+    const repo = makeRepo({ "docs/sessions/session-plan.md": "### Session 1 of 1: Work\n" });
+    const set = await capture(() => bootstrapVerb(["--project-dir", repo, "--branch", "remediation"]));
+    assert.equal(set.value, 2);
+    assert.match(set.stderr, /already is/);
+    assert.equal(gitOut(repo, "symbolic-ref", "--short", "HEAD"), "main");
+    assert.equal(gitOut(repo, "branch", "--list", "remediation"), "");
   });
 });

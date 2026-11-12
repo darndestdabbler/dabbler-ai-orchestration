@@ -25,7 +25,7 @@ import {
   writeConfigurationChoice,
 } from "../config.ts";
 import { freshnessWarnings } from "../discovery.ts";
-import { SESSIONS_DIRNAME, ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
+import { SESSIONS_DIRNAME, SESSION_PLAN_FILENAME, ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
 import { haveCommonHistory, reconcileWithOrigin, remoteDefaultBranch, repoRelativePath, runGit } from "../journal.ts";
 import { originHoldsWorkRefusal } from "../session.ts";
 import { PROJECT_CONFIG_FILENAME } from "../config.ts";
@@ -66,7 +66,7 @@ const CHOICES = [...VALID_TRANSPORTS].sort();
 function usage(): string {
   return [
     "usage: dabbler bootstrap [-h] [--project-dir PROJECT_DIR]",
-    "                        [--repo-name REPO_NAME] [--remote URL]",
+    "                        [--repo-name REPO_NAME] [--remote URL] [--branch NAME]",
     "                        [--print-plan-prompt]",
     "                        [--print-decomposition-prompt]",
     `                        [--transport {${CHOICES.join(",")}}]`,
@@ -84,6 +84,11 @@ function usage(): string {
     "                        folder with no commit and no files, check out",
     "                        origin's default branch; otherwise merge origin's",
     "                        branch before the first push. Never a force-push.",
+    "  --branch NAME         put the framework's files on this branch: checked",
+    "                        out where it exists, here or at origin, and made",
+    "                        from the commit checked out where it does not.",
+    "                        The scaffold is committed to it and it alone is",
+    "                        pushed, with its upstream. Nothing is merged.",
     "  --commit-existing     commit the files already in the folder as the",
     "                        project's starting point, before anything is",
     "                        written.",
@@ -98,7 +103,7 @@ function usage(): string {
   ].join("\n");
 }
 
-const VALUE_FLAGS = new Set(["--project-dir", "--repo-name", "--remote", "--transport"]);
+const VALUE_FLAGS = new Set(["--project-dir", "--repo-name", "--remote", "--branch", "--transport"]);
 const BARE_FLAGS = new Set([
   "--print-plan-prompt",
   "--print-decomposition-prompt",
@@ -110,6 +115,7 @@ interface Parsed {
   readonly projectDir: string;
   readonly repoName: string | null;
   readonly remote: string | null;
+  readonly branch: string | null;
   readonly fromOrigin: boolean;
   readonly commitExisting: boolean;
   readonly printPlanPrompt: boolean;
@@ -143,6 +149,7 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     projectDir: values.get("--project-dir") ?? ".",
     repoName: values.get("--repo-name") ?? null,
     remote: values.get("--remote") ?? null,
+    branch: values.get("--branch") ?? null,
     fromOrigin: flags.has("--from-origin"),
     commitExisting: flags.has("--commit-existing"),
     printPlanPrompt: flags.has("--print-plan-prompt"),
@@ -216,6 +223,11 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     writeErr(`bootstrap: not a directory: ${project}\n`);
     return EXIT_USAGE;
   }
+  const refusal = branchRefusal(project, parsed);
+  if (refusal !== null) {
+    writeErr(`dabbler bootstrap: error: ${refusal}\n`);
+    return EXIT_USAGE;
+  }
 
   // A repository, before anything else. Everything after this needs one --
   // the commit guard lives under .git/hooks, the scaffold is committed at
@@ -262,6 +274,17 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   // the first commit.
   const fromOrigin = parsed.fromOrigin ? startFromOrigin(project) : null;
   if (fromOrigin?.line) writeOut(`bootstrap: ${fromOrigin.line}\n`);
+  if (parsed.branch !== null) {
+    const checkedOut = checkOutBranch(project, parsed.branch);
+    if (checkedOut.error) {
+      writeErr(
+        `bootstrap: could not check out '${parsed.branch}' (${checkedOut.error}); ` +
+          "nothing of the framework's has been written.\n",
+      );
+      return EXIT_ERROR;
+    }
+    if (checkedOut.line) writeOut(`bootstrap: ${checkedOut.line}\n`);
+  }
   if (parsed.commitExisting) {
     const started = commitStartingPoint(project);
     if (started) writeOut(`bootstrap: ${started}\n`);
@@ -481,7 +504,27 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   // reported and is not fatal: the remote is recorded either way, and a
   // half-configured remote an operator can finish beats a set-up that died
   // after writing the scaffold.
-  if (remote !== null && remote.added) {
+  //
+  // A named branch is pushed once and on its own: no merge and no retry,
+  // because either would reach a branch nobody named, and the default
+  // branch differing from it is the point rather than a mismatch.
+  if (parsed.branch !== null) {
+    const root = repoRootFor(project);
+    if (root !== null && hasOrigin(root)) {
+      const pushed = pushUpstream(project);
+      if (pushed.error === "") {
+        writeOut(
+          `bootstrap: pushed ${pushed.branch} to origin and set it to track there; ` +
+            "no other branch was pushed.\n",
+        );
+      } else {
+        writeErr(
+          `bootstrap: the first push of ${parsed.branch} failed (${pushed.error}). ` +
+            `Push it yourself once: git push -u origin ${parsed.branch}\n`,
+        );
+      }
+    }
+  } else if (remote !== null && remote.added) {
     let pushed = pushUpstream(project);
     // A host that initialised the repository with a README refuses the first
     // push. That commit is merged and the push made again; anything more on
@@ -663,6 +706,84 @@ function startFromOrigin(projectDir: string): { readonly line: string; readonly 
           `origin's '${current}' is merged if it has one.`,
     adopted: false,
   };
+}
+
+/**
+ * Why `--branch` cannot be honoured in this folder, or null. Asked before
+ * anything is written, so a refusal leaves the folder as it was.
+ *
+ * A branch is made from a commit, so a repository with none has nothing to
+ * make it from -- except where `--from-origin` is about to check out
+ * origin's default branch into an empty folder. Into a folder with work of
+ * its own, `--from-origin` merges origin's branch into that work, and which
+ * branch should carry the result is a person's to work out in git. A
+ * repository already set up has its branch, and changing it is git's.
+ */
+function branchRefusal(projectDir: string, parsed: Parsed): string | null {
+  const name = parsed.branch;
+  if (name === null) return null;
+  if (runGit(projectDir, ["check-ref-format", "--branch", name]).code !== 0) {
+    return `argument --branch: '${name}' is not a name git accepts for a branch`;
+  }
+  if (existsSync(join(projectDir, "docs", SESSIONS_DIRNAME, SESSION_PLAN_FILENAME))) {
+    return (
+      "--branch is for setting a repository up, and this one already is: it has a session plan. " +
+      "Its branch is changed in git, and bootstrap without --branch refreshes it where it is"
+    );
+  }
+  const root = repoRootFor(projectDir);
+  const born = root !== null && runGit(root, ["rev-parse", "-q", "--verify", "HEAD"]).code === 0;
+  if (parsed.fromOrigin) {
+    const empty = !born && readdirSync(root ?? projectDir).every((entry) => entry === ".git");
+    return empty
+      ? null
+      : "--branch with --from-origin is for an empty folder: here origin's default branch would be " +
+          "merged into this folder's own work, and which branch carries that is yours to settle in git";
+  }
+  return born
+    ? null
+    : "--branch needs a commit to branch from, and this repository has none; " +
+        "commit something first, or set up without --branch";
+}
+
+/**
+ * Put the checkout on `name`. A branch that exists, here or at origin, is
+ * checked out as it is; one that does not is made from the commit checked
+ * out. Nothing is merged either way.
+ */
+function checkOutBranch(projectDir: string, name: string): { readonly line: string; readonly error: string } {
+  const root = repoRootFor(projectDir);
+  if (root === null) return { line: "", error: "not inside a git repository" };
+  if (runGit(root, ["rev-parse", "-q", "--verify", "HEAD"]).code !== 0) {
+    return { line: "", error: "there is no commit to branch from" };
+  }
+  const current = runGit(root, ["symbolic-ref", "--short", "-q", "HEAD"]).stdout.trim();
+  if (current === name) return { line: "", error: "" };
+  const failed = (result: { code: number; stderr: string }) =>
+    result.code === 0 ? "" : result.stderr.trim() || "git switch failed";
+  if (runGit(root, ["show-ref", "--verify", "--quiet", `refs/heads/${name}`]).code === 0) {
+    const error = failed(runGit(root, ["switch", "-q", name]));
+    return { line: error ? "" : `checked out '${name}', which already existed.`, error };
+  }
+  const atOrigin =
+    hasOrigin(root) &&
+    runGit(root, ["fetch", "-q", "origin", `+refs/heads/${name}:refs/remotes/origin/${name}`]).code === 0;
+  if (atOrigin) {
+    const error = failed(runGit(root, ["switch", "-q", "-c", name, "--track", `origin/${name}`]));
+    return { line: error ? "" : `checked out origin's '${name}', which already existed.`, error };
+  }
+  const error = failed(runGit(root, ["switch", "-q", "-c", name]));
+  return {
+    line: error
+      ? ""
+      : `made '${name}' from ${current ? `'${current}'` : "the commit checked out"} and checked it out; ` +
+        "the framework's files are committed to it and to no other branch.",
+    error,
+  };
+}
+
+function hasOrigin(root: string): boolean {
+  return runGit(root, ["remote"]).stdout.split("\n").some((entry) => entry.trim() === "origin");
 }
 
 /** Push the checked-out branch with an upstream, so a bare `git push` works after. */

@@ -249,6 +249,15 @@ Maven WAR or a Spring Boot service. Those repositories are often opened in
 Visual Studio, IntelliJ or Eclipse by people who never use this framework.
 Set up in one, the framework recognises it and does not change it.
 
+**Which branch.** The framework commits to the branch checked out, and has
+no branch name of its own. Where origin already has that branch, Set Up New
+Project asks which branch Dabbler should work on. A new name is created
+from the current branch and pushed, and the framework's files are committed
+to it and to no other branch. Outside VS Code, `dabbler bootstrap --branch
+<name>` does the same. Merging that branch back is a pull request that a
+person opens. Until it merges, run sessions on one branch only: the two
+branches would take the same session numbers.
+
 **What detection reads.** `dabbler bootstrap` reads the repository root
 and two levels below it, skipping `bin`, `obj`, `target`, `node_modules`
 and `.git`. So a solution file or a POM under `src/` is found. A suite

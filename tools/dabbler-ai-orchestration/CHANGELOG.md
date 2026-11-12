@@ -10,6 +10,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.33.0] — 2026-11-12
+
+**Set Up New Project can put the framework's files on a branch of their
+own.**
+
+### Added
+
+- **Which branch Dabbler works on.** In a repository where origin already
+  has the branch checked out, or when a project starts from origin's
+  history in an empty folder, Set Up New Project asks which branch Dabbler
+  should work on. A new name is created from the current branch, the
+  framework's files are committed to it and to no other branch, and it is
+  pushed with its upstream. Outside VS Code, `dabbler bootstrap --branch
+  <name>` does the same.
+
+### Changed
+
+- **A clone is no longer asked where it pushes.** In a folder whose
+  repository already has an `origin`, Set Up New Project no longer asks
+  for a remote and no longer offers to pull. The origin is left as it is.
+
 ## [3.32.5] — 2026-11-12
 
 **The risks table says what a reader most needs to know, and the guide

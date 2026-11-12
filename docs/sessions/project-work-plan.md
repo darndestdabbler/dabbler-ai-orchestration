@@ -363,7 +363,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 323 | The listing says it in plain words, and names the transcript | no | 2026-11-11 |
 | 324 | Release 3.32.4 (release: 3.32.4) | yes | 2026-11-11 |
 | 325 | The risks table says what a reader most needs to know | no | 2026-11-12 |
-| 326 | A guide page on what a session costs, and what is sent to a reviewer | — | not declared |
+| 326 | A guide page on what a session costs, and what is sent to a reviewer | no | 2026-11-12 |
 | 327 | Release 3.32.5 (release: 3.32.5) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -3742,3 +3742,9 @@ Release 3.32.4: the framework packs and publishes what is on the trunk.
 **Releasable: no.**
 
 Rewrite five right-hand cells of the risks table on the Marketplace page (tools/dabbler-ai-orchestration/README.md) -- the black-box, evaluation, does-more-than-asked, untested-code and gets-stuck rows -- to the exact text the session plan gives, each keeping the link it has now; carry the same table word for word into the root README.md; and in docs/guide/the-record.md, under The transcript, say what `outline` and `full` carry and that neither carries the AI's own terminal conversation, making the paragraph above it agree.
+
+### Session 326 — A guide page on what a session costs, and what is sent to a reviewer
+
+**Releasable: no.**
+
+Write docs/guide/cost-and-what-is-sent.md, a guide page on what a session costs and what is sent to a reviewer. First read from the source, and note in the step's report: every place a session can call a model (the authoring engine, each review round, the unattended Mechanic, Check this stop, an adjudication, a consult) and which the framework starts by itself and which only a person starts; whether a release session calls a model at all; what the framework can and cannot see of the cost (what a review round records, what `dabbler seat-cost` reads, whether the authoring engine's own spend reaches the record); and what a reviewer is sent (prompt-templates/verification.md, verify/rounds.ts) and what it may read for itself, by vehicle. Take measured ranges of recent review-round cost by reviewer model from this machine's records, or give no number where the records cannot support one. Then write the page in the guide's shape: the three cost cases in the operator's terms, that prices move and should be watched, links to the four companies' own pricing pages (each opened first), the operator's own experience as one person's experience on the date, what moves the cost with the setting for each, what a reviewer is sent and may read, which companies receive code, and where to see it. Add the page's line to docs/guide/README.md and link the Marketplace page's cost sentence under Get started to it, saying no more than it does now. Set version.json to 3.32.5, stamp with npm run stamp:version, and add a 3.32.5 changelog section covering this session and 325.

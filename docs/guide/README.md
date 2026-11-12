@@ -26,3 +26,7 @@ link to for their proof. To run a session, read
 - [The Configuration](configuration.md): each row of the Solution
   Explorer's Configuration, where every choice is kept and which layer
   wins, the two vehicles, the model lists, and credentials.
+- [What a session costs, and what is sent to a reviewer](cost-and-what-is-sent.md):
+  where a session calls a model and who starts each call, what decides the
+  cost and where to see it, where each company's prices are, what a
+  reviewer is sent and may read, and which companies receive the code.

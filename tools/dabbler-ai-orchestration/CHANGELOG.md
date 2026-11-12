@@ -10,6 +10,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.32.5] — 2026-11-12
+
+**The risks table says what a reader most needs to know, and the guide
+says what a session costs.** No behaviour changed in this release: it is
+wording only.
+
+### Changed
+
+- **The risks table on the Marketplace page and the repository README.**
+  It now says that a person can watch the work as it happens and audit
+  each session afterwards; what happens when findings still block after
+  the last of the seven rounds; that work the plan rules out is raised as a
+  finding; and that by default the Mechanic tries the smallest fix first,
+  within set limits, before a stuck session comes to a person.
+
+### Added
+
+- **A guide page on cost and on what a reviewer is sent.**
+  `docs/guide/cost-and-what-is-sent.md` says where a session calls a model
+  and who starts each call, what decides the cost and where to see it,
+  where each company's own prices are, what a reviewer is sent and may
+  read, and which companies receive the code. The Marketplace page's
+  sentence on costs links to it.
+
 ## [3.32.4] — 2026-11-11
 
 **The listing says it in plain words, and names the transcript.** No

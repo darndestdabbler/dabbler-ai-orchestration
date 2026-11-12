@@ -19248,11 +19248,10 @@ session's to change. Any change to behaviour.
 
 The framework publishes session 323 as 3.32.4 and nothing else.
 
-### Session 325 of 328: The risks table says what a reader most needs to know
+### Session 325 of 327: The risks table says what a reader most needs to know
 
 Scope: `README.md`, `tools/dabbler-ai-orchestration/README.md`,
-`docs/guide/the-record.md`, `version.json` and the manifests `npm run
-stamp:version` writes, `tools/dabbler-ai-orchestration/CHANGELOG.md`
+`docs/guide/the-record.md`
 
 **Why.** The operator read the risks table on 2026-11-12 and found that the
 black-box row never says a person can watch the work on screen as it
@@ -19291,27 +19290,18 @@ conversation in its terminal: the page records what the framework asked,
 what it measured and what the reviewer said. The paragraph above it, which
 lists "every line the framework printed ... and the jobs", is made to agree.
 
-**Step 4 -- the number.** `version.json` goes to 3.32.5, stamped with `npm
-run stamp:version` -- a patch: wording only. The changelog's 3.32.5 section
-says the risks table now names watching and auditing, the round cap and the
-Mechanic's default.
-
-**Non-goals.** An eighth row. The cheats row. The introduction's "commits
+**Non-goals.** The version number and the changelog: 326 stamps 3.32.5 for
+both sessions. An eighth row. The cheats row. The introduction's "commits
 only what passed": the evaluation row beneath it now says what happens at
 the cap. Repeating the requirements on the GitHub page. A page on what a
-session costs or on what is sent to a reviewer: a later session if the
-operator wants one. A new screenshot. Any change to behaviour.
+session costs or on what is sent to a reviewer: that is 326. A new
+screenshot. Any change to behaviour.
 
-**Tests.** None added. The lint control runs `check-shipped-docs.mjs`;
-`npm run check:version` checks the stamp.
+**Tests.** None added. The lint control runs `check-shipped-docs.mjs`.
 
-**Releasable.** Yes, as 3.32.5 in session 326.
+**Releasable.** Yes -- with 326, as 3.32.5 in session 327.
 
-### Session 326 of 328: Release 3.32.5 (release: 3.32.5)
-
-The framework publishes session 325 as 3.32.5 and nothing else.
-
-### Session 327 of 328: A guide page on what a session costs, and what is sent to a reviewer
+### Session 326 of 327: A guide page on what a session costs, and what is sent to a reviewer
 
 Scope: `docs/guide/cost-and-what-is-sent.md` (new), `docs/guide/README.md`,
 `tools/dabbler-ai-orchestration/README.md`, `version.json` and the
@@ -19385,11 +19375,13 @@ long. It says:
 the Marketplace page, the sentence under *Get started* that names the costs
 links to the page and says no more than it does now.
 
-**Step 5 -- the number.** `version.json` goes to 3.32.6, stamped with `npm
-run stamp:version` -- a patch: wording only. The changelog's 3.32.6 section
-says the guide has a page on cost and on what a reviewer is sent.
+**Step 5 -- the number.** `version.json` goes to 3.32.5, stamped with `npm
+run stamp:version` -- a patch: wording only. The changelog's 3.32.5 section
+covers this session and 325: the risks table now names watching and
+auditing, the round cap and the Mechanic's default, and the guide has a
+page on cost and on what a reviewer is sent.
 
-**Non-goals.** The risks table. A cost estimate before a session, a spend
+**Non-goals.** The risks table, which is 325's. A cost estimate before a session, a spend
 limit, or any other change to behaviour. Handing work to cheaper models by
 difficulty: the operator noted the framework once did this and could again
 if cost proves a barrier; not now. Keys chosen per repository, for a
@@ -19401,8 +19393,8 @@ of anybody's account or plan.
 **Tests.** None added. The lint control runs `check-shipped-docs.mjs`;
 `npm run check:version` checks the stamp.
 
-**Releasable.** Yes, as 3.32.6 in session 328.
+**Releasable.** Yes -- with 325, as 3.32.5 in session 327.
 
-### Session 328 of 328: Release 3.32.6 (release: 3.32.6)
+### Session 327 of 327: Release 3.32.5 (release: 3.32.5)
 
-The framework publishes session 327 as 3.32.6 and nothing else.
+The framework publishes sessions 325 and 326 as 3.32.5 and nothing else.

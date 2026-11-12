@@ -19247,3 +19247,66 @@ session's to change. Any change to behaviour.
 ### Session 324 of 324: Release 3.32.4 (release: 3.32.4)
 
 The framework publishes session 323 as 3.32.4 and nothing else.
+
+### Session 325 of 326: The risks table says what a reader most needs to know
+
+Scope: `README.md`, `tools/dabbler-ai-orchestration/README.md`,
+`docs/guide/the-record.md`, `version.json` and the manifests `npm run
+stamp:version` writes, `tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The operator read the risks table on 2026-11-12 and found that the
+black-box row never says a person can watch the work on screen as it
+happens and audit it afterwards from the transcript. Before changing one
+row, the whole of the public documentation was read for gaps of the same
+kind by two advisers from two vendors (consult round 24,
+`docs/design/consults/round24-synthesis.md`). They agreed on four more
+rows: one stops short of what happens at the round cap, one claims more
+than the guide describes, one states the test rule loosely, and one leaves
+out what the framework does by default. A sceptical reader who finds the
+cap or the unattended Mechanic only in the guide reads it as something the
+front page hid.
+
+**Step 1 -- five cells on the Marketplace page.** The right-hand cell of
+each row becomes the text below. Each cell keeps the link it has now.
+
+| Row | Becomes |
+|---|---|
+| AI's work is a black box | A person can watch the work as it happens, in the Work Explorer and the Dabbler terminal, and audit each session afterwards from the plan, the log, the decisions and the transcript committed to the repository. |
+| AI's work is not adequately evaluated | A model from a different provider reviews every session. The two work through findings and fixes, up to seven rounds, without a person. If findings still block after the last round, the session stops for a person, or the final fix lands marked as unreviewed. |
+| AI does more than it is asked | Reviewers judge the work against what the plan says the session will and will not do. Work the plan rules out is raised as a finding, and a blocking finding has to be fixed or disputed before the work lands. |
+| Untested code gets committed | The framework runs the automated tests before any code is committed, and the reviewer is shown every changed source file that has no test named after it. |
+| A session gets stuck | By default a fresh AI (the **Mechanic**) first tries the smallest fix, within set limits. If the session is still stuck, a person can ask another AI what went wrong (**Consult with AI**) or decide for themselves, and the decision is recorded. |
+
+The cheats row and the last row stay as they are.
+
+**Step 2 -- the root README** carries the table word for word as the
+Marketplace page does, as 321 established.
+
+**Step 3 -- what a transcript carries.** In `docs/guide/the-record.md`,
+under *The transcript*, after the sentence that names `off`, `outline` and
+`full`: `outline` carries the framework's own lines, the review rounds, the
+test runs, the steps accepted, the stop, and the output of any job that
+failed; `full` adds the output of every job. Neither carries the AI's own
+conversation in its terminal: the page records what the framework asked,
+what it measured and what the reviewer said. The paragraph above it, which
+lists "every line the framework printed ... and the jobs", is made to agree.
+
+**Step 4 -- the number.** `version.json` goes to 3.32.5, stamped with `npm
+run stamp:version` -- a patch: wording only. The changelog's 3.32.5 section
+says the risks table now names watching and auditing, the round cap and the
+Mechanic's default.
+
+**Non-goals.** An eighth row. The cheats row. The introduction's "commits
+only what passed": the evaluation row beneath it now says what happens at
+the cap. Repeating the requirements on the GitHub page. A page on what a
+session costs or on what is sent to a reviewer: a later session if the
+operator wants one. A new screenshot. Any change to behaviour.
+
+**Tests.** None added. The lint control runs `check-shipped-docs.mjs`;
+`npm run check:version` checks the stamp.
+
+**Releasable.** Yes, as 3.32.5 in session 326.
+
+### Session 326 of 326: Release 3.32.5 (release: 3.32.5)
+
+The framework publishes session 325 as 3.32.5 and nothing else.

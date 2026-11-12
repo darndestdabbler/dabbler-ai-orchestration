@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 270 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 270 transcript</h1>
+<p class="stamp">Rendered 2026-10-17T10:09:23.075Z by dabbler-ai-router 3.21.0 at 28eb0fb51e2d7aa76926d6ae5887cb7627ccdefb.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-17T06:03:57.332-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 270 of 271: The Configuration row names what each role runs on</h3>
+<p>Scope: <code>tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts</code> (the <code>configuration</code> case); <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes; <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code>; tests in <code>solutionTreeModel.test.ts</code></p>
+<p><strong>Why.</strong> The Configuration row in the Solution Explorer read <code>claude-code · copilot-cli</code> in survsys and in this repository, where nothing runs on the Copilot seat. The row joins the engine with the machine's vehicle (<code>configuration.transport.effective</code>), and no row beneath it is decided by that value: the Authoring AI runs inside the engine's CLI, and both reviewers run on the reviewing vehicle (<code>dabbler.reviewerTransport</code>, <code>api</code> in both repositories), which outranks it. The machine's vehicle is the shipped <code>transport.profile: copilot-cli</code> in survsys and a <code>dabbler.transport</code> line in this checkout's settings. The shipped seat default is deliberate and stays; the row is what misleads.</p>
+<p><strong>Step 1 -- the row names the engine and the reviewing vehicle.</strong> The Configuration row's description is the authoring engine and the reviewing vehicle the Reviewing AI row shows (<code>claude-code · api</code> in both repositories), and the machine's vehicle is not in it. Where either is unread, it is left out, as the engine is today.</p>
+<p><strong>Step 2 -- the version and the words.</strong> <code>version.json</code> goes to 3.22.1 (a patch: one row's wording), stamped with <code>npm run stamp:version</code>, and the changelog gets the 3.22.1 section.</p>
+<p><strong>Non-goals.</strong> The shipped <code>transport.profile</code>, which stays <code>copilot-cli</code>. This checkout's <code>dabbler.transport</code> setting. How any vehicle is resolved, or any row other than Configuration. <code>dabbler configuration explain</code>'s wording.</p>
+<p><strong>Tests.</strong> In <code>solutionTreeModel.test.ts</code>, one assertion on the <code>configured()</code> projection: the Configuration row's description is the engine and the reviewing vehicle, and not the machine's. No new test.</p>
+<p><strong>Releasable.</strong> Yes -- as 3.22.1 in session 271.</p>
+<h2>Work Plan</h2>
+<p>Make the Solution Explorer's Configuration row name what each role actually runs on: its description becomes the authoring engine and the reviewing vehicle the Reviewing AI row shows (claude-code · api), no longer the machine's vehicle (configuration.transport.effective), with either part left out where it is unread. Update the configured() assertion in solutionTreeModel.test.ts to prove the row carries the reviewing vehicle and not the machine's, then bump version.json to 3.22.1, stamp the manifests with npm run stamp:version, and add the 3.22.1 changelog section.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/be91b6c49537dd92cc49c9567b08f1213b8103aa"><code>be91b6c49537dd92cc49c9567b08f1213b8103aa</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Row names reviewing vehicle</td><td><p>In the configuration case of solutionTreeModel.ts's descriptor, replace config.transport.effective with the reviewing vehicle's chosen id (configVehicle(p, 'reviewing')?.chosen), leaving it out when unread. In solutionTreeModel.test.ts, assert on the configured() projection with a machine vehicle of copilot-cli that the Configuration row's description is 'claude-code · api' and does not name copilot-cli.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts</span></td><td><code>npm --prefix tools/dabbler-ai-orchestration run lint</code></td><td>yes</td></tr>
+<tr><td>Version 3 22 1</td><td><p>Set version.json to 3.22.1, run npm run stamp:version to write it into the manifests and lockfile, and add a 3.22.1 section to the extension changelog saying the Configuration row names the engine and the reviewing vehicle rather than the machine's vehicle.</p></td><td><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>The shipped transport.profile, which stays copilot-cli.</li><li>This checkout's dabbler.transport setting.</li><li>How any vehicle is resolved, or any row other than Configuration.</li><li>dabbler configuration explain's wording.</li><li>No new test: one assertion on the existing configured() projection.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[10:03:57]</span> <span class="muted">run-started</span> session=270 mode=pull</div>
+<div class="line"><span class="at">[10:03:57]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[10:04:41]</span> <span class="muted">run-resumed</span> session=270 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[10:04:41]</span> <span class="muted">plan-accepted</span> steps=[&quot;row-names-reviewing-vehicle&quot;,&quot;version-3-22-1&quot;] non_goals=5</div>
+<div class="line"><span class="at">[10:04:41]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[10:04:41]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=row-names-reviewing-vehicle</div>
+<div class="line"><span class="at">[10:05:25]</span> <span class="muted">run-resumed</span> session=270 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[10:05:29]</span> <span class="muted">check-passed</span> step=row-names-reviewing-vehicle argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;tools/dabbler-ai-orchestration&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[10:05:34]</span> <span class="muted">named-tests-passed</span> step=row-names-reviewing-vehicle suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts</div>
+<div class="line"><span class="at">[10:05:35]</span> <span class="muted">report-accepted</span> seq=2 step=row-names-reviewing-vehicle files=[&quot;tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts&quot;] notes=Configuration row joins the engine with the reviewing vehicle, not the machine's; one assertion on configured() with a copilot-cli machine vehicle</div>
+<div class="line"><span class="at">[10:05:35]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=version-3-22-1</div>
+<div class="line"><span class="at">[10:06:11]</span> <span class="muted">run-resumed</span> session=270 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[10:06:13]</span> <span class="muted">check-passed</span> step=version-3-22-1 argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[10:06:13]</span> <span class="muted">report-accepted</span> seq=3 step=version-3-22-1 files=[&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version.json 3.22.1, stamped into three manifests, 3.22.1 changelog section</div>
+<div class="line"><span class="at">[10:06:13]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[10:06:14]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[10:06:16]</span> <span class="muted">job-started</span> name=verification pid=25232 log=.dabbler/runs/s270/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[10:07:14]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s270/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[10:07:14]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[10:07:14]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[10:07:14]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[10:07:15]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=7544 log=.dabbler/runs/s270/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[10:07:18]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s270/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[10:07:18]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[10:07:19]</span> <span class="muted">job-started</span> name=run of record: typescript pid=15508 log=.dabbler/runs/s270/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[10:08:53]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s270/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[10:08:53]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[10:08:54]</span> <span class="muted">job-started</span> name=run of record: extension pid=20988 log=.dabbler/runs/s270/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[10:09:12]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s270/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[10:09:12]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[10:09:15]</span> <span class="muted">landed</span> commit=be91b6c49537dd92cc49c9567b08f1213b8103aa</div>
+<div class="line"><span class="at">[10:09:15]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[10:09:15]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[10:09:15]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[10:09:16]</span> <span class="muted">job-started</span> name=close pid=30828 log=.dabbler/runs/s270/driver/jobs/close.log</div>
+<div class="line"><span class="at">[10:09:23]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s270/driver/jobs/close.log</div>
+<div class="line"><span class="at">[10:09:23]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gemini-4-argon</td><td>google</td><td>api</td><td><details><summary>4 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** The diff in `tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts` pins the case where both the authoring engine and reviewing vehicle are present alongside a differing machine transport (`&quot;claude-code · api&quot;` when `transport.effective` is `&quot;copilot-cli&quot;`), which matches the session's constraint of adding one assertion on `configured()`. Unless covered elsewhere in `solutionTreeModel.test.ts` outside the visible diff hunks, the partial-omission branches (&quot;Where either is unread, it is left out&quot;) could also be pinned with:</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Precondition:** A `configured(...)` projection where `vehicles` omits the `&quot;reviewing&quot;` entry (or its `chosen` is `undefined`) while `engines.chosen` is `&quot;claude-code&quot;`, and vice versa (`engines` unset while the `&quot;reviewing&quot;` vehicle has `chosen: &quot;api&quot;`).</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Input:** `descriptorFor(root, projection).description` for the `configuration` root node.</td><td>not answered</td></tr>
+<tr><td>3</td><td><strong>minor</strong></td><td>**Expectation:** Returns `&quot;claude-code&quot;` in the first case and `&quot;api&quot;` in the second (with no stray `&quot; · &quot;` separator), whereas a naive join without filtering unread parts would render `&quot;claude-code · &quot;` or `&quot; · api&quot;`.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>52</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>92s</td><td>1341</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>282</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

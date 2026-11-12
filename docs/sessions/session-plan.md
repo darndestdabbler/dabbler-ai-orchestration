@@ -19354,9 +19354,20 @@ long. It says:
   subscription on both sides (the authoring tool's own plan, and a GitHub
   Copilot subscription for the review): the cost is contained while the
   work stays inside the plans' monthly limits. Copilot billed by use, or API
-  keys for either side: the cost follows the models chosen, and with the
-  most expensive models a session can run to dozens of dollars and
-  sometimes hundreds. A release session: whatever step 1 found.
+  keys for either side: the cost follows the models chosen. With a
+  top-tier frontier model on both sides, expect dozens of dollars a
+  session, and now and then a session past a hundred. A release session:
+  whatever step 1 found.
+- **Prices move, so watch them.** Models differ in price many times over,
+  and the prices change as new models arrive. The page says plainly that a
+  person should keep an eye on what sessions cost, and names where to look.
+- **The operator's own experience**, given as one person's experience on
+  the date of writing and not as a price list: the top Anthropic models
+  (Opus, Fable) cost much less through a Claude Max subscription than
+  through GitHub Copilot billed by use; and Sonnet writing the code with
+  Terra or Argon reviewing it is capable enough for most work at a
+  reasonable price, with a session often under $10. Each model is named
+  as the Configuration lists it.
 - **What moves the cost**, each with the setting that changes it: the model
   chosen for each role in the Configuration, the round cap
   (`verification.settings.max_rounds`), and the Mechanic's delegation.
@@ -19387,8 +19398,9 @@ difficulty: the operator noted the framework once did this and could again
 if cost proves a barrier; not now. Keys chosen per repository, for a
 developer who bills more than one cost centre: a later session when someone
 needs it. Any provider's retention or regional policy: the page names who
-receives the code and leaves each company's policy to that company. Detail
-of anybody's account or plan.
+receives the code and leaves each company's policy to that company. A
+table of model prices: it would be wrong within a month. Detail of
+anybody's account beyond the operator's experience as given above.
 
 **Tests.** None added. The lint control runs `check-shipped-docs.mjs`;
 `npm run check:version` checks the stamp.

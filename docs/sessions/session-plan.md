@@ -19420,3 +19420,120 @@ anybody's account beyond the operator's experience as given above.
 ### Session 327 of 327: Release 3.32.5 (release: 3.32.5)
 
 The framework publishes sessions 325 and 326 as 3.32.5 and nothing else.
+
+### Session 328 of 329: Set Up New Project asks which branch, in a repository that already has one
+
+Scope: `packages/router/src/cli/bootstrap.ts`,
+`packages/router/src/contracts/router.ts`,
+`packages/router/src/inProcess.ts`, `packages/router/test/bootstrap.test.ts`,
+`tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts`,
+`tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts`,
+`docs/driving-a-session.md`, `tools/dabbler-ai-orchestration/README.md`,
+`version.json` and the manifests `npm run stamp:version` writes,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** On 2026-11-12 the operator asked how a member of staff sets the
+framework up in an existing Azure DevOps repository so that its files land
+on a new branch, `remediation`, and not on `main`. The answer was
+twenty-three steps, four of them git commands typed by hand, and one
+warning. The commands are the same for every repository except for the
+branch's name, which is the kind of command the framework runs for a
+person. The warning is a trap in the flow as it stands:
+
+- Set Up New Project asks "where does it push?" in every folder, a clone
+  that already has an `origin` included. Answering it there with the
+  repository's own URL leads to the offer to pull, which tries to rename
+  the checked-out branch to origin's default and merges it.
+- From an empty folder, the same answer checks out origin's default branch,
+  commits the scaffold to it and pushes it. A repository whose default
+  branch takes changes only by pull request has then had a push attempted
+  at it that nobody asked for.
+
+A branch setting was considered and is not what this session adds. The
+framework names no branch anywhere: it commits to the one checked out. A
+recorded name would be a second copy of what git already holds, and a
+committed one would be carried onto the default branch by the pull request
+that merges the work, where it would be wrong.
+
+**Step 1 -- `dabbler bootstrap --branch <name>`.** The router creates the
+branch, so the rule has one implementation and a person outside VS Code has
+it too.
+
+- The branch is made from the commit checked out and is checked out, before
+  anything is written. With `--from-origin` into an empty folder, origin's
+  default branch is checked out first, as now, and the new branch is made
+  from it.
+- A name that already exists, here or at origin, is checked out and not
+  created. Nothing is merged.
+- A name git refuses (`git check-ref-format --branch`) is a usage error
+  naming it, and nothing is written.
+- A repository with no commit has nothing to branch from: the flag is
+  refused there, saying so.
+- After the scaffold is committed, and where there is an origin, the branch
+  is pushed with its upstream. A refused push is reported with the command
+  that finishes it and fails nothing, as the first push is now.
+- With `--branch`, nothing is pushed to any other branch.
+- `--branch` with `--from-origin` in a folder that holds files of its own
+  is refused: that path merges origin's default branch into the folder's
+  files, and which branch should then carry the result is a person's to
+  work out in git, not a flag's.
+
+`Router.bootstrap` takes `branch` beside `fromOrigin` and `commitExisting`.
+
+**Step 2 -- the remote is not asked for where there is one.** In Set Up New
+Project, a folder whose repository already has an `origin` is not asked
+"where does it push?", and is not offered the pull. The origin it has is
+left exactly as it is, which is what `bootstrap` already does with one.
+
+**Step 3 -- one question, when the branch is shared.** Set Up New Project
+asks "Which branch should Dabbler work on?" in two cases: origin already
+has the checked-out branch, or the project is starting from origin's
+history into an empty folder. It is an input box holding the current
+branch's name (origin's default, in the second case).
+
+- Accepted unchanged, set-up carries on as it does now.
+- A different name is passed as `branch`.
+- Escape cancels set-up, and nothing has been written.
+- The box says in one sentence what a new name does: the branch is created
+  from the current one and pushed, and the framework's files are committed
+  to it and to no other.
+
+A new project, and a repository whose branch origin has never seen, are
+asked nothing new.
+
+**Step 4 -- the documentation.** In `docs/driving-a-session.md`, under *An
+existing repository*, one paragraph: the framework commits to the branch
+checked out and names none of its own; set-up asks which branch and creates
+it; merging it back is a pull request a person opens, and until it merges,
+sessions run on one branch only, because both would take the same session
+numbers. The Marketplace page's *Get started* gains one sentence saying an
+existing repository can be set up on a branch of its own.
+
+**Step 5 -- the number.** `version.json` goes to 3.33.0, stamped with `npm
+run stamp:version` -- a minor: a new flag and a new question. The
+changelog's 3.33.0 section says set-up can put the framework's files on a
+new branch, and no longer asks where a clone pushes.
+
+**Non-goals.** A branch setting, in `dabbler.yaml`, `.dabbler/` or
+anywhere else. Cloning from inside Set Up New Project beyond what
+`--from-origin` already does. Merging the branch back, or opening the pull
+request, on Azure DevOps or GitHub. Anything about two branches of one
+repository both running sessions: the paragraph says not to, and no code
+detects it. Changing the branch of a repository already set up. A stop
+when the checked-out branch changes between sessions. Pushing the scaffold
+where no `--branch` was given and the remote was already there: that is as
+it is now.
+
+**Tests.** In `bootstrap.test.ts`: `--branch` commits the scaffold on the
+new branch and leaves the branch it was made from where it was; a name
+that exists is checked out and not recreated; the flag is refused in a
+repository with no commit. In `commandFlows.test.ts`: a folder with an
+origin is not asked for a remote; the branch question is asked when origin
+has the checked-out branch, and a changed answer reaches `bootstrap` as
+`branch`; a new project is not asked.
+
+**Releasable.** Yes, as 3.33.0 in session 329.
+
+### Session 329 of 329: Release 3.33.0 (release: 3.33.0)
+
+The framework publishes session 328 as 3.33.0 and nothing else.

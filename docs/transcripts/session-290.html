@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 290 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 290 transcript</h1>
+<p class="stamp">Rendered 2026-10-27T13:40:15.147Z by dabbler-ai-router 3.23.0 at b21ad7df386110b2f11a93f0f6d2f280b0a0c6be.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-27T09:25:31.194-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 290 of 291: Packaging and the Mechanic, from the field</h3>
+<p>Scope: <code>packages/router/src/packaging.ts</code> (<code>runStep</code>, the rehearsal), <code>packages/router/src/cli/</code> (the <code>packaging</code> verb's options), <code>packages/router/src/drive.ts</code> (<code>callInTheMechanic</code>, <code>mechanicHandsBack</code>), the packaging-session guidance; their tests; <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes; <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> The same report. A release whose pack exited 0 crashed because <code>runStep</code> removes its scratch folder with no retry and no catch, and .NET build servers that inherited <code>TEMP</code> still held files in it (<code>EPERM</code>, session 27). <code>packaging --dry-run</code> runs nothing, so a packaging session passed and the next release failed at once on <code>NETSDK1152</code> (sessions 9 and 10); four release sessions were cancelled in all. And the unattended Mechanic is launched on the run's engine, which under the pull loop is the literal <code>cli</code>, so it logged &quot;no built-in command for 'cli'&quot; and was never called (session 62) -- for a <code>provider-unreachable</code> stop that a retry, not a code edit, was the recovery for.</p>
+<p><strong>Step 1 -- cleanup never fails a pack.</strong> <code>runStep</code> retries removing its scratch folder, then warns with the path left behind instead of throwing.</p>
+<p>**Step 2 -- <code>dabbler packaging --rehearse</code>.** Runs <code>pack.argv</code> into a scratch output, pushes nothing and files nothing. The guidance for a packaging session names it as that session's check; <code>--dry-run</code> is unchanged.</p>
+<p><strong>Step 3 -- the Mechanic on the session's engine.</strong> Launched on the session's declared engine, not the pull loop's <code>cli</code>. A <code>provider-unreachable</code> stop hands back.</p>
+<p><strong>Step 4 -- the version and the words.</strong> <code>version.json</code> goes to 3.26.0 (a minor: the land refusal, the re-run and <code>--rehearse</code> are new behaviour), stamped with <code>npm run stamp:version</code>, and the changelog gets a 3.26.0 section naming what 288, 289 and 290 changed for a developer.</p>
+<p><strong>Non-goals.</strong> .NET-specific environment tuning in the packaging child. Any change to <code>--dry-run</code>. <code>{output}</code> quoting inside <code>cmd /c</code> (not reproduced; a script is the answer). A <code>findstr</code> refusal. A non-interactive environment variable for applications.</p>
+<p><strong>Tests.</strong> In <code>packaging.test.ts</code>, a cleanup that fails warns and the pack's result stands; <code>--rehearse</code> runs the pack and pushes nothing. In <code>drive.test.ts</code>, a pull-loop session's Mechanic launches on its declared engine, and <code>provider-unreachable</code> hands back. <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes -- with 288 and 289, as 3.26.0 in session 291.</p>
+<h2>Work Plan</h2>
+<p>Fix three packaging and Mechanic defects from the field, then stamp 3.26.0. runStep in packaging.ts retries removing its scratch folder and, when it still cannot, warns with the path left behind instead of throwing, so a pack that exited 0 keeps its result. <code>dabbler packaging --rehearse</code> runs the declared pack.argv into a scratch output, reports its exit and what it produced, pushes nothing and files nothing; the packaging-session guidance in the bootstrap templates names it as that session's check, and --dry-run is unchanged. The unattended Mechanic is launched on the session's declared engine (the in-flight ledger row's engine) rather than the pull loop's literal 'cli', and mechanicHandsBack hands a provider-unreachable stop back to the person, because a retry rather than an edit is its recovery. Finally version.json goes to 3.26.0, stamped into the manifests by npm run stamp:version, and the extension changelog gets a 3.26.0 section naming what sessions 288, 289 and 290 changed for a developer.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/8511ab62a1b402e600f72dc421a186881166852b"><code>8511ab62a1b402e600f72dc421a186881166852b</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Cleanup never fails a pack</td><td><p>In packages/router/src/packaging.ts, make runStep's removal of its scratch folder retry (rmSync's maxRetries/retryDelay) and, if it still fails, catch the error and add a warning naming the path left behind to the step's output instead of throwing, so the step's exit code and result stand. Add a test in packages/router/test/packaging.test.ts: a cleanup that fails warns and the pack's result stands.</p></td><td><span class="mono">packages/router/src/packaging.ts</span><br><span class="mono">packages/router/test/packaging.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Packaging rehearse</td><td><p>Add <code>rehearsePack</code> to packages/router/src/packaging.ts: it loads the session's packaging declaration (the module's block or the root's), runs pack.argv through runStep into a scratch output directory (substituting {output}, and {version} from --version or the canonical version), reports the step and the files it produced, removes the scratch output, and pushes nothing and files nothing; it does not require the session to be releasable. Wire <code>--rehearse</code> into packages/router/src/cli/packaging.ts (usage text included), exiting 0 only when the pack is green and produced at least one file. Update the packaging-session guidance in packages/router/src/bootstrap/templates.ts (both plan-guidance paragraphs and the dabbler.yaml comment) to name <code>dabbler packaging --rehearse</code> as the packaging session's check. --dry-run is unchanged. Add a test in packages/router/test/packaging.test.ts: --rehearse runs the pack and pushes nothing.</p></td><td><span class="mono">packages/router/src/packaging.ts</span><br><span class="mono">packages/router/src/cli/packaging.ts</span><br><span class="mono">packages/router/src/bootstrap/templates.ts</span><br><span class="mono">packages/router/test/packaging.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Mechanic on the sessions engine</td><td><p>In packages/router/src/drive.ts, callInTheMechanic launches the Mechanic on the session's declared engine (orchestratorOf(repoRoot).engine, falling back to the run's engine) instead of this.run.engine, which under the pull loop is the literal 'cli'. mechanicHandsBack takes the stop's code and hands a provider-unreachable stop back to the person (a retry, not a code edit, recovers it). In packages/router/test/drive.test.ts, extend the mechanicHandsBack test with provider-unreachable, and add a test that a pull-loop session's Mechanic is launched on its declared engine (via setMechanicLauncher).</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/drive.test.ts</span><br><span class="mono">packages/router/test/walk-session.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Version and changelog</td><td><p>Set version.json to 3.26.0 and run <code>npm run stamp:version</code> to write it into the manifests. Add a <code>## [3.26.0]</code> section to tools/dabbler-ai-orchestration/CHANGELOG.md naming what sessions 288, 289 and 290 changed for a developer (read the session plan's sections and those sessions' commits for 288 and 289).</p></td><td><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code><br><code>node -e process.exit(require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8').includes('## [3.26.0]')?0:1)</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>.NET-specific environment tuning in the packaging child (no build-server shutdown, no TEMP tricks beyond the retry and warning).</li><li>Any change to <code>dabbler packaging --dry-run</code>'s behaviour.</li><li><code>{output}</code> quoting inside <code>cmd /c</code>; a script is the answer there.</li><li>A <code>findstr</code> refusal.</li><li>A non-interactive environment variable for applications.</li><li>Publishing 3.26.0: the release is session 291.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[13:25:31]</span> <span class="muted">run-started</span> session=290 mode=pull</div>
+<div class="line"><span class="at">[13:25:31]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[13:26:40]</span> <span class="muted">run-resumed</span> session=290 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[13:26:40]</span> <span class="muted">plan-accepted</span> steps=[&quot;cleanup-never-fails-a-pack&quot;,&quot;packaging-rehearse&quot;,&quot;mechanic-on-the-sessions-engine&quot;,&quot;version-and-changelog&quot;] non_goals=6</div>
+<div class="line"><span class="at">[13:26:40]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[13:26:41]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=cleanup-never-fails-a-pack</div>
+<div class="line"><span class="at">[13:27:28]</span> <span class="muted">run-resumed</span> session=290 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[13:27:33]</span> <span class="muted">check-passed</span> step=cleanup-never-fails-a-pack argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[13:27:38]</span> <span class="muted">named-tests-passed</span> step=cleanup-never-fails-a-pack suite=typescript command=node scripts/suite.mjs container packages/router/test/packaging.test.ts</div>
+<div class="line"><span class="at">[13:27:38]</span> <span class="muted">report-accepted</span> seq=2 step=cleanup-never-fails-a-pack files=[&quot;packages/router/src/packaging.ts&quot;,&quot;packages/router/test/packaging.test.ts&quot;] notes=runStep retries removing its scratch folder and appends a left-behind warning to the step's output instead of throwing</div>
+<div class="line"><span class="at">[13:27:38]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=packaging-rehearse</div>
+<div class="line"><span class="at">[13:29:31]</span> <span class="muted">run-resumed</span> session=290 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[13:29:36]</span> <span class="muted">check-passed</span> step=packaging-rehearse argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[13:29:40]</span> <span class="muted">named-tests-passed</span> step=packaging-rehearse suite=typescript command=node scripts/suite.mjs container packages/router/test/packaging.test.ts packages/router/test/templates.test.ts</div>
+<div class="line"><span class="at">[13:29:40]</span> <span class="muted">report-accepted</span> seq=3 step=packaging-rehearse files=[&quot;packages/router/src/packaging.ts&quot;,&quot;packages/router/src/cli/packaging.ts&quot;,&quot;packages/router/src/bootstrap/templates.ts&quot;,&quot;packages/router/test/packaging.test.ts&quot;] notes=rehearsePack runs the declared pack into a scratch output, pushes and files nothing; packaging --rehearse wires it; guidance names it as the packaging session's check</div>
+<div class="line"><span class="at">[13:29:40]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=mechanic-on-the-sessions-engine</div>
+<div class="line"><span class="at">[13:31:25]</span> <span class="muted">run-resumed</span> session=290 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[13:31:30]</span> <span class="muted">check-passed</span> step=mechanic-on-the-sessions-engine argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[13:32:20]</span> <span class="muted">named-tests-passed</span> step=mechanic-on-the-sessions-engine suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/walk-session.test.ts</div>
+<div class="line"><span class="at">[13:32:21]</span> <span class="muted">report-accepted</span> seq=4 step=mechanic-on-the-sessions-engine files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;,&quot;packages/router/test/walk-session.test.ts&quot;] notes=Mechanic launches on the session's declared engine (orchestratorOf) not the pull loop's cli; provider-unreachable hands back; the declared-engine launch is proved by the walk fixture whose run engine is now cli</div>
+<div class="line"><span class="at">[13:32:21]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=version-and-changelog</div>
+<div class="line"><span class="at">[13:32:45]</span> <span class="muted">run-resumed</span> session=290 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[13:32:48]</span> <span class="muted">check-passed</span> step=version-and-changelog argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[13:32:48]</span> <span class="muted">check-passed</span> step=version-and-changelog argv=[&quot;node&quot;,&quot;-e&quot;,&quot;process.exit(require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8').includes('## [3.26.0]')?0:1)&quot;]</div>
+<div class="line"><span class="at">[13:32:49]</span> <span class="muted">report-accepted</span> seq=5 step=version-and-changelog files=[&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version.json 3.26.0 stamped into the manifests; changelog 3.26.0 names what 288, 289 and 290 changed</div>
+<div class="line"><span class="at">[13:32:49]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[13:32:50]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[13:32:50]</span> <span class="muted">job-started</span> name=verification pid=37380 log=.dabbler/runs/s290/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[13:34:55]</span> <span class="muted">job-finished</span> name=verification exit=<span class="bad">4</span> log=.dabbler/runs/s290/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[13:34:55]</span> <span class="muted">verification-blocking</span></div>
+<div class="line"><span class="at">[13:34:55]</span> <span class="milestone">phase</span> phase=<span class="milestone">dispositions</span></div>
+<div class="line"><span class="at">[13:34:55]</span> <span class="muted">instruction-issued</span> seq=6 kind=rejection reasons=5</div>
+<div class="line"><span class="at">[13:35:22]</span> <span class="muted">run-resumed</span> session=290 phase=<span class="milestone">dispositions</span> mode=pull</div>
+<div class="line"><span class="at">[13:35:22]</span> <span class="muted">dispositions-accepted</span> round=1 fix=[0,1,3] reject=[] answers=[{&quot;finding&quot;:0,&quot;action&quot;:&quot;fix&quot;},{&quot;finding&quot;:1,&quot;action&quot;:&quot;fix&quot;},{&quot;finding&quot;:3,&quot;action&quot;:&quot;fix&quot;}]</div>
+<div class="line"><span class="at">[13:35:22]</span> <span class="milestone">phase</span> phase=<span class="milestone">fix</span></div>
+<div class="line"><span class="at">[13:35:22]</span> <span class="muted">instruction-issued</span> seq=7 kind=step step=fix-round-1</div>
+<div class="line"><span class="at">[13:36:41]</span> <span class="muted">run-resumed</span> session=290 phase=<span class="milestone">fix</span> mode=pull</div>
+<div class="line"><span class="at">[13:36:45]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] owner=cleanup-never-fails-a-pack</div>
+<div class="line"><span class="at">[13:36:49]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] owner=packaging-rehearse</div>
+<div class="line"><span class="at">[13:36:52]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] owner=mechanic-on-the-sessions-engine</div>
+<div class="line"><span class="at">[13:36:53]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;] owner=version-and-changelog</div>
+<div class="line"><span class="at">[13:36:54]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;node&quot;,&quot;-e&quot;,&quot;process.exit(require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8').includes('## [3.26.0]')?0:1)&quot;] owner=version-and-changelog</div>
+<div class="line"><span class="at">[13:37:47]</span> <span class="muted">named-tests-passed</span> step=fix-round-1 suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/packaging.test.ts</div>
+<div class="line"><span class="at">[13:37:47]</span> <span class="muted">report-accepted</span> seq=7 step=fix-round-1 files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/src/packaging.ts&quot;,&quot;packages/router/src/cli/packaging.ts&quot;,&quot;packages/router/test/packaging.test.ts&quot;] notes=[0] Mechanic engine from resolveSessionOrchestratorIdentity(this.sessionsDir, this.sessionNumber); [1] --dry-run with --rehearse refused at parse; [3] a failed rehearsal reports the files the pack made</div>
+<div class="line"><span class="at">[13:37:47]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[13:37:49]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[13:37:49]</span> <span class="muted">job-started</span> name=verification pid=16224 log=.dabbler/runs/s290/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[13:38:32]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s290/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[13:38:32]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[13:38:32]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[13:38:32]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[13:38:32]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=23200 log=.dabbler/runs/s290/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[13:38:34]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s290/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[13:38:34]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[13:38:34]</span> <span class="muted">job-started</span> name=run of record: typescript pid=9568 log=.dabbler/runs/s290/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[13:39:43]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s290/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[13:39:43]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[13:39:43]</span> <span class="muted">job-started</span> name=run of record: extension pid=48620 log=.dabbler/runs/s290/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[13:40:00]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s290/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[13:40:00]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[13:40:05]</span> <span class="muted">landed</span> commit=8511ab62a1b402e600f72dc421a186881166852b</div>
+<div class="line"><span class="at">[13:40:05]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[13:40:06]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[13:40:06]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[13:40:06]</span> <span class="muted">job-started</span> name=close pid=8492 log=.dabbler/runs/s290/driver/jobs/close.log</div>
+<div class="line"><span class="at">[13:40:15]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s290/driver/jobs/close.log</div>
+<div class="line"><span class="at">[13:40:15]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="bad">ISSUES_FOUND</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details open><summary>5 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>major</strong> <span class="bad">blocking</span></td><td>The Mechanic uses the current repository configuration, not the in-flight session ledger’s declared engine**</td><td>fixed — [0] Mechanic engine from resolveSessionOrchestratorIdentity(this.sessionsDir, this.sessionNumber); [1] --dry-run with --rehearse refused at parse; [3] a failed rehearsal reports the files the pack made — (packages/router/src/drive.ts, packages/router/src/packaging.ts, packages/router/src/cli/packaging.ts, packages/router/test/packaging.test.ts)</td></tr>
+<tr><td>1</td><td><strong>major</strong> <span class="bad">blocking</span></td><td>Combining `--dry-run` with `--rehearse` executes the pack, violating the explicit dry-run non-goal**</td><td>fixed — [0] Mechanic engine from resolveSessionOrchestratorIdentity(this.sessionsDir, this.sessionNumber); [1] --dry-run with --rehearse refused at parse; [3] a failed rehearsal reports the files the pack made — (packages/router/src/drive.ts, packages/router/src/packaging.ts, packages/router/src/cli/packaging.ts, packages/router/test/packaging.test.ts)</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** The visible rehearsal test calls `rehearsePack` directly rather than driving `packagingVerb([&quot;--rehearse&quot;, ...])`. A useful case would start with a declared pack and push marker, invoke the CLI flag, and assert exit 0, artifact reporting, no push marker, and no packaging record. This would pin the option parsing and dispatch promised by the task.</td><td>not answered</td></tr>
+<tr><td>3</td><td><strong>minor</strong></td><td>**Nit:** A failed pack’s produced files are not reported. With a declared pack that writes `partial.nupkg` into `{output}` and then exits 3, `--rehearse` should report both exit 3 and `partial.nupkg`; today `failed(&quot;&quot;, step)` forces `artifacts: []`, so `renderRehearsal` omits what was produced.</td><td>fixed — [0] Mechanic engine from resolveSessionOrchestratorIdentity(this.sessionsDir, this.sessionNumber); [1] --dry-run with --rehearse refused at parse; [3] a failed rehearsal reports the files the pack made — (packages/router/src/drive.ts, packages/router/src/packaging.ts, packages/router/src/cli/packaging.ts, packages/router/test/packaging.test.ts)</td></tr>
+<tr><td>4</td><td><strong>minor</strong></td><td>**Nit:** The cleanup test replaces the complete `ScratchRemover`, so it proves warning behavior but not the required retry. A focused case should simulate two `EPERM` removals followed by success and assert that cleanup is attempted three times, the successful pack remains successful, and no leftover warning is emitted.</td><td>not answered</td></tr>
+</table></td></tr>
+<tr><td>2</td><td>fix-delta</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>2 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** The prior CLI coverage concern persists. The visible success test still calls `rehearsePack` directly; the only `packagingVerb` test covers conflicting flags. A case should create a declared pack and push marker, invoke `packagingVerb([&quot;--rehearse&quot;, &quot;--sessions-dir&quot;, sessionsDir])`, and assert exit 0, artifact output, no push marker, and no packaging record.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** The prior cleanup-retry coverage concern is not remediated in this delta. A focused case should make the scratch remover throw `EPERM` twice and succeed on the third call, then assert exactly three attempts, a successful pack result, and no leftover-cleanup warning.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>68s</td><td>1396</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>296</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

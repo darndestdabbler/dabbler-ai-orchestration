@@ -366,7 +366,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 326 | A guide page on what a session costs, and what is sent to a reviewer | no | 2026-11-12 |
 | 327 | Release 3.32.5 (release: 3.32.5) | yes | 2026-11-12 |
 | 328 | Set Up New Project asks which branch, in a repository that already has one | no | 2026-11-12 |
-| 329 | Release 3.33.0 (release: 3.33.0) | — | not declared |
+| 329 | Release 3.33.0 (release: 3.33.0) | yes | 2026-11-12 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3766,3 +3766,9 @@ Let Set Up New Project put the framework's files on a branch of their own in a r
 **Amended after acceptance:**
 
 - 2026-11-12 — step 'setup-flow-branch': its checks: The host run of commandFlows.test.ts fails three 'Start opens the person's own CLI' tests with or without this step's change (80 pass/3 fail before, 83/3 after): they depend on this machine. The extension suite's declared runner is scripts/suite.mjs extension, which runs in the container where all 86 pass; the check now uses that runner. (claude-code (anthropic, claude-opus-5-5))
+
+### Session 329 — Release 3.33.0 (release: 3.33.0)
+
+**Releasable: yes.**
+
+Release 3.33.0: the framework packs and publishes what is on the trunk.

@@ -6509,9 +6509,9 @@
     {
       "number": 328,
       "title": "Set Up New Project asks which branch, in a repository that already has one",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-12T14:46:54.691000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-12T15:10:37.447000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

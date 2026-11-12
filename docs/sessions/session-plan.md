@@ -19361,6 +19361,15 @@ long. It says:
 - **Prices move, so watch them.** Models differ in price many times over,
   and the prices change as new models arrive. The page says plainly that a
   person should keep an eye on what sessions cost, and names where to look.
+- **Where the prices are**, as links to each company's own pricing page,
+  the operator's list: Google
+  (`https://aistudio.google.com/docs/pricing`), OpenAI
+  (`https://openai.com/api/`), Anthropic
+  (`https://platform.claude.com/docs/en/about-claude/pricing`) and GitHub
+  Copilot
+  (`https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing`).
+  Each link is opened before it is written, and one that no longer leads
+  to prices is replaced by the page that does.
 - **The operator's own experience**, given as one person's experience on
   the date of writing and not as a price list: the top Anthropic models
   (Opus, Fable) cost much less through a Claude Max subscription than
@@ -19399,7 +19408,8 @@ if cost proves a barrier; not now. Keys chosen per repository, for a
 developer who bills more than one cost centre: a later session when someone
 needs it. Any provider's retention or regional policy: the page names who
 receives the code and leaves each company's policy to that company. A
-table of model prices: it would be wrong within a month. Detail of
+table of model prices: it would be wrong within a month, and the links
+to each company's own page are what the page carries instead. Detail of
 anybody's account beyond the operator's experience as given above.
 
 **Tests.** None added. The lint control runs `check-shipped-docs.mjs`;

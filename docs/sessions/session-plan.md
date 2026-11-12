@@ -19248,7 +19248,7 @@ session's to change. Any change to behaviour.
 
 The framework publishes session 323 as 3.32.4 and nothing else.
 
-### Session 325 of 326: The risks table says what a reader most needs to know
+### Session 325 of 328: The risks table says what a reader most needs to know
 
 Scope: `README.md`, `tools/dabbler-ai-orchestration/README.md`,
 `docs/guide/the-record.md`, `version.json` and the manifests `npm run
@@ -19307,6 +19307,102 @@ operator wants one. A new screenshot. Any change to behaviour.
 
 **Releasable.** Yes, as 3.32.5 in session 326.
 
-### Session 326 of 326: Release 3.32.5 (release: 3.32.5)
+### Session 326 of 328: Release 3.32.5 (release: 3.32.5)
 
 The framework publishes session 325 as 3.32.5 and nothing else.
+
+### Session 327 of 328: A guide page on what a session costs, and what is sent to a reviewer
+
+Scope: `docs/guide/cost-and-what-is-sent.md` (new), `docs/guide/README.md`,
+`tools/dabbler-ai-orchestration/README.md`, `version.json` and the
+manifests `npm run stamp:version` writes,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** Consult round 24 asked two advisers what a reader still cannot
+tell after reading all of the public documentation. Both ranked the same
+two questions highest: what a session costs, and what leaves the machine
+for a reviewer. The listing answers the first in one sentence ("Your costs
+are your provider's API spend or your Copilot seat") and nothing answers
+the second in one place. The operator ruled on 2026-11-12 that neither
+belongs in the risks table, because the honest answer has too many cases
+for a cell, and that it should be said elsewhere.
+
+**Step 1 -- the facts, from the source.** Before a sentence is written,
+read and note in the step's report:
+
+- every place a session can call a model: the authoring engine, each
+  review round, the unattended Mechanic, **Check this stop**, an
+  adjudication, a consult; and which of them the framework starts by itself
+  and which only a person starts;
+- whether a release session calls a model at all. The operator's
+  understanding is that it does not, because only the framework runs. The
+  page says so only if the source agrees;
+- what the framework can and cannot see of the cost: what a review round
+  records, what `dabbler seat-cost` reads, and whether anything of the
+  authoring engine's own spend reaches the record;
+- what a reviewer is sent, from `packages/router/prompt-templates/
+  verification.md` and `verify/rounds.ts`, and what it may read for itself.
+  Checked on 2026-11-12: a reviewer reached through a Copilot seat can list,
+  search and read files, 40 operations a round by default
+  (`verification.settings.read_budget`), declared to it and measured
+  afterwards rather than refused; a reviewer reached through an API key has
+  no tools and sees only what it is sent, unless
+  `verification.settings.api_file_requests` is on, which it is not by
+  default; no review round can write to the repository.
+
+**Step 2 -- measured ranges, or none.** From the records on this machine,
+take what recent sessions' review rounds cost, by reviewer model, and give
+a range with the models named. Where the records cannot support a number,
+the page says what the cost depends on and gives no number. No figure on
+the page is an estimate.
+
+**Step 3 -- the page.** `docs/guide/cost-and-what-is-sent.md`, in the
+guide's own shape (a claim, the mechanism, where to see it), one sitting
+long. It says:
+
+- **What a session costs**, as three cases in the operator's terms. A
+  subscription on both sides (the authoring tool's own plan, and a GitHub
+  Copilot subscription for the review): the cost is contained while the
+  work stays inside the plans' monthly limits. Copilot billed by use, or API
+  keys for either side: the cost follows the models chosen, and with the
+  most expensive models a session can run to dozens of dollars and
+  sometimes hundreds. A release session: whatever step 1 found.
+- **What moves the cost**, each with the setting that changes it: the model
+  chosen for each role in the Configuration, the round cap
+  (`verification.settings.max_rounds`), and the Mechanic's delegation.
+- **What is sent to a reviewer**: the session's section of the plan, the
+  diff, the decisions, the list of changed files with no test named after
+  them, and a prompt that tells the reviewer to assume the work is flawed
+  and try to prove it; and what it may read beyond that, by vehicle, as
+  step 1 found.
+- **Which companies receive code**: the author's provider and the
+  reviewer's, always two; a third only when a person asks for an
+  adjudication.
+- **Where to see it**: `dabbler seat-cost`, the round's own record, and
+  `dabbler configuration explain`.
+
+**Step 4 -- the links.** `docs/guide/README.md` gains the page's line. On
+the Marketplace page, the sentence under *Get started* that names the costs
+links to the page and says no more than it does now.
+
+**Step 5 -- the number.** `version.json` goes to 3.32.6, stamped with `npm
+run stamp:version` -- a patch: wording only. The changelog's 3.32.6 section
+says the guide has a page on cost and on what a reviewer is sent.
+
+**Non-goals.** The risks table. A cost estimate before a session, a spend
+limit, or any other change to behaviour. Handing work to cheaper models by
+difficulty: the operator noted the framework once did this and could again
+if cost proves a barrier; not now. Keys chosen per repository, for a
+developer who bills more than one cost centre: a later session when someone
+needs it. Any provider's retention or regional policy: the page names who
+receives the code and leaves each company's policy to that company. Detail
+of anybody's account or plan.
+
+**Tests.** None added. The lint control runs `check-shipped-docs.mjs`;
+`npm run check:version` checks the stamp.
+
+**Releasable.** Yes, as 3.32.6 in session 328.
+
+### Session 328 of 328: Release 3.32.6 (release: 3.32.6)
+
+The framework publishes session 327 as 3.32.6 and nothing else.

@@ -1,0 +1,34 @@
+# The walkthrough solution. Deliberately trivial: the reader should be
+# watching the framework, not thinking about CSV edge cases.
+solution:
+  name: csv-demo
+  title: Read a people CSV into objects
+  step: plan
+
+# Directory names use underscores because Python packages cannot carry a
+# hyphen. Component names stay hyphenated: they are the solution's vocabulary,
+# not an import path.
+components:
+  - name: csv-model
+    kind: library
+    title: The record a row becomes
+    source: components/csv_model/src
+    contract: components/csv_model/contract.yaml
+    owner: Ama
+
+  - name: csv-parser
+    kind: library
+    title: Turns CSV text into records
+    source: components/csv_parser/src
+    contract: components/csv_parser/contract.yaml
+    version: 1.1.0
+    dependsOn: [csv-model]
+    owner: Ravi
+
+  - name: csv-app
+    kind: integration
+    title: Reads a file and reports what it found
+    source: components/csv_app/src
+    contract: components/csv_app/contract.yaml
+    dependsOn: [csv-parser, csv-model]
+    owner: Ama

@@ -19537,3 +19537,333 @@ has the checked-out branch, and a changed answer reaches `bootstrap` as
 ### Session 329 of 329: Release 3.33.0 (release: 3.33.0)
 
 The framework publishes session 328 as 3.33.0 and nothing else.
+
+### Session 330 of 333: Configuration before any folder, and buttons that say what a person has
+
+Scope: `tools/dabbler-ai-orchestration/package.json` (`viewsWelcome`, the
+command's title, the walkthrough),
+`tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts`,
+`tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts`,
+`tools/dabbler-ai-orchestration/src/commands/configurationCommands.ts`,
+`tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts`,
+`tools/dabbler-ai-orchestration/src/commands/troubleshoot.ts`,
+`tools/dabbler-ai-orchestration/src/router/host.ts`,
+`tools/dabbler-ai-orchestration/src/utils/projection.ts`,
+`tools/dabbler-ai-orchestration/src/extension.ts`,
+`packages/router/src/cli/configure.ts`, `packages/router/src/cli/bootstrap.ts`
+(its messages), `packages/router/src/projection.ts` (the configuration
+reading), the tests named after each,
+`tools/dabbler-ai-orchestration/media/walkthrough-setup.md`,
+`tools/dabbler-ai-orchestration/README.md`, `README.md`,
+`docs/quick-start.md`, `docs/driving-a-session.md`, `docs/guide/`,
+`docs/tutorials/csv-solution/` with
+`tools/dabbler-ai-orchestration/scripts/render-csv-walkthrough.mjs`,
+`docs/onboarding/build-deck.mjs`, `MIGRATION-FROM-V1.md`
+
+**Why.** The operator asked, several sessions ago, that starting with
+Dabbler begin at the Configuration. Session 303 delivered that only once a
+folder is open: its plan said "with no folder open at all, both welcomes
+stay as they are", and listed the no-folder case as a non-goal. So a person
+who opens VS Code, or a new window, and chooses Dabbler sees an Open Folder
+button and a sentence about what a folder would show. The operator's words,
+2026-11-14: "I don't understand why a user can't see and set the machine
+default configurations IMMEDIATELY prior to a folder opened or project
+being started."
+
+Nothing stands in the way. The Solution Explorer's provider returns early
+without a workspace root, and so does each Configuration command, but the
+reading is already taken with no folder (activation reads it from the home
+directory to warn about a missing engine CLI), the write that touches the
+machine's default alone already exists (`mine`), and the catalog refresh
+needs no folder. A machine whose defaults are set first then hands them to
+every solution it sets up, which is the "Copilot needs a model" stop of
+2026-11-10 removed rather than explained.
+
+The two buttons say the wrong things too. "Set Up New Project" sets up what
+the Solution Explorer calls a solution, and it is the only button for a
+person whose repository is ten years old, where nothing is new. And the
+person who has a folder or a repository already is offered "Open Folder"
+with no word about what follows.
+
+**Step 1 -- the machine's reading, with no folder.** The configuration
+reading takes no repository: the flag and checkout layers are absent, and
+what it reports is the machine's `preferences.json` over the distribution's
+defaults, with the catalog as it stands. It is a reading of its own and not
+the home directory read as a repository, so a `.vscode/settings.json` that
+happens to sit in a person's home folder decides nothing. With no workspace
+root the Solution Explorer renders the Configuration root alone, labelled
+as this machine's defaults, and the unread-catalog reading of session 303
+runs there as it does with a folder.
+
+**Step 2 -- every row writes the machine's default.** With no folder, each
+Configuration command writes with `mine` and names no repository;
+`configure` accepts that pair. A row that has no machine default to write
+is left out rather than shown and refused. The toast says the choice is
+this machine's default and that a solution set up from here starts with it.
+
+**Step 3 -- the buttons, in the Work Explorer.** Once the Configuration
+always shows, the Solution Explorer is never empty and VS Code never shows
+its welcome, so that entry is deleted and the Work Explorer's welcome
+carries the buttons:
+
+- No folder open: **Set Up New Solution** first, then **Open Existing
+  Folder or Repository**.
+- A folder open that is not set up: **Set Up Dabbler in This Folder**, one
+  button, the same command.
+
+Open Existing Folder or Repository asks one thing -- a folder on this
+machine, or a repository to clone -- and hands each to VS Code's own
+command (`vscode.openFolder`, `git.clone`). The window that opens makes the
+offer it already makes for a folder that is not set up, and that toast's
+button takes the same label as the welcome's.
+
+**Step 4 -- the words.** The command's title becomes "Set Up New
+Solution"; its id stays `dabbler.setupNewProject`, which nobody reads and
+key bindings name. Every sentence a person is shown follows: the toasts and
+errors in the extension and in `dabbler bootstrap`, the walkthrough, the
+troubleshooter, both READMEs, the quick start, the guide,
+`docs/driving-a-session.md`, the CSV tutorial and the script that renders
+it, the onboarding deck's source and the migration note. The README's
+*Get started* and the quick start begin with the Configuration and no
+folder.
+
+**Non-goals.** Any change to what a choice is or to the layers that decide
+it: a flag, the checkout, the machine, the distribution, and no fifth. Any
+change to what `bootstrap` writes. A new command id. Cloning done by
+Dabbler's own code. The Marketplace screenshots. The changelog's earlier
+sections, the transcripts, the field trials, the UAT records and the design
+consults, which say what was true when they were written. The version and
+the changelog's new section: session 332 writes both.
+
+**Tests.** In `solutionTreeProvider.test.ts`: no workspace root renders
+the Configuration root alone, and its label says the defaults are the
+machine's. In `commandFlows.test.ts`: a row chosen with no folder reaches
+`configure` with `mine` and no repository; Open Existing Folder or
+Repository runs the VS Code command for the answer given and nothing on
+escape. In `actionRegistry.test.ts`: the Work Explorer's welcome offers the
+two buttons with no folder and the one with a folder, and the Solution
+Explorer declares none. In `configure.test.ts`: `mine` with no repository
+writes the machine's file and nothing else, and no repository without
+`mine` is refused. In `projection.test.ts`: the reading with no repository
+ignores a settings file in the directory it is run from.
+
+**Releasable.** Yes, as 3.34.0 in session 333.
+
+### Session 331 of 333: The first two sessions ask what is being made
+
+Scope: `packages/router/src/bootstrap/templates.ts` (`PLAN_PROMPT`,
+`DECOMPOSITION_PROMPT`, the greenfield pieces of `bootstrapPlan`),
+`packages/router/src/cli/bootstrap.ts` (the hand-off line),
+`packages/router/test/bootstrap.test.ts`,
+`tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts` (the two
+"project set up" offers),
+`tools/dabbler-ai-orchestration/package.json` (the walkthrough's second
+step), `tools/dabbler-ai-orchestration/media/walkthrough-session.md`,
+`tools/dabbler-ai-orchestration/README.md`, `docs/quick-start.md`,
+`docs/driving-a-session.md`
+
+**Why.** The operator, 2026-11-14, on what the framework is for: a .NET or
+Java solution, or some other kind of programming solution, "or it could be
+a blog post, or novel, or policy document or legislation". The framework
+needs no built-in support for each, "but it shouldn't choke if a user
+elects to pursue a novel use case".
+
+Session 1 as scaffolded today chokes on all of them but the first. It asks
+what "the solution" is, then how production is split and which part may
+talk to the database, and writes a plan of handoff artifacts, modules, and
+projects in a `.sln` or a `pom.xml`. Session 2 challenges the module cuts
+and plans a skeleton session that writes a solution file. A person writing
+a standard operating procedure is asked about an API tier.
+
+So the first two sessions change character. Session 1 is about
+understanding the goal, in the person's own terms, and its questions are
+written out word for word so that every engine asks the same ones. Session
+2 still challenges and decomposes, toward the aim the operator stated: a
+series of sessions that produces a draft of the whole work, or of a
+component of it, with planning for whatever is deferred. The .NET and Java
+scaffolding stays exactly as it is, and applies only when the goal is a new
+or rebuilt .NET or Java solution.
+
+The questions live in session 1's own text in the scaffolded
+`session-plan.md`, and in `PLAN_PROMPT`, which is the same session run
+untracked. Not in `AGENTS.md`: that file is read at the start of every
+session for the life of the repository, and these are asked once.
+
+**Step 1 -- session 1, "Understand the goal and write the plan".** With a
+brief in the prompt or at `docs/planning/brief.md` that already answers
+them, the questions are not asked. Otherwise the session asks the first,
+in these words:
+
+> What are you making?
+>
+> 1. An application or other programming solution.
+> 2. A work document: a policy, legislation, a specification, a standard
+>    operating procedure, a presentation, a research paper.
+> 3. A creative work: a story or a novel, a poem, a screenplay, a blog
+>    post, a podcast episode, a song, a sermon or a lecture, a prayer.
+> 4. Something else. Say what.
+
+and then the second, the same for every answer but its last line:
+
+> Tell me what you can about it now. Then three things:
+>
+> - Is there material to start from: a specification, documentation, a
+>   plan, a draft, links to related works or ideas? Say where it is.
+> - What is already fixed: a deadline, a length, a form or a house style
+>   it must follow? (For an application: a language, a platform or an
+>   architecture already decided?)
+> - Would you like to work the idea through together before I plan it?
+>   That is usually worth doing.
+
+A yes to the last is a conversation held in this session, for as long as
+it takes: the session asks, proposes, and is corrected, and writes nothing
+but the brief until the person says the idea is settled. The answers go to
+`docs/planning/brief.md` with the kind of work on its first line, before
+any plan is written. The rule that the substance is the person's stays in
+the same words: no neighbouring directory is searched, and nothing is
+drafted from the folder's name.
+
+Where the repository already holds a solution or a build file, the first
+question is not asked: the repository has answered it.
+
+**Step 2 -- the plan takes the shape of the work.**
+`docs/planning/solution-plan.md` keeps its name and carries, for every
+kind: the objective a reader can act on (what it is for, who uses, reads or
+hears it, what it must do or cover, what is out of scope); the material it
+starts from; what is fixed; the parts, each with what it is responsible
+for; what this plan drafts and what it defers.
+
+- **An application in .NET or Java:** today's text, unchanged -- the
+  production split and its question, the handoff artifacts, the modules as
+  projects reached by project reference.
+- **Any other programming solution:** the parts are that language's own
+  units -- scripts, modules, packages -- and one is a fine answer. The
+  production split is asked about only where the person says something
+  runs separately; a script run by hand has no tiers. The plan says how
+  the work is shown to run: the tests the language has, or the command
+  that exercises it.
+- **A work document or a creative work:** the form (the kind of document
+  or genre, its length, its structure, its voice, the house style or
+  citation rule it follows); the parts as sections, chapters, scenes or
+  slides; and how a draft is judged -- against the brief, against the
+  source material, and against itself. The work is kept as text files a
+  reviewer can read line by line, Markdown unless the person names another
+  text format; a `.docx`, `.pptx` or PDF is produced from them at the end
+  where one is wanted, and is never what a session edits.
+- **Something else:** the common list above, and the person's own words
+  for the parts.
+
+**Step 3 -- session 2 breaks any of them down.** It challenges the parts as
+it challenges modules now -- whether each should exist, and whether what it
+promises is something a reader or a test can check -- and breaks the plan
+into numbered sessions that together produce a draft of the whole work or
+of the component the plan names. Where the plan defers anything, the last
+session it writes is a planning session for what was deferred. The
+skeleton session, the suite it declares, the architecture test, the
+packaging session and the release sessions are planned where the plan
+names a .NET, Maven or Gradle solution, in today's words; another language
+gets a first session that writes its own build and declares its suite
+where it has either; a document or a creative work gets a first session
+that lays out its files and outline, and no skeleton, suite, packaging or
+release. `DECOMPOSITION_PROMPT` says the same.
+
+**Step 4 -- the sentences around them.** The offer that ends set-up, the
+hand-off line `dabbler bootstrap` prints, the walkthrough's second step
+and its page, the README, the quick start and
+`docs/driving-a-session.md` say that session 1 asks what you are making and
+whether you want to work it through, and stop saying "one module is a fine
+answer" as though every plan had modules.
+
+**Non-goals.** The maintenance posture's two sessions: a repository that
+already holds code is asked what is to change, as now. A `kind` in
+`dabbler.yaml` or anywhere the framework reads: the kind is a line in the
+brief, and no code branches on it. A question asked by Set Up New Solution
+itself. Renaming `solution-plan.md` or `docs/planning/`. Refinement
+sessions inserted between sessions 1 and 2: the conversation is held in
+session 1, and nothing renumbers session 2. Reading, diffing or reviewing
+`.docx`, `.pptx` or any binary format. Templates for particular genres.
+Any change to `detect.ts`, to the suites, or to what a step's checks are:
+session 332 walks a document to a close and fixes what stops it there.
+
+**Tests.** In `bootstrap.test.ts`: the plan scaffolded into an empty
+folder carries both questions in session 1 and still parses as two
+sessions with their steps; scaffolded over a build file, it leaves the
+first question out and keeps the adoption text; under `maintenance` it is
+what it was. The existing assertions on the .NET and Java text move to the
+branch that names them and are not relaxed.
+
+**Releasable.** Yes, as 3.34.0 in session 333.
+
+### Session 332 of 333: Scripts and prose are read as what they are, and walked to a close
+
+Scope: `packages/router/src/bootstrap/detect.ts` (`SOURCE_FILE`),
+`packages/router/test/detect.test.ts`, whatever in `packages/router/src/`
+or `tools/dabbler-ai-orchestration/src/` the two walks show to be stopping
+a session, with the test named after it, `docs/guide/README.md`,
+`tools/dabbler-ai-orchestration/README.md`, `version.json` and the
+manifests `npm run stamp:version` writes,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** Session 331 changes what the first two sessions say. Nobody has
+yet run a session to its close in a repository with no test suite and no
+code, and the framework's own account of itself -- checks, suites, a run of
+record, a reviewer reading a diff -- was written about code. The claim that
+a novel use does not choke is a claim until it has been walked.
+
+One thing is known already. Set-up reads a repository's posture from the
+files git tracks, and its list of what counts as source names C#, Java,
+TypeScript, Python and their neighbours and omits PowerShell, R and shell
+scripts. A repository of forty PowerShell modules is read as holding no
+code and is given the sessions for a new solution.
+
+**Step 1 -- the source list.** `SOURCE_FILE` gains `.ps1`, `.psm1`,
+`.psd1`, `.r`, `.rmd`, `.qmd`, `.sh`, `.bash`, `.c`, `.h`, `.cpp`, `.hpp`,
+`.swift` and `.dart`. Prose is deliberately not added: a folder of tracked
+Markdown is material to start from, which session 1 now asks about, and
+the maintenance sessions speak of projects and build tools it does not
+have.
+
+**Step 2 -- walk a document.** In a scratch folder outside this
+repository, with the built extension's router: set up, answer session 1 as
+a person writing a two-page standard operating procedure with no material
+to start from, run session 2, and run the first numbered session to its
+close. No suite is declared at any point. Each stop is a finding.
+
+**Step 3 -- walk a script repository.** A second scratch folder holding a
+committed PowerShell module and no test: set up, confirm the posture reads
+`maintenance`, and run sessions 1 and 2 and the first numbered session to
+its close.
+
+**Step 4 -- fix what stopped, within a bound.** A stop whose fix is small
+and plainly the framework's -- a sentence that assumes code, a gate that
+demands a suite where none is declared and none is owed -- is fixed here,
+with its test. A stop that needs a design is written into this plan as a
+session of its own and is not fixed here; the walk then goes round it by
+the exits a person has, and says which.
+
+**Step 5 -- the words and the number.** `docs/guide/README.md` and the
+extension's README say in one short paragraph what the framework is used
+for -- programs in any language, documents, creative work -- and that work
+is kept as text a reviewer can read, with `.docx` and its kin produced at
+the end. `version.json` goes to 3.34.0 (a minor: the pane works with no
+folder, and the first sessions ask a new question), stamped with `npm run
+stamp:version`, and the changelog's 3.34.0 section says what sessions 330
+to 332 changed for a person.
+
+**Non-goals.** Detectors, suites or scaffolding for PowerShell, R, or any
+ecosystem `detect.ts` does not already read: a person declares the suite,
+as the scaffolded `dabbler.yaml` says. A reviewer for binary documents. A
+spell-check, style or citation control. A posture for prose. Walking every
+kind of work the first question names: two walks, and the others are a
+person's to report.
+
+**Tests.** In `detect.test.ts`: a repository whose tracked files are
+PowerShell reads `maintenance`, and one whose tracked files are Markdown
+reads `greenfield`. One test per fix step 4 makes, in the file named after
+what it changed. `npm run check:version` checks the stamp.
+
+**Releasable.** Yes, as 3.34.0 in session 333.
+
+### Session 333 of 333: Release 3.34.0 (release: 3.34.0)
+
+The framework publishes sessions 330 to 332 as 3.34.0 and nothing else.

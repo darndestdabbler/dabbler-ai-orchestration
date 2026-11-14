@@ -89,7 +89,13 @@ export class SolutionTreeProvider
     /** Called whenever the Configuration root is painted, with what it was painted from. */
     private readonly onConfigurationPainted?: (projection: Projection) => void,
   ) {
-    if (!workspaceRoot) return;
+    // **With no folder open, the Configuration alone**, read for this
+    // machine: its inputs are the user-level files, and they are watched the
+    // same way whether or not a folder is.
+    if (!workspaceRoot) {
+      this.watchUserConfiguration();
+      return;
+    }
     // The document itself: something rewrote it, so read it again.
     this.watch(PROJECTION_GLOB, () => this.refresh());
     // And the declarations it is derived from. A change to one of these
@@ -208,7 +214,9 @@ export class SolutionTreeProvider
    * until the first read.
    */
   private projection(): Projection | undefined {
-    if (!this.workspaceRoot) return undefined;
+    if (!this.workspaceRoot) {
+      return { projects: [], configuration: this.currentConfiguration() } as unknown as Projection;
+    }
     if (!this.cached) {
       const file = path.join(this.workspaceRoot, PROJECTION_RELPATH);
       try {
@@ -251,9 +259,7 @@ export class SolutionTreeProvider
     if (this.configuration !== undefined && now - this.configuration.at < CONFIGURATION_TTL_MS) {
       return this.configuration.value;
     }
-    const value = solutionConfiguration(
-      this.workspaceRoot as string,
-    ) as Projection["configuration"];
+    const value = solutionConfiguration(this.workspaceRoot ?? null) as Projection["configuration"];
     this.configuration = { value, at: now };
     return value;
   }
@@ -303,7 +309,8 @@ export class SolutionTreeProvider
       // setting changed in the settings editor must not need a window
       // reload to reach the row that reports it.
       chosenEngine: chosenEngineIn(this.currentProjection()),
-      ...mechanicChoicesIn(this.workspaceRoot),
+      ...mechanicChoicesIn(this.workspaceRoot ?? null),
+      machineOnly: !this.workspaceRoot,
     });
 
     const item = new vscode.TreeItem(

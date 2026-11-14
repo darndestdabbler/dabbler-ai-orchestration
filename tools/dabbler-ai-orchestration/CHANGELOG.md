@@ -10,6 +10,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.34.0] — 2026-11-14
+
+**The Configuration comes before any folder, and the buttons say what you
+have.**
+
+### Added
+
+- **This machine's defaults, with no folder open.** Click the Dabbler AI
+  Orchestration icon in an empty window and the Solution Explorer shows the
+  Configuration alone, labelled as this machine's defaults. Every row there
+  writes the machine's default: it applies wherever a repository has no
+  choice of its own, and it does not replace a choice already saved in one.
+  Set it first and every project you set up starts from it. From a
+  terminal, `dabbler configure --mine --no-repo` does the same.
+- **Open Existing Folder or Repository.** With no folder open, the Work
+  Explorer offers it beside Set Up New Project. It asks one thing -- a
+  folder on this machine, or a repository to clone -- and hands it to VS
+  Code's own folder dialog or clone.
+
+### Changed
+
+- **Set Up Dabbler in This Folder.** A folder that is not set up offers
+  this, in the Work Explorer and in the toast, rather than Set Up New
+  Project: nothing about a ten-year-old repository is new. It is the same
+  command.
+- The Solution Explorer no longer has a welcome of its own: it always shows
+  the Configuration, so the buttons are the Work Explorer's.
+
 ## [3.33.0] — 2026-11-12
 
 **Set Up New Project can put the framework's files on a branch of their

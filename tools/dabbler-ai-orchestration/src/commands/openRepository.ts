@@ -316,3 +316,41 @@ export function workspaceFileIn(stdout: string): string | null {
   const found = /^wrote (.+\.code-workspace)\s*$/m.exec(stdout);
   return found ? found[1].trim() : null;
 }
+
+/** The two answers Open Existing Folder or Repository offers. */
+export const OPEN_A_FOLDER = "A folder on this machine";
+export const CLONE_A_REPOSITORY = "A repository to clone";
+
+/** What Open Existing Folder or Repository needs of the editor, so the suite can drive it. */
+export interface OpenExistingUi {
+  pick: (
+    items: readonly vscode.QuickPickItem[],
+    options: vscode.QuickPickOptions,
+  ) => Thenable<vscode.QuickPickItem | undefined>;
+  execute: (command: string) => Thenable<unknown>;
+}
+
+/**
+ * Open what a person already has: a folder here, or a repository elsewhere.
+ *
+ * One question, and each answer is VS Code's own command -- its folder dialog
+ * or its clone, which asks for the URL and where to put it. Dabbler clones
+ * nothing itself. The window that opens offers to set the folder up, as it
+ * does for any folder that is not set up yet.
+ */
+export async function openExistingFolderOrRepository(
+  ui: OpenExistingUi = {
+    pick: (items, options) => vscode.window.showQuickPick(items, options),
+    execute: (command) => vscode.commands.executeCommand(command),
+  },
+): Promise<void> {
+  const picked = await ui.pick(
+    [
+      { label: OPEN_A_FOLDER, description: "VS Code asks which one, and opens it" },
+      { label: CLONE_A_REPOSITORY, description: "VS Code asks for its URL, clones it and opens it" },
+    ],
+    { title: "Open Existing Folder or Repository", placeHolder: "Where is it?" },
+  );
+  if (!picked) return;
+  await ui.execute(picked.label === OPEN_A_FOLDER ? "vscode.openFolder" : "git.clone");
+}

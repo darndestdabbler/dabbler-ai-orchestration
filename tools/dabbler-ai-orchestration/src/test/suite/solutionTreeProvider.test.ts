@@ -64,6 +64,16 @@ suite("SolutionTreeProvider: derives at startup", () => {
     assert.deepStrictEqual(provider.getChildren().map((node) => node.kind), ["solution", "configuration"]);
   });
 
+  test("with no folder open shows the Configuration alone, labelled as this machine's defaults", () => {
+    // A person who opens VS Code with no folder sets the machine's defaults
+    // first; every solution set up afterwards inherits them.
+    provider = new SolutionTreeProvider(undefined);
+    const roots = provider.getChildren();
+    assert.deepStrictEqual(roots.map((node) => node.kind), ["configuration"]);
+    const item = provider.getTreeItem(roots[0]!);
+    assert.match(String(item.label), /this machine's defaults/);
+  });
+
   test("a projection already on disk is re-derived, because a stale one looks current", async () => {
     // The inverse of what this asserted until session 155, and the reason is
     // the defect the old behaviour had: deriving only over a MISSING file

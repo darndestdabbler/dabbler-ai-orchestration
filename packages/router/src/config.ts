@@ -451,7 +451,14 @@ function rejectUnknownOverlayKeys(
 
 // --- Loading ------------------------------------------------------------------
 
-export function loadConfig(path?: string, projectDir?: string): RouterConfig {
+/**
+ * The configuration for `projectDir`, for the working directory's repository
+ * when it is undefined, or for NO repository when it is null: the
+ * distribution's defaults and this machine's preferences, with no project
+ * layer and no checkout settings. Null is how a reading is taken before any
+ * folder is open, so nothing in the directory the process stands in decides.
+ */
+export function loadConfig(path?: string, projectDir?: string | null): RouterConfig {
   // **The checkout the caller NAMED, not its git toplevel.** `projectRoot`
   // answers null outside a repository, and a settings file is a file --
   // reading it has nothing to do with whether git knows about the directory
@@ -459,8 +466,12 @@ export function loadConfig(path?: string, projectDir?: string): RouterConfig {
   // setting invisible in a checkout that is not a repository, which the
   // walk found on its first reading: the pane said "nothing resolves" over
   // a setting it was rendering the vehicle from two rows above.
-  const checkout = projectDir ?? projectRoot();
-  const config = withCredentialReferences(loadConfigFrom(resolveConfigSources(path, projectDir)), checkout);
+  const checkout = projectDir === undefined ? projectRoot() : projectDir;
+  const sources =
+    projectDir === null
+      ? chooseConfigSources(path, process.env[CONFIG_ENV_VAR], null, new Set())
+      : resolveConfigSources(path, projectDir);
+  const config = withCredentialReferences(loadConfigFrom(sources), checkout);
   // Which checkout this configuration is OF. A choice read through the layers
   // is read from that checkout's settings, and a caller asking about a
   // repository it is not standing in -- the pane always is -- must not be
@@ -951,7 +962,7 @@ export interface TransportReading {
  * own `router-config.yaml` is the built-in default and is untouched: that is
  * the bottom tier of the order, not a fifth input.
  */
-function overlayTransport(config: RouterConfig, projectDir: string | undefined): string | null {
+function overlayTransport(config: RouterConfig, projectDir: string | null | undefined): string | null {
   // **The overlay THIS config was loaded from, before the one the working
   // directory happens to have.** A loaded config records where its layers
   // came from, and a caller that hands over a config for another checkout --
@@ -983,16 +994,17 @@ function overlayTransport(config: RouterConfig, projectDir: string | undefined):
  * A caller that named a checkout has already answered "which project": going
  * back to git for the toplevel of a directory we were handed would be asking
  * a question that is already answered, and it would spawn a process on every
- * transport reading.
+ * transport reading. Null is no checkout at all, which has no overlay.
  */
-function overlayBeside(projectDir: string | undefined): string | null {
+function overlayBeside(projectDir: string | null | undefined): string | null {
+  if (projectDir === null) return null;
   if (projectDir === undefined) return localOverridesPath(undefined);
   const beside = join(projectDir, LOCAL_OVERRIDES_FILENAME);
   return existsSync(beside) ? beside : null;
 }
 
 function refuseObsoleteOverlayTransport(config: RouterConfig, projectDir: string | null): void {
-  const declared = overlayTransport(config, projectDir ?? undefined);
+  const declared = overlayTransport(config, projectDir);
   if (declared === null) return;
   throw new ConfigError(
     `${LOCAL_OVERRIDES_FILENAME} still says transport.profile: '${declared}', and ` +
@@ -1063,7 +1075,7 @@ export function explainAuthoringModel(
   cliFlag?: string | null,
   root?: string | null,
 ): TransportReading {
-  const checkout = root ?? projectRoot();
+  const checkout = root === undefined ? projectRoot() : root;
   // A model id goes through unnormalised: the date suffix is what makes a
   // pin a pin, and the CLI is the authority on whether it knows the id.
   return explainChoice([
@@ -1090,7 +1102,7 @@ export const MECHANIC_DEFAULT: MechanicMode = "unattended";
 
 /** The Mechanic's delegation in force, and every layer that named one. A value it does not know is refused. */
 export function explainMechanic(root?: string | null): TransportReading {
-  const checkout = root ?? projectRoot();
+  const checkout = root === undefined ? projectRoot() : root;
   const reading = explainChoice([
     [MECHANIC_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_MECHANIC] ?? null],
     [MECHANIC_SOURCE_PREFERENCES, personal(() => readPreferences().mechanic)],
@@ -1125,7 +1137,7 @@ export function explainMechanicModel(
   root?: string | null,
   primary?: string | null,
 ): TransportReading {
-  const checkout = root ?? projectRoot();
+  const checkout = root === undefined ? projectRoot() : root;
   const named = explainChoice([
     [MECHANIC_MODEL_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_MECHANIC_MODEL] ?? null],
     [MECHANIC_MODEL_SOURCE_PREFERENCES, personal(() => readPreferences().mechanic_model)],
@@ -1366,7 +1378,7 @@ export const TRANSCRIPT_DEFAULT: TranscriptCarry = "outline";
  * see being ignored.
  */
 export function explainTranscript(root?: string | null): TransportReading {
-  const checkout = root ?? projectRoot();
+  const checkout = root === undefined ? projectRoot() : root;
   const reading = explainChoice([
     [TRANSCRIPT_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_TRANSCRIPT] ?? null],
   ]);
@@ -1390,7 +1402,7 @@ export function transcriptCarry(root?: string | null): TranscriptCarry {
 
 /** The engine in force, and every layer that named one. */
 export function explainEngine(cliFlag?: string | null, root?: string | null): TransportReading {
-  const checkout = root ?? projectRoot();
+  const checkout = root === undefined ? projectRoot() : root;
   return explainChoice([
     [ENGINE_SOURCE_FLAG, cliFlag ?? null],
     [ENGINE_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_ENGINE] ?? null],
@@ -1421,7 +1433,7 @@ export function explainTransport(
   cliFlag?: string | null,
   root?: string | null,
 ): TransportReading {
-  const checkout = root ?? projectRoot();
+  const checkout = root === undefined ? projectRoot() : root;
   refuseObsoleteOverlayTransport(config, checkout);
   const candidates: ReadonlyArray<readonly [string, unknown]> = [
     [TRANSPORT_SOURCE_FLAG, cliFlag ?? null],
@@ -1558,7 +1570,7 @@ export function explainReviewingTransport(
         `${STALE_AUXILIARY_TRANSPORT_KEY}, or set both to the same value.`,
     );
   }
-  const checkout = root ?? projectRoot();
+  const checkout = root === undefined ? projectRoot() : root;
   const named: Array<readonly [string, string | null]> = [
     [REVIEWING_SOURCE_SETTINGS, checkoutSettings(checkout)[SETTING_REVIEWER_TRANSPORT] ?? null],
     [REVIEWING_SOURCE_PREFERENCES, personalTransport("reviewer_transport")],

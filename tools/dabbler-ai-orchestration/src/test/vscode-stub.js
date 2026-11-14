@@ -84,7 +84,8 @@ const vscodeStub = {
   },
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
   MarkdownString: class MarkdownString { constructor(s) { this.value = s; } },
-  ThemeIcon: class ThemeIcon { constructor(id) { this.id = id; } },
+  ThemeIcon: class ThemeIcon { constructor(id, color) { this.id = id; this.color = color; } },
+  ThemeColor: class ThemeColor { constructor(id) { this.id = id; } },
   // The editor's own numbering: 1 light, 2 dark, 3 high-contrast (dark),
   // 4 high-contrast light.
   ColorThemeKind: { Light: 1, Dark: 2, HighContrast: 3, HighContrastLight: 4 },

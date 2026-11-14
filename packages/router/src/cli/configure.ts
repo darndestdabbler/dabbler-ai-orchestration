@@ -103,6 +103,9 @@ import { writeErr, writeOut } from "./output.ts";
 // out of; the declaration's refusal reads the same constant.
 export { MINE_FLAG };
 
+/** No repository: the call writes this machine's default and nothing else. */
+export const NO_REPO_FLAG = "--no-repo";
+
 const EXIT_OK = 0;
 const EXIT_REFUSED = 1;
 const EXIT_USAGE = 2;
@@ -114,7 +117,7 @@ function usage(): string {
     "                         [--reviewer-model M] [--auxiliary-model M]",
     "                         [--mechanic MODE] [--mechanic-model M]",
     "                         [--credential PROVIDER=NAME]",
-    `                         [${MINE_FLAG}] [--repo-root PATH]`,
+    `                         [${MINE_FLAG}] [--repo-root PATH | ${NO_REPO_FLAG}]`,
     "",
     "  what the NEXT session is run with",
     "",
@@ -171,6 +174,10 @@ function usage(): string {
     "                          it lands changes. It holds for every choice alike:",
     "                          the engine and the two reviewing models as well",
     "  --repo-root PATH        the repository; derived from the cwd when absent",
+    `  ${NO_REPO_FLAG}               no repository at all: with ${MINE_FLAG}, write this`,
+    "                          machine's default and read nothing in the cwd.",
+    "                          A machine default applies where a repository has",
+    "                          no choice of its own and replaces none saved in one",
     "  -h, --help              show this message",
     "",
   ].join("\n");
@@ -276,7 +283,11 @@ function namesOffered(ids: readonly string[]): string {
 
 
 export interface ConfigureOptions {
-  readonly repoRoot: string;
+  /**
+   * The checkout, or null for none: a choice made before any folder is open.
+   * Null is accepted only with `mine`, since a repository's choice needs one.
+   */
+  readonly repoRoot: string | null;
   /** The engine the next session is offered; an empty value clears it. */
   readonly engine?: string;
   readonly transport?: string;
@@ -347,8 +358,18 @@ export function staleModelChoice(repoRoot: string): string | null {
  * pane renders so the row the operator clicked says the new thing.
  */
 export function configure(options: ConfigureOptions): ConfigureOutcome {
-  const config = loadConfig(undefined, options.repoRoot);
   const empty = { changed: [], path: null, stale: null, warnings: [] };
+  const repoRoot = options.repoRoot;
+  if (repoRoot === null && options.mine !== true) {
+    return {
+      ...empty,
+      refusal:
+        `a choice for a repository needs one, and none was named. ${MINE_FLAG} ` +
+        "makes it this machine's default instead, which applies where a " +
+        "repository has no choice of its own and replaces none saved in one.",
+    };
+  }
+  const config = loadConfig(undefined, repoRoot);
   const choice: ConfigurationChoice = {};
   const named: Record<string, string> = {};
   if (
@@ -830,12 +851,12 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
   const written =
     Object.keys(choice).length === 0
       ? { path: null, changed: [] as readonly string[] }
-      : writeConfigurationChoice(options.repoRoot, choice);
-  const landed = written.path === null ? null : commitChoice(options.repoRoot, Object.keys(choice));
+      : writeConfigurationChoice(repoRoot as string, choice);
+  const landed = written.path === null ? null : commitChoice(repoRoot as string, Object.keys(choice));
   // The pane reads the projection, and the projection is derived. Without
   // this the operator's own change is the one thing the surface does not
   // show until something unrelated moves a declaration.
-  tryWriteProjection(options.repoRoot);
+  if (repoRoot !== null) tryWriteProjection(repoRoot);
   return {
     refusal: null,
     changed: [
@@ -847,7 +868,7 @@ export function configure(options: ConfigureOptions): ConfigureOutcome {
     path: written.path,
     // Read AFTER the write, so a call that fixes the stale choice reports
     // nothing, and a call that sets something else beside it reports it.
-    stale: staleModelChoice(options.repoRoot),
+    stale: repoRoot === null ? null : staleModelChoice(repoRoot),
     warnings,
   };
 }
@@ -936,7 +957,12 @@ export async function configureVerb(argv: string[]): Promise<number> {
   // everyone who clones, `preferences.json` is on this machine and travels
   // nowhere. It takes no value, so it is read before the pairs are.
   let mine = false;
+  let noRepo = false;
   const argvWithoutScope = argv.filter((entry) => {
+    if (entry === NO_REPO_FLAG) {
+      noRepo = true;
+      return false;
+    }
     if (entry !== MINE_FLAG) return true;
     mine = true;
     return false;
@@ -959,9 +985,13 @@ export async function configureVerb(argv: string[]): Promise<number> {
   // The repository when this is one, and otherwise where we stand: a
   // configuration is a fact about a checkout, and a checkout that is not a
   // git repository still has one.
+  if (noRepo && values.has("--repo-root")) {
+    writeErr(`dabbler configure: --repo-root and ${NO_REPO_FLAG} name opposite things\n\n${usage()}`);
+    return EXIT_USAGE;
+  }
   const here = workingDirectory();
   const options: ConfigureOptions = {
-    repoRoot: values.get("--repo-root") ?? repoRootFor(here) ?? here,
+    repoRoot: noRepo ? null : (values.get("--repo-root") ?? repoRootFor(here) ?? here),
     ...(values.has("--engine") ? { engine: values.get("--engine") as string } : {}),
     ...(values.has("--transport") ? { transport: values.get("--transport") as string } : {}),
     ...(values.has("--reviewer-transport")

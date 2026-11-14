@@ -314,6 +314,34 @@ describe("what a session would be run with", () => {
     }
   });
 
+  it("reads this machine's defaults with no repository, whatever the directory it is run from holds", () => {
+    // Before any folder is open there is no checkout to read, and the
+    // directory this process stands in -- a home folder, most often -- is
+    // not one: its settings file must decide nothing.
+    const root = tempDir("configuration-machine-");
+    const restore = onVehicle(root, TRANSPORT_API, withEnv({}));
+    const ungit = inRepository(root);
+    try {
+      writeSettings(root, { [SETTING_ENGINE]: "copilot" });
+      writePreferences({ engine: "claude-code" });
+      type Engines = { chosen: string; decidedBy: string | null };
+      // The working directory's repository is `root`, and it names its own.
+      assert.equal((configurationNode(root)["engines"] as Engines).chosen, "copilot");
+
+      const machine = configurationNode(null);
+      const engines = machine["engines"] as Engines;
+      assert.equal(engines.chosen, "claude-code");
+      assert.equal(engines.decidedBy, "preferences.json (engine)");
+      const transport = machine["transport"] as { decidedBy: string | null; layers: { source: string }[] };
+      assert.ok(transport.layers.every((layer) => !layer.source.includes("settings.json")));
+    } finally {
+      writePreferences({ engine: "" });
+      writeSettings(root, { [SETTING_ENGINE]: "" });
+      ungit();
+      restore();
+    }
+  });
+
   /** The overlay `configure` writes, removed, so each call decides afresh. */
   /**
    * Back to a machine that has configured nothing.

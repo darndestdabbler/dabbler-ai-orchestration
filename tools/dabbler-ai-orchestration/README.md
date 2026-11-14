@@ -103,14 +103,19 @@ saved in the repository, so it travels to the next clone. See
 
 ## Get started
 
-Open a project folder and click the **Dabbler AI Orchestration** icon. Set
-the Configuration first; then **Set Up New Project** writes the
-instructions your AI reads and the first two sessions, and commits them.
-Choose **Start Session** on the repository's row and watch the tree. An
-existing repository is recognised and kept as it is: the framework plans
-changes to its projects and leaves their layout alone. It can be set up on
-a branch of its own, so the framework's files stay off the main branch
-until you merge them.
+Click the **Dabbler AI Orchestration** icon; no folder needs to be open.
+The Configuration shows first, as this machine's defaults: the AI that
+authors, its model, and who reviews it. A machine default applies wherever
+a repository has no choice of its own, and it does not replace a choice
+already saved in one. Then choose **Set Up New Project**, or **Open
+Existing Folder or Repository** for something you already have; a folder
+that is not set up offers **Set Up Dabbler in This Folder**. Setting up
+writes the instructions your AI reads and the first two sessions, and
+commits them. Choose **Start Session** on the repository's row and watch
+the tree. An existing repository is recognised and kept as it is: the
+framework plans changes to its projects and leaves their layout alone. It
+can be set up on a branch of its own, so the framework's files stay off
+the main branch until you merge them.
 
 The framework is open source (MIT). [Your costs](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/cost-and-what-is-sent.md)
 are your provider's API spend or your Copilot seat.

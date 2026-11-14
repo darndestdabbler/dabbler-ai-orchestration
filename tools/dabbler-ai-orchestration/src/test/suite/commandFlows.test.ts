@@ -13,6 +13,9 @@ import {
   createRepository,
   identifyRemote,
   locateRepository,
+  openExistingFolderOrRepository,
+  OPEN_A_FOLDER,
+  CLONE_A_REPOSITORY,
 } from "../../commands/openRepository";
 import type { Projection } from "../../providers/solutionTreeModel";
 import {
@@ -1649,6 +1652,19 @@ suite("commandFlows: cancel at planning time", () => {
 
 });
 
+suite("Open Existing Folder or Repository", () => {
+  test("hands each answer to VS Code's own command, and runs nothing on escape", async () => {
+    const ran: string[] = [];
+    for (const answer of [OPEN_A_FOLDER, CLONE_A_REPOSITORY, undefined]) {
+      await openExistingFolderOrRepository({
+        pick: (items) => Promise.resolve(items.find((item) => item.label === answer)),
+        execute: (command) => Promise.resolve(ran.push(command)),
+      });
+    }
+    assert.deepStrictEqual(ran, ["vscode.openFolder", "git.clone"]);
+  });
+});
+
 suite("placing a repository the Explorer cannot reach", () => {
   const PROJECTION = {
     solution: { name: "csv", title: "CSV", multi: false, implicit: true, moduleCount: 1 },
@@ -2101,6 +2117,19 @@ suite("the Configuration section's model pick", () => {
     assert.deepStrictEqual(offered.map((item) => item.label), ["api", "copilot-cli"]);
     assert.ok(options[0]?.placeHolder?.includes("dabbler.reviewerTransport"), options[0]?.placeHolder);
     assert.deepStrictEqual(configureOptions, [{ repoRoot: "D:/ws", reviewerTransport: "api" }]);
+  });
+
+  test("with no folder open, a row writes the machine's default and says a repository's own choice is kept", async () => {
+    const { ui, informed } = capturingUi(true);
+    const { router, configureOptions } = fakeRouter(0, "written");
+    await setReviewerTransport(
+      router,
+      { node: { kind: "configVehicle", who: "reviewing" }, projection: reviewedOver() },
+      () => undefined,
+      { ...ui, workspaceRoot: () => undefined },
+    );
+    assert.deepStrictEqual(configureOptions, [{ repoRoot: null, reviewerTransport: "api", mine: true }]);
+    assert.match(informed[0] ?? "", /does not replace a choice already saved in one/);
   });
 
   test("picks the Auxiliary Reviewer from its own candidates and writes it as that role", async () => {

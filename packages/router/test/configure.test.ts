@@ -382,3 +382,37 @@ describe("where a choice made with configure is kept", () => {
     }
   });
 });
+
+describe("configure with no repository, before any folder is open", () => {
+  it("writes the machine's default with --mine and nothing else, and refuses without it", () => {
+    const restore = machine();
+    try {
+      const unscoped = configure({ repoRoot: null, engine: "copilot" });
+      assert.match(String(unscoped.refusal), /needs one/);
+      assert.equal(readPreferences().engine, undefined);
+
+      const kept = configure({ repoRoot: null, engine: "claude-code", reviewerModel: "gpt-5.6-sol", mine: true });
+      assert.equal(kept.refusal, null);
+      assert.equal(kept.path, null);
+      assert.equal(kept.stale, null);
+      assert.equal(readPreferences().engine, "claude-code");
+      assert.equal(readPreferences().selected?.[ROLE_PRIMARY_REVIEWER], "gpt-5.6-sol");
+      assert.ok(kept.changed.every((line) => /preferences\.json|Primary Reviewer/.test(line)), kept.changed.join("\n"));
+    } finally {
+      restore();
+    }
+  });
+
+  it("leaves a repository's own choice standing when the machine's default changes", () => {
+    const restore = machine();
+    try {
+      const root = tempDir("configure-own-");
+      writeSettings(root, { [SETTING_TRANSPORT]: TRANSPORT_API, [SETTING_ENGINE]: "copilot" });
+      assert.equal(configure({ repoRoot: null, engine: "claude-code", mine: true }).refusal, null);
+      assert.equal(node(configurationNode(root)["engines"])["chosen"], "copilot");
+      assert.equal(node(configurationNode(null)["engines"])["chosen"], "claude-code");
+    } finally {
+      restore();
+    }
+  });
+});

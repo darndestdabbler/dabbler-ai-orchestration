@@ -26,6 +26,8 @@
 // engine-facing, and belong in the terminal `dabbler` is on, which is
 // where the framework's own lifecycle runs them.
 
+import { homedir } from "node:os";
+
 import { readPlan } from "./approvedPlan.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { latestRound, sessionRunDir } from "./ledger.ts";
@@ -33,7 +35,7 @@ import { asAPersonsClick } from "./session.ts";
 import { buildProjection } from "./progress.ts";
 import { standIn } from "./workdir.ts";
 import { HANDLERS } from "./cli/registry.ts";
-import { MINE_FLAG } from "./cli/configure.ts";
+import { MINE_FLAG, NO_REPO_FLAG } from "./cli/configure.ts";
 import { capture } from "./output.ts";
 import {
   EXIT_OK,
@@ -555,7 +557,9 @@ export class InProcessRouter implements Router {
     // `--repo-root` and not the cwd: the extension host stands wherever the
     // window was opened, and the repository the operator clicked in is the
     // one being configured.
-    const args = ["--repo-root", o.repoRoot];
+    // No repository is said, never left to the cwd: the extension host stands
+    // wherever VS Code was started, and that directory must decide nothing.
+    const args = o.repoRoot === null ? [NO_REPO_FLAG] : ["--repo-root", o.repoRoot];
     optional(args, "--engine", o.engine);
     optional(args, "--transport", o.transport);
     optional(args, "--reviewer-transport", o.reviewerTransport);
@@ -566,7 +570,7 @@ export class InProcessRouter implements Router {
     // Passed even when empty: an empty Mechanic Model is the clear.
     if (o.mechanicModel !== undefined) args.push("--mechanic-model", o.mechanicModel);
     if (o.mine === true) args.push(MINE_FLAG);
-    return this.text("configure", args, o.repoRoot);
+    return this.text("configure", args, o.repoRoot ?? homedir());
   }
 
   public bootstrap(o: BootstrapOptions): Promise<RouterResult<RouterText>> {

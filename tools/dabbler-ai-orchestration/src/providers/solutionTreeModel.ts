@@ -857,7 +857,14 @@ export interface SolutionContext {
   readonly mechanic?: string | null;
   /** The Mechanic Model someone chose, or null where it is the Authoring Model's. */
   readonly mechanicModel?: string | null;
+  /** No folder is open, so the Configuration is this machine's defaults and nothing else. */
+  readonly machineOnly?: boolean;
 }
+
+/** What a machine default is, said once for the pane's label and the toast after a write. */
+export const MACHINE_DEFAULT_MEANS =
+  "A machine default applies wherever a repository has no choice of its own, " +
+  "and it does not replace a choice already saved in one.";
 
 /** What each Mechanic delegation means, on its row and in its pick. */
 export const MECHANIC_MODES: ReadonlyArray<{ mode: string; means: string }> = [
@@ -1072,7 +1079,7 @@ export function descriptorFor(
       const stale = (config.records ?? []).filter((row) => row.stale).length;
       return {
         id: "configuration",
-        label: "Configuration",
+        label: context.machineOnly ? "Configuration: this machine's defaults" : "Configuration",
         description: config.unavailable
           ? "cannot be read"
           : bits.length > 0
@@ -1081,6 +1088,9 @@ export function descriptorFor(
         tooltip:
           config.unavailable ??
           [
+            // With no folder open there is no repository to choose for, so
+            // every row here is the machine's, and the label says so.
+            ...(context.machineOnly ? [`No folder is open, so these are this machine's defaults. ${MACHINE_DEFAULT_MEANS}`] : []),
             "What a session is run with, read from files. Nothing here is " +
               "probed: the model catalog is a dated record, and refreshing " +
               "it is something you ask for.",

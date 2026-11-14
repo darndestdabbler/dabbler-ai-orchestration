@@ -6,6 +6,15 @@ section of the Solution Explorer. Every choice is the repository's own and
 travels with it to the next clone. The machine keeps only a default for a
 repository that has made none.
 
+**Start here, before any folder is open.** Click the Dabbler AI
+Orchestration icon in a window with no folder and the section shows alone,
+labelled as this machine's defaults; every row there writes the machine's
+default and nothing else. A machine default applies wherever a repository
+has no choice of its own, and it does not replace a choice already saved
+in one. Set them first and every project you then set up starts from them,
+so a first session does not stop to ask for a model. From a terminal the
+same write is `dabbler configure --mine --no-repo`.
+
 This page goes through the section row by row, says where each choice is
 kept and which layer wins, and says what each way of reaching a model
 needs. *See it:* `dabbler configuration explain` names, for every value,

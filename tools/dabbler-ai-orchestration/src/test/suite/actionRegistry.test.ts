@@ -279,33 +279,26 @@ suite("ActionRegistry: package.json menu registry", () => {
     assert.ok(menuEntries.some((e) => e.command === id && (e.when ?? "").includes(token)));
   });
 
-  test("the Solution Explorer says what it is for, and offers a way in", () => {
-    // csv-model's fourth feedback item: the view's purpose was unclear, and
-    // an empty tree said nothing at all. What answers it is a welcome the
-    // reader sees BEFORE there is anything to render -- so it is a
-    // contribution, and a contribution nothing asserts is one a refactor
-    // drops silently.
+  test("the Work Explorer's welcome offers two ways in with no folder and one with a folder; the Solution Explorer declares none", () => {
+    // The Solution Explorer always shows the Configuration, so it is never
+    // empty and a welcome there is never seen. The buttons are the Work
+    // Explorer's, and say what a person has.
     const welcomes = (
       manifest.contributes as unknown as {
-        viewsWelcome?: Array<{ view: string; contents: string }>;
+        viewsWelcome?: Array<{ view: string; contents: string; when?: string }>;
       }
     ).viewsWelcome ?? [];
-    const solution = welcomes.find((entry) => entry.view === "dabblerSolutionTree");
-    assert.ok(solution, "the Solution Explorer contributes no welcome");
-    // What it is FOR, in the terms the feedback item asked for: what the
-    // view shows, and who is affected when one of those things changes.
-    // "solution" alone would pass on the view's own name, which is the
-    // sentence the item called unclear in the first place.
-    for (const promise of [/built FROM/i, /projects/i, /promises|breaks|changes/i]) {
-      assert.ok(
-        promise.test(solution.contents),
-        `the welcome does not say what the view is for (${promise})`,
-      );
-    }
-    assert.ok(
-      /\(command:[a-zA-Z.]+\)/.test(solution.contents),
-      "the welcome offers no command, so an empty view is a dead end",
-    );
+    assert.ok(!welcomes.some((entry) => entry.view === "dabblerSolutionTree"));
+    const buttons = (when: string): string[] =>
+      [...(welcomes.find((entry) => entry.view === "dabblerWorkExplorerTree" && entry.when === when)?.contents ?? "")
+        .matchAll(/\[([^\]]+)\]\(command:([a-zA-Z.]+)\)/g)].map((match) => `${match[1]} -> ${match[2]}`);
+    assert.deepStrictEqual(buttons("workbenchState == empty"), [
+      "Set Up New Project -> dabbler.setupNewProject",
+      "Open Existing Folder or Repository -> dabbler.openExistingFolderOrRepository",
+    ]);
+    assert.deepStrictEqual(buttons("workbenchState != empty"), [
+      "Set Up Dabbler in This Folder -> dabbler.setupNewProject",
+    ]);
   });
 
   test("every act- token in package.json maps back to a registry action", () => {

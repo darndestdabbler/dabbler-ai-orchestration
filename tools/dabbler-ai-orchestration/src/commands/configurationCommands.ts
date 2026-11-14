@@ -24,6 +24,7 @@
 // from that moment, so a control that appeared to change one would be
 // offering something the ledger will not honour.
 
+import * as os from "os";
 import * as vscode from "vscode";
 import { explainMechanic, explainMechanicModel, type Router } from "dabbler-ai-router";
 
@@ -31,6 +32,7 @@ import { resolveRouterCli } from "../router/terminalShim";
 
 import {
   ENUMERATION_WORDS,
+  MACHINE_DEFAULT_MEANS,
   MECHANIC_MODES,
   providerRelationWord,
   REVIEWER_HELP,
@@ -61,9 +63,9 @@ export function chosenEngineIn(projection: Projection | null | undefined): strin
  * router's own reading. The model is null where no Mechanic layer named one,
  * which is the Authoring Model's -- the reading falls to it, and the row says
  * so rather than repeating it. Either is null where the reading refused.
+ * A null root is no folder open, and reads this machine's defaults alone.
  */
-export function mechanicChoicesIn(root: string | undefined): { mechanic: string | null; mechanicModel: string | null } {
-  if (!root) return { mechanic: null, mechanicModel: null };
+export function mechanicChoicesIn(root: string | null): { mechanic: string | null; mechanicModel: string | null } {
   const read = <T>(reading: () => T): T | null => {
     try {
       return reading();
@@ -237,8 +239,7 @@ export async function setEngine(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot();
-  if (!root) return;
+  const root = ui.workspaceRoot() ?? null;
   const items = engineItems(target.projection ?? null, launchable);
   if (items.length === 0) {
     ui.showWarningMessage(
@@ -258,10 +259,16 @@ export async function setEngine(
   await write(router, root, { engine: picked.label }, ui, refreshed);
 }
 
-/** One router write, with whatever it said handed straight back. */
+/**
+ * One router write, with whatever it said handed straight back.
+ *
+ * With no folder open there is no repository to choose for, so the write is
+ * this machine's default -- `mine`, naming no repository -- and the toast
+ * says in one sentence what a machine default is.
+ */
 async function write(
   router: Pick<Router, "configure">,
-  root: string,
+  root: string | null,
   choice: {
     engine?: string;
     transport?: string;
@@ -277,7 +284,7 @@ async function write(
   ui: ConfigurationUi,
   refreshed: () => void,
 ): Promise<void> {
-  const result = await router.configure({ repoRoot: root, ...choice });
+  const result = await router.configure({ repoRoot: root, ...choice, ...(root === null ? { mine: true } : {}) });
   if (!result.ok) {
     // The router's own words. A refusal reworded here would be a second
     // statement of a rule selection owns -- and the rule is the reason the
@@ -285,7 +292,8 @@ async function write(
     ui.showWarningMessage((result.message ?? result.outcome).trim() || "Dabbler refused that.");
     return;
   }
-  ui.showInformationMessage((result.value.stdout ?? "").trim() || "Written.");
+  const said = (result.value.stdout ?? "").trim() || "Written.";
+  ui.showInformationMessage(root === null ? `${said}\n\n${MACHINE_DEFAULT_MEANS}` : said);
   refreshed();
 }
 
@@ -302,8 +310,7 @@ export async function setReviewerTransport(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot();
-  if (!root) return;
+  const root = ui.workspaceRoot() ?? null;
   const vehicle = target.projection?.configuration?.primaryReviewer?.vehicle;
   const options = vehicle?.options ?? [];
   if (options.length === 0) {
@@ -348,7 +355,8 @@ function verbArgs(command: string): string[] {
  * run, every model choice on that transport fails against an empty list. The
  * terminal is the one Update the Catalog uses, so it is seen happening. A
  * refresh that fails leaves the rows saying what they said; the terminal
- * already says why.
+ * already says why. With no folder open it runs in the home directory: the
+ * catalog is the machine's, and reading it needs no repository.
  */
 export function unreadCatalogReader(
   ui: ConfigurationUi = defaultConfigurationUi(),
@@ -356,10 +364,9 @@ export function unreadCatalogReader(
   let taken = false;
   return async (projection, refreshed) => {
     const row = (projection?.configuration?.records ?? [])[0];
-    const root = ui.workspaceRoot();
-    if (taken || !row || !root || (projection?.configuration?.unread ?? []).length === 0) return;
+    if (taken || !row || (projection?.configuration?.unread ?? []).length === 0) return;
     taken = true;
-    await ui.runVerb(`Dabbler: ${row.record}`, root, verbArgs(row.command));
+    await ui.runVerb(`Dabbler: ${row.record}`, ui.workspaceRoot() ?? os.homedir(), verbArgs(row.command));
     refreshed();
   };
 }
@@ -426,8 +433,7 @@ export async function refreshRecord(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot();
-  if (!root) return;
+  const root = ui.workspaceRoot() ?? null;
   // The Configuration node's own action now, because there is ONE catalog
   // and a row for it under the participants would have been a row named
   // after the mechanism again. The record is still the router's: what it is
@@ -455,7 +461,7 @@ export async function refreshRecord(
     "Refresh",
   );
   if (!agreed) return;
-  const code = await ui.runVerb(`Dabbler: ${row.record}`, root, args);
+  const code = await ui.runVerb(`Dabbler: ${row.record}`, root ?? os.homedir(), args);
   // Whatever it ended on, the reading is re-taken and the tree repainted: a
   // refresh that failed halfway still moved the file, and a pane left
   // showing the state before it would be wrong in the one direction an
@@ -494,8 +500,7 @@ export async function setAsMyDefault(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot();
-  if (!root) return;
+  const root = ui.workspaceRoot() ?? null;
   const node = target.node;
   if (!node) return;
   const configuration = target.projection?.configuration;
@@ -562,8 +567,7 @@ export async function setAuthoringModel(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot();
-  if (!root) return;
+  const root = ui.workspaceRoot() ?? null;
   const role = target.projection?.configuration?.authoring;
   if (role?.declaredAtStart) {
     ui.showWarningMessage(
@@ -625,8 +629,7 @@ export async function setRoleModel(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot();
-  if (!root) return;
+  const root = ui.workspaceRoot() ?? null;
   if (which === "authoring") {
     await setAuthoringModel(router, target, refreshed, ui);
     return;
@@ -698,8 +701,7 @@ export async function setMechanicModel(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot();
-  if (!root) return;
+  const root = ui.workspaceRoot() ?? null;
   const role = target.projection?.configuration?.authoring;
   const chosen = mechanicChoicesIn(root).mechanicModel;
   const picked = await ui.pick(
@@ -722,8 +724,7 @@ export async function setMechanic(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot();
-  if (!root) return;
+  const root = ui.workspaceRoot() ?? null;
   const chosen = mechanicChoicesIn(root).mechanic;
   const picked = await ui.pick(
     MECHANIC_MODES.map((entry) => ({
@@ -731,7 +732,7 @@ export async function setMechanic(
       description: entry.means,
       detail: entry.mode === chosen ? "what you chose" : undefined,
     })),
-    { title: "May the framework call in the Mechanic on a stop?", placeHolder: "This repository's choice, committed with its settings." },
+    { title: "May the framework call in the Mechanic on a stop?", placeHolder: root === null ? "This machine's default." : "This repository's choice, committed with its settings." },
   );
   if (!picked) return;
   await write(router, root, { mechanic: picked.label }, ui, refreshed);
@@ -758,8 +759,7 @@ export async function storeCredential(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot();
-  if (!root) return;
+  const root = ui.workspaceRoot() ?? null;
   const node = target.node;
   if (!node || node.kind !== "configCredential") return;
   const credential = (target.projection?.configuration?.credentials ?? []).find(
@@ -775,7 +775,7 @@ export async function storeCredential(
   // terminal is the no. A modal in front of it is two questions for one
   // answer, and the walk found the practical half of the same point -- the
   // modal blocked the window it was drawn over.
-  const code = await ui.runVerb(`Dabbler: ${label} key`, root, [
+  const code = await ui.runVerb(`Dabbler: ${label} key`, root ?? os.homedir(), [
     "auth",
     "set",
     credential.provider,

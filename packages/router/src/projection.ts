@@ -478,7 +478,7 @@ export const RELEASE_ENGINE = "framework";
  * session, and every surface that appeared to choose one was offering
  * something the ledger would not honour.
  */
-export function orchestratorOf(root: string, release: "author" | "none" = "author"): {
+export function orchestratorOf(root: string | null, release: "author" | "none" = "author"): {
   engine: string | null;
   model: string | null;
   /**
@@ -492,6 +492,8 @@ export function orchestratorOf(root: string, release: "author" | "none" = "autho
    */
   provider: string | null;
 } {
+  // No repository has no ledger, so nothing is in flight.
+  if (root === null) return { engine: null, model: null, provider: null };
   try {
     const raw = readRawSessionState(sessionsDirFor(root));
     const sessions = Array.isArray(raw?.["sessions"]) ? (raw?.["sessions"] as Node[]) : [];
@@ -547,7 +549,7 @@ export function orchestratorOf(root: string, release: "author" | "none" = "autho
  * refuses five of them.
  */
 export function authoringNode(
-  root: string,
+  root: string | null,
   readingFor: (transport: string) => RoleReading,
   /**
    * The engine this reading is FOR, where the caller knows it and the record
@@ -766,7 +768,7 @@ function enginePreferenceReason(choice: TransportReading): string {
  * the session on the record -- which is the sentence the pane needs, not a
  * control it has to disable for reasons it invents.
  */
-function engineVehicleNode(root: string): Node {
+function engineVehicleNode(root: string | null): Node {
   const reading = installedEngines();
   const present = reading.engines.filter((entry) => entry.path !== null);
   const inFlight = orchestratorOf(root, "none").engine;
@@ -810,7 +812,7 @@ function engineVehicleNode(root: string): Node {
  * work and changed nothing. What the two roles differ in is what they may
  * not BE; how they are reached is one question.
  */
-function reviewingVehicleNode(config: RouterConfig, root: string): Node {
+function reviewingVehicleNode(config: RouterConfig, root: string | null): Node {
   // The ROOT this reading was asked about, not wherever this process is
   // standing. `explainTransport` and its reviewing twin fall back to
   // `projectRoot()`, which is the cwd's repository -- so a reading taken for
@@ -975,8 +977,15 @@ function unreadTransports(config: RouterConfig, engines: EngineReading): string[
   return unread;
 }
 
+/**
+ * What a session in `root` would be run with, or -- with root null -- what
+ * THIS MACHINE's defaults are: its preferences over the distribution's
+ * defaults, with no flag, no checkout and no ledger. Null is a reading of
+ * its own, so a settings file in the directory this process stands in
+ * decides nothing.
+ */
 export function configurationNode(
-  root: string,
+  root: string | null,
   options: ConfigurationReadingOptions = {},
 ): Node {
   let config: RouterConfig;

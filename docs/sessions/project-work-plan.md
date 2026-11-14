@@ -367,6 +367,12 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 327 | Release 3.32.5 (release: 3.32.5) | yes | 2026-11-12 |
 | 328 | Set Up New Project asks which branch, in a repository that already has one | no | 2026-11-12 |
 | 329 | Release 3.33.0 (release: 3.33.0) | yes | 2026-11-12 |
+| 330 | Configuration before any folder, and buttons that say what a person has | no | 2026-11-14 |
+| 331 | Release 3.34.0 (release: 3.34.0) | — | not declared |
+| 332 | A document is walked to a close, on the framework as it is | — | not declared |
+| 333 | A script repository is read as code and walked to a close | — | not declared |
+| 334 | The first two sessions ask what is being made | — | not declared |
+| 335 | Release 3.35.0 (release: 3.35.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3772,3 +3778,16 @@ Let Set Up New Project put the framework's files on a branch of their own in a r
 **Releasable: yes.**
 
 Release 3.33.0: the framework packs and publishes what is on the trunk.
+
+### Session 330 — Configuration before any folder, and buttons that say what a person has
+
+**Releasable: no.**
+
+Make the Configuration reachable before any folder is open, and make the set-up buttons say what a person has. The router's configuration reading (`configurationNode`) accepts no repository: with root null the flag and checkout layers are absent, no ledger is read, and it reports this machine's preferences over the distribution's defaults with the catalog as it stands -- never the cwd's or the home folder's settings file. `configure` accepts `mine` with no repository and writes only the machine's preferences; no repository without `mine` is refused. With no workspace root the Solution Explorer renders the Configuration root alone, labelled as this machine's defaults, watches the user-level configuration files and runs the unread-catalog reading as it does with a folder; each Configuration command then writes with `mine` and no repository, rows with no machine default are left out, and the label and toast say in one sentence what a machine default is (it applies where a repository has no choice of its own and does not replace one already saved there). The Solution Explorer's welcome is deleted and the Work Explorer's carries the buttons: with no folder, Set Up New Project then Open Existing Folder or Repository (a new command asking for a folder on this machine or a repository to clone and handing each to `vscode.openFolder` / `git.clone`); with a folder that is not set up, Set Up Dabbler in This Folder, which the first-run toast's button also says. The extension README's Get started, the quick start and the guide's Configuration page begin with the Configuration and no folder; version.json goes to 3.34.0, stamped, with a changelog section.
+
+**Amended after acceptance:**
+
+- 2026-11-14 — step 'machine-reading': its files: An explicit null root now means no checkout; route.ts passed repoRoot ?? null to mean the working directory, so it must pass undefined to keep its behaviour. (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-14 — step 'configure-machine-only': its files: The extension reaches configure through the router contract and the in-process router, which build the CLI argv; a configure with no repository needs both to carry it. (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-14 — step 'pane-without-folder': its files: The pane's Mechanic rows read mechanicChoicesIn and the unread-catalog reading runs unreadCatalogReader, both in configurationCommands.ts; each returns early with no folder and must read the machine instead. (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-14 — step 'pane-without-folder': its files: The provider test paints the Configuration row, whose icon carries a ThemeColor; the vscode stub had no ThemeColor, so it gains the one-line class. (claude-code (anthropic, claude-opus-5-5))

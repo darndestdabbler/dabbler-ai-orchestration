@@ -138,7 +138,8 @@ export function userConfigurationDirs(): string[] {
 }
 
 export function solutionConfiguration(
-  repoRoot: string,
+  /** The repository, or null for this machine's defaults alone: no folder is open. */
+  repoRoot: string | null,
   /**
    * What the caller knows that the record does not say yet -- the engine a
    * launch is ABOUT to use, most often. Without it the reading answers for

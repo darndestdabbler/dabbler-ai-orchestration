@@ -39,18 +39,21 @@ a prompt at its first newline. If you already have it, `npm uninstall -g
 @github/copilot` first. The Solution Explorer's Vehicle row says which one
 this machine has, and says so when it has no engine CLI at all.
 
-**In VS Code, the Configuration comes first.** Open the folder and the
-Solution Explorer shows its **Configuration** section before any project
-exists: the authoring AI's vehicle and model, and who reviews it. Set them
-there before setting the project up. A machine that has never read its
-Copilot seat or its vendors' model lists reads them itself the first time
-the section is shown — `dabbler discovery refresh`, free, with no prompt
-sent — so there is a list to choose a model from.
+**In VS Code, the Configuration comes first, before any folder.** Click the
+Dabbler AI Orchestration icon with no folder open and the Solution Explorer
+shows its **Configuration** section as this machine's defaults: the
+authoring AI's vehicle and model, and who reviews it. A machine default
+applies wherever a repository has no choice of its own, and it does not
+replace a choice already saved in one. Set them there first, and every
+project set up on this machine starts from them. A machine that has never
+read its Copilot seat or its vendors' model lists reads them itself the
+first time the section is shown — `dabbler discovery refresh`, free, with
+no prompt sent — so there is a list to choose a model from.
 
-![The Dabbler AI Orchestration views before a folder is open: the Solution
-Explorer explains that it shows the Configuration first and offers Open
-Folder; the Work Explorer says nothing has run here yet and offers Set Up
-New Project.](guide/media/first-1-empty.png)
+The Work Explorer then offers **Set Up New Project** and **Open Existing
+Folder or Repository** — a folder on this machine, or a repository VS Code
+clones for you. A folder that is not set up offers **Set Up Dabbler in
+This Folder**.
 
 ## 1. Bootstrap a project
 

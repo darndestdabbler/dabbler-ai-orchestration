@@ -267,7 +267,12 @@ export interface DepsVerbs {
  * `session start` takes it as an argument, so its default belongs to the
  * surface that offers to start one rather than to the router's config.
  */
-export interface ConfigureOptions extends RepositoryTarget {
+export interface ConfigureOptions extends Omit<RepositoryTarget, "repoRoot"> {
+  /**
+   * The checkout, or null for none: a choice made before any folder is
+   * open, which is this machine's default and is accepted only with `mine`.
+   */
+  readonly repoRoot: string | null;
   /**
    * The engine the next session is offered, written to the USER-level
    * preferences beside the catalog. It lived in an editor setting, where

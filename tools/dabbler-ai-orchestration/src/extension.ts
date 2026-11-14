@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import * as os from "os";
 import * as path from "path";
 import { registerOpenFileCommands } from "./commands/openFile";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
@@ -44,6 +43,7 @@ import {
   createRepository,
   identifyRemote,
   locateRepository,
+  openExistingFolderOrRepository,
   openRepository,
   openRepositoryInNewWindow,
   openSolutionWorkspace,
@@ -63,6 +63,9 @@ import {
 } from "./commands/configurationCommands";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 import { productionRouter, solutionConfiguration } from "./router/host";
+
+/** The set-up offer for a folder that is not set up: the welcome's button and the toast's say the same. */
+const SET_UP_THIS_FOLDER = "Set Up Dabbler in This Folder";
 
 export function activate(context: vscode.ExtensionContext): void {
   // Activation must NOT bail when no folder is open: the bootstrap and
@@ -113,10 +116,10 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   // First-run on-ramp: the first time the view becomes visible in a
-  // workspace with no session sets at all, offer to run Set Up New
-  // Project — one confirmation prompt, once per window, never silently.
-  // A declined offer stays declined for this window; the command remains
-  // in the palette.
+  // workspace with no session sets at all, offer to set it up -- the same
+  // command and the same label as the Work Explorer's welcome -- in one
+  // confirmation prompt, once per window, never silently. A declined offer
+  // stays declined for this window; the command remains in the palette.
   let setupOffered = false;
   const maybeOfferSetup = async (): Promise<void> => {
     if (setupOffered || !treeView.visible) return;
@@ -131,10 +134,10 @@ export function activate(context: vscode.ExtensionContext): void {
       "This workspace has no Dabbler sessions yet. Set it up now? " +
         "Nothing is installed: this writes the guidance files, the ignore " +
         "rule and the first two sessions, and commits them.",
-      "Set Up New Project",
+      SET_UP_THIS_FOLDER,
       "Not Now",
     );
-    if (choice === "Set Up New Project") {
+    if (choice === SET_UP_THIS_FOLDER) {
       void vscode.commands.executeCommand("dabbler.setupNewProject");
     }
   };
@@ -146,9 +149,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // A machine with no engine CLI is told now, once per window, rather than
   // by the first session that fails for it. With no folder open the reading
-  // is taken from the home directory: what is on PATH is the machine's.
+  // is the machine's own: what is on PATH is the machine's.
   void warnWhenNoEngine(
-    solutionConfiguration(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.homedir()),
+    solutionConfiguration(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null),
   );
 
   // --- File watchers ---
@@ -289,6 +292,9 @@ export function activate(context: vscode.ExtensionContext): void {
         productionRouter(),
         vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
       ),
+    ),
+    vscode.commands.registerCommand("dabbler.openExistingFolderOrRepository", () =>
+      openExistingFolderOrRepository(),
     ),
     vscode.commands.registerCommand(
       "dabblerSolution.openRepository",

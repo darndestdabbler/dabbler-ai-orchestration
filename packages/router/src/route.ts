@@ -1096,9 +1096,11 @@ async function routeLive(
   // reached, and the auxiliary's separate vehicle was state no surface could
   // show or set. A generator that declares its own is still dispatched over
   // it, which is the config-tier answer `explainRoleTransport` gives.
+  // A repository not named is the working directory's: to the readers, null
+  // would mean no checkout at all.
   const vehicle = REVIEWING_ROLES.has(role)
-    ? explainReviewingTransport(config, options.transport ?? null, options.repoRoot ?? null)
-    : explainRoleTransport(config, role, options.transport ?? null, options.repoRoot ?? null);
+    ? explainReviewingTransport(config, options.transport ?? null, options.repoRoot ?? undefined)
+    : explainRoleTransport(config, role, options.transport ?? null, options.repoRoot ?? undefined);
   const transportName = vehicle.transport;
   // The caller's exclusion, used both to build the ladder and to re-assert
   // immediately before the wire. It ALWAYS applies: a selection narrows the

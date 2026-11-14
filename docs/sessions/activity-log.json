@@ -13281,6 +13281,45 @@
       "dateTime": "2026-11-12T15:11:54.778000-05:00",
       "task": "Release 3.33.0: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 330,
+      "dateTime": "2026-11-14T06:53:31.122000-05:00",
+      "task": "Make the Configuration reachable before any folder is open, and make the set-up buttons say what a person has. The router's configuration reading (`configurationNode`) accepts no repository: with root null the flag and checkout layers are absent, no ledger is read, and it reports this machine's preferences over the distribution's defaults with the catalog as it stands -- never the cwd's or the home folder's settings file. `configure` accepts `mine` with no repository and writes only the machine's preferences; no repository without `mine` is refused. With no workspace root the Solution Explorer renders the Configuration root alone, labelled as this machine's defaults, watches the user-level configuration files and runs the unread-catalog reading as it does with a folder; each Configuration command then writes with `mine` and no repository, rows with no machine default are left out, and the label and toast say in one sentence what a machine default is (it applies where a repository has no choice of its own and does not replace one already saved there). The Solution Explorer's welcome is deleted and the Work Explorer's carries the buttons: with no folder, Set Up New Project then Open Existing Folder or Repository (a new command asking for a folder on this machine or a repository to clone and handing each to `vscode.openFolder` / `git.clone`); with a folder that is not set up, Set Up Dabbler in This Folder, which the first-run toast's button also says. The extension README's Get started, the quick start and the guide's Configuration page begin with the Configuration and no folder; version.json goes to 3.34.0, stamped, with a changelog section.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 330,
+      "dateTime": "2026-11-14T06:55:59.811000-05:00",
+      "what": "step 'machine-reading': its files",
+      "reason": "An explicit null root now means no checkout; route.ts passed repoRoot ?? null to mean the working directory, so it must pass undefined to keep its behaviour.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 330,
+      "dateTime": "2026-11-14T06:59:36.199000-05:00",
+      "what": "step 'configure-machine-only': its files",
+      "reason": "The extension reaches configure through the router contract and the in-process router, which build the CLI argv; a configure with no repository needs both to carry it.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 330,
+      "dateTime": "2026-11-14T07:03:51.423000-05:00",
+      "what": "step 'pane-without-folder': its files",
+      "reason": "The pane's Mechanic rows read mechanicChoicesIn and the unread-catalog reading runs unreadCatalogReader, both in configurationCommands.ts; each returns early with no folder and must read the machine instead.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 330,
+      "dateTime": "2026-11-14T07:06:31.638000-05:00",
+      "what": "step 'pane-without-folder': its files",
+      "reason": "The provider test paints the Configuration row, whose icon carries a ThemeColor; the vscode stub had no ThemeColor, so it gains the one-line class.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

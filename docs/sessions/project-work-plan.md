@@ -368,7 +368,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 328 | Set Up New Project asks which branch, in a repository that already has one | no | 2026-11-12 |
 | 329 | Release 3.33.0 (release: 3.33.0) | yes | 2026-11-12 |
 | 330 | Configuration before any folder, and buttons that say what a person has | no | 2026-11-14 |
-| 331 | Release 3.34.0 (release: 3.34.0) | — | not declared |
+| 331 | Release 3.34.0 (release: 3.34.0) | yes | 2026-11-14 |
 | 332 | A document is walked to a close, on the framework as it is | — | not declared |
 | 333 | A script repository is read as code and walked to a close | — | not declared |
 | 334 | The first two sessions ask what is being made | — | not declared |
@@ -3791,3 +3791,9 @@ Make the Configuration reachable before any folder is open, and make the set-up 
 - 2026-11-14 — step 'configure-machine-only': its files: The extension reaches configure through the router contract and the in-process router, which build the CLI argv; a configure with no repository needs both to carry it. (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-14 — step 'pane-without-folder': its files: The pane's Mechanic rows read mechanicChoicesIn and the unread-catalog reading runs unreadCatalogReader, both in configurationCommands.ts; each returns early with no folder and must read the machine instead. (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-14 — step 'pane-without-folder': its files: The provider test paints the Configuration row, whose icon carries a ThemeColor; the vscode stub had no ThemeColor, so it gains the one-line class. (claude-code (anthropic, claude-opus-5-5))
+
+### Session 331 — Release 3.34.0 (release: 3.34.0)
+
+**Releasable: yes.**
+
+Release 3.34.0: the framework packs and publishes what is on the trunk.

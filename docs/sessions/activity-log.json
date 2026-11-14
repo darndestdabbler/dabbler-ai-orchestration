@@ -13320,6 +13320,13 @@
       "what": "step 'pane-without-folder': its files",
       "reason": "The provider test paints the Configuration row, whose icon carries a ThemeColor; the vscode stub had no ThemeColor, so it gains the one-line class.",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 331,
+      "dateTime": "2026-11-14T07:26:19.302000-05:00",
+      "task": "Release 3.34.0: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

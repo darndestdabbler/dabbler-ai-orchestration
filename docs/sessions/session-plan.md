@@ -19723,6 +19723,15 @@ says what was walked, each finding, and for each whether it was fixed
 here, is planned as a session, or is a limit to state in the
 documentation. Session 334 is written from this page.
 
+The page also carries a second list, kept through steps 1 to 3: every
+thing the walk needed that a person who is not a developer would not have
+or would not know. Installing an engine CLI, a key or a seat, git and a
+remote, a terminal, Markdown, reading a diff, the vocabulary on screen.
+The operator asked on 2026-11-14 whether VS Code is the right interface
+for this kind of work at all, and whether such a person needs a simpler
+one. That is decided from this list, after the walk, and not before it:
+the list says whether the obstacle is the editor or everything under it.
+
 **Step 5 -- fix what is small.** A stop whose fix is small and plainly the
 framework's -- a sentence that assumes code -- is fixed here, with its
 test. Anything that needs a design -- handing the reviewer the brief and
@@ -20007,7 +20016,10 @@ answer" as though every plan had modules.
 the extension's README say in one short paragraph what the framework is
 used for, and claim only what sessions 332 and 333 walked: programs,
 scripts included, and plain-text documents kept in Markdown, with the
-limits the walks found. Session 1's question may name a novel or
+limits the walks found. The reader it is written for is a person who
+already works in VS Code and with git: a developer or a technical writer
+who also has a procedure or a specification to write. Nothing says it is
+ready for a person who is not one. Session 1's question may name a novel or
 legislation; the public pages do not, until somebody has taken one to a
 close. `version.json` goes to 3.35.0 (a minor: the first sessions ask a
 new question), stamped with `npm run stamp:version`, and the changelog's

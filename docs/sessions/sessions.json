@@ -6545,9 +6545,9 @@
     {
       "number": 330,
       "title": "Configuration before any folder, and buttons that say what a person has",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-14T06:49:33.406000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-14T07:21:40.463000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

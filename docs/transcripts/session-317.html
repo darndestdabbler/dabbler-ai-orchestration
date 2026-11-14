@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 317 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 317 transcript</h1>
+<p class="stamp">Rendered 2026-11-11T14:41:51.952Z by dabbler-ai-router 3.32.1 at 1ac3314c38b0f6e104ca1e751ad2f1b986014341.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-11T09:36:37.385-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 317 of 322: The reviewing vehicle's row warns only when something is wrong</h3>
+<p>Scope: <code>tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts</code>, <code>tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts</code>, <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes, <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> The operator's report, 2026-11-11, on 3.32.1: the Vehicle row under Reviewing AI shows a warning mark that nothing clears. Choosing a vehicle on the row does not clear it, and neither does reloading the window.</p>
+<p>The cause is in how the row is drawn. <code>descriptorFor</code> adds the mark to a Vehicle row whenever any layer below the deciding one names a value. For the reviewing vehicle one always does: the configuration the distribution ships names <code>transport.profile</code>, so every repository's row has at least one layer underneath, and the mark is on every reviewing Vehicle row on every machine. A repository that names its own vehicle, over a machine default that agrees with it, shows the mark for doing exactly what the product asks. The authoring Vehicle row has no shipped layer under it, which is why the same rule leaves it clean.</p>
+<p>The mark was added when a persisted environment variable could override a person's choice with no surface able to show it. That variable is retired. What remains under a choice is the machine's default and the shipped default, and one layer overriding the next is how the layers are meant to work. It is not something for a person to fix.</p>
+<p>The report also says the tooltip called the choice the machine's default after the repository had named one. That was not reproduced: read on the reporter's repository with <code>dabbler.reviewerTransport</code> set, the router answers that the checkout decided, and the pane draws its row from that reading. Step 2 settles it on the running extension.</p>
+<p><strong>What.</strong></p>
+<p><strong>Step 1 -- the mark.</strong> A Vehicle row no longer carries a warning mark because a lower layer names a value. Its description is the vehicle and whose choice it is, and nothing else. The tooltip keeps every line it has: what decided, and each layer it overrides with that layer's value. The mark for the npm Copilot shim on the authoring row stays, because that one is a fault a person can fix.</p>
+<p><strong>Step 2 -- the row on a repository that names its vehicle.</strong> With <code>dabbler.reviewerTransport</code> in the checkout's settings, a machine default and the shipped default beneath it, the row reads <code>api · this repository</code> and its tooltip says the choice is this repository's. The existing test of the Vehicle row is extended to that case, drawn from the reading the router gives for such a repository. The operator sees the row itself on 3.32.2 when retaking the screenshot; a pane that still names the machine there is a defect of its own and a session of its own.</p>
+<p><strong>Step 3 -- the number.</strong> <code>version.json</code> goes to 3.32.2, stamped with <code>npm run stamp:version</code> -- a patch: one row drawn correctly. The changelog's 3.32.2 section says the reviewing Vehicle row no longer shows a warning for an ordinary choice.</p>
+<p><strong>Non-goals.</strong> A new mark for a different condition on this row: none is added until an incident asks for one. Any change to how the layers are read, or to <code>dabbler configuration explain</code>. The marks on the model rows, which report a selection the vehicle does not list or a reviewer from the author's own provider. Retaking the operator's screenshot, which is theirs to do on the released build.</p>
+<p><strong>Tests.</strong> No test is added. The Vehicle row's existing test in <code>solutionTreeModel.test.ts</code> changes with the behaviour: a row with layers beneath its choice carries no mark and still lists them in its tooltip.</p>
+<p><strong>Releasable.</strong> Yes -- as 3.32.2 in session 318.</p>
+<h2>Work Plan</h2>
+<p>Stop the Vehicle rows in the Configuration pane from carrying a warning mark merely because a layer beneath the deciding one names a value: in descriptorFor's configVehicle case, the description is the vehicle and whose choice it is, the icon takes no attention tone for shadowed layers, and the tooltip keeps every line it has (what decided, and each overridden layer with its value). The npm Copilot shim mark on the authoring row stays. The existing reviewing Vehicle row test is extended to a repository that names dabbler.reviewerTransport over a machine default and the shipped default: the row reads 'api · this repository', carries no mark, says in its tooltip that the choice is this repository's, and still lists the layers it overrides. Then version.json goes to 3.32.2, stamped with npm run stamp:version, and the changelog gains a 3.32.2 section saying the reviewing Vehicle row no longer warns for an ordinary choice.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/8559e78be271a334d50c8b64190ae221c49ba581"><code>8559e78be271a334d50c8b64190ae221c49ba581</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Vehicle row mark</td><td><p>In tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts, configVehicle case: drop the ' ⚠' appended to the description when lower layers exist, and drop shadowed layers from the condition that gives the icon the attention tone (the shim keeps it). Keep the tooltip lines listing each overridden layer, and update the comment to state the constraint (a lower layer being overridden is how layers work, not a fault). In solutionTreeModel.test.ts, extend the reviewing Vehicle row test: the vehicle decided by the checkout (decidedLayer checkout) over a machine default and the shipped roles.reviewer.transport layer reads 'api · this repository', has no ⚠ and no attention tone, its tooltip carries the this-repository sentence and still names each overridden layer.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts</span></td><td><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration/tsconfig.json</code></td><td>yes</td></tr>
+<tr><td>Version and changelog</td><td><p>Set version.json to 3.32.2 and run npm run stamp:version so the router and extension manifests and the lockfile carry it. Add a 3.32.2 section at the top of tools/dabbler-ai-orchestration/CHANGELOG.md saying the reviewing Vehicle row no longer shows a warning for an ordinary choice.</p></td><td><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code><br><code>node -e const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');process.exit(t.includes('## [3.32.2]')?0:1)</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>No new mark for a different condition on the Vehicle row.</li><li>No change to how the configuration layers are read, or to dabbler configuration explain.</li><li>No change to the marks on the model rows (a selection the vehicle does not list, or a reviewer from the author's provider).</li><li>No retaking of the operator's screenshot, and no publishing: 3.32.2 is released in session 318.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[14:36:37]</span> <span class="muted">run-started</span> session=317 mode=pull</div>
+<div class="line"><span class="at">[14:36:37]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[14:37:24]</span> <span class="muted">run-resumed</span> session=317 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[14:37:24]</span> <span class="muted">plan-accepted</span> steps=[&quot;vehicle-row-mark&quot;,&quot;version-and-changelog&quot;] non_goals=4</div>
+<div class="line"><span class="at">[14:37:25]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[14:37:25]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=vehicle-row-mark</div>
+<div class="line"><span class="at">[14:38:36]</span> <span class="muted">run-resumed</span> session=317 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:38:40]</span> <span class="muted">check-passed</span> step=vehicle-row-mark argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration/tsconfig.json&quot;]</div>
+<div class="line"><span class="at">[14:38:46]</span> <span class="muted">named-tests-passed</span> step=vehicle-row-mark suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts</div>
+<div class="line"><span class="at">[14:38:46]</span> <span class="muted">report-accepted</span> seq=2 step=vehicle-row-mark files=[&quot;tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts&quot;] notes=Vehicle row drops the overridden-layer mark and attention tone; tooltip keeps every overridden layer; shim mark kept; reviewing Vehicle test extended to a checkout-decided reading over machine and shipped layers</div>
+<div class="line"><span class="at">[14:38:46]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=version-and-changelog</div>
+<div class="line"><span class="at">[14:39:09]</span> <span class="muted">run-resumed</span> session=317 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:39:11]</span> <span class="muted">check-passed</span> step=version-and-changelog argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[14:39:11]</span> <span class="muted">check-passed</span> step=version-and-changelog argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');process.exit(t.includes('## [3.32.2]')?0:1)&quot;]</div>
+<div class="line"><span class="at">[14:39:12]</span> <span class="muted">report-accepted</span> seq=3 step=version-and-changelog files=[&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version.json at 3.32.2, stamped into both manifests and the lockfile; changelog 3.32.2 section added</div>
+<div class="line"><span class="at">[14:39:12]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[14:39:13]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[14:39:13]</span> <span class="muted">job-started</span> name=verification pid=49500 log=.dabbler/runs/s317/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[14:39:46]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s317/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[14:39:46]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[14:39:46]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[14:39:46]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[14:39:46]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=51312 log=.dabbler/runs/s317/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[14:39:47]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s317/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[14:39:47]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[14:39:47]</span> <span class="muted">job-started</span> name=run of record: typescript pid=41108 log=.dabbler/runs/s317/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[14:41:23]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s317/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[14:41:23]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[14:41:23]</span> <span class="muted">job-started</span> name=run of record: extension pid=62596 log=.dabbler/runs/s317/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[14:41:43]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s317/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[14:41:43]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[14:41:46]</span> <span class="muted">landed</span> commit=8559e78be271a334d50c8b64190ae221c49ba581</div>
+<div class="line"><span class="at">[14:41:46]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[14:41:46]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[14:41:46]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[14:41:46]</span> <span class="muted">job-started</span> name=close pid=62020 log=.dabbler/runs/s317/driver/jobs/close.log</div>
+<div class="line"><span class="at">[14:41:51]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s317/driver/jobs/close.log</div>
+<div class="line"><span class="at">[14:41:51]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>2 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** The changed test does not assert the `.vscode\settings.json` overridden-layer line despite including it in the fixture. With that four-layer reading, `descriptorFor` should include all three overridden layers; today’s code does, but a regression dropping only the middle layer would pass this test.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** The visible npm-shim test checks explanatory text but not the retained mark itself. With an authoring Copilot shim, it could additionally assert `description` contains `⚠` and `icon.tone === &quot;attention&quot;`; today’s implementation satisfies both.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>95s</td><td>1493</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>19s</td><td>316</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

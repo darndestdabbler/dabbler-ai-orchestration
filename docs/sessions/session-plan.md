@@ -19538,7 +19538,7 @@ has the checked-out branch, and a changed answer reaches `bootstrap` as
 
 The framework publishes session 328 as 3.33.0 and nothing else.
 
-### Session 330 of 333: Configuration before any folder, and buttons that say what a person has
+### Session 330 of 334: Configuration before any folder, and buttons that say what a person has
 
 Scope: `tools/dabbler-ai-orchestration/package.json` (`viewsWelcome`, the
 command's title, the walkthrough),
@@ -19598,8 +19598,10 @@ runs there as it does with a folder.
 **Step 2 -- every row writes the machine's default.** With no folder, each
 Configuration command writes with `mine` and names no repository;
 `configure` accepts that pair. A row that has no machine default to write
-is left out rather than shown and refused. The toast says the choice is
-this machine's default and that a solution set up from here starts with it.
+is left out rather than shown and refused. The section's label and the
+toast both say what a machine default is, in one sentence: it applies
+where a repository has no choice of its own, and it does not replace a
+choice already saved in one.
 
 **Step 3 -- the buttons, in the Work Explorer.** Once the Configuration
 always shows, the Solution Explorer is never empty and VS Code never shows
@@ -19633,13 +19635,13 @@ change to what `bootstrap` writes. A new command id. Cloning done by
 Dabbler's own code. The Marketplace screenshots. The changelog's earlier
 sections, the transcripts, the field trials, the UAT records and the design
 consults, which say what was true when they were written. The version and
-the changelog's new section: session 332 writes both.
+the changelog's new section: session 333 writes both.
 
 **Tests.** In `solutionTreeProvider.test.ts`: no workspace root renders
 the Configuration root alone, and its label says the defaults are the
 machine's. In `commandFlows.test.ts`: a row chosen with no folder reaches
-`configure` with `mine` and no repository; Open Existing Folder or
-Repository runs the VS Code command for the answer given and nothing on
+`configure` with `mine` and no repository, and the toast says a
+repository's own choice is kept; Open Existing Folder or Repository runs the VS Code command for the answer given and nothing on
 escape. In `actionRegistry.test.ts`: the Work Explorer's welcome offers the
 two buttons with no folder and the one with a folder, and the Solution
 Explorer declares none. In `configure.test.ts`: `mine` with no repository
@@ -19647,12 +19649,13 @@ writes the machine's file and nothing else, and no repository without
 `mine` is refused. In `projection.test.ts`: the reading with no repository
 ignores a settings file in the directory it is run from.
 
-**Releasable.** Yes, as 3.34.0 in session 333.
+**Releasable.** Yes, as 3.34.0 in session 334.
 
-### Session 331 of 333: The first two sessions ask what is being made
+### Session 331 of 334: The first two sessions ask what is being made
 
 Scope: `packages/router/src/bootstrap/templates.ts` (`PLAN_PROMPT`,
-`DECOMPOSITION_PROMPT`, the greenfield pieces of `bootstrapPlan`),
+`DECOMPOSITION_PROMPT`, the greenfield pieces of `bootstrapPlan`, one
+clause of the maintenance session 1 and `MAINTENANCE_PLAN_PROMPT`),
 `packages/router/src/cli/bootstrap.ts` (the hand-off line),
 `packages/router/test/bootstrap.test.ts`,
 `tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts` (the two
@@ -19689,42 +19692,68 @@ The questions live in session 1's own text in the scaffolded
 untracked. Not in `AGENTS.md`: that file is read at the start of every
 session for the life of the repository, and these are asked once.
 
-**Step 1 -- session 1, "Understand the goal and write the plan".** With a
-brief in the prompt or at `docs/planning/brief.md` that already answers
-them, the questions are not asked. Otherwise the session asks the first,
-in these words:
+**Step 1 -- session 1, "Understand the goal and write the plan".** The
+session reads the brief it was given, in the prompt or at
+`docs/planning/brief.md`, says back what it understands, and asks only for
+what the brief leaves open. With no brief it asks the first question, in
+these words:
 
-> What are you making?
+> What are you making? Pick one or more, or say it in your own words.
 >
-> 1. An application or other programming solution.
+> 1. Software: an application, a script, a library, a data analysis.
 > 2. A work document: a policy, legislation, a specification, a standard
 >    operating procedure, a presentation, a research paper.
 > 3. A creative work: a story or a novel, a poem, a screenplay, a blog
 >    post, a podcast episode, a song, a sermon or a lecture, a prayer.
 > 4. Something else. Say what.
 
-and then the second, the same for every answer but its last line:
+and then the second:
 
-> Tell me what you can about it now. Then three things:
+> Tell me what you can about it now, and three things if you have them:
 >
+> - Who is it for, and what would make a first draft useful to them?
 > - Is there material to start from: a specification, documentation, a
 >   plan, a draft, links to related works or ideas? Say where it is.
 > - What is already fixed: a deadline, a length, a form or a house style
->   it must follow? (For an application: a language, a platform or an
->   architecture already decided?)
-> - Would you like to work the idea through together before I plan it?
->   That is usually worth doing.
+>   it must follow? For software, a language, a platform or an
+>   architecture already decided?
 
-A yes to the last is a conversation held in this session, for as long as
-it takes: the session asks, proposes, and is corrected, and writes nothing
-but the brief until the person says the idea is settled. The answers go to
-`docs/planning/brief.md` with the kind of work on its first line, before
-any plan is written. The rule that the substance is the person's stays in
-the same words: no neighbouring directory is searched, and nothing is
-drafted from the folder's name.
+The categories are a prompt and not a boundary: a research paper with
+code in it is two of them, and the plan is shaped by what the person
+said, not by the number they picked.
+
+Refinement is not asked about before the idea has been heard. When the
+person has answered, the session says back what it understood, names what
+is still open, and asks:
+
+> Is this clear enough to plan a first draft, or shall we work on it
+> together first? Working on it first is usually worth it. We can stop
+> and carry on later: I keep what we have agreed, and what is still open,
+> in the brief.
+
+Working on it is a conversation held in this session, across as many
+sittings as it takes: the session asks, proposes and is corrected, and
+writes nothing but the brief until the person says it is clear enough to
+plan. The answers go to `docs/planning/brief.md` with the kind of work on
+its first line, before any plan is written. The rule that the substance is
+the person's stays in the same words: no neighbouring directory is
+searched, and nothing is drafted from the folder's name.
 
 Where the repository already holds a solution or a build file, the first
-question is not asked: the repository has answered it.
+question becomes a confirmation and names what was found: "This folder
+holds a Java application. Is that what we are working on?" The person may
+be writing its operating procedure.
+
+Before any material the person points at is read, the session names the
+authoring AI and the reviewer this repository is configured with, as
+`dabbler configuration explain` reports them, and says in one sentence
+that the material and the drafts made from it are sent to both. It asks
+for nothing and blocks nothing: whether a document may be sent is the
+person's to know, and the sentence is what lets them.
+
+Material in `.docx`, `.pptx` or another binary format is not read as it
+is: the session asks the person to save it into the folder as text or
+Markdown first.
 
 **Step 2 -- the plan takes the shape of the work.**
 `docs/planning/solution-plan.md` keeps its name and carries, for every
@@ -19748,8 +19777,14 @@ for; what this plan drafts and what it defers.
   slides; and how a draft is judged -- against the brief, against the
   source material, and against itself. The work is kept as text files a
   reviewer can read line by line, Markdown unless the person names another
-  text format; a `.docx`, `.pptx` or PDF is produced from them at the end
-  where one is wanted, and is never what a session edits.
+  text format, and the plan says so in as many words: the text files are
+  the authoritative copy. Where the person's office works in Word, the
+  plan names when a Word copy is made -- early, so the template, the
+  headings and the numbering are seen before much is written, and again
+  at each point somebody outside reviews it -- and how: a converter the
+  machine has, or, where it has none, the Markdown preview copied into
+  Word. Changes made in the Word copy come back only by a person bringing
+  them into the text; nothing claims a round trip.
 - **Something else:** the common list above, and the person's own words
   for the parts.
 
@@ -19757,15 +19792,36 @@ for; what this plan drafts and what it defers.
 it challenges modules now -- whether each should exist, and whether what it
 promises is something a reader or a test can check -- and breaks the plan
 into numbered sessions that together produce a draft of the whole work or
-of the component the plan names. Where the plan defers anything, the last
-session it writes is a planning session for what was deferred. The
-skeleton session, the suite it declares, the architecture test, the
+of the component the plan names. Its own text stops calling a session "one
+AI coding session". Where the brief leaves questions open that a
+conversation, a piece of research or a trial would settle, it may plan
+those as the first numbered sessions, each ending in an amended brief, and
+a planning session after them that breaks down the rest: that is how a
+person gets more than one session of working the idea through, and no
+session is renumbered for it. What the plan defers is recorded in it; a
+planning session for the deferred work is written only where the person
+has said what comes next.
+
+Every step still has a check the framework can run, and the text says
+what one is for prose, since the framework refuses a step without one: a
+command that exits 0 when the file exists and carries the sections the
+step was to write, named through an interpreter the machine has
+(`powershell -NoProfile -Command ...`). It proves the draft is there and
+whole. Whether it is any good is the reviewer's to judge, against the
+brief, the material and the plan's own account of how a draft is judged.
+
+The skeleton session, the suite it declares, the architecture test, the
 packaging session and the release sessions are planned where the plan
 names a .NET, Maven or Gradle solution, in today's words; another language
 gets a first session that writes its own build and declares its suite
-where it has either; a document or a creative work gets a first session
-that lays out its files and outline, and no skeleton, suite, packaging or
-release. `DECOMPOSITION_PROMPT` says the same.
+where it has either; a document or a creative work gets no skeleton,
+suite, packaging or release, and its first drafting session writes prose,
+laying out the files as it goes. `DECOMPOSITION_PROMPT` says the same.
+
+The maintenance posture's session 1 reads "its projects, their target
+frameworks or JDKs, their project formats, their build tools"; it gains
+the clause that a repository of scripts has none of those, and is read as
+the scripts and modules it holds and the way each is run.
 
 **Step 4 -- the sentences around them.** The offer that ends set-up, the
 hand-off line `dabbler bootstrap` prints, the walkthrough's second step
@@ -19774,35 +19830,35 @@ and its page, the README, the quick start and
 whether you want to work it through, and stop saying "one module is a fine
 answer" as though every plan had modules.
 
-**Non-goals.** The maintenance posture's two sessions: a repository that
-already holds code is asked what is to change, as now. A `kind` in
-`dabbler.yaml` or anywhere the framework reads: the kind is a line in the
-brief, and no code branches on it. A question asked by Set Up New Solution
-itself. Renaming `solution-plan.md` or `docs/planning/`. Refinement
-sessions inserted between sessions 1 and 2: the conversation is held in
-session 1, and nothing renumbers session 2. Reading, diffing or reviewing
-`.docx`, `.pptx` or any binary format. Templates for particular genres.
-Any change to `detect.ts`, to the suites, or to what a step's checks are:
+**Non-goals.** The maintenance posture's two sessions beyond that one
+clause: a repository that already holds code is asked what is to change,
+as now. A `kind` in `dabbler.yaml` or anywhere the framework reads: the
+kind is a line in the brief, and no code branches on it. A question asked
+by set-up itself, or a text scaffolded per kind: one text, so a person at
+a terminal is asked what a person in VS Code is. Renaming
+`solution-plan.md` or `docs/planning/`. Sessions inserted between 1 and
+2. A confirmation, a setting or a gate about what may be sent to a
+provider: one sentence, said once. Reading, diffing, reviewing or
+converting `.docx`, `.pptx` or any binary format in the framework's own
+code. Templates for particular genres. Any change to `detect.ts`, to the
+suites, to the reviewer's prompt, or to the rule that a step has a check:
 session 332 walks a document to a close and fixes what stops it there.
 
 **Tests.** In `bootstrap.test.ts`: the plan scaffolded into an empty
 folder carries both questions in session 1 and still parses as two
-sessions with their steps; scaffolded over a build file, it leaves the
-first question out and keeps the adoption text; under `maintenance` it is
-what it was. The existing assertions on the .NET and Java text move to the
-branch that names them and are not relaxed.
+sessions with their steps; scaffolded over a build file, it asks the
+confirmation in place of the first question and keeps the adoption text;
+under `maintenance` it names scripts beside projects. The existing
+assertions on the .NET and Java text move to the branch that names them
+and are not relaxed.
 
-**Releasable.** Yes, as 3.34.0 in session 333.
+**Releasable.** Yes, as 3.34.0 in session 334.
 
-### Session 332 of 333: Scripts and prose are read as what they are, and walked to a close
+### Session 332 of 334: A document is walked to a close
 
-Scope: `packages/router/src/bootstrap/detect.ts` (`SOURCE_FILE`),
-`packages/router/test/detect.test.ts`, whatever in `packages/router/src/`
-or `tools/dabbler-ai-orchestration/src/` the two walks show to be stopping
-a session, with the test named after it, `docs/guide/README.md`,
-`tools/dabbler-ai-orchestration/README.md`, `version.json` and the
-manifests `npm run stamp:version` writes,
-`tools/dabbler-ai-orchestration/CHANGELOG.md`
+Scope: whatever in `packages/router/src/` or
+`tools/dabbler-ai-orchestration/src/` the walk shows to be stopping a
+session, with the test named after it
 
 **Why.** Session 331 changes what the first two sessions say. Nobody has
 yet run a session to its close in a repository with no test suite and no
@@ -19810,60 +19866,97 @@ code, and the framework's own account of itself -- checks, suites, a run of
 record, a reviewer reading a diff -- was written about code. The claim that
 a novel use does not choke is a claim until it has been walked.
 
-One thing is known already. Set-up reads a repository's posture from the
-files git tracks, and its list of what counts as source names C#, Java,
-TypeScript, Python and their neighbours and omits PowerShell, R and shell
-scripts. A repository of forty PowerShell modules is read as holding no
-code and is given the sessions for a new solution.
+Two things are known from the source and are not what the walk is for.
+The suite gate already says a repository of documents "has nothing to run
+and is inapplicable, not passed", so no suite is not a stop. And every
+step must declare a check, which session 331's text now explains for
+prose. What is not known is everything between: what the reviewer makes of
+a diff that is prose, what a finding against prose looks like and whether
+the author can answer it, and which sentences the framework prints along
+the way assume code.
+
+**Step 1 -- walk it.** In a scratch folder outside this repository, with
+the router built from this tree: set up, answer session 1 as a person
+writing a two-page standard operating procedure with no material to start
+from, run session 2, and run the first drafting session to its close. That
+session writes prose, not an outline, so the reviewer has a draft to judge.
+No suite is declared at any point. Each stop, and each sentence that
+speaks of code to a person writing a procedure, is a finding.
+
+**Step 2 -- a review that says no.** In the same folder, run the next
+drafting session with a brief the draft plainly does not meet, so the
+reviewer returns findings and the author answers them. The walk is not
+finished until one round of findings against prose has been raised,
+answered and closed.
+
+**Step 3 -- fix what stopped, within a bound.** A stop whose fix is small
+and plainly the framework's -- a sentence that assumes code, a prompt that
+asks a reviewer of prose about tests -- is fixed here, with its test. A
+stop that needs a design is written into this plan as a session of its own
+and is not fixed here; the walk then goes round it by the exits a person
+has, and says which. Where a stop is passed only by a waiver, session 333
+does not say that documents are supported.
+
+**Non-goals.** A reviewer for binary documents. A spell-check, style or
+citation control. A posture for prose. Walking every kind of work the
+first question names: the others are a person's to report.
+
+**Tests.** One per fix step 3 makes, in the file named after what it
+changed. A walk that finds nothing to fix adds none.
+
+**Releasable.** Yes, as 3.34.0 in session 334.
+
+### Session 333 of 334: A script repository is read as code and walked to a close
+
+Scope: `packages/router/src/bootstrap/detect.ts` (`SOURCE_FILE`),
+`packages/router/test/detect.test.ts`, whatever in `packages/router/src/`
+or `tools/dabbler-ai-orchestration/src/` the walk shows to be stopping a
+session, with the test named after it, `docs/guide/README.md`,
+`tools/dabbler-ai-orchestration/README.md`, `version.json` and the
+manifests `npm run stamp:version` writes,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** Set-up reads a repository's posture from the files git tracks,
+and its list of what counts as source names C#, Java, TypeScript, Python
+and their neighbours and omits PowerShell, R and shell scripts. A
+repository of forty PowerShell modules is read as holding no code and is
+given the sessions for a new solution.
 
 **Step 1 -- the source list.** `SOURCE_FILE` gains `.ps1`, `.psm1`,
-`.psd1`, `.r`, `.rmd`, `.qmd`, `.sh`, `.bash`, `.c`, `.h`, `.cpp`, `.hpp`,
-`.swift` and `.dart`. Prose is deliberately not added: a folder of tracked
-Markdown is material to start from, which session 1 now asks about, and
-the maintenance sessions speak of projects and build tools it does not
-have.
+`.psd1`, `.r`, `.rmd`, `.qmd`, `.sh` and `.bash`: the languages the
+operator named. Prose is deliberately not added: a folder of tracked
+Markdown is material to start from, which session 1 now asks about.
 
-**Step 2 -- walk a document.** In a scratch folder outside this
-repository, with the built extension's router: set up, answer session 1 as
-a person writing a two-page standard operating procedure with no material
-to start from, run session 2, and run the first numbered session to its
-close. No suite is declared at any point. Each stop is a finding.
+**Step 2 -- walk a script repository.** A scratch folder outside this
+repository holding a committed PowerShell module and no test: set up,
+confirm `dabbler.yaml` says `posture: maintenance`, and run sessions 1 and
+2 and the first numbered session to its close. Session 1 there is the
+maintenance one, with the clause session 331 gave it.
 
-**Step 3 -- walk a script repository.** A second scratch folder holding a
-committed PowerShell module and no test: set up, confirm the posture reads
-`maintenance`, and run sessions 1 and 2 and the first numbered session to
-its close.
+**Step 3 -- fix what stopped, within the same bound** as session 332's
+step 3.
 
-**Step 4 -- fix what stopped, within a bound.** A stop whose fix is small
-and plainly the framework's -- a sentence that assumes code, a gate that
-demands a suite where none is declared and none is owed -- is fixed here,
-with its test. A stop that needs a design is written into this plan as a
-session of its own and is not fixed here; the walk then goes round it by
-the exits a person has, and says which.
-
-**Step 5 -- the words and the number.** `docs/guide/README.md` and the
+**Step 4 -- the words and the number.** `docs/guide/README.md` and the
 extension's README say in one short paragraph what the framework is used
-for -- programs in any language, documents, creative work -- and that work
-is kept as text a reviewer can read, with `.docx` and its kin produced at
-the end. `version.json` goes to 3.34.0 (a minor: the pane works with no
-folder, and the first sessions ask a new question), stamped with `npm run
-stamp:version`, and the changelog's 3.34.0 section says what sessions 330
-to 332 changed for a person.
+for, claiming only what sessions 332 and 333 walked: programs in any
+language, and documents kept as text a reviewer can read, with a Word copy
+made from them by a person. `version.json` goes to 3.34.0 (a minor: the
+pane works with no folder, and the first sessions ask a new question),
+stamped with `npm run stamp:version`, and the changelog's 3.34.0 section
+says what sessions 330 to 333 changed for a person.
 
 **Non-goals.** Detectors, suites or scaffolding for PowerShell, R, or any
 ecosystem `detect.ts` does not already read: a person declares the suite,
-as the scaffolded `dabbler.yaml` says. A reviewer for binary documents. A
-spell-check, style or citation control. A posture for prose. Walking every
-kind of work the first question names: two walks, and the others are a
-person's to report.
+as the scaffolded `dabbler.yaml` says. Source extensions nobody has asked
+for.
 
 **Tests.** In `detect.test.ts`: a repository whose tracked files are
 PowerShell reads `maintenance`, and one whose tracked files are Markdown
-reads `greenfield`. One test per fix step 4 makes, in the file named after
-what it changed. `npm run check:version` checks the stamp.
+reads `greenfield`. One test per fix step 3 makes. `npm run
+check:version` checks the stamp.
 
-**Releasable.** Yes, as 3.34.0 in session 333.
+**Releasable.** Yes, as 3.34.0 in session 334.
 
-### Session 333 of 333: Release 3.34.0 (release: 3.34.0)
+### Session 334 of 334: Release 3.34.0 (release: 3.34.0)
 
-The framework publishes sessions 330 to 332 as 3.34.0 and nothing else.
+The framework publishes sessions 330 to 333 as 3.34.0 and nothing else.

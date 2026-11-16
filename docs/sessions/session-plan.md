@@ -19538,7 +19538,7 @@ has the checked-out branch, and a changed answer reaches `bootstrap` as
 
 The framework publishes session 328 as 3.33.0 and nothing else.
 
-### Session 330 of 335: Configuration before any folder, and buttons that say what a person has
+### Session 330 of 337: Configuration before any folder, and buttons that say what a person has
 
 Scope: `tools/dabbler-ai-orchestration/package.json` (`viewsWelcome`),
 `tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts`,
@@ -19632,7 +19632,7 @@ changelog's 3.34.0 section says what changed for a person.
 Explorer. Any change to what a choice is or to the layers that decide it:
 a flag, the checkout, the machine, the distribution, and no fifth. Any
 change to what `bootstrap` writes, or to the first two sessions it
-scaffolds: session 334. Cloning done by Dabbler's own code. The
+scaffolds: session 336. Cloning done by Dabbler's own code. The
 Marketplace screenshots.
 
 **Tests.** In `solutionTreeProvider.test.ts`: no workspace root renders
@@ -19652,11 +19652,105 @@ run from. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes, as 3.34.0 in session 331.
 
-### Session 331 of 335: Release 3.34.0 (release: 3.34.0)
+### Session 331 of 337: Release 3.34.0 (release: 3.34.0)
 
 The framework publishes session 330 as 3.34.0 and nothing else.
 
-### Session 332 of 335: A document is walked to a close, on the framework as it is
+### Session 332 of 337: The Work Explorer stops freezing the window
+
+Scope: `tools/dabbler-ai-orchestration/src/utils/projection.ts`
+(`projectionCacheKey`, `taskRecordInputs`),
+`tools/dabbler-ai-orchestration/src/utils/fileSystem.ts` (`discoverRoots`,
+`listGitWorktrees`, `scanRepositories`),
+`tools/dabbler-ai-orchestration/src/providers/WorkExplorerTreeProvider.ts`
+(`refresh`), `tools/dabbler-ai-orchestration/src/extension.ts` (the
+watchers and the poll), `projection.test.ts`, `fileSystem.test.ts`,
+`workExplorerTreeProvider.test.ts` (new), `version.json` and the manifests
+`npm run stamp:version` writes, `tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**An emergency fix, before the walks.** The operator, 2026-11-16: Dabbler
+"seems to be running really slowly", and a Start in
+chromatic-notation-configurator did nothing the first time and took a
+couple of minutes the second. Every session in every repository pays for
+this, and sessions 334 and 335 would walk a framework that freezes the
+window they are walked in. So it comes first, and ships alone as 3.34.1.
+
+**Why.** Measured on this machine, 2026-11-16, from VS Code's own logs:
+
+- Since 2026-11-14, about fifty `UNRESPONSIVE extension host` reports name
+  `darndestdabbler.dabbler-ai-orchestration`, each with a CPU profile saved
+  under `%TEMP%`. Across 53 profiles, 73% of the time attributed to the
+  extension is in one chain: `getChildren > scan > scanRepositories >
+  ProjectionCache.get > projectionCacheKey`.
+- The freezes come every 30 seconds or so, in every open window at once,
+  and last 1 to 8 seconds each. The chromatic window registered session 73
+  at 07:08:26, and its run started at 07:11:11. In between, the window froze
+  for about 40 seconds, in pieces of up to 8.6.
+- The key decides only whether to ask the router again, yet working it out
+  stats five files for every session the repository has ever run: 1,305
+  stats here (580 of them for files that do not exist) and 360 in
+  chromatic, all synchronous on the extension host's one thread. A closed
+  session's records never move, and they are stat'ed on every scan for
+  good, so the cost grows with every session closed. The same sweep takes
+  17 ms in a plain `node`, and 230 to 490 ms in the profiles. Why the host
+  is that much slower is not known, and nothing here depends on knowing.
+- Every scan, and every 30-second poll before it (`bindWatchers`), also
+  runs `git worktree list` through `execFileSync`. That is two blocking git
+  processes per poll per window.
+- Every write to a watched file starts a full scan of its own, with nothing
+  to merge a burst. Starting a session writes in bursts.
+
+**Step 1 -- the key reads what can move.** The key is the four
+sessions-root files, the runs directory's own mtime (a run directory added
+or removed moves it), and the five records of one run: the run the cached
+projection named current, or the highest-numbered run when there is none.
+The number of files it reads no longer depends on how many sessions the
+repository has run. This rests on one constraint, and the session confirms
+it from the writers before relying on it: a closed session's run records
+move only with `sessions.json` or `activity-log.json`, which are in the
+key. A writer that breaks that keeps its file in the key, and the session
+records which one it was.
+
+**Step 2 -- git does not block the window.** `listGitWorktrees` runs git
+asynchronously. Roots are discovered once per poll tick, workspace-folder
+change or explicit refresh, and not once per scan: the poll's watcher
+binding and the scan take the same list.
+
+**Step 3 -- a burst is one scan.** `refresh()` merges the calls that arrive
+within a quarter of a second into one repaint. The explicit refresh
+command, `refresh(true)`, still repaints at once.
+
+**Step 4 -- the number.** `version.json` goes to 3.34.1 (a patch: nothing
+a person does changes, and the window stops freezing), stamped with `npm
+run stamp:version`, and the changelog's 3.34.1 section says so in a
+sentence.
+
+**Non-goals.** The router's in-process projection (`buildProjection`,
+about 6% of the time sampled) and the scan's other readers
+(`currentActivity`, `uncollectedWords`, about 10%). They were measured and
+are left alone; if the logs still show the host unresponsive after this
+release, they get a session of their own. Moving the scan to a worker
+thread. Any change to `dabbler.refreshSeconds` or its default. Explaining
+the Start that did nothing: no trace of it was found (no run directory and
+no write), and if it happens again after this release it becomes a session
+of its own.
+
+**Tests.** In `projection.test.ts`: the key reads the same number of files
+for a repository with three runs as for one with three hundred (counted
+through the injected `statFile`); the key moves when the current run's
+`driver/run.json` moves, and when a run directory is added. In
+`fileSystem.test.ts`: the scan takes the roots it is given and starts no
+git process. In `workExplorerTreeProvider.test.ts`: three `refresh()` calls
+inside the window fire one change, and `refresh(true)` fires at once. `npm
+run check:version` checks the stamp.
+
+**Releasable.** Yes, as 3.34.1 in session 333.
+
+### Session 333 of 337: Release 3.34.1 (release: 3.34.1)
+
+The framework publishes session 332 as 3.34.1 and nothing else.
+
+### Session 334 of 337: A document is walked to a close, on the framework as it is
 
 Scope: `docs/uat/uat-document-walk.md` (new: what was walked and what was
 found), whatever in `packages/router/src/` or
@@ -19674,7 +19768,7 @@ and `round26-*`). Three of them, and both of the stronger pair, said the
 same thing about order: walk a document before the first two sessions'
 text is rewritten, not after. Text scaffolded into a repository stays in
 it for good, so what it says about prose should be what a walk showed and
-not what a plan supposed. So this session comes before session 334 and
+not what a plan supposed. So this session comes before session 336 and
 uses the framework as it stands, with a session plan written by hand for
 the scratch folder.
 
@@ -19721,7 +19815,7 @@ session's record and transcript then say was checked.
 **Step 4 -- what was found, written down.** `docs/uat/uat-document-walk.md`
 says what was walked, each finding, and for each whether it was fixed
 here, is planned as a session, or is a limit to state in the
-documentation. Session 334 is written from this page.
+documentation. Session 336 is written from this page.
 
 The page also carries a second list, kept through steps 1 to 3: every
 thing the walk needed that a person who is not a developer would not have
@@ -19737,10 +19831,10 @@ framework's -- a sentence that assumes code -- is fixed here, with its
 test. Anything that needs a design -- handing the reviewer the brief and
 the sources, a rule for severity on prose, a check the router itself
 provides, a line in the record saying no person has approved a draft -- is
-written into this plan as a session of its own, before session 334, and
+written into this plan as a session of its own, before session 336, and
 is not built here.
 
-**Non-goals.** Any change to the scaffolded sessions 1 and 2: session 334.
+**Non-goals.** Any change to the scaffolded sessions 1 and 2: session 336.
 A reviewer for binary documents. A spell-check, style or citation control.
 Any public statement that documents are supported. Walking legislation, a
 novel or any long work: a two-page procedure, and the page says so.
@@ -19748,10 +19842,10 @@ novel or any long work: a two-page procedure, and the page says so.
 **Tests.** One per fix step 5 makes, in the file named after what it
 changed. A walk that finds nothing small to fix adds none.
 
-**Releasable.** Yes, as 3.35.0 in session 335, where step 5 changed
+**Releasable.** Yes, as 3.35.0 in session 337, where step 5 changed
 anything.
 
-### Session 333 of 335: A script repository is read as code and walked to a close
+### Session 335 of 337: A script repository is read as code and walked to a close
 
 Scope: `packages/router/src/bootstrap/detect.ts` (`SOURCE_FILE`),
 `packages/router/test/detect.test.ts`, `docs/uat/uat-script-walk.md`
@@ -19780,22 +19874,22 @@ and no test framework, and how the session is closed with code and no
 suite: by a suite the person is led to declare, not by a waiver.
 
 **Step 3 -- what was found, written down** in
-`docs/uat/uat-script-walk.md`, as session 332 does for a document.
+`docs/uat/uat-script-walk.md`, as session 334 does for a document.
 
-**Step 4 -- fix what is small,** within the bound of session 332's step 5.
+**Step 4 -- fix what is small,** within the bound of session 334's step 5.
 
 **Non-goals.** Detectors, suites or scaffolding for PowerShell, R, or any
 ecosystem `detect.ts` does not already read: a person declares the suite,
 as the scaffolded `dabbler.yaml` says. Source extensions nobody has asked
-for. Any change to the scaffolded sessions 1 and 2: session 334.
+for. Any change to the scaffolded sessions 1 and 2: session 336.
 
 **Tests.** In `detect.test.ts`: a repository whose tracked files are
 PowerShell reads `maintenance`, and one whose tracked files are Markdown
 or R Markdown reads `greenfield`. One test per fix step 4 makes.
 
-**Releasable.** Yes, as 3.35.0 in session 335.
+**Releasable.** Yes, as 3.35.0 in session 337.
 
-### Session 334 of 335: The first two sessions ask what is being made
+### Session 336 of 337: The first two sessions ask what is being made
 
 Scope: `packages/router/src/bootstrap/templates.ts` (`PLAN_PROMPT`,
 `DECOMPOSITION_PROMPT`, the greenfield pieces of `bootstrapPlan`, one
@@ -19811,7 +19905,7 @@ step), `tools/dabbler-ai-orchestration/media/walkthrough-session.md`,
 the manifests `npm run stamp:version` writes,
 `tools/dabbler-ai-orchestration/CHANGELOG.md`
 
-**Written from the walks.** This session runs after sessions 332 and 333
+**Written from the walks.** This session runs after sessions 334 and 335
 and is amended from `docs/uat/uat-document-walk.md` and
 `docs/uat/uat-script-walk.md` before it starts: where a walk contradicts a
 sentence below, the walk is right and the sentence is changed, with the
@@ -19980,7 +20074,7 @@ has said what comes next.
 Every step still has a check the framework can run, and the text says
 what one is for prose, since the framework refuses a step without one: a
 command that exits 0 when the file exists and carries the sections the
-step was to write. Which command is what session 332 found to run on a
+step was to write. Which command is what session 334 found to run on a
 locked-down machine. The text says what such a check proves and no more:
 the draft is there and has its sections.
 
@@ -20014,7 +20108,7 @@ answer" as though every plan had modules.
 
 **Step 5 -- what is claimed, and the number.** `docs/guide/README.md` and
 the extension's README say in one short paragraph what the framework is
-used for, and claim only what sessions 332 and 333 walked: programs,
+used for, and claim only what sessions 334 and 335 walked: programs,
 scripts included, and plain-text documents kept in Markdown, with the
 limits the walks found. The reader it is written for is a person who
 already works in VS Code and with git: a developer or a technical writer
@@ -20023,7 +20117,7 @@ ready for a person who is not one. Session 1's question may name a novel or
 legislation; the public pages do not, until somebody has taken one to a
 close. `version.json` goes to 3.35.0 (a minor: the first sessions ask a
 new question), stamped with `npm run stamp:version`, and the changelog's
-3.35.0 section says what sessions 332 to 334 changed for a person.
+3.35.0 section says what sessions 334 to 336 changed for a person.
 
 **Non-goals.** The maintenance posture's two sessions beyond that one
 clause: a repository that already holds code is asked what is to change,
@@ -20038,7 +20132,7 @@ converting `.docx`, `.pptx` or any binary format in the framework's own
 code. Templates for particular genres. Rewriting the sessions 1 and 2 of
 a repository already set up. Any change to `detect.ts`, to the suites, to
 the reviewer's prompt, to the record, or to the rule that a step has a
-check: where session 332 found one of those wanting, it is a session of
+check: where session 334 found one of those wanting, it is a session of
 its own, planned before this one.
 
 **Tests.** In `bootstrap.test.ts`: the plan scaffolded into an empty
@@ -20051,8 +20145,8 @@ printed plan prompt does. The existing assertions on the .NET and Java
 text move to the printed guidance and are not relaxed. `npm run
 check:version` checks the stamp.
 
-**Releasable.** Yes, as 3.35.0 in session 335.
+**Releasable.** Yes, as 3.35.0 in session 337.
 
-### Session 335 of 335: Release 3.35.0 (release: 3.35.0)
+### Session 337 of 337: Release 3.35.0 (release: 3.35.0)
 
-The framework publishes sessions 332 to 334 as 3.35.0 and nothing else.
+The framework publishes sessions 334 to 336 as 3.35.0 and nothing else.

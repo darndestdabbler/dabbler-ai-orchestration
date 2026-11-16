@@ -94,6 +94,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const treeProvider = new WorkExplorerTreeProvider(context.extensionUri);
   context.subscriptions.push({ dispose: () => treeProvider.dispose() });
+  // Roots are discovered here and handed on, never by the scan itself:
+  // discovery spawns git, and a scan runs on every watcher event.
+  const initialRoots = discoverRoots();
+  treeProvider.setRoots(initialRoots);
   const treeView = vscode.window.createTreeView(WorkExplorerTreeProvider.viewType, {
     treeDataProvider: treeProvider,
     showCollapseAll: true,
@@ -158,8 +162,7 @@ export function activate(context: vscode.ExtensionContext): void {
   let watcherSubs: vscode.Disposable[] = [];
   let boundRoots = new Set<string>();
 
-  function bindWatchers(): void {
-    const roots = discoverRoots();
+  function bindWatchers(roots: readonly string[]): void {
     const want = new Set(roots.map((r) => r.toLowerCase()));
     if (want.size === boundRoots.size && [...want].every((r) => boundRoots.has(r))) {
       return;
@@ -225,9 +228,11 @@ export function activate(context: vscode.ExtensionContext): void {
   // repository bootstrapped after activation, a second folder or a worktree
   // is not left without one.
   context.subscriptions.push(disposeDabblerTerminals(), watchClosedTerminals());
-  for (const root of discoverRoots()) {
-    if (hasSessionsRoot(root)) openDabblerTerminal(root);
-  }
+  void initialRoots.then((roots) => {
+    for (const root of roots) {
+      if (hasSessionsRoot(root)) openDabblerTerminal(root);
+    }
+  });
 
   // The way back to it. Activation creates the terminal and does not show
   // it, which makes closing it the easiest thing in the world to do by
@@ -236,7 +241,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // run with no sight of what the framework was doing at all.
   context.subscriptions.push(
     vscode.commands.registerCommand("dabbler.showFrameworkTerminal", async (arg: unknown) => {
-      const roots = discoverRoots().filter(hasSessionsRoot);
+      const roots = (await discoverRoots()).filter(hasSessionsRoot);
       const asked = asRepositoryNode(arg)?.repository.root;
       const root =
         asked ??
@@ -251,22 +256,24 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  const refreshAll = () => {
-    bindWatchers();
-    treeProvider.refresh();
+  // One discovery feeds both the watchers and the scan.
+  const rediscover = async (hard = false): Promise<void> => {
+    const roots = await discoverRoots();
+    treeProvider.setRoots(roots);
+    bindWatchers(roots);
+    treeProvider.refresh(hard);
   };
+  const refreshAll = () => void rediscover();
 
   // Defensive: a thrown error from createFileSystemWatcher (e.g. a
   // permission issue on a workspace folder) shouldn't kill activation.
-  try {
-    bindWatchers();
-  } catch (err) {
+  void initialRoots.then(bindWatchers).catch((err) => {
     console.error(
       "[dabbler-ai-orchestration] activation: bindWatchers() threw — " +
         "live refresh may not work; manual refresh still functions.",
       err,
     );
-  }
+  });
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(refreshAll));
   // The backstop behind the file watchers, and now a declared number rather
   // than a literal: a repository whose sessions are minutes long and one
@@ -413,10 +420,7 @@ export function activate(context: vscode.ExtensionContext): void {
         ),
       ),
     ),
-    vscode.commands.registerCommand("dabblerSessionSets.refresh", () => {
-      bindWatchers();
-      treeProvider.refresh(true);
-    }),
+    vscode.commands.registerCommand("dabblerSessionSets.refresh", () => rediscover(true)),
   );
 
   // --- Feature command groups ---

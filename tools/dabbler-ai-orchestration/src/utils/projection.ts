@@ -42,33 +42,54 @@ export const RUNS_REL = path.join(".dabbler", "runs");
  * both, in extension.ts) asked for a fresh one. Measured: `dabbler session
  * next` accepting a step moved nothing in the Work Explorer until the
  * cache aged out on its own.
+ *
+ * ONE run's records, not every run's: `session` (the run the cached
+ * projection named current), or the highest-numbered run when it is null.
+ * The key is computed on the extension host's one thread every scan, and
+ * statting five files per session ever run made it grow with every close.
  */
 export function taskRecordInputs(
   repositoryRoot: string,
+  session: number | null,
   listDir: (p: string) => string[] = readdirOrEmpty,
 ): string[] {
   const runs = path.join(repositoryRoot, RUNS_REL);
-  const inputs: string[] = [];
-  for (const entry of listDir(runs)) {
-    if (!/^s\d+$/.test(entry)) continue;
-    inputs.push(path.join(runs, entry, "step-execution.jsonl"));
-    inputs.push(path.join(runs, entry, "approved-plan.json"));
-    inputs.push(path.join(runs, entry, "rounds.jsonl"));
-    inputs.push(path.join(runs, entry, "driver", "run.json"));
-    inputs.push(path.join(runs, entry, "driver", "plan.json"));
+  let run = session;
+  if (run === null) {
+    for (const entry of listDir(runs)) {
+      const match = /^s(\d+)$/.exec(entry);
+      if (match && (run === null || Number(match[1]) > run)) run = Number(match[1]);
+    }
   }
-  return inputs.sort();
+  if (run === null) return [];
+  const dir = path.join(runs, `s${run}`);
+  return [
+    path.join(dir, "step-execution.jsonl"),
+    path.join(dir, "approved-plan.json"),
+    path.join(dir, "rounds.jsonl"),
+    path.join(dir, "driver", "run.json"),
+    path.join(dir, "driver", "plan.json"),
+  ];
 }
 
+/**
+ * Rests on one constraint: a run that is not the current one moves only
+ * together with `sessions.json` or `activity-log.json`. Every per-run writer
+ * writes the session in flight, and a session's rounds land before its
+ * close writes the ledger. A run added or removed moves the runs
+ * directory's own mtime, which is in the key.
+ */
 export function projectionCacheKey(
   sessionsDir: string,
   repositoryRoot: string,
+  session: number | null = null,
   statFile: (p: string) => number | null = mtimeOrNull,
   listDir: (p: string) => string[] = readdirOrEmpty,
 ): string {
   const files = [
     ...CACHE_INPUTS.map((f) => path.join(sessionsDir, f)),
-    ...taskRecordInputs(repositoryRoot, listDir),
+    path.join(repositoryRoot, RUNS_REL),
+    ...taskRecordInputs(repositoryRoot, session, listDir),
   ];
   return files.map((f) => `${f}=${statFile(f)}`).join("|");
 }
@@ -210,8 +231,9 @@ export class ProjectionCache {
   }
 
   async get(sessionsDir: string, repoRoot: string): Promise<ProjectionResult> {
-    const key = projectionCacheKey(sessionsDir, repoRoot);
     const cached = this.entries.get(sessionsDir);
+    const current = cached?.result.payload?.repository?.currentSession ?? null;
+    const key = projectionCacheKey(sessionsDir, repoRoot, current);
     if (cached && cached.key === key) return cached.result;
     const result = await this.runner(sessionsDir, repoRoot);
     // Only an answer is kept. A failure used to be cached as well, so that

@@ -10,6 +10,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [3.34.1] — 2026-11-16
+
+### Fixed
+
+- **The window no longer freezes every few seconds.** The Work Explorer's
+  refresh used to check every past session's records and run git in a way
+  that blocked VS Code, so every open window paused for up to several
+  seconds on each poll; it now reads only what can change, runs git in
+  the background, and merges a burst of file changes into one repaint.
+
 ## [3.34.0] — 2026-11-14
 
 **The Configuration comes before any folder, and the buttons say what you

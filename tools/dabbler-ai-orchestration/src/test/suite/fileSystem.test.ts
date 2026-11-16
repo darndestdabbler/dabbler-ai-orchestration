@@ -45,12 +45,12 @@ suite("fileSystem: workspace scan", () => {
       "docs/sessions/sessions.json": "{}",
       "docs/sessions/session-plan.md": "# plan",
     });
-    setWorkspaceFolders([root]);
     const projection = makeProjection({
       repository: { totalSessions: 2, sessionsCompleted: 1, currentSession: 2 },
     });
     const scan = await scanRepositories(
       fakeCache({ [sessionsDirOf(root)]: projection }),
+      [root],
     );
     assert.strictEqual(scan.repositories.length, 1);
     const repository = scan.repositories[0];
@@ -66,8 +66,7 @@ suite("fileSystem: workspace scan", () => {
     // state they are in is Python's answer, and guessing it here would
     // be a second implementation of the rule.
     writeFileTree(root, { "docs/sessions/sessions.json": "{}" });
-    setWorkspaceFolders([root]);
-    const scan = await scanRepositories(fakeCache({}));
+    const scan = await scanRepositories(fakeCache({}), [root]);
     assert.strictEqual(scan.repositories.length, 1);
     assert.deepStrictEqual(scan.repositories[0].sessions, []);
     assert.strictEqual(scan.repositories[0].totalSessions, null);
@@ -82,13 +81,13 @@ suite("fileSystem: workspace scan", () => {
     // projection decides what the sessions are and says where they came
     // from.
     writeFileTree(root, { "docs/sessions/session-plan.md": "# plan" });
-    setWorkspaceFolders([root]);
     assert.strictEqual(hasSessionsRoot(root), true);
     const projection = makeProjection({
       repository: { sessionsSource: "plan", totalSessions: 2, sessionsCompleted: 0 },
     });
     const scan = await scanRepositories(
       fakeCache({ [sessionsDirOf(root)]: projection }),
+      [root],
     );
     assert.strictEqual(scan.repositories.length, 1);
     assert.strictEqual(scan.repositories[0].sessionsSource, "plan");
@@ -97,16 +96,39 @@ suite("fileSystem: workspace scan", () => {
 
   test("a folder with neither file contributes no row", async () => {
     writeFileTree(root, { "README.md": "# not a dabbler repository" });
-    setWorkspaceFolders([root]);
     assert.strictEqual(hasSessionsRoot(root), false);
-    const scan = await scanRepositories(fakeCache({}));
+    const scan = await scanRepositories(fakeCache({}), [root]);
     assert.deepStrictEqual(scan.repositories, []);
   });
 
-  test("no workspace folders scans to an empty result", async () => {
-    setWorkspaceFolders([]);
-    const scan = await scanRepositories(fakeCache({}));
-    assert.deepStrictEqual(scan.repositories, []);
+  test("the scan takes the roots it is given and starts no git process", async () => {
+    // Discovery spawns git; the scan runs on every watcher event, so it
+    // must read the roots it is handed and never discover its own. The
+    // workspace names a different folder, which the scan must not read.
+    const other = makeTempDir("dabbler-scan-other-");
+    writeFileTree(root, { "docs/sessions/sessions.json": "{}" });
+    writeFileTree(other, { "docs/sessions/sessions.json": "{}" });
+    setWorkspaceFolders([other]);
+    // The module object itself, not an interop copy, so the stubs are what
+    // the scan would call.
+    const childProcess = process.getBuiltinModule("child_process") as unknown as Record<string, unknown>;
+    const names = ["execFile", "execFileSync", "spawn", "spawnSync", "exec", "execSync"];
+    const saved = names.map((name) => childProcess[name]);
+    let spawned = 0;
+    for (const name of names) {
+      childProcess[name] = () => {
+        spawned += 1;
+        throw new Error(`the scan spawned a process (${name})`);
+      };
+    }
+    try {
+      const scan = await scanRepositories(fakeCache({}), [root]);
+      assert.deepStrictEqual(scan.repositories.map((r) => r.root), [root]);
+    } finally {
+      names.forEach((name, i) => (childProcess[name] = saved[i]));
+      rmrf(other);
+    }
+    assert.strictEqual(spawned, 0);
   });
 });
 

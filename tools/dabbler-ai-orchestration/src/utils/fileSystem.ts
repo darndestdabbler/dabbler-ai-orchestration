@@ -141,19 +141,21 @@ export function hasSessionsRoot(root: string): boolean {
   );
 }
 
-export function listGitWorktrees(cwd: string): string[] {
-  let out: string;
-  try {
-    out = cp.execFileSync("git", ["worktree", "list", "--porcelain"], {
-      cwd,
-      encoding: "utf8",
-      windowsHide: true,
-      maxBuffer: 1024 * 1024,
-      timeout: 5000,
-    });
-  } catch {
-    return [];
-  }
+/**
+ * The worktrees of the repository at *cwd*, or [] where git cannot say.
+ * Asynchronous: this runs on the extension host's one thread, and a
+ * blocking git spawn there froze every window on every poll.
+ */
+export async function listGitWorktrees(cwd: string): Promise<string[]> {
+  const out = await new Promise<string | null>((resolve) => {
+    cp.execFile(
+      "git",
+      ["worktree", "list", "--porcelain"],
+      { cwd, encoding: "utf8", windowsHide: true, maxBuffer: 1024 * 1024, timeout: 5000 },
+      (error, stdout) => resolve(error ? null : stdout),
+    );
+  });
+  if (out === null) return [];
   const paths: string[] = [];
   for (const line of out.split(/\r?\n/)) {
     if (line.startsWith("worktree ")) {
@@ -173,8 +175,11 @@ export function listGitWorktrees(cwd: string): string[] {
  * commit, so two checkouts of one repository genuinely hold two
  * different ledgers — collapsing them would show one checkout's progress
  * under the other's name.
+ *
+ * Discovered once per poll tick, workspace-folder change or explicit
+ * refresh, and handed to the scan and the watchers alike.
  */
-export function discoverRoots(): string[] {
+export async function discoverRoots(): Promise<string[]> {
   const seen = new Set<string>();
   const order: string[] = [];
   // Dedup on the filesystem's own canonical form: realpath collapses
@@ -199,9 +204,8 @@ export function discoverRoots(): string[] {
     path.resolve(f.uri.fsPath),
   );
   for (const folder of folders) add(folder);
-  for (const folder of folders) {
-    for (const worktree of listGitWorktrees(folder)) add(worktree);
-  }
+  const worktrees = await Promise.all(folders.map((folder) => listGitWorktrees(folder)));
+  for (const list of worktrees) for (const worktree of list) add(worktree);
   return order;
 }
 
@@ -261,15 +265,17 @@ export interface ScanResult {
 }
 
 /**
- * The full workspace scan: discover roots, project each one that has a
- * sessions root, and assemble the rows.
+ * The full workspace scan: project each of *roots* that has a sessions
+ * root, and assemble the rows. The roots are the caller's, discovered by
+ * `discoverRoots`; the scan starts no process of its own.
  */
 export async function scanRepositories(
   cache: ProjectionCache,
+  roots: readonly string[],
 ): Promise<ScanResult> {
   const repositories: SessionsRepository[] = [];
   const projectionErrors: Array<{ root: string; error: string }> = [];
-  for (const root of discoverRoots()) {
+  for (const root of roots) {
     if (!hasSessionsRoot(root)) continue;
     const projection = await cache.get(sessionsDirOf(root), root);
     if (!projection.payload && projection.error) {

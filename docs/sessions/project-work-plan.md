@@ -369,10 +369,12 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 329 | Release 3.33.0 (release: 3.33.0) | yes | 2026-11-12 |
 | 330 | Configuration before any folder, and buttons that say what a person has | no | 2026-11-14 |
 | 331 | Release 3.34.0 (release: 3.34.0) | yes | 2026-11-14 |
-| 332 | A document is walked to a close, on the framework as it is | — | not declared |
-| 333 | A script repository is read as code and walked to a close | — | not declared |
-| 334 | The first two sessions ask what is being made | — | not declared |
-| 335 | Release 3.35.0 (release: 3.35.0) | — | not declared |
+| 332 | The Work Explorer stops freezing the window | no | 2026-11-16 |
+| 333 | Release 3.34.1 (release: 3.34.1) | — | not declared |
+| 334 | A document is walked to a close, on the framework as it is | — | not declared |
+| 335 | A script repository is read as code and walked to a close | — | not declared |
+| 336 | The first two sessions ask what is being made | — | not declared |
+| 337 | Release 3.35.0 (release: 3.35.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3797,3 +3799,9 @@ Make the Configuration reachable before any folder is open, and make the set-up 
 **Releasable: yes.**
 
 Release 3.34.0: the framework packs and publishes what is on the trunk.
+
+### Session 332 — The Work Explorer stops freezing the window
+
+**Releasable: no.**
+
+Stop the Work Explorer from freezing the extension host, and stamp it as 3.34.1. The projection cache key stops stat'ing five records for every run the repository has ever had: it reads the four sessions-root files, the runs directory's own mtime, and the five records of one run -- the run the cached projection named current, or the highest-numbered run when there is none -- after confirming from the router's writers that a closed session's run records move only together with sessions.json or activity-log.json (a writer that breaks that keeps its file in the key, and the step's report names it). `git worktree list` runs asynchronously, and roots are discovered once per poll tick, workspace-folder change or explicit refresh, with the poll's watcher binding and the scan taking the same list; the scan no longer discovers roots itself. `refresh()` merges calls inside a quarter of a second into one repaint while `refresh(true)` still repaints at once. version.json goes to 3.34.1, stamped with `npm run stamp:version`, with a one-sentence 3.34.1 changelog section.

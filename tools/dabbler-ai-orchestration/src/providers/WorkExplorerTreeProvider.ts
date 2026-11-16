@@ -25,6 +25,9 @@ import {
   repositoryNodes,
 } from "./workExplorerTreeModel";
 
+/** How long `refresh()` waits to merge a burst of calls into one repaint. */
+export const REFRESH_WINDOW_MS = 250;
+
 export class WorkExplorerTreeProvider
   implements vscode.TreeDataProvider<WorkExplorerNode>, vscode.Disposable
 {
@@ -37,6 +40,12 @@ export class WorkExplorerTreeProvider
   private readonly projectionCache = new ProjectionCache();
   /** Memoised scan for the current refresh generation. */
   private scanPromise: Promise<ScanResult> | null = null;
+  /**
+   * The roots the scan reads, set by whoever discovers them (`setRoots`).
+   * A promise is accepted so the first scan waits for the first discovery
+   * rather than painting an empty view.
+   */
+  private roots: Promise<readonly string[]> = Promise.resolve([]);
   /** Parent links, populated as children are served, so reveal() works. */
   private readonly parents = new WeakMap<object, WorkExplorerNode>();
 
@@ -70,16 +79,46 @@ export class WorkExplorerTreeProvider
   }
 
   public dispose(): void {
+    this.cancelPending();
     this.onDidChangeEmitter.dispose();
+  }
+
+  /** The repository roots the next scan reads. Does not repaint. */
+  public setRoots(roots: readonly string[] | Promise<readonly string[]>): void {
+    this.roots = Promise.resolve(roots);
   }
 
   /**
    * Invalidate the scan generation and repaint. The projection cache
    * survives — it is mtime-keyed, so unchanged repositories stay free —
    * unless `hard` (the explicit refresh command) clears it too.
+   *
+   * Calls inside `REFRESH_WINDOW_MS` of the first are one repaint: a
+   * session start writes its records in a burst, and every watcher event
+   * used to be a full scan of its own. `hard` repaints at once.
    */
   public refresh(hard = false): void {
-    if (hard) this.projectionCache.clear();
+    if (hard) {
+      this.cancelPending();
+      this.projectionCache.clear();
+      this.repaint();
+      return;
+    }
+    if (this.pending) return;
+    this.pending = setTimeout(() => {
+      this.pending = undefined;
+      this.repaint();
+    }, REFRESH_WINDOW_MS);
+  }
+
+  private pending: ReturnType<typeof setTimeout> | undefined;
+
+  private cancelPending(): void {
+    if (this.pending) clearTimeout(this.pending);
+    this.pending = undefined;
+  }
+
+  private repaint(): void {
     this.scanPromise = null;
     this.onDidChangeEmitter.fire(undefined);
   }
@@ -114,7 +153,7 @@ export class WorkExplorerTreeProvider
 
   private scan(): Promise<ScanResult> {
     if (!this.scanPromise) {
-      this.scanPromise = scanRepositories(this.projectionCache);
+      this.scanPromise = this.roots.then((roots) => scanRepositories(this.projectionCache, roots));
     }
     return this.scanPromise;
   }

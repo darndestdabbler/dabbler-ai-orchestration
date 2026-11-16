@@ -6683,9 +6683,9 @@
     {
       "number": 337,
       "title": "The Dabbler Terminal says what is happening",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-16T13:04:47.910000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-16T13:26:49.322000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

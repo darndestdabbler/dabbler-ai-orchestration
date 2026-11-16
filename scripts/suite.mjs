@@ -432,7 +432,7 @@ export function announceCancelled({ cancelled, counted }) {
  * Run a child, stream its output through untouched, and watch the TAP for
  * cancelled tests. Untouched matters: this output is the run of record, and a
  * runner that rewrote it would be recording its own account of the run rather
- * than the run.
+ * than the run. Resolves with the guarded status and the TAP it read.
  */
 function runWatched(program, argv) {
   return new Promise((done) => {
@@ -445,14 +445,60 @@ function runWatched(program, argv) {
     child.stderr.on("data", (chunk) => process.stderr.write(chunk));
     child.on("error", (error) => {
       process.stderr.write(`suite: ${error.message}\n`);
-      done(CANNOT_RUN);
+      done({ status: CANNOT_RUN, tap });
     });
     child.on("close", (status) => {
       const outcome = verdict(tap, status ?? CANNOT_RUN);
       announceCancelled(outcome);
-      done(outcome.status);
+      done({ status: outcome.status, tap });
     });
   });
+}
+
+// --- A long list says how far it has got --------------------------------------
+//
+// One `node --test` over seventy files says nothing until all seventy are
+// done, which is minutes of a run nobody can tell from a hung one. The list
+// runs in batches of whole files, one after another, and each batch's end is
+// one line in the router's own format, so the Dabbler Terminal draws it as
+// one of its own lines. Sequential on purpose: batches side by side would be
+// the one silent run again.
+
+/** Whole files per batch. */
+export const BATCH_FILES = 10;
+
+/** What a TAP stream's summary said for one counter, or 0 where it said nothing. */
+function summaryCount(tap, counter) {
+  const said = new RegExp(`^# ${counter} (\\d+)$`, "m").exec(String(tap));
+  return said === null ? 0 : Number(said[1]);
+}
+
+function clock() {
+  const now = new Date();
+  return [now.getHours(), now.getMinutes(), now.getSeconds()].map((part) => String(part).padStart(2, "0")).join(":");
+}
+
+/**
+ * `tests` in order, `size` whole files at a time, each batch awaited before
+ * the next starts. `runOne(batch)` resolves with `{ status, tap }`; the run's
+ * status is the worst batch's, so one red batch is a red run. `say` is where
+ * the progress lines go.
+ */
+export async function runBatches(tests, runOne, size = BATCH_FILES, say = (line) => process.stdout.write(line)) {
+  let worst = 0;
+  let done = 0;
+  let passed = 0;
+  let failed = 0;
+  for (let at = 0; at < tests.length; at += size) {
+    const batch = tests.slice(at, at + size);
+    const { status, tap } = await runOne(batch);
+    if (status > worst) worst = status;
+    done += batch.length;
+    passed += summaryCount(tap, "pass");
+    failed += summaryCount(tap, "fail");
+    say(`dabbler [${clock()}] suite-batch files=${done}/${tests.length} passed=${passed} failed=${failed}\n`);
+  }
+  return worst;
 }
 
 /** `podman run` of one command in the suite's container, bounded and reaped. */
@@ -488,11 +534,11 @@ function prepareContainer() {
 
 function runContainer(tests) {
   prepareContainer();
-  return runWatched("podman", containerArgv(["node", ...NODE_TEST, ...tests]));
+  return runBatches(tests, (batch) => runWatched("podman", containerArgv(["node", ...NODE_TEST, ...batch])));
 }
 
 function runHost(tests) {
-  return runWatched(process.execPath, [...NODE_TEST, ...tests]);
+  return runBatches(tests, (batch) => runWatched(process.execPath, [...NODE_TEST, ...batch]));
 }
 
 /**

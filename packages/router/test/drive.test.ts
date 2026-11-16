@@ -836,6 +836,70 @@ describe("the step baseline, taken at plan acceptance", () => {
   });
 });
 
+describe("a step's answer, taken up", () => {
+  it("is said before it is judged, with the wait moved off the author", async () => {
+    // Session 334, 2026-11-16: half an hour of checks under a line saying
+    // the author owed the answer the author had already given.
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const owner = `const w=JSON.parse(require('fs').readFileSync(${JSON.stringify(runPath(repo, 1))},'utf8')).waiting;` +
+      "process.exit(w.owner==='job'?0:1)";
+    writeWorkPlan(repo, 1, {
+      schema_version: 1, session_number: 1, task: "Make the widget real.",
+      non_goals: ["Anything the step does not name."],
+      steps: [{ id: "one", ask: "Make it.", files: ["src/widget.py"], checks: [{ argv: ["node", "-e", owner] }] }],
+      recorded_at: "2026-11-16T10:00:00-05:00",
+    });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase: "work", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: [], baseline_tree: null,
+      stop: null, lease_epoch: 1,
+      started_at: "2026-11-16T10:00:00-05:00", updated_at: "2026-11-16T10:00:00-05:00",
+    });
+    await capture(() => sessionNext(sessionsDir, {}));
+    const seq = owedInstruction(repo, 1)?.seq ?? 0;
+    writeFileSync(reportPath(repo, 1), JSON.stringify(report({ seq, step_id: "one", files_changed: [] })));
+    await capture(() => sessionNext(sessionsDir, {}));
+    const said = readDriverEvents(repo, 1).map((event) => event.event);
+    const taken = readDriverEvents(repo, 1).find((event) => event.event === "answer-taken");
+    assert.deepEqual(taken?.fields, { seq, step: "one", status: "done", notes: "made it real" });
+    assert.ok(said.indexOf("answer-taken") < said.indexOf("report-accepted"), said.join(" "));
+    assert.ok(said.includes("report-accepted"), said.join(" "));
+  });
+});
+
+describe("runStepChecks", () => {
+  it("says each check as it starts and as it ends, in order, the second start after the first end", async () => {
+    const repo = tempDir("checks-told-");
+    const restore = gitAnswers([
+      [["read-tree"], {}],
+      [["add"], {}],
+      [["rm"], {}],
+      [["write-tree"], { stdout: "tree" }],
+    ]);
+    try {
+      const config = { run_policy: { check_timeout_seconds: 60 } } as unknown as RouterConfig;
+      const told: string[] = [];
+      await runStepChecks(repo, "widget", [
+        { argv: ["node", "-e", ""] },
+        { argv: ["node", "-e", "process.exit(1)"] },
+      ], "tree", config, {
+        started: (check, index, timeoutSeconds) => told.push(`start ${index} ${check.argv[2]} ${timeoutSeconds}`),
+        ended: (check, run, seconds) =>
+          told.push(`end ${check.argv[2]} ${checkRunGreen(run) ? "passed" : "failed"} ${typeof seconds}`),
+      });
+      assert.deepEqual(told, [
+        "start 0  60",
+        "end  passed number",
+        "start 1 process.exit(1) 60",
+        "end process.exit(1) failed number",
+      ]);
+    } finally {
+      restore();
+    }
+  });
+});
+
 describe("a check that fails", () => {
   it("names the step that declared it when that is another step, and ends with the way past a wrong check", () => {
     // The fix round runs every plan step's checks. An engine whose fix
@@ -903,8 +967,11 @@ describe("a check that fails", () => {
       events.some((event) => event.event === "report-accepted" && event.fields["step"] === "fix-configuration"),
       JSON.stringify(events),
     );
-    assert.ok(events.some((event) => event.event === "check-passed" && event.fields["owner"] === "one"), JSON.stringify(events));
-    assert.ok(!events.some((event) => event.event === "check-failed"), answered.stdout);
+    assert.ok(
+      events.some((event) => event.event === "check-ended" && event.fields["owner"] === "one" && event.fields["outcome"] === "passed"),
+      JSON.stringify(events),
+    );
+    assert.ok(!events.some((event) => event.event === "check-ended" && event.fields["outcome"] === "failed"), answered.stdout);
     assert.match(answered.stdout, /"step_id": "two"/);
   });
 

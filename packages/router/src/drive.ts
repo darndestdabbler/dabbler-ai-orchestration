@@ -1612,6 +1612,15 @@ export function checkFailedRefusal(
 }
 
 /**
+ * Told as each check starts and as it ends, so a step whose checks take
+ * twenty minutes says so as they run rather than all at once after them.
+ */
+export interface CheckObserver {
+  started(check: StepSpec["checks"][number], index: number, timeoutSeconds: number): void;
+  ended(check: StepSpec["checks"][number], run: CheckRun, seconds: number): void;
+}
+
+/**
  * A step's checks in order, each against the tree the one before it ended
  * on: a check is judged on what IT changed, so a read-only check after one
  * that wrote a file passes, and `moved` names what the writer wrote.
@@ -1622,17 +1631,22 @@ export async function runStepChecks(
   checks: StepSpec["checks"],
   reference: string,
   config: RouterConfig,
+  observer?: CheckObserver,
 ): Promise<{ check: StepSpec["checks"][number]; run: CheckRun; moved: string[] }[]> {
   const results: { check: StepSpec["checks"][number]; run: CheckRun; moved: string[] }[] = [];
   let tree = reference;
   for (const [index, check] of checks.entries()) {
     const argv = [...check.argv];
     const declared = makeCheck({ name: `${stepId} check ${index + 1}`, argv, kind: "control" });
+    const timeoutSeconds = timeoutFor(declared, config);
+    observer?.started(check, index, timeoutSeconds);
+    const began = Date.now();
     const run = await executeCheck(repoRoot, declared, argv.join(" "), {
       stage: "driver",
       treeDigest: tree,
-      timeoutSeconds: timeoutFor(declared, config),
+      timeoutSeconds,
     });
+    observer?.ended(check, run, Math.round((Date.now() - began) / 1000));
     const after = run.postTreeDigest ?? tree;
     const moved = run.treeMutated ? (changedPathsBetween(repoRoot, tree, after) ?? []) : [];
     results.push({ check, run, moved });
@@ -2093,6 +2107,48 @@ class Driver {
   private setWaiting(owner: Waiting["owner"], forWhat: string, by: string | null = null): void {
     this.run = { ...this.run, waiting: this.waiting(owner, forWhat, by) };
     this.save();
+  }
+
+  /**
+   * An author's answer, taken up: said before it is judged, and the wait
+   * moved off the author at the same moment. Judging can take as long as
+   * the step's checks do, and a record still naming the author said for all
+   * of it that an answer already given was owed.
+   */
+  private answerTaken(fields: Record<string, unknown>, work: string): void {
+    this.log("answer-taken", fields);
+    this.setWaiting("job", work);
+  }
+
+  /**
+   * A run the framework makes to judge a step -- a check, a suite's named
+   * tests -- said as it starts and as it ends, and waited on as a job is:
+   * the wait names it with its time limit, so `waiting-on` reads how long
+   * it has run against how long it may.
+   */
+  private checkStarted(fields: Record<string, unknown>, work: string, timeoutSeconds: number): void {
+    this.log("check-started", fields);
+    this.setWaiting("job", work, new Date(Date.now() + timeoutSeconds * 1000).toISOString());
+  }
+
+  /** The end of one, and the wait back on the judging it was part of: a finished check is not what is running. */
+  private checkEnded(fields: { readonly step: string } & Record<string, unknown>, run: CheckRun, seconds: number): void {
+    this.log("check-ended", { ...fields, outcome: checkRunGreen(run) ? "passed" : "failed", seconds });
+    this.setWaiting("job", `judging the report of step ${fields.step}`);
+  }
+
+  /** The observer a step's own checks are run under. */
+  private checkObserver(stepId: string): CheckObserver {
+    const fields = (check: StepSpec["checks"][number]) => ({
+      step: stepId,
+      argv: [...check.argv],
+      ...(check.owner ? { owner: check.owner } : {}),
+    });
+    return {
+      started: (check, _index, timeoutSeconds) =>
+        this.checkStarted(fields(check), `check ${check.argv.join(" ")} of step ${stepId}`, timeoutSeconds),
+      ended: (check, run, seconds) => this.checkEnded(fields(check), run, seconds),
+    };
   }
 
   /**
@@ -3387,6 +3443,7 @@ class Driver {
       return;
     }
     let plan = readWorkPlan(this.repoRoot, this.sessionNumber);
+    if (plan !== null) this.answerTaken({ steps: plan.steps.length }, "judging the work plan");
     let reasons: string[] = [];
     while (plan === null) {
       const instruction = await this.converse({
@@ -3400,6 +3457,7 @@ class Driver {
       });
       plan = readWorkPlan(this.repoRoot, this.sessionNumber);
       if (plan !== null) {
+        this.answerTaken({ seq: instruction.seq, steps: plan.steps.length }, "judging the work plan");
         // The schema accepted it; what a schema cannot say may still refuse
         // it. A refused plan is handed back with the judge's own words, and
         // the file is removed so the next answer is judged afresh.
@@ -3740,6 +3798,12 @@ class Driver {
         this.log("instruction-outstanding", { seq: instruction.seq, step: spec.id });
         throw new Awaiting(instruction);
       }
+      if (report !== null) {
+        this.answerTaken(
+          { seq: report.seq, step: report.step_id, status: report.status, notes: report.notes },
+          `judging the report of step ${spec.id}`,
+        );
+      }
       const judged = await this.judge(report, instruction, spec);
       if (judged === "blocked") {
         throw new Stop(
@@ -3784,7 +3848,9 @@ class Driver {
   private async acceptWaivedStep(spec: StepSpec): Promise<void> {
     const tree = snapshotWorktreeTree(this.repoRoot);
     if (tree === null) throw new Stop("engine", "could not snapshot the working tree");
-    const checks = (await runStepChecks(this.repoRoot, spec.id, spec.checks, tree, this.config())).map(
+    const checks = (
+      await runStepChecks(this.repoRoot, spec.id, spec.checks, tree, this.config(), this.checkObserver(spec.id))
+    ).map(
       ({ check, run }) => ({ argv: [...check.argv], green: checkRunGreen(run) }),
     );
     this.run = {
@@ -3837,13 +3903,9 @@ class Driver {
       return [refusal(RULE.configMalformed, configurationRefusal(error))];
     }
 
-    for (const { check, run, moved } of await runStepChecks(this.repoRoot, spec.id, spec.checks, current, config)) {
-      const green = checkRunGreen(run);
-      // The log event and the rule are the same fact, so they are the same
-      // string: a log line saying one thing while the refusal says another
-      // is two names for one failure.
-      this.log(green ? "check-passed" : RULE.checkFailed, { step: spec.id, argv: [...check.argv], ...(check.owner ? { owner: check.owner } : {}) });
-      if (!green) reasons.push(checkFailedRefusal(spec.id, check, run, moved));
+    const observer = this.checkObserver(spec.id);
+    for (const { check, run, moved } of await runStepChecks(this.repoRoot, spec.id, spec.checks, current, config, observer)) {
+      if (!checkRunGreen(run)) reasons.push(checkFailedRefusal(spec.id, check, run, moved));
     }
     if (reasons.length === 0) {
       const contract = contractRefusal(this.repoRoot, this.sessionsDir, this.sessionNumber, postureOf(config));
@@ -3871,14 +3933,17 @@ class Driver {
     const reasons: string[] = [];
     for (const { suite, command } of namedTestCommands(this.repoRoot, config, changed)) {
       const declared = makeCheck({ name: `${stepId} named tests of ${suite}`, command });
+      const timeoutSeconds = timeoutFor(declared, config);
+      const fields = { step: stepId, suite, command };
+      this.checkStarted(fields, `named tests of ${suite} for step ${stepId}`, timeoutSeconds);
+      const began = Date.now();
       const run = await executeCheck(this.repoRoot, declared, command, {
         stage: "driver",
         treeDigest: tree,
-        timeoutSeconds: timeoutFor(declared, config),
+        timeoutSeconds,
       });
-      const green = checkRunGreen(run);
-      this.log(green ? "named-tests-passed" : RULE.checkFailed, { step: stepId, suite, command });
-      if (!green) {
+      this.checkEnded(fields, run, Math.round((Date.now() - began) / 1000));
+      if (!checkRunGreen(run)) {
         reasons.push(
           refusal(
             RULE.checkFailed,
@@ -4334,6 +4399,12 @@ class Driver {
     const findings = Array.isArray(round["findings"]) ? (round["findings"] as Row[]) : [];
     let set = readDispositions(this.repoRoot, this.sessionNumber);
     if (set !== null && set.round !== roundNumber) set = null;
+    if (set !== null) {
+      this.answerTaken(
+        { seq: set.seq, round: roundNumber, dispositions: set.dispositions.length },
+        `judging the dispositions of round ${roundNumber}`,
+      );
+    }
 
     // A stored answer is judged like a new one: a loop resumed after a
     // refusal would otherwise record the same refused dispute again.
@@ -4363,6 +4434,10 @@ class Driver {
             `the answer is \`${instruction.answer_command}\``,
         );
       } else {
+        this.answerTaken(
+          { seq: instruction.seq, round: roundNumber, dispositions: answered.dispositions.length },
+          `judging the dispositions of round ${roundNumber}`,
+        );
         refusals.push(...dispositionRefusals(this.repoRoot, answered));
         // The disputes this set implies are written HERE, before it is
         // accepted: one the ledger refuses refuses the answer with it.
@@ -4657,6 +4732,9 @@ class Driver {
     // Read again at the last moment before each act that cannot be taken
     // back: a cancelled session's work is never added, committed or pushed.
     this.refuseIfEnded();
+    // A commit runs the repository's hooks and a push waits on the network:
+    // each is said as it starts, so neither is a silence in the land.
+    this.log("committing", { subject: message.subject });
     runGit(this.repoRoot, ["add", "-A", "--", "."]);
     // Two `-m`s: git joins them with the blank line a subject and a body
     // are separated by, and quotes nothing on the way.
@@ -4704,6 +4782,7 @@ class Driver {
         const tested = runGit(this.repoRoot, ["rev-parse", "HEAD"]).stdout;
         const base = runGit(this.repoRoot, ["rev-parse", `origin/${trunk}`]).stdout;
         const branch = `candidate/s${this.sessionNumber}`;
+        this.log("pushing", { branch });
         const pushed = runGit(this.repoRoot, ["push", "origin", `HEAD:refs/heads/${branch}`]);
         if (pushed.code !== 0) {
           throw new Stop("land", `the candidate push was refused: ${tail(pushed.stderr, 300)}`);
@@ -4727,6 +4806,7 @@ class Driver {
         this.setPhase("gate-wait");
         return;
       }
+      this.log("pushing");
       pushLanded(this.repoRoot);
     }
     const local = localGateReceipt(this.repoRoot);
@@ -5048,6 +5128,7 @@ class Driver {
     // A page already there is kept, unless it is the cancelled page of a
     // session that was restored and has now closed: one rule, wherever a
     // transcript is written.
+    this.log("transcript-rendering", { carry });
     const page = commitSessionTranscript(this.repoRoot, this.sessionNumber, {
       jobs: carry === "full" ? "all" : "failed",
       sessionsDir: this.sessionsDir,
@@ -5067,6 +5148,7 @@ class Driver {
       // its refusal is a Stop, and this is the one phase that may not stop,
       // so the Stop is caught and said instead.
       try {
+        this.log("pushing", { path: page.path });
         pushLanded(this.repoRoot);
         this.log("transcript-pushed", { path: page.path });
       } catch (error) {

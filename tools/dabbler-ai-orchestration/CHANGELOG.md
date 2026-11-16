@@ -28,6 +28,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   line saying you chose to roll back, and `dabbler session rollback --help`
   says to run it first.
 
+- **The Dabbler Terminal says what is happening while the framework works.**
+  When your AI answers, the terminal says the answer arrived, and the
+  waiting line stops saying the AI owes it and names what the framework is
+  doing instead. Each of a step's checks and each run of its named tests has
+  a line when it starts and another when it ends, passed or failed, with how
+  long it took, and while one runs the waiting line names it with the time it
+  has run against its limit. A long test run prints one line per batch of
+  test files, with how many files are done and how many tests have passed
+  and failed so far. The land's commit and push and the transcript each have
+  a line as they start. Nothing from a check's own output is copied into the
+  terminal: its log still holds it.
+
 ### Changed
 
 - **The answer file you write says whose it is.** The plan and the

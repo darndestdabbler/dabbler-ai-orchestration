@@ -30,6 +30,7 @@ import {
   normalizeLegacyState,
   possiblyStalled,
   readRawLegacyState,
+  renderWaiting,
   sessionsFromPlan,
   synthesizeV3FromV2,
   verificationCap,
@@ -802,5 +803,21 @@ describe("liveness, derived rather than stamped", () => {
     const repo = repository(sessionsDir);
     assert.equal(repo["stalledAfterSeconds"], DEFAULT_STALLED_AFTER_SECONDS);
     assert.equal(repo["possiblyStalled"], false);
+  });
+});
+
+describe("renderWaiting", () => {
+  it("names a running check with how long it has run against its time limit", () => {
+    const said = renderWaiting(
+      {
+        owner: "job",
+        for: "check npm test of step one",
+        since: "2026-11-16T12:00:00Z",
+        by: "2026-11-16T12:10:00Z",
+        last_progress: "2026-11-16T12:00:00Z",
+      },
+      Date.parse("2026-11-16T12:03:05Z"),
+    );
+    assert.equal(said, "Check npm test of step one — 3:05 of 10:00");
   });
 });

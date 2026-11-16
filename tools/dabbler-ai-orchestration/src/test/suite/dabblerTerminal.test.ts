@@ -357,6 +357,38 @@ suite("the Dabbler terminal", () => {
     rmrf(root);
   });
 
+  test("draws an answer taken, a check starting and ending, and a suite's batch in its one line format", () => {
+    // Session 334: half an hour of checks said nothing. These are the lines
+    // that say it now, from the loop's log and from a run of record's job.
+    const { root, driver, terminal, written } = drivenRepo(RUNNING);
+    terminal.open();
+    written.length = 0;
+    fs.writeFileSync(
+      path.join(driver, "jobs", "run-of-record.log"),
+      "dabbler [13:10:12] answer-taken seq=2 step=widget status=done notes=made it real\n" +
+        'dabbler [13:10:12] check-started step=widget argv=["npm","test"]\n' +
+        'dabbler [13:10:40] check-ended step=widget argv=["npm","test"] outcome=passed seconds=28\n' +
+        'dabbler [13:10:41] check-ended step=widget argv=["npm","run","lint"] outcome=failed seconds=1\n' +
+        "TAP version 13\n" +
+        "dabbler [13:11:02] suite-batch files=10/72 passed=180 failed=0\n",
+      "utf8",
+    );
+    terminal.poll();
+    const said = written.map(plain).join("");
+    assert.match(said, /^13:10:12 answer-taken seq=2 step=widget status=done notes=made it real\r?$/m);
+    assert.match(said, /^13:10:12 check-started step=widget argv=\["npm","test"\]\r?$/m);
+    assert.match(said, /^13:10:40 check-ended step=widget argv=\["npm","test"\] outcome=passed seconds=28\r?$/m);
+    assert.match(said, /^13:11:02 suite-batch files=10\/72 passed=180 failed=0\r?$/m);
+    assert.doesNotMatch(said, /dabbler \[/);
+    // The outcome is toned as it is on every other line that carries one.
+    const painted = written.join("");
+    assert.ok(painted.includes(paint("passed", "good", "dark", true)), "a passed check is green");
+    assert.ok(painted.includes(paint("failed", "bad", "dark", true)), "a failed check is red");
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
   test("re-reads the theme when it changes rather than painting the old palette", () => {
     useTheme(vscode.ColorThemeKind.Dark);
     const { root, driver, terminal, written } = drivenRepo(RUNNING);

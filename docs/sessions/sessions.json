@@ -6661,9 +6661,9 @@
     {
       "number": 336,
       "title": "A rollback from a stop offers the report first",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-16T12:22:44.620000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-16T12:36:46.801000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

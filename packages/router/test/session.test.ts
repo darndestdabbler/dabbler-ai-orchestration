@@ -85,7 +85,7 @@ import {
   defectReport,
   type SequenceFacts,
 } from "../src/session.ts";
-import { loopPath, readInstruction, readRepairs, readReport, readRun, recordRepair, writeInstruction, writeRun, writeWorkPlan } from "../src/driver.ts";
+import { dispositionsPath, loopPath, planPath, readInstruction, readRepairs, readReport, readRun, recordRepair, writeInstruction, writeRun, writeWorkPlan } from "../src/driver.ts";
 import { NoCandidateError, setRouteSource } from "../src/route.ts";
 import {
   amendmentEntries,
@@ -1641,6 +1641,121 @@ describe("a report that answers an instruction already replaced", () => {
       assert.equal(driven.code, EXIT_BOUNDARY);
       assert.match(driven.err, /Run `dabbler session wait` again and answer what it prints/);
       assert.doesNotMatch(driven.err, /session next/);
+    } finally {
+      state.restore();
+    }
+  });
+});
+
+// --- An answer file that says whose it is ----------------------------------------
+
+describe("an answer file, which says whose it is", () => {
+  const PLAN_BODY = {
+    task: "Make the widget real.",
+    non_goals: ["Anything the step does not name."],
+    steps: [{ id: "widget", ask: "Make the widget real.", files: ["src/widget.py"], checks: [{ argv: [process.execPath, "-e", "0"] }] }],
+  };
+
+  /** A sandbox with session 1 registered and the instruction `fields` outstanding. */
+  function owing(fields: Record<string, unknown>): { repo: string; sessionsDir: string; restore: () => void } {
+    const state = stateDir();
+    registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+    writeInstruction(state.repo, 1, {
+      schema_version: 1, seq: 1, session_number: 1, issued_at: "2026-11-16T10:00:00-05:00",
+      answer_command: "dabbler session report --seq 1 --answer-file <path>",
+      ...fields,
+    } as Parameters<typeof writeInstruction>[2]);
+    return state;
+  }
+
+  function answerWith(state: { repo: string; sessionsDir: string }, body: unknown): Promise<{ code: number; out: string; err: string }> {
+    const path = join(tempDir("answer-"), "answer.json");
+    writeFileSync(path, JSON.stringify(body), "utf8");
+    return run(() => report(state.sessionsDir, { seq: 1, answerFile: path }));
+  }
+
+  const PLAN_STEP = { kind: "step", step_id: "plan", ask: "Plan session 1.", answer_schema: "driver-work-plan.schema.json" };
+
+  it("refuses a plan that leaves out session_number, naming what to add, and records nothing", async () => {
+    // A leftover file from an earlier session carried no number, and was
+    // declared as this session's plan.
+    const state = owing(PLAN_STEP);
+    try {
+      const answered = await answerWith(state, PLAN_BODY);
+      assert.equal(answered.code, EXIT_USAGE);
+      assert.match(answered.err, /refused -- the answer file does not say whose it is; add "session_number": 1/);
+      assert.equal(existsSync(planPath(state.repo, 1)), false);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("accepts a plan carrying this session's number", async () => {
+    const state = owing(PLAN_STEP);
+    try {
+      const answered = await answerWith(state, { session_number: 1, ...PLAN_BODY });
+      assert.equal(answered.code, EXIT_OK, answered.err);
+      assert.equal(existsSync(planPath(state.repo, 1)), true);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("refuses dispositions carrying another round's number", async () => {
+    const state = owing({
+      kind: "rejection", round: 2, ask: "Dispose of round 2.", reasons: ["[1] blocking: x"],
+      answer_schema: "driver-disposition.schema.json",
+    });
+    try {
+      const answered = await answerWith(state, {
+        session_number: 1, round: 1, dispositions: [{ finding_index: 1, action: "fix" }],
+      });
+      assert.equal(answered.code, EXIT_USAGE);
+      assert.match(answered.err, /round=1, and this session's is 2/);
+      assert.equal(existsSync(dispositionsPath(state.repo, 1)), false);
+    } finally {
+      state.restore();
+    }
+  });
+
+  /** Write `body` to `path` and answer the outstanding plan instruction with it. */
+  function answerFrom(state: { sessionsDir: string }, path: string, body: unknown): Promise<{ code: number; out: string; err: string }> {
+    mkdirSync(join(path, ".."), { recursive: true });
+    writeFileSync(path, JSON.stringify(body), "utf8");
+    return run(() => report(state.sessionsDir, { seq: 1, answerFile: path }));
+  }
+
+  it("removes an accepted answer under .dabbler/scratch/, so a later session cannot answer with it", async () => {
+    const state = owing(PLAN_STEP);
+    try {
+      const path = join(state.repo, ".dabbler", "scratch", "plan-s1.json");
+      const answered = await answerFrom(state, path, { session_number: 1, ...PLAN_BODY });
+      assert.equal(answered.code, EXIT_OK, answered.err);
+      assert.equal(existsSync(path), false);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("leaves an accepted answer anywhere else, because that file is the engine's own", async () => {
+    const state = owing(PLAN_STEP);
+    try {
+      const path = join(tempDir("answer-"), "plan.json");
+      const answered = await answerFrom(state, path, { session_number: 1, ...PLAN_BODY });
+      assert.equal(answered.code, EXIT_OK, answered.err);
+      assert.equal(existsSync(path), true);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("leaves a refused answer under .dabbler/scratch/, to be corrected", async () => {
+    const state = owing(PLAN_STEP);
+    try {
+      const path = join(state.repo, ".dabbler", "scratch", "plan-s1.json");
+      const answered = await answerFrom(state, path, PLAN_BODY);
+      assert.equal(answered.code, EXIT_USAGE);
+      assert.equal(existsSync(path), true);
     } finally {
       state.restore();
     }

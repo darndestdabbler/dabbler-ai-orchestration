@@ -102,6 +102,7 @@ const NAMED = {
 };
 
 const PLAN = {
+  session_number: 1,
   task: "Make widget() return 2.",
   non_goals: ["Anything the step does not name."],
   steps: [
@@ -2150,6 +2151,7 @@ describe("a session rolled back to where it started", () => {
     const planned = await next(sessionsDir);
     assert.equal(await answerPlan(sessionsDir, planned.instruction?.seq ?? 0, {
       ...PLAN,
+      session_number: 2,
       task: "Make widget() return 3.",
       steps: [{ ...PLAN.steps[0], ask: "Make widget() return 3." }],
     }), EXIT_OK);
@@ -2299,7 +2301,7 @@ describe("a session rolled back to where it started", () => {
     assert.equal((await capture(() => Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })))).value, EXIT_OK);
     assert.equal(rows()?.[1]?.["startCommit"], closed);
     const planned = await next(sessionsDir);
-    assert.equal(await answerPlan(sessionsDir, planned.instruction?.seq ?? 0, { ...PLAN, task: "Make widget() return 3." }), EXIT_OK);
+    assert.equal(await answerPlan(sessionsDir, planned.instruction?.seq ?? 0, { ...PLAN, session_number: 2, task: "Make widget() return 3." }), EXIT_OK);
     const step = await next(sessionsDir);
     assert.equal(step.instruction?.step_id, "widget", step.err);
     writeFileSync(join(repo, "src", "widget.py"), WIDGET_V3, "utf8");

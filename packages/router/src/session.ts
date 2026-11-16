@@ -23,6 +23,7 @@ import {
   openSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmSync,
   rmdirSync,
@@ -32,7 +33,7 @@ import {
   writeFileSync,
   writeSync,
 } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import {
   IdentityResolutionError,
@@ -2434,6 +2435,23 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
     );
     return EXIT_BOUNDARY;
   }
+  // An answer says whose it is, so a file left by an earlier session or
+  // round cannot be taken for this one's. A value that disagrees is
+  // stampAnswer's to refuse; one left out is refused here.
+  const owed: Record<string, unknown> = isPlan
+    ? { session_number: target }
+    : { session_number: target, round: instruction.round };
+  if (answer !== null && typeof answer === "object" && !Array.isArray(answer)) {
+    const missing = Object.keys(owed).filter((key) => !(key in answer));
+    if (missing.length > 0) {
+      writeErr(
+        `report: refused -- the answer file does not say whose it is; add ` +
+          `${missing.map((key) => `"${key}": ${JSON.stringify(owed[key])}`).join(" and ")} ` +
+          "to it and answer again.\n",
+      );
+      return EXIT_USAGE;
+    }
+  }
   const stamps: Record<string, unknown> = isPlan
     ? { schema_version: DRIVER_SCHEMA_VERSION, session_number: target, recorded_at: nowIso() }
     : {
@@ -2461,11 +2479,37 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
     writeErr(`report: refused -- ${error.message}\n`);
     return EXIT_USAGE;
   }
+  spendAnswerFile(repoRoot, source);
   writeOut(
     `report: session ${sessionDisplayNumber(target)} seq ${instruction.seq} answered; ` +
       `${summary}; the driver reads it next.\n`,
   );
   return EXIT_OK;
+}
+
+/**
+ * An accepted answer is used once: its file is removed where it lies under
+ * `.dabbler/scratch/`, so a later session cannot answer with it. Both paths
+ * are resolved first, so a link out of that folder is not followed. A file
+ * anywhere else is the engine's own and is left. A removal that fails is
+ * said and does not fail the answer, which is already written.
+ */
+function spendAnswerFile(repoRoot: string, source: string): void {
+  try {
+    const scratch = realpathSync(join(repoRoot, ".dabbler", "scratch"));
+    const real = realpathSync(source);
+    const inside = relative(scratch, real);
+    // Another drive gives an absolute path back rather than one up with "..".
+    if (inside === "" || inside.startsWith("..") || isAbsolute(inside)) return;
+    unlinkSync(real);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return;
+    writeErr(
+      `report: the answer is written, and its file ${source} could not be removed -- ` +
+        `${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
 }
 
 // --- interrupt ---------------------------------------------------------------

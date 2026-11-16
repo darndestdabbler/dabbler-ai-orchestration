@@ -6610,23 +6610,35 @@
         "engine": "framework",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null,
-      "startCommit": "3f4b650050bfe152465964451033dbf301e94ab9",
       "frameworkVersion": "3.34.0",
-      "noChange": true
-    },
-    {
-      "number": 334,
-      "title": "A document is walked to a close, on the framework as it is",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
+      "startCommit": "3f4b650050bfe152465964451033dbf301e94ab9",
       "verificationVerdict": null
     },
     {
+      "number": 334,
+      "title": "A leftover answer file cannot be submitted",
+      "status": "in-progress",
+      "startedAt": "2026-11-16T09:44:55.999000-05:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "a5bea3233f4906977ca638eb95df42495cba18da",
+      "frameworkVersion": "3.34.1",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5.6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
       "number": 335,
-      "title": "A script repository is read as code and walked to a close",
+      "title": "A session's section of the plan is read one way",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,
@@ -6635,7 +6647,7 @@
     },
     {
       "number": 336,
-      "title": "The first two sessions ask what is being made",
+      "title": "A rollback from a stop offers the report first",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,
@@ -6645,6 +6657,42 @@
     {
       "number": 337,
       "title": "Release 3.35.0 (release: 3.35.0)",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 338,
+      "title": "A document is walked to a close, on the framework as it is",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 339,
+      "title": "A script repository is read as code and walked to a close",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 340,
+      "title": "The first two sessions ask what is being made",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 341,
+      "title": "Release 3.36.0 (release: 3.36.0)",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

@@ -532,7 +532,14 @@ describe("a stop the framework can cure", () => {
   it("asks for dispositions naming the inline cap a bare cite is refused over", () => {
     // Sessions 33 and 57 were refused twice each: the ask called the range
     // optional, and the ledger refused a large file cited without one.
-    assert.match(dispositionAsk(2), /A cited file over 16,384 bytes is cited as path:START-END/);
+    assert.match(dispositionAsk(2, 7), /A cited file over 16,384 bytes is cited as path:START-END/);
+  });
+
+  it("names a file of this session and round, and asks the answer to say both", () => {
+    // A leftover file from an earlier round or session was answered as this one's.
+    const ask = dispositionAsk(2, 7);
+    assert.match(ask, /\.dabbler\/scratch\/dispositions-s7-r2\.json/);
+    assert.match(ask, /"session_number": 7, "round": 2/);
   });
 });
 
@@ -1762,6 +1769,31 @@ describe("the plan ask's rule for a non-goal", () => {
     const ask = String(JSON.parse(asked.stdout).ask);
     assert.match(ask, /A non-goal may not exclude what the session's section requires/);
     assert.match(ask, /defer work only to a later session the plan names/);
+  });
+});
+
+describe("the plan ask's answer file", () => {
+  it("names a file of this session's own and asks the plan to carry the session's number", async () => {
+    const { sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+
+    const asked = await capture(() => sessionNext(sessionsDir, {}));
+
+    const ask = String(JSON.parse(asked.stdout).ask);
+    assert.match(ask, /\.dabbler\/scratch\/plan-s1\.json/);
+    assert.match(ask, /session_number {2}1 /);
+    assert.doesNotMatch(ask, /Do not include[^\n]*session_number/);
+  });
+
+  it("says a check changes nothing, so a generator runs as the step's work", async () => {
+    // A staff session was refused twice for a check that regenerated a tracked file.
+    const { sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+
+    const asked = await capture(() => sessionNext(sessionsDir, {}));
+
+    const ask = String(JSON.parse(asked.stdout).ask);
+    assert.match(ask, /one that writes a tracked file is refused, so a generator is run as the step's work and the check proves its output is current/);
   });
 });
 

@@ -371,10 +371,14 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 331 | Release 3.34.0 (release: 3.34.0) | yes | 2026-11-14 |
 | 332 | The Work Explorer stops freezing the window | no | 2026-11-16 |
 | 333 | Release 3.34.1 (release: 3.34.1) | yes | 2026-11-16 |
-| 334 | A document is walked to a close, on the framework as it is | — | not declared |
-| 335 | A script repository is read as code and walked to a close | — | not declared |
-| 336 | The first two sessions ask what is being made | — | not declared |
+| 334 | A leftover answer file cannot be submitted | no | 2026-11-16 |
+| 335 | A session's section of the plan is read one way | — | not declared |
+| 336 | A rollback from a stop offers the report first | — | not declared |
 | 337 | Release 3.35.0 (release: 3.35.0) | — | not declared |
+| 338 | A document is walked to a close, on the framework as it is | — | not declared |
+| 339 | A script repository is read as code and walked to a close | — | not declared |
+| 340 | The first two sessions ask what is being made | — | not declared |
+| 341 | Release 3.36.0 (release: 3.36.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3811,3 +3815,13 @@ Stop the Work Explorer from freezing the extension host, and stamp it as 3.34.1.
 **Releasable: yes.**
 
 Release 3.34.1: the framework packs and publishes what is on the trunk.
+
+### Session 334 — A leftover answer file cannot be submitted
+
+**Releasable: no.**
+
+Make a leftover answer file impossible to submit as this session's answer. The plan ask (`planAsk` in drive.ts) names `.dabbler/scratch/plan-s<N>.json` as its example path and the dispositions ask (`dispositionAsk`, which now takes the session number as well as the round) names `.dabbler/scratch/dispositions-s<N>-r<R>.json`; both stay examples. The plan ask stops forbidding `session_number` and asks for it, and the dispositions ask asks for `session_number` and `round`; `schema_version` and `recorded_at` stay the framework's. `report`'s answer-file branch in session.ts refuses a file that leaves out one of those members, in words that say what to add, and nothing reaches the ledger; one carrying another session's or round's stays refused by `stampAnswer`, unchanged. No clock is read. Once an answer is validated and written into the ledger, its file is removed when its resolved real path lies under this repository's `.dabbler/scratch/` (so a link out of that folder is not followed); a refused answer's file stays to be corrected, a file anywhere else is left, and a removal that fails is said in one line without failing the answer. The plan ask gains one sentence: a check that writes a tracked file is refused, so a generator runs as the step's work and the check proves its output is current. The `--answer-file` help and `docs/driving-a-session.md` say the same, and the tests that answer by file carry the members they now owe.
+
+**Amended after acceptance:**
+
+- 2026-11-16 — step 'answer-says-whose': its checks: walk-session.test.ts whole is ~42 session walks (~1 hour) and timed out as a step check with every finished test green; the step keeps one walk that answers a plan by file, and the whole file runs in the run of record (claude-code (anthropic, claude-opus-5-5))

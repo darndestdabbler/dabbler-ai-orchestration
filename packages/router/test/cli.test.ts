@@ -463,6 +463,7 @@ describe("dabbler session report --next", () => {
     writeFileSync(
       plan,
       JSON.stringify({
+        session_number: 1,
         task: "Make the widget real.",
         non_goals: ["Anything the step does not name."],
         steps: [{ id: "widget", ask: "Make the widget real.", files: ["src/widget.py"], checks: [{ argv: [process.execPath, "-e", "0"] }] }],

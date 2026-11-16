@@ -62,6 +62,7 @@ const TESTING = {
 };
 
 const PLAN = {
+  session_number: 1,
   task: "Make the store real.",
   non_goals: ["Anything the step does not name."],
   steps: [

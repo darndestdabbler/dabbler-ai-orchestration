@@ -199,8 +199,9 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --notes TEXT             one line for the log",
     "  --tests COMMAND          the test command run, when one was",
     "  a work plan or a disposition, when the instruction asked for one:",
-    "  --answer-file PATH       the JSON you wrote, outside the driver's ledger; the",
-    "                           framework validates it and stamps its own members",
+    "  --answer-file PATH       the JSON you wrote, outside the driver's ledger; it",
+    "                           carries session_number (a disposition its round too),",
+    "                           and the framework validates it and stamps its own members",
   ],
   plan: [
     "  --body TEXT              the plan prose; mutually exclusive with --body-file",

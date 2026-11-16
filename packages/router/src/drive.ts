@@ -408,12 +408,14 @@ export function suitesTheLandHolds(suites: readonly LandSuiteFact[], redWaived: 
  * The ask for a round's dispositions. It states the inline cap, because a
  * bare cite of a file over it is refused.
  */
-export function dispositionAsk(round: number): string {
+export function dispositionAsk(round: number, sessionNumber: number): string {
   return (
     `Verification round ${round} found what is listed under \`reasons\`, numbered. Answer ` +
     "with a disposition for every finding marked blocking (and any other you choose), as " +
-    "JSON written to a file outside the tracked tree, then run the answer command. The " +
-    'file carries exactly: {"dispositions": [{"finding_index": <number>, "action": "fix"} ' +
+    "JSON written to a file outside the tracked tree (for example " +
+    `.dabbler/scratch/dispositions-s${sessionNumber}-r${round}.json), then run the answer ` +
+    `command. The file carries exactly: {"session_number": ${sessionNumber}, "round": ${round}, ` +
+    '"dispositions": [{"finding_index": <number>, "action": "fix"} ' +
     'or {"finding_index": <number>, "action": "reject", "reason": "<why the finding is ' +
     'wrong>", "evidence_paths": ["<repository-relative path, or path:START-END>"]}]}. ' +
     `A cited file over ${DISPUTE_EVIDENCE_INLINE_CAP.toLocaleString("en-US")} bytes is cited ` +
@@ -3305,9 +3307,10 @@ class Driver {
       "much by the simplicity and clarity of its design and implementation as by the alignment " +
       "of the solution with the stated requirements and objectives.\n\n" +
       "Answer with a work plan as JSON, written to a file outside the tracked tree " +
-      "(for example .dabbler/scratch/plan.json), then run the answer command. The file " +
-      "carries exactly these members and no other:\n" +
-      "  task        one paragraph: what this session will do -- it becomes the declaration\n" +
+      `(for example .dabbler/scratch/plan-s${this.sessionNumber}.json), then run the answer ` +
+      "command. The file carries exactly these members and no other:\n" +
+      `  session_number  ${this.sessionNumber} -- this session's number: it says the file is this session's answer\n` +
+      "  task       one paragraph: what this session will do -- it becomes the declaration\n" +
       "  non_goals   a list of at least one: what this session will NOT do -- the exclusions its section of the session plan states, or the nearest concrete boundary of the task where it states none. An engine that cannot name one has not understood the scope; the reviewer holds the work to the list. A non-goal may not exclude what the session's section requires, and may defer work only to a later session the plan names: the session plan outranks this list, and the reviewer reads one that cuts required work as missing work\n" +
       '  steps       an ordered list; each step is {"id": "<lowercase-slug>", "ask": "<what ' +
       'to do, in words>", "files": ["<every repository-relative file the step creates or ' +
@@ -3318,7 +3321,9 @@ class Driver {
       "and under a driver it started. A check runs in a built environment -- PATH, HOME, the " +
       "toolchain roots, a scratch TEMP -- and sees no credential; a driver job (verification, " +
       "the run of record, the publish) inherits the shell, so do not assert a credential from " +
-      "a check. A step whose product is prose still has a mechanical " +
+      "a check. A check changes nothing: one that writes a tracked file is refused, so a " +
+      "generator is run as the step's work and the check proves its output is current. " +
+      "A step whose product is prose still has a mechanical " +
       "check. Keep steps small, one concern each; the files a step lists are exactly the " +
       "files it will touch, because its report is measured against them.\n" +
       "Tests are named after what they test: a source file's tests are the test file named after " +
@@ -3338,7 +3343,7 @@ class Driver {
       "repository never declares a dependency on it. Name it only when this plan's own steps " +
       "need those repositories on disk; a plan for one repository of a many-repository " +
       "solution leaves it out.\n" +
-      "Do not include schema_version, session_number or recorded_at: the framework stamps them.\n" +
+      "Do not include schema_version or recorded_at: the framework stamps them.\n" +
       // Said here because the sample's engine failed a step three times
       // rather than change a check it had correctly diagnosed: the verb
       // existed and nothing in the instruction named it.
@@ -4341,7 +4346,7 @@ class Driver {
       const instruction = await this.converse({
         kind: "rejection",
         round: roundNumber,
-        ask: dispositionAsk(roundNumber),
+        ask: dispositionAsk(roundNumber, this.sessionNumber),
         reasons: [
           ...findings.map((finding, index) => describeFinding(index, finding)),
           ...refusals,

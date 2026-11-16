@@ -546,13 +546,21 @@ at least one non-goal
 (what the session will NOT do, which the reviewer holds the work to), and
 the ordered steps,
 each with the files it will touch and at least one mechanical check that
-proves it. Write it as JSON somewhere outside the tracked tree and hand
-the file over:
+proves it. Write it as JSON somewhere outside the tracked tree, carrying
+`"session_number": 1` beside those members, and hand the file over:
 
 ```
-dabbler session report --sessions-dir docs/sessions --seq 1 --answer-file /tmp/plan.json
+dabbler session report --sessions-dir docs/sessions --seq 1 --answer-file .dabbler/scratch/plan-s1.json
 report: session 001 seq 1 answered; work plan (1 step(s)) written to .dabbler/runs/s1/driver/plan.json; the driver reads it next.
 ```
+
+An answer file says whose it is: a plan carries its session's
+`session_number`, and a round's dispositions carry `round` as well. One
+that leaves either out is refused with the member to add, and one that
+names another session or round is refused too, so a file left over from
+an earlier session cannot be declared as this one's. An accepted file
+under `.dabbler/scratch/` is removed, so it cannot be answered again; a
+refused one stays, to be corrected.
 
 The next call accepts it, declares the session from it, and asks for the
 first step:

@@ -13334,6 +13334,13 @@
       "dateTime": "2026-11-16T07:41:05.100000-05:00",
       "task": "Stop the Work Explorer from freezing the extension host, and stamp it as 3.34.1. The projection cache key stops stat'ing five records for every run the repository has ever had: it reads the four sessions-root files, the runs directory's own mtime, and the five records of one run -- the run the cached projection named current, or the highest-numbered run when there is none -- after confirming from the router's writers that a closed session's run records move only together with sessions.json or activity-log.json (a writer that breaks that keeps its file in the key, and the step's report names it). `git worktree list` runs asynchronously, and roots are discovered once per poll tick, workspace-folder change or explicit refresh, with the poll's watcher binding and the scan taking the same list; the scan no longer discovers roots itself. `refresh()` merges calls inside a quarter of a second into one repaint while `refresh(true)` still repaints at once. version.json goes to 3.34.1, stamped with `npm run stamp:version`, with a one-sentence 3.34.1 changelog section.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 333,
+      "dateTime": "2026-11-16T08:05:11.960000-05:00",
+      "task": "Release 3.34.1: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

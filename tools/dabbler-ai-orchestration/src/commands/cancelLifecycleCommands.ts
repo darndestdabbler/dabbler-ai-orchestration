@@ -1,10 +1,13 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import type { Router } from "dabbler-ai-router";
 import { RouterUnavailableError } from "dabbler-ai-router";
 import { RouterRefusal, productionRouter } from "../router/host";
 import { sessionRowLabel } from "../providers/sessionsModel";
 import { sessionCannotClose } from "../providers/rowMenuHelpers";
+import { hasStandingStop } from "../providers/ActionRegistry";
 import { asSessionNode } from "./workExplorerTreeCommands";
+import { openReport, type ReportStopActions } from "./sessionCommands";
 
 /** What a row must carry for these flows: where to spawn, and which
  * session. A repository has sessions, not sets of them. */
@@ -18,6 +21,12 @@ export interface CancellableSession {
    * never asked of the operator.
    */
   force?: boolean;
+  /**
+   * A stop the framework recorded stands over this session, the one in
+   * flight: the rollback offers to report it first, because the rollback
+   * moves aside the run record the report is read from.
+   */
+  stopStands?: boolean;
 }
 
 /**
@@ -34,6 +43,7 @@ export function cancellableSessionOf(arg: unknown): CancellableSession | undefin
     number: node.session.number,
     name: sessionRowLabel(node.session),
     force: sessionCannotClose(node.session),
+    stopStands: hasStandingStop(node.repository, node.session),
   };
 }
 
@@ -42,12 +52,10 @@ interface RegisterDeps {
 }
 
 export interface CancelLifecycleUi {
-  confirm(
-    summary: string,
-    detail: string,
-    affirmative: string,
-    negative: string,
-  ): Thenable<string | undefined>;
+  /** A modal with its choices in order; dismissing it answers undefined. */
+  confirm(summary: string, detail: string, ...choices: string[]): Thenable<string | undefined>;
+  /** The offer made once a report is open, as Report this stop makes it. */
+  choose(message: string, items: readonly string[]): Thenable<string | undefined>;
   promptReason(prompt: string, placeHolder: string): Thenable<string | undefined>;
   showInformationMessage(message: string): unknown;
   showErrorMessage(message: string): unknown;
@@ -55,13 +63,9 @@ export interface CancelLifecycleUi {
 
 function defaultUi(): CancelLifecycleUi {
   return {
-    confirm: (summary, detail, affirmative, negative) =>
-      vscode.window.showInformationMessage(
-        summary,
-        { modal: true, detail },
-        affirmative,
-        negative,
-      ),
+    confirm: (summary, detail, ...choices) =>
+      vscode.window.showInformationMessage(summary, { modal: true, detail }, ...choices),
+    choose: (message, items) => vscode.window.showWarningMessage(message, { modal: true }, ...items),
     promptReason: (prompt, placeHolder) =>
       vscode.window.showInputBox({ prompt, placeHolder, ignoreFocusOut: true }),
     showInformationMessage: (m) => vscode.window.showInformationMessage(m),
@@ -219,6 +223,7 @@ interface RollbackFacts {
 }
 
 const ROLLBACK_REASON = "Rollback to Start of This Session from the Work Explorer";
+const REPORT_FIRST = "Report, Then Roll Back";
 
 /**
  * The dialog's detail, from the facts and nothing else: the sessions
@@ -255,11 +260,16 @@ export function rollbackDetail(facts: RollbackFacts): string {
  * were read at and refuses a repository that moved while the dialog was
  * open. A dry run the router refuses (a release in the span, a row that is
  * no longer what it was) is shown in the router's words and asks nothing.
+ *
+ * Where a stop stands, the same dialog offers to report it first: once the
+ * rollback has moved its run record aside, nothing can. The report writes
+ * only under `.dabbler/`, so the HEAD the facts were read at still holds.
  */
 export async function runRollbackSessionFlow(
   session: CancellableSession,
   ui: CancelLifecycleUi = defaultUi(),
   router: Router = productionRouter(),
+  actions?: ReportStopActions,
 ): Promise<boolean> {
   const preview = await call(ui, () =>
     router.session.rollback({
@@ -283,13 +293,44 @@ export async function runRollbackSessionFlow(
     return false;
   }
 
-  const choice = await ui.confirm(
-    `Roll back to the start of session ${session.number} "${session.name}"?`,
-    rollbackDetail(facts),
-    "Roll Back",
-    "Keep",
-  );
-  if (choice !== "Roll Back") return false;
+  const summary = `Roll back to the start of session ${session.number} "${session.name}"?`;
+  const choice = session.stopStands
+    ? await ui.confirm(
+        summary,
+        `${rollbackDetail(facts)} ${REPORT_FIRST} writes a report of the stop first, for you to read and send to ` +
+          "Dabbler's maintainers if you choose: one provider call, and nothing is sent.",
+        REPORT_FIRST,
+        "Roll Back",
+        "Keep",
+      )
+    : await ui.confirm(summary, rollbackDetail(facts), "Roll Back", "Keep");
+  if (choice !== "Roll Back" && choice !== REPORT_FIRST) return false;
+
+  let report: { file: string; said: string } | null = null;
+  if (choice === REPORT_FIRST) {
+    const written = await call(ui, () => router.session.defectReport({ repoRoot: session.root, rollingBack: true }));
+    const file = written?.ok ? /written to (\S+)/.exec(written.value.stdout)?.[1] : undefined;
+    if (written?.ok && file !== undefined) {
+      report = { file: path.join(session.root, file), said: written.value.stdout };
+    } else {
+      // Asked once, and the default keeps the session: rolling back is what
+      // makes the report impossible. An unreachable router has said its own
+      // words already.
+      const words =
+        written === null
+          ? "the router could not be reached."
+          : written.ok
+            ? written.value.stdout.trim()
+            : written.message.trim() || `exit ${written.exitCode}`;
+      const anyway = await ui.confirm(
+        `No report was written for session ${session.number}'s stop — ${words}`,
+        "Once it is rolled back, this stop cannot be reported. Roll back anyway?",
+        "Roll Back Anyway",
+        "Keep",
+      );
+      if (anyway !== "Roll Back Anyway") return false;
+    }
+  }
 
   const result = await call(ui, () =>
     router.session.rollback({
@@ -299,16 +340,18 @@ export async function runRollbackSessionFlow(
       asOf: facts.head,
     }),
   );
-  if (!result || !result.ok) {
-    if (result) {
-      ui.showErrorMessage(describeLifecycleFailure("Rolling back", session.name, result));
-    }
-    return false;
+  const rolledBack = result !== null && result.ok;
+  if (result && !result.ok) {
+    ui.showErrorMessage(describeLifecycleFailure("Rolling back", session.name, result));
   }
-  ui.showInformationMessage(
-    `Rolled back to the start of session ${session.number}; amend the plan, then Start Session.`,
-  );
-  return true;
+  if (rolledBack) {
+    ui.showInformationMessage(
+      `Rolled back to the start of session ${session.number}; amend the plan, then Start Session.`,
+    );
+  }
+  // Written is written: the report opens whether or not the rollback went through.
+  if (report !== null) await openReport(report.file, report.said, (message, items) => ui.choose(message, items), actions);
+  return rolledBack;
 }
 
 export function registerCancelLifecycleCommands(

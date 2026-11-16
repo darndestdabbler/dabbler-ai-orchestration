@@ -186,6 +186,8 @@ export interface SessionWaiveOptions extends RepositoryTarget {
 export interface SessionDefectReportOptions extends RepositoryTarget {
   /** A session other than the one in flight: its last recorded stop is reported. */
   readonly session?: number;
+  /** The person is rolling the session back from this stop, and the report says so. */
+  readonly rollingBack?: boolean;
 }
 
 export interface SessionVerbs {

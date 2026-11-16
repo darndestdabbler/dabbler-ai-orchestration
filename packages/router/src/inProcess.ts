@@ -338,6 +338,7 @@ export class InProcessRouter implements Router {
     defectReport: (o: SessionDefectReportOptions) => {
       const args = ["defect-report"];
       optional(args, "--session", o.session?.toString());
+      if (o.rollingBack === true) args.push("--rolling-back");
       return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
     },
   };

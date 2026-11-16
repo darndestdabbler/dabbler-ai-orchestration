@@ -1259,19 +1259,31 @@ export async function runReportStop(
     ui.report(`Report this stop — session ${number}`, result.value.stdout);
     return false;
   }
-  const file = path.join(repository.root, written);
+  await openReport(path.join(repository.root, written), result.value.stdout, (message, items) => ui.choose(message, items), actions);
+  return true;
+}
+
+/**
+ * A written report, opened for reading; only when the person says so is it
+ * copied and the address `defect-report` printed opened in their browser.
+ */
+export async function openReport(
+  file: string,
+  said: string,
+  choose: (message: string, items: readonly string[]) => Thenable<string | undefined>,
+  actions: ReportStopActions = REPORT_STOP_ACTIONS,
+): Promise<void> {
   await actions.open(file);
-  const address = /^Reports go to (\S+) -- /m.exec(result.value.stdout)?.[1];
-  if (address === undefined) return true;
-  const send = await ui.choose(
+  const address = /^Reports go to (\S+) -- /m.exec(said)?.[1];
+  if (address === undefined) return;
+  const send = await choose(
     `When you have read the report: copy it and open ${address} in your browser, to send it yourself? ` +
       "Its key stays with you.",
     ["Copy and open"],
   );
-  if (send !== "Copy and open") return true;
+  if (send !== "Copy and open") return;
   await actions.copy(fs.readFileSync(file, "utf8"));
   await actions.browse(address);
-  return true;
 }
 
 /**

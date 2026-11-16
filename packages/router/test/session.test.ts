@@ -2316,6 +2316,26 @@ describe("a defect report of a stop the framework caused", () => {
     }
   });
 
+  it("says in Where that the person chose to roll back, only with rollingBack, and nothing else of it", async () => {
+    const state = stopped(STOP);
+    try {
+      const report = async (rollingBack: boolean): Promise<string> => {
+        const made = await run(() => defectReport(state.sessionsDir, { packageRoot: extensionRoot(), rollingBack }));
+        assert.equal(made.code, EXIT_OK, made.err);
+        return readFileSync(join(state.repo, /written to (\S+)/.exec(made.out)![1]!), "utf8");
+      };
+      const plain = await report(false);
+      const rolling = await report(true);
+      const line = "- Then: the person chose to roll the session back rather than go on\n";
+      assert.ok(!plain.includes("roll the session back"));
+      assert.equal(rolling.replace(line, ""), plain);
+      const where = rolling.slice(rolling.indexOf("## Where"), rolling.indexOf("## Problem"));
+      assert.ok(where.includes(line));
+    } finally {
+      state.restore();
+    }
+  });
+
   it("refuses a session that met no stop, and reports a named session's last one", async () => {
     const clear = stopped(null);
     try {

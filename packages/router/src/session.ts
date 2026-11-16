@@ -4570,6 +4570,8 @@ export interface DefectReportOptions {
   readonly sessionNumber?: number | null;
   /** Where the router runs from, so the extension's manifest above it is found. */
   readonly packageRoot?: string;
+  /** The person is rolling the session back from this stop: Where says so, and nothing else of the rollback. */
+  readonly rollingBack?: boolean;
 }
 
 /** A stop as the report reads it: the framework's values and its phase, never its reason's words. */
@@ -4635,6 +4637,7 @@ function reportText(parts: {
   readonly checked: string;
   /** The two checked passages, or null where they are the person's to write. */
   readonly passages: { readonly problem: string; readonly fix: string } | null;
+  readonly rollingBack: boolean;
 }): string {
   const { stop, passages } = parts;
   const section = (heading: string, text: string | undefined, words: string): string[] =>
@@ -4657,6 +4660,7 @@ function reportText(parts: {
     `- Platform: ${process.platform} ${process.arch}, Node ${process.version}`,
     `- Stop: kind \`${stop.kind}\`, code \`${stop.code ?? "none"}\`, phase \`${stop.phase ?? "not recorded"}\`, ` +
       `rule \`${stop.rule ?? "none cited"}\``,
+    ...(parts.rollingBack ? ["- Then: the person chose to roll the session back rather than go on"] : []),
     "",
     ...section("Problem", passages?.problem, "Yours to write: what the framework did that was wrong, in the framework's terms."),
     ...section("Suggested fix", passages?.fix, "Yours to write: what the framework should do instead."),
@@ -4745,7 +4749,15 @@ export async function defectReport(sessionsDir: string, options: DefectReportOpt
         `${holders.removed} code snippet(s) removed. The key to what was replaced is beside this file and stays with you.`;
     }
   }
-  const text = reportText({ stop, engine: run.engine, reviewing: reviewingVehicle(repoRoot), extension, checked, passages });
+  const text = reportText({
+    stop,
+    engine: run.engine,
+    reviewing: reviewingVehicle(repoRoot),
+    extension,
+    checked,
+    passages,
+    rollingBack: options.rollingBack === true,
+  });
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, `${name}.md`), `${text}\n`, "utf8");
   const key = `${name}-key.md`;

@@ -254,6 +254,8 @@ const OPTIONS: Record<string, readonly string[]> = {
   "defect-report": [
     "  --session N              report the last stop session N met; omitted, the stop",
     "                           the session in flight stands at",
+    "  --rolling-back           the report says you chose to roll the session back",
+    "                           rather than go on, and nothing else of the rollback",
     "",
     "  Writes one markdown file under .dabbler/reports/ and prints its path: where the",
     "  stop is in the framework (versions, engine, vehicles, platform, the stop's kind,",
@@ -290,6 +292,10 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --as-of SHA              the HEAD the dry run's facts were read at; refused when",
     "                           the repository has moved since, so a confirm is of",
     "                           the facts it was shown",
+    "",
+    "  A stop is reported BEFORE it is rolled back: the rollback moves aside the run",
+    "  record a report is read from. To tell the maintainers about the stop, run",
+    "  `dabbler session defect-report --rolling-back` first, then roll back.",
   ],
   migrate: ["  --from PATH              required: the legacy session-set directory"],
 };
@@ -353,6 +359,7 @@ const SWITCHES = new Set([
   "--mailbox",
   "--merge-origin",
   "--next",
+  "--rolling-back",
   "--stop",
   "--undo-changes",
 ]);
@@ -576,7 +583,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(`dabbler session defect-report: ${named}\n`);
       return EXIT_USAGE;
     }
-    return defectReport(sessionsDir, { sessionNumber: named ?? sessionNumber });
+    return defectReport(sessionsDir, { sessionNumber: named ?? sessionNumber, rollingBack: switches.has("--rolling-back") });
   }
 
   if (subcommand === "rollback") {

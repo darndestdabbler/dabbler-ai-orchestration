@@ -12,8 +12,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [3.35.0] — 2026-11-16
+
+### Added
+
+- **A stop you roll back from can be reported first.** Where a stop stands
+  over the session in flight, the Work Explorer's Rollback dialog offers a
+  third choice, "Report, Then Roll Back": it writes the same report Report
+  this stop to Dabbler writes (one provider call), rolls the session back,
+  then opens the report for you to read and, if you choose, send. Nothing is
+  sent for you. If the report cannot be written you are told why and asked
+  once whether to roll back anyway; the default keeps the session, because
+  after a rollback the stop can no longer be reported. At a terminal,
+  `dabbler session defect-report --rolling-back` writes the report with one
+  line saying you chose to roll back, and `dabbler session rollback --help`
+  says to run it first.
+
 ### Changed
 
+- **The answer file you write says whose it is.** The plan and the
+  findings each ask for an answer file named after its session (and round),
+  carrying `session_number`, and a report naming a file without one is
+  refused -- so an answer left over from another session can no longer be
+  taken for this one's. An accepted answer file under `.dabbler/scratch/` is
+  removed once it has been used. The plan ask also says that a step's check
+  may not write a tracked file: a generator runs as the step's work, and
+  the check proves its output is current.
 - **A session's section of the plan ends at the next heading.** The plan
   ask, the reviewer, the build contract and the transcript now read a
   session's section the same way: it ends at the next heading of level

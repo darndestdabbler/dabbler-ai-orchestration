@@ -1069,7 +1069,14 @@ and how old, and what the tree carries -- as JSON and changes nothing; the
 Work Explorer's dialog reads it, so the person decides on facts, and the
 rollback it then runs carries `--as-of <HEAD>`, the commit those facts were
 read at: a repository that moved while the dialog was open is refused
-rather than rolled back on facts it no longer states. The
+rather than rolled back on facts it no longer states. A stop is reported
+before it is rolled back, never after: the rollback moves aside the run
+record a report is read from, and the tracked file the Mechanic's lines for
+the maintainers are in goes back with everything else. At a terminal, run
+`dabbler session defect-report --rolling-back` first, which says in the
+report that you chose to roll back and nothing else of it; where a stop
+stands, the Work Explorer's dialog offers Report, Then Roll Back, which
+does the same in one choice and still sends nothing. The
 sessions are at not-started with the plan as it was at that start; amend
 the plan, then Start Session again. A job still running finishes into a
 directory nothing reads. Nothing under `.dabbler/` is tracked for any of

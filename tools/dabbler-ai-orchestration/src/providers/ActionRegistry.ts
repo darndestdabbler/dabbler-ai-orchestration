@@ -95,7 +95,7 @@ export function fundsVendor(session: SessionRecord): string | null {
 }
 
 /** The session in flight, with a stop standing over it. */
-const hasStandingStop = (repository: SessionsRepository, session: SessionRecord): boolean =>
+export const hasStandingStop = (repository: SessionsRepository, session: SessionRecord): boolean =>
   repository.currentSession === session.number && session.status === "in-progress" && session.stopActor !== undefined;
 
 export const SESSION_ACTIONS: SessionAction[] = [

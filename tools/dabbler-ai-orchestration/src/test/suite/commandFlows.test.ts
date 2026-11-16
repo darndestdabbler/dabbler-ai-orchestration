@@ -88,6 +88,7 @@ function cancelUi(overrides: Partial<CancelLifecycleUi> = {}): {
   const infos: string[] = [];
   const ui: CancelLifecycleUi = {
     confirm: async (_s, _d, affirmative) => affirmative,
+    choose: async () => undefined,
     promptReason: async () => "because",
     showInformationMessage: (m: string) => infos.push(m),
     showErrorMessage: (m: string) => errors.push(m),
@@ -197,6 +198,102 @@ suite("cancel/restore flows", () => {
       assert.strictEqual(calls.length, 1, "the dry run only");
       assert.strictEqual(calls[0].dryRun, true);
     }
+  });
+
+  const STOPPED: CancellableSession = { ...CANCELLABLE, stopStands: true };
+  const WRITTEN =
+    "defect-report: session 003's 'tests' stop, written to .dabbler/reports/s3-x.md\n" +
+    "Reports go to https://example.com/issues -- read the report, then send it yourself if you choose. Nothing has been sent.\n";
+
+  /** A router whose report and rollback answer as told, every call recorded in order. */
+  function reportingRouter(options: { reportRefused?: string; rollbackFails?: boolean } = {}): {
+    router: Parameters<typeof runRollbackSessionFlow>[2];
+    calls: string[];
+    reported: Record<string, unknown>[];
+  } {
+    const calls: string[] = [];
+    const reported: Record<string, unknown>[] = [];
+    const router = {
+      session: {
+        defectReport: async (o: Record<string, unknown>) => {
+          calls.push("defect-report");
+          reported.push(o);
+          return options.reportRefused === undefined
+            ? { ok: true, outcome: "ok", value: { stdout: WRITTEN } }
+            : { ok: false, outcome: "refused", exitCode: 3, message: options.reportRefused };
+        },
+        rollback: async (o: Record<string, unknown>) => {
+          calls.push(o.dryRun ? "rollback --dry-run" : `rollback --as-of ${String(o.asOf)}`);
+          return !o.dryRun && options.rollbackFails
+            ? { ok: false, outcome: "failed", exitCode: 1, message: "git revert failed" }
+            : { ok: true, outcome: "ok", value: { stdout: `${JSON.stringify(FACTS)}\n` } };
+        },
+      },
+    } as unknown as Parameters<typeof runRollbackSessionFlow>[2];
+    return { router, calls, reported };
+  }
+
+  function openings(): { actions: { open: (f: string) => Promise<void>; copy: () => Promise<void>; browse: () => Promise<boolean> }; opened: string[] } {
+    const opened: string[] = [];
+    return {
+      opened,
+      actions: { open: async (file) => { opened.push(path.basename(file)); }, copy: async () => {}, browse: async () => true },
+    };
+  }
+
+  test("with a stop standing, Report, Then Roll Back reports, then rolls back at the facts' HEAD, then opens the report", async () => {
+    const seen: { detail: string; buttons: string[] }[] = [];
+    const { ui, infos } = cancelUi({
+      confirm: async (_s, detail, ...choices) => { seen.push({ detail, buttons: choices }); return "Report, Then Roll Back"; },
+    });
+    const { router, calls, reported } = reportingRouter();
+    const { actions, opened } = openings();
+    assert.strictEqual(await runRollbackSessionFlow(STOPPED, ui, router, actions), true);
+    assert.strictEqual(seen.length, 1, "one dialog");
+    assert.deepStrictEqual(seen[0].buttons, ["Report, Then Roll Back", "Roll Back", "Keep"]);
+    assert.match(seen[0].detail, /one provider call, and nothing is sent/);
+    assert.deepStrictEqual(calls, ["rollback --dry-run", "defect-report", `rollback --as-of ${FACTS.head}`]);
+    assert.strictEqual(reported[0].rollingBack, true);
+    assert.deepStrictEqual(opened, ["s3-x.md"]);
+    assert.ok(infos[0].includes("Rolled back to the start of session 3"));
+  });
+
+  test("with no stop standing the dialog offers two choices and writes no report", async () => {
+    const seen: string[][] = [];
+    const { ui } = cancelUi({ confirm: async (_s, _d, ...choices) => { seen.push(choices); return "Roll Back"; } });
+    const { router, calls } = reportingRouter();
+    assert.strictEqual(await runRollbackSessionFlow(CANCELLABLE, ui, router, openings().actions), true);
+    assert.deepStrictEqual(seen, [["Roll Back", "Keep"]]);
+    assert.ok(!calls.includes("defect-report"));
+  });
+
+  test("a refused report is said in its words, asked about once, and rolled back only on the person's say-so", async () => {
+    for (const [answer, rolled] of [[undefined, false], ["Keep", false], ["Roll Back Anyway", true]] as const) {
+      const asked: { summary: string; buttons: string[] }[] = [];
+      const { ui } = cancelUi({
+        confirm: async (summary, _d, ...choices) => {
+          asked.push({ summary, buttons: choices });
+          return asked.length === 1 ? "Report, Then Roll Back" : answer;
+        },
+      });
+      const { router, calls } = reportingRouter({ reportRefused: "defect-report: refused -- session 003 stands at no stop" });
+      const { actions, opened } = openings();
+      assert.strictEqual(await runRollbackSessionFlow(STOPPED, ui, router, actions), rolled);
+      assert.strictEqual(asked.length, 2, "the dialog, then one question");
+      assert.match(asked[1].summary, /stands at no stop/);
+      assert.deepStrictEqual(asked[1].buttons, ["Roll Back Anyway", "Keep"]);
+      assert.strictEqual(calls.includes(`rollback --as-of ${FACTS.head}`), rolled);
+      assert.deepStrictEqual(opened, []);
+    }
+  });
+
+  test("a rollback that fails after the report was written still opens the report", async () => {
+    const { ui, errors } = cancelUi({ confirm: async () => "Report, Then Roll Back" });
+    const { router } = reportingRouter({ rollbackFails: true });
+    const { actions, opened } = openings();
+    assert.strictEqual(await runRollbackSessionFlow(STOPPED, ui, router, actions), false);
+    assert.ok(errors[0].includes("git revert failed"));
+    assert.deepStrictEqual(opened, ["s3-x.md"]);
   });
 
   test("a rollback the router refuses at the dry run surfaces in its words, asks nothing, and does not refresh", async () => {

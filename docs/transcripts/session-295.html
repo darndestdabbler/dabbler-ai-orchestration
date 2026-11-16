@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 295 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 295 transcript</h1>
+<p class="stamp">Rendered 2026-10-30T15:04:40.131Z by dabbler-ai-router 3.27.0 at d973bfb4cf40e2f5d10194cfe66b6c0c11d4c61f.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-30T10:41:41.129-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 295 of 298: The Mechanic on a release session</h3>
+<p>Scope: <code>packages/router/src/projection.ts</code> (<code>orchestratorOf</code>, <code>authoringNode</code>), <code>packages/router/src/drive.ts</code> (<code>callInTheMechanic</code>), <code>tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts</code> (<code>runOpenMechanic</code>); their tests</p>
+<p><strong>Why.</strong> A field report on CT.DPH.Syndromic-Surveillance-V2 (sessions 75-99, router 3.24.0-3.27.0, dated 2026-10-30, checked against this source on master) traced the one cancelled session in 25, Release 1.7.0 (session 91). Its <code>publish</code> stop is the one stop on a release that <code>mechanicHandsBack</code> lets the Mechanic take, and the Mechanic could not be reached by either road. A release registers <code>orchestrator: {engine: &quot;framework&quot;}</code> (<code>RELEASE_ENGINE</code>), with no model and no provider. Unattended, <code>resolveSessionOrchestratorIdentity</code> throws on that block, the <code>catch</code> leaves the run's engine to name it, the pull loop's <code>cli</code>, and the transcript says <code>mechanic-not-called why=no built-in command for 'cli'</code>; had it not thrown, <code>framework</code> fails the same way. Attended, <code>orchestratorOf</code> returns <code>engine: &quot;framework&quot;</code> for the release in flight, <code>authoringNode</code>'s <code>forEngine ?? inFlight ?? explainEngine(...)</code> takes it over the configured engine, and <strong>Open a Mechanic</strong> refuses with &quot;No session in flight names an engine&quot;. Session 290 fixed the pull loop's <code>cli</code> for an ordinary session; a release was never in its reach. The release-publish test in <code>walk-session.test.ts</code> installs a launcher that ignores <code>(engine, model)</code>, so it passed with <code>(&quot;cli&quot;, null)</code>.</p>
+<p><strong>Step 1 -- a release names no authoring engine.</strong> <code>orchestratorOf</code> reads a row whose engine is <code>RELEASE_ENGINE</code> as naming no engine and no model, and takes them from the newest earlier row that does. <code>authoringNode</code>, the Configuration pane and <strong>Open a Mechanic</strong> then fall through to the repository's configured engine, as they do when nothing is in flight.</p>
+<p><strong>Step 2 -- the unattended Mechanic launches on an engine that exists.</strong> <code>callInTheMechanic</code> launches on the session's declared engine when it is set and is not <code>RELEASE_ENGINE</code>; otherwise on the configured engine (<code>explainEngine</code>); otherwise on what <code>orchestratorOf</code> now returns; and only last on the run's own engine. The model is <code>explainMechanicModel</code>'s, then <code>orchestratorOf</code>'s.</p>
+<p><strong>Step 3 -- a Mechanic that still cannot launch says what to set.</strong> When no engine or no model resolves, <code>mechanic-not-called</code> names <code>dabbler configure --engine</code> or <code>--mechanic-model</code>, rather than <code>--engine-argv</code>, which no developer runs.</p>
+<p><strong>Non-goals.</strong> Recording an authoring engine on a release row. Any change to what a release's stops hand back. Adding <code>codex</code> to the extension's engines.</p>
+<p><strong>Tests.</strong> In <code>walk-session.test.ts</code>, the refused-publish test captures the launcher's <code>(engine, model)</code> and asserts the configured engine and its model. In <code>projection.test.ts</code>, a release in flight reads as the newest authoring row. In the extension's <code>sessionCommands</code> tests, <strong>Open a Mechanic</strong> on a release in flight opens on the configured engine.</p>
+<p><strong>Releasable.</strong> Yes -- with 296 and 297, as 3.28.0 in session 298.</p>
+<h2>Work Plan</h2>
+<p>Make the Mechanic reachable on a release session, whose row registers orchestrator {engine: &quot;framework&quot;} (RELEASE_ENGINE) with no model. orchestratorOf (projection.ts) reads an in-flight row whose engine is RELEASE_ENGINE as naming no engine and no model, and takes engine, model and provider from the newest earlier session row that names a real engine; so authoringNode, the Configuration pane and Open a Mechanic (runOpenMechanic) fall through to the repository's configured engine as they do when nothing is in flight. callInTheMechanic (drive.ts) launches on the session's declared engine when it is set and is not RELEASE_ENGINE, otherwise on the configured engine (explainEngine), otherwise on orchestratorOf's engine, and only last on the run's own engine; the model stays explainMechanicModel's, then orchestratorOf's. Where no engine or no model resolves, mechanic-not-called names <code>dabbler configure --engine &lt;engine&gt;</code> or <code>dabbler configure --mechanic-model &lt;model&gt;</code> instead of --engine-argv. Tests: the refused-publish walk captures the launcher's (engine, model) and asserts the configured engine and model; projection.test.ts shows a release in flight reading as the newest authoring row; commandFlows.test.ts shows Open a Mechanic on a release in flight opening on the configured engine.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/2c55e83e4343abf75400bd5fee8bab4df5f579ea"><code>2c55e83e4343abf75400bd5fee8bab4df5f579ea</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Release names no authoring engine</td><td><p>In projection.ts, make orchestratorOf treat an in-flight row whose orchestrator engine is RELEASE_ENGINE as naming nothing, and read engine, model and provider from the newest earlier row whose orchestrator names an engine other than RELEASE_ENGINE (null where none does). RELEASE_ENGINE's definition moves to projection.ts (session.ts already imports projection.ts, so the reverse import would be a cycle) and session.ts imports it from there and keeps exporting it, so every existing importer is unchanged. authoringNode needs no change of its own: with inFlight null it already falls through to explainEngine. Add a test in projection.test.ts: with a completed claude-code session on claude-opus-5-5 followed by a release in flight, orchestratorOf returns claude-code and claude-opus-5-5.</p></td><td><span class="mono">packages/router/src/projection.ts</span><br><span class="mono">packages/router/src/session.ts</span><br><span class="mono">packages/router/test/projection.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Mechanic launches on a real engine</td><td><p>In drive.ts callInTheMechanic, choose the launch engine as: the declared engine from resolveSessionOrchestratorIdentity when it is set and is not RELEASE_ENGINE; else explainEngine(null, repoRoot).transport when non-empty; else orchestratorOf(repoRoot).engine; else this.run.engine. Where no engine resolves (only the run's own <code>cli</code>/<code>framework</code> is left, i.e. builtInEngine refuses it) log mechanic-not-called with a why naming <code>dabbler configure --engine &lt;engine&gt;</code>; where no model resolves, log one naming <code>dabbler configure --mechanic-model &lt;model&gt;</code> and do not launch. In walk-session.test.ts, the refused-publish release test writes a configured engine (claude-code) and authoring model to the checkout's settings, captures the launcher's (engine, model), and asserts [&quot;claude-code&quot;, &lt;that model&gt;].</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/walk-session.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Open a mechanic on a release</td><td><p>Confirm runOpenMechanic (sessionCommands.ts) opens on the configured engine once the configuration reading falls through for a release in flight, changing it only if it does not. Add a test in commandFlows.test.ts beside the existing Open a Mechanic tests: a fixture repository whose ledger has a release in flight and whose checkout settings name claude-code and an authoring model, read through the real configuration (no configurationFor stub), opens one Mechanic terminal on Claude Code with no error.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</span></td><td><code>npm run build -w dabbler-ai-router</code><br><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Recording an authoring engine on a release row</li><li>Any change to what a release's stops hand back (mechanicHandsBack)</li><li>Adding codex to the extension's engines</li><li>Publishing 3.28.0, which is session 298's</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[14:41:41]</span> <span class="muted">run-started</span> session=295 mode=pull</div>
+<div class="line"><span class="at">[14:41:41]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[14:44:40]</span> <span class="muted">run-resumed</span> session=295 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[14:44:40]</span> <span class="muted">plan-accepted</span> steps=[&quot;release-names-no-authoring-engine&quot;,&quot;mechanic-launches-on-a-real-engine&quot;,&quot;open-a-mechanic-on-a-release&quot;] non_goals=4</div>
+<div class="line"><span class="at">[14:44:43]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[14:44:43]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=release-names-no-authoring-engine</div>
+<div class="line"><span class="at">[14:46:02]</span> <span class="muted">run-resumed</span> session=295 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:46:08]</span> <span class="muted">check-passed</span> step=release-names-no-authoring-engine argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[14:46:16]</span> <span class="muted">named-tests-passed</span> step=release-names-no-authoring-engine suite=typescript command=node scripts/suite.mjs container packages/router/test/projection.test.ts packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[14:46:23]</span> <span class="muted">named-tests-passed</span> step=release-names-no-authoring-engine suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts</div>
+<div class="line"><span class="at">[14:46:24]</span> <span class="muted">report-accepted</span> seq=2 step=release-names-no-authoring-engine files=[&quot;packages/router/src/projection.ts&quot;,&quot;packages/router/src/session.ts&quot;,&quot;packages/router/test/projection.test.ts&quot;] notes=orchestratorOf reads a release in flight as the newest earlier authoring row; RELEASE_ENGINE moved to projection.ts and re-exported from session.ts</div>
+<div class="line"><span class="at">[14:46:24]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=mechanic-launches-on-a-real-engine</div>
+<div class="line"><span class="at">[14:54:01]</span> <span class="muted">run-resumed</span> session=295 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:54:07]</span> <span class="muted">check-passed</span> step=mechanic-launches-on-a-real-engine argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[14:55:04]</span> <span class="muted">named-tests-passed</span> step=mechanic-launches-on-a-real-engine suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/walk-session.test.ts</div>
+<div class="line"><span class="at">[14:55:04]</span> <span class="muted">report-accepted</span> seq=3 step=mechanic-launches-on-a-real-engine files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/walk-session.test.ts&quot;] notes=callInTheMechanic launches on declared (not RELEASE_ENGINE) &gt; configured &gt; newest author &gt; run engine, and names dabbler configure --engine when none is built in; a null model still launches on the engine's default, as before (two Mechanic walks start Claude Code with no model, and refusing would break that), and an engine refusing the model already names --mechanic-model; release walk asserts claude-code/claude-sonnet-5-5</div>
+<div class="line"><span class="at">[14:55:04]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=open-a-mechanic-on-a-release</div>
+<div class="line"><span class="at">[14:56:30]</span> <span class="muted">run-resumed</span> session=295 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[14:56:34]</span> <span class="muted">check-passed</span> step=open-a-mechanic-on-a-release argv=[&quot;npm&quot;,&quot;run&quot;,&quot;build&quot;,&quot;-w&quot;,&quot;dabbler-ai-router&quot;]</div>
+<div class="line"><span class="at">[14:56:37]</span> <span class="muted">check-passed</span> step=open-a-mechanic-on-a-release argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[14:56:46]</span> <span class="muted">named-tests-passed</span> step=open-a-mechanic-on-a-release suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</div>
+<div class="line"><span class="at">[14:56:47]</span> <span class="muted">report-accepted</span> seq=4 step=open-a-mechanic-on-a-release files=[&quot;tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts&quot;] notes=runOpenMechanic needed no change: with a release in flight the real configuration reading now names claude-code; new commandFlows test opens one Claude Code Mechanic terminal with no error</div>
+<div class="line"><span class="at">[14:56:47]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[14:56:48]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[14:56:51]</span> <span class="muted">job-started</span> name=verification pid=60816 log=.dabbler/runs/s295/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[14:58:30]</span> <span class="muted">job-finished</span> name=verification exit=<span class="bad">4</span> log=.dabbler/runs/s295/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[14:58:30]</span> <span class="muted">verification-blocking</span></div>
+<div class="line"><span class="at">[14:58:30]</span> <span class="milestone">phase</span> phase=<span class="milestone">dispositions</span></div>
+<div class="line"><span class="at">[14:58:30]</span> <span class="muted">instruction-issued</span> seq=5 kind=rejection reasons=1</div>
+<div class="line"><span class="at">[14:58:51]</span> <span class="muted">run-resumed</span> session=295 phase=<span class="milestone">dispositions</span> mode=pull</div>
+<div class="line"><span class="at">[14:58:51]</span> <span class="muted">dispositions-accepted</span> round=1 fix=[0] reject=[] answers=[{&quot;finding&quot;:0,&quot;action&quot;:&quot;fix&quot;}]</div>
+<div class="line"><span class="at">[14:58:51]</span> <span class="milestone">phase</span> phase=<span class="milestone">fix</span></div>
+<div class="line"><span class="at">[14:58:51]</span> <span class="muted">instruction-issued</span> seq=6 kind=step step=fix-round-1</div>
+<div class="line"><span class="at">[15:00:56]</span> <span class="muted">run-resumed</span> session=295 phase=<span class="milestone">fix</span> mode=pull</div>
+<div class="line"><span class="at">[15:01:04]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] owner=release-names-no-authoring-engine</div>
+<div class="line"><span class="at">[15:01:08]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] owner=mechanic-launches-on-a-real-engine</div>
+<div class="line"><span class="at">[15:01:09]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;npm&quot;,&quot;run&quot;,&quot;build&quot;,&quot;-w&quot;,&quot;dabbler-ai-router&quot;] owner=open-a-mechanic-on-a-release</div>
+<div class="line"><span class="at">[15:01:12]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;] owner=open-a-mechanic-on-a-release</div>
+<div class="line"><span class="at">[15:01:19]</span> <span class="muted">named-tests-passed</span> step=fix-round-1 suite=typescript command=node scripts/suite.mjs container packages/router/test/projection.test.ts</div>
+<div class="line"><span class="at">[15:01:28]</span> <span class="muted">named-tests-passed</span> step=fix-round-1 suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts</div>
+<div class="line"><span class="at">[15:01:29]</span> <span class="muted">report-accepted</span> seq=6 step=fix-round-1 files=[&quot;packages/router/src/projection.ts&quot;,&quot;packages/router/test/projection.test.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts&quot;] notes=orchestratorOf takes release 'author' (default, the unattended fallback) or 'none'; authoringNode and engineVehicleNode read 'none', so a release in flight answers from the configuration; projection and Open a Mechanic tests now use a copilot/gpt-5.6-sol earlier session against a configured claude-code/sonnet</div>
+<div class="line"><span class="at">[15:01:29]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[15:01:30]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[15:01:31]</span> <span class="muted">job-started</span> name=verification pid=48792 log=.dabbler/runs/s295/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[15:02:25]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s295/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[15:02:25]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[15:02:25]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[15:02:25]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[15:02:26]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=61560 log=.dabbler/runs/s295/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[15:02:30]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s295/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[15:02:31]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[15:02:31]</span> <span class="muted">job-started</span> name=run of record: typescript pid=63980 log=.dabbler/runs/s295/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[15:03:52]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s295/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[15:03:53]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[15:03:54]</span> <span class="muted">job-started</span> name=run of record: extension pid=38140 log=.dabbler/runs/s295/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[15:04:14]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s295/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[15:04:14]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[15:04:21]</span> <span class="muted">landed</span> commit=2c55e83e4343abf75400bd5fee8bab4df5f579ea</div>
+<div class="line"><span class="at">[15:04:21]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[15:04:22]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[15:04:22]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[15:04:23]</span> <span class="muted">job-started</span> name=close pid=14064 log=.dabbler/runs/s295/driver/jobs/close.log</div>
+<div class="line"><span class="at">[15:04:40]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s295/driver/jobs/close.log</div>
+<div class="line"><span class="at">[15:04:40]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="bad">ISSUES_FOUND</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details open><summary>1 finding</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>major</strong> <span class="bad">blocking</span></td><td>Release UI still prefers the previous session’s orchestrator instead of the repository’s configured authoring engine</td><td>fixed — orchestratorOf takes release 'author' (default, the unattended fallback) or 'none'; authoringNode and engineVehicleNode read 'none', so a release in flight answers from the configuration; projection and Open a Mechanic tests now use a copilot/gpt-5.6-sol earlier session against a configured claude-code/sonnet — (packages/router/src/projection.ts, packages/router/test/projection.test.ts, tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts)</td></tr>
+</table></td></tr>
+<tr><td>2</td><td>fix-delta</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td>0</td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>2s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>78s</td><td>1407</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>18s</td><td>297</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

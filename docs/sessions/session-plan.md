@@ -19538,7 +19538,7 @@ has the checked-out branch, and a changed answer reaches `bootstrap` as
 
 The framework publishes session 328 as 3.33.0 and nothing else.
 
-### Session 330 of 339: Configuration before any folder, and buttons that say what a person has
+### Session 330 of 341: Configuration before any folder, and buttons that say what a person has
 
 Scope: `tools/dabbler-ai-orchestration/package.json` (`viewsWelcome`),
 `tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts`,
@@ -19632,7 +19632,7 @@ changelog's 3.34.0 section says what changed for a person.
 Explorer. Any change to what a choice is or to the layers that decide it:
 a flag, the checkout, the machine, the distribution, and no fifth. Any
 change to what `bootstrap` writes, or to the first two sessions it
-scaffolds: session 338. Cloning done by Dabbler's own code. The
+scaffolds: session 340. Cloning done by Dabbler's own code. The
 Marketplace screenshots.
 
 **Tests.** In `solutionTreeProvider.test.ts`: no workspace root renders
@@ -19652,11 +19652,11 @@ run from. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes, as 3.34.0 in session 331.
 
-### Session 331 of 339: Release 3.34.0 (release: 3.34.0)
+### Session 331 of 341: Release 3.34.0 (release: 3.34.0)
 
 The framework publishes session 330 as 3.34.0 and nothing else.
 
-### Session 332 of 339: The Work Explorer stops freezing the window
+### Session 332 of 341: The Work Explorer stops freezing the window
 
 Scope: `tools/dabbler-ai-orchestration/src/utils/projection.ts`
 (`projectionCacheKey`, `taskRecordInputs`),
@@ -19672,7 +19672,7 @@ watchers and the poll), `projection.test.ts`, `fileSystem.test.ts`,
 "seems to be running really slowly", and a Start in
 chromatic-notation-configurator did nothing the first time and took a
 couple of minutes the second. Every session in every repository pays for
-this, and sessions 336 and 337 would walk a framework that freezes the
+this, and sessions 338 and 339 would walk a framework that freezes the
 window they are walked in. So it comes first, and ships alone as 3.34.1.
 
 **Why.** Measured on this machine, 2026-11-16, from VS Code's own logs:
@@ -19746,11 +19746,148 @@ run check:version` checks the stamp.
 
 **Releasable.** Yes, as 3.34.1 in session 333.
 
-### Session 333 of 339: Release 3.34.1 (release: 3.34.1)
+### Session 333 of 341: Release 3.34.1 (release: 3.34.1)
 
 The framework publishes session 332 as 3.34.1 and nothing else.
 
-### Session 334 of 339: A rollback from a stop offers the report first
+### Session 334 of 341: A leftover answer file cannot be submitted
+
+Scope: `packages/router/src/drive.ts` (`planAsk`, the dispositions ask),
+`packages/router/src/session.ts` (`report`, the answer-file branch),
+`packages/router/src/cli/session.ts` (the `--answer-file` help),
+`drive.test.ts`, `session.test.ts`, `docs/driving-a-session.md`
+
+**Ahead of the walks, and first of three.** The operator, 2026-11-16:
+staff are meeting stops that end in a rollback. An investigation of one
+staff repository (`docs/syndromic-surveillance-v2-session-138-140-141-investigation.md`,
+written against router 3.29.0) traced five of its sessions to one cause,
+and the cause was confirmed in this tree before this was planned. Sessions
+334 to 336 ship together as 3.35.0, ahead of sessions 338 to 341: this
+one removes the cause, session 335 makes the plan a session is held to
+one reading, and session 336 lets a person report the stop they roll
+back from.
+
+**Why.** A session can be declared from another session's work plan, and
+once it is, only a rollback undoes it:
+
+- `planAsk` tells the engine to write its plan to a file "for example
+  .dabbler/scratch/plan.json". `.dabbler/` is ignored and nothing empties
+  it, so the last session's file is still there.
+- An engine's tool for creating a file refuses one that exists. The engine
+  that does not notice runs the answer command anyway, and `report` reads
+  the old file.
+- The same instruction forbids `session_number` in the file, so nothing in
+  the file says whose it is. `stampAnswer` stamps this session's number on
+  it, and the declaration goes on the activity log, which is append-only.
+- `plan amend` changes one step's files or checks and nothing else, and a
+  cancel followed by a restore brings the same declaration back. In the
+  staff repository this cost a rollback in sessions 119, 120, 138, 140
+  and 141, and a hand-written warning pasted into the plan in between.
+- A dispositions answer travels by file the same way and has the same gap.
+
+**Step 1 -- the instruction names a file of this session's own.** The plan
+ask names `.dabbler/scratch/plan-s<N>.json`, and the dispositions ask
+names one that carries the session and the round. Still an example: an
+engine may write its answer anywhere outside the ledger.
+
+**Step 2 -- an answer written before it was asked for is refused.**
+`report` refuses an answer file last written before the instruction it
+answers was issued, and says when each was, and to write the answer and
+run the command again. This is the guard that does not depend on the
+name. The session confirms from the driver what an interrupt's re-issue
+does to `issued_at` before relying on it: an answer written to the first
+issue is still an answer, and the comparison is with the first.
+
+**Step 3 -- an accepted answer is used once.** When an answer is copied
+into the ledger, its file is removed where it lies under
+`.dabbler/scratch/`. A file anywhere else is the engine's own and is left.
+
+**Step 4 -- the plan ask says a check changes nothing.** One sentence
+where the ask describes checks: a check that writes a tracked file is
+refused, so a generator is run as the step's work and the check proves
+its output is current. Session 138 of the staff repository learned it
+from two refusals.
+
+**Non-goals.** Replacing a work plan once it is declared: a rollback
+before any step is accepted discards nothing that was committed, and it
+stays the way out until this release has run on staff machines and shown
+whether another is wanted. Requiring `session_number` in the file, or any
+change to `stampAnswer`'s rule. Emptying `.dabbler/scratch/` at a start.
+What `restore` brings back. `version.json`: session 336 stamps it.
+
+**Tests.** In `session.test.ts`: an answer file older than its
+instruction is refused and nothing is written to the ledger; one written
+after it is accepted; an accepted file under `.dabbler/scratch/` is gone
+afterwards and one elsewhere is still there. In `drive.test.ts`: the plan
+ask and the dispositions ask each name a path carrying the session's
+number.
+
+**Releasable.** Yes, as 3.35.0 in session 337.
+
+### Session 335 of 341: A session's section of the plan is read one way
+
+Scope: `packages/router/src/session.ts` (`extractSpecExcerpt`),
+`packages/router/src/verify/prompts.ts` (`specExcerpt`, `buildTaskBlock`),
+`packages/router/src/approvedPlan.ts` (`approvedContractChange`),
+`packages/router/src/transcript.ts` (`readPlanSection`),
+`packages/router/src/drive.ts` (`planAsk`), `session.test.ts`,
+`prompts.test.ts`, `approvedPlan.test.ts`, `transcript.test.ts`
+
+**Why.** The same investigation, and confirmed in this tree: what the
+author is asked to plan from and what the reviewer holds the session to
+can be different text, and neither is told.
+
+- `extractSpecExcerpt` returns the whole plan when no heading matches the
+  session. `planAsk` expects nothing in that case and has words for it
+  that are never reached; the reviewer is handed every session in the
+  file as "the session's plan, verbatim".
+- Three functions find a session's section, each by its own rule.
+  `extractSpecExcerpt` and `approvedContractChange` run to the next
+  session heading, so a heading that is not a session's is swept into the
+  section before it: in this plan, the part headings between sessions; in
+  the staff repository, a "Proposed follow-up" the session itself
+  appended. `readPlanSection`, for the transcript, stops at any `###`.
+- The reviewer reads the section from the working tree. A session that
+  edits the plan, as session 140 of the staff repository was asked to, is
+  reviewed against the text it wrote. The contract control already reads
+  the plan as committed at the session's start, for this reason.
+
+**Step 1 -- one reader.** One function takes the plan's text and a
+session's number and returns that session's section, or nothing. A
+section ends at the next heading of level three or above. The plan ask,
+the reviewer's prompt, the contract control and the transcript all call
+it, and the private copies are deleted.
+
+**Step 2 -- no section is said, never the whole file.** The plan ask says
+what it already has the words for. The reviewer's prompt says the plan
+has no section for this session.
+
+**Step 3 -- the reviewer is given the section as it stood at the start.**
+`specExcerpt` reads the plan at the session's start commit. Where the
+section in the tree differs from it, the prompt carries both, the second
+labelled as changed during the session, so an amendment a person made is
+in front of the reviewer and an edit the author made is too.
+
+**Non-goals.** The work plan block the reviewer is also given: where it
+disagrees with the session's section, saying so is the reviewer's job.
+Showing the session's section again in each step's ask. Writing
+`sessions.json` or `project-work-plan.md` when the plan is committed:
+`dabbler status` already reads a not-started session's title from the
+plan. `healTitle`. Which transcript pages a rollback keeps: the page the
+investigation found stale was put back by a revert made by hand, and
+`dabbler transcript --from 140 --to 140` in that repository renders it
+again. `version.json`: session 336 stamps it.
+
+**Tests.** In `session.test.ts`: a number with no heading reads as
+nothing; a section stops at a heading that is not a session's. In
+`prompts.test.ts`: the prompt carries the section as committed at the
+start, and both versions where the tree's differs. The contract control's
+and the transcript's existing tests hold unchanged through the one
+reader.
+
+**Releasable.** Yes, as 3.35.0 in session 337.
+
+### Session 336 of 341: A rollback from a stop offers the report first
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/cancelLifecycleCommands.ts`
 (`runRollbackSessionFlow`),
@@ -19763,10 +19900,11 @@ and `packages/router/src/inProcess.ts` (`SessionDefectReportOptions`),
 `version.json` and the manifests `npm run stamp:version` writes,
 `tools/dabbler-ai-orchestration/CHANGELOG.md`
 
-**Ahead of the walks.** The operator, 2026-11-16: staff are starting to
-meet framework stops that end in a rollback, and those are the stops the
-maintainers most need to hear about. So this comes before sessions 336 to
-339 and ships alone as 3.35.0.
+**Ahead of the walks, and last of three.** The operator, 2026-11-16: staff
+are starting to meet framework stops that end in a rollback, and those
+are the stops the maintainers most need to hear about. Sessions 334 and
+335 remove the cause that was found; this one is for the next cause,
+which nobody has found yet. It ships with them as 3.35.0.
 
 **Why.** A stop a person rolls back from is one the framework gave no
 acceptable way past, and today it is the one stop that cannot be reported:
@@ -19813,7 +19951,8 @@ before it is rolled back, and name the command.
 
 **Step 5 -- the number.** `version.json` goes to 3.35.0 (a minor: a
 person has a choice they did not have), stamped with `npm run
-stamp:version`, and the changelog's 3.35.0 section says so in a sentence.
+stamp:version`, and the changelog's 3.35.0 section says what sessions 334
+to 336 changed for a person.
 
 **Non-goals.** Sending anything: the person reads the report and sends it
 themselves, as now, and no code posts an issue. A report after the
@@ -19833,13 +19972,13 @@ only on the person's say-so. In `session.test.ts`: `--rolling-back` adds
 the one line to Where, and the report without it is unchanged. `npm run
 check:version` checks the stamp.
 
-**Releasable.** Yes, as 3.35.0 in session 335.
+**Releasable.** Yes, as 3.35.0 in session 337.
 
-### Session 335 of 339: Release 3.35.0 (release: 3.35.0)
+### Session 337 of 341: Release 3.35.0 (release: 3.35.0)
 
-The framework publishes session 334 as 3.35.0 and nothing else.
+The framework publishes sessions 334 to 336 as 3.35.0 and nothing else.
 
-### Session 336 of 339: A document is walked to a close, on the framework as it is
+### Session 338 of 341: A document is walked to a close, on the framework as it is
 
 Scope: `docs/uat/uat-document-walk.md` (new: what was walked and what was
 found), whatever in `packages/router/src/` or
@@ -19857,7 +19996,7 @@ and `round26-*`). Three of them, and both of the stronger pair, said the
 same thing about order: walk a document before the first two sessions'
 text is rewritten, not after. Text scaffolded into a repository stays in
 it for good, so what it says about prose should be what a walk showed and
-not what a plan supposed. So this session comes before session 338 and
+not what a plan supposed. So this session comes before session 340 and
 uses the framework as it stands, with a session plan written by hand for
 the scratch folder.
 
@@ -19904,7 +20043,7 @@ session's record and transcript then say was checked.
 **Step 4 -- what was found, written down.** `docs/uat/uat-document-walk.md`
 says what was walked, each finding, and for each whether it was fixed
 here, is planned as a session, or is a limit to state in the
-documentation. Session 338 is written from this page.
+documentation. Session 340 is written from this page.
 
 The page also carries a second list, kept through steps 1 to 3: every
 thing the walk needed that a person who is not a developer would not have
@@ -19920,10 +20059,10 @@ framework's -- a sentence that assumes code -- is fixed here, with its
 test. Anything that needs a design -- handing the reviewer the brief and
 the sources, a rule for severity on prose, a check the router itself
 provides, a line in the record saying no person has approved a draft -- is
-written into this plan as a session of its own, before session 338, and
+written into this plan as a session of its own, before session 340, and
 is not built here.
 
-**Non-goals.** Any change to the scaffolded sessions 1 and 2: session 338.
+**Non-goals.** Any change to the scaffolded sessions 1 and 2: session 340.
 A reviewer for binary documents. A spell-check, style or citation control.
 Any public statement that documents are supported. Walking legislation, a
 novel or any long work: a two-page procedure, and the page says so.
@@ -19931,10 +20070,10 @@ novel or any long work: a two-page procedure, and the page says so.
 **Tests.** One per fix step 5 makes, in the file named after what it
 changed. A walk that finds nothing small to fix adds none.
 
-**Releasable.** Yes, as 3.36.0 in session 339, where step 5 changed
+**Releasable.** Yes, as 3.36.0 in session 341, where step 5 changed
 anything.
 
-### Session 337 of 339: A script repository is read as code and walked to a close
+### Session 339 of 341: A script repository is read as code and walked to a close
 
 Scope: `packages/router/src/bootstrap/detect.ts` (`SOURCE_FILE`),
 `packages/router/test/detect.test.ts`, `docs/uat/uat-script-walk.md`
@@ -19963,22 +20102,22 @@ and no test framework, and how the session is closed with code and no
 suite: by a suite the person is led to declare, not by a waiver.
 
 **Step 3 -- what was found, written down** in
-`docs/uat/uat-script-walk.md`, as session 336 does for a document.
+`docs/uat/uat-script-walk.md`, as session 338 does for a document.
 
-**Step 4 -- fix what is small,** within the bound of session 336's step 5.
+**Step 4 -- fix what is small,** within the bound of session 338's step 5.
 
 **Non-goals.** Detectors, suites or scaffolding for PowerShell, R, or any
 ecosystem `detect.ts` does not already read: a person declares the suite,
 as the scaffolded `dabbler.yaml` says. Source extensions nobody has asked
-for. Any change to the scaffolded sessions 1 and 2: session 338.
+for. Any change to the scaffolded sessions 1 and 2: session 340.
 
 **Tests.** In `detect.test.ts`: a repository whose tracked files are
 PowerShell reads `maintenance`, and one whose tracked files are Markdown
 or R Markdown reads `greenfield`. One test per fix step 4 makes.
 
-**Releasable.** Yes, as 3.36.0 in session 339.
+**Releasable.** Yes, as 3.36.0 in session 341.
 
-### Session 338 of 339: The first two sessions ask what is being made
+### Session 340 of 341: The first two sessions ask what is being made
 
 Scope: `packages/router/src/bootstrap/templates.ts` (`PLAN_PROMPT`,
 `DECOMPOSITION_PROMPT`, the greenfield pieces of `bootstrapPlan`, one
@@ -19994,7 +20133,7 @@ step), `tools/dabbler-ai-orchestration/media/walkthrough-session.md`,
 the manifests `npm run stamp:version` writes,
 `tools/dabbler-ai-orchestration/CHANGELOG.md`
 
-**Written from the walks.** This session runs after sessions 336 and 337
+**Written from the walks.** This session runs after sessions 338 and 339
 and is amended from `docs/uat/uat-document-walk.md` and
 `docs/uat/uat-script-walk.md` before it starts: where a walk contradicts a
 sentence below, the walk is right and the sentence is changed, with the
@@ -20163,7 +20302,7 @@ has said what comes next.
 Every step still has a check the framework can run, and the text says
 what one is for prose, since the framework refuses a step without one: a
 command that exits 0 when the file exists and carries the sections the
-step was to write. Which command is what session 336 found to run on a
+step was to write. Which command is what session 338 found to run on a
 locked-down machine. The text says what such a check proves and no more:
 the draft is there and has its sections.
 
@@ -20197,7 +20336,7 @@ answer" as though every plan had modules.
 
 **Step 5 -- what is claimed, and the number.** `docs/guide/README.md` and
 the extension's README say in one short paragraph what the framework is
-used for, and claim only what sessions 336 and 337 walked: programs,
+used for, and claim only what sessions 338 and 339 walked: programs,
 scripts included, and plain-text documents kept in Markdown, with the
 limits the walks found. The reader it is written for is a person who
 already works in VS Code and with git: a developer or a technical writer
@@ -20206,7 +20345,7 @@ ready for a person who is not one. Session 1's question may name a novel or
 legislation; the public pages do not, until somebody has taken one to a
 close. `version.json` goes to 3.36.0 (a minor: the first sessions ask a
 new question), stamped with `npm run stamp:version`, and the changelog's
-3.36.0 section says what sessions 336 to 338 changed for a person.
+3.36.0 section says what sessions 338 to 340 changed for a person.
 
 **Non-goals.** The maintenance posture's two sessions beyond that one
 clause: a repository that already holds code is asked what is to change,
@@ -20221,7 +20360,7 @@ converting `.docx`, `.pptx` or any binary format in the framework's own
 code. Templates for particular genres. Rewriting the sessions 1 and 2 of
 a repository already set up. Any change to `detect.ts`, to the suites, to
 the reviewer's prompt, to the record, or to the rule that a step has a
-check: where session 336 found one of those wanting, it is a session of
+check: where session 338 found one of those wanting, it is a session of
 its own, planned before this one.
 
 **Tests.** In `bootstrap.test.ts`: the plan scaffolded into an empty
@@ -20234,8 +20373,8 @@ printed plan prompt does. The existing assertions on the .NET and Java
 text move to the printed guidance and are not relaxed. `npm run
 check:version` checks the stamp.
 
-**Releasable.** Yes, as 3.36.0 in session 339.
+**Releasable.** Yes, as 3.36.0 in session 341.
 
-### Session 339 of 339: Release 3.36.0 (release: 3.36.0)
+### Session 341 of 341: Release 3.36.0 (release: 3.36.0)
 
-The framework publishes sessions 336 to 338 as 3.36.0 and nothing else.
+The framework publishes sessions 338 to 340 as 3.36.0 and nothing else.

@@ -6617,9 +6617,9 @@
     {
       "number": 334,
       "title": "A leftover answer file cannot be submitted",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-16T09:44:55.999000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-16T11:20:29.285000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

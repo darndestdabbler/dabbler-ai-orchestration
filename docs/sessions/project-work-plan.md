@@ -375,7 +375,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 335 | A session's section of the plan is read one way | no | 2026-11-16 |
 | 336 | A rollback from a stop offers the report first | no | 2026-11-16 |
 | 337 | The Dabbler Terminal says what is happening | no | 2026-11-16 |
-| 338 | Release 3.35.0 (release: 3.35.0) | — | not declared |
+| 338 | Release 3.35.0 (release: 3.35.0) | yes | 2026-11-16 |
 | 339 | A document is walked to a close, on the framework as it is | — | not declared |
 | 340 | A script repository is read as code and walked to a close | — | not declared |
 | 341 | The first two sessions ask what is being made | — | not declared |
@@ -3844,3 +3844,9 @@ Make a stop that ends in a rollback reportable. The router's `dabbler session de
 **Releasable: no.**
 
 Make the Dabbler Terminal say what the framework is doing between an answer and the next instruction. When the driver takes up an author's answer -- a plan, a step's report, a round's dispositions -- it logs one `answer-taken` line before judging it (the step id or the round, the status, the notes) and moves the waiting record off the author to the framework's own work (owner `job`, so `waiting-on` reads like a job's: "Judging the report of step x -- 0:12"); the verdict, adjudication and Mechanic answers are confirmed to log on arrival, and one that does not gets a line. `runStepChecks` takes an optional observer so each check logs `check-started` (step, argv) as it begins and `check-ended` (step, argv, outcome passed|failed, seconds) as it ends, and the named-test run after them logs the same pair; while a check runs the waiting record names it with its time limit as `by`, so `renderWaiting` says the check and its time against its limit. `scripts/suite.mjs` runs a list of router test files in sequential batches of whole files, streaming each batch's output untouched as today and printing one router-format progress line per batch (files done of total, tests passed and failed so far), the exit status the worst of the batches and the cancelled-test guard applied per batch. The Dabbler Terminal renders the new lines in its one line format with no check or batch output copied into it. Finally the driver is read for other places where work starts and nothing is logged until it ends, each gets a line as it starts, anything larger than a line becomes a session of its own in the plan, and the 3.35.0 changelog section gains a paragraph saying what a person now sees.
+
+### Session 338 — Release 3.35.0 (release: 3.35.0)
+
+**Releasable: yes.**
+
+Release 3.35.0: the framework packs and publishes what is on the trunk.

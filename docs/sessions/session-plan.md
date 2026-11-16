@@ -19538,7 +19538,7 @@ has the checked-out branch, and a changed answer reaches `bootstrap` as
 
 The framework publishes session 328 as 3.33.0 and nothing else.
 
-### Session 330 of 341: Configuration before any folder, and buttons that say what a person has
+### Session 330 of 342: Configuration before any folder, and buttons that say what a person has
 
 Scope: `tools/dabbler-ai-orchestration/package.json` (`viewsWelcome`),
 `tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts`,
@@ -19652,11 +19652,11 @@ run from. `npm run check:version` checks the stamp.
 
 **Releasable.** Yes, as 3.34.0 in session 331.
 
-### Session 331 of 341: Release 3.34.0 (release: 3.34.0)
+### Session 331 of 342: Release 3.34.0 (release: 3.34.0)
 
 The framework publishes session 330 as 3.34.0 and nothing else.
 
-### Session 332 of 341: The Work Explorer stops freezing the window
+### Session 332 of 342: The Work Explorer stops freezing the window
 
 Scope: `tools/dabbler-ai-orchestration/src/utils/projection.ts`
 (`projectionCacheKey`, `taskRecordInputs`),
@@ -19746,11 +19746,11 @@ run check:version` checks the stamp.
 
 **Releasable.** Yes, as 3.34.1 in session 333.
 
-### Session 333 of 341: Release 3.34.1 (release: 3.34.1)
+### Session 333 of 342: Release 3.34.1 (release: 3.34.1)
 
 The framework publishes session 332 as 3.34.1 and nothing else.
 
-### Session 334 of 341: A leftover answer file cannot be submitted
+### Session 334 of 342: A leftover answer file cannot be submitted
 
 Scope: `packages/router/src/drive.ts` (`planAsk`, the dispositions ask),
 `packages/router/src/session.ts` (`report`, the answer-file branch),
@@ -19835,7 +19835,7 @@ number and ask for the members step 2 names.
 
 **Releasable.** Yes, as 3.35.0 in session 337.
 
-### Session 335 of 341: A session's section of the plan is read one way
+### Session 335 of 342: A session's section of the plan is read one way
 
 Scope: `packages/router/src/session.ts` (`extractSpecExcerpt`),
 `packages/router/src/verify/prompts.ts` (`specExcerpt`, `buildTaskBlock`),
@@ -19907,9 +19907,9 @@ named, where the tree's differs. In `approvedPlan.test.ts`: a contract
 change written into the tree's section after the start grants nothing,
 as now. The transcript's existing tests hold through the one reader.
 
-**Releasable.** Yes, as 3.35.0 in session 337.
+**Releasable.** Yes, as 3.35.0 in session 338.
 
-### Session 336 of 341: A rollback from a stop offers the report first
+### Session 336 of 342: A rollback from a stop offers the report first
 
 Scope: `tools/dabbler-ai-orchestration/src/commands/cancelLifecycleCommands.ts`
 (`runRollbackSessionFlow`),
@@ -19995,13 +19995,100 @@ written still opens the report. In `session.test.ts`: `--rolling-back` adds
 the one line to Where, and the report without it is unchanged. `npm run
 check:version` checks the stamp.
 
-**Releasable.** Yes, as 3.35.0 in session 337.
+**Releasable.** Yes, as 3.35.0 in session 338.
 
-### Session 337 of 341: Release 3.35.0 (release: 3.35.0)
+### Session 337 of 342: The Dabbler Terminal says what is happening
 
-The framework publishes sessions 334 to 336 as 3.35.0 and nothing else.
+Scope: `packages/router/src/drive.ts` (`runStepChecks`, the named-test
+run, the answer intake, `setWaiting`), `packages/router/src/progress.ts`
+(`renderWaiting`), `scripts/suite.mjs` (the run of a list of test files),
+`tools/dabbler-ai-orchestration/src/router/dabblerTerminal.ts` (the lines it
+renders), `drive.test.ts`, `progress.test.ts`, `dabblerTerminal.test.ts`,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
 
-### Session 338 of 341: A document is walked to a close, on the framework as it is
+**Ahead of the release, and with 334 to 336.** The operator, 2026-11-16,
+watching session 334: "Between the framework output and the AI output, we
+shouldn't leave human operators wondering what is going on." Step 2 of
+that session sat for more than half an hour with the terminal's last line
+`waiting-on says=Author owes step answer-says-whose - 0:01`, though the
+answer had been given and the framework was running its checks. The
+operator asked whether it was stuck, and the only way to tell was to list
+the machine's processes. It ships with sessions 334 to 336 as 3.35.0.
+
+**Why.** Two silences, both measured in that session:
+
+- **An answer arriving says nothing.** The event log has `run-resumed` and
+  nothing more until the checks end, and the waiting record still names
+  the author, so the terminal goes on saying the author owes an answer the
+  author has given.
+- **A step's checks are logged only once all of them have run.**
+  `runStepChecks` runs every check and then the loop logs each result, so
+  a step whose checks take twenty minutes prints nothing for twenty
+  minutes and then everything at once. Nothing is logged when a check
+  starts, and the named tests after it are the same.
+
+**Step 1 -- an answer says it has arrived.** When the driver takes up an
+answer from the author -- a plan, a step's report, a round's dispositions
+-- it logs one line before judging it: what was answered (the step's id,
+or the round), its status, and its notes. The waiting record moves off
+the author at the same moment, to the framework's own work, so the
+`waiting-on` line says what the framework is doing rather than what the
+author owes. The answers the framework already logs when they arrive --
+a verdict, an adjudication, the Mechanic's -- are confirmed to have a line
+each, and one that has none gets one.
+
+**Step 2 -- each check says when it starts and when it ends.** A step's
+checks are logged one by one: a line as each starts, naming its argv, and
+a line as each ends, passed or failed, with how long it took. The named
+tests after them are logged the same way. While a check is running, the
+waiting record names it, so the `waiting-on` line reads like a job's,
+with the check and the time it has run against its time limit.
+
+**Step 3 -- a long list of test files reports progress.** `suite.mjs`
+runs a list of test files in batches rather than in one `node --test`
+call, and prints one line as each batch ends: how many files of how many
+are done, and how many tests passed and failed so far. The batches run
+one after another, so a run takes somewhat longer; the operator prefers
+progress that costs a little time to speed that says nothing. A failure
+is still reported once, at the end, with the whole output it has today.
+
+**Step 4 -- the terminal renders them.** The Dabbler Terminal shows the
+new lines in the format it uses for every other line (`hh:mm:ss`, the
+event, its fields, a hanging indent). Nothing from a check's or a batch's
+own output is copied into the terminal: what a person reads is that it
+started, that it is still running, and how it ended.
+
+**Step 5 -- the other quiet stretches.** Read the driver for any other
+place where the framework starts work and logs nothing until it ends,
+and give each one a line as it starts. Anything found that is larger
+than a line is written into this plan as a session of its own, not done
+here. The changelog's 3.35.0 section gains a paragraph saying what a
+person now sees.
+
+**Non-goals.** Copying a check's, a test's or a job's output into the
+terminal: the job's log already holds it and is named. A progress bar or
+any other widget. Changing what a check, a test run or a job decides, or
+any time limit. Running batches in parallel, which would put back the
+silence this session removes. Breaking a single test file into pieces:
+a batch is a group of whole files. `version.json`: session 336 stamps
+3.35.0, and this session changes no version.
+
+**Tests.** In `drive.test.ts`: an answer is logged before it is judged,
+and the waiting record leaves the author when it is taken up; a step with
+two checks logs a start and an end for each, in order, the second start
+after the first end. In `progress.test.ts`: the waiting sentence for a
+running check names the check and its time. In `dabblerTerminal.test.ts`:
+the new lines render in the terminal's one line format. `suite.mjs`'s
+batching is checked by running it over a short list and reading one line
+per batch.
+
+**Releasable.** Yes, as 3.35.0 in session 338.
+
+### Session 338 of 342: Release 3.35.0 (release: 3.35.0)
+
+The framework publishes sessions 334 to 337 as 3.35.0 and nothing else.
+
+### Session 339 of 342: A document is walked to a close, on the framework as it is
 
 Scope: `docs/uat/uat-document-walk.md` (new: what was walked and what was
 found), whatever in `packages/router/src/` or
@@ -20019,7 +20106,7 @@ and `round26-*`). Three of them, and both of the stronger pair, said the
 same thing about order: walk a document before the first two sessions'
 text is rewritten, not after. Text scaffolded into a repository stays in
 it for good, so what it says about prose should be what a walk showed and
-not what a plan supposed. So this session comes before session 340 and
+not what a plan supposed. So this session comes before session 341 and
 uses the framework as it stands, with a session plan written by hand for
 the scratch folder.
 
@@ -20066,7 +20153,7 @@ session's record and transcript then say was checked.
 **Step 4 -- what was found, written down.** `docs/uat/uat-document-walk.md`
 says what was walked, each finding, and for each whether it was fixed
 here, is planned as a session, or is a limit to state in the
-documentation. Session 340 is written from this page.
+documentation. Session 341 is written from this page.
 
 The page also carries a second list, kept through steps 1 to 3: every
 thing the walk needed that a person who is not a developer would not have
@@ -20082,10 +20169,10 @@ framework's -- a sentence that assumes code -- is fixed here, with its
 test. Anything that needs a design -- handing the reviewer the brief and
 the sources, a rule for severity on prose, a check the router itself
 provides, a line in the record saying no person has approved a draft -- is
-written into this plan as a session of its own, before session 340, and
+written into this plan as a session of its own, before session 341, and
 is not built here.
 
-**Non-goals.** Any change to the scaffolded sessions 1 and 2: session 340.
+**Non-goals.** Any change to the scaffolded sessions 1 and 2: session 341.
 A reviewer for binary documents. A spell-check, style or citation control.
 Any public statement that documents are supported. Walking legislation, a
 novel or any long work: a two-page procedure, and the page says so.
@@ -20093,10 +20180,10 @@ novel or any long work: a two-page procedure, and the page says so.
 **Tests.** One per fix step 5 makes, in the file named after what it
 changed. A walk that finds nothing small to fix adds none.
 
-**Releasable.** Yes, as 3.36.0 in session 341, where step 5 changed
+**Releasable.** Yes, as 3.36.0 in session 342, where step 5 changed
 anything.
 
-### Session 339 of 341: A script repository is read as code and walked to a close
+### Session 340 of 342: A script repository is read as code and walked to a close
 
 Scope: `packages/router/src/bootstrap/detect.ts` (`SOURCE_FILE`),
 `packages/router/test/detect.test.ts`, `docs/uat/uat-script-walk.md`
@@ -20125,22 +20212,22 @@ and no test framework, and how the session is closed with code and no
 suite: by a suite the person is led to declare, not by a waiver.
 
 **Step 3 -- what was found, written down** in
-`docs/uat/uat-script-walk.md`, as session 338 does for a document.
+`docs/uat/uat-script-walk.md`, as session 339 does for a document.
 
-**Step 4 -- fix what is small,** within the bound of session 338's step 5.
+**Step 4 -- fix what is small,** within the bound of session 339's step 5.
 
 **Non-goals.** Detectors, suites or scaffolding for PowerShell, R, or any
 ecosystem `detect.ts` does not already read: a person declares the suite,
 as the scaffolded `dabbler.yaml` says. Source extensions nobody has asked
-for. Any change to the scaffolded sessions 1 and 2: session 340.
+for. Any change to the scaffolded sessions 1 and 2: session 341.
 
 **Tests.** In `detect.test.ts`: a repository whose tracked files are
 PowerShell reads `maintenance`, and one whose tracked files are Markdown
 or R Markdown reads `greenfield`. One test per fix step 4 makes.
 
-**Releasable.** Yes, as 3.36.0 in session 341.
+**Releasable.** Yes, as 3.36.0 in session 342.
 
-### Session 340 of 341: The first two sessions ask what is being made
+### Session 341 of 342: The first two sessions ask what is being made
 
 Scope: `packages/router/src/bootstrap/templates.ts` (`PLAN_PROMPT`,
 `DECOMPOSITION_PROMPT`, the greenfield pieces of `bootstrapPlan`, one
@@ -20156,7 +20243,7 @@ step), `tools/dabbler-ai-orchestration/media/walkthrough-session.md`,
 the manifests `npm run stamp:version` writes,
 `tools/dabbler-ai-orchestration/CHANGELOG.md`
 
-**Written from the walks.** This session runs after sessions 338 and 339
+**Written from the walks.** This session runs after sessions 339 and 340
 and is amended from `docs/uat/uat-document-walk.md` and
 `docs/uat/uat-script-walk.md` before it starts: where a walk contradicts a
 sentence below, the walk is right and the sentence is changed, with the
@@ -20325,7 +20412,7 @@ has said what comes next.
 Every step still has a check the framework can run, and the text says
 what one is for prose, since the framework refuses a step without one: a
 command that exits 0 when the file exists and carries the sections the
-step was to write. Which command is what session 338 found to run on a
+step was to write. Which command is what session 339 found to run on a
 locked-down machine. The text says what such a check proves and no more:
 the draft is there and has its sections.
 
@@ -20359,7 +20446,7 @@ answer" as though every plan had modules.
 
 **Step 5 -- what is claimed, and the number.** `docs/guide/README.md` and
 the extension's README say in one short paragraph what the framework is
-used for, and claim only what sessions 338 and 339 walked: programs,
+used for, and claim only what sessions 339 and 340 walked: programs,
 scripts included, and plain-text documents kept in Markdown, with the
 limits the walks found. The reader it is written for is a person who
 already works in VS Code and with git: a developer or a technical writer
@@ -20368,7 +20455,7 @@ ready for a person who is not one. Session 1's question may name a novel or
 legislation; the public pages do not, until somebody has taken one to a
 close. `version.json` goes to 3.36.0 (a minor: the first sessions ask a
 new question), stamped with `npm run stamp:version`, and the changelog's
-3.36.0 section says what sessions 338 to 340 changed for a person.
+3.36.0 section says what sessions 339 to 341 changed for a person.
 
 **Non-goals.** The maintenance posture's two sessions beyond that one
 clause: a repository that already holds code is asked what is to change,
@@ -20383,7 +20470,7 @@ converting `.docx`, `.pptx` or any binary format in the framework's own
 code. Templates for particular genres. Rewriting the sessions 1 and 2 of
 a repository already set up. Any change to `detect.ts`, to the suites, to
 the reviewer's prompt, to the record, or to the rule that a step has a
-check: where session 338 found one of those wanting, it is a session of
+check: where session 339 found one of those wanting, it is a session of
 its own, planned before this one.
 
 **Tests.** In `bootstrap.test.ts`: the plan scaffolded into an empty
@@ -20396,8 +20483,8 @@ printed plan prompt does. The existing assertions on the .NET and Java
 text move to the printed guidance and are not relaxed. `npm run
 check:version` checks the stamp.
 
-**Releasable.** Yes, as 3.36.0 in session 341.
+**Releasable.** Yes, as 3.36.0 in session 342.
 
-### Session 341 of 341: Release 3.36.0 (release: 3.36.0)
+### Session 342 of 342: Release 3.36.0 (release: 3.36.0)
 
-The framework publishes sessions 338 to 340 as 3.36.0 and nothing else.
+The framework publishes sessions 339 to 341 as 3.36.0 and nothing else.

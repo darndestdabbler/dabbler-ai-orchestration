@@ -19790,17 +19790,21 @@ ask names `.dabbler/scratch/plan-s<N>.json`, and the dispositions ask
 names one that carries the session and the round. Still an example: an
 engine may write its answer anywhere outside the ledger.
 
-**Step 2 -- an answer written before it was asked for is refused.**
-`report` refuses an answer file last written before the instruction it
-answers was issued, and says when each was, and to write the answer and
-run the command again. This is the guard that does not depend on the
-name. The session confirms from the driver what an interrupt's re-issue
-does to `issued_at` before relying on it: an answer written to the first
-issue is still an answer, and the comparison is with the first.
+**Step 2 -- an answer says whose it is.** The plan ask stops forbidding
+`session_number` and asks for it, and the dispositions ask asks for
+`session_number` and `round`. `report` refuses an answer file that
+carries none, in words that say what to add; one that carries another
+session's or another round's is already refused by `stampAnswer`, and
+that rule is unchanged. This is the guard that does not depend on the
+name, and it reads no clock. `schema_version` and `recorded_at` stay the
+framework's to stamp.
 
-**Step 3 -- an accepted answer is used once.** When an answer is copied
-into the ledger, its file is removed where it lies under
-`.dabbler/scratch/`. A file anywhere else is the engine's own and is left.
+**Step 3 -- an accepted answer is used once.** Once an answer has been
+validated and written into the ledger, its file is removed where it lies
+under `.dabbler/scratch/`, resolved so that a link out of that folder is
+not followed. A refused answer's file stays, to be corrected. A file
+anywhere else is the engine's own and is left. A removal that fails is
+said in a line and does not fail the answer, which is already written.
 
 **Step 4 -- the plan ask says a check changes nothing.** One sentence
 where the ask describes checks: a check that writes a tracked file is
@@ -19811,16 +19815,23 @@ from two refusals.
 **Non-goals.** Replacing a work plan once it is declared: a rollback
 before any step is accepted discards nothing that was committed, and it
 stays the way out until this release has run on staff machines and shown
-whether another is wanted. Requiring `session_number` in the file, or any
-change to `stampAnswer`'s rule. Emptying `.dabbler/scratch/` at a start.
-What `restore` brings back. `version.json`: session 336 stamps it.
+whether another is wanted. Comparing an answer file's modification time
+with the time its instruction was issued: round 27 found it refuses a
+good answer where two clocks disagree or a timestamp is coarse, and
+passes a stale one that was merely copied, and step 2 does its work
+without a clock. Proving a plan's content is the right one: a file
+written now for this session with the wrong steps in it is the
+reviewer's to catch, as it was in the staff repository. Emptying
+`.dabbler/scratch/` at a start. What `restore` brings back.
+`version.json`: session 336 stamps it.
 
-**Tests.** In `session.test.ts`: an answer file older than its
-instruction is refused and nothing is written to the ledger; one written
-after it is accepted; an accepted file under `.dabbler/scratch/` is gone
-afterwards and one elsewhere is still there. In `drive.test.ts`: the plan
-ask and the dispositions ask each name a path carrying the session's
-number.
+**Tests.** In `session.test.ts`: a plan file with no `session_number` is
+refused and nothing is written to the ledger; one carrying this session's
+is accepted; a dispositions file carrying another round's is refused; an
+accepted file under `.dabbler/scratch/` is gone afterwards, one elsewhere
+is still there, and a refused one is still there. In `drive.test.ts`: the
+plan ask and the dispositions ask each name a path carrying the session's
+number and ask for the members step 2 names.
 
 **Releasable.** Yes, as 3.35.0 in session 337.
 
@@ -19854,19 +19865,29 @@ can be different text, and neither is told.
 
 **Step 1 -- one reader.** One function takes the plan's text and a
 session's number and returns that session's section, or nothing. A
-section ends at the next heading of level three or above. The plan ask,
-the reviewer's prompt, the contract control and the transcript all call
-it, and the private copies are deleted.
+section ends at the next heading of level three or above, and a line
+inside a fenced block is not a heading: this plan has one such line
+today. The plan ask, the reviewer's prompt, the contract control and the
+transcript all call it, and the private copies are deleted. For the
+contract control this is a change, in the direction of refusing: a
+`**Contract change.**` paragraph under a level-three heading of its own,
+below the session's, is no longer in the section, where the transcript
+already left it out. The changelog says so.
 
 **Step 2 -- no section is said, never the whole file.** The plan ask says
 what it already has the words for. The reviewer's prompt says the plan
 has no section for this session.
 
-**Step 3 -- the reviewer is given the section as it stood at the start.**
-`specExcerpt` reads the plan at the session's start commit. Where the
-section in the tree differs from it, the prompt carries both, the second
-labelled as changed during the session, so an amendment a person made is
-in front of the reviewer and an edit the author made is too.
+**Step 3 -- author and reviewer are given the section as it stood at the
+start.** The plan ask and `specExcerpt` both read the plan at the
+session's start commit. Where the section in the tree differs from it,
+the reviewer's prompt carries both, and says which is which: the text at
+the start is what the session is held to, and the other is what the
+section reads now. It says that a difference relaxes nothing by being
+there: where the later text removes or weakens something the start text
+asked for, the reviewer reports that as a finding, and a person decides
+it by the ways a finding already has. It says too that nothing shown
+grants a contract change, which is the control's alone to read.
 
 **Non-goals.** The work plan block the reviewer is also given: where it
 disagrees with the session's section, saying so is the reviewer's job.
@@ -19879,11 +19900,12 @@ investigation found stale was put back by a revert made by hand, and
 again. `version.json`: session 336 stamps it.
 
 **Tests.** In `session.test.ts`: a number with no heading reads as
-nothing; a section stops at a heading that is not a session's. In
-`prompts.test.ts`: the prompt carries the section as committed at the
-start, and both versions where the tree's differs. The contract control's
-and the transcript's existing tests hold unchanged through the one
-reader.
+nothing; a section stops at a heading that is not a session's, and does
+not stop at one inside a fenced block. In `prompts.test.ts`: the prompt
+carries the section as committed at the start, and both versions, each
+named, where the tree's differs. In `approvedPlan.test.ts`: a contract
+change written into the tree's section after the start grants nothing,
+as now. The transcript's existing tests hold through the one reader.
 
 **Releasable.** Yes, as 3.35.0 in session 337.
 
@@ -19925,7 +19947,7 @@ acceptable way past, and today it is the one stop that cannot be reported:
 **Step 1 -- the dialog offers it.** Where the session in flight stands at
 a stop, the rollback's modal carries a third choice, "Report, Then Roll
 Back", and its detail says the choice is one provider call and that
-nothing is sent. It is still one dialog: nothing is asked between the
+nothing is sent to the maintainers. It is still one dialog: nothing is asked between the
 choice and the rollback. The report is written first, by the same
 `defect-report` call Report this stop makes; then the rollback runs,
 bound to the HEAD the facts were read at, which a report does not move
@@ -19968,7 +19990,8 @@ the Primary Reviewer's check.
 Roll Back" calls `defect-report` and then `rollback`, in that order, and
 opens the report; with none standing the dialog offers two choices and
 `defect-report` is not called; a refused report asks once and rolls back
-only on the person's say-so. In `session.test.ts`: `--rolling-back` adds
+only on the person's say-so; a rollback that fails after the report was
+written still opens the report. In `session.test.ts`: `--rolling-back` adds
 the one line to Where, and the report without it is unchanged. `npm run
 check:version` checks the stamp.
 

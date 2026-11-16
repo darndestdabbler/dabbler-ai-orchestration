@@ -59,6 +59,38 @@ export const STATE_FILENAME = "sessions.json";
 export const ACTIVITY_LOG_FILENAME = "activity-log.json";
 export const SESSION_PLAN_FILENAME = "session-plan.md";
 
+const SESSION_HEADING = /^###\s+Session\s+(\d+)\b/;
+const SECTION_END = /^#{1,3}(?:\s|$)/;
+const FENCE = /^ {0,3}(?:```|~~~)/;
+
+/**
+ * Session `sessionNumber`'s section of the session plan: its `### Session N`
+ * heading through the line before the next heading of level three or above,
+ * trimmed. A line inside a fenced block is not a heading. Null where no
+ * heading names the session -- never the whole plan in its place. Every
+ * reader of one session's section reads it here.
+ */
+export function planSection(planText: string, sessionNumber: number): string | null {
+  const lines = planText.split(/\r?\n/);
+  let fenced = false;
+  let start = -1;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (FENCE.test(line)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) continue;
+    if (start >= 0) {
+      if (SECTION_END.test(line)) return lines.slice(start, index).join("\n").trim();
+      continue;
+    }
+    const heading = SESSION_HEADING.exec(line);
+    if (heading !== null && Number.parseInt(heading[1], 10) === sessionNumber) start = index;
+  }
+  return start < 0 ? null : lines.slice(start).join("\n").trim();
+}
+
 export function sessionsDirFor(repoRoot: string): string {
   return join(repoRoot, SESSIONS_PARENT, SESSIONS_DIRNAME);
 }

@@ -683,22 +683,6 @@ export function releaseSessionVersion(sessionsDir: string, sessionNumber: number
   return parseSessionPlans(text).find((plan) => plan.number === sessionNumber)?.release ?? null;
 }
 
-/**
- * The one session's slice of the plan, falling back to the whole when no
- * heading matches.
- */
-export function extractSpecExcerpt(specText: string, sessionNumber: number): string {
-  SESSION_HEAD_RE.lastIndex = 0;
-  const matches = [...specText.matchAll(SESSION_HEAD_RE)];
-  for (let index = 0; index < matches.length; index += 1) {
-    if (Number.parseInt(matches[index][1], 10) !== sessionNumber) continue;
-    const end =
-      index + 1 < matches.length ? matches[index + 1].index! : specText.length;
-    return specText.slice(matches[index].index!, end).trim();
-  }
-  return specText.trim();
-}
-
 // --- start -------------------------------------------------------------------
 
 function isDirectory(path: string): boolean {

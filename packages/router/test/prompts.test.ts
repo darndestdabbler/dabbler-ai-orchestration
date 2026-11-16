@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 
 import { grantForTransport } from "../src/agency.ts";
 import {
@@ -96,6 +96,14 @@ describe("the prior-findings block", () => {
 });
 
 describe("the task block a round opens with", () => {
+  // The task block reads the plan as committed at the session's start; a
+  // fixture with no commit answers that it has none, and the tree is read.
+  let restoreGit: () => void = () => {};
+  before(() => {
+    restoreGit = gitAnswers([[["show"], { code: 128 }]]);
+  });
+  after(() => restoreGit());
+
   it("carries the session's own plan verbatim and the round number, says when the plan is unavailable, and appends the briefing only when a grant was made", () => {
     const repo = tempDir();
     seed(repo, { "docs/sessions/session-plan.md": "### Session 1 of 1: First things\n1. Register.\n2. **Build the widget.** Make it real.\n" });
@@ -105,6 +113,36 @@ describe("the task block a round opens with", () => {
     assert.ok(buildTaskBlock(tempDir(), 1, 1, []).includes("(session plan unavailable)"));
     const seat = grantForTransport("copilot-cli", { scope: ["src/widget.py"] });
     assert.notEqual(buildTaskBlock(sessionsDir, 1, 1, [], null, null, seat), block);
+  });
+
+  it("says the plan has no section for a session it does not name, and carries no other session's text", () => {
+    const repo = tempDir();
+    seed(repo, { "docs/sessions/session-plan.md": "### Session 1 of 2: First things\n1. Build the widget.\n" });
+    const block = buildTaskBlock(join(repo, "docs", "sessions"), 2, 1, []);
+    assert.ok(block.includes("(the session plan has no section for session 2)"));
+    assert.ok(!block.includes("Build the widget."));
+  });
+
+  it("carries the section as committed at the session's start, and both versions, each named, where the tree's differs", () => {
+    const repo = tempDir();
+    const sessionsDir = join(repo, "docs", "sessions");
+    const atStart = "### Session 1 of 1: First things\n1. Build the widget, with tests.\n";
+    seed(repo, { "docs/sessions/session-plan.md": atStart });
+    const restore = gitAnswers([[(args) => args[0] === "show", () => ({ stdout: atStart })]]);
+    try {
+      const same = buildTaskBlock(sessionsDir, 1, 1, [], null, repo);
+      assert.ok(same.includes("Build the widget, with tests.") && !same.includes("As committed at the session's start"));
+      seed(repo, { "docs/sessions/session-plan.md": "### Session 1 of 1: First things\n1. Build the widget.\n" });
+      const block = buildTaskBlock(sessionsDir, 1, 1, [], null, repo);
+      const held = block.indexOf("As committed at the session's start -- the text this session is held to:");
+      const now = block.indexOf("As the section reads in the working tree now:");
+      assert.ok(held >= 0 && now > held);
+      assert.ok(block.slice(held, now).includes("Build the widget, with tests."));
+      assert.ok(block.slice(now).includes("1. Build the widget.\n"));
+      assert.ok(block.includes("relaxes nothing") && block.includes("grants a contract change"));
+    } finally {
+      restore();
+    }
   });
 
   it("carries the accepted work plan's task and non-goals, and nothing for a session with no plan", () => {
@@ -184,6 +222,7 @@ describe("the task block a round opens with", () => {
       [["rev-parse", "--show-toplevel"], (_args, root) => ({ stdout: root.split("\\").join("/") })],
       [["status", "--porcelain", "-uall"], { stdout: "" }],
       [["status", "--porcelain"], { stdout: "" }],
+      [["show"], { code: 128 }],
     ]);
     try {
       registerSessionStart(sessionsDir, 1, { engine: "claude-code" });

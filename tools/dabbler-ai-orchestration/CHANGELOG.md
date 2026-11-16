@@ -10,6 +10,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > written here, in a version section, by the session that carries the
 > release.
 
+## [Unreleased]
+
+### Changed
+
+- **A session's section of the plan ends at the next heading.** The plan
+  ask, the reviewer, the build contract and the transcript now read a
+  session's section the same way: it ends at the next heading of level
+  three or above, and a heading-shaped line inside a fenced block does not
+  end it. For the build contract this is stricter: a
+  `**Contract change.**` paragraph under a level-three heading of its own
+  below the session's, such as a "Proposed follow-up", no longer approves
+  anything.
+
 ## [3.34.1] — 2026-11-16
 
 ### Fixed

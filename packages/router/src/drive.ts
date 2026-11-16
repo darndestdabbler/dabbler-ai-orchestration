@@ -107,7 +107,7 @@ import { commitSessionTranscript } from "./transcript.ts";
 import { SETTING_AUTHORING_MODEL, SETTING_MECHANIC_MODEL, SETTING_TRANSCRIPT } from "./settings.ts";
 import { namedReviewers, readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
-import { approvedContractChange, sessionStartCommit } from "./approvedPlan.ts";
+import { approvedContractChange, sessionStartCommit, startPlanText } from "./approvedPlan.ts";
 import { STATUS_NOT_APPLICABLE, STATUS_PASS, contractFact } from "./facts.ts";
 import { type LandFacts, type LandSuiteFact, judgeLandReadiness } from "./land.ts";
 import { detectEcosystems, existingBuildFiles } from "./bootstrap/detect.ts";
@@ -120,7 +120,7 @@ import {
   FIDELITY_UNKNOWN,
   observedFidelity,
 } from "./selection.ts";
-import { SESSION_PLAN_FILENAME } from "./evidence.ts";
+import { SESSION_PLAN_FILENAME, planSection } from "./evidence.ts";
 import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
   type EvidencePhase,
@@ -175,7 +175,6 @@ import {
   RELEASE_ENGINE,
   declare,
   liveLoopSession,
-  extractSpecExcerpt,
   releaseSessionVersion,
   lastSessionDone,
   report,
@@ -3286,10 +3285,12 @@ class Driver {
   private planAsk(): string {
     let excerpt = "";
     try {
-      excerpt = extractSpecExcerpt(
-        readFileSync(join(this.sessionsDir, SESSION_PLAN_FILENAME), "utf8"),
-        this.sessionNumber,
-      );
+      // The plan as committed at the session's start, which the reviewer
+      // holds the session to; the tree's only where that commit has none.
+      const plan =
+        startPlanText(this.repoRoot, this.sessionsDir, this.sessionNumber) ??
+        readFileSync(join(this.sessionsDir, SESSION_PLAN_FILENAME), "utf8");
+      excerpt = planSection(plan, this.sessionNumber) ?? "";
     } catch {
       excerpt = "";
     }

@@ -32,12 +32,12 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join } from "node:path";
 
 import { driverDir, readDriverEvents, readRun, readWorkPlan } from "./driver.ts";
-import { SESSION_PLAN_FILENAME } from "./evidence.ts";
+import { SESSION_PLAN_FILENAME, planSection } from "./evidence.ts";
 import { jobLogPath, jobStatusPath, jobsDir } from "./jobs.ts";
 import { TRANSCRIPTS_DIRNAME, runGit } from "./journal.ts";
 import { readExceptions, readRounds } from "./ledger.ts";
 import { redact } from "./packaging.ts";
-import { SESSION_HEADING_RE, STATUS_CANCELLED, sessionDisplayNumber } from "./progress.ts";
+import { STATUS_CANCELLED, sessionDisplayNumber } from "./progress.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { readRecords, type TestRunRecord } from "./testEvidence.ts";
 import { totalsOf, type TestTotals } from "./testOutput.ts";
@@ -285,19 +285,12 @@ function readSession(
   return { sessionNumber, planSection, workPlan, run, events, rounds, testRuns, jobs, roundsUnreadable };
 }
 
-/** From the session's `###` heading to the next `###` heading or the end. */
 function readPlanSection(sessionsDir: string, sessionNumber: number): string | null {
-  let plan: string;
   try {
-    plan = readFileSync(join(sessionsDir, SESSION_PLAN_FILENAME), "utf8");
+    return planSection(readFileSync(join(sessionsDir, SESSION_PLAN_FILENAME), "utf8"), sessionNumber);
   } catch {
     return null;
   }
-  const heading = [...plan.matchAll(SESSION_HEADING_RE)].find((match) => Number(match[1]) === sessionNumber);
-  if (heading === undefined) return null;
-  const after = plan.slice(heading.index + heading[0].length);
-  const end = after.search(/^###\s/m);
-  return heading[0] + (end < 0 ? after : after.slice(0, end));
 }
 
 function readJobs(repoRoot: string, sessionNumber: number, carry: JobCarry): JobReading[] {

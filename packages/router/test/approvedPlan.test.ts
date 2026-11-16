@@ -116,11 +116,12 @@ describe("an approved contract change", () => {
     }
   });
 
-  it("is read at the commit the session started on, so a paragraph committed during the session approves nothing", () => {
+  it("is read at the commit the session started on, so a paragraph written or committed during the session approves nothing", () => {
     const repo = tempDir();
     const sessionsDir = join(repo, "docs", "sessions");
     seed(repo, {
       "docs/sessions/sessions.json": JSON.stringify({ sessions: [{ number: 4, startCommit: "a1b2c3d4e5f6a7b8" }] }),
+      "docs/sessions/session-plan.md": PLAN,
     });
     const before = "### Session 4 of 5: Move the web service\n\n**What.** Nothing approved.\n";
     const at: Record<string, string> = {
@@ -133,6 +134,26 @@ describe("an approved contract change", () => {
       assert.equal(approvedContractChange(repo, sessionsDir, 4), null);
       at["a1b2c3d4e5f6a7b8:docs/sessions/session-plan.md"] = PLAN;
       assert.deepEqual(approvedContractChange(repo, sessionsDir, 4)?.files, ["Web/Web.csproj"]);
+    } finally {
+      restore();
+    }
+  });
+
+  it("grants nothing from a paragraph under a level-three heading of its own below the session's", () => {
+    const repo = tempDir();
+    const plan = [
+      "### Session 4 of 5: Move the web service",
+      "",
+      "**What.** Nothing approved here.",
+      "",
+      "### Proposed follow-up",
+      "",
+      "**Contract change.** `Web/Web.csproj` -- the session appended this.",
+      "",
+    ].join("\n");
+    const restore = gitAnswers([[(args) => args[0] === "show", () => ({ stdout: plan })]]);
+    try {
+      assert.equal(approvedContractChange(repo, join(repo, "docs", "sessions"), 4), null);
     } finally {
       restore();
     }

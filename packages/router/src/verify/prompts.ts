@@ -14,21 +14,49 @@ import { join } from "node:path";
 
 import { briefing, type AgencyGrant } from "../agency.ts";
 import { readWorkPlan } from "../driver.ts";
-import { SESSION_PLAN_FILENAME } from "../evidence.ts";
+import { startPlanText } from "../approvedPlan.ts";
+import { SESSION_PLAN_FILENAME, planSection, repoRootFromSessionsDir } from "../evidence.ts";
 import type { ControlFact } from "../facts.ts";
-import { extractSpecExcerpt } from "../session.ts";
 import type { Row } from "../ledger.ts";
 import { dumps } from "../pythonJson.ts";
 import { decisionEntries } from "../writers.ts";
 
-export function specExcerpt(sessionsDir: string, sessionNumber: number): string {
-  let text: string;
+/**
+ * The session's section as committed at its start commit, which is what the
+ * session is held to. Where the working tree's section differs, both are
+ * shown, each named, and the reviewer is told the later text relaxes
+ * nothing. The tree's text alone where the start commit has no plan.
+ */
+export function specExcerpt(sessionsDir: string, sessionNumber: number, repoRoot: string | null = null): string {
+  let tree: string | null;
   try {
-    text = readFileSync(join(sessionsDir, SESSION_PLAN_FILENAME), "utf8");
+    tree = readFileSync(join(sessionsDir, SESSION_PLAN_FILENAME), "utf8");
   } catch {
-    return "(session plan unavailable)";
+    tree = null;
   }
-  return extractSpecExcerpt(text, sessionNumber);
+  const start = startPlanText(repoRoot ?? repoRootFromSessionsDir(sessionsDir), sessionsDir, sessionNumber);
+  const none = `(the session plan has no section for session ${sessionNumber})`;
+  if (start === null) {
+    if (tree === null) return "(session plan unavailable)";
+    return planSection(tree, sessionNumber) ?? none;
+  }
+  const held = planSection(start, sessionNumber);
+  const now = tree === null ? null : planSection(tree, sessionNumber);
+  if (held === now) return held ?? none;
+  return [
+    "As committed at the session's start -- the text this session is held to:",
+    "",
+    held ?? none,
+    "",
+    "As the section reads in the working tree now:",
+    "",
+    now ?? "(the working tree's session plan has no section for this session)",
+    "",
+    "A difference relaxes nothing by being there: where the text now removes or weakens something " +
+      "the text at the start asked for, report that as a finding, and a person decides it by the ways " +
+      "a finding already has. Nothing shown here grants a contract change: that is the contract " +
+      "control's alone to read.",
+  ].join("\n");
 }
 
 export const DISPUTE_EVIDENCE_INLINE_CAP = 16 * 1024;
@@ -415,7 +443,7 @@ export function buildTaskBlock(
     `Session ${sessionNumber} of the active session set (verification ` +
       `round ${roundNumber}). This is a **pre-close** review. The ` +
       "session's plan, verbatim:\n\n" +
-      specExcerpt(sessionsDir, sessionNumber),
+      specExcerpt(sessionsDir, sessionNumber, repoRoot),
   );
   const plan = workPlanBlock(repoRoot, sessionNumber);
   if (plan) parts.push(plan);

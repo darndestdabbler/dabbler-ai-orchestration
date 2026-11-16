@@ -372,13 +372,14 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 332 | The Work Explorer stops freezing the window | no | 2026-11-16 |
 | 333 | Release 3.34.1 (release: 3.34.1) | yes | 2026-11-16 |
 | 334 | A leftover answer file cannot be submitted | no | 2026-11-16 |
-| 335 | A session's section of the plan is read one way | — | not declared |
+| 335 | A session's section of the plan is read one way | no | 2026-11-16 |
 | 336 | A rollback from a stop offers the report first | — | not declared |
-| 337 | Release 3.35.0 (release: 3.35.0) | — | not declared |
-| 338 | A document is walked to a close, on the framework as it is | — | not declared |
-| 339 | A script repository is read as code and walked to a close | — | not declared |
-| 340 | The first two sessions ask what is being made | — | not declared |
-| 341 | Release 3.36.0 (release: 3.36.0) | — | not declared |
+| 337 | The Dabbler Terminal says what is happening | — | not declared |
+| 338 | Release 3.35.0 (release: 3.35.0) | — | not declared |
+| 339 | A document is walked to a close, on the framework as it is | — | not declared |
+| 340 | A script repository is read as code and walked to a close | — | not declared |
+| 341 | The first two sessions ask what is being made | — | not declared |
+| 342 | Release 3.36.0 (release: 3.36.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3825,3 +3826,9 @@ Make a leftover answer file impossible to submit as this session's answer. The p
 **Amended after acceptance:**
 
 - 2026-11-16 — step 'answer-says-whose': its checks: walk-session.test.ts whole is ~42 session walks (~1 hour) and timed out as a step check with every finished test green; the step keeps one walk that answers a plan by file, and the whole file runs in the run of record (claude-code (anthropic, claude-opus-5-5))
+
+### Session 335 — A session's section of the plan is read one way
+
+**Releasable: no.**
+
+Make a session's section of the plan read one way. One function, `planSection(planText, sessionNumber)`, returns that session's section or null: it starts at the session's `### Session N` heading and ends at the next heading of level three or above, and a line inside a fenced block is not a heading. It lives in `evidence.ts`, beside `SESSION_PLAN_FILENAME`, because all four callers already import that module and `transcript.ts` cannot import `session.ts` (session imports transcript, and the boundary control refuses a new import cycle); its tests are therefore in `evidence.test.ts`, named after it. The contract control (`approvedContractChange`), the transcript (`readPlanSection`, deleted), the reviewer's prompt (`specExcerpt`) and the plan ask (`planAsk`) all call it, and `extractSpecExcerpt` is deleted. Where no section exists the plan ask uses the words it already has and the reviewer's prompt says the plan has no section for this session -- never the whole file. The plan ask and the reviewer's prompt read the plan as committed at the session's start commit (one helper in `approvedPlan.ts`, beside `sessionStartCommit`, which the contract control also uses); where the plan file is not in that commit at all, the tree's text is the only one and is named as such. Where the tree's section differs from the start's, the reviewer is given both, each named: the start text is what the session is held to; a difference relaxes nothing, and a later text that removes or weakens what the start asked for is reported as a finding; nothing shown grants a contract change, which is the control's alone to read. An `## [Unreleased]` entry in the extension's CHANGELOG says the contract control no longer reads a `**Contract change.**` paragraph under a level-three heading of its own below the session's.

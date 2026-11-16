@@ -16,6 +16,7 @@ import {
   hashOutput,
   matchScope,
   nextAbsenceFallback,
+  planSection,
   recordStateWrite,
   validateFindingEvidence,
   validateTranscript,
@@ -176,5 +177,44 @@ describe("the way out of a blocked check", () => {
       assert.ok(error instanceof EvidenceError);
       assert.equal(error.code, "worker-result-malformed");
     }
+  });
+});
+
+describe("planSection", () => {
+  const plan = [
+    "## Part one",
+    "",
+    "### Session 1 of 2: First",
+    "",
+    "Do the first thing.",
+    "",
+    "```yaml",
+    "# a comment, not a heading",
+    "### Session 2 of 2: not a heading either",
+    "```",
+    "",
+    "Still the first.",
+    "",
+    "### Proposed follow-up",
+    "",
+    "Not the session's.",
+    "",
+    "## Part two",
+    "",
+    "### Session 2 of 2: Second",
+    "",
+    "Do the second thing.",
+  ].join("\n");
+
+  it("reads a number with no heading as nothing", () => {
+    assert.equal(planSection(plan, 3), null);
+  });
+
+  it("stops at a heading that is not a session's, and not at one inside a fenced block", () => {
+    const first = planSection(plan, 1) ?? "";
+    assert.ok(first.startsWith("### Session 1 of 2: First"));
+    assert.ok(first.includes("# a comment, not a heading") && first.endsWith("Still the first."));
+    assert.ok(!first.includes("Proposed follow-up"));
+    assert.equal(planSection(plan, 2), "### Session 2 of 2: Second\n\nDo the second thing.");
   });
 });

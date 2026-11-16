@@ -22,7 +22,7 @@ import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 import { workingTreeChanges } from "./affected.ts";
-import { SESSION_PLAN_FILENAME, hashBytes } from "./evidence.ts";
+import { SESSION_PLAN_FILENAME, hashBytes, planSection } from "./evidence.ts";
 import { nowIso, platformNewlines, repoRelativePath, runGit } from "./journal.ts";
 import {
   LIFECYCLE_WRITTEN_FILES,
@@ -653,6 +653,17 @@ export function sessionStartCommit(sessionsDir: string, sessionNumber: number): 
 }
 
 /**
+ * The session plan as committed at the commit this session started on: the
+ * text the session is held to, which nothing the session writes can move.
+ * Null where that commit has no plan, or git cannot show it.
+ */
+export function startPlanText(repoRoot: string, sessionsDir: string, sessionNumber: number): string | null {
+  const planRel = repoRelativePath(repoRoot, join(sessionsDir, SESSION_PLAN_FILENAME)).replace(/\\/g, "/");
+  const shown = runGit(repoRoot, ["show", `${sessionStartCommit(sessionsDir, sessionNumber)}:${planRel}`]);
+  return shown.code === 0 ? shown.stdout : null;
+}
+
+/**
  * The target change this session's plan approves: the `**Contract change.**`
  * paragraph in this session's section of the session plan as committed at
  * the commit the session started on, which the person approved by
@@ -668,15 +679,9 @@ export function approvedContractChange(
   sessionsDir: string,
   sessionNumber: number,
 ): ContractChange | null {
-  const planRel = repoRelativePath(repoRoot, join(sessionsDir, SESSION_PLAN_FILENAME)).replace(/\\/g, "/");
-  const shown = runGit(repoRoot, ["show", `${sessionStartCommit(sessionsDir, sessionNumber)}:${planRel}`]);
-  if (shown.code !== 0) return null;
-  const heading = new RegExp(`^###\\s+Session\\s+${sessionNumber}\\b`, "m");
-  const start = heading.exec(shown.stdout);
-  if (start === null) return null;
-  const rest = shown.stdout.slice(start.index);
-  const next = /\n###\s+Session\s+\d+/.exec(rest.slice(1));
-  return contractChangeOf(next === null ? rest : rest.slice(0, next.index + 1));
+  const plan = startPlanText(repoRoot, sessionsDir, sessionNumber);
+  const section = plan === null ? null : planSection(plan, sessionNumber);
+  return section === null ? null : contractChangeOf(section);
 }
 
 // --- Risk flags --------------------------------------------------------------

@@ -13356,6 +13356,13 @@
       "what": "step 'answer-says-whose': its checks",
       "reason": "walk-session.test.ts whole is ~42 session walks (~1 hour) and timed out as a step check with every finished test green; the step keeps one walk that answers a plan by file, and the whole file runs in the run of record",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 335,
+      "dateTime": "2026-11-16T11:49:48.653000-05:00",
+      "task": "Make a session's section of the plan read one way. One function, `planSection(planText, sessionNumber)`, returns that session's section or null: it starts at the session's `### Session N` heading and ends at the next heading of level three or above, and a line inside a fenced block is not a heading. It lives in `evidence.ts`, beside `SESSION_PLAN_FILENAME`, because all four callers already import that module and `transcript.ts` cannot import `session.ts` (session imports transcript, and the boundary control refuses a new import cycle); its tests are therefore in `evidence.test.ts`, named after it. The contract control (`approvedContractChange`), the transcript (`readPlanSection`, deleted), the reviewer's prompt (`specExcerpt`) and the plan ask (`planAsk`) all call it, and `extractSpecExcerpt` is deleted. Where no section exists the plan ask uses the words it already has and the reviewer's prompt says the plan has no section for this session -- never the whole file. The plan ask and the reviewer's prompt read the plan as committed at the session's start commit (one helper in `approvedPlan.ts`, beside `sessionStartCommit`, which the contract control also uses); where the plan file is not in that commit at all, the tree's text is the only one and is named as such. Where the tree's section differs from the start's, the reviewer is given both, each named: the start text is what the session is held to; a difference relaxes nothing, and a later text that removes or weakens what the start asked for is reported as a finding; nothing shown grants a contract change, which is the control's alone to read. An `## [Unreleased]` entry in the extension's CHANGELOG says the contract control no longer reads a `**Contract change.**` paragraph under a level-three heading of its own below the session's.",
+      "releasable": false
     }
   ]
 }

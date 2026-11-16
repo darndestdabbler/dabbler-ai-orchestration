@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 282 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 282 transcript</h1>
+<p class="stamp">Rendered 2026-10-26T17:28:31.478Z by dabbler-ai-router 3.23.0 at bf989c719d9ec65b0ce72d7c182cb264cb309a9d.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-26T13:18:03.610-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 282 of 283: The planning session reads the code already there</h3>
+<p>Scope: <code>packages/router/src/bootstrap/templates.ts</code> (<code>BOOTSTRAP_PLAN</code>, <code>PLAN_PROMPT</code>, <code>DECOMPOSITION_PROMPT</code>), <code>packages/router/src/drive.ts</code> (<code>planAsk</code>); their tests; <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes; <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> The same request: existing work that needs to come onto Dabbler should be welcomed, and a planning session should read it. Bootstrap already detects a .NET solution or a Maven or Gradle build and declares its suites from it, but session 1's brief never mentions existing code, tells the engine not to look past the brief, and plans a first &quot;skeleton&quot; session that writes the solution file and every project -- over the ones already there.</p>
+<p><strong>Step 1 -- the brief surveys what exists.</strong> Where the repository already holds a solution (<code>.sln</code>, <code>.csproj</code>) or a build (<code>pom.xml</code>, <code>build.gradle</code>), session 1's brief and the plan ask tell the engine to read its structure, say in the plan whether it suits the framework's module-per-folder layout and what does not, and plan the first sessions as alignment -- Dabbler's documents, suites and module boundaries fitted to the projects that exist -- before any feature work.</p>
+<p><strong>Step 2 -- the skeleton is for a blank repository.</strong> The decomposition prompt's &quot;the first numbered session writes the solution file and every project&quot; applies where there is none; over an existing solution the first session adopts it, and adds only what the plan names that is missing.</p>
+<p><strong>Step 3 -- the version and the words.</strong> <code>version.json</code> goes to 3.24.0 (a minor: new behaviour for a project's start), stamped with <code>npm run stamp:version</code>, and the changelog gets a 3.24.0 section naming what 281 and 282 changed for a developer; 280's 3.23.1 section stays beneath it.</p>
+<p><strong>Non-goals.</strong> Restructuring existing code without the person's approval of the plan. Any language beyond the ecosystems <code>detectEcosystems</code> already knows. Any change to a blank repository's plan.</p>
+<p><strong>Tests.</strong> In <code>templates.test.ts</code> (new: nothing tests the templates today), the brief over an existing solution asks for the survey and alignment, and over a blank repository is unchanged. In <code>drive.test.ts</code>, the plan ask names the detected structure. <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes -- with 280 and 281, as 3.24.0 in session 283.</p>
+<h2>Work Plan</h2>
+<p>Make a planning session read the code already in a repository. A new <code>existingBuildFiles(root)</code> in bootstrap/detect.ts names the solution and build files at the root (*.sln, *.slnx, *.csproj, *.fsproj, pom.xml, build.gradle, build.gradle.kts) -- the same files the dotnet, Maven and Gradle detectors already read. The bootstrap session plan becomes <code>bootstrapPlan(existing)</code> in templates.ts: over a blank repository it returns exactly the text BOOTSTRAP_PLAN carries today; over an existing solution session 1's brief names those files and asks the engine to read the structure, say in the plan whether it suits the module-per-folder layout and what does not, and plan the first sessions as alignment (Dabbler's documents, suites and module boundaries fitted to the projects that exist) before any feature work, and session 2's skeleton paragraph says the first session adopts the existing solution and adds only what the plan names that is missing. scaffoldBootstrapSessions passes the files it finds. PLAN_PROMPT and DECOMPOSITION_PROMPT get the same rule in words that read correctly for either case. The driver's plan ask names the detected files, beside the existing suite-gap sentence, and nothing for a repository without them. version.json goes to 3.24.0, stamped, and the changelog gains a 3.24.0 section naming what 281 and 282 changed for a developer, above 280's 3.23.1.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/b1f2ec0e514655a395b9ad97739f9872af96e915"><code>b1f2ec0e514655a395b9ad97739f9872af96e915</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Brief surveys existing</td><td><p>Add existingBuildFiles(root) to detect.ts (root entries only, sorted) and test it in bootstrap.test.ts beside detectEcosystems. In templates.ts turn BOOTSTRAP_PLAN into bootstrapPlan(existing: readonly string[]): empty gives today's text unchanged; non-empty adds to session 1 a step-2 survey naming the files, asking for the structure to be read, its fit to the module-per-folder layout stated in the plan, and the first sessions planned as alignment before feature work, and replaces the skeleton sentences in session 1 step 3 and session 2 with adoption of the existing solution, adding only what the plan names that is missing. Keep BOOTSTRAP_PLAN exported as bootstrapPlan([]) only if something still needs it; otherwise remove it. scaffoldBootstrapSessions in bootstrap/index.ts passes existingBuildFiles(projectDir). New templates.test.ts: over an existing solution the plan asks for the survey and alignment and adopts rather than re-creates; over a blank repository it is unchanged.</p></td><td></td><td><code>node --test packages/router/test/templates.test.ts packages/router/test/bootstrap.test.ts</code><br><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Skeleton for blank only</td><td><p>In templates.ts, PLAN_PROMPT's 'The first numbered session, the skeleton, writes the projects' and DECOMPOSITION_PROMPT's 'The skeleton comes first' requirement say the skeleton applies where the repository has no solution or build yet; where one exists, the plan reads it and the first session adopts it and adds only what the plan names that is missing, never re-creating projects that exist. Extend templates.test.ts to hold both prompts to it.</p></td><td></td><td><code>node --test packages/router/test/templates.test.ts</code></td><td>yes</td></tr>
+<tr><td>Plan ask names structure</td><td><p>In drive.ts, planAsk gains one sentence, beside suiteGap, only where existingBuildFiles(repoRoot) finds files: it names them and says to read that structure and plan against the projects that exist rather than re-create them. drive.test.ts: the plan ask over a repository holding a solution names its files, and over one without names none.</p></td><td></td><td><code>node --test packages/router/test/drive.test.ts</code><br><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Version and changelog</td><td><p>Set version.json to 3.24.0 and run npm run stamp:version so the router and extension manifests and package-lock.json carry it. Add a 3.24.0 section to tools/dabbler-ai-orchestration/CHANGELOG.md above 3.23.1, naming for a developer what session 281 changed (an existing remote or folder is a starting point: --from-origin, --commit-existing, Set Up New Project reads the remote and offers to pull, the starter-files placeholder, the session-1 refusal offering to commit the files) and what session 282 changed (a planning session reads an existing .NET, Maven or Gradle solution and plans alignment first).</p></td><td></td><td><code>npm run check:version</code><br><code>node -e const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');const a=t.indexOf('## [3.24.0]'),b=t.indexOf('## [3.23.1]');process.exit(a&gt;=0&amp;&amp;a&lt;b?0:1)</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Restructuring any existing code, or writing any step that does so without the person's approval of the plan</li><li>Any language or build beyond the ecosystems detectEcosystems already knows (.NET, Maven, Gradle here)</li><li>Any change to the plan a blank repository is scaffolded with: bootstrapPlan([]) is byte-identical to today's BOOTSTRAP_PLAN</li><li>Reading below the repository root, which detect.ts deliberately does not do</li><li>Publishing: the release is session 283</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[17:18:03]</span> <span class="muted">run-started</span> session=282 mode=pull</div>
+<div class="line"><span class="at">[17:18:03]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[17:19:27]</span> <span class="muted">run-resumed</span> session=282 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[17:19:27]</span> <span class="muted">plan-accepted</span> steps=[&quot;brief-surveys-existing&quot;,&quot;skeleton-for-blank-only&quot;,&quot;plan-ask-names-structure&quot;,&quot;version-and-changelog&quot;] non_goals=5</div>
+<div class="line"><span class="at">[17:19:27]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[17:19:28]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=brief-surveys-existing</div>
+<div class="line"><span class="at">[17:21:35]</span> <span class="muted">run-resumed</span> session=282 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:21:38]</span> <span class="muted">check-passed</span> step=brief-surveys-existing argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/templates.test.ts&quot;,&quot;packages/router/test/bootstrap.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:21:42]</span> <span class="muted">check-passed</span> step=brief-surveys-existing argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[17:21:46]</span> <span class="muted">named-tests-passed</span> step=brief-surveys-existing suite=typescript command=node scripts/suite.mjs container packages/router/test/bootstrap.test.ts packages/router/test/schema.test.ts packages/router/test/templates.test.ts</div>
+<div class="line"><span class="at">[17:21:47]</span> <span class="muted">report-accepted</span> seq=2 step=brief-surveys-existing files=[] notes=existingBuildFiles names root solution/build files; bootstrapPlan(existing) surveys and adopts over them, byte-identical to the old BOOTSTRAP_PLAN when blank</div>
+<div class="line"><span class="at">[17:21:47]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=skeleton-for-blank-only</div>
+<div class="line"><span class="at">[17:22:52]</span> <span class="muted">run-resumed</span> session=282 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:22:55]</span> <span class="muted">check-passed</span> step=skeleton-for-blank-only argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/templates.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:22:58]</span> <span class="muted">named-tests-passed</span> step=skeleton-for-blank-only suite=typescript command=node scripts/suite.mjs container packages/router/test/templates.test.ts</div>
+<div class="line"><span class="at">[17:22:58]</span> <span class="muted">report-accepted</span> seq=3 step=skeleton-for-blank-only files=[] notes=PLAN_PROMPT and DECOMPOSITION_PROMPT keep the skeleton for a blank repository and have an existing solution read, aligned to and adopted</div>
+<div class="line"><span class="at">[17:22:58]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=plan-ask-names-structure</div>
+<div class="line"><span class="at">[17:23:59]</span> <span class="muted">run-resumed</span> session=282 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:24:02]</span> <span class="muted">check-passed</span> step=plan-ask-names-structure argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/drive.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:24:05]</span> <span class="muted">check-passed</span> step=plan-ask-names-structure argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[17:24:53]</span> <span class="muted">named-tests-passed</span> step=plan-ask-names-structure suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[17:24:53]</span> <span class="muted">report-accepted</span> seq=4 step=plan-ask-names-structure files=[] notes=planAsk carries existingStructureLine: names the root solution/build files and says to adopt them; empty where there are none</div>
+<div class="line"><span class="at">[17:24:53]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=version-and-changelog</div>
+<div class="line"><span class="at">[17:25:23]</span> <span class="muted">run-resumed</span> session=282 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:25:25]</span> <span class="muted">check-passed</span> step=version-and-changelog argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[17:25:26]</span> <span class="muted">check-passed</span> step=version-and-changelog argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');const a=t.indexOf('## [3.24.0]'),b=t.indexOf('## [3.23.1]');process.exit(a&gt;=0&amp;&amp;a&lt;b?0:1)&quot;]</div>
+<div class="line"><span class="at">[17:25:26]</span> <span class="muted">report-accepted</span> seq=5 step=version-and-changelog files=[] notes=version.json 3.24.0 stamped into the router and extension manifests and the lock; changelog 3.24.0 names 281 and 282 above 3.23.1</div>
+<div class="line"><span class="at">[17:25:26]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[17:25:27]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[17:25:28]</span> <span class="muted">job-started</span> name=verification pid=32272 log=.dabbler/runs/s282/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:26:50]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s282/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:26:50]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[17:26:50]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[17:26:50]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[17:26:50]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=41292 log=.dabbler/runs/s282/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:26:52]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s282/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:26:52]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[17:26:52]</span> <span class="muted">job-started</span> name=run of record: typescript pid=18296 log=.dabbler/runs/s282/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:28:03]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s282/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:28:03]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[17:28:03]</span> <span class="muted">job-started</span> name=run of record: extension pid=12000 log=.dabbler/runs/s282/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:28:20]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s282/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:28:20]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[17:28:24]</span> <span class="muted">landed</span> commit=b1f2ec0e514655a395b9ad97739f9872af96e915</div>
+<div class="line"><span class="at">[17:28:24]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[17:28:24]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[17:28:24]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[17:28:24]</span> <span class="muted">job-started</span> name=close pid=3824 log=.dabbler/runs/s282/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:28:31]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s282/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:28:31]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>3 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** The promised byte-identical blank-plan behavior is not pinned → `packages/router/test/templates.test.ts` → Start with the prior `BOOTSTRAP_PLAN` text as a golden fixture, call `bootstrapPlan([])`, and assert strict equality. The current regex assertions would still pass after unrelated wording changes.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** The driver test exercises only `existingStructureLine`, not the actual plan ask required by the task → `packages/router/test/drive.test.ts`, `packages/router/src/drive.ts` → With `Acme.sln` at the repository root, issue a real planning instruction and assert its text names `Acme.sln`; repeat with a blank root and assert the sentence is absent. The current test would survive removal of the `existingStructureLine(this.repoRoot)` integration.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** Detection tests do not pin the complete supported extension set → `packages/router/test/bootstrap.test.ts`, `packages/router/src/bootstrap/detect.ts` → Seed root-level `.sln`, `.slnx`, `.csproj`, `.fsproj`, `pom.xml`, `build.gradle`, and `build.gradle.kts` files plus matching nested files, then assert the sorted result contains every root file and no nested file.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>70s</td><td>1380</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>15s</td><td>296</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "comment": "The named remainder of the 2026-09-02 untangle: every import-cycle edge the boundary control tolerates, beside the boundary it violates. 52 back-edges were cut to these 2. Retire entries by breaking the cycle; never add one without its reason.",
+  "edges": [
+    ["gates", "writers"],
+    ["writers", "gates"],
+    ["route", "verifyjob"],
+    ["verifyjob", "route"]
+  ],
+  "reasons": {
+    "gates<->writers": "The close-out pair: gates asks writers whether the session declared itself releasable (sessionIsReleasable), and writers asks gates what the worktree materially changed before allowing a declaration (materialWorktreeChanges). Both are close-out workflow internals; the split belongs to the workflow-boundary session that gives close-out its own context.",
+    "route<->verifyjob": "A deliberate lazy pair the blind scanner never saw: route defers autoVerify (route.ts:658, 'because verifyjob calls back into route'; Python deferred the same edge the same way) and verifyjob defers route for dispatch. Runtime-safe by construction, on the record now that dynamic imports count; the split belongs to the verification workflow context."
+  }
+}

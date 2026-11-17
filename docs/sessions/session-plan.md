@@ -20088,27 +20088,41 @@ per batch.
 
 The framework publishes sessions 334 to 337 as 3.35.0 and nothing else.
 
-### Session 339 of 342: A document is walked to a close, on the framework as it is
+### Session 339 of 342: Documentation for an existing .NET solution is walked to a close
 
 Scope: `docs/uat/uat-document-walk.md` (new: what was walked and what was
 found), whatever in `packages/router/src/` or
 `tools/dabbler-ai-orchestration/src/` the walk shows to be stopping a
 session and is small to fix, with the test named after it
 
-**Why.** The operator wants the framework to be usable for a policy, a
-procedure or a piece of writing without choking. Nobody has yet run a
-session to its close in a repository with no code, and the framework's
-account of itself -- checks, suites, a run of record, a reviewer reading a
-diff -- was written about code.
+**Why.** The operator wants the framework to be usable for work that is
+not a program without choking, and has a real need that is one: a
+documentation repository for an existing .NET solution, separate from the
+code it describes, holding enough high-level and lower-level documentation
+(how database access is done, which UI tools are used) to move that
+solution to AI-facilitated development. Nobody has yet run a session to
+its close in a repository with no code, and the framework's account of
+itself -- checks, suites, a run of record, a reviewer reading a diff --
+was written about code.
 
-Four advisors were asked in two rounds (`docs/design/consults/round25-*`
-and `round26-*`). Three of them, and both of the stronger pair, said the
-same thing about order: walk a document before the first two sessions'
-text is rewritten, not after. Text scaffolded into a repository stays in
-it for good, so what it says about prose should be what a walk showed and
-not what a plan supposed. So this session comes before session 341 and
-uses the framework as it stands, with a session plan written by hand for
-the scratch folder.
+Rounds 25 and 26 (`docs/design/consults/`) said to walk a document before
+the first two sessions' text is rewritten, since text scaffolded into a
+repository stays in it for good. Round 28 (`round28-synthesis.md`), asked
+on 2026-11-17 whether a general or light Dabbler is wanted, said no: the
+operator's Python, JavaScript and LilyPond repositories have closed 131
+sessions between them with no special support, so the engine is already
+general, and less enforcement is not what work without code lacks. What it
+lacks is two things no instruction can supply: the material a reviewer
+needs to judge a claim, and a record that a person accepted the work. Both
+advisors also said documentation of real code is a better first walk than
+the scratch procedure this session first planned, because its claims can
+be shown false.
+
+The operator's solution is a work repository and is not sent anywhere by
+this session. The walk uses `darndestdabbler/ContosoUniversity`, one of
+the six public forks of the maintenance walk: an ASP.NET MVC 5 application
+on .NET Framework 4.8.1 with Entity Framework, a solution kept under
+`src/`, and enough of a data layer and a UI to have something to get wrong.
 
 Two things are known from the source and are not what the walk is for.
 The suite gate already says a repository of documents "has nothing to run
@@ -20117,45 +20131,88 @@ prose steps included. What is not known is what the walk is for:
 
 - **What the reviewer is given.** It reads the diff against the session's
   section of the plan and the declared non-goals. Nothing in the
-  verification code names a brief or source material, so a reviewer may be
-  judging a policy against sources it was never shown, and a change to one
-  chapter without the chapters it must agree with.
+  verification code names source material, so a reviewer may be judging a
+  page about data access against code it was never shown. Whether a
+  reviewer reached through a seat reads the code for itself is not known.
 - **Whether the loop ends.** A reviewer of prose can raise findings about
   taste for seven rounds. Findings should be errors -- a requirement
-  missed, a source contradicted, an earlier section contradicted, a stated
+  missed, the code contradicted, an earlier page contradicted, a stated
   rule broken -- and preferences should be Minor, which ends the loop.
-- **What a check can honestly be,** on a locked-down Windows machine that
-  may have neither Node on PATH nor a free hand with PowerShell.
+- **What a suite can honestly be** for documentation, and what a check can
+  be on a locked-down Windows machine that may have neither Node on PATH
+  nor a free hand with PowerShell.
 - **What the diff looks like.** A paragraph written as one long line shows
   a three-word edit as the whole paragraph replaced. One sentence per line
   may be what makes a prose diff reviewable.
 - **Which sentences the framework prints assume code.**
+- **What a person's review costs and catches** that the suite and the
+  reviewer did not.
 
-**Step 1 -- the scratch repository.** Outside this repository, with the
-router built from this tree: a folder set up as it is today, with a
-session plan written by hand in place of the scaffolded sessions 1 and 2.
-It holds source material -- a short existing policy the new procedure must
-agree with -- and two drafting sessions for a two-page standard operating
-procedure. The procedure is written one sentence per line.
+**Step 1 -- the documentation repository.** Outside this repository, with
+the router built from this tree: a new folder with its own git repository
+and no remote, set up as it is today, with a session plan written by hand
+in place of the scaffolded sessions 1 and 2. The code is a sibling
+checkout of the fork, read and never written, and
+`docs/planning/source.md` in the documentation repository records the
+fork's address, the full commit hash and the paths that matter. No
+submodule, and no neighbouring folder is searched: the path is given.
 
-**Step 2 -- a draft to its close.** Run the first drafting session to its
-close. Record each stop, each sentence that speaks of code to a person
-writing a procedure, what the checks were and whether they ran, and what
-the reviewer was sent, read from the round's own record.
+The plan written by hand has six documentation sessions, of which this
+walk runs two: a solution map with the commands that build and test it; a
+glossary of the domain's terms as the code uses them; how database access
+is done, traced through one entity; how a request reaches a page and comes
+back, with the UI tools named; what to touch to make each common kind of
+change; and a hand-over page a model reads first. They are written for a
+model that will change the code, so they are short and dense and name
+files, not long prose for a newcomer. Pages are Markdown, one sentence per
+line.
 
-**Step 3 -- a review that should say no.** The second drafting session's
-draft carries one seeded error of substance: a sentence that contradicts
-the source policy, in a section the session did not otherwise change.
-Record whether the reviewer finds it, whether its other findings are
-errors or preferences, how many rounds the loop takes, and what the
-session's record and transcript then say was checked.
+The repository declares one suite in `dabbler.yaml`, a short script it
+holds itself: every relative link resolves, every path a page names in
+backticks exists in the code at the pinned commit, and the sibling
+checkout is at that commit. It does not claim that a type or a member a
+page names exists: a text search cannot promise that.
 
-**Step 4 -- what was found, written down.** `docs/uat/uat-document-walk.md`
+Before either session runs, the plan also holds three to five questions a
+person will be asked of the finished pages, agreed by the operator: for
+instance, whether the page on database access matches how the solution
+works, and whether a developer could find where to make a named change
+from the pages alone.
+
+**Step 2 -- a page to its close.** Run the first documentation session,
+the solution map, to its close. Record each stop, each sentence that
+speaks of code to a person writing documentation, what the checks and the
+suite were and whether they ran, and what the reviewer was sent, read from
+the round's own record.
+
+**Step 3 -- a review that should say no.** The second session writes the
+page on database access, and its draft carries one seeded false claim
+about the code: for instance, that two saves are one transaction where
+the code commits them separately. The code that disproves it is in the
+sibling checkout and not in the diff. Record whether the reviewer finds
+it, what it cited, whether its other findings are errors or preferences,
+and how many rounds the loop takes. If the claim gets through, the
+session's section of the plan is amended to quote the source the claim
+rests on, with its path and commit, and the review is asked again: that
+says whether handing the reviewer the source is enough. The false claim
+is removed before the session closes, whoever found it.
+
+**Step 4 -- a person's review, by hand.** The authoring AI turns the
+agreed questions into a checklist in the JSON format of the operator's
+checklist editor (`darndestdabbler/uat-checklist-editor`), the operator
+works through it against the two pages, and what fails is corrected or
+written down as a session. Nothing in the router reads the file. Record
+how long it took, what it caught that the suite and the reviewer had not,
+which questions were worth asking, and whether anything stopped the
+authoring AI from marking the items passed itself.
+
+**Step 5 -- what was found, written down.** `docs/uat/uat-document-walk.md`
 says what was walked, each finding, and for each whether it was fixed
 here, is planned as a session, or is a limit to state in the
-documentation. Session 341 is written from this page.
+documentation. Session 341 is written from this page, and so is the plan
+the operator then writes for the work repository's own documentation.
 
-The page also carries a second list, kept through steps 1 to 3: every
+The page also carries a second list, kept through steps 1 to 4: every
 thing the walk needed that a person who is not a developer would not have
 or would not know. Installing an engine CLI, a key or a seat, git and a
 remote, a terminal, Markdown, reading a diff, the vocabulary on screen.
@@ -20164,66 +20221,103 @@ for this kind of work at all, and whether such a person needs a simpler
 one. That is decided from this list, after the walk, and not before it:
 the list says whether the obstacle is the editor or everything under it.
 
-**Step 5 -- fix what is small.** A stop whose fix is small and plainly the
+**Step 6 -- fix what is small.** A stop whose fix is small and plainly the
 framework's -- a sentence that assumes code -- is fixed here, with its
-test. Anything that needs a design -- handing the reviewer the brief and
-the sources, a rule for severity on prose, a check the router itself
-provides, a line in the record saying no person has approved a draft -- is
-written into this plan as a session of its own, before session 341, and
-is not built here.
+test. Anything that needs a design is written into this plan as a session
+of its own, before session 341, and is not built here. Two are expected
+and are planned only if the walk shows the need: a way for a session to
+name the material its reviewer is given, one mechanism for code and prose
+alike; and a person's acceptance of a piece of work at a milestone,
+recorded by the router against the commit that was read, which an engine
+cannot write and which replaces no check, finding or suite result.
 
-**Non-goals.** Any change to the scaffolded sessions 1 and 2: session 341.
-A reviewer for binary documents. A spell-check, style or citation control.
-Any public statement that documents are supported. Walking legislation, a
-novel or any long work: a two-page procedure, and the page says so.
+**Non-goals.** The other four documentation sessions, and any
+documentation of the operator's work repository: that is the operator's,
+in its own repository, after this. A mode, a setting or a lighter
+framework for work that is not code. Reading the checklist file in the
+router, or any record of a person's acceptance: step 6 plans it if it is
+wanted. A check of types and members by a compiler. Building or running
+the solution documented. Any change to the scaffolded sessions 1 and 2:
+session 341. A reviewer for binary documents. A spell-check, style or
+citation control. Any public statement that documents are supported.
 
-**Tests.** One per fix step 5 makes, in the file named after what it
+**Tests.** One per fix step 6 makes, in the file named after what it
 changed. A walk that finds nothing small to fix adds none.
 
-**Releasable.** Yes, as 3.36.0 in session 342, where step 5 changed
+**Releasable.** Yes, as 3.36.0 in session 342, where step 6 changed
 anything.
 
-### Session 340 of 342: A script repository is read as code and walked to a close
+### Session 340 of 342: Scripts are read as code, and a blog post is walked to a close
 
 Scope: `packages/router/src/bootstrap/detect.ts` (`SOURCE_FILE`),
-`packages/router/test/detect.test.ts`, `docs/uat/uat-script-walk.md`
+`packages/router/test/detect.test.ts`, `docs/uat/uat-prose-walk.md`
 (new), whatever in `packages/router/src/` or
 `tools/dabbler-ai-orchestration/src/` the walk shows to be stopping a
 session and is small to fix, with the test named after it
 
-**Why.** Set-up reads a repository's posture from the files git tracks,
-and its list of what counts as source names C#, Java, TypeScript, Python
-and their neighbours and omits PowerShell, R and shell scripts. A
-repository of forty PowerShell modules is read as holding no code and is
-given the sessions for a new solution.
+**Why.** Two things, one small and known, one not known.
+
+Set-up reads a repository's posture from the files git tracks, and its
+list of what counts as source names C#, Java, TypeScript, Python and their
+neighbours and omits PowerShell, R and shell scripts. A repository of
+forty PowerShell modules is read as holding no code and is given the
+sessions for a new solution. This session first planned to walk such a
+repository to a close as well. That walk is dropped: three repositories in
+languages the framework has no detector for have closed 131 sessions with
+suites a person declared, and a fourth language would show nothing new.
+The source list is the part that was wrong.
+
+What is not known is how the framework behaves on writing that nothing can
+check. Session 339's pages are about code, and a claim in them is true or
+false. A blog post has no path to look up and no source to contradict, so
+it is where a review turns into an argument about taste, and where a
+person's reading is the only test there is. Round 28's advisors split on
+whether this needs walking before session 341; the operator has a post to
+write for darndestdabbler.org, which settles it.
 
 **Step 1 -- the source list.** `SOURCE_FILE` gains `.ps1`, `.psm1`,
-`.psd1`, `.r`, `.sh` and `.bash`. Not `.rmd` or `.qmd`: R Markdown and
-Quarto files are mostly prose, and a folder of research papers is not a
-codebase to maintain. Prose is not added either: a folder of tracked
-Markdown is material to start from.
+`.psd1`, `.r`, `.sh` and `.bash`. Not `.rmd` or `.qmd`, which nobody has
+asked for: they can hold code, and leaving them out says nothing about
+whether such a repository needs checks. Prose is not added: a folder of
+tracked Markdown is material to start from.
 
-**Step 2 -- walk a script repository.** A scratch folder outside this
-repository holding a committed PowerShell module and no test: set up,
-confirm `dabbler.yaml` says `posture: maintenance`, and run sessions 1 and
-2 and the first numbered session to its close. Record what the
-maintenance session 1 asks of a repository with no projects, no build tool
-and no test framework, and how the session is closed with code and no
-suite: by a suite the person is led to declare, not by a waiver.
+**Step 2 -- the post, to a close.** A scratch folder outside this
+repository, set up as it is today, with a session plan written by hand.
+The idea for the post is the operator's and is asked for, in their words,
+and kept as `docs/planning/brief.md` with who the post is for and how long
+it should be; nothing is drafted from a guess. One drafting session writes
+the whole post, Markdown, one sentence per line, and a second revises it
+from what the operator says. Each session's section says what counts as an
+error -- the brief missed or contradicted, a fact stated that the brief
+does not support, an earlier paragraph contradicted, the length broken --
+and that wording, structure and taste are suggestions. Record the check
+each step could honestly declare, how many rounds each review took, which
+findings were errors and which were preferences raised as more, and each
+sentence the framework printed that assumes code.
 
-**Step 3 -- what was found, written down** in
-`docs/uat/uat-script-walk.md`, as session 339 does for a document.
+**Step 3 -- the operator reads it.** Between the two sessions the operator
+reads the draft and says whether it is the post they meant and what must
+change, against two or three questions agreed before the first session
+ran. That is the whole of the review, by hand, as in session 339. Record
+what it cost and what the second session did with it.
 
-**Step 4 -- fix what is small,** within the bound of session 339's step 5.
+**Step 4 -- what was found, written down** in `docs/uat/uat-prose-walk.md`,
+as session 339 does for documentation, with what the two walks found
+alike and what only this one did.
 
-**Non-goals.** Detectors, suites or scaffolding for PowerShell, R, or any
-ecosystem `detect.ts` does not already read: a person declares the suite,
-as the scaffolded `dabbler.yaml` says. Source extensions nobody has asked
-for. Any change to the scaffolded sessions 1 and 2: session 341.
+**Step 5 -- fix what is small,** within the bound of session 339's step 6.
+
+**Non-goals.** Publishing the post, or anything in the site's own
+repository: the operator takes the text from the scratch folder. Walking a
+script repository. Detectors, suites or scaffolding for PowerShell, R, or
+any ecosystem `detect.ts` does not already read: a person declares the
+suite, as the scaffolded `dabbler.yaml` says. Source extensions nobody has
+asked for. Any change to the scaffolded sessions 1 and 2: session 341.
+Fiction, verse, music or slides: one post, and the page says so.
 
 **Tests.** In `detect.test.ts`: a repository whose tracked files are
 PowerShell reads `maintenance`, and one whose tracked files are Markdown
-or R Markdown reads `greenfield`. One test per fix step 4 makes.
+or R Markdown reads `greenfield`. One test per fix step 5 makes.
 
 **Releasable.** Yes, as 3.36.0 in session 342.
 
@@ -20245,7 +20339,7 @@ the manifests `npm run stamp:version` writes,
 
 **Written from the walks.** This session runs after sessions 339 and 340
 and is amended from `docs/uat/uat-document-walk.md` and
-`docs/uat/uat-script-walk.md` before it starts: where a walk contradicts a
+`docs/uat/uat-prose-walk.md` before it starts: where a walk contradicts a
 sentence below, the walk is right and the sentence is changed, with the
 person's approval, as any plan amendment is.
 
@@ -20429,8 +20523,9 @@ packaging session and the release sessions are planned where the plan
 names a .NET, Maven or Gradle solution, in today's words; another language
 gets a first session that writes its own build and declares its suite
 where it has either; a document or a creative work gets no skeleton,
-suite, packaging or release, and its first drafting session writes prose,
-laying out the files as it goes. `DECOMPOSITION_PROMPT` says the same.
+packaging or release, a suite only where something can be run over it, as
+session 339's documentation had, and its first drafting session writes
+prose, laying out the files as it goes. `DECOMPOSITION_PROMPT` says the same.
 
 The maintenance posture's session 1 reads "its projects, their target
 frameworks or JDKs, their project formats, their build tools"; it gains
@@ -20446,9 +20541,10 @@ answer" as though every plan had modules.
 
 **Step 5 -- what is claimed, and the number.** `docs/guide/README.md` and
 the extension's README say in one short paragraph what the framework is
-used for, and claim only what sessions 339 and 340 walked: programs,
-scripts included, and plain-text documents kept in Markdown, with the
-limits the walks found. The reader it is written for is a person who
+used for, and claim only what has been taken to a close: programs in any
+language a person declares a suite for, and what sessions 339 and 340
+walked, documentation and a short piece of prose kept in Markdown, with
+the limits the walks found. The reader it is written for is a person who
 already works in VS Code and with git: a developer or a technical writer
 who also has a procedure or a specification to write. Nothing says it is
 ready for a person who is not one. Session 1's question may name a novel or

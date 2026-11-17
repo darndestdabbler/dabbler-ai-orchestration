@@ -6744,11 +6744,14 @@
     {
       "number": 341,
       "title": "The first two sessions ask what is being made",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "not needed",
+      "cancelledAt": "2026-11-17T12:46:40-05:00"
     },
     {
       "number": 342,

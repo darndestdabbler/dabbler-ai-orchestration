@@ -6756,11 +6756,14 @@
     {
       "number": 342,
       "title": "Release 3.36.0 (release: 3.36.0)",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "Not needed",
+      "cancelledAt": "2026-11-17T12:46:52-05:00"
     }
   ]
 }

@@ -380,6 +380,26 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 340 | A script repository is read as code and walked to a close | — | not declared |
 | 341 | The first two sessions ask what is being made | — | not declared |
 | 342 | Release 3.36.0 (release: 3.36.0) | — | not declared |
+| 343 | The router prints the Dabbler Terminal's lines | no | 2026-11-17 |
+| 344 | The router prints the Work Explorer's rows | — | not declared |
+| 345 | The router prints the Configuration rows and what may be chosen | — | not declared |
+| 346 | The router says how an engine is started, and answers with data | — | not declared |
+| 347 | The views follow the records | — | not declared |
+| 348 | Release 3.36.0 (release: 3.36.0) | — | not declared |
+| 349 | A Visual Studio extension that installs and finds the router | — | not declared |
+| 350 | The Work Explorer in Visual Studio | — | not declared |
+| 351 | Start Session from Visual Studio, with the engine in Windows Terminal | — | not declared |
+| 352 | The Dabbler Terminal's output in Visual Studio | — | not declared |
+| 353 | Stop, Continue, Close, Cancel and Restore from Visual Studio | — | not declared |
+| 354 | Rollback and the ways on from a stop, from Visual Studio | — | not declared |
+| 355 | The Configuration window in Visual Studio | — | not declared |
+| 356 | The catalog, a key, and Start Session with Different Models, from Visual Studio | — | not declared |
+| 357 | Set up Dabbler in the solution that is open | — | not declared |
+| 358 | Visual Studio says when a session needs a person | — | not declared |
+| 359 | Before a session starts and after it ends, beside the IDE | — | not declared |
+| 360 | A session is walked in Visual Studio, on an old-style solution | — | not declared |
+| 361 | The Visual Studio extension is documented and made ready to publish | — | not declared |
+| 362 | Release 3.37.0 (release: 3.37.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3850,3 +3870,16 @@ Make the Dabbler Terminal say what the framework is doing between an answer and 
 **Releasable: yes.**
 
 Release 3.35.0: the framework packs and publishes what is on the trunk.
+
+### Session 343 — The router prints the Dabbler Terminal's lines
+
+**Releasable: no.**
+
+Move the Dabbler Terminal's lines out of the VS Code extension into the router, so that any interface -- a bare terminal today, Visual Studio later -- gets the same lines. The record readers (`liveRunPath`, `currentActivity`, `uncollectedWords`, the run, ledger, instruction and JSONL readers), the formatting (`paint`, `layout`, `renderSpans`, `divider`, `banner`, `forTerminal`, `routerLine`, `suiteResultSpans`, `whoActs`, `firstSentence`, `watcherLookMs`) and the polling state machine with its history, replay, indicator and timers move from `tools/dabbler-ai-orchestration/src/router/dabblerTerminal.ts` to a new `packages/router/src/views/terminalLines.ts`, as a class `TerminalLines` that is given a repository root, a width, a theme (light or dark) and a place to write, is told of a new width or theme by method, and imports nothing of any editor; the operator's stall-threshold setting reaches it as an option. A new verb `dabbler terminal --sessions-dir <dir> [--follow] [--width N] [--theme light|dark] [--json]` prints the lines of the run in flight, or of the last one, and exits, or with `--follow` keeps printing until interrupted; the defaults are the terminal's own width and dark. `--json` prints one JSON object per line in place of coloured text -- the time, the event, its fields, and each piece of text with the router's tone by name; a job's passed-through output is one object per line of it; and the two notices the terminal raises today (a session paused, an instruction overdue) are objects of their own kind in the same stream, which the class also hands to a notice callback in text mode. Last, the VS Code extension's `DabblerTerminal` becomes the pseudoterminal around the moved class, called in-process: creating it, where it opens, revealing it when a session starts, passing on its size and the colour theme, and showing its two warnings from the notices -- with what reaches the terminal unchanged byte for byte. The tests of the moved code move with it to `packages/router/test/terminalLines.test.ts`, rewritten for `node --test` with none dropped or weakened, plus one new test that the `--json` form of a run carries the same events in the same order as the text form; `dabblerTerminal.test.ts` keeps only the tests of the VS Code terminal around it.
+
+**Amended after acceptance:**
+
+- 2026-11-17 — step 'move-terminal-lines': its files: A new src/views module must be declared in boundaries.json or the boundary control fails it as unlisted (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-17 — step 'move-terminal-lines': its checks: The boundary control is what proves the new views module is declared and adds no import cycle (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-17 — step 'terminal-verb': its files: No spinner when stdout is not a TTY needs an indicator option on TerminalLines; nothing else in it changes (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-17 — step 'extension-reads-it': its checks: build.mjs resolves its entry from the package directory, so it must run under npm --prefix packages/router, not node from the repository root (claude-code (anthropic, claude-opus-5-5))

@@ -20,7 +20,7 @@ import type {
 } from "dabbler-ai-router";
 import { mechanicMemoPath } from "dabbler-ai-router";
 import { ProjectionCache, ProjectionResult } from "./projection";
-import { type Activity, currentActivity, uncollectedWords } from "../router/dabblerTerminal";
+import { type Activity, currentActivity, uncollectedWords } from "dabbler-ai-router";
 
 /**
  * Where a repository's sessions came from. `ledger` is the

@@ -6712,58 +6712,250 @@
         "engine": "framework",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null,
-      "startCommit": "51fe4c1e2d615143d5d8c04653241d77f125f15b",
       "frameworkVersion": "3.34.1",
-      "noChange": true
+      "startCommit": "51fe4c1e2d615143d5d8c04653241d77f125f15b",
+      "verificationVerdict": null
     },
     {
       "number": 339,
       "title": "A document is walked to a close, on the framework as it is",
       "status": "cancelled",
+      "preCancelStatus": "not-started",
+      "cancelledReason": "",
+      "cancelledAt": "2026-11-17T12:45:46-05:00",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null,
-      "preCancelStatus": "not-started",
-      "cancelledReason": "",
-      "cancelledAt": "2026-11-17T12:45:46-05:00"
+      "verificationVerdict": null
     },
     {
       "number": 340,
       "title": "A script repository is read as code and walked to a close",
       "status": "cancelled",
+      "preCancelStatus": "not-started",
+      "cancelledReason": "",
+      "cancelledAt": "2026-11-17T12:46:15-05:00",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null,
-      "preCancelStatus": "not-started",
-      "cancelledReason": "",
-      "cancelledAt": "2026-11-17T12:46:15-05:00"
+      "verificationVerdict": null
     },
     {
       "number": 341,
       "title": "The first two sessions ask what is being made",
       "status": "cancelled",
+      "preCancelStatus": "not-started",
+      "cancelledReason": "not needed",
+      "cancelledAt": "2026-11-17T12:46:40-05:00",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null,
-      "preCancelStatus": "not-started",
-      "cancelledReason": "not needed",
-      "cancelledAt": "2026-11-17T12:46:40-05:00"
+      "verificationVerdict": null
     },
     {
       "number": 342,
       "title": "Release 3.36.0 (release: 3.36.0)",
       "status": "cancelled",
+      "preCancelStatus": "not-started",
+      "cancelledReason": "Not needed",
+      "cancelledAt": "2026-11-17T12:46:52-05:00",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null,
-      "preCancelStatus": "not-started",
-      "cancelledReason": "Not needed",
-      "cancelledAt": "2026-11-17T12:46:52-05:00"
+      "verificationVerdict": null
+    },
+    {
+      "number": 343,
+      "title": "The router prints the Dabbler Terminal's lines",
+      "status": "in-progress",
+      "startedAt": "2026-11-17T13:21:57.841000-05:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "266a6f3ea83781ded50f1e42bb0f35bf9ef17d0f",
+      "frameworkVersion": "3.34.1",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5.6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 344,
+      "title": "The router prints the Work Explorer's rows",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 345,
+      "title": "The router prints the Configuration rows and what may be chosen",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 346,
+      "title": "The router says how an engine is started, and answers with data",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 347,
+      "title": "The views follow the records",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 348,
+      "title": "Release 3.36.0 (release: 3.36.0)",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 349,
+      "title": "A Visual Studio extension that installs and finds the router",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 350,
+      "title": "The Work Explorer in Visual Studio",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 351,
+      "title": "Start Session from Visual Studio, with the engine in Windows Terminal",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 352,
+      "title": "The Dabbler Terminal's output in Visual Studio",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 353,
+      "title": "Stop, Continue, Close, Cancel and Restore from Visual Studio",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 354,
+      "title": "Rollback and the ways on from a stop, from Visual Studio",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 355,
+      "title": "The Configuration window in Visual Studio",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 356,
+      "title": "The catalog, a key, and Start Session with Different Models, from Visual Studio",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 357,
+      "title": "Set up Dabbler in the solution that is open",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 358,
+      "title": "Visual Studio says when a session needs a person",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 359,
+      "title": "Before a session starts and after it ends, beside the IDE",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 360,
+      "title": "A session is walked in Visual Studio, on an old-style solution",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 361,
+      "title": "The Visual Studio extension is documented and made ready to publish",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 362,
+      "title": "Release 3.37.0 (release: 3.37.0)",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
     }
   ]
 }

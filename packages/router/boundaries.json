@@ -102,11 +102,12 @@
       ]
     },
     "projection": {
-      "comment": "What a person sees: the fold, the Solution Explorer's projection, the CLI rim, the in-process face the extension calls, the package entry.",
+      "comment": "What a person sees: the fold, the Solution Explorer's projection, the views every interface renders, the CLI rim, the in-process face the extension calls, the package entry.",
       "members": [
         "progress",
         "projection",
         "transcript",
+        "views",
         "cli",
         "inProcess",
         "index"

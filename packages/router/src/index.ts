@@ -171,3 +171,35 @@ export {
 // Where a session's page is, and the section the Work Explorer opens it at,
 // by the names the writer uses rather than a second statement of them.
 export { TRANSCRIPTS_DIRNAME } from "./journal.ts";
+// The Dabbler Terminal's lines, whole: the readers, the formatting and the
+// polling that turns a run's records into text. An interface gives it a
+// width, a theme and a place to write; `dabbler terminal` prints the same
+// lines at a bare prompt, so no editor decides what a line says.
+export {
+  FRAMEWORK_VOICE,
+  HANGING_INDENT,
+  RULE_CHAR,
+  TerminalLines,
+  banner,
+  currentActivity,
+  divider,
+  firstSentence,
+  forTerminal,
+  layout,
+  liveRunPath,
+  paint,
+  renderSpans,
+  routerLine,
+  suiteResultSpans,
+  uncollectedWords,
+  watcherLookMs,
+  whoActs,
+  type Activity,
+  type RouterLine,
+  type Span,
+  type TerminalFormat,
+  type TerminalLinesOptions,
+  type TerminalNotice,
+  type TerminalRecord,
+  type TerminalRunRecord,
+} from "./views/terminalLines.ts";

@@ -204,6 +204,14 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "render a range of sessions as self-contained pages, from records on disk",
   },
   {
+    // The Dabbler Terminal's lines at a bare prompt: the same lines the
+    // extension's terminal shows, for a person outside VS Code. It reads
+    // records and prints; the extension calls the class in-process.
+    verb: "terminal",
+    extensionFacing: false,
+    summary: "print the lines of the run in flight, or of the last one; --follow keeps printing",
+  },
+  {
     // The managed body tells an engine to report the version it ran; this
     // is what it runs. `dabbler --version` is the same handler.
     verb: "version",

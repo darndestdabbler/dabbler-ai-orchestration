@@ -8,7 +8,7 @@
 // unmodified.
 
 import * as vscode from "vscode";
-import { RepositoryNode, SessionNode } from "../providers/workExplorerTreeModel";
+import type { RepositoryNode, SessionNode } from "dabbler-ai-router";
 
 /** Narrow an untrusted command argument to a repository tree node. */
 export function asRepositoryNode(arg: unknown): RepositoryNode | undefined {

@@ -218,6 +218,14 @@ export const VERBS: readonly VerbSpec[] = [
     extensionFacing: false,
     summary: "the router's version, and the extension's when inside one",
   },
+  {
+    // What an interface shows, as data: the rows it renders and the rules
+    // that decide them, worked out once here. The VS Code extension calls the
+    // same functions in-process; another interface reads the JSON.
+    verb: "view",
+    extensionFacing: false,
+    summary: "print a view as JSON: work-explorer, the Work Explorer's whole tree for each --repo-root",
+  },
 ];
 
 /** The verb by name, or undefined. */

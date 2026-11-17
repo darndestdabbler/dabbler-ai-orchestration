@@ -1,3 +1,724 @@
+// The Work Explorer's rows, for every interface that shows them.
+//
+// PURE of any editor: the router's progress reading of each repository in,
+// plain rows out -- a label, a description, a tooltip, an icon by name,
+// whether the row opens, and the actions it offers. The rules that decide a
+// row live here once, so a second interface renders them rather than
+// working them out again; `dabbler view work-explorer` prints them as JSON.
+
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import { mechanicMemoPath } from "../drive.ts";
+import {
+  ACTIVITY_LOG_FILENAME,
+  SESSION_PLAN_FILENAME,
+  SESSIONS_DIRNAME,
+  STATE_FILENAME,
+  planSection,
+} from "../evidence.ts";
+import type {
+  ProgressProjection,
+  ProgressProjectionOrchestrator as OrchestratorInfo,
+  ProgressProjectionRepository,
+  ProgressProjectionSession as SessionRecord,
+  ProgressProjectionSessionStatus as SessionStatus,
+  ProgressProjectionVerification as SessionVerification,
+  ProgressProjectionTask as TaskRecord,
+  ProgressProjectionFinding as VerificationFinding,
+} from "../generated/progress-projection.ts";
+import type {
+  WorkExplorer,
+  WorkExplorerAction,
+  WorkExplorerConfirmation,
+  WorkExplorerIcon,
+  WorkExplorerOpens,
+  WorkExplorerReason,
+  WorkExplorerRow,
+} from "../generated/work-explorer.ts";
+import { TRANSCRIPTS_DIRNAME } from "../journal.ts";
+import { EXCEPTIONS_ANCHOR, humanizeStepKey, sessionTranscriptName } from "../transcript.ts";
+import { type Activity, currentActivity, uncollectedWords } from "./terminalLines.ts";
+
+// ===========================================================================
+// The verdict words
+// ===========================================================================
+
+// The reader side of the `verificationVerdict` vocabulary.
+//
+// Set 112 S2: this module is what survived `utils/tierLegibility.ts`.
+// That file hosted the Lightweight tier's Explorer signals — the `lw`
+// marker, the tier-mismatch advisory, the `N/M+` fraction, the `v?`/`v+`
+// verification-posture markers, the durable `verificationMode` reader and
+// the seven-state workflow ladder — every one of which existed only to
+// make the Lightweight tier legible. The tier is gone, so they are gone.
+// The verdict vocabulary below is tier-independent (the Work Explorer
+// renders it on every row) and moved here rather than dying with its old
+// host.
+
+// Set 086 S2: the reader-recognized verdict vocabulary. Readers are
+// deliberately PREFIX-lenient (docs/session-state-schema.md → the
+// `verificationVerdict` contract): an intentionally-shipped extension token
+// like `ISSUES_FOUND_RESOLVED_IN_FLIGHT` classifies via its canonical prefix
+// without a schema bump. This mirrors the STRICT (exact-allowlist) writer side
+// of the same asymmetry (ai_router/session_state.py `_CANONICAL_VERDICT_TOKENS`):
+// the sanctioned writer refuses to persist a non-verdict, and this reader refuses
+// to render an unrecognized one as if it were a clean verdict.
+export const RECOGNIZED_VERDICT_PREFIXES = [
+  "VERIFIED",
+  "ISSUES_FOUND",
+  "REMEDIATED_AT_CAP",
+  // Retired: no writer emits WAIVED any more, and the Python writer
+  // refuses it. Historical records carry it, and a reader that stopped
+  // recognizing it would render the past as a confabulation.
+  "WAIVED",
+] as const;
+
+// True iff `verdict`, normalized (trimmed, upper-cased), begins with a
+// recognized canonical prefix. A free-form non-verdict — e.g. the confabulated
+// `manual-override-development` the Set-086 root-cause incident persisted —
+// returns false, which is what lets the display flag it instead of laundering
+// it into a legitimate-looking status.
+export function isRecognizedVerdictToken(
+  verdict: string | null | undefined,
+): boolean {
+  if (typeof verdict !== "string") return false;
+  const normalized = verdict.trim().toUpperCase();
+  if (!normalized) return false;
+  return RECOGNIZED_VERDICT_PREFIXES.some((p) => normalized.startsWith(p));
+}
+
+// ===========================================================================
+// Row rules
+// ===========================================================================
+
+// Row-level rules the platform does not make for us, pure and
+// unit-testable, shared by the native row command and the context menu.
+
+/**
+ * Whether *session* is in flight AND unresolved at the cap — the one
+ * state the lifecycle cannot close out of. The router refuses to cancel a
+ * session in flight without `--force`, and that refusal is right for live
+ * work; here it would leave the session with no exit at all, so cancel is
+ * the sanctioned one and the flag is passed on the record's say-so.
+ */
+export function sessionCannotClose(session: SessionRecord): boolean {
+  return (
+    session.status === "in-progress" &&
+    session.verification !== null &&
+    session.verification.terminal === "ISSUES_FOUND"
+  );
+}
+
+// ===========================================================================
+// Session naming, progress text and icons
+// ===========================================================================
+
+// Pure data-layer helpers shared by the tree model: the status icon map,
+// row naming, progress text, and the verdict-cleanliness rule. No vscode
+// import.
+
+/**
+ * The operator's authored status glyphs, resolved BY NAME out of
+ * media/light/ and media/dark/ and handed to TreeItem.iconPath as a
+ * { light, dark } pair.
+ *
+ * Do not consolidate these into one `fill:currentColor` asset. A
+ * `contributes.viewsContainers` icon and a TreeItem.iconPath are not
+ * rendered by the same mechanism — VS Code paints a tree icon as a
+ * background-image with no mask, so the SVG renders exactly as authored
+ * and inherits no colour from the row. The light/dark split exists
+ * because the as-authored glyphs carry a hardcoded `#ffffff` that makes
+ * `not-started` nearly invisible on a light theme. See
+ * media/status-icon-theming.md.
+ */
+export const ICON_FILES: Record<SessionStatus, string> = {
+  complete: "done.svg",
+  "in-progress": "in-progress.svg",
+  "not-started": "not-started.svg",
+  cancelled: "cancelled.svg",
+};
+
+/**
+ * How a session number is WRITTEN — three digits, zero-padded — as the
+ * projection already wrote it.
+ *
+ * The padding rule has ONE owner and it is Python's
+ * `progress.session_display_number`, which the CLI's human output calls
+ * and the projection carries here. This function does not re-implement
+ * it: a payload that carries no name degrades to the plain number rather
+ * than growing a second copy of the rule that could disagree with the
+ * first. TypeScript renders; Python decides.
+ */
+export function sessionDisplayNumber(session: SessionRecord): string {
+  return session.displayNumber || String(session.number);
+}
+
+/** The row label: the session's written number, then its own title. */
+export function sessionRowLabel(session: SessionRecord): string {
+  const title = session.title.trim() || `Session ${session.number}`;
+  return `${sessionDisplayNumber(session)} · ${title}`;
+}
+
+/** Sessions in ledger order — ascending by number, the order they run. */
+export function sessionsInOrder(
+  sessions: readonly SessionRecord[],
+): SessionRecord[] {
+  return [...sessions].sort((a, b) => a.number - b.number);
+}
+
+/**
+ * The repository row's description. Always X/total: an "X/X" shape on a
+ * finished repository would mask a count that ran ahead of the ledger.
+ *
+ * A repository whose sessions came from its plan says so instead of
+ * counting. "0/2" on a repository the router has never written to reads
+ * as two sessions that have not run YET, which is true of a repository
+ * mid-sequence too; the distinction the operator needs is that nothing
+ * has run here at all.
+ */
+export function progressText(repository: SessionsRepository): string {
+  if (repository.sessionsSource === "plan") {
+    return `${repository.sessions.length} planned · nothing has run here yet`;
+  }
+  const total = repository.totalSessions;
+  const base =
+    total && total > 0
+      ? `${repository.sessionsCompleted}/${total}`
+      : repository.sessionsCompleted > 0
+        ? `${repository.sessionsCompleted} complete`
+        : "";
+  const current = repository.currentSession;
+  if (current === null) return base;
+  // The in-flight session's own written number, so the repository row
+  // and the row beneath it name it identically.
+  const inFlight = repository.sessions.find((s) => s.number === current);
+  const written = inFlight ? sessionDisplayNumber(inFlight) : String(current);
+  // A heartbeat, and only a heartbeat. It says the record has stopped
+  // MOVING; it does not say the thinking has stopped being useful, and a
+  // row that implied the second would be making a judgment it cannot make.
+  const annotation = repository.possiblyStalled
+    ? `session ${written} in flight · nothing written for a while`
+    : `session ${written} in flight`;
+  return base ? `${base} · ${annotation}` : annotation;
+}
+
+/** A verdict that must not render as a pass: unrecognized, or a failure
+ * token. REMEDIATED_AT_CAP is unclean on purpose — the work landed, but
+ * no verifier reviewed the repair, and a row that reads as a pass would
+ * hide that. */
+export function verdictIsUnclean(verdict: string | null | undefined): boolean {
+  if (typeof verdict !== "string" || verdict.trim() === "") return false;
+  if (!isRecognizedVerdictToken(verdict)) return true;
+  const normalized = verdict.trim().toUpperCase();
+  return (
+    normalized.startsWith("ISSUES_FOUND") ||
+    normalized.startsWith("WAIVED") ||
+    normalized.startsWith("REMEDIATED_AT_CAP")
+  );
+}
+
+// ===========================================================================
+// The actions a row offers
+// ===========================================================================
+
+// Typed action registry for the Work Explorer's row context menus. Each
+// entry mints a `contextValue` token (see actionToken in the tree
+// model); package.json's `when` clauses match those tokens, and the
+// registry check in the test suite keeps the two in lockstep.
+//
+// Two lists, because the two row kinds answer to different questions. A
+// repository owns the files and the lifecycle launchers; a session owns
+// what can be done to that session. Widening one `when` to cover both
+// would make every entry's signature lie about what it reads.
+
+// The shapes an action is written in are the rows' schema's
+// (schemas/work-explorer.schema.json), generated, so the Visual Studio
+// extension's types and these are written from one file.
+
+/** A confirmation a person gives before an action runs, in the words they are shown. */
+export type ActionConfirmation = WorkExplorerConfirmation;
+
+/**
+ * A reason a person types before an action runs; it reaches the command as
+ * `--reason <text>` after its other arguments.
+ */
+export type ActionReason = WorkExplorerReason;
+
+/** A file an action opens rather than a verb it runs. */
+export type ActionOpens = WorkExplorerOpens;
+
+/** One action as offered on one row. */
+export type OfferedAction = WorkExplorerAction;
+
+/**
+ * What an action is, for an interface to show and run: the `dabbler` verb it
+ * stands for with its arguments filled in from the row, or the file it opens,
+ * and what it needs from a person first. Nothing about it is left for the
+ * interface to work out -- Cancel's `--force` included.
+ */
+export type ActionEffect = Omit<WorkExplorerAction, "id" | "title">;
+
+const NOTHING_ASKED = { opens: null, preview: null, confirm: null, reason: null } as const;
+
+/** `dabbler <verb...> --sessions-dir <the repository's sessions root>`. */
+function dabbler(repository: SessionsRepository, ...verb: string[]): string[] {
+  return ["dabbler", ...verb, "--sessions-dir", repository.sessionsDir];
+}
+
+function runs(argv: string[]): ActionEffect {
+  return { ...NOTHING_ASKED, argv };
+}
+
+function opens(file: string, line: number | null = 1, fragment: string | null = null): ActionEffect {
+  return { ...NOTHING_ASKED, argv: null, opens: { file, line, fragment } };
+}
+
+/** How a session in flight is named in the words that ask about it. */
+const threeDigits = (sessionNumber: number): string => String(sessionNumber).padStart(3, "0");
+
+// ---------------------------------------------------------------------------
+// The words each action asks with, one copy, for every interface
+// ---------------------------------------------------------------------------
+
+export function cancelConfirmation(sessionNumber: number, name: string, force: boolean): ActionConfirmation {
+  // The button label is the full phrase rather than "Cancel": an editor's
+  // own Esc/cancel already means "abort this dialog", so a button labeled
+  // "Cancel" reads as abort rather than as the action.
+  return {
+    title: `Cancel session ${sessionNumber} "${name}"?`,
+    detail: force
+      ? "This session is unresolved at the cap and cannot close, so it is " +
+        "cancelled in flight. Nothing it built lands; its record stays. " +
+        "The reason is recorded on the session, which can be restored later."
+      : "The reason is recorded on the session, which can be restored later.",
+    accept: "Cancel Session",
+    keep: "Keep",
+  };
+}
+
+export function cancelReason(name: string): ActionReason {
+  return {
+    prompt: `Reason for cancelling "${name}" (optional)`,
+    placeholder: "e.g. scope rolled into another session",
+    blank: "",
+    // Optional: a dismissed box goes on as an empty one, as the CLI's own
+    // contract allows.
+    dismissed: "blank",
+  };
+}
+
+export function restoreConfirmation(sessionNumber: number, name: string): ActionConfirmation {
+  return {
+    title: `Restore session ${sessionNumber} "${name}"?`,
+    detail: "This returns the session to the status it held before it was cancelled.",
+    accept: "Restore",
+    keep: "Keep Cancelled",
+  };
+}
+
+export function restoreReason(name: string): ActionReason {
+  return {
+    prompt: `Reason for restoring "${name}" (optional)`,
+    placeholder: "e.g. scope is back in plan",
+    blank: "",
+    dismissed: "blank",
+  };
+}
+
+/** The reason every rollback from a row is recorded with. */
+export const ROLLBACK_REASON = "Rollback to Start of This Session from the Work Explorer";
+
+/** A rollback's question; its detail is `rollbackDetail` over the dry run's facts. */
+export function rollbackConfirmation(sessionNumber: number, name: string): ActionConfirmation {
+  return {
+    title: `Roll back to the start of session ${sessionNumber} "${name}"?`,
+    detail: null,
+    accept: "Roll Back",
+    keep: "Keep",
+  };
+}
+
+/** What the router's rollback dry run answers: the facts the dialog states. */
+export interface RollbackFacts {
+  session: number;
+  through: number;
+  /** The HEAD the facts were read at; the confirm is bound to it. */
+  head: string;
+  commits: number;
+  authors: string[];
+  oldest: string | null;
+  uncommitted: number;
+}
+
+/**
+ * The rollback dialog's detail, from the facts and nothing else: the sessions
+ * undone, the commits reverted and whose, the oldest, and that uncommitted
+ * work is kept. No count of files: that is the plan's own line. A clause
+ * that does not apply is left out rather than written as zero.
+ */
+export function rollbackDetail(facts: RollbackFacts): string {
+  const span =
+    facts.through === facts.session
+      ? `Session ${facts.session} is undone`
+      : `Sessions ${facts.session} to ${facts.through} are undone`;
+  const clauses: string[] = [];
+  if (facts.commits > 0) {
+    const who = facts.authors.length > 0 ? ` by ${facts.authors.join(" and ")}` : "";
+    const since = facts.oldest ? `, the oldest from ${facts.oldest.slice(0, 10)}` : "";
+    clauses.push(`${facts.commits} commit${facts.commits === 1 ? "" : "s"}${who}${since}, ${facts.commits === 1 ? "is" : "are"} reverted on the trunk`);
+  }
+  if (facts.uncommitted > 0) {
+    clauses.push("uncommitted work is kept on a safety branch");
+  }
+  clauses.push(`the session${facts.through === facts.session ? " returns" : "s return"} to not-started`);
+  return `${span}: ${clauses.join("; ")}. The session plan is kept.`;
+}
+
+/** The reason a stop is recorded with when the person typed none. */
+export const STOP_REASON_BLANK = "the operator stopped the session";
+
+export function stopReason(sessionNumber: number): ActionReason {
+  // Dismissing the box aborts: a stop nobody typed a reason into is a stop
+  // nobody meant.
+  return {
+    prompt: `Why stop session ${threeDigits(sessionNumber)}? The reason is recorded on the stop.`,
+    placeholder: "e.g. I need the machine back",
+    blank: STOP_REASON_BLANK,
+    dismissed: "abort",
+  };
+}
+
+export function checkStopConfirmation(sessionNumber: number): ActionConfirmation {
+  // Said first to be one provider call and advice only, because it is a
+  // button that spends one; the person's yes runs it.
+  return {
+    title:
+      `Check session ${threeDigits(sessionNumber)}'s stop? This is one provider call: a model that is not the author's reads the ` +
+      "record and says whose the stop is, naming a way within the rules where it finds one. It is advice only " +
+      "and is kept in the run's exceptions.jsonl; it decides nothing.",
+    detail: null,
+    accept: "Check this stop",
+    keep: null,
+  };
+}
+
+export function waiveReason(sessionNumber: number): ActionReason {
+  // The card is read first, whether or not a check was run; a dismissed or
+  // empty box changes nothing.
+  return {
+    prompt: `Why may session ${threeDigits(sessionNumber)} go past this stop? Your reason and your name are recorded beside what was unmet.`,
+    placeholder: "e.g. the clock test is flaky on this host; the fix is planned",
+    blank: null,
+    dismissed: "abort",
+  };
+}
+
+export function reportStopConfirmation(sessionNumber: number): ActionConfirmation {
+  return {
+    title:
+      `Write a report of session ${threeDigits(sessionNumber)}'s stop for Dabbler's maintainers? This is one provider call: the Primary ` +
+      "Reviewer reads the report's two short passages for anything of your repository's. The report opens for you " +
+      "to read; nothing is sent.",
+    detail: null,
+    accept: "Write the report",
+    keep: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The two lists
+// ---------------------------------------------------------------------------
+
+export interface RepositoryAction {
+  id: string;
+  label: string;
+  group: number;
+  when: (repository: SessionsRepository) => boolean;
+  does: (repository: SessionsRepository) => ActionEffect;
+}
+
+/** A repository with work left to start. */
+const hasNextSession = (r: SessionsRepository): boolean =>
+  r.sessions.some(
+    (s) =>
+      s.status === "in-progress" ||
+      s.status === "not-started" ||
+      // A session the plan declares and the ledger has not reached is still
+      // work left to start — it is exactly what `session start` registers
+      // next. Omitting it would hide the launcher on the repository that
+      // most needs it: one whose planning session just added the sessions.
+      s.status === "planned",
+  );
+
+const START_SESSION = "dabblerSessionSets.startSession";
+const CONSULT_WITH_AI = "dabbler.consultWithAi";
+
+// `session start` registers the next session and opens the engine on it; it
+// takes no number, so the same command stands on every row that offers it.
+const startSession = (repository: SessionsRepository): ActionEffect => runs(dabbler(repository, "session", "start"));
+
+// Ordered list; `group` bands: 1xx Open File submenu, 3xx Copy Prompt
+// submenu, 9xx lifecycle.
+export const REPOSITORY_ACTIONS: RepositoryAction[] = [
+  { id: "dabblerSessionSets.openSpec", label: "Session Plan", group: 101, when: () => true,
+    does: (r) => opens(r.planPath) },
+  { id: "dabblerSessionSets.openActivityLog", label: "Activity Log", group: 102, when: () => true,
+    does: (r) => opens(r.activityPath) },
+  { id: "dabblerSessionSets.openChangeLog", label: "Change Log", group: 103, when: () => true,
+    does: (r) => opens(r.changeLogPath) },
+  { id: "dabblerSessionSets.openSessionState", label: "Sessions Ledger", group: 104, when: () => true,
+    does: (r) => opens(r.ledgerPath) },
+  { id: START_SESSION, label: "Start Session", group: 905, when: hasNextSession, does: startSession },
+  // No confirmation because no decision exists: the gates decide, and a
+  // refusal is information rather than something a person authorises.
+  { id: "dabblerSessionSets.closeSession", label: "Close Session", group: 906,
+    when: (r) => r.currentSession !== null, does: (r) => runs(dabbler(r, "session", "close")) },
+  // Whatever state the work is in: a consult drives nothing. The engine it
+  // opens is told to run this first.
+  { id: CONSULT_WITH_AI, label: "Consult with AI", group: 908, when: () => true,
+    does: (r) => runs(dabbler(r, "consult")) },
+];
+
+export function applicableRepositoryActions(
+  repository: SessionsRepository,
+): RepositoryAction[] {
+  return REPOSITORY_ACTIONS.filter((a) => a.when(repository)).sort(
+    (a, b) => a.group - b.group,
+  );
+}
+
+// Band: 6xx prompts and the plan, 9xx lifecycle. Cancellation is a
+// decision about one session, so it lives here rather than on the
+// repository.
+//
+// There is no approve-over entry: the framework has no approval anywhere.
+// What a person may do at a stop is go past it on their own authority, on
+// the record, after reading the card -- Review exception, which is
+// `dabbler session waive` and writes what was unmet as unmet. Check this
+// stop is the independent check beside it, advice and never a gate.
+export interface SessionAction {
+  id: string;
+  label: string;
+  group: number;
+  when: (repository: SessionsRepository, session: SessionRecord) => boolean;
+  does: (repository: SessionsRepository, session: SessionRecord) => ActionEffect;
+}
+
+// On the row for the session that would actually be registered, and only
+// while nothing is in flight. Both halves matter and neither is decided
+// here: `session start` registers the NEXT session and takes no number, so
+// an entry on any other planned row would start a different session than
+// the one it was clicked on -- and `nextSession` is the router's own answer
+// to which that is, carried through the projection rather than recomputed
+// beside it.
+const isTheNextRow = (repository: SessionsRepository, session: SessionRecord): boolean =>
+  repository.currentSession === null &&
+  repository.nextSession !== null &&
+  session.number === repository.nextSession;
+
+/**
+ * Whose funds a session is waiting for, off the router's own wait sentence
+ * ("waiting for funds: <vendor>. ..."), or null where it is not that wait.
+ */
+export function fundsVendor(session: SessionRecord): string | null {
+  if (session.waiting?.owner !== "person") return null;
+  const said = /waiting for funds:\s*([^.]+)/i.exec(session.waiting.for);
+  return said === null ? null : said[1].trim();
+}
+
+/** The session in flight, with a stop standing over it. */
+export const hasStandingStop = (repository: SessionsRepository, session: SessionRecord): boolean =>
+  repository.currentSession === session.number && session.status === "in-progress" && session.stopActor !== undefined;
+
+/** `--session-number N`: the verbs that act on one session take it so. */
+const numbered = (session: SessionRecord): string[] => ["--session-number", String(session.number)];
+
+export const SESSION_ACTIONS: SessionAction[] = [
+  {
+    id: "dabblerSessionSets.continueSession",
+    label: "Continue Session",
+    group: 899,
+    // A wait for funds is the person's, and its one way on is to carry on
+    // once the account is paid: the same start Start Session runs.
+    when: (repository, session) =>
+      repository.currentSession === session.number &&
+      session.status === "in-progress" &&
+      fundsVendor(session) !== null,
+    does: (repository) => startSession(repository),
+  },
+  {
+    id: START_SESSION,
+    label: "Start Session",
+    group: 900,
+    when: isTheNextRow,
+    does: (repository) => startSession(repository),
+  },
+  {
+    id: "dabblerSessionSets.stopSession",
+    label: "Stop Session",
+    group: 905,
+    // The person asking for the machine back, on the row of the session
+    // actually in flight -- there is one, and `session interrupt` writes
+    // its request for the framework to read. Offered whether or not the
+    // framework is working at that moment: a request written while it is not
+    // is read when the AI's next answer arrives, and a person who cannot find
+    // the stop button reaches for the one thing that always works, which is
+    // killing something.
+    when: (repository, session) =>
+      repository.currentSession === session.number && session.status === "in-progress",
+    does: (repository, session) => ({
+      ...runs([...dabbler(repository, "session", "interrupt"), ...numbered(session), "--stop"]),
+      reason: stopReason(session.number),
+    }),
+  },
+  {
+    id: CONSULT_WITH_AI,
+    label: "Consult with AI",
+    group: 904,
+    when: () => true,
+    does: (repository, session) => runs([...dabbler(repository, "consult"), "--session", String(session.number)]),
+  },
+  {
+    id: "dabbler.openMechanic",
+    label: "Open a Mechanic",
+    group: 906,
+    // The session a Mechanic would diagnose: the one in flight, stopped or not.
+    when: (repository, session) =>
+      repository.currentSession === session.number && session.status === "in-progress",
+    does: (repository) => runs([...dabbler(repository, "consult"), "--mechanic"]),
+  },
+  {
+    id: "dabbler.checkStop",
+    label: "Check this stop",
+    group: 908,
+    // A stop standing over the session in flight: `stopActor` is projected
+    // only then, so a row without one has nothing to check.
+    when: hasStandingStop,
+    does: (repository, session) => ({
+      ...runs(dabbler(repository, "triage")),
+      confirm: checkStopConfirmation(session.number),
+    }),
+  },
+  {
+    id: "dabbler.reviewException",
+    label: "Review exception",
+    group: 909,
+    when: hasStandingStop,
+    // Without a reason the verb prints the card and writes nothing; the
+    // card is what the person reads before they give one.
+    does: (repository, session) => ({
+      ...runs(dabbler(repository, "session", "waive")),
+      preview: dabbler(repository, "session", "waive"),
+      reason: waiveReason(session.number),
+    }),
+  },
+  {
+    id: "dabbler.reportStop",
+    label: "Report this stop to Dabbler",
+    group: 911,
+    // A stop the framework recorded, standing now: the report is of it, and
+    // the person reads and sends what is written.
+    when: hasStandingStop,
+    does: (repository, session) => ({
+      ...runs(dabbler(repository, "session", "defect-report")),
+      confirm: reportStopConfirmation(session.number),
+    }),
+  },
+  {
+    id: "dabbler.openTranscript",
+    label: "Open Transcript at its Exceptions",
+    group: 910,
+    // A closed session that went past a stop on a person's authority: its
+    // committed page says what was unmet and who authorised going on.
+    when: (_repository, session) => session.status === "complete" && (session.exceptions?.length ?? 0) > 0,
+    does: (repository, session) =>
+      opens(path.join(repository.root, TRANSCRIPTS_DIRNAME, sessionTranscriptName(session.number)), null, EXCEPTIONS_ANCHOR),
+  },
+  {
+    id: "dabblerSessionSets.cancel",
+    label: "Cancel Session",
+    group: 901,
+    // A cancelled session restores; anything else can be cancelled,
+    // including a complete one — the reason is recorded either way.
+    when: (_repository, session) => session.status !== "cancelled",
+    // `--force` is the record's say-so, never the person's: the one state
+    // the lifecycle cannot close out of is cancelled in flight.
+    does: (repository, session) => {
+      const force = sessionCannotClose(session);
+      return {
+        ...runs([...dabbler(repository, "session", "cancel"), ...numbered(session), ...(force ? ["--force"] : [])]),
+        confirm: cancelConfirmation(session.number, sessionRowLabel(session), force),
+        reason: cancelReason(sessionRowLabel(session)),
+      };
+    },
+  },
+  {
+    id: "dabblerSessionSets.restore",
+    label: "Restore Session",
+    group: 902,
+    when: (_repository, session) => session.status === "cancelled",
+    does: (repository, session) => ({
+      ...runs([...dabbler(repository, "session", "restore"), ...numbered(session)]),
+      confirm: restoreConfirmation(session.number, sessionRowLabel(session)),
+      reason: restoreReason(sessionRowLabel(session)),
+    }),
+  },
+  {
+    id: "dabblerSessionSets.rollback",
+    label: "Rollback to Start of This Session",
+    group: 903,
+    // The third way to end a session, for an implementation that went
+    // wrong or a problem that spans several: back to where this session
+    // started, it and every session after it discarded. The router takes a
+    // session in flight or completed and refuses the rest, so the item is
+    // on those rows and on no other.
+    when: (_repository, session) => session.status === "in-progress" || session.status === "complete",
+    // The dry run's facts are the confirmation's detail, and its `head` is
+    // passed back as `--as-of`, so the rollback refuses a repository that
+    // moved while the person was reading.
+    does: (repository, session) => {
+      const argv = [...dabbler(repository, "session", "rollback"), ...numbered(session), "--reason", ROLLBACK_REASON];
+      return {
+        ...runs(argv),
+        preview: [...argv, "--dry-run"],
+        confirm: rollbackConfirmation(session.number, sessionRowLabel(session)),
+      };
+    },
+  },
+];
+
+export function applicableSessionActions(
+  repository: SessionsRepository,
+  session: SessionRecord,
+): SessionAction[] {
+  return SESSION_ACTIONS.filter((a) => a.when(repository, session)).sort(
+    (a, b) => a.group - b.group,
+  );
+}
+
+/** The actions a repository row offers, in menu order, each as an interface runs it. */
+export function offeredRepositoryActions(repository: SessionsRepository): OfferedAction[] {
+  return applicableRepositoryActions(repository).map((action) => ({
+    id: action.id,
+    title: action.label,
+    ...action.does(repository),
+  }));
+}
+
+/** The actions a session row offers, in menu order, each as an interface runs it. */
+export function offeredSessionActions(repository: SessionsRepository, session: SessionRecord): OfferedAction[] {
+  return applicableSessionActions(repository, session).map((action) => ({
+    id: action.id,
+    title: action.label,
+    ...action.does(repository, session),
+  }));
+}
+
+// ===========================================================================
+// The tree: nodes, children and descriptors
+// ===========================================================================
+
 // The Work Explorer's native-tree view model.
 //
 // PURE. No vscode import: everything here is a plain data transform from
@@ -20,31 +741,6 @@
 //      contextValue.
 //   3. At most two inline actions per row, enforced in package.json and
 //      asserted by the menu-registry test.
-
-import type {
-  ProgressProjectionSession as SessionRecord,
-  ProgressProjectionSessionStatus as SessionStatus,
-  ProgressProjectionVerification as SessionVerification,
-  ProgressProjectionTask as TaskRecord,
-  ProgressProjectionFinding as VerificationFinding,
-} from "dabbler-ai-router";
-import { humanizeStepKey } from "dabbler-ai-router";
-import type { SessionsRepository } from "../utils/fileSystem";
-import {
-  REPOSITORY_ACTIONS,
-  RepositoryAction,
-  SESSION_ACTIONS,
-  SessionAction,
-  fundsVendor,
-} from "./ActionRegistry";
-import {
-  ICON_FILES,
-  progressText,
-  sessionRowLabel,
-  sessionsInOrder,
-  verdictIsUnclean,
-} from "./sessionsModel";
-import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 
 // ---------------------------------------------------------------------------
 // Nodes: repository -> bucket -> session -> step
@@ -224,7 +920,6 @@ export function sessionNodes(node: BucketNode): SessionNode[] {
   }));
 }
 
-
 /**
  * The third level: the in-flight session's tasks, exactly as the
  * projection lists them. A refusal outranks the list — the projection
@@ -355,9 +1050,7 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
  * operator's authored status SVGs under media/{light,dark}/, resolved
  * per theme by the adapter.
  */
-export type IconSpec =
-  | { kind: "theme"; id: string; color?: string }
-  | { kind: "file"; slug: string };
+export type IconSpec = WorkExplorerIcon;
 
 export interface RowDescriptor {
   /**
@@ -385,6 +1078,12 @@ export interface RowDescriptor {
    * which knows the node; this is for rows that carry their own argument.
    */
   command?: { command: string; title: string; arguments: unknown[] };
+  /**
+   * The actions the row offers, in menu order, each as the `dabbler` command
+   * it stands for or the file it opens, with what it asks first. The same
+   * rule mints the row's action tokens, so the two cannot disagree.
+   */
+  actions?: OfferedAction[];
 }
 
 // Tokens are `;`-wrapped on both sides so a `when` clause can match
@@ -421,7 +1120,7 @@ export const NODE_TOKEN = {
  * command id so a new registry entry cannot be added without the
  * registry test noticing that no menu contribution matches it.
  */
-export function actionToken(action: RepositoryAction | SessionAction): string {
+export function actionToken(action: { readonly id: string }): string {
   return `act-${action.id.replace(/^dabbler(SessionSets)?\./, "").replace(/\./g, "-")}`;
 }
 
@@ -430,8 +1129,6 @@ export function actionToken(action: RepositoryAction | SessionAction): string {
 // ---------------------------------------------------------------------------
 
 export type SessionSeverity = "verification" | "record" | null;
-
-export { verdictIsUnclean } from "./sessionsModel";
 
 /**
  * What a session row must not render as clean. A verdict the framework
@@ -513,9 +1210,8 @@ export function repositoryTooltip(repository: SessionsRepository): string {
 export function repositoryDescriptor(node: RepositoryNode): RowDescriptor {
   const { repository } = node;
   const tokens: string[] = [NODE_TOKEN.repository];
-  for (const action of REPOSITORY_ACTIONS) {
-    if (action.when(repository)) tokens.push(actionToken(action));
-  }
+  const actions = offeredRepositoryActions(repository);
+  for (const action of actions) tokens.push(actionToken(action));
   return {
     // The root path is the identity: two worktrees of one repository are
     // two rows, and only the path tells them apart.
@@ -529,6 +1225,7 @@ export function repositoryDescriptor(node: RepositoryNode): RowDescriptor {
     icon: undefined,
     contextValue: tokenString(tokens),
     collapsible: repository.sessions.length > 0 ? "collapsed" : "none",
+    actions,
   };
 }
 
@@ -609,10 +1306,10 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
   const tokens: string[] = [NODE_TOKEN.session, `session-${session.status}`];
   const severity = severityOf(session);
   if (severity) tokens.push(`severity-${severity}`);
-  for (const action of SESSION_ACTIONS) {
-    if (action.when(repository, session)) tokens.push(actionToken(action));
-  }
+  const actions = offeredSessionActions(repository, session);
+  for (const action of actions) tokens.push(actionToken(action));
   return {
+    actions,
     id: `session:${repository.root}/${session.number}`,
     label: sessionRowLabel(session),
     // Short labels, so a description survives truncation here. Three states
@@ -1193,7 +1890,6 @@ export function bucketDescriptor(node: BucketNode): RowDescriptor {
   };
 }
 
-
 /** An attention row, which is a leaf and carries no menu of its own. */
 export function attentionDescriptor(node: AttentionNode): RowDescriptor {
   return {
@@ -1234,4 +1930,232 @@ export function elapsedSince(
   const hours = Math.round(minutes / 60);
   if (hours < 36) return `${hours} hours`;
   return `${Math.round(hours / 24)} days`;
+}
+
+// ===========================================================================
+// The repository a tree is built from
+// ===========================================================================
+
+/**
+ * Where a repository's sessions came from. `ledger` is the
+ * machine-written record; `plan` is a repository that has been set up
+ * and never run, whose sessions are the ones its plan declares — the
+ * two setup sessions bootstrap scaffolds, before the first registration
+ * writes anything.
+ */
+export type SessionsSource = ProgressProjectionRepository["sessionsSource"];
+
+/**
+ * One repository and the sessions it holds — the Work Explorer's root row.
+ *
+ * Everything it carries about SESSIONS is the progress reading's answer,
+ * typed by its generated types; `workExplorerRepository` is the one place
+ * that assembles one.
+ *
+ * The four file paths are the sessions root's own artifacts. They are
+ * the whole Open File surface: a repository has one plan, one activity
+ * log, one change log and one ledger, so there is nothing to select
+ * between.
+ */
+export interface SessionsRepository {
+  /** Repository root — the spawn cwd. */
+  root: string;
+  /** `<root>/docs/sessions`. */
+  sessionsDir: string;
+  /** Display name; `path.basename(root)`. */
+  label: string;
+  planPath: string;
+  activityPath: string;
+  changeLogPath: string;
+  ledgerPath: string;
+  totalSessions: number | null;
+  sessionsCompleted: number;
+  currentSession: number | null;
+  /**
+   * What the next `session start` would register, by the router's own rule.
+   *
+   * Carried rather than recomputed: the rule is "the session in flight if
+   * there is one, else the lowest-numbered row that has not run", it spans
+   * the ledger AND the plan's rows, and a second reading of it here would
+   * offer to start a session the framework would refuse to start.
+   */
+  nextSession: number | null;
+  forceClosed: boolean;
+  schemaVersionOnDisk: number | null;
+  sessionsSource: SessionsSource;
+  invariantViolation: string | null;
+  /** Derived liveness: when the record last moved, and whether it stopped. */
+  lastActivityAt: string | null;
+  possiblyStalled: boolean;
+  /**
+   * Whether the framework is running something right now.
+   *
+   * Read from the driven run record through the one rule that answers it,
+   * so the Explorer's liveness row and the Dabbler terminal's indicator
+   * cannot disagree. Optional because a repository built by hand -- a test,
+   * a fixture -- has no run to read.
+   */
+  activity?: Activity;
+  /**
+   * The router's words for a job that finished and nobody collected, when
+   * `activity` is `uncollected`; the row's detail is these and no wording
+   * of the Explorer's own.
+   */
+  uncollected?: string | null;
+  /**
+   * The memo the Mechanic left on the session in flight, or null where it
+   * left none. Optional for the reason `activity` is.
+   */
+  mechanicMemo?: string | null;
+  orchestrator: OrchestratorInfo | null;
+  /**
+   * The progress reading's sessions, with tasks populated on the in-flight
+   * session only. Empty when the reading was unavailable — the repository
+   * row still renders, and the interface says the rendering is degraded
+   * rather than guessing statuses that only the router decides.
+   */
+  sessions: SessionRecord[];
+}
+
+export const CHANGE_LOG_FILENAME = "change-log.md";
+
+/** `<root>/docs/sessions`, whether or not it exists. */
+export function sessionsDirOf(root: string): string {
+  return path.join(root, "docs", SESSIONS_DIRNAME);
+}
+
+/**
+ * Whether *root* is a repository the Work Explorer has anything to say
+ * about: its sessions root holds a machine-written ledger, or a session plan.
+ *
+ * The plan counts because a bootstrapped repository has one and nothing
+ * else — its two setup sessions exist there until the first registration
+ * writes a ledger — and a view that showed nothing until then would hide
+ * project setup from every repository that most needs it. Presence decides
+ * only whether to ASK for the progress reading; which sessions exist and
+ * what state each is in are the reading's answers.
+ */
+export function hasSessionsRoot(root: string): boolean {
+  const dir = sessionsDirOf(root);
+  return fs.existsSync(path.join(dir, STATE_FILENAME)) || fs.existsSync(path.join(dir, SESSION_PLAN_FILENAME));
+}
+
+/** The Mechanic's memo on this session, where the router says it leaves one; null where there is none. */
+export function readMechanicMemo(root: string, sessionNumber: number): string | null {
+  try {
+    const memo = fs.readFileSync(path.join(root, mechanicMemoPath(sessionNumber)), "utf8").trim();
+    return memo === "" ? null : memo;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The repository at *root*, from its progress reading -- or from none, where
+ * the reading failed: a failed reading is not a fresh repository, so every
+ * field is the reading's answer or nothing, and there is no file-presence
+ * fallback beside it.
+ */
+export function workExplorerRepository(
+  root: string,
+  reading: ProgressProjection | null,
+): SessionsRepository {
+  const sessionsDir = sessionsDirOf(root);
+  const p = reading;
+  return {
+    root,
+    sessionsDir,
+    label: path.basename(root),
+    planPath: path.join(sessionsDir, SESSION_PLAN_FILENAME),
+    activityPath: path.join(sessionsDir, ACTIVITY_LOG_FILENAME),
+    changeLogPath: path.join(sessionsDir, CHANGE_LOG_FILENAME),
+    ledgerPath: path.join(sessionsDir, STATE_FILENAME),
+    totalSessions: p ? p.repository.totalSessions : null,
+    sessionsCompleted: p ? p.repository.sessionsCompleted : 0,
+    currentSession: p ? p.repository.currentSession : null,
+    nextSession: p ? p.repository.nextSession : null,
+    lastActivityAt: p ? p.repository.lastActivityAt : null,
+    possiblyStalled: p ? p.repository.possiblyStalled : false,
+    activity: currentActivity(root),
+    uncollected: uncollectedWords(root),
+    mechanicMemo: p?.repository.currentSession != null ? readMechanicMemo(root, p.repository.currentSession) : null,
+    forceClosed: p ? p.repository.forceClosed : false,
+    schemaVersionOnDisk: p ? p.repository.schemaVersionOnDisk : null,
+    // "ledger" is what a row with no reading claims, so the never-run copy
+    // is only ever shown on a reading that actually said so.
+    sessionsSource: p ? p.repository.sessionsSource : "ledger",
+    invariantViolation: p ? p.repository.invariantViolation : null,
+    orchestrator: p ? p.repository.orchestrator : null,
+    sessions: p ? p.sessions : [],
+  };
+}
+
+// ===========================================================================
+// The whole tree, as rows an interface is handed
+// ===========================================================================
+
+/** One repository to print: its assembly, and why its reading failed where it did. */
+export interface WorkExplorerEntry {
+  repository: SessionsRepository;
+  error: string | null;
+}
+
+/**
+ * Each session's line in the session plan, 1-based, by the router's own
+ * reading of a section: the line its section starts on. Read once per
+ * repository, when the tree is printed, and never on a scan.
+ */
+function sessionPlanLines(repository: SessionsRepository): Map<number, number> {
+  const lines = new Map<number, number>();
+  let text: string;
+  try {
+    text = fs.readFileSync(repository.planPath, "utf8");
+  } catch {
+    return lines;
+  }
+  const planLines = text.split(/\r?\n/);
+  for (const session of repository.sessions) {
+    const heading = planSection(text, session.number)?.split("\n")[0];
+    const index = heading === undefined ? -1 : planLines.indexOf(heading);
+    if (index >= 0) lines.set(session.number, index + 1);
+  }
+  return lines;
+}
+
+/** Activating a repository row opens its plan; a session row opens it at the session's own section. */
+function clickOf(node: WorkExplorerNode, planLines: Map<number, number>): WorkExplorerAction | null {
+  if (node.kind !== "repository" && node.kind !== "session") return null;
+  const line = node.kind === "session" ? (planLines.get(node.session.number) ?? null) : null;
+  return {
+    id: node.kind === "repository" ? "dabblerWorkExplorer.activateRepository" : "dabblerWorkExplorer.activateSession",
+    title: "Open Session Plan",
+    ...opens(node.repository.planPath, line),
+  };
+}
+
+function rowOf(node: WorkExplorerNode, planLines: Map<number, number>): WorkExplorerRow {
+  const descriptor = descriptorFor(node);
+  return {
+    id: descriptor.id,
+    kind: node.kind,
+    label: descriptor.label,
+    description: descriptor.description ?? null,
+    tooltip: descriptor.tooltip ?? null,
+    icon: descriptor.icon ?? null,
+    collapsible: descriptor.collapsible,
+    contextValue: descriptor.contextValue,
+    click: clickOf(node, planLines),
+    actions: descriptor.actions ?? [],
+    children: childrenOf(node).map((child) => rowOf(child, planLines)),
+  };
+}
+
+/** The whole Work Explorer tree, every level present, for the repositories given. */
+export function workExplorerTree(entries: readonly WorkExplorerEntry[]): WorkExplorer {
+  const repositories = repositoryNodes(entries.map((entry) => entry.repository)).map((node, index) => {
+    const row = rowOf(node, sessionPlanLines(node.repository));
+    const error = entries[index]?.error ?? null;
+    return error === null ? row : { ...row, error };
+  });
+  return { schemaVersion: 1, repositories };
 }

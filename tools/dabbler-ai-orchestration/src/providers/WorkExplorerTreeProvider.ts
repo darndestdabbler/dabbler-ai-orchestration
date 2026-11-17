@@ -1,10 +1,11 @@
 // The native TreeDataProvider for the Work Explorer.
 //
-// Deliberately thin: everything that decides WHAT a row says lives in
-// workExplorerTreeModel.ts (which imports no vscode and is driveable
-// from the unit suite); this class converts descriptors into TreeItems
-// and owns the platform lifecycle — the change event, the async scan
-// cache, getParent.
+// Deliberately thin: everything that decides WHAT a row says is the
+// router's (`views/workExplorer.ts`, called in-process, the same rows
+// `dabbler view work-explorer` prints); this class converts descriptors
+// into TreeItems and owns the platform lifecycle — the change event, the
+// async scan cache, getParent. Which menu item shows on a row is its
+// `contextValue`, minted from the row's own actions.
 //
 // The laziness contract: nothing is computed until the view is visible;
 // each level is computed only when its parent expands; a repository
@@ -13,17 +14,17 @@
 // generation.
 
 import * as vscode from "vscode";
-import type { SessionsRepository } from "../utils/fileSystem";
-import { ScanResult, scanRepositories } from "../utils/fileSystem";
-import { ProjectionCache } from "../utils/projection";
 import {
-  IconSpec,
-  RowDescriptor,
-  WorkExplorerNode,
   childrenOf,
   descriptorFor,
   repositoryNodes,
-} from "./workExplorerTreeModel";
+  type IconSpec,
+  type RowDescriptor,
+  type SessionsRepository,
+  type WorkExplorerNode,
+} from "dabbler-ai-router";
+import { ScanResult, scanRepositories } from "../utils/fileSystem";
+import { ProjectionCache } from "../utils/projection";
 
 /** How long `refresh()` waits to merge a burst of calls into one repaint. */
 export const REFRESH_WINDOW_MS = 250;

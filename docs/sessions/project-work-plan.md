@@ -381,7 +381,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 341 | The first two sessions ask what is being made | — | not declared |
 | 342 | Release 3.36.0 (release: 3.36.0) | — | not declared |
 | 343 | The router prints the Dabbler Terminal's lines | no | 2026-11-17 |
-| 344 | The router prints the Work Explorer's rows | — | not declared |
+| 344 | The router prints the Work Explorer's rows | no | 2026-11-17 |
 | 345 | The router prints the Configuration rows and what may be chosen | — | not declared |
 | 346 | The router says how an engine is started, and answers with data | — | not declared |
 | 347 | The views follow the records | — | not declared |
@@ -3883,3 +3883,15 @@ Move the Dabbler Terminal's lines out of the VS Code extension into the router, 
 - 2026-11-17 — step 'move-terminal-lines': its checks: The boundary control is what proves the new views module is declared and adds no import cycle (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-17 — step 'terminal-verb': its files: No spinner when stdout is not a TTY needs an indicator option on TerminalLines; nothing else in it changes (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-17 — step 'extension-reads-it': its checks: build.mjs resolves its entry from the package directory, so it must run under npm --prefix packages/router, not node from the repository root (claude-code (anthropic, claude-opus-5-5))
+
+### Session 344 — The router prints the Work Explorer's rows
+
+**Releasable: no.**
+
+Move the Work Explorer's model out of the VS Code extension into the router, so that a second interface gets the same rows rather than working them out again. `workExplorerTreeModel.ts`, `ActionRegistry.ts`, `sessionsModel.ts` and `rowMenuHelpers.ts` (under `tools/dabbler-ai-orchestration/src/providers/`) and `utils/verdictTokens.ts` move, unchanged in behaviour, to a new `packages/router/src/views/workExplorer.ts`, with the part of `utils/fileSystem.ts` that assembles what the model is given -- the `SessionsRepository` shape built from the router's progress reading, the activity of the run in flight, the uncollected words and the Mechanic's memo. Each action a row offers then carries its id, its title, the `dabbler` command it stands for with its arguments filled in (Cancel's `--force` decided there, not by the interface), and what it needs from a person first -- a confirmation with its words, a reason, or nothing; an action that opens a file names the file and the line. The rows' shape becomes `packages/router/schemas/work-explorer.schema.json` with its TypeScript type generated as the progress reading's is, and a new verb `dabbler view work-explorer --repo-root <path> [--repo-root <path> ...]` prints the whole tree as JSON: each repository, its buckets, its sessions, and under a session its tasks, verification, findings and what needs attention, each row carrying its id, label, description, tooltip, icon by name, whether it starts open, the command a click runs, and its actions. Last, the extension's `WorkExplorerTreeProvider.ts` turns the router's rows into tree items in-process as it does today, its menu tokens still derived from each row's actions, so nothing a person sees changes. The model's, the action rule's and the labels' tests move to `packages/router/test/workExplorer.test.ts` rewritten for `node --test`, none dropped or weakened, plus one new test that the JSON the verb prints for a fixture repository validates against the schema and offers the actions the model's own tests expect.
+
+**Amended after acceptance:**
+
+- 2026-11-17 — step 'actions-are-verbs': its files: Stop Session, Check this stop, Review exception and Report this stop keep their confirmation and reason words in sessionCommands.ts; they move to the router as the one copy, so it reads them from there (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-17 — step 'extension-reads-it': its files and checks: Two tests that stay in the extension need a home once their files go: the parity test of the Dabbler Terminal against the Work Explorer drives the extension's DabblerTerminal, so it joins dabblerTerminal.test.ts; the Solution Explorer's menu suite read the manifest beside the Work Explorer's, so it joins solutionTreeProvider.test.ts. Both are run by the step's checks. (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-17 — step 'extension-reads-it': its files: The extension's scan now asks the router which folder holds a sessions root (hasSessionsRoot, moved beside the assembly in view-verb), so the router's package entry exports it (claude-code (anthropic, claude-opus-5-5))

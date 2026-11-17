@@ -32,9 +32,13 @@ import {
   STARTING_POINT,
   TRANSCRIPTS_DIRNAME,
   UNDO_CHANGES_FLAG,
+  checkStopConfirmation,
   preflightRefusedModel,
   releaseSessionToStart,
+  reportStopConfirmation,
   sessionTranscriptName,
+  stopReason,
+  waiveReason,
   type Router,
 } from "dabbler-ai-router";
 import { SESSIONS_REL, type SessionsRepository } from "../utils/fileSystem";
@@ -900,15 +904,13 @@ export async function runStopSession(
   const number = String(session).padStart(3, "0");
   // Dismissing the box aborts, as it does everywhere else a reason is
   // asked for: a stop nobody typed a reason into is a stop nobody meant.
-  const reason = await promptReason(
-    `Why stop session ${number}? The reason is recorded on the stop.`,
-    "e.g. I need the machine back",
-  );
+  const asked = stopReason(session);
+  const reason = await promptReason(asked.prompt, asked.placeholder);
   if (reason === undefined) return false;
   const result = await router.session.interrupt({
     repoRoot: repository.root,
     sessionNumber: session,
-    reason: reason.trim() === "" ? "the operator stopped the session" : reason.trim(),
+    reason: reason.trim() === "" ? (asked.blank ?? "") : reason.trim(),
     stop: true,
   });
   if (!result.ok) {
@@ -1155,13 +1157,8 @@ export async function runCheckStop(repository: SessionsRepository, ui: SessionRu
     ui.showInformationMessage(`Nothing is in flight in ${repository.label}; there is no stop to check.`);
     return false;
   }
-  const number = String(session).padStart(3, "0");
-  const yes = await ui.confirm(
-    `Check session ${number}'s stop? This is one provider call: a model that is not the author's reads the ` +
-      "record and says whose the stop is, naming a way within the rules where it finds one. It is advice only " +
-      "and is kept in the run's exceptions.jsonl; it decides nothing.",
-    "Check this stop",
-  );
+  const words = checkStopConfirmation(session);
+  const yes = await ui.confirm(words.title, words.accept);
   if (!yes) return false;
   const dir = SESSIONS_REL.replace(/\\/g, "/");
   ui.runCommand(repository.root, `Check this stop — ${repository.label}`, `dabbler triage --sessions-dir ${dir}`);
@@ -1195,10 +1192,8 @@ export async function runReviewException(
     return false;
   }
   ui.report(`Review exception — session ${number}`, card.value.stdout);
-  const reason = await promptReason(
-    `Why may session ${number} go past this stop? Your reason and your name are recorded beside what was unmet.`,
-    "e.g. the clock test is flaky on this host; the fix is planned",
-  );
+  const asked = waiveReason(session);
+  const reason = await promptReason(asked.prompt, asked.placeholder);
   if (reason === undefined || reason.trim() === "") return false;
   const result = await router.session.waive({ repoRoot: repository.root, reason: reason.trim() });
   if (!result.ok) {
@@ -1242,12 +1237,8 @@ export async function runReportStop(
     return false;
   }
   const number = String(session).padStart(3, "0");
-  const yes = await ui.confirm(
-    `Write a report of session ${number}'s stop for Dabbler's maintainers? This is one provider call: the Primary ` +
-      "Reviewer reads the report's two short passages for anything of your repository's. The report opens for you " +
-      "to read; nothing is sent.",
-    "Write the report",
-  );
+  const words = reportStopConfirmation(session);
+  const yes = await ui.confirm(words.title, words.accept);
   if (!yes) return false;
   const result = await router.session.defectReport({ repoRoot: repository.root });
   if (!result.ok) {

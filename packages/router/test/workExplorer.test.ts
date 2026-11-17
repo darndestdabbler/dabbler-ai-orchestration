@@ -1,46 +1,223 @@
-import * as assert from "assert";
-import { spawnSync } from "child_process";
-import * as fs from "fs";
-import * as path from "path";
-import { createInProcessRouter } from "dabbler-ai-router";
-import type { Router } from "dabbler-ai-router";
-import { DabblerTerminal } from "../../router/dabblerTerminal";
+// The Work Explorer's rows: the nodes and their children, each row's
+// descriptor, the labels and icons, the verdict words, and the rule for
+// which actions a row offers.
+//
+// What is asserted is the rows an interface is handed. The tests that read
+// the VS Code extension's own files -- its manifest's menus, its status
+// icons -- stay with the extension.
+
+import assert from "node:assert";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { suite, test } from "node:test";
+
+import type {
+  ProgressProjection as ProjectionPayload,
+  ProgressProjectionSession as SessionRecord,
+  ProgressProjectionVerification as SessionVerification,
+  ProgressProjectionTask as TaskRecord,
+  ProgressProjectionFinding as VerificationFinding,
+} from "../src/generated/progress-projection.ts";
+import type { WorkExplorer } from "../src/generated/work-explorer.ts";
+import { viewVerb } from "../src/cli/view.ts";
+import { loadSchemaFile, schemaFailure } from "../src/schema/validate.ts";
 import {
+  ICON_FILES,
   NODE_TOKEN,
-  WORK_STEP_PREFIX,
+  REPOSITORY_ACTIONS,
+  SESSION_ACTIONS,
   actionToken,
+  applicableRepositoryActions,
+  applicableSessionActions,
+  attentionNodes,
   bucketNodes,
   childrenOf,
   descriptorFor,
   findingDescriptor,
   hasToken,
+  offeredRepositoryActions,
+  offeredSessionActions,
+  progressText,
+  readMechanicMemo,
+  refusalDescriptor,
   repositoryDescriptor,
   repositoryNodes,
   repositoryTooltip,
-  attentionNodes,
   sessionDescriptor,
+  sessionDisplayNumber,
   sessionNodes,
-  refusalDescriptor,
+  sessionRowLabel,
+  sessionsInOrder,
   severityOf,
   stepStartLabel,
   taskDescriptor,
   taskNodes,
   taskRowLabel,
   tokenString,
+  verdictIsUnclean,
   verificationDescriptor,
-} from "../../providers/workExplorerTreeModel";
-import { SESSION_ACTIONS } from "../../providers/ActionRegistry";
-import {
-  makeFinding,
-  makeRepository,
-  makeSession,
-  makeTask,
-  makeTempDir,
-  makeVerification,
-  rmrf,
-} from "./helpers";
+  workExplorerRepository,
+  type SessionsRepository,
+} from "../src/views/workExplorer.ts";
 
-suite("workExplorerTreeModel: nodes", () => {
+// ---------------------------------------------------------------------------
+// Builders: records shaped exactly as the progress reading and the
+// repository assembly build them, with per-test overrides.
+// ---------------------------------------------------------------------------
+
+export function makeFinding(
+  overrides: Partial<VerificationFinding> = {},
+): VerificationFinding {
+  return {
+    round: 3,
+    description: "the suite command is guessed rather than declared",
+    severity: "major",
+    category: "Correctness",
+    failureScenario: "A Java repository gets `python -m pytest`.",
+    evidencePaths: ["ai_router/affected.py"],
+    blocking: true,
+    disposition: "outstanding",
+    ...overrides,
+  };
+}
+
+/** A session unresolved at the cap, as the projection folds one. */
+export function makeVerification(
+  overrides: Partial<SessionVerification> = {},
+): SessionVerification {
+  return {
+    terminal: "ISSUES_FOUND",
+    headline: "unresolved at the cap",
+    clean: false,
+    verdict: "ISSUES_FOUND",
+    rounds: 3,
+    stoppedAtRound: 3,
+    cap: 3,
+    verifierModel: "gpt-5-6-sol",
+    verifierProvider: "openai",
+    transport: "api",
+    agency: {
+      mode: "none",
+      reads: 0,
+      searches: 0,
+      listings: 0,
+      transformedReads: 0,
+      outOfScope: 0,
+      overBudget: 0,
+      reason: "this transport sends no tools",
+      operations: [],
+    },
+    findings: [makeFinding()],
+    fixPaths: [],
+    ...overrides,
+  };
+}
+
+export function makeTask(overrides: Partial<TaskRecord> = {}): TaskRecord {
+  return {
+    position: 0,
+    stepId: "implement",
+    intent: "Implement the thing.",
+    state: "pending",
+    iconKey: "not-started",
+    isOpen: false,
+    startedAt: null,
+    ...overrides,
+  };
+}
+
+export function makeSession(overrides: Partial<SessionRecord> = {}): SessionRecord {
+  const number = overrides.number ?? 1;
+  return {
+    number,
+    displayNumber: String(number).padStart(3, "0"),
+    title: "Session one",
+    status: "complete",
+    iconKey: "complete",
+    inFlight: false,
+    startedAt: null,
+    completedAt: null,
+    verificationVerdict: null,
+    tasks: [],
+    tasksRefused: null,
+    verification: null,
+    verificationRefused: null,
+    ...overrides,
+  };
+}
+
+export function makeRepository(
+  overrides: Partial<SessionsRepository> = {},
+): SessionsRepository {
+  const root = overrides.root ?? path.join("D:", "ws");
+  const sessionsDir = path.join(root, "docs", "sessions");
+  return {
+    root,
+    sessionsDir,
+    label: path.basename(root),
+    planPath: path.join(sessionsDir, "session-plan.md"),
+    activityPath: path.join(sessionsDir, "activity-log.json"),
+    changeLogPath: path.join(sessionsDir, "change-log.md"),
+    ledgerPath: path.join(sessionsDir, "sessions.json"),
+    totalSessions: null,
+    sessionsCompleted: 0,
+    currentSession: null,
+    nextSession: null,
+    forceClosed: false,
+    schemaVersionOnDisk: null,
+    sessionsSource: "ledger",
+    invariantViolation: null,
+    lastActivityAt: null,
+    possiblyStalled: false,
+    orchestrator: null,
+    sessions: [],
+    ...overrides,
+  };
+}
+
+export function makeProjection(
+  overrides: {
+    repository?: Partial<ProjectionPayload["repository"]>;
+    sessions?: SessionRecord[];
+  } = {},
+): ProjectionPayload {
+  return {
+    schemaVersion: 1,
+    generatedAt: "2026-08-17T12:00:00-04:00",
+    repository: {
+      sessionsSource: "ledger",
+      schemaVersionOnDisk: 5,
+      totalSessions: 2,
+      sessionsCompleted: 2,
+      currentSession: null,
+      plannedSessions: 0,
+      nextSession: null,
+      lastActivityAt: null,
+      possiblyStalled: false,
+      stalledAfterSeconds: null,
+        forceClosed: false,
+      orchestrator: null,
+      invariantViolation: null,
+      ...(overrides.repository ?? {}),
+    },
+    sessions: overrides.sessions ?? [
+      makeSession({ number: 1 }),
+      makeSession({ number: 2, title: "Session two" }),
+    ],
+  };
+}
+
+function makeTempDir(prefix: string): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+}
+
+function rmrf(dir: string): void {
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+
+suite("workExplorer: nodes", () => {
   test("sessions group under non-empty status buckets: live work ascending, finished work descending", () => {
     // The operator's ruling, superseding D104: the live buckets read in run
     // order, the finished ones put the latest close under the header, a
@@ -270,7 +447,7 @@ suite("workExplorerTreeModel: nodes", () => {
   });
 });
 
-suite("workExplorerTreeModel: tokens", () => {
+suite("workExplorer: tokens", () => {
   test("tokenString wraps every token in separators on both sides", () => {
     assert.strictEqual(tokenString(["a", "b"]), ";a;b;");
   });
@@ -283,27 +460,17 @@ suite("workExplorerTreeModel: tokens", () => {
 
   test("actionToken strips the command prefix and dots", () => {
     assert.strictEqual(
-      actionToken({
-        id: "dabblerSessionSets.openSpec",
-        label: "",
-        group: 0,
-        when: () => true,
-      }),
+      actionToken({ id: "dabblerSessionSets.openSpec" }),
       "act-openSpec",
     );
     assert.strictEqual(
-      actionToken({
-        id: "dabbler.consultWithAi",
-        label: "",
-        group: 0,
-        when: () => true,
-      }),
+      actionToken({ id: "dabbler.consultWithAi" }),
       "act-consultWithAi",
     );
   });
 });
 
-suite("workExplorerTreeModel: repository descriptor", () => {
+suite("workExplorer: repository descriptor", () => {
   test("the fraction and the in-flight session read from the row itself", () => {
     const d = repositoryDescriptor(
       repositoryNodes([
@@ -370,7 +537,7 @@ suite("workExplorerTreeModel: repository descriptor", () => {
   });
 });
 
-suite("workExplorerTreeModel: session descriptor", () => {
+suite("workExplorer: session descriptor", () => {
   const repository = makeRepository({
     sessions: [makeSession({ number: 1, status: "complete" })],
   });
@@ -683,7 +850,7 @@ suite("workExplorerTreeModel: session descriptor", () => {
   });
 });
 
-suite("workExplorerTreeModel: severity", () => {
+suite("workExplorer: severity", () => {
   test("an unrecognized verdict is severe, never clean", () => {
     assert.strictEqual(
       severityOf(makeSession({ verificationVerdict: "manual-override-development" })),
@@ -713,7 +880,7 @@ suite("workExplorerTreeModel: severity", () => {
     assert.ok(hasToken(d.contextValue, "severity-verification"));
   });
 });
-suite("workExplorerTreeModel: task rows", () => {
+suite("workExplorer: task rows", () => {
   const repository = makeRepository();
 
   test("the six lifecycle rows read in the operator's words, and the ids do not move", () => {
@@ -821,7 +988,7 @@ suite("workExplorerTreeModel: task rows", () => {
   });
 });
 
-suite("workExplorerTreeModel: the unresolved-session view", () => {
+suite("workExplorer: the unresolved-session view", () => {
   const repository = makeRepository();
   const sessionNode = (session: ReturnType<typeof makeSession>) =>
     ({ kind: "session", repository, session }) as const;
@@ -1000,7 +1167,7 @@ suite("workExplorerTreeModel: the unresolved-session view", () => {
   });
 });
 
-suite("workExplorerTreeModel: descriptorFor dispatch", () => {
+suite("workExplorer: descriptorFor dispatch", () => {
   test("every node kind resolves to a descriptor with a stable id", () => {
     const session = makeSession({ status: "in-progress", tasks: [makeTask()] });
     const [repositoryNode] = repositoryNodes([
@@ -1027,209 +1194,521 @@ suite("workExplorerTreeModel: descriptorFor dispatch", () => {
   });
 });
 
-suite("workExplorerTreeModel: the two surfaces over one record", () => {
-  const ESC = "\u001b";
+const finished = makeRepository({
+  currentSession: null,
+  sessions: [makeSession({ number: 1, status: "complete" })],
+});
+const inFlight = makeRepository({
+  currentSession: 2,
+  sessions: [
+    makeSession({ number: 1, status: "complete" }),
+    makeSession({ number: 2, status: "in-progress" }),
+  ],
+});
 
-  /** The bytes a pty received, with the SGR sequences taken back out. */
-  function plain(text: string): string {
-    return text
-      .split(ESC)
-      .map((piece, index) => (index === 0 ? piece : piece.slice(piece.indexOf("m") + 1)))
-      .join("");
-  }
-
-  /** The step the terminal last announced, from what it actually wrote. */
-  function announced(written: readonly string[]): string | null {
-    const said = [...plain(written.join("")).matchAll(/step id=(\S+)/g)];
-    return said.length === 0 ? null : (said[said.length - 1]?.[1] ?? null);
-  }
-
-  /** The step the Work Explorer shows as the open child of its Work row. */
-  async function shown(router: Router, root: string, sessionsDir: string): Promise<string | null> {
-    const projection = await router.progress({ repoRoot: root, sessionsDir });
-    assert.ok(projection.ok, JSON.stringify(projection));
-    const session = projection.value.sessions.find((row) => row.number === 1);
-    const open = (session?.tasks ?? []).find(
-      (row) => row.isOpen && (row.stepId ?? "").startsWith(WORK_STEP_PREFIX),
-    );
-    return open ? (open.stepId ?? "").slice(WORK_STEP_PREFIX.length) : null;
-  }
-
-  test("the terminal and the Work Explorer name the same step, from one instruction at one seq", async () => {
-    // The point is not that each surface renders something -- both did, and
-    // that is exactly why they were free to disagree. They are fed by one
-    // record, and when they disagree the operator cannot tell which is
-    // lying. So: one driver directory, and the same answer out of both, at
-    // two different seqs, so a fixed answer cannot pass twice.
-    const root = makeTempDir("dabbler-parity-");
-    const sessionsDir = path.join(root, "docs", "sessions");
-    fs.mkdirSync(sessionsDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(sessionsDir, "session-plan.md"),
-      "### Session 1 of 1: Build the widget\n1. Register.\n",
-      "utf8",
-    );
-    // `start` asks the declaration's own question first -- whether work has
-    // begun in the tree -- so the fixture is a git repository with its plan
-    // committed, the state a repository is in when a session starts.
-    for (const args of [
-      ["init", "-q"],
-      ["add", "-A"],
-      ["-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "plan"],
-    ]) {
-      const git = spawnSync("git", args, { cwd: root, encoding: "utf8" });
-      assert.strictEqual(git.status, 0, `git ${args.join(" ")}: ${git.stdout}${git.stderr}`);
+suite("workExplorer: repository actions", () => {
+  test("open-file actions apply whatever state the work is in", () => {
+    for (const repository of [finished, inFlight]) {
+      const ids = applicableRepositoryActions(repository).map((a) => a.id);
+      assert.ok(ids.includes("dabblerSessionSets.openSpec"));
+      assert.ok(ids.includes("dabblerSessionSets.openSessionState"));
     }
+  });
 
-    // `start` refuses an engine whose CLI is not on PATH, and the suite may
-    // not read this machine's PATH -- so it builds the one it needs. Both
-    // spellings, so the lookup finds one on either platform; nothing runs.
-    const bin = makeTempDir("dabbler-parity-bin-");
-    fs.writeFileSync(path.join(bin, "claude"), "#!/bin/sh\n", "utf8");
-    fs.writeFileSync(path.join(bin, "claude.cmd"), "@echo off\n", "utf8");
-    // `start` also refreshes the catalog when this machine has a seat login or
-    // a provider key, and then asks it for a Primary Reviewer outside the
-    // author's provider. The suite may read neither, so the home is empty, no
-    // key is set, nothing is due, and the reviewer is the one model the
-    // catalog is seeded with -- a seat block read for no login, which is what
-    // an empty home believes.
-    const home = makeTempDir("dabbler-parity-home-");
-    const catalogPath = process.env.DABBLER_CATALOG_PATH as string;
-    const savedCatalog = fs.existsSync(catalogPath) ? fs.readFileSync(catalogPath, "utf8") : null;
-    const now = new Date().toISOString();
-    fs.writeFileSync(
-      catalogPath,
-      JSON.stringify({
-        schema_version: 1,
-        written_by: "workExplorerTreeModel.test.ts",
-        written_at: now,
-        transports: {
-          "copilot-cli": {
-            refreshed_at: now,
-            source: "acp-session-new",
-            scope: {},
-            models: [
-              {
-                id: "gpt-5.4",
-                provider: "openai",
-                provider_source: "openai",
-                display_name: "GPT-5.4",
-                enabled: true,
-                price_category: null,
-                cost: null,
-                listed_at: now,
-              },
-            ],
-            retired: [],
-          },
-        },
-      }),
-      "utf8",
-    );
-    const saved = new Map<string, string | undefined>();
-    const set = (name: string, value: string | undefined): void => {
-      if (!saved.has(name)) saved.set(name, process.env[name]);
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-    };
-    set("PATH", [bin, process.env.PATH ?? ""].join(path.delimiter));
-    set("PATHEXT", ".COM;.EXE;.BAT;.CMD");
-    set("HOME", home);
-    set("USERPROFILE", home);
-    for (const name of Object.keys(process.env).filter((key) => /^DABBLER_.*_API_KEY$/.test(key))) {
-      set(name, undefined);
-    }
-    const router = createInProcessRouter();
-    let started;
-    try {
-      started = await router.session.start({
-        engine: "claude-code",
-        provider: "anthropic",
-        repoRoot: root,
-        sessionsDir,
-      });
-    } finally {
-      for (const [name, value] of saved) {
-        if (value === undefined) delete process.env[name];
-        else process.env[name] = value;
-      }
-      if (savedCatalog === null) fs.rmSync(catalogPath, { force: true });
-      else fs.writeFileSync(catalogPath, savedCatalog, "utf8");
-    }
-    assert.ok(started.ok, JSON.stringify(started));
+  test("start offers while work remains; close only while one is in flight", () => {
+    const running = applicableRepositoryActions(inFlight).map((a) => a.id);
+    assert.ok(running.includes("dabblerSessionSets.startSession"));
+    assert.ok(running.includes("dabblerSessionSets.closeSession"));
+    const done = applicableRepositoryActions(finished).map((a) => a.id);
+    assert.ok(!done.includes("dabblerSessionSets.startSession"));
+    assert.ok(!done.includes("dabblerSessionSets.closeSession"));
+  });
 
-    const driver = path.join(root, ".dabbler", "runs", "s1", "driver");
-    fs.mkdirSync(driver, { recursive: true });
-    const steps = ["widget", "polish", "ship"];
-    fs.writeFileSync(
-      path.join(driver, "plan.json"),
-      JSON.stringify({
-        schema_version: 1,
-        session_number: 1,
-        task: "Do it.",
-        non_goals: ["Anything the step does not name."],
-        recorded_at: "2026-09-09T11:00:00-04:00",
-        steps: steps.map((id) => ({
-          id,
-          ask: `Do the ${id}. Then check it.`,
-          files: ["src/w.ts"],
-          checks: [{ argv: ["true"] }],
-        })),
-      }),
-      "utf8",
-    );
+  test("a repository with only planned sessions can still be started", () => {
+    // The affordances are gated on session status, never on a ledger
+    // existing. Project setup is unreachable otherwise: the two setup
+    // sessions are exactly the ones that run before anything is written.
+    const scaffolded = makeRepository({
+      sessionsSource: "plan",
+      sessions: [makeSession({ number: 1, status: "not-started" })],
+    });
+    const ids = applicableRepositoryActions(scaffolded).map((a) => a.id);
+    assert.ok(ids.includes("dabblerSessionSets.startSession"));
+    assert.ok(!ids.includes("dabblerSessionSets.closeSession"));
+  });
 
-    const written: string[] = [];
-    const terminal = new DabblerTerminal({ repoRoot: root, pollMs: 60_000 });
-    terminal.onDidWrite((text: string) => written.push(text));
-    terminal.open({ columns: 100, rows: 20 });
-
-    // Two moments of one run: the second step outstanding, then the third.
-    for (const [seq, accepted] of [
-      [5, ["widget"]],
-      [6, ["widget", "polish"]],
-    ] as ReadonlyArray<readonly [number, readonly string[]]>) {
-      const outstanding = steps[accepted.length];
-      fs.writeFileSync(
-        path.join(driver, "instruction.json"),
-        JSON.stringify({
-          schema_version: 1,
-          seq,
-          session_number: 1,
-          issued_at: "2026-09-09T11:30:00-04:00",
-          kind: "step",
-          step_id: outstanding,
-          ask: `Do the ${outstanding}. Then check it.`,
-        }),
-        "utf8",
-      );
-      fs.writeFileSync(
-        path.join(driver, "run.json"),
-        JSON.stringify({
-          schema_version: 1,
-          session_number: 1,
-          engine: "cli",
-          phase: "work",
-          seq,
-          invocations: 1,
-          max_invocations: 24,
-          accepted_steps: [...accepted],
-          baseline_tree: null,
-          stop: null,
-          started_at: "2026-09-09T11:00:00-04:00",
-          updated_at: "2026-09-09T11:30:00-04:00",
-        }),
-        "utf8",
-      );
-
-      terminal.poll();
-      const fromTerminal = announced(written);
-      const fromExplorer = await shown(router, root, sessionsDir);
-      assert.strictEqual(fromTerminal, fromExplorer, `seq ${seq}: ${plain(written.join(""))}`);
-      assert.strictEqual(fromTerminal, outstanding, `seq ${seq}`);
-    }
-
-    terminal.dispose();
-    rmrf(root);
+  test("actions come back sorted by group", () => {
+    const groups = applicableRepositoryActions(inFlight).map((a) => a.group);
+    assert.deepStrictEqual(groups, [...groups].sort((a, b) => a - b));
   });
 });
+
+suite("workExplorer: session actions", () => {
+  test("a session stopped at the cap can be cancelled, and nothing approves", () => {
+    const stopped = makeSession({ number: 1, status: "in-progress", verification: makeVerification() });
+    const ids = applicableSessionActions(makeRepository({ sessions: [stopped] }), stopped).map((a) => a.id);
+    assert.ok(ids.includes("dabblerSessionSets.cancel"));
+    // There is no approval anywhere in this framework, so there is no
+    // action that could accept work over a standing finding -- and nothing
+    // that hands a person a prompt to paste, because the framework sends.
+    for (const action of [...REPOSITORY_ACTIONS, ...SESSION_ACTIONS]) {
+      assert.doesNotMatch(`${action.id} ${action.label}`, /approv|waive|accept|copy|prompt/i);
+    }
+  });
+
+  test("Start Session is offered on the row that would actually be registered", () => {
+    // csv-model feedback item 9: right-clicking the next session in Not
+    // Started and choosing Start Session. The repository row already
+    // offered it; the session rows offered nothing but Cancel, so the
+    // operator's own reading of "what runs next" was the one place they
+    // could not act.
+    const sessions = [
+      makeSession({ number: 1, status: "complete" }),
+      makeSession({ number: 2, status: "not-started" }),
+      makeSession({ number: 3, status: "not-started" }),
+    ];
+    const idle = makeRepository({ currentSession: null, nextSession: 2, sessions });
+    const offered = (
+      repository: ReturnType<typeof makeRepository>,
+      session: ReturnType<typeof makeSession>,
+    ) => applicableSessionActions(repository, session).map((a) => a.id);
+
+    assert.ok(offered(idle, sessions[1]).includes("dabblerSessionSets.startSession"));
+    // Not on any other row. `session start` takes no session number -- it
+    // registers the next one -- so an entry on session 3 would start
+    // session 2, which is a menu item that lies about what it does.
+    assert.ok(!offered(idle, sessions[2]).includes("dabblerSessionSets.startSession"));
+    assert.ok(!offered(idle, sessions[0]).includes("dabblerSessionSets.startSession"));
+
+    // And never while one is in flight, whatever the row says.
+    const running = makeRepository({ currentSession: 2, nextSession: 2, sessions });
+    assert.ok(!offered(running, sessions[1]).includes("dabblerSessionSets.startSession"));
+
+    // A repository whose projection could not say what is next offers it
+    // nowhere, rather than guessing a session to register.
+    const unknown = makeRepository({ currentSession: null, nextSession: null, sessions });
+    for (const session of sessions) {
+      assert.ok(!offered(unknown, session).includes("dabblerSessionSets.startSession"));
+    }
+  });
+
+  test("Stop Session is offered on the session in flight and on no other row", () => {
+    // The person asking for the machine back. It is `session interrupt
+    // --stop`, which names the session the record says is in flight -- so
+    // an entry on any other row would stop a session the operator did not
+    // click on.
+    const sessions = [
+      makeSession({ number: 1, status: "complete" }),
+      makeSession({ number: 2, status: "in-progress" }),
+      makeSession({ number: 3, status: "not-started" }),
+    ];
+    const running = makeRepository({ currentSession: 2, nextSession: 3, sessions });
+    const offered = (session: ReturnType<typeof makeSession>) =>
+      applicableSessionActions(running, session).map((a) => a.id);
+    assert.ok(offered(sessions[1]).includes("dabblerSessionSets.stopSession"));
+    assert.ok(!offered(sessions[0]).includes("dabblerSessionSets.stopSession"));
+    assert.ok(!offered(sessions[2]).includes("dabblerSessionSets.stopSession"));
+    // And nowhere at all once nothing is in flight.
+    const idle = makeRepository({ currentSession: null, nextSession: 3, sessions });
+    assert.ok(!applicableSessionActions(idle, sessions[1]).map((a) => a.id).includes("dabblerSessionSets.stopSession"));
+  });
+
+  test("Continue Session is offered only on a session waiting for funds", () => {
+    const waiting = (forWhat: string) =>
+      makeSession({
+        number: 2,
+        status: "in-progress",
+        waiting: { owner: "person", for: forWhat, since: "", by: null, lastProgress: "", says: "" },
+      });
+    const offered = (session: ReturnType<typeof makeSession>) =>
+      applicableSessionActions(makeRepository({ currentSession: 2, sessions: [session] }), session).map((a) => a.id);
+    assert.ok(offered(waiting("waiting for funds: anthropic.")).includes("dabblerSessionSets.continueSession"));
+    assert.ok(!offered(waiting("The tests failed.")).includes("dabblerSessionSets.continueSession"));
+  });
+
+  test("Open a Mechanic is offered on the session in flight, and on no other row", () => {
+    const sessions = [
+      makeSession({ number: 1, status: "complete" }),
+      makeSession({ number: 2, status: "in-progress" }),
+    ];
+    const running = makeRepository({ currentSession: 2, sessions });
+    const offered = (session: ReturnType<typeof makeSession>) =>
+      applicableSessionActions(running, session).map((a) => a.id);
+    assert.ok(offered(sessions[1]).includes("dabbler.openMechanic"));
+    assert.ok(!offered(sessions[0]).includes("dabbler.openMechanic"));
+  });
+
+  test("Check this stop, Review exception and Report this stop are offered on the session in flight while a stop stands, and nowhere else", () => {
+    const stopped = makeSession({ number: 2, status: "in-progress", stopActor: "operator" });
+    const working = makeSession({ number: 2, status: "in-progress" });
+    const done = makeSession({ number: 1, status: "complete", stopActor: "operator" });
+    const offered = (session: ReturnType<typeof makeSession>) =>
+      applicableSessionActions(makeRepository({ currentSession: 2, sessions: [done, session] }), session).map((a) => a.id);
+    for (const id of ["dabbler.checkStop", "dabbler.reviewException", "dabbler.reportStop"]) {
+      assert.ok(offered(stopped).includes(id), id);
+      assert.ok(!offered(working).includes(id), id);
+      assert.ok(!offered(done).includes(id), id);
+    }
+  });
+
+  test("Open Transcript at its Exceptions is offered on a closed session that went past a stop, and on no other row", () => {
+    const waiver = { kind: "tests", stepId: null, unmet: "the suite failed", by: "the operator", reason: "flaky", at: "" };
+    const waived = makeSession({ number: 1, status: "complete", exceptions: [waiver] });
+    const clean = makeSession({ number: 2, status: "complete" });
+    const inFlight = makeSession({ number: 3, status: "in-progress", exceptions: [waiver] });
+    const repository = makeRepository({ currentSession: 3, sessions: [waived, clean, inFlight] });
+    const offered = (session: ReturnType<typeof makeSession>) => applicableSessionActions(repository, session).map((a) => a.id);
+    assert.ok(offered(waived).includes("dabbler.openTranscript"));
+    assert.ok(!offered(clean).includes("dabbler.openTranscript"));
+    assert.ok(!offered(inFlight).includes("dabbler.openTranscript"));
+  });
+
+  test("Rollback to Start of This Session is offered on a session in flight or completed, and on no other row", () => {
+    // The router rolls back to the start of a session that ran -- in flight
+    // or completed -- and refuses a cancelled one (restore's) and one that
+    // has not started; the item follows the router row for row.
+    const sessions = [
+      makeSession({ number: 1, status: "complete" }),
+      makeSession({ number: 2, status: "in-progress" }),
+      makeSession({ number: 3, status: "not-started" }),
+      makeSession({ number: 4, status: "cancelled" }),
+    ];
+    const running = makeRepository({ currentSession: 2, nextSession: 3, sessions });
+    const offered = (session: ReturnType<typeof makeSession>) =>
+      applicableSessionActions(running, session).map((a) => a.id);
+    assert.ok(offered(sessions[0]).includes("dabblerSessionSets.rollback"));
+    assert.ok(offered(sessions[1]).includes("dabblerSessionSets.rollback"));
+    assert.ok(!offered(sessions[2]).includes("dabblerSessionSets.rollback"));
+    assert.ok(!offered(sessions[3]).includes("dabblerSessionSets.rollback"));
+  });
+
+  test("cancel and restore are mutually exclusive on one row", () => {
+    const cancelled = makeSession({ number: 1, status: "cancelled" });
+    const ids = applicableSessionActions(
+      makeRepository({ sessions: [cancelled] }),
+      cancelled,
+    ).map((a) => a.id);
+    assert.ok(ids.includes("dabblerSessionSets.restore"));
+    assert.ok(!ids.includes("dabblerSessionSets.cancel"));
+  });
+
+  test("a session in flight offers Stop and Cancel and no Resume, whoever its stop is for", () => {
+    // Nothing waits for the AI, so there is no loop for a button to start
+    // again: carrying on is said to the AI, in its chat.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "no-resume-"));
+    const offered = (stopActor?: "engine" | "operator" | "either") =>
+      applicableSessionActions(
+        makeRepository({
+          root,
+          currentSession: 2,
+          sessions: [makeSession({ number: 2, status: "in-progress", ...(stopActor ? { stopActor } : {}) })],
+        }),
+        makeSession({ number: 2, status: "in-progress", ...(stopActor ? { stopActor } : {}) }),
+      ).map((a) => a.id);
+
+    for (const actor of ["engine", "operator", "either", undefined] as const) {
+      assert.ok(!offered(actor).some((id) => /resume/i.test(id)), String(actor));
+      assert.ok(offered(actor).includes("dabblerSessionSets.stopSession"), String(actor));
+    }
+    // And nothing else moves: cancelling a session is the person's verb
+    // whatever the loop is doing.
+    assert.ok(offered("engine").includes("dabblerSessionSets.cancel"));
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+suite("workExplorer: the operator's status icons", () => {
+  test("the four authored filenames resolve by status, unchanged", () => {
+    assert.deepStrictEqual(ICON_FILES, {
+      complete: "done.svg",
+      "in-progress": "in-progress.svg",
+      "not-started": "not-started.svg",
+      cancelled: "cancelled.svg",
+    });
+  });
+
+});
+
+suite("workExplorer: session naming", () => {
+  test("the written number is the projection's, never re-derived here", () => {
+    // Python owns the padding rule. A payload that carries no name
+    // degrades to the plain number rather than growing a second copy of
+    // the rule that could disagree with the first.
+    assert.strictEqual(
+      sessionDisplayNumber(makeSession({ number: 15, displayNumber: "015" })),
+      "015",
+    );
+    assert.strictEqual(
+      sessionDisplayNumber(makeSession({ number: 15, displayNumber: "" })),
+      "15",
+    );
+  });
+
+  test("the row label is the written number then the session's own title", () => {
+    assert.strictEqual(
+      sessionRowLabel(makeSession({ number: 15, title: "The sessions view" })),
+      "015 · The sessions view",
+    );
+  });
+
+  test("sessions come back in ledger order whatever order they arrive in", () => {
+    const ordered = sessionsInOrder([
+      makeSession({ number: 3 }),
+      makeSession({ number: 1 }),
+      makeSession({ number: 2 }),
+    ]);
+    assert.deepStrictEqual(ordered.map((s) => s.number), [1, 2, 3]);
+  });
+});
+
+suite("workExplorer: progress text", () => {
+  test("the fraction is always X/total, with the in-flight session named", () => {
+    assert.strictEqual(
+      progressText(
+        makeRepository({
+          totalSessions: 20,
+          sessionsCompleted: 14,
+          currentSession: 15,
+          sessions: [makeSession({ number: 15, status: "in-progress" })],
+        }),
+      ),
+      "14/20 · session 015 in flight",
+    );
+    assert.strictEqual(
+      progressText(makeRepository({ totalSessions: 20, sessionsCompleted: 20 })),
+      "20/20",
+    );
+  });
+
+  test("an unknown total still reports what completed", () => {
+    assert.strictEqual(
+      progressText(makeRepository({ totalSessions: null, sessionsCompleted: 3 })),
+      "3 complete",
+    );
+    assert.strictEqual(progressText(makeRepository()), "");
+  });
+
+  test("a repository whose sessions came from its plan says nothing has run", () => {
+    // "0/2" would be true of a repository mid-sequence too. What the
+    // operator needs from a freshly bootstrapped one is that the router
+    // has never written here at all.
+    const text = progressText(
+      makeRepository({
+        sessionsSource: "plan",
+        totalSessions: 2,
+        sessions: [
+          makeSession({ number: 1, status: "not-started" }),
+          makeSession({ number: 2, status: "not-started" }),
+        ],
+      }),
+    );
+    assert.strictEqual(text, "2 planned · nothing has run here yet");
+  });
+});
+
+suite("workExplorer: verdict cleanliness", () => {
+  test("an unrecognized verdict is unclean; a missing one is not a verdict", () => {
+    assert.ok(verdictIsUnclean("manual-override-development"));
+    assert.ok(!verdictIsUnclean(null));
+    assert.ok(!verdictIsUnclean(""));
+  });
+
+  test("remediated-at-the-cap never reads as a pass", () => {
+    // The work landed; no verifier reviewed the repair. A row that read
+    // as clean would hide exactly that.
+    assert.ok(verdictIsUnclean("REMEDIATED_AT_CAP"));
+    assert.ok(verdictIsUnclean("ISSUES_FOUND"));
+    assert.ok(!verdictIsUnclean("VERIFIED"));
+  });
+});
+
+suite("workExplorer: an action is the verb a person would type", () => {
+  const atCap = makeSession({
+    number: 7,
+    title: "Stuck",
+    status: "in-progress",
+    iconKey: "in-progress",
+    inFlight: true,
+    verification: makeVerification({ terminal: "ISSUES_FOUND" }),
+  });
+  const repository = makeRepository({ currentSession: 7, sessions: [atCap] });
+  const cancelOf = (session: SessionRecord) =>
+    offeredSessionActions(makeRepository({ currentSession: session.number, sessions: [session] }), session).find(
+      (action) => action.id === "dabblerSessionSets.cancel",
+    );
+
+  test("Cancel carries --force exactly when the session cannot close", () => {
+    const forced = cancelOf(atCap);
+    assert.deepStrictEqual(forced?.argv, [
+      "dabbler", "session", "cancel", "--sessions-dir", repository.sessionsDir, "--session-number", "7", "--force",
+    ]);
+    const live = cancelOf(makeSession({ number: 7, status: "in-progress", inFlight: true }));
+    assert.ok(live?.argv !== null && live?.argv !== undefined && !live.argv.includes("--force"));
+    const closed = cancelOf(makeSession({ number: 7, status: "complete", verification: makeVerification({ terminal: "ISSUES_FOUND" }) }));
+    assert.ok(closed?.argv !== null && closed?.argv !== undefined && !closed.argv.includes("--force"));
+  });
+
+  test("every offered action runs a command or opens a file, never neither and never both", () => {
+    const stopped = makeSession({
+      ...atCap,
+      stopActor: "operator",
+      waiting: {
+        owner: "person",
+        for: "waiting for funds: openai. Pay the account, then carry on.",
+        since: "2026-11-17T10:00:00-05:00",
+        by: null,
+        lastProgress: "2026-11-17T10:00:00-05:00",
+        says: "waiting for funds",
+      },
+    });
+    const past = makeSession({ number: 3, status: "complete", exceptions: [{ at: "close" }] as SessionRecord["exceptions"] });
+    const cancelled = makeSession({ number: 4, status: "cancelled" });
+    const planned = makeSession({ number: 8, status: "not-started" });
+    const live = makeRepository({ currentSession: 7, sessions: [past, cancelled, stopped] });
+    const idle = makeRepository({ currentSession: null, nextSession: 8, sessions: [past, planned] });
+    const offered = [
+      ...offeredRepositoryActions(live),
+      ...offeredRepositoryActions(idle),
+      ...live.sessions.flatMap((session) => offeredSessionActions(live, session)),
+      ...idle.sessions.flatMap((session) => offeredSessionActions(idle, session)),
+    ];
+    const ids = new Set(offered.map((action) => action.id));
+    // Every action either list declares is reached by these rows.
+    for (const action of [...REPOSITORY_ACTIONS, ...SESSION_ACTIONS]) assert.ok(ids.has(action.id), action.id);
+    for (const action of offered) {
+      assert.ok((action.argv === null) !== (action.opens === null), action.id);
+      if (action.argv !== null) assert.strictEqual(action.argv[0], "dabbler", action.id);
+      if (action.preview !== null) assert.strictEqual(action.preview[0], "dabbler", action.id);
+    }
+    const transcript = offered.find((action) => action.id === "dabbler.openTranscript");
+    assert.deepStrictEqual(transcript?.opens, {
+      file: path.join(live.root, "docs", "transcripts", "session-003.html"),
+      line: null,
+      fragment: "exceptions",
+    });
+  });
+
+  test("a confirmation's words are the ones the extension shows", () => {
+    const forced = cancelOf(atCap);
+    assert.deepStrictEqual(forced?.confirm, {
+      title: 'Cancel session 7 "007 · Stuck"?',
+      detail:
+        "This session is unresolved at the cap and cannot close, so it is cancelled in flight. Nothing it built " +
+        "lands; its record stays. The reason is recorded on the session, which can be restored later.",
+      accept: "Cancel Session",
+      keep: "Keep",
+    });
+    assert.deepStrictEqual(forced?.reason, {
+      prompt: 'Reason for cancelling "007 · Stuck" (optional)',
+      placeholder: "e.g. scope rolled into another session",
+      blank: "",
+      dismissed: "blank",
+    });
+    const stop = offeredSessionActions(repository, atCap).find((action) => action.id === "dabblerSessionSets.stopSession");
+    assert.strictEqual(stop?.reason?.prompt, "Why stop session 007? The reason is recorded on the stop.");
+    assert.strictEqual(stop?.reason?.dismissed, "abort");
+    assert.strictEqual(stop?.confirm, null);
+  });
+});
+
+suite("workExplorer: dabbler view work-explorer", () => {
+  async function printed(argv: string[]): Promise<{ code: number; out: string }> {
+    const out: string[] = [];
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: unknown) => {
+      out.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      return { code: await viewVerb(argv), out: out.join("") };
+    } finally {
+      process.stdout.write = write;
+    }
+  }
+
+  test("the JSON it prints for a fixture repository validates and offers the model's actions", async () => {
+    // A repository set up and never run: its two sessions are its plan's,
+    // and the first is the one `session start` would register.
+    const root = makeTempDir("dabbler-view-");
+    const empty = makeTempDir("dabbler-view-empty-");
+    try {
+      const sessionsDir = path.join(root, "docs", "sessions");
+      fs.mkdirSync(sessionsDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(sessionsDir, "session-plan.md"),
+        "# Plan\n\n### Session 1 of 2: Set up\n\nDo it.\n\n### Session 2 of 2: Build\n\nThen this.\n",
+        "utf8",
+      );
+      const { code, out } = await printed(["work-explorer", "--repo-root", root, "--repo-root", empty]);
+      assert.strictEqual(code, 0);
+      const tree = JSON.parse(out) as WorkExplorer;
+      assert.strictEqual(schemaFailure(tree, loadSchemaFile("work-explorer.schema.json"), "the tree"), null);
+
+      // A folder with no sessions root shows nothing.
+      assert.deepStrictEqual(tree.repositories.map((row) => row.label), [path.basename(root)]);
+      const repository = tree.repositories[0];
+      assert.ok(repository.actions.some((action) => action.id === "dabblerSessionSets.startSession"));
+      const sessions = repository.children.flatMap((bucket) => bucket.children).filter((row) => row.kind === "session");
+      assert.strictEqual(sessions.length, 2);
+      const [first, second] = sessions;
+      // Start Session is offered on the row that would be registered, and only there.
+      const start = first.actions.find((action) => action.id === "dabblerSessionSets.startSession");
+      assert.deepStrictEqual(start?.argv, ["dabbler", "session", "start", "--sessions-dir", sessionsDir]);
+      assert.ok(!second.actions.some((action) => action.id === "dabblerSessionSets.startSession"));
+      // Each row offers what the model offers, its tokens minted from the same list.
+      for (const row of sessions) {
+        for (const action of row.actions) assert.ok(hasToken(row.contextValue, actionToken(action)), action.id);
+      }
+      // A click opens the plan at the session's own heading.
+      assert.deepStrictEqual(first.click?.opens, { file: path.join(sessionsDir, "session-plan.md"), line: 3, fragment: null });
+      assert.deepStrictEqual(second.click?.opens?.line, 7);
+    } finally {
+      rmrf(root);
+      rmrf(empty);
+    }
+  });
+});
+
+suite("workExplorer: the repository a tree is built from", () => {
+  test("reads the memo the router says it leaves, and nothing where there is none", () => {
+    const root = makeTempDir("dabbler-memo-");
+    try {
+      assert.strictEqual(readMechanicMemo(root, 4), null);
+      fs.mkdirSync(path.join(root, ".dabbler", "scratch"), { recursive: true });
+      fs.writeFileSync(path.join(root, ".dabbler", "scratch", "mechanic-memo-s4.md"), "  The cause, and what to decide.\n", "utf8");
+      assert.strictEqual(readMechanicMemo(root, 4), "The cause, and what to decide.");
+    } finally {
+      rmrf(root);
+    }
+  });
+
+  test("a repository carries the reading's sessions and its own paths", () => {
+    const root = makeTempDir("dabbler-assembly-");
+    try {
+      const reading = makeProjection({
+        repository: { totalSessions: 2, sessionsCompleted: 1, currentSession: 2 },
+      });
+      const repository: SessionsRepository = workExplorerRepository(root, reading);
+      assert.strictEqual(repository.currentSession, 2);
+      assert.strictEqual(repository.sessions.length, 2);
+      assert.strictEqual(repository.label, path.basename(root));
+      assert.ok(repository.planPath.endsWith("session-plan.md"));
+      assert.strictEqual(repository.sessionsDir, path.join(root, "docs", "sessions"));
+    } finally {
+      rmrf(root);
+    }
+  });
+
+  test("a failed reading shows no sessions and claims the ledger, never a fresh plan", () => {
+    const root = makeTempDir("dabbler-assembly-");
+    try {
+      const repository = workExplorerRepository(root, null);
+      assert.deepStrictEqual(repository.sessions, []);
+      assert.strictEqual(repository.totalSessions, null);
+      assert.strictEqual(repository.sessionsSource, "ledger");
+    } finally {
+      rmrf(root);
+    }
+  });
+});
+

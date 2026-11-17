@@ -31,6 +31,7 @@ import { transcriptVerb } from "./transcript.ts";
 import { triageVerb } from "./triage.ts";
 import { verifyVerb } from "./verify.ts";
 import { versionVerb } from "./version.ts";
+import { viewVerb } from "./view.ts";
 
 /** argv after the verb; the process's exit code comes back. */
 export type VerbHandler = (argv: string[]) => Promise<number>;
@@ -62,4 +63,5 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   triage: triageVerb,
   verify: verifyVerb,
   version: versionVerb,
+  view: viewVerb,
 };

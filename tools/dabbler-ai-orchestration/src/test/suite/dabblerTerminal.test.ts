@@ -7,10 +7,11 @@
 // where the setting says and comes into view when a session starts.
 
 import * as assert from "assert";
+import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { TerminalLines, paint, type Tone } from "dabbler-ai-router";
+import { TerminalLines, WORK_STEP_PREFIX, createInProcessRouter, paint, type Router, type Tone } from "dabbler-ai-router";
 
 import {
   DabblerTerminal,
@@ -373,5 +374,214 @@ suite("the watcher's threshold", () => {
     assert.strictEqual(watcherThreshold(root), 90);
     stub.__clearConfig();
     rmrf(root);
+  });
+});
+
+suite("DabblerTerminal: the two surfaces over one record", () => {
+  const ESC = "\u001b";
+
+  /** The bytes a pty received, with the SGR sequences taken back out. */
+  function plain(text: string): string {
+    return text
+      .split(ESC)
+      .map((piece, index) => (index === 0 ? piece : piece.slice(piece.indexOf("m") + 1)))
+      .join("");
+  }
+
+  /** The step the terminal last announced, from what it actually wrote. */
+  function announced(written: readonly string[]): string | null {
+    const said = [...plain(written.join("")).matchAll(/step id=(\S+)/g)];
+    return said.length === 0 ? null : (said[said.length - 1]?.[1] ?? null);
+  }
+
+  /** The step the Work Explorer shows as the open child of its Work row. */
+  async function shown(router: Router, root: string, sessionsDir: string): Promise<string | null> {
+    const projection = await router.progress({ repoRoot: root, sessionsDir });
+    assert.ok(projection.ok, JSON.stringify(projection));
+    const session = projection.value.sessions.find((row) => row.number === 1);
+    const open = (session?.tasks ?? []).find(
+      (row) => row.isOpen && (row.stepId ?? "").startsWith(WORK_STEP_PREFIX),
+    );
+    return open ? (open.stepId ?? "").slice(WORK_STEP_PREFIX.length) : null;
+  }
+
+  test("the terminal and the Work Explorer name the same step, from one instruction at one seq", async () => {
+    // The point is not that each surface renders something -- both did, and
+    // that is exactly why they were free to disagree. They are fed by one
+    // record, and when they disagree the operator cannot tell which is
+    // lying. So: one driver directory, and the same answer out of both, at
+    // two different seqs, so a fixed answer cannot pass twice.
+    const root = makeTempDir("dabbler-parity-");
+    const sessionsDir = path.join(root, "docs", "sessions");
+    fs.mkdirSync(sessionsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(sessionsDir, "session-plan.md"),
+      "### Session 1 of 1: Build the widget\n1. Register.\n",
+      "utf8",
+    );
+    // `start` asks the declaration's own question first -- whether work has
+    // begun in the tree -- so the fixture is a git repository with its plan
+    // committed, the state a repository is in when a session starts.
+    for (const args of [
+      ["init", "-q"],
+      ["add", "-A"],
+      ["-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "plan"],
+    ]) {
+      const git = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+      assert.strictEqual(git.status, 0, `git ${args.join(" ")}: ${git.stdout}${git.stderr}`);
+    }
+
+    // `start` refuses an engine whose CLI is not on PATH, and the suite may
+    // not read this machine's PATH -- so it builds the one it needs. Both
+    // spellings, so the lookup finds one on either platform; nothing runs.
+    const bin = makeTempDir("dabbler-parity-bin-");
+    fs.writeFileSync(path.join(bin, "claude"), "#!/bin/sh\n", "utf8");
+    fs.writeFileSync(path.join(bin, "claude.cmd"), "@echo off\n", "utf8");
+    // `start` also refreshes the catalog when this machine has a seat login or
+    // a provider key, and then asks it for a Primary Reviewer outside the
+    // author's provider. The suite may read neither, so the home is empty, no
+    // key is set, nothing is due, and the reviewer is the one model the
+    // catalog is seeded with -- a seat block read for no login, which is what
+    // an empty home believes.
+    const home = makeTempDir("dabbler-parity-home-");
+    const catalogPath = process.env.DABBLER_CATALOG_PATH as string;
+    const savedCatalog = fs.existsSync(catalogPath) ? fs.readFileSync(catalogPath, "utf8") : null;
+    const now = new Date().toISOString();
+    fs.writeFileSync(
+      catalogPath,
+      JSON.stringify({
+        schema_version: 1,
+        written_by: "workExplorerTreeModel.test.ts",
+        written_at: now,
+        transports: {
+          "copilot-cli": {
+            refreshed_at: now,
+            source: "acp-session-new",
+            scope: {},
+            models: [
+              {
+                id: "gpt-5.4",
+                provider: "openai",
+                provider_source: "openai",
+                display_name: "GPT-5.4",
+                enabled: true,
+                price_category: null,
+                cost: null,
+                listed_at: now,
+              },
+            ],
+            retired: [],
+          },
+        },
+      }),
+      "utf8",
+    );
+    const saved = new Map<string, string | undefined>();
+    const set = (name: string, value: string | undefined): void => {
+      if (!saved.has(name)) saved.set(name, process.env[name]);
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    };
+    set("PATH", [bin, process.env.PATH ?? ""].join(path.delimiter));
+    set("PATHEXT", ".COM;.EXE;.BAT;.CMD");
+    set("HOME", home);
+    set("USERPROFILE", home);
+    for (const name of Object.keys(process.env).filter((key) => /^DABBLER_.*_API_KEY$/.test(key))) {
+      set(name, undefined);
+    }
+    const router = createInProcessRouter();
+    let started;
+    try {
+      started = await router.session.start({
+        engine: "claude-code",
+        provider: "anthropic",
+        repoRoot: root,
+        sessionsDir,
+      });
+    } finally {
+      for (const [name, value] of saved) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+      if (savedCatalog === null) fs.rmSync(catalogPath, { force: true });
+      else fs.writeFileSync(catalogPath, savedCatalog, "utf8");
+    }
+    assert.ok(started.ok, JSON.stringify(started));
+
+    const driver = path.join(root, ".dabbler", "runs", "s1", "driver");
+    fs.mkdirSync(driver, { recursive: true });
+    const steps = ["widget", "polish", "ship"];
+    fs.writeFileSync(
+      path.join(driver, "plan.json"),
+      JSON.stringify({
+        schema_version: 1,
+        session_number: 1,
+        task: "Do it.",
+        non_goals: ["Anything the step does not name."],
+        recorded_at: "2026-09-09T11:00:00-04:00",
+        steps: steps.map((id) => ({
+          id,
+          ask: `Do the ${id}. Then check it.`,
+          files: ["src/w.ts"],
+          checks: [{ argv: ["true"] }],
+        })),
+      }),
+      "utf8",
+    );
+
+    const written: string[] = [];
+    const terminal = new DabblerTerminal({ repoRoot: root, pollMs: 60_000 });
+    terminal.onDidWrite((text: string) => written.push(text));
+    terminal.open({ columns: 100, rows: 20 });
+
+    // Two moments of one run: the second step outstanding, then the third.
+    for (const [seq, accepted] of [
+      [5, ["widget"]],
+      [6, ["widget", "polish"]],
+    ] as ReadonlyArray<readonly [number, readonly string[]]>) {
+      const outstanding = steps[accepted.length];
+      fs.writeFileSync(
+        path.join(driver, "instruction.json"),
+        JSON.stringify({
+          schema_version: 1,
+          seq,
+          session_number: 1,
+          issued_at: "2026-09-09T11:30:00-04:00",
+          kind: "step",
+          step_id: outstanding,
+          ask: `Do the ${outstanding}. Then check it.`,
+        }),
+        "utf8",
+      );
+      fs.writeFileSync(
+        path.join(driver, "run.json"),
+        JSON.stringify({
+          schema_version: 1,
+          session_number: 1,
+          engine: "cli",
+          phase: "work",
+          seq,
+          invocations: 1,
+          max_invocations: 24,
+          accepted_steps: [...accepted],
+          baseline_tree: null,
+          stop: null,
+          started_at: "2026-09-09T11:00:00-04:00",
+          updated_at: "2026-09-09T11:30:00-04:00",
+        }),
+        "utf8",
+      );
+
+      terminal.poll();
+      const fromTerminal = announced(written);
+      const fromExplorer = await shown(router, root, sessionsDir);
+      assert.strictEqual(fromTerminal, fromExplorer, `seq ${seq}: ${plain(written.join(""))}`);
+      assert.strictEqual(fromTerminal, outstanding, `seq ${seq}`);
+    }
+
+    terminal.dispose();
+    rmrf(root);
+    rmrf(bin);
+    rmrf(home);
   });
 });

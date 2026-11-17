@@ -1,11 +1,20 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import type { Router } from "dabbler-ai-router";
-import { RouterUnavailableError } from "dabbler-ai-router";
+import type { RollbackFacts, Router } from "dabbler-ai-router";
+import {
+  ROLLBACK_REASON,
+  RouterUnavailableError,
+  cancelConfirmation,
+  cancelReason,
+  hasStandingStop,
+  restoreConfirmation,
+  restoreReason,
+  rollbackConfirmation,
+  rollbackDetail,
+  sessionCannotClose,
+  sessionRowLabel,
+} from "dabbler-ai-router";
 import { RouterRefusal, productionRouter } from "../router/host";
-import { sessionRowLabel } from "../providers/sessionsModel";
-import { sessionCannotClose } from "../providers/rowMenuHelpers";
-import { hasStandingStop } from "../providers/ActionRegistry";
 import { asSessionNode } from "./workExplorerTreeCommands";
 import { openReport, type ReportStopActions } from "./sessionCommands";
 
@@ -110,28 +119,16 @@ export async function runCancelSessionFlow(
   // Two-step prompt: a confirmation dialog with explicit "Cancel Session"
   // / "Keep" buttons so the (destructive-ish) action requires an
   // affirmative click. Dismissing the dialog returns undefined and aborts.
-  // The button label is the full phrase rather than "Cancel" — VS Code's
-  // Esc/cancel semantics already mean "abort a modal", so a button labeled
-  // "Cancel" reads as "abort this dialog" rather than "perform the action".
-  const choice = await ui.confirm(
-    `Cancel session ${session.number} "${session.name}"?`,
-    session.force
-      ? "This session is unresolved at the cap and cannot close, so it is " +
-          "cancelled in flight. Nothing it built lands; its record stays. " +
-          "The reason is recorded on the session, which can be restored later."
-      : "The reason is recorded on the session, which can be restored later.",
-    "Cancel Session",
-    "Keep",
-  );
-  if (choice !== "Cancel Session") return false;
+  // The words are the router's, the one copy every interface asks with.
+  const words = cancelConfirmation(session.number, session.name, session.force === true);
+  const choice = await ui.confirm(words.title, words.detail ?? "", words.accept, words.keep ?? "Keep");
+  if (choice !== words.accept) return false;
 
   // The reason prompt returns undefined when dismissed with Esc; an empty
   // reason is valid. Both are treated the same, which matches the CLI's
   // own contract.
-  const reason = await ui.promptReason(
-    `Reason for cancelling "${session.name}" (optional)`,
-    "e.g. scope rolled into another session",
-  );
+  const asked = cancelReason(session.name);
+  const reason = await ui.promptReason(asked.prompt, asked.placeholder);
 
   const result = await call(ui, () =>
     router.session.cancel({
@@ -178,18 +175,12 @@ export async function runRestoreSessionFlow(
   ui: CancelLifecycleUi = defaultUi(),
   router: Router = productionRouter(),
 ): Promise<boolean> {
-  const choice = await ui.confirm(
-    `Restore session ${session.number} "${session.name}"?`,
-    "This returns the session to the status it held before it was cancelled.",
-    "Restore",
-    "Keep Cancelled",
-  );
-  if (choice !== "Restore") return false;
+  const words = restoreConfirmation(session.number, session.name);
+  const choice = await ui.confirm(words.title, words.detail ?? "", words.accept, words.keep ?? "Keep Cancelled");
+  if (choice !== words.accept) return false;
 
-  const reason = await ui.promptReason(
-    `Reason for restoring "${session.name}" (optional)`,
-    "e.g. scope is back in plan",
-  );
+  const asked = restoreReason(session.name);
+  const reason = await ui.promptReason(asked.prompt, asked.placeholder);
 
   const result = await call(ui, () =>
     router.session.restore({
@@ -210,45 +201,11 @@ export async function runRestoreSessionFlow(
   return true;
 }
 
-/** What the router's dry run answers: the facts the dialog states. */
-interface RollbackFacts {
-  session: number;
-  through: number;
-  /** The HEAD the facts were read at; the confirm is bound to it. */
-  head: string;
-  commits: number;
-  authors: string[];
-  oldest: string | null;
-  uncommitted: number;
-}
+// The dialog's detail is the router's, from the dry run's facts; the suite
+// holds its words where it always has.
+export { rollbackDetail };
 
-const ROLLBACK_REASON = "Rollback to Start of This Session from the Work Explorer";
 const REPORT_FIRST = "Report, Then Roll Back";
-
-/**
- * The dialog's detail, from the facts and nothing else: the sessions
- * undone, the commits reverted and whose, the oldest, and that uncommitted
- * work is kept. No count of files: that is the plan's own line. A clause
- * that does not apply is left out rather than written as zero. Pure, so
- * the suite can hold the words.
- */
-export function rollbackDetail(facts: RollbackFacts): string {
-  const span =
-    facts.through === facts.session
-      ? `Session ${facts.session} is undone`
-      : `Sessions ${facts.session} to ${facts.through} are undone`;
-  const clauses: string[] = [];
-  if (facts.commits > 0) {
-    const who = facts.authors.length > 0 ? ` by ${facts.authors.join(" and ")}` : "";
-    const since = facts.oldest ? `, the oldest from ${facts.oldest.slice(0, 10)}` : "";
-    clauses.push(`${facts.commits} commit${facts.commits === 1 ? "" : "s"}${who}${since}, ${facts.commits === 1 ? "is" : "are"} reverted on the trunk`);
-  }
-  if (facts.uncommitted > 0) {
-    clauses.push("uncommitted work is kept on a safety branch");
-  }
-  clauses.push(`the session${facts.through === facts.session ? " returns" : "s return"} to not-started`);
-  return `${span}: ${clauses.join("; ")}. The session plan is kept.`;
-}
 
 /**
  * The third way to end a session, for an implementation that went wrong
@@ -293,18 +250,19 @@ export async function runRollbackSessionFlow(
     return false;
   }
 
-  const summary = `Roll back to the start of session ${session.number} "${session.name}"?`;
+  const words = rollbackConfirmation(session.number, session.name);
+  const keep = words.keep ?? "Keep";
   const choice = session.stopStands
     ? await ui.confirm(
-        summary,
+        words.title,
         `${rollbackDetail(facts)} ${REPORT_FIRST} writes a report of the stop first, for you to read and send to ` +
           "Dabbler's maintainers if you choose: one provider call, and nothing is sent.",
         REPORT_FIRST,
-        "Roll Back",
-        "Keep",
+        words.accept,
+        keep,
       )
-    : await ui.confirm(summary, rollbackDetail(facts), "Roll Back", "Keep");
-  if (choice !== "Roll Back" && choice !== REPORT_FIRST) return false;
+    : await ui.confirm(words.title, rollbackDetail(facts), words.accept, keep);
+  if (choice !== words.accept && choice !== REPORT_FIRST) return false;
 
   let report: { file: string; said: string } | null = null;
   if (choice === REPORT_FIRST) {

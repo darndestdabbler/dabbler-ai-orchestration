@@ -6833,9 +6833,9 @@
     {
       "number": 346,
       "title": "The router says how an engine is started, and answers with data",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-17T17:55:48.946000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-17T18:24:53.006000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
